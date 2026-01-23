@@ -5,24 +5,30 @@ This directory contains the Docker Compose configuration for the Attesta project
 ## Services
 
 ### MongoDB Community Edition
-- **Image**: `mongo:latest`
+- **Image**: `mongo:7.0`
 - **Port**: 27017
-- **Default Credentials**:
-  - Username: `admin`
-  - Password: `password`
-  - Database: `attesta`
+- **Credentials**: Configured via environment variables (see `.env.example`)
+  - Default username: `admin`
+  - Default password: `change-this-password`
+  - Default database: `attesta`
 
 ### Cerbos Policy Engine
-- **Image**: `ghcr.io/cerbos/cerbos:latest`
+- **Image**: `ghcr.io/cerbos/cerbos:0.39.0`
 - **HTTP Port**: 3592
 - **gRPC Port**: 3593
 - **Admin Credentials**:
   - Username: `cerbos`
-  - Password: `cerbosAdmin`
+  - Password: `cerbosAdmin` (configured in `cerbos/config/config.yaml`)
 
 ## Quick Start
 
-1. Start all services:
+1. Copy the example environment file and customize it:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set secure passwords
+   ```
+
+2. Start all services:
    ```bash
    docker compose up -d
    ```
@@ -71,7 +77,14 @@ Both services include health checks:
 
 ## Accessing Services
 
-- **MongoDB**: `mongodb://admin:password@localhost:27017/attesta`
+- **MongoDB**: `mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@localhost:27017/${MONGO_DATABASE}`
 - **Cerbos HTTP API**: `http://localhost:3592`
 - **Cerbos gRPC API**: `localhost:3593`
 - **Cerbos Admin API**: `http://localhost:3592/_cerbos/admin`
+
+## Security Notes
+
+- **Never commit `.env` files** to version control
+- Change default passwords in `.env` before deploying to production
+- Consider using Docker secrets or external secret management for production deployments
+- Cerbos admin password hash should be updated in `cerbos/config/config.yaml` or configured via environment variables

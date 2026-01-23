@@ -1,12 +1,12 @@
 services:
   mongodb:
-    image: mongo:latest
+    image: mongo:7.0
     container_name: attesta-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: attesta
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-attesta}
     ports:
       - "27017:27017"
     volumes:
@@ -21,7 +21,7 @@ services:
       retries: 5
 
   cerbos:
-    image: ghcr.io/cerbos/cerbos:latest
+    image: ghcr.io/cerbos/cerbos:0.39.0
     container_name: attesta-cerbos
     restart: unless-stopped
     command: ["server", "--config=/config/config.yaml"]
