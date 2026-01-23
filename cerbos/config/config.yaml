@@ -1,0 +1,18 @@
+---
+server:
+  httpListenAddr: ":3592"
+  grpcListenAddr: ":3593"
+  adminAPI:
+    enabled: true
+    adminCredentials:
+      username: cerbos
+      passwordHash: JDJ5JDEwJEdEOGVFaHJlS0EyRGhKT0lBdkNmTy5sL0h4QnZ0UXRPczVkdTFhckN5cXNYeVBqT1cvNGpp # bcrypt hash of 'cerbosAdmin'
+
+storage:
+  driver: "disk"
+  disk:
+    directory: /policies
+    watchForChanges: true
+
+schema:
+  enforcement: reject
