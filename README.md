@@ -1,8 +1,8 @@
 <div align="center">
 
-# {project_name}
+# ATTESTA <!-- omit in toc -->
 
-### {tagline}
+### {tagline} <!-- omit in toc -->
 
 </div>
 
@@ -17,11 +17,11 @@
 <br><br>
 
 
-## {project_name} Features
+## {project_name} Features <!-- omit in toc -->
 
 {screenshot}
 
-# [LIVE DEMO](https://https://interfacer-gui-staging.dyne.org/)
+# [LIVE DEMO](https://https://interfacer-gui-staging.dyne.org/) <!-- omit in toc -->
 
 <br>
 
@@ -31,12 +31,14 @@
 
 - [💾 Install](#-install)
 - [🎮 Quick start](#-quick-start)
-- [🚑 Community & support](#-community--support)
+- [🚑 Community \& support](#-community--support)
 - [🐋 Docker](#-docker)
 - [🐝 API](#-api)
+  - [POST /token](#post-token)
+  - [GET /token/${request.token}/${request.owner}](#get-tokenrequesttokenrequestowner)
 - [🔧 Configuration](#-configuration)
 - [📋 Testing](#-testing)
-- [🐛 Troubleshooting & debugging](#-troubleshooting--debugging)
+- [🐛 Troubleshooting \& debugging](#-troubleshooting--debugging)
 - [😍 Acknowledgements](#-acknowledgements)
 - [👤 Contributing](#-contributing)
 - [💼 License](#-license)
@@ -56,6 +58,7 @@
 To start using {project_name} run the following command in the root folder
 
 ```bash
+git submodule update --init
 docker compose up
 ```
 
