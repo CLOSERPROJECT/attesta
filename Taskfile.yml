@@ -1,0 +1,49 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Start services and show status.
+    cmds:
+      - task: start
+
+  env:
+    desc: Ensure .env exists (copied from .env.example if missing).
+    cmds:
+      - test -f .env || cp .env.example .env
+
+  start:
+    desc: Bring up the stack and show status.
+    deps: [env]
+    cmds:
+      - docker compose up -d
+      - docker compose ps
+
+  stop:
+    desc: Stop services and keep volumes.
+    cmds:
+      - docker compose down
+
+  reset:
+    desc: Stop services and remove volumes.
+    cmds:
+      - docker compose down -v
+
+  status:
+    desc: Show service status.
+    cmds:
+      - docker compose ps
+
+  logs:
+    desc: Tail logs for all services.
+    cmds:
+      - docker compose logs -f
+
+  mongo-ping:
+    desc: Ping MongoDB from the container.
+    cmds:
+      - docker exec attesta-mongodb mongosh --eval "db.adminCommand('ping')"
+
+  cerbos-health:
+    desc: Check Cerbos health endpoint.
+    cmds:
+      - curl http://localhost:3592/_cerbos/health
