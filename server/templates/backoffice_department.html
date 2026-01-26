@@ -1,0 +1,75 @@
+{{define "dept_dashboard_body"}}
+<div class="two-col" data-dept-role="{{.CurrentUser.Role}}">
+  <div id="dept-dashboard">
+    {{template "dept_dashboard_content" .}}
+  </div>
+</div>
+{{end}}
+
+{{define "dept_dashboard_content"}}
+<section class="panel">
+  <h1>{{.RoleLabel}} dashboard</h1>
+  <p class="muted">Signed in as <strong>{{.CurrentUser.UserID}}</strong>.</p>
+  <div class="panel-block">
+    <h2>Things to do</h2>
+    {{if .TodoActions}}
+      <ul class="process-list">
+        {{range .TodoActions}}
+          <li class="process-item">
+            <div class="process-head">
+              <a href="/backoffice/{{$.CurrentUser.Role}}/process/{{.ProcessID}}">{{.ProcessID}}</a>
+              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+            </div>
+            <p class="muted">{{.SubstepID}} - {{.Title}}</p>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted">No available actions for this department.</p>
+    {{end}}
+  </div>
+</section>
+<div class="stack">
+  <section class="panel">
+    <h2>Active processes</h2>
+    {{if .ActiveProcesses}}
+      <ul class="process-list">
+        {{range .ActiveProcesses}}
+          <li class="process-item">
+            <div class="process-head">
+              <a href="/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
+              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+            </div>
+            {{if .NextSubstep}}
+              <p class="muted">Next for you: {{.NextSubstep}} - {{.NextTitle}}</p>
+            {{end}}
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted">No active processes yet.</p>
+    {{end}}
+  </section>
+  <section class="panel">
+    <h2>Previous history</h2>
+    {{if .DoneProcesses}}
+      <ul class="process-list">
+        {{range .DoneProcesses}}
+          <li class="process-item">
+            <div class="process-head">
+              <a href="/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
+              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+            </div>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted">No completed processes yet.</p>
+    {{end}}
+  </section>
+</div>
+{{end}}
+
+{{define "backoffice_department.html"}}
+  {{template "layout.html" .}}
+{{end}}

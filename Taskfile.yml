@@ -6,17 +6,20 @@ tasks:
     cmds:
       - task: start
 
-  env:
-    desc: Ensure .env exists (copied from .env.example if missing).
-    cmds:
-      - test -f .env || cp .env.example .env
-
   start:
     desc: Bring up the stack and show status.
-    deps: [env]
     cmds:
       - docker compose up -d
       - docker compose ps
+
+  up:
+    desc: Start infra, build assets, and run the Go server.
+    cmds:
+      - "docker compose up -d"
+      - "sh -c 'cd web && npm install'"
+      - "sh -c 'cd web && npm run build'"
+      - "sh -c 'cd server && go mod tidy'"
+      - "sh -c 'cd server && go run ./cmd/server'"
 
   stop:
     desc: Stop services and keep volumes.
@@ -28,20 +31,32 @@ tasks:
     cmds:
       - docker compose down -v
 
+  purge:
+    desc: Purge all database data after confirmation.
+    cmds:
+      - |
+          read -r -p "This will delete all MongoDB data. Type PURGE to continue: " confirm
+          if [ "$confirm" = "PURGE" ]; then
+            docker compose down -v --remove-orphans
+            docker volume rm -f mongodb_data "${PWD##*/}_mongodb_data" >/dev/null 2>&1 || true
+          else
+            echo "Purge cancelled."
+          fi
+
   status:
     desc: Show service status.
     cmds:
       - docker compose ps
 
   logs:
-    desc: Tail logs for all services.
+    desc: Tail Docker logs.
     cmds:
       - docker compose logs -f
 
   mongo-ping:
     desc: Ping MongoDB from the container.
     cmds:
-      - docker exec attesta-mongodb mongosh --eval "db.adminCommand('ping')"
+      - docker exec closer-mongodb mongosh --eval "db.adminCommand('ping')"
 
   cerbos-health:
     desc: Check Cerbos health endpoint.

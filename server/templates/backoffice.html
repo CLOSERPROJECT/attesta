@@ -1,0 +1,27 @@
+{{define "backoffice_landing_body"}}
+<section class="panel landing">
+  <h1>Backoffice</h1>
+  <p class="muted">Choose a department to continue.</p>
+  <div class="impersonate">
+    <form method="post" action="/impersonate">
+      <input type="hidden" name="userId" value="u1" />
+      <input type="hidden" name="role" value="dep1" />
+      <button type="submit">Department 1</button>
+    </form>
+    <form method="post" action="/impersonate">
+      <input type="hidden" name="userId" value="u2" />
+      <input type="hidden" name="role" value="dep2" />
+      <button type="submit">Department 2</button>
+    </form>
+    <form method="post" action="/impersonate">
+      <input type="hidden" name="userId" value="u3" />
+      <input type="hidden" name="role" value="dep3" />
+      <button type="submit">Department 3</button>
+    </form>
+  </div>
+</section>
+{{end}}
+
+{{define "backoffice_landing.html"}}
+  {{template "layout.html" .}}
+{{end}}

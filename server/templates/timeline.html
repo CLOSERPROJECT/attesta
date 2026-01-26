@@ -1,0 +1,29 @@
+{{define "timeline.html"}}
+<div class="timeline">
+  {{range .}}
+    <div class="timeline-step">
+      <h3>Step {{.StepID}} - {{.Title}}</h3>
+      <ul>
+        {{range .Substeps}}
+          <li class="substep substep-{{.Status}} dept-{{.Role}}">
+            <div class="substep-head">
+              <span class="pill">{{.SubstepID}}</span>
+              <span class="title">{{.Title}}</span>
+              <span class="dept-badge dept-{{.Role}}">{{.RoleLabel}}</span>
+              <span class="status">{{.Status}}</span>
+            </div>
+            <div class="substep-meta">
+              <span class="role">role: {{.Role}}</span>
+              {{if eq .Status "done"}}
+                <span class="actor">by {{.DoneBy}} ({{.DoneRole}})</span>
+                <span class="time">{{.DoneAt}}</span>
+                <span class="data">data: {{printf "%v" .Data}}</span>
+              {{end}}
+            </div>
+          </li>
+        {{end}}
+      </ul>
+    </div>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,19 @@
+{{define "process_body"}}
+<div class="two-col" data-process-id="{{.ProcessID}}">
+  <section class="panel">
+    <h2>Home / Process timeline</h2>
+    <div id="timeline">
+      {{template "timeline.html" .Timeline}}
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Backoffice access</h2>
+    <p class="muted">Open the backoffice in a new window to impersonate roles and complete steps.</p>
+    <a class="secondary" href="/backoffice" target="_blank" rel="noopener">Open backoffice</a>
+  </section>
+</div>
+{{end}}
+
+{{define "process.html"}}
+  {{template "layout.html" .}}
+{{end}}

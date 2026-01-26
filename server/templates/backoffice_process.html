@@ -1,0 +1,19 @@
+{{define "dept_process_body"}}
+<div class="two-col" data-process-id="{{.ProcessID}}">
+  <section class="panel">
+    <h1>{{.RoleLabel}} actions</h1>
+    <p class="muted">Process <strong>{{.ProcessID}}</strong></p>
+    <a class="secondary" href="/backoffice/{{.CurrentUser.Role}}">Back to dashboard</a>
+  </section>
+  <section class="panel">
+    <h2>Available actions</h2>
+    <div id="action-area">
+      {{template "action_list.html" .}}
+    </div>
+  </section>
+</div>
+{{end}}
+
+{{define "backoffice_process.html"}}
+  {{template "layout.html" .}}
+{{end}}
