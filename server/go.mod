@@ -2,7 +2,10 @@ module github.com/CLOSERPROJECT/attesta/server
 
 go 1.25
 
-require go.mongodb.org/mongo-driver v1.17.1
+require (
+	go.mongodb.org/mongo-driver v1.17.1
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/golang/snappy v0.0.4 // indirect

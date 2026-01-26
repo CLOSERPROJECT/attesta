@@ -2,23 +2,23 @@
 <section class="panel landing">
   <h1>Backoffice</h1>
   <p class="muted">Choose a department to continue.</p>
-  <div class="impersonate">
-    <form method="post" action="/impersonate">
-      <input type="hidden" name="userId" value="u1" />
-      <input type="hidden" name="role" value="dep1" />
-      <button type="submit">Department 1</button>
-    </form>
-    <form method="post" action="/impersonate">
-      <input type="hidden" name="userId" value="u2" />
-      <input type="hidden" name="role" value="dep2" />
-      <button type="submit">Department 2</button>
-    </form>
-    <form method="post" action="/impersonate">
-      <input type="hidden" name="userId" value="u3" />
-      <input type="hidden" name="role" value="dep3" />
-      <button type="submit">Department 3</button>
-    </form>
-  </div>
+  {{if .Users}}
+    <div class="impersonate">
+      {{range .Users}}
+        <form method="post" action="/impersonate">
+          <input type="hidden" name="userId" value="{{.ID}}" />
+          <input type="hidden" name="role" value="{{.Role}}" />
+          <button
+            type="submit"
+            class="dept-button"
+            style="--role-color: {{.RoleColor}}; --role-border: {{.RoleBorder}}"
+          >{{.RoleLabel}} ({{.Name}})</button>
+        </form>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="muted">No users configured.</p>
+  {{end}}
 </section>
 {{end}}
 

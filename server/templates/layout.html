@@ -1,19 +1,23 @@
 {{define "layout.html"}}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Closer Demo</title>
     <link rel="stylesheet" href="/static/assets/main.css" />
-    <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-LORzM0VqaO8k6G7L6oUkW3FQ7P1VnacFccW9dSgqkdtpUm4nFQdEF9zOUbJ8m8+H" crossorigin="anonymous"></script>
+    <script
+      src="https://unpkg.com/htmx.org@1.9.12"
+      integrity="sha384-LORzM0VqaO8k6G7L6oUkW3FQ7P1VnacFccW9dSgqkdtpUm4nFQdEF9zOUbJ8m8+H"
+      crossorigin="anonymous"
+    ></script>
     <script defer src="/static/assets/app.js"></script>
   </head>
   <body>
     <header class="topbar">
       <div>
-        <span class="brand">closer demo</span>
-        <span class="tag">Gallium Recycling Notarization</span>
+        <span class="brand">ATTESTA</span>
+        <span class="tag">closerproject demo</span>
       </div>
       <nav class="nav">
         <a href="/">Home</a>
@@ -21,17 +25,12 @@
       </nav>
     </header>
     <main class="page">
-      {{if eq .Body "home_body"}}
-        {{template "home_body" .}}
-      {{else if eq .Body "process_body"}}
-        {{template "process_body" .}}
-      {{else if eq .Body "backoffice_landing_body"}}
-        {{template "backoffice_landing_body" .}}
-      {{else if eq .Body "dept_dashboard_body"}}
-        {{template "dept_dashboard_body" .}}
-      {{else if eq .Body "dept_process_body"}}
-        {{template "dept_process_body" .}}
-      {{end}}
+      {{if eq .Body "home_body"}} {{template "home_body" .}} {{else if eq .Body
+      "process_body"}} {{template "process_body" .}} {{else if eq .Body
+      "backoffice_landing_body"}} {{template "backoffice_landing_body" .}}
+      {{else if eq .Body "dept_dashboard_body"}} {{template
+      "dept_dashboard_body" .}} {{else if eq .Body "dept_process_body"}}
+      {{template "dept_process_body" .}} {{end}}
     </main>
   </body>
 </html>

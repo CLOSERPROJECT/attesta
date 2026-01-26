@@ -5,11 +5,17 @@
       <h3>Step {{.StepID}} - {{.Title}}</h3>
       <ul>
         {{range .Substeps}}
-          <li class="substep substep-{{.Status}} dept-{{.Role}}">
+          <li
+            class="substep substep-{{.Status}}"
+            style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+          >
             <div class="substep-head">
               <span class="pill">{{.SubstepID}}</span>
               <span class="title">{{.Title}}</span>
-              <span class="dept-badge dept-{{.Role}}">{{.RoleLabel}}</span>
+              <span
+                class="dept-badge"
+                style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+              >{{.RoleLabel}}</span>
               <span class="status">{{.Status}}</span>
             </div>
             <div class="substep-meta">
