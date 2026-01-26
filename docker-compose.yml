@@ -29,7 +29,7 @@ services:
       - "3592:3592"
       - "3593:3593"
     volumes:
-      - ./cerbos/policies:/policies
+      - ./cerbos/policies/policies:/policies
       - ./cerbos/config:/config
     networks:
       - attesta-network

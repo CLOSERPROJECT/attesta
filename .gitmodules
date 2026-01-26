@@ -1,0 +1,3 @@
+[submodule "cerbos/policies"]
+	path = cerbos/policies
+	url = https://github.com/closerproject/policies.git
