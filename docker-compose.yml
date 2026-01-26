@@ -21,7 +21,7 @@ services:
       retries: 5
 
   cerbos:
-    image: ghcr.io/cerbos/cerbos:0.39.0
+    image: ghcr.io/cerbos/cerbos:0.50.0
     container_name: attesta-cerbos
     restart: unless-stopped
     command: ["server", "--config=/config/config.yaml"]
