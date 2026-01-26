@@ -8,8 +8,9 @@ services:
       - mongodb_data:/data/db
 
   cerbos:
-    image: ghcr.io/cerbos/cerbos:0.39.0
-    container_name: closer-cerbos
+    image: ghcr.io/cerbos/cerbos:0.50.0
+    container_name: attesta-cerbos
+    restart: unless-stopped
     command: ["server", "--config=/config/config.yaml"]
     ports:
       - "3592:3592"
