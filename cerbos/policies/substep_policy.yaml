@@ -1,0 +1,14 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "substep"
+  rules:
+    - actions: ["complete"]
+      effect: EFFECT_ALLOW
+      roles: ["dep1", "dep2", "dep3"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: request.resource.attr.sequenceOk == true
+              - expr: request.resource.attr.roleRequired in request.principal.roles

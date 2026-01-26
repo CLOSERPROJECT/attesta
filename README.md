@@ -1,182 +1,68 @@
-<div align="center">
+# Closer demo (Gallium Recycling Notarization)
 
-# {project_name}
+Small end-to-end demo with Go + HTMX + SSE + MongoDB + Cerbos.
 
-### {tagline}
+## Requirements
+- Go 1.25+
+- Node.js 18+
+- Docker + Docker Compose
 
-</div>
-
-<p align="center">
-  <a href="https://dyne.org">
-    <img src="https://files.dyne.org/software_by_dyne.png" width="170">
-  </a>
-</p>
-
-
----
-<br><br>
-
-
-## {project_name} Features
-
-{screenshot}
-
-# [LIVE DEMO](https://https://interfacer-gui-staging.dyne.org/)
-
-<br>
-
-<div id="toc">
-
-### 🚩 Table of Contents
-
-- [💾 Install](#-install)
-- [🎮 Quick start](#-quick-start)
-- [🚑 Community & support](#-community--support)
-- [🐋 Docker](#-docker)
-- [🐝 API](#-api)
-- [🔧 Configuration](#-configuration)
-- [📋 Testing](#-testing)
-- [🐛 Troubleshooting & debugging](#-troubleshooting--debugging)
-- [😍 Acknowledgements](#-acknowledgements)
-- [👤 Contributing](#-contributing)
-- [💼 License](#-license)
-
-</div>
-
-***
-## 💾 Install
-```pip install / yard add {project_name}```
-
-
-**[🔝 back to top](#toc)**
-
-***
-## 🎮 Quick start
-
-To start using {project_name} run the following command in the root folder
-
+## Quick start
 ```bash
-docker compose up
+# 1) Infra
+docker compose up -d
+
+# 2) Build frontend assets
+cd web
+npm install
+npm run build
+
+# 3) Run Go server
+cd ../server
+go mod tidy
+go run ./cmd/server
 ```
 
-**[🔝 back to top](#toc)**
+Open:
+- Home: http://localhost:3000
+- Backoffice: http://localhost:3000/backoffice
+- Mongo Express (optional): http://localhost:8081
 
-***
-## 🚑 Community & support
+## What it does
+- Seeds a workflow definition on first run.
+- Starts a process instance with sequential substeps.
+- Backoffice impersonates roles (dep1, dep2, dep3) and completes actions.
+- Cerbos enforces role + sequence gating.
+- Mongo stores process progress + notarizations.
+- SSE broadcasts realtime updates to timelines.
 
-**[📝 Documentation](#toc)** - Getting started and more.
+## Curl examples
+Start a process:
+```bash
+curl -X POST http://localhost:3000/process/start -i
+```
 
-**[🌱 Ecosystem](https://github.com/dyne/ecosystem)** - Plugins, resources, and more.
+Impersonate dep1:
+```bash
+curl -X POST http://localhost:3000/impersonate \
+  -d 'userId=u1' -d 'role=dep1' -i
+```
 
-**[🚩 Issues](../../issues)** - Bugs end errors you encounter using {project_name}.
+Complete substep 1.1 (dep1):
+```bash
+curl -X POST http://localhost:3000/process/PROCESS_ID/substep/1.1/complete \
+  -H 'Cookie: demo_user=u1|dep1' \
+  -d 'value=10'
+```
 
-**[💬 Discussions](../../discussions)** - Get help, ask questions, request features, and discuss {project_name}.
+Attempt out-of-sequence (should fail):
+```bash
+curl -X POST http://localhost:3000/process/PROCESS_ID/substep/2.1/complete \
+  -H 'Cookie: demo_user=u2|dep2' \
+  -d 'value=5'
+```
 
-**[[] Matrix](https://socials.dyne.org/matrix)** - Hanging out with the community.
-
-**[🗣️ Discord](https://socials.dyne.org/discord)** - Hanging out with the community.
-
-**[🪁 Telegram](https://socials.dyne.org/telegram)** - Hanging out with the community.
-
-**[📖 Example](https://github.com/{project_name}/example)** - An example repository that uses {project_name}.
-
-**[🔝 back to top](#toc)**
-
-***
-## 🐋 Docker
-
-Please refer to [DOCKER PACKAGES](../../packages)
-
-
-**[🔝 back to top](#toc)**
-
-***
-## 🐝 API
-
-Available endpoints
-
-### POST /token
-
-Execute a transaction with some amount
-
-**Parameters**
-
-|          Name | Required |  Type   | Description       | 
-| -------------:|:--------:|:-------:| ------------------|
-|       `token` | required | string  | Type of token. Accepted values `idea` or `strength`  |
-|       `amount`| required | number  | Transaction's token amount |
-|       `owner` | required | ULID    | The ULID of the Agent's owner |
- 
-### GET /token/${request.token}/${request.owner}
-
-Retrieves the actual value of the token type for the specified owner
-
-
-**[🔝 back to top](#toc)**
-
-***
-## 🔧 Configuration
-
-**[🔝 back to top](#toc)**
-
-***
-
-## 📋 Testing
-
-**[🔝 back to top](#toc)**
-
-***
-## 🐛 Troubleshooting & debugging
-
-**[🔝 back to top](#toc)**
-
-***
-## 😍 Acknowledgements
-
-<a href="https://dyne.org">
-  <img src="https://files.dyne.org/software_by_dyne.png" width="222">
-</a>
-
-
-Copyleft 🄯 2023 by [Dyne.org](https://www.dyne.org) foundation, Amsterdam
-
-Designed, written and maintained by Puria Nafisi Azizi.
-
-Special thanks to Mr. W. White for his special contributions.
-
-**[🔝 back to top](#toc)**
-
-***
-## 👤 Contributing
-
-Please first take a look at the [Dyne.org - Contributor License Agreement](CONTRIBUTING.md) then
-
-1.  🔀 [FORK IT](../../fork)
-2.  Create your feature branch `git checkout -b feature/branch`
-3.  Commit your changes `git commit -am 'feat: New feature\ncloses #398'`
-4.  Push to the branch `git push origin feature/branch`
-5.  Create a new Pull Request `gh pr create -f`
-6.  🙏 Thank you
-
-
-**[🔝 back to top](#toc)**
-
-***
-## 💼 License
-    {project_name} - {tagline}
-    Copyleft 🄯 2023 Dyne.org foundation, Amsterdam
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**[🔝 back to top](#toc)**
+## Notes
+- Cerbos PDP is expected at `http://localhost:3592`.
+- MongoDB is expected at `mongodb://localhost:27017`.
+- Timeline updates pull `/process/:id/timeline` when SSE events arrive.

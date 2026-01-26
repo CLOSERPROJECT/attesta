@@ -1,0 +1,27 @@
+{{define "backoffice_landing_body"}}
+<section class="panel landing">
+  <h1>Backoffice</h1>
+  <p class="muted">Choose a department to continue.</p>
+  {{if .Users}}
+    <div class="impersonate">
+      {{range .Users}}
+        <form method="post" action="/impersonate">
+          <input type="hidden" name="userId" value="{{.ID}}" />
+          <input type="hidden" name="role" value="{{.Role}}" />
+          <button
+            type="submit"
+            class="dept-button"
+            style="--role-color: {{.RoleColor}}; --role-border: {{.RoleBorder}}"
+          >{{.RoleLabel}} ({{.Name}})</button>
+        </form>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="muted">No users configured.</p>
+  {{end}}
+</section>
+{{end}}
+
+{{define "backoffice_landing.html"}}
+  {{template "layout.html" .}}
+{{end}}

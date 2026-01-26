@@ -1,0 +1,41 @@
+{{define "action_list.html"}}
+  {{template "error_banner.html" .}}
+  {{if .ProcessID}}
+    <div class="actions">
+      {{range .Actions}}
+        <div class="action-card action-{{.Status}}">
+          <div class="action-head">
+            <span class="pill">{{.SubstepID}}</span>
+            <span class="title">{{.Title}}</span>
+            <span
+              class="role role-badge"
+              style="--role-color: {{.RoleColor}}; --role-border: {{.RoleBorder}}"
+            >{{.RoleLabel}}</span>
+          </div>
+          <form
+            class="action-form"
+            method="post"
+            action="/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+            hx-post="/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+            hx-target="#action-area"
+            hx-swap="innerHTML"
+          >
+            <label>
+              {{.InputKey}}
+              <input type="text" name="value" placeholder="Enter {{.InputType}}" {{if .Disabled}}disabled{{end}} />
+            </label>
+            <button type="submit" {{if .Disabled}}disabled{{end}}>Complete</button>
+          </form>
+          <p class="muted">Status: {{.Status}}{{if .Reason}} - {{.Reason}}{{end}}</p>
+        </div>
+      {{end}}
+    </div>
+    {{if .Timeline}}
+      <div id="timeline" hx-swap-oob="true">
+        {{template "timeline.html" .Timeline}}
+      </div>
+    {{end}}
+  {{else}}
+    <p class="muted">No actions available for this department yet.</p>
+  {{end}}
+{{end}}
