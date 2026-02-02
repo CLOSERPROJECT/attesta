@@ -1,0 +1,26 @@
+name: 🧪 Tests
+
+on:
+  pull_request:
+    paths-ignore:
+      - '*.md'
+      - '*.org'
+    branches:
+      - main
+
+jobs:
+  test:
+    name: ⏳ Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔔 Checkout
+        uses: actions/checkout@v6
+      - name: 🐹 Set up go@1.25.5
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.5'
+      - name: 🧪 Run tests
+        run: |
+          GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./...
+        working-directory: ./server
+        shell: bash
