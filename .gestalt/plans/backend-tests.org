@@ -171,11 +171,11 @@
    - Tests :: The route matrix is the checklist for handler test coverage.
    - Done when :: Each route has at least one positive plus two negative cases encoded in tests.
 
-* TODO [#A] Implement unit tests for pure/domain-ish helpers
+* WIP [#A] Implement unit tests for pure/domain-ish helpers
   - Effort :: M
   - Goal :: Quickly raise coverage with stable unit tests, and lock in workflow invariants.
   - Notes :: These tests should be fast and not involve HTTP, templates, or external IO.
-** TODO [#A] Workflow ordering + progress key invariants
+** DONE [#A] Workflow ordering + progress key invariants
    - Why :: Ordering/encoding affects every endpoint and UI view.
    - Change :: Add tests for:
      - `sortedSteps`, `sortedSubsteps`, `orderedSubsteps`
