@@ -213,11 +213,11 @@
    - Tests :: Use goroutines carefully; avoid sleeps by using buffered channels and deterministic reads.
    - Done when :: SSEHub is covered with at least one positive and one negative/edge test.
 
-* TODO [#A] Implement handler tests with fakes (positive + negative)
+* WIP [#A] Implement handler tests with fakes (positive + negative)
   - Effort :: L
   - Goal :: Cover the majority of handler statements to reach ≥70% coverage without external services.
   - Notes :: Use `httptest.NewRequest` + `httptest.NewRecorder`. Prefer asserting: status code, headers (`Location`, `Set-Cookie`), and store state changes.
-** TODO [#A] `POST /process/start` tests
+** DONE [#A] `POST /process/start` tests
    - Why :: Creates initial process state and triggers SSE role broadcasts.
    - Change :: Tests:
      - Positive: returns 303, sets `Location: /process/:id`, inserts process with all substeps pending.
