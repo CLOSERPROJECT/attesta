@@ -265,7 +265,7 @@
      - Notarization digest is non-empty and method is `sha256`.
      - When completing the final substep, process status becomes `done`.
    - Done when :: The handler’s main branches (success + each error mapping) are covered and stable.
-** TODO [#B] `GET /backoffice` + department dashboards tests
+** DONE [#B] `GET /backoffice` + department dashboards tests
    - Why :: Backoffice code covers role validation, dashboard queries, and template execution.
    - Change :: Tests:
      - Positive: `/backoffice` renders landing with user list.

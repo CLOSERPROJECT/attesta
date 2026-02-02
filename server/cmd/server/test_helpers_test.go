@@ -65,7 +65,7 @@ func testTemplates() *template.Template {
 {{define "timeline.html"}}TIMELINE {{range .}}{{.StepID}} {{end}}{{end}}
 {{define "backoffice_landing_body"}}BACKOFFICE{{end}}
 {{define "backoffice_landing.html"}}{{template "layout.html" .}}{{end}}
-{{define "dept_dashboard_content"}}DASHBOARD {{.CurrentUser.Role}}{{end}}
+{{define "dept_dashboard_content"}}DASHBOARD {{.CurrentUser.Role}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dept_dashboard_body"}}{{template "dept_dashboard_content" .}}{{end}}
 {{define "backoffice_department.html"}}{{template "layout.html" .}}{{end}}
 {{define "backoffice_department_partial.html"}}{{template "dept_dashboard_content" .}}{{end}}
