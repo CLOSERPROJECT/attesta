@@ -69,9 +69,9 @@ func testTemplates() *template.Template {
 {{define "dept_dashboard_body"}}{{template "dept_dashboard_content" .}}{{end}}
 {{define "backoffice_department.html"}}{{template "layout.html" .}}{{end}}
 {{define "backoffice_department_partial.html"}}{{template "dept_dashboard_content" .}}{{end}}
-{{define "dept_process_body"}}{{template "action_list.html" .}}{{end}}
+{{define "dept_process_body"}}PROCESS_PAGE {{template "action_list.html" .}}{{end}}
 {{define "backoffice_process.html"}}{{template "layout.html" .}}{{end}}
-{{define "action_list.html"}}ACTIONS {{.Error}}{{end}}
+{{define "action_list.html"}}ACTION_LIST {{.Error}}{{end}}
 {{define "error_banner.html"}}{{if .Error}}ERROR {{.Error}}{{end}}{{end}}
 `))
 }

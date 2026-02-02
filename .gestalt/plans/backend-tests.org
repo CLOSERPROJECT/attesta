@@ -244,7 +244,7 @@
      - Negative: template execution error -> 500 (force by providing a template that errors).
    - Tests :: Assert response contains a stable marker (e.g., process ID or body name) rather than full HTML.
    - Done when :: Read paths are covered with both existence and error handling.
-** TODO [#A] `POST /process/:id/substep/:substepId/complete` tests (HTMX + non-HTMX)
+** DONE [#A] `POST /process/:id/substep/:substepId/complete` tests (HTMX + non-HTMX)
    - Why :: Most logic lives here: actor selection, sequence gating, auth, validation, store writes, notarization, status update, SSE broadcast.
    - Change :: Tests (minimum set):
      - Positive (HTMX): allowed + sequence OK + valid value -> 200 and updates progress + notarization written.

@@ -1,0 +1,232 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+func TestHandleCompleteSubstepSuccessNonHTMX(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "PROCESS_PAGE") {
+		t.Fatalf("expected non-HTMX process page marker, got %q", rr.Body.String())
+	}
+}
+
+func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "malformed"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	id, _ := primitive.ObjectIDFromHex(processID)
+	process, _ := store.SnapshotProcess(id)
+	if process.Progress["1_1"].DoneBy == nil || process.Progress["1_1"].DoneBy.UserID != "u1" {
+		t.Fatalf("expected fallback actor u1|dep1, got %#v", process.Progress["1_1"].DoneBy)
+	}
+}
+
+func TestHandleCompleteSubstepProcessNotFoundPaths(t *testing.T) {
+	missingID := primitive.NewObjectID().Hex()
+	server := &Server{
+		store:      NewMemoryStore(),
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	htmxReq := httptest.NewRequest(http.MethodPost, "/process/"+missingID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	htmxReq.Header.Set("HX-Request", "true")
+	htmxReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	htmxRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(htmxRec, htmxReq, missingID, "1.1")
+	if htmxRec.Code != http.StatusNotFound {
+		t.Fatalf("expected HTMX status %d, got %d", http.StatusNotFound, htmxRec.Code)
+	}
+	if strings.Contains(htmxRec.Body.String(), "PROCESS_PAGE") {
+		t.Fatalf("expected HTMX path to render action list only, got %q", htmxRec.Body.String())
+	}
+
+	fullReq := httptest.NewRequest(http.MethodPost, "/process/"+missingID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	fullReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	fullRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(fullRec, fullReq, missingID, "1.1")
+	if fullRec.Code != http.StatusNotFound {
+		t.Fatalf("expected non-HTMX status %d, got %d", http.StatusNotFound, fullRec.Code)
+	}
+	if !strings.Contains(fullRec.Body.String(), "PROCESS_PAGE") {
+		t.Fatalf("expected non-HTMX path to render process page, got %q", fullRec.Body.String())
+	}
+}
+
+func TestHandleCompleteSubstepSubstepNotFoundReturns404(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/404/complete", strings.NewReader("value=10"))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "404")
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
+	}
+}
+
+func TestHandleCompleteSubstepSequenceConflictReturns409(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/2.1/complete", strings.NewReader("value=10"))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u2|dep2"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "2.1")
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d", http.StatusConflict, rr.Code)
+	}
+}
+
+func TestHandleCompleteSubstepFormAndValueValidation(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	invalidFormReq := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("%zz"))
+	invalidFormReq.Header.Set("HX-Request", "true")
+	invalidFormReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	invalidFormRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(invalidFormRec, invalidFormReq, processID, "1.1")
+	if invalidFormRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid form status %d, got %d", http.StatusBadRequest, invalidFormRec.Code)
+	}
+
+	missingValueReq := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value="))
+	missingValueReq.Header.Set("HX-Request", "true")
+	missingValueReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	missingValueRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(missingValueRec, missingValueReq, processID, "1.1")
+	if missingValueRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected missing value status %d, got %d", http.StatusBadRequest, missingValueRec.Code)
+	}
+
+	invalidNumberReq := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=abc"))
+	invalidNumberReq.Header.Set("HX-Request", "true")
+	invalidNumberReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	invalidNumberRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(invalidNumberRec, invalidNumberReq, processID, "1.1")
+	if invalidNumberRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid number status %d, got %d", http.StatusBadRequest, invalidNumberRec.Code)
+	}
+	if !strings.Contains(invalidNumberRec.Body.String(), "Value must be a number.") {
+		t.Fatalf("expected parse error message in body, got %q", invalidNumberRec.Body.String())
+	}
+}
+
+func TestHandleCompleteSubstepStoreFailures(t *testing.T) {
+	store := NewMemoryStore()
+	store.UpdateProgressErr = assertErr("update")
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	updateReq := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	updateReq.Header.Set("HX-Request", "true")
+	updateReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	updateRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(updateRec, updateReq, processID, "1.1")
+	if updateRec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected update error status %d, got %d", http.StatusInternalServerError, updateRec.Code)
+	}
+
+	store.UpdateProgressErr = nil
+	store.InsertNotarizeErr = assertErr("notarize")
+	notarizeReq := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	notarizeReq.Header.Set("HX-Request", "true")
+	notarizeReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	notarizeRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(notarizeRec, notarizeReq, processID, "1.1")
+	if notarizeRec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected notarization error status %d, got %d", http.StatusInternalServerError, notarizeRec.Code)
+	}
+}
+
+func TestHandleCompleteSubstepFinalCompletionMarksProcessDone(t *testing.T) {
+	store := NewMemoryStore()
+	process := Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "done"},
+			"2_1": {State: "done"},
+			"2_2": {State: "done"},
+			"3_1": {State: "done"},
+			"3_2": {State: "pending"},
+		},
+	}
+	store.SeedProcess(process)
+	server := &Server{
+		store:      store,
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+		now: func() time.Time { return time.Date(2026, 2, 2, 15, 0, 0, 0, time.UTC) },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+process.ID.Hex()+"/substep/3.2/complete", strings.NewReader("value=done"))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u3|dep3"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, process.ID.Hex(), "3.2")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	snapshot, ok := store.SnapshotProcess(process.ID)
+	if !ok {
+		t.Fatal("expected process snapshot")
+	}
+	if snapshot.Status != "done" {
+		t.Fatalf("expected final process status done, got %q", snapshot.Status)
+	}
+}
+
+type assertErr string
+
+func (e assertErr) Error() string { return string(e) }
