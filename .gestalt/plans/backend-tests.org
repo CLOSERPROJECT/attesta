@@ -235,7 +235,7 @@
      - Negative: unknown role (when config available) -> 400.
    - Tests :: Assert cookie value format `userId|role`.
    - Done when :: Cookie + redirect contract is locked in with negative cases.
-** TODO [#A] `GET /process/:id` + `GET /process/:id/timeline` tests
+** DONE [#A] `GET /process/:id` + `GET /process/:id/timeline` tests
    - Why :: Core read paths; should validate 404 and template rendering.
    - Change :: Tests:
      - Positive: existing process renders 200 (full page and partial).
