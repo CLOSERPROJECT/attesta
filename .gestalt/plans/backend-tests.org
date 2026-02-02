@@ -22,14 +22,18 @@
      - CI/local gate target: `>= 70.0%`
    - Tests :: N/A (decision).
    - Done when :: Definition is in this plan and mirrored to project docs with exact commands.
-** TODO [#B] Confirm “negative test” expectations
+** DONE [#B] Confirm “negative test” expectations
    - Why :: “Negative” could mean invalid inputs, unauthorized, out-of-sequence, dependency failures, and/or server errors.
    - Change :: Agree minimum negative categories to cover:
      - Request validation (400/405/404)
      - Authorization/sequence gating (403/409)
      - Dependency failures (502 Cerbos, 500 storage, 500 template/config)
+   - Decision matrix ::
+     - Validation: 400 (bad form/payload), 404 (missing resources), 405 (wrong method)
+     - Authorization + sequence: 403 (deny), 409 (out of sequence)
+     - Dependency and rendering failures: 500 (store/template/config), 502 (authorizer upstream)
    - Tests :: N/A (decision).
-   - Done when :: A matrix of required negative cases exists and is accepted.
+   - Done when :: Matrix is explicit in this plan and used as checklist in route-level tests.
 
 * TODO [#A] Establish baseline + test harness conventions
   - Effort :: S
