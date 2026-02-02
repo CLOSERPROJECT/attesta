@@ -198,7 +198,7 @@
      - `digestPayload` stability (same map content -> same digest; include at least one negative test around non-deterministic map ordering if applicable by implementation)
    - Tests :: Use fixed inputs; assert exact outputs or at least non-empty hex length.
    - Done when :: Both success and failure modes are covered and deterministic.
-** TODO [#B] Actor + HTMX detection helpers
+** DONE [#B] Actor + HTMX detection helpers
    - Why :: Cookie parsing and HTMX branching affect handler behavior.
    - Change :: Add tests for:
      - `readActor` (missing cookie, malformed cookie, correct cookie)
