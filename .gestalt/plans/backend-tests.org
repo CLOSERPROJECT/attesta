@@ -307,11 +307,11 @@
    - Tests :: N/A (docs).
    - Done when :: README/QUICKSTART includes the commands and expectations.
 
-* TODO [#B] Optional: integration test slice (Docker-backed)
+* DONE [#B] Optional: integration test slice (Docker-backed)
   - Effort :: M
   - Goal :: Validate real Mongo + Cerbos behavior end-to-end without bloating unit tests.
   - Notes :: Keep behind `//go:build integration` so default `go test ./...` remains fast and deterministic.
-** TODO [#B] Add integration tests for real Cerbos + Mongo interactions
+** DONE [#B] Add integration tests for real Cerbos + Mongo interactions
    - Why :: Unit tests with fakes can miss request/response drift and real DB update semantics.
    - Change :: Add a small number of high-value integration cases:
      - Complete substep allowed vs denied by Cerbos policy (real PDP)
