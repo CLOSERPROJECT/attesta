@@ -286,7 +286,7 @@
    - Tests :: Use a request context with cancellation; avoid time-based waits by broadcasting immediately after subscription is established.
    - Done when :: SSE endpoint correctness is covered without flaky sleeps.
 
-* WIP [#A] Coverage enforcement + developer ergonomics
+* DONE [#A] Coverage enforcement + developer ergonomics
   - Effort :: S
   - Goal :: Make it easy to keep coverage ≥70% over time.
   - Notes :: Prefer Taskfile enhancements over new tooling; do not add new dependencies.
@@ -298,7 +298,7 @@
      - Fails if total < 70.0
    - Tests :: The gate is self-testing by temporarily setting threshold higher locally (manual check) during development.
    - Done when :: A single command fails the build when coverage drops below 70%.
-** TODO [#B] Document how to run unit vs integration tests
+** DONE [#B] Document how to run unit vs integration tests
    - Why :: Developers need a predictable workflow; integration tests (if added) should be explicit.
    - Change :: Document:
      - Unit: `cd server && go test ./...`

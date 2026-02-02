@@ -29,3 +29,20 @@ go run ./cmd/server
 ## Open the demo
 - Home: http://localhost:3000
 - Backoffice: http://localhost:3000/backoffice
+
+## Run tests
+Unit tests:
+```bash
+task test
+```
+
+Coverage with gate:
+```bash
+task cover
+```
+
+Optional integration command:
+```bash
+cd server
+go test -tags=integration ./...
+```
