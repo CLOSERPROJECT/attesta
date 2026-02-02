@@ -286,11 +286,11 @@
    - Tests :: Use a request context with cancellation; avoid time-based waits by broadcasting immediately after subscription is established.
    - Done when :: SSE endpoint correctness is covered without flaky sleeps.
 
-* TODO [#A] Coverage enforcement + developer ergonomics
+* WIP [#A] Coverage enforcement + developer ergonomics
   - Effort :: S
   - Goal :: Make it easy to keep coverage ≥70% over time.
   - Notes :: Prefer Taskfile enhancements over new tooling; do not add new dependencies.
-** TODO [#A] Add a coverage gate command (Taskfile or script)
+** DONE [#A] Add a coverage gate command (Taskfile or script)
    - Why :: Without gating, coverage targets regress silently.
    - Change :: Add a `task test` and `task cover` in `Taskfile.yml` (or a small shell script under `server/`) that:
      - Runs `cd server && go test ./... -coverprofile=coverage.out`
