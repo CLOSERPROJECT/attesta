@@ -35,7 +35,7 @@
    - Tests :: N/A (decision).
    - Done when :: Matrix is explicit in this plan and used as checklist in route-level tests.
 
-* WIP [#A] Establish baseline + test harness conventions
+* DONE [#A] Establish baseline + test harness conventions
   - Effort :: S
   - Goal :: Know current coverage and pick the simplest harness that’s stable in CI/local.
   - Notes :: Avoid adding third-party test deps unless clearly needed; prefer stdlib `testing`, `httptest`, table-driven tests.
@@ -55,14 +55,21 @@
      - Time IO: inject `now func() time.Time` for deterministic timestamps
    - Tests :: N/A (inventory).
    - Done when :: The plan lists concrete seams and their minimal interfaces/function fields.
-** TODO [#B] Define test layout + naming
+** DONE [#B] Define test layout + naming
    - Why :: Consistency keeps “a lot of tests” maintainable.
    - Change :: Adopt conventions:
      - Keep tests in `server/cmd/server` and `package main` to access unexported helpers.
      - Use `*_test.go` helpers (e.g. `test_helpers_test.go`) for fixtures and fakes.
      - Prefer table-driven tests; use `t.Run` and `t.Parallel()` where safe.
+   - Testing conventions ::
+     - Put tests beside code in `server/cmd/server` with `package main`
+     - Keep shared fixtures/fakes in `test_helpers_test.go`
+     - Use table-driven tests for pure helpers
+     - Use handler-focused tests with `httptest.NewRequest`/`httptest.NewRecorder`
+     - Use `t.Parallel()` only for tests that do not mutate shared fakes/state
+     - Assert stable markers (status, headers, key body substrings) over full HTML snapshots
    - Tests :: N/A (convention).
-   - Done when :: A short “Testing conventions” section is included in the plan and later mirrored into docs.
+   - Done when :: This section exists in the plan and is mirrored in docs.
 
 * TODO [#A] Minimal refactor to enable fast unit tests (ports/adapters)
   - Effort :: M
