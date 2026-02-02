@@ -182,7 +182,7 @@
      - `encodeProgressKey` and `normalizeProgressKeys` (including dots/underscores behavior)
    - Tests :: Table-driven with mixed orders and key edge cases.
    - Done when :: Ordering is deterministic and key normalization is covered by both positive and edge-case assertions.
-** TODO [#A] Sequence/availability state machine
+** DONE [#A] Sequence/availability state machine
    - Why :: The demo’s core invariant is “exactly one next substep is available; others are locked until prior is done”.
    - Change :: Add tests for:
      - `computeAvailability` (only first pending is available)
