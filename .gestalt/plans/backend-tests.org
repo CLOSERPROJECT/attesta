@@ -71,7 +71,7 @@
    - Tests :: N/A (convention).
    - Done when :: This section exists in the plan and is mirrored in docs.
 
-* WIP [#A] Minimal refactor to enable fast unit tests (ports/adapters)
+* DONE [#A] Minimal refactor to enable fast unit tests (ports/adapters)
   - Effort :: M
   - Goal :: Make handler tests possible without Docker by introducing small, explicit seams (Hex-lite).
   - Notes :: Keep behavior identical; avoid moving routes/HTML structure. Refactor only what is needed to test deterministically.
@@ -98,7 +98,7 @@
    - Change :: Add a `now func() time.Time` field on `Server` (default `time.Now`) and use it where timestamps are written.
    - Tests :: Assert exact timestamps in process creation/completion and notarization creation.
    - Done when :: No handler/unit test relies on time windows or sleeps.
-** TODO [#B] Provide template/config seams for handler tests
+** DONE [#B] Provide template/config seams for handler tests
    - Why :: Rendering is part of the handler response; tests should not depend on the full HTML templates on disk.
    - Change :: For tests:
      - Provide minimal templates with the same template names the handlers execute (e.g. `home.html`, `action_list.html`).

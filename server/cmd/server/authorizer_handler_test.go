@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -98,11 +97,6 @@ func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 
 func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Authorizer) (*Server, string, time.Time) {
 	t.Helper()
-	cfgPath := writeTestConfig(t)
-	tmpl := template.Must(template.New("test").Parse(`
-{{define "action_list.html"}}{{.Error}}{{end}}
-{{define "backoffice_process.html"}}{{.Error}}{{end}}
-`))
 	fixedNow := time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC)
 
 	process := Process{
@@ -122,11 +116,13 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 
 	server := &Server{
 		store:      store,
-		tmpl:       tmpl,
+		tmpl:       testTemplates(),
 		authorizer: authorizer,
 		sse:        newSSEHub(),
-		configPath: cfgPath,
-		now:        func() time.Time { return fixedNow },
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+		now: func() time.Time { return fixedNow },
 	}
 	return server, process.ID.Hex(), fixedNow
 }

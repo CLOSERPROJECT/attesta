@@ -81,17 +81,18 @@ type FakeNotary struct {
 }
 
 type Server struct {
-	mongo         *mongo.Client
-	store         Store
-	tmpl          *template.Template
-	authorizer    Authorizer
-	sse           *SSEHub
-	now           func() time.Time
-	workflowDefID primitive.ObjectID
-	configPath    string
-	configMu      sync.Mutex
-	configModTime time.Time
-	config        *RuntimeConfig
+	mongo          *mongo.Client
+	store          Store
+	tmpl           *template.Template
+	authorizer     Authorizer
+	sse            *SSEHub
+	now            func() time.Time
+	configProvider func() (RuntimeConfig, error)
+	workflowDefID  primitive.ObjectID
+	configPath     string
+	configMu       sync.Mutex
+	configModTime  time.Time
+	config         *RuntimeConfig
 }
 
 type SSEHub struct {
@@ -293,7 +294,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := s.getConfig(); err != nil {
+	if _, err := s.runtimeConfig(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -313,7 +314,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -366,7 +367,7 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -385,7 +386,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 }
 
 func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -403,7 +404,7 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 }
 
 func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -459,7 +460,7 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid impersonation", http.StatusBadRequest)
 		return
 	}
-	if cfg, err := s.getConfig(); err == nil && !s.isKnownRole(cfg, role) {
+	if cfg, err := s.runtimeConfig(); err == nil && !s.isKnownRole(cfg, role) {
 		http.Error(w, "unknown role", http.StatusBadRequest)
 		return
 	}
@@ -473,7 +474,7 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -576,7 +577,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -625,7 +626,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -657,7 +658,7 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request, role, processID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -693,7 +694,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 }
 
 func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http.Request, role string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -737,6 +738,13 @@ func (s *Server) loadLatestProcess(ctx context.Context) (*Process, error) {
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
 	return process, nil
+}
+
+func (s *Server) runtimeConfig() (RuntimeConfig, error) {
+	if s.configProvider != nil {
+		return s.configProvider()
+	}
+	return s.getConfig()
 }
 
 func (s *Server) getConfig() (RuntimeConfig, error) {
@@ -1226,7 +1234,7 @@ func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) renderActionList(w http.ResponseWriter, process *Process, actor Actor, message string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1248,7 +1256,7 @@ func (s *Server) renderActionList(w http.ResponseWriter, process *Process, actor
 }
 
 func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, process *Process, actor Actor, message string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
