@@ -213,7 +213,7 @@
    - Tests :: Use goroutines carefully; avoid sleeps by using buffered channels and deterministic reads.
    - Done when :: SSEHub is covered with at least one positive and one negative/edge test.
 
-* WIP [#A] Implement handler tests with fakes (positive + negative)
+* DONE [#A] Implement handler tests with fakes (positive + negative)
   - Effort :: L
   - Goal :: Cover the majority of handler statements to reach ≥70% coverage without external services.
   - Notes :: Use `httptest.NewRequest` + `httptest.NewRecorder`. Prefer asserting: status code, headers (`Location`, `Set-Cookie`), and store state changes.
@@ -276,7 +276,7 @@
      - Negative: missing process -> 404 (for process view).
    - Tests :: Store fixture includes multiple processes in different states to validate todo/active/done grouping.
    - Done when :: Backoffice routes are covered with at least one negative case each.
-** TODO [#C] `GET /events` SSE tests
+** DONE [#C] `GET /events` SSE tests
    - Why :: Ensures SSE endpoint enforces required query params and role validation.
    - Change :: Tests:
      - Negative: missing `processId` and `role` -> 400.
