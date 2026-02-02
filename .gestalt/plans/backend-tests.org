@@ -191,7 +191,7 @@
      - `nextAvailableSubstep` and `nextAvailableSubstepForRole`
    - Tests :: Cover: empty progress, partial progress, fully done, nil process.
    - Done when :: All transitions are validated with both positive and negative cases.
-** TODO [#B] Payload normalization + digest
+** DONE [#B] Payload normalization + digest
    - Why :: Input validation drives 400 vs success, and notarization digest should be stable.
    - Change :: Add tests for:
      - `normalizePayload` number parsing success/failure; default string behavior
