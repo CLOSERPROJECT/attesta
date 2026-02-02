@@ -71,11 +71,11 @@
    - Tests :: N/A (convention).
    - Done when :: This section exists in the plan and is mirrored in docs.
 
-* TODO [#A] Minimal refactor to enable fast unit tests (ports/adapters)
+* WIP [#A] Minimal refactor to enable fast unit tests (ports/adapters)
   - Effort :: M
   - Goal :: Make handler tests possible without Docker by introducing small, explicit seams (Hex-lite).
   - Notes :: Keep behavior identical; avoid moving routes/HTML structure. Refactor only what is needed to test deterministically.
-** TODO [#A] Introduce a storage port with an in-memory adapter for tests
+** DONE [#A] Introduce a storage port with an in-memory adapter for tests
    - Why :: Current handler logic cannot be unit-tested without a real MongoDB instance.
    - Change :: Add a `Store` interface (port) that covers only operations used by handlers:
      - Processes: insert, load by ID, load latest, list recent, update progress subdocument, update status

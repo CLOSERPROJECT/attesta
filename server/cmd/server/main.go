@@ -16,11 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/yaml.v3"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/yaml.v3"
 )
 
 type WorkflowDef struct {
@@ -83,7 +82,7 @@ type FakeNotary struct {
 
 type Server struct {
 	mongo         *mongo.Client
-	db            *mongo.Database
+	store         Store
 	tmpl          *template.Template
 	cerbosURL     string
 	sse           *SSEHub
@@ -100,17 +99,17 @@ type SSEHub struct {
 }
 
 type TimelineSubstep struct {
-	SubstepID string
-	Title     string
-	Role      string
-	RoleLabel string
-	RoleColor string
+	SubstepID  string
+	Title      string
+	Role       string
+	RoleLabel  string
+	RoleColor  string
 	RoleBorder string
-	Status    string
-	DoneBy    string
-	DoneRole  string
-	DoneAt    string
-	Data      map[string]interface{}
+	Status     string
+	DoneBy     string
+	DoneRole   string
+	DoneAt     string
+	Data       map[string]interface{}
 }
 
 type TimelineStep struct {
@@ -120,18 +119,18 @@ type TimelineStep struct {
 }
 
 type ActionView struct {
-	ProcessID string
-	SubstepID string
-	Title     string
-	Role      string
-	RoleLabel string
-	RoleColor string
+	ProcessID  string
+	SubstepID  string
+	Title      string
+	Role       string
+	RoleLabel  string
+	RoleColor  string
 	RoleBorder string
-	InputKey  string
-	InputType string
-	Status    string
-	Disabled  bool
-	Reason    string
+	InputKey   string
+	InputType  string
+	Status     string
+	Disabled   bool
+	Reason     string
 }
 
 type ActionTodo struct {
@@ -186,7 +185,7 @@ type ProcessSummary struct {
 }
 
 type BackofficeLandingView struct {
-	Body string
+	Body  string
 	Users []UserView
 }
 
@@ -247,7 +246,7 @@ func main() {
 
 	server := &Server{
 		mongo:         client,
-		db:            db,
+		store:         &MongoStore{db: db},
 		tmpl:          tmpl,
 		cerbosURL:     envOr("CERBOS_URL", "http://localhost:3592"),
 		sse:           newSSEHub(),
@@ -297,11 +296,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	collection := s.db.Collection("processes")
-	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
-	var latest Process
 	latestID := ""
-	if err := collection.FindOne(ctx, bson.M{}, opts).Decode(&latest); err == nil {
+	if latest, err := s.loadLatestProcess(ctx); err == nil {
 		latestID = latest.ID.Hex()
 	}
 
@@ -333,12 +329,11 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 			process.Progress[encodeProgressKey(sub.SubstepID)] = ProcessStep{State: "pending"}
 		}
 	}
-	result, err := s.db.Collection("processes").InsertOne(ctx, process)
+	id, err := s.store.InsertProcess(ctx, process)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id := result.InsertedID.(primitive.ObjectID)
 	for _, role := range s.roles(cfg) {
 		s.sse.Broadcast("role:"+role, "role-updated")
 	}
@@ -537,13 +532,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		Data:   payload,
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"progress." + encodeProgressKey(substepID): progressUpdate,
-		},
-	}
-
-	if err := s.db.Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": process.ID}, update).Err(); err != nil {
+	if err := s.store.UpdateProcessProgress(ctx, process.ID, substepID, progressUpdate); err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
 		return
 	}
@@ -559,14 +548,14 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 			Digest: digestPayload(payload),
 		},
 	}
-	if _, err := s.db.Collection("notarizations").InsertOne(ctx, notary); err != nil {
+	if err := s.store.InsertNotarization(ctx, notary); err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
 		return
 	}
 
 	process, _ = s.loadProcess(ctx, processID)
 	if process != nil && isProcessDone(cfg.Workflow, process) {
-		_, _ = s.db.Collection("processes").UpdateOne(ctx, bson.M{"_id": process.ID}, bson.M{"$set": bson.M{"status": "done"}})
+		_ = s.store.UpdateProcessStatus(ctx, process.ID, "done")
 	}
 
 	s.sse.Broadcast(processID, "process-updated")
@@ -727,22 +716,21 @@ func (s *Server) loadProcess(ctx context.Context, id string) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	var process Process
-	if err := s.db.Collection("processes").FindOne(ctx, bson.M{"_id": objectID}).Decode(&process); err != nil {
+	process, err := s.store.LoadProcessByID(ctx, objectID)
+	if err != nil {
 		return nil, err
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
-	return &process, nil
+	return process, nil
 }
 
 func (s *Server) loadLatestProcess(ctx context.Context) (*Process, error) {
-	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
-	var process Process
-	if err := s.db.Collection("processes").FindOne(ctx, bson.M{}, opts).Decode(&process); err != nil {
+	process, err := s.store.LoadLatestProcess(ctx)
+	if err != nil {
 		return nil, err
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
-	return &process, nil
+	return process, nil
 }
 
 func (s *Server) getConfig() (RuntimeConfig, error) {
@@ -854,21 +842,15 @@ func (s *Server) userViews(cfg RuntimeConfig) []UserView {
 }
 
 func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, role string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
-	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(25)
-	cursor, err := s.db.Collection("processes").Find(ctx, bson.M{}, opts)
+	processes, err := s.store.ListRecentProcesses(ctx, 25)
 	if err != nil {
 		return nil, nil, nil
 	}
-	defer cursor.Close(ctx)
 
 	var todo []ActionTodo
 	var active []ProcessSummary
 	var done []ProcessSummary
-	for cursor.Next(ctx) {
-		var process Process
-		if err := cursor.Decode(&process); err != nil {
-			continue
-		}
+	for _, process := range processes {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := process.Status
 		if status == "" {
@@ -924,11 +906,11 @@ func buildTimeline(def WorkflowDef, process *Process, roleMeta map[string]RoleMe
 		for _, sub := range sortedSubsteps(step) {
 			meta := roleMetaFor(sub.Role, roleMeta)
 			entry := TimelineSubstep{
-				SubstepID: sub.SubstepID,
-				Title:     sub.Title,
-				Role:      sub.Role,
-				RoleLabel: meta.Label,
-				RoleColor: meta.Color,
+				SubstepID:  sub.SubstepID,
+				Title:      sub.Title,
+				Role:       sub.Role,
+				RoleLabel:  meta.Label,
+				RoleColor:  meta.Color,
 				RoleBorder: meta.Border,
 			}
 			if process != nil {
@@ -1081,18 +1063,18 @@ func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bo
 			reason = "Role mismatch"
 		}
 		actions = append(actions, ActionView{
-			ProcessID: processIDString(process),
-			SubstepID: sub.SubstepID,
-			Title:     sub.Title,
-			Role:      sub.Role,
-			RoleLabel: meta.Label,
-			RoleColor: meta.Color,
+			ProcessID:  processIDString(process),
+			SubstepID:  sub.SubstepID,
+			Title:      sub.Title,
+			Role:       sub.Role,
+			RoleLabel:  meta.Label,
+			RoleColor:  meta.Color,
 			RoleBorder: meta.Border,
-			InputKey:  sub.InputKey,
-			InputType: sub.InputType,
-			Status:    status,
-			Disabled:  disabled,
-			Reason:    reason,
+			InputKey:   sub.InputKey,
+			InputType:  sub.InputType,
+			Status:     status,
+			Disabled:   disabled,
+			Reason:     reason,
 		})
 	}
 	return actions
