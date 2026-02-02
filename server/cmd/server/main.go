@@ -84,7 +84,7 @@ type Server struct {
 	mongo         *mongo.Client
 	store         Store
 	tmpl          *template.Template
-	cerbosURL     string
+	authorizer    Authorizer
 	sse           *SSEHub
 	workflowDefID primitive.ObjectID
 	configPath    string
@@ -248,7 +248,7 @@ func main() {
 		mongo:         client,
 		store:         &MongoStore{db: db},
 		tmpl:          tmpl,
-		cerbosURL:     envOr("CERBOS_URL", "http://localhost:3592"),
+		authorizer:    NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:           newSSEHub(),
 		workflowDefID: primitive.NewObjectID(),
 		configPath:    envOr("WORKFLOW_CONFIG", "config/workflow.yaml"),
@@ -495,7 +495,11 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 
 	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
-	allowed, err := s.checkCerbos(r.Context(), actor, processID, substep, step.Order, sequenceOK)
+	if s.authorizer == nil {
+		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
+		return
+	}
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, substep, step.Order, sequenceOK)
 	if err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
@@ -1196,63 +1200,6 @@ func digestPayload(payload map[string]interface{}) string {
 	data, _ := json.Marshal(payload)
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
-}
-
-func (s *Server) checkCerbos(ctx context.Context, actor Actor, processID string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
-	request := map[string]interface{}{
-		"requestId": fmt.Sprintf("req-%d", time.Now().UnixNano()),
-		"principal": map[string]interface{}{
-			"id":    actor.UserID,
-			"roles": []string{actor.Role},
-		},
-		"resource": map[string]interface{}{
-			"kind": "substep",
-			"instances": map[string]interface{}{
-				sub.SubstepID: map[string]interface{}{
-					"attr": map[string]interface{}{
-						"roleRequired": sub.Role,
-						"stepOrder":    stepOrder,
-						"substepOrder": sub.Order,
-						"substepId":    sub.SubstepID,
-						"processId":    processID,
-						"sequenceOk":   sequenceOK,
-					},
-				},
-			},
-		},
-		"actions": []string{"complete"},
-	}
-
-	body, _ := json.Marshal(request)
-	endpoint := strings.TrimSuffix(s.cerbosURL, "/") + "/api/check"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(body)))
-	if err != nil {
-		return false, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("cerbos status %d", resp.StatusCode)
-	}
-	var result struct {
-		ResourceInstances map[string]struct {
-			Actions map[string]string `json:"actions"`
-		} `json:"resourceInstances"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return false, err
-	}
-	if res, ok := result.ResourceInstances[sub.SubstepID]; ok {
-		if effect, ok := res.Actions["complete"]; ok {
-			return strings.EqualFold(effect, "EFFECT_ALLOW"), nil
-		}
-	}
-	return false, nil
 }
 
 func (s *Server) renderActionError(w http.ResponseWriter, status int, message string, process *Process, actor Actor) {

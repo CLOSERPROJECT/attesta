@@ -85,7 +85,7 @@
      - Update `Server` to depend on `Store` instead of `*mongo.Database`.
    - Tests :: New unit tests will target handlers using `MemoryStore` and verify state transitions.
    - Done when :: Handlers can be executed in tests with no Docker services running.
-** TODO [#A] Introduce a Cerbos/authorization port + fake
+** DONE [#A] Introduce a Cerbos/authorization port + fake
    - Why :: `checkCerbos()` currently depends on network + `http.DefaultClient`, complicating deterministic tests and negative cases (timeouts, non-200, deny).
    - Change :: Add an `Authorizer` interface:
      - Method like `CanComplete(ctx, actor, processID, substep, stepOrder, sequenceOK) (bool, error)`
