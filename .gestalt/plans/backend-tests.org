@@ -106,7 +106,7 @@
    - Tests :: Handler tests assert status codes + presence of key markers in rendered output, not full HTML snapshots.
    - Done when :: Handler tests do not require reading template files or YAML from disk (except for specific `getConfig()` tests).
 
-* WIP [#A] Build fixtures and test matrix (positive + negative)
+* DONE [#A] Build fixtures and test matrix (positive + negative)
   - Effort :: M
   - Goal :: Define exactly what is covered and ensure coverage growth is intentional, not accidental.
   - Notes :: Prefer fewer brittle HTML assertions; focus on HTTP status, redirects, cookies, and persisted state in the `Store`.
@@ -120,7 +120,7 @@
      - `server/cmd/server/test_helpers_test.go:testRuntimeConfig()` is the canonical fixture.
      - Tests inject it through `Server.configProvider`.
    - Done when :: All tests share the same fixture builder and avoid ad-hoc configs.
-** TODO [#A] Enumerate handler routes + expected behavior (REPR-style per route)
+** DONE [#A] Enumerate handler routes + expected behavior (REPR-style per route)
    - Why :: Route behavior is the contract; tests should encode it explicitly.
    - Change :: Write a route matrix for:
      - `GET /` (home)
@@ -132,8 +132,44 @@
      - `GET /backoffice` and `/backoffice/:role` (+ partial + process page)
      - `GET /events?processId=...` or `?role=...`
      For each: request shape, auth/sequence expectations, status codes, and response type (full page vs HTMX partial).
-   - Tests :: The route matrix becomes the checklist for tests; each route must have at least 1 positive + 2 negative tests.
-   - Done when :: The plan lists concrete test cases per route, including status codes and key assertions.
+   - Route matrix ::
+     - `GET /`
+       - Positive: 200 renders home marker
+       - Negative: wrong path (`/x`) -> 404
+       - Negative: config provider error -> 500
+     - `POST /process/start`
+       - Positive: 303 redirect to `/process/:id`; process inserted with pending map
+       - Negative: wrong method -> 405
+       - Negative: config error/store insert error -> 500
+     - `GET /process/:id`
+       - Positive: 200 renders process marker + timeline marker
+       - Negative: invalid id -> 404
+       - Negative: missing process/template error -> 404/500
+     - `GET /process/:id/timeline`
+       - Positive: 200 renders timeline marker
+       - Negative: invalid id -> 404
+       - Negative: missing process/template error -> 404/500
+     - `POST /process/:id/substep/:substepId/complete`
+       - Positive: HTMX 200 updates progress + notarization
+       - Positive: non-HTMX 200 renders process page
+       - Negative: missing process/substep -> 404
+       - Negative: sequence fail -> 409
+       - Negative: authorizer deny/error -> 403/502
+       - Negative: form/value/parse/update/notarize errors -> 400/500
+     - `POST /impersonate`
+       - Positive: 303 + `demo_user` cookie + redirect to role dashboard
+       - Negative: wrong method -> 405
+       - Negative: missing fields/unknown role/parse error -> 400
+     - `GET /backoffice`, `/backoffice/:role`, `/backoffice/:role/partial`, `/backoffice/:role/process/:id`
+       - Positive: 200 for known role and existing process
+       - Negative: unknown role -> 404
+       - Negative: missing process/template/config errors -> 404/500
+     - `GET /events?processId=...` or `?role=...`
+       - Positive: SSE stream emits process/role updates
+       - Negative: missing both query params -> 400
+       - Negative: unknown role -> 400
+   - Tests :: The route matrix is the checklist for handler test coverage.
+   - Done when :: Each route has at least one positive plus two negative cases encoded in tests.
 
 * TODO [#A] Implement unit tests for pure/domain-ish helpers
   - Effort :: M
