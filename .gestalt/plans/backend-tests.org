@@ -171,7 +171,7 @@
    - Tests :: The route matrix is the checklist for handler test coverage.
    - Done when :: Each route has at least one positive plus two negative cases encoded in tests.
 
-* WIP [#A] Implement unit tests for pure/domain-ish helpers
+* DONE [#A] Implement unit tests for pure/domain-ish helpers
   - Effort :: M
   - Goal :: Quickly raise coverage with stable unit tests, and lock in workflow invariants.
   - Notes :: These tests should be fast and not involve HTTP, templates, or external IO.
@@ -205,7 +205,7 @@
      - `isHTMXRequest` (case-insensitive “true”)
    - Tests :: Straightforward unit tests.
    - Done when :: Cookie parsing and HTMX detection are fully covered including negative cases.
-** TODO [#C] SSE hub behavior
+** DONE [#C] SSE hub behavior
    - Why :: SSE is concurrency-adjacent; regressions are subtle.
    - Change :: Add tests for:
      - Subscribe/unsubscribe lifecycle (channel closed on unsubscribe)
