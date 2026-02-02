@@ -66,3 +66,23 @@ curl -X POST http://localhost:3000/process/PROCESS_ID/substep/2.1/complete \
 - Cerbos PDP is expected at `http://localhost:3592`.
 - MongoDB is expected at `mongodb://localhost:27017`.
 - Timeline updates pull `/process/:id/timeline` when SSE events arrive.
+
+## Tests
+Unit tests:
+```bash
+task test
+# or: cd server && go test ./...
+```
+
+Coverage with 70% gate:
+```bash
+task cover
+# or: cd server && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out
+```
+
+Optional integration test command (Docker-backed):
+```bash
+docker compose up -d
+cd server
+go test -tags=integration ./...
+```

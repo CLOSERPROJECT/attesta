@@ -1,0 +1,320 @@
+#+TITLE: Backend Tests (Go server)
+#+SUBTITLE: Reach ≥70% coverage with positive + negative tests
+#+DATE: 2026-02-02
+#+KEYWORDS: go, testing, coverage, httptest, hex, ports-adapters, cerbos, mongodb, sse, htmx
+
+* DONE [#A] Align on scope + success criteria
+  - Effort :: S
+  - Goal :: Remove ambiguity around “70% coverage” and what’s included.
+  - Notes :: This repo’s backend is largely `server/cmd/server/main.go` (single package `main`), so coverage and testability hinge on seams for Mongo + Cerbos + time + templates.
+** DONE [#A] Confirm coverage definition + gating
+   - Why :: “70%” can mean per-package, module-wide, with/without integration tests, and with/without generated/template code.
+   - Change :: Decide and document:
+     - Command of record: `cd server && go test ./... -coverprofile=coverage.out`
+     - Threshold scope: module-wide total (recommended) vs per-package minimum.
+     - Whether `-coverpkg=./...` is required (usually not, given single package today).
+     - Whether integration tests (Mongo/Cerbos) count toward the 70% (recommend: no; unit suite alone should pass threshold).
+   - Decision ::
+     - Coverage command of record: `cd server && go test ./... -coverprofile=coverage.out`
+     - Gate on module-wide total from `go tool cover -func=coverage.out` (not per-package)
+     - No `-coverpkg=./...` requirement for now (single package path today)
+     - Integration tests do *not* count toward the 70% gate; unit suite must pass on its own
+     - CI/local gate target: `>= 70.0%`
+   - Tests :: N/A (decision).
+   - Done when :: Definition is in this plan and mirrored to project docs with exact commands.
+** DONE [#B] Confirm “negative test” expectations
+   - Why :: “Negative” could mean invalid inputs, unauthorized, out-of-sequence, dependency failures, and/or server errors.
+   - Change :: Agree minimum negative categories to cover:
+     - Request validation (400/405/404)
+     - Authorization/sequence gating (403/409)
+     - Dependency failures (502 Cerbos, 500 storage, 500 template/config)
+   - Decision matrix ::
+     - Validation: 400 (bad form/payload), 404 (missing resources), 405 (wrong method)
+     - Authorization + sequence: 403 (deny), 409 (out of sequence)
+     - Dependency and rendering failures: 500 (store/template/config), 502 (authorizer upstream)
+   - Tests :: N/A (decision).
+   - Done when :: Matrix is explicit in this plan and used as checklist in route-level tests.
+
+* DONE [#A] Establish baseline + test harness conventions
+  - Effort :: S
+  - Goal :: Know current coverage and pick the simplest harness that’s stable in CI/local.
+  - Notes :: Avoid adding third-party test deps unless clearly needed; prefer stdlib `testing`, `httptest`, table-driven tests.
+** DONE [#A] Inventory current testability seams
+   - Why :: Handlers currently call Mongo directly via `*mongo.Database` and call Cerbos via `http.DefaultClient`, making unit tests brittle without refactoring.
+   - Change :: Document (in the plan) current IO touchpoints:
+     - Mongo: `s.db.Collection(...).Find/FindOne/InsertOne/UpdateOne/FindOneAndUpdate`
+     - Cerbos: `checkCerbos()` HTTP POST to `/api/check`
+     - Config: `getConfig()` reads YAML file and caches by modtime
+     - Templates: `ExecuteTemplate` across multiple template names
+     - Time: `time.Now().UTC()` in process creation and completion
+   - Inventory result ::
+     - Mongo IO: replace direct `s.db.Collection(...` calls with a `Store` port (process CRUD-ish ops + notarization insert)
+     - Cerbos IO: replace `checkCerbos()` network call with `Authorizer` port
+     - Config IO: keep `getConfig()` for prod, inject `ConfigProvider` function in tests
+     - Template IO: keep html/template usage but allow in-memory templates in tests
+     - Time IO: inject `now func() time.Time` for deterministic timestamps
+   - Tests :: N/A (inventory).
+   - Done when :: The plan lists concrete seams and their minimal interfaces/function fields.
+** DONE [#B] Define test layout + naming
+   - Why :: Consistency keeps “a lot of tests” maintainable.
+   - Change :: Adopt conventions:
+     - Keep tests in `server/cmd/server` and `package main` to access unexported helpers.
+     - Use `*_test.go` helpers (e.g. `test_helpers_test.go`) for fixtures and fakes.
+     - Prefer table-driven tests; use `t.Run` and `t.Parallel()` where safe.
+   - Testing conventions ::
+     - Put tests beside code in `server/cmd/server` with `package main`
+     - Keep shared fixtures/fakes in `test_helpers_test.go`
+     - Use table-driven tests for pure helpers
+     - Use handler-focused tests with `httptest.NewRequest`/`httptest.NewRecorder`
+     - Use `t.Parallel()` only for tests that do not mutate shared fakes/state
+     - Assert stable markers (status, headers, key body substrings) over full HTML snapshots
+   - Tests :: N/A (convention).
+   - Done when :: This section exists in the plan and is mirrored in docs.
+
+* DONE [#A] Minimal refactor to enable fast unit tests (ports/adapters)
+  - Effort :: M
+  - Goal :: Make handler tests possible without Docker by introducing small, explicit seams (Hex-lite).
+  - Notes :: Keep behavior identical; avoid moving routes/HTML structure. Refactor only what is needed to test deterministically.
+** DONE [#A] Introduce a storage port with an in-memory adapter for tests
+   - Why :: Current handler logic cannot be unit-tested without a real MongoDB instance.
+   - Change :: Add a `Store` interface (port) that covers only operations used by handlers:
+     - Processes: insert, load by ID, load latest, list recent, update progress subdocument, update status
+     - Notarizations: insert
+     - Keep production adapter `MongoStore` using the existing mongo-driver calls.
+     - Add `MemoryStore` (test-only) that stores processes/notarizations in maps and mimics key behaviors (including progress key encoding rules).
+     - Update `Server` to depend on `Store` instead of `*mongo.Database`.
+   - Tests :: New unit tests will target handlers using `MemoryStore` and verify state transitions.
+   - Done when :: Handlers can be executed in tests with no Docker services running.
+** DONE [#A] Introduce a Cerbos/authorization port + fake
+   - Why :: `checkCerbos()` currently depends on network + `http.DefaultClient`, complicating deterministic tests and negative cases (timeouts, non-200, deny).
+   - Change :: Add an `Authorizer` interface:
+     - Method like `CanComplete(ctx, actor, processID, substep, stepOrder, sequenceOK) (bool, error)`
+     - Production `CerbosAuthorizer` wraps current JSON request/response handling.
+     - Test fake authorizer supports scripted outcomes: allow/deny/error based on inputs.
+   - Tests :: Unit tests for handler authorization and dependency failure mapping (502).
+   - Done when :: Handler tests can force allow/deny/error without network.
+** DONE [#B] Make time deterministic where it affects assertions
+   - Why :: `time.Now().UTC()` makes “doneAt/createdAt” assertions flaky.
+   - Change :: Add a `now func() time.Time` field on `Server` (default `time.Now`) and use it where timestamps are written.
+   - Tests :: Assert exact timestamps in process creation/completion and notarization creation.
+   - Done when :: No handler/unit test relies on time windows or sleeps.
+** DONE [#B] Provide template/config seams for handler tests
+   - Why :: Rendering is part of the handler response; tests should not depend on the full HTML templates on disk.
+   - Change :: For tests:
+     - Provide minimal templates with the same template names the handlers execute (e.g. `home.html`, `action_list.html`).
+     - Provide a `ConfigProvider` seam (either interface or function field) so tests can inject a known `RuntimeConfig` without touching the filesystem; keep `getConfig()` as production implementation.
+   - Tests :: Handler tests assert status codes + presence of key markers in rendered output, not full HTML snapshots.
+   - Done when :: Handler tests do not require reading template files or YAML from disk (except for specific `getConfig()` tests).
+
+* DONE [#A] Build fixtures and test matrix (positive + negative)
+  - Effort :: M
+  - Goal :: Define exactly what is covered and ensure coverage growth is intentional, not accidental.
+  - Notes :: Prefer fewer brittle HTML assertions; focus on HTTP status, redirects, cookies, and persisted state in the `Store`.
+** DONE [#A] Define canonical workflow fixture + actors
+   - Why :: Many helpers (sequence, availability, timeline, actions) depend on consistent ordering and roles.
+   - Change :: Create a single in-test `RuntimeConfig` fixture mirroring `server/config/workflow.yaml`:
+     - Roles: `dep1/dep2/dep3`, users `u1/u2/u3`
+     - Substeps: `1.1`..`3.2`, ordered
+   - Tests :: Reuse this fixture across all unit + handler tests.
+   - Implemented ::
+     - `server/cmd/server/test_helpers_test.go:testRuntimeConfig()` is the canonical fixture.
+     - Tests inject it through `Server.configProvider`.
+   - Done when :: All tests share the same fixture builder and avoid ad-hoc configs.
+** DONE [#A] Enumerate handler routes + expected behavior (REPR-style per route)
+   - Why :: Route behavior is the contract; tests should encode it explicitly.
+   - Change :: Write a route matrix for:
+     - `GET /` (home)
+     - `POST /process/start`
+     - `GET /process/:id`
+     - `GET /process/:id/timeline`
+     - `POST /process/:id/substep/:substepId/complete`
+     - `POST /impersonate`
+     - `GET /backoffice` and `/backoffice/:role` (+ partial + process page)
+     - `GET /events?processId=...` or `?role=...`
+     For each: request shape, auth/sequence expectations, status codes, and response type (full page vs HTMX partial).
+   - Route matrix ::
+     - `GET /`
+       - Positive: 200 renders home marker
+       - Negative: wrong path (`/x`) -> 404
+       - Negative: config provider error -> 500
+     - `POST /process/start`
+       - Positive: 303 redirect to `/process/:id`; process inserted with pending map
+       - Negative: wrong method -> 405
+       - Negative: config error/store insert error -> 500
+     - `GET /process/:id`
+       - Positive: 200 renders process marker + timeline marker
+       - Negative: invalid id -> 404
+       - Negative: missing process/template error -> 404/500
+     - `GET /process/:id/timeline`
+       - Positive: 200 renders timeline marker
+       - Negative: invalid id -> 404
+       - Negative: missing process/template error -> 404/500
+     - `POST /process/:id/substep/:substepId/complete`
+       - Positive: HTMX 200 updates progress + notarization
+       - Positive: non-HTMX 200 renders process page
+       - Negative: missing process/substep -> 404
+       - Negative: sequence fail -> 409
+       - Negative: authorizer deny/error -> 403/502
+       - Negative: form/value/parse/update/notarize errors -> 400/500
+     - `POST /impersonate`
+       - Positive: 303 + `demo_user` cookie + redirect to role dashboard
+       - Negative: wrong method -> 405
+       - Negative: missing fields/unknown role/parse error -> 400
+     - `GET /backoffice`, `/backoffice/:role`, `/backoffice/:role/partial`, `/backoffice/:role/process/:id`
+       - Positive: 200 for known role and existing process
+       - Negative: unknown role -> 404
+       - Negative: missing process/template/config errors -> 404/500
+     - `GET /events?processId=...` or `?role=...`
+       - Positive: SSE stream emits process/role updates
+       - Negative: missing both query params -> 400
+       - Negative: unknown role -> 400
+   - Tests :: The route matrix is the checklist for handler test coverage.
+   - Done when :: Each route has at least one positive plus two negative cases encoded in tests.
+
+* DONE [#A] Implement unit tests for pure/domain-ish helpers
+  - Effort :: M
+  - Goal :: Quickly raise coverage with stable unit tests, and lock in workflow invariants.
+  - Notes :: These tests should be fast and not involve HTTP, templates, or external IO.
+** DONE [#A] Workflow ordering + progress key invariants
+   - Why :: Ordering/encoding affects every endpoint and UI view.
+   - Change :: Add tests for:
+     - `sortedSteps`, `sortedSubsteps`, `orderedSubsteps`
+     - `encodeProgressKey` and `normalizeProgressKeys` (including dots/underscores behavior)
+   - Tests :: Table-driven with mixed orders and key edge cases.
+   - Done when :: Ordering is deterministic and key normalization is covered by both positive and edge-case assertions.
+** DONE [#A] Sequence/availability state machine
+   - Why :: The demo’s core invariant is “exactly one next substep is available; others are locked until prior is done”.
+   - Change :: Add tests for:
+     - `computeAvailability` (only first pending is available)
+     - `isSequenceOK` (true only when all previous are done)
+     - `isProcessDone`
+     - `nextAvailableSubstep` and `nextAvailableSubstepForRole`
+   - Tests :: Cover: empty progress, partial progress, fully done, nil process.
+   - Done when :: All transitions are validated with both positive and negative cases.
+** DONE [#B] Payload normalization + digest
+   - Why :: Input validation drives 400 vs success, and notarization digest should be stable.
+   - Change :: Add tests for:
+     - `normalizePayload` number parsing success/failure; default string behavior
+     - `digestPayload` stability (same map content -> same digest; include at least one negative test around non-deterministic map ordering if applicable by implementation)
+   - Tests :: Use fixed inputs; assert exact outputs or at least non-empty hex length.
+   - Done when :: Both success and failure modes are covered and deterministic.
+** DONE [#B] Actor + HTMX detection helpers
+   - Why :: Cookie parsing and HTMX branching affect handler behavior.
+   - Change :: Add tests for:
+     - `readActor` (missing cookie, malformed cookie, correct cookie)
+     - `isHTMXRequest` (case-insensitive “true”)
+   - Tests :: Straightforward unit tests.
+   - Done when :: Cookie parsing and HTMX detection are fully covered including negative cases.
+** DONE [#C] SSE hub behavior
+   - Why :: SSE is concurrency-adjacent; regressions are subtle.
+   - Change :: Add tests for:
+     - Subscribe/unsubscribe lifecycle (channel closed on unsubscribe)
+     - Broadcast delivers to subscribers; buffer overflow behavior doesn’t block
+   - Tests :: Use goroutines carefully; avoid sleeps by using buffered channels and deterministic reads.
+   - Done when :: SSEHub is covered with at least one positive and one negative/edge test.
+
+* DONE [#A] Implement handler tests with fakes (positive + negative)
+  - Effort :: L
+  - Goal :: Cover the majority of handler statements to reach ≥70% coverage without external services.
+  - Notes :: Use `httptest.NewRequest` + `httptest.NewRecorder`. Prefer asserting: status code, headers (`Location`, `Set-Cookie`), and store state changes.
+** DONE [#A] `POST /process/start` tests
+   - Why :: Creates initial process state and triggers SSE role broadcasts.
+   - Change :: Tests:
+     - Positive: returns 303, sets `Location: /process/:id`, inserts process with all substeps pending.
+     - Negative: wrong method -> 405.
+     - Negative: config load error -> 500.
+     - Negative: store insert error -> 500.
+   - Tests :: Verify progress map includes all configured substeps with `pending` state.
+   - Done when :: Both redirect behavior and persisted process state are validated.
+** DONE [#A] `POST /impersonate` tests
+   - Why :: Drives auth context for backoffice; easy wins for coverage.
+   - Change :: Tests:
+     - Positive: sets `demo_user` cookie and redirects to `/backoffice/:role`.
+     - Negative: wrong method -> 405.
+     - Negative: parse form error / missing fields -> 400.
+     - Negative: unknown role (when config available) -> 400.
+   - Tests :: Assert cookie value format `userId|role`.
+   - Done when :: Cookie + redirect contract is locked in with negative cases.
+** DONE [#A] `GET /process/:id` + `GET /process/:id/timeline` tests
+   - Why :: Core read paths; should validate 404 and template rendering.
+   - Change :: Tests:
+     - Positive: existing process renders 200 (full page and partial).
+     - Negative: bad ObjectID -> 404 or 404-like behavior (confirm current behavior and codify).
+     - Negative: missing process -> 404.
+     - Negative: template execution error -> 500 (force by providing a template that errors).
+   - Tests :: Assert response contains a stable marker (e.g., process ID or body name) rather than full HTML.
+   - Done when :: Read paths are covered with both existence and error handling.
+** DONE [#A] `POST /process/:id/substep/:substepId/complete` tests (HTMX + non-HTMX)
+   - Why :: Most logic lives here: actor selection, sequence gating, auth, validation, store writes, notarization, status update, SSE broadcast.
+   - Change :: Tests (minimum set):
+     - Positive (HTMX): allowed + sequence OK + valid value -> 200 and updates progress + notarization written.
+     - Positive (non-HTMX): same but returns a full page render and correct status code.
+     - Negative: missing/invalid actor cookie falls back to default role actor.
+     - Negative: process not found -> 404 (and correct error render path for HTMX vs non-HTMX).
+     - Negative: substep not found -> 404.
+     - Negative: sequence not OK -> 409.
+     - Negative: authorizer denies -> 403.
+     - Negative: authorizer errors -> 502.
+     - Negative: form parse error -> 400.
+     - Negative: missing value -> 400.
+     - Negative: invalid number parsing for numeric substep -> 400 with message.
+     - Negative: store update error -> 500.
+     - Negative: notarization insert error -> 500.
+   - Tests :: Assert:
+     - Progress transitions: `pending` -> `done` with `DoneAt`, `DoneBy`, and `Data`.
+     - Notarization digest is non-empty and method is `sha256`.
+     - When completing the final substep, process status becomes `done`.
+   - Done when :: The handler’s main branches (success + each error mapping) are covered and stable.
+** DONE [#B] `GET /backoffice` + department dashboards tests
+   - Why :: Backoffice code covers role validation, dashboard queries, and template execution.
+   - Change :: Tests:
+     - Positive: `/backoffice` renders landing with user list.
+     - Positive: `/backoffice/:role` sets/normalizes cookie to match role and renders dashboard.
+     - Positive: `/backoffice/:role/partial` returns partial dashboard.
+     - Positive: `/backoffice/:role/process/:id` renders process view for role.
+     - Negative: unknown role -> 404.
+     - Negative: missing process -> 404 (for process view).
+   - Tests :: Store fixture includes multiple processes in different states to validate todo/active/done grouping.
+   - Done when :: Backoffice routes are covered with at least one negative case each.
+** DONE [#C] `GET /events` SSE tests
+   - Why :: Ensures SSE endpoint enforces required query params and role validation.
+   - Change :: Tests:
+     - Negative: missing `processId` and `role` -> 400.
+     - Negative: unknown role -> 400.
+     - Positive: subscribe by processId and receive at least one event after broadcast (use request context cancellation to exit).
+     - Positive: subscribe by role and receive “role-updated” events.
+   - Tests :: Use a request context with cancellation; avoid time-based waits by broadcasting immediately after subscription is established.
+   - Done when :: SSE endpoint correctness is covered without flaky sleeps.
+
+* DONE [#A] Coverage enforcement + developer ergonomics
+  - Effort :: S
+  - Goal :: Make it easy to keep coverage ≥70% over time.
+  - Notes :: Prefer Taskfile enhancements over new tooling; do not add new dependencies.
+** DONE [#A] Add a coverage gate command (Taskfile or script)
+   - Why :: Without gating, coverage targets regress silently.
+   - Change :: Add a `task test` and `task cover` in `Taskfile.yml` (or a small shell script under `server/`) that:
+     - Runs `cd server && go test ./... -coverprofile=coverage.out`
+     - Extracts total from `go tool cover -func=coverage.out`
+     - Fails if total < 70.0
+   - Tests :: The gate is self-testing by temporarily setting threshold higher locally (manual check) during development.
+   - Done when :: A single command fails the build when coverage drops below 70%.
+** DONE [#B] Document how to run unit vs integration tests
+   - Why :: Developers need a predictable workflow; integration tests (if added) should be explicit.
+   - Change :: Document:
+     - Unit: `cd server && go test ./...`
+     - Coverage: `cd server && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out`
+     - Optional integration: `docker compose up -d` then `cd server && go test -tags=integration ./...`
+   - Tests :: N/A (docs).
+   - Done when :: README/QUICKSTART includes the commands and expectations.
+
+* DONE [#B] Optional: integration test slice (Docker-backed)
+  - Effort :: M
+  - Goal :: Validate real Mongo + Cerbos behavior end-to-end without bloating unit tests.
+  - Notes :: Keep behind `//go:build integration` so default `go test ./...` remains fast and deterministic.
+** DONE [#B] Add integration tests for real Cerbos + Mongo interactions
+   - Why :: Unit tests with fakes can miss request/response drift and real DB update semantics.
+   - Change :: Add a small number of high-value integration cases:
+     - Complete substep allowed vs denied by Cerbos policy (real PDP)
+     - Mongo progress update and notarization persistence roundtrip
+   - Tests :: Run only under integration tag; ensure they clean up created documents.
+   - Done when :: Integration tests pass reliably when `docker compose up -d` is running, and are skipped otherwise.

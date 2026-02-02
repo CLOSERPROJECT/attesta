@@ -16,11 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/yaml.v3"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/yaml.v3"
 )
 
 type WorkflowDef struct {
@@ -82,16 +81,18 @@ type FakeNotary struct {
 }
 
 type Server struct {
-	mongo         *mongo.Client
-	db            *mongo.Database
-	tmpl          *template.Template
-	cerbosURL     string
-	sse           *SSEHub
-	workflowDefID primitive.ObjectID
-	configPath    string
-	configMu      sync.Mutex
-	configModTime time.Time
-	config        *RuntimeConfig
+	mongo          *mongo.Client
+	store          Store
+	tmpl           *template.Template
+	authorizer     Authorizer
+	sse            *SSEHub
+	now            func() time.Time
+	configProvider func() (RuntimeConfig, error)
+	workflowDefID  primitive.ObjectID
+	configPath     string
+	configMu       sync.Mutex
+	configModTime  time.Time
+	config         *RuntimeConfig
 }
 
 type SSEHub struct {
@@ -100,17 +101,17 @@ type SSEHub struct {
 }
 
 type TimelineSubstep struct {
-	SubstepID string
-	Title     string
-	Role      string
-	RoleLabel string
-	RoleColor string
+	SubstepID  string
+	Title      string
+	Role       string
+	RoleLabel  string
+	RoleColor  string
 	RoleBorder string
-	Status    string
-	DoneBy    string
-	DoneRole  string
-	DoneAt    string
-	Data      map[string]interface{}
+	Status     string
+	DoneBy     string
+	DoneRole   string
+	DoneAt     string
+	Data       map[string]interface{}
 }
 
 type TimelineStep struct {
@@ -120,18 +121,18 @@ type TimelineStep struct {
 }
 
 type ActionView struct {
-	ProcessID string
-	SubstepID string
-	Title     string
-	Role      string
-	RoleLabel string
-	RoleColor string
+	ProcessID  string
+	SubstepID  string
+	Title      string
+	Role       string
+	RoleLabel  string
+	RoleColor  string
 	RoleBorder string
-	InputKey  string
-	InputType string
-	Status    string
-	Disabled  bool
-	Reason    string
+	InputKey   string
+	InputType  string
+	Status     string
+	Disabled   bool
+	Reason     string
 }
 
 type ActionTodo struct {
@@ -186,7 +187,7 @@ type ProcessSummary struct {
 }
 
 type BackofficeLandingView struct {
-	Body string
+	Body  string
 	Users []UserView
 }
 
@@ -247,10 +248,11 @@ func main() {
 
 	server := &Server{
 		mongo:         client,
-		db:            db,
+		store:         &MongoStore{db: db},
 		tmpl:          tmpl,
-		cerbosURL:     envOr("CERBOS_URL", "http://localhost:3592"),
+		authorizer:    NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:           newSSEHub(),
+		now:           time.Now,
 		workflowDefID: primitive.NewObjectID(),
 		configPath:    envOr("WORKFLOW_CONFIG", "config/workflow.yaml"),
 	}
@@ -292,16 +294,13 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := s.getConfig(); err != nil {
+	if _, err := s.runtimeConfig(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	ctx := r.Context()
-	collection := s.db.Collection("processes")
-	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
-	var latest Process
 	latestID := ""
-	if err := collection.FindOne(ctx, bson.M{}, opts).Decode(&latest); err == nil {
+	if latest, err := s.loadLatestProcess(ctx); err == nil {
 		latestID = latest.ID.Hex()
 	}
 
@@ -315,7 +314,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -323,7 +322,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	process := Process{
 		WorkflowDefID: s.workflowDefID,
-		CreatedAt:     time.Now().UTC(),
+		CreatedAt:     s.nowUTC(),
 		CreatedBy:     "demo",
 		Status:        "active",
 		Progress:      map[string]ProcessStep{},
@@ -333,12 +332,11 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 			process.Progress[encodeProgressKey(sub.SubstepID)] = ProcessStep{State: "pending"}
 		}
 	}
-	result, err := s.db.Collection("processes").InsertOne(ctx, process)
+	id, err := s.store.InsertProcess(ctx, process)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id := result.InsertedID.(primitive.ObjectID)
 	for _, role := range s.roles(cfg) {
 		s.sse.Broadcast("role:"+role, "role-updated")
 	}
@@ -369,7 +367,7 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -388,7 +386,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 }
 
 func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -406,7 +404,7 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 }
 
 func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -462,7 +460,7 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid impersonation", http.StatusBadRequest)
 		return
 	}
-	if cfg, err := s.getConfig(); err == nil && !s.isKnownRole(cfg, role) {
+	if cfg, err := s.runtimeConfig(); err == nil && !s.isKnownRole(cfg, role) {
 		http.Error(w, "unknown role", http.StatusBadRequest)
 		return
 	}
@@ -476,7 +474,7 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -500,7 +498,11 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 
 	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
-	allowed, err := s.checkCerbos(r.Context(), actor, processID, substep, step.Order, sequenceOK)
+	if s.authorizer == nil {
+		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
+		return
+	}
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, substep, step.Order, sequenceOK)
 	if err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
@@ -529,7 +531,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	now := time.Now().UTC()
+	now := s.nowUTC()
 	progressUpdate := ProcessStep{
 		State:  "done",
 		DoneAt: &now,
@@ -537,13 +539,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		Data:   payload,
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"progress." + encodeProgressKey(substepID): progressUpdate,
-		},
-	}
-
-	if err := s.db.Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": process.ID}, update).Err(); err != nil {
+	if err := s.store.UpdateProcessProgress(ctx, process.ID, substepID, progressUpdate); err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
 		return
 	}
@@ -559,14 +555,14 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 			Digest: digestPayload(payload),
 		},
 	}
-	if _, err := s.db.Collection("notarizations").InsertOne(ctx, notary); err != nil {
+	if err := s.store.InsertNotarization(ctx, notary); err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
 		return
 	}
 
 	process, _ = s.loadProcess(ctx, processID)
 	if process != nil && isProcessDone(cfg.Workflow, process) {
-		_, _ = s.db.Collection("processes").UpdateOne(ctx, bson.M{"_id": process.ID}, bson.M{"$set": bson.M{"status": "done"}})
+		_ = s.store.UpdateProcessStatus(ctx, process.ID, "done")
 	}
 
 	s.sse.Broadcast(processID, "process-updated")
@@ -581,7 +577,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -630,7 +626,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -662,7 +658,7 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request, role, processID string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -698,7 +694,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 }
 
 func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http.Request, role string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -727,22 +723,28 @@ func (s *Server) loadProcess(ctx context.Context, id string) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	var process Process
-	if err := s.db.Collection("processes").FindOne(ctx, bson.M{"_id": objectID}).Decode(&process); err != nil {
+	process, err := s.store.LoadProcessByID(ctx, objectID)
+	if err != nil {
 		return nil, err
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
-	return &process, nil
+	return process, nil
 }
 
 func (s *Server) loadLatestProcess(ctx context.Context) (*Process, error) {
-	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
-	var process Process
-	if err := s.db.Collection("processes").FindOne(ctx, bson.M{}, opts).Decode(&process); err != nil {
+	process, err := s.store.LoadLatestProcess(ctx)
+	if err != nil {
 		return nil, err
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
-	return &process, nil
+	return process, nil
+}
+
+func (s *Server) runtimeConfig() (RuntimeConfig, error) {
+	if s.configProvider != nil {
+		return s.configProvider()
+	}
+	return s.getConfig()
 }
 
 func (s *Server) getConfig() (RuntimeConfig, error) {
@@ -854,21 +856,15 @@ func (s *Server) userViews(cfg RuntimeConfig) []UserView {
 }
 
 func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, role string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
-	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(25)
-	cursor, err := s.db.Collection("processes").Find(ctx, bson.M{}, opts)
+	processes, err := s.store.ListRecentProcesses(ctx, 25)
 	if err != nil {
 		return nil, nil, nil
 	}
-	defer cursor.Close(ctx)
 
 	var todo []ActionTodo
 	var active []ProcessSummary
 	var done []ProcessSummary
-	for cursor.Next(ctx) {
-		var process Process
-		if err := cursor.Decode(&process); err != nil {
-			continue
-		}
+	for _, process := range processes {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := process.Status
 		if status == "" {
@@ -924,11 +920,11 @@ func buildTimeline(def WorkflowDef, process *Process, roleMeta map[string]RoleMe
 		for _, sub := range sortedSubsteps(step) {
 			meta := roleMetaFor(sub.Role, roleMeta)
 			entry := TimelineSubstep{
-				SubstepID: sub.SubstepID,
-				Title:     sub.Title,
-				Role:      sub.Role,
-				RoleLabel: meta.Label,
-				RoleColor: meta.Color,
+				SubstepID:  sub.SubstepID,
+				Title:      sub.Title,
+				Role:       sub.Role,
+				RoleLabel:  meta.Label,
+				RoleColor:  meta.Color,
 				RoleBorder: meta.Border,
 			}
 			if process != nil {
@@ -1081,18 +1077,18 @@ func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bo
 			reason = "Role mismatch"
 		}
 		actions = append(actions, ActionView{
-			ProcessID: processIDString(process),
-			SubstepID: sub.SubstepID,
-			Title:     sub.Title,
-			Role:      sub.Role,
-			RoleLabel: meta.Label,
-			RoleColor: meta.Color,
+			ProcessID:  processIDString(process),
+			SubstepID:  sub.SubstepID,
+			Title:      sub.Title,
+			Role:       sub.Role,
+			RoleLabel:  meta.Label,
+			RoleColor:  meta.Color,
 			RoleBorder: meta.Border,
-			InputKey:  sub.InputKey,
-			InputType: sub.InputType,
-			Status:    status,
-			Disabled:  disabled,
-			Reason:    reason,
+			InputKey:   sub.InputKey,
+			InputType:  sub.InputType,
+			Status:     status,
+			Disabled:   disabled,
+			Reason:     reason,
 		})
 	}
 	return actions
@@ -1216,61 +1212,11 @@ func digestPayload(payload map[string]interface{}) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (s *Server) checkCerbos(ctx context.Context, actor Actor, processID string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
-	request := map[string]interface{}{
-		"requestId": fmt.Sprintf("req-%d", time.Now().UnixNano()),
-		"principal": map[string]interface{}{
-			"id":    actor.UserID,
-			"roles": []string{actor.Role},
-		},
-		"resource": map[string]interface{}{
-			"kind": "substep",
-			"instances": map[string]interface{}{
-				sub.SubstepID: map[string]interface{}{
-					"attr": map[string]interface{}{
-						"roleRequired": sub.Role,
-						"stepOrder":    stepOrder,
-						"substepOrder": sub.Order,
-						"substepId":    sub.SubstepID,
-						"processId":    processID,
-						"sequenceOk":   sequenceOK,
-					},
-				},
-			},
-		},
-		"actions": []string{"complete"},
+func (s *Server) nowUTC() time.Time {
+	if s.now == nil {
+		return time.Now().UTC()
 	}
-
-	body, _ := json.Marshal(request)
-	endpoint := strings.TrimSuffix(s.cerbosURL, "/") + "/api/check"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(body)))
-	if err != nil {
-		return false, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("cerbos status %d", resp.StatusCode)
-	}
-	var result struct {
-		ResourceInstances map[string]struct {
-			Actions map[string]string `json:"actions"`
-		} `json:"resourceInstances"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return false, err
-	}
-	if res, ok := result.ResourceInstances[sub.SubstepID]; ok {
-		if effect, ok := res.Actions["complete"]; ok {
-			return strings.EqualFold(effect, "EFFECT_ALLOW"), nil
-		}
-	}
-	return false, nil
+	return s.now().UTC()
 }
 
 func (s *Server) renderActionError(w http.ResponseWriter, status int, message string, process *Process, actor Actor) {
@@ -1288,7 +1234,7 @@ func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) renderActionList(w http.ResponseWriter, process *Process, actor Actor, message string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1310,7 +1256,7 @@ func (s *Server) renderActionList(w http.ResponseWriter, process *Process, actor
 }
 
 func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, process *Process, actor Actor, message string) {
-	cfg, err := s.getConfig()
+	cfg, err := s.runtimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

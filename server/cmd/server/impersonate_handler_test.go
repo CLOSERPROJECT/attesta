@@ -1,0 +1,88 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestHandleImpersonateSuccess(t *testing.T) {
+	server := &Server{
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/impersonate", strings.NewReader("userId=u1&role=dep1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	server.handleImpersonate(rr, req)
+
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, rr.Code)
+	}
+	if got := rr.Header().Get("Location"); got != "/backoffice/dep1" {
+		t.Fatalf("expected redirect to /backoffice/dep1, got %q", got)
+	}
+	cookies := rr.Result().Cookies()
+	if len(cookies) == 0 || cookies[0].Name != "demo_user" || cookies[0].Value != "u1|dep1" {
+		t.Fatalf("expected demo_user cookie u1|dep1, got %#v", cookies)
+	}
+}
+
+func TestHandleImpersonateMethodNotAllowed(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodGet, "/impersonate", nil)
+	rr := httptest.NewRecorder()
+
+	server.handleImpersonate(rr, req)
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, rr.Code)
+	}
+}
+
+func TestHandleImpersonateInvalidFormReturns400(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodPost, "/impersonate", strings.NewReader("%zz"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	server.handleImpersonate(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleImpersonateMissingFieldsReturns400(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodPost, "/impersonate", strings.NewReader("userId=u1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	server.handleImpersonate(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleImpersonateUnknownRoleReturns400(t *testing.T) {
+	server := &Server{
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/impersonate", strings.NewReader("userId=u1&role=unknown"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	server.handleImpersonate(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
