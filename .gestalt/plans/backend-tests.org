@@ -3,7 +3,7 @@
 #+DATE: 2026-02-02
 #+KEYWORDS: go, testing, coverage, httptest, hex, ports-adapters, cerbos, mongodb, sse, htmx
 
-* WIP [#A] Align on scope + success criteria
+* DONE [#A] Align on scope + success criteria
   - Effort :: S
   - Goal :: Remove ambiguity around “70% coverage” and what’s included.
   - Notes :: This repo’s backend is largely `server/cmd/server/main.go` (single package `main`), so coverage and testability hinge on seams for Mongo + Cerbos + time + templates.
@@ -35,11 +35,11 @@
    - Tests :: N/A (decision).
    - Done when :: Matrix is explicit in this plan and used as checklist in route-level tests.
 
-* TODO [#A] Establish baseline + test harness conventions
+* WIP [#A] Establish baseline + test harness conventions
   - Effort :: S
   - Goal :: Know current coverage and pick the simplest harness that’s stable in CI/local.
   - Notes :: Avoid adding third-party test deps unless clearly needed; prefer stdlib `testing`, `httptest`, table-driven tests.
-** TODO [#A] Inventory current testability seams
+** DONE [#A] Inventory current testability seams
    - Why :: Handlers currently call Mongo directly via `*mongo.Database` and call Cerbos via `http.DefaultClient`, making unit tests brittle without refactoring.
    - Change :: Document (in the plan) current IO touchpoints:
      - Mongo: `s.db.Collection(...).Find/FindOne/InsertOne/UpdateOne/FindOneAndUpdate`
@@ -47,8 +47,14 @@
      - Config: `getConfig()` reads YAML file and caches by modtime
      - Templates: `ExecuteTemplate` across multiple template names
      - Time: `time.Now().UTC()` in process creation and completion
+   - Inventory result ::
+     - Mongo IO: replace direct `s.db.Collection(...` calls with a `Store` port (process CRUD-ish ops + notarization insert)
+     - Cerbos IO: replace `checkCerbos()` network call with `Authorizer` port
+     - Config IO: keep `getConfig()` for prod, inject `ConfigProvider` function in tests
+     - Template IO: keep html/template usage but allow in-memory templates in tests
+     - Time IO: inject `now func() time.Time` for deterministic timestamps
    - Tests :: N/A (inventory).
-   - Done when :: The plan lists all IO seams and names the minimal interfaces/function seams to introduce.
+   - Done when :: The plan lists concrete seams and their minimal interfaces/function fields.
 ** TODO [#B] Define test layout + naming
    - Why :: Consistency keeps “a lot of tests” maintainable.
    - Change :: Adopt conventions:
