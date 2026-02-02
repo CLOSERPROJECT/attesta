@@ -226,7 +226,7 @@
      - Negative: store insert error -> 500.
    - Tests :: Verify progress map includes all configured substeps with `pending` state.
    - Done when :: Both redirect behavior and persisted process state are validated.
-** TODO [#A] `POST /impersonate` tests
+** DONE [#A] `POST /impersonate` tests
    - Why :: Drives auth context for backoffice; easy wins for coverage.
    - Change :: Tests:
      - Positive: sets `demo_user` cookie and redirects to `/backoffice/:role`.
