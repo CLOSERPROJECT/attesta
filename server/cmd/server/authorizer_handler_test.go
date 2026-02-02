@@ -15,7 +15,7 @@ import (
 
 func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 	store := NewMemoryStore()
-	server, processID := newServerForCompleteTests(t, store, fakeAuthorizer{
+	server, processID, fixedNow := newServerForCompleteTests(t, store, fakeAuthorizer{
 		decide: func(Actor, string, WorkflowSub, int, bool) (bool, error) {
 			return true, nil
 		},
@@ -42,14 +42,21 @@ func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 	if step.State != "done" {
 		t.Fatalf("expected substep state done, got %q", step.State)
 	}
+	if step.DoneAt == nil || !step.DoneAt.Equal(fixedNow) {
+		t.Fatalf("expected deterministic doneAt %s, got %#v", fixedNow, step.DoneAt)
+	}
 	if len(store.Notarizations()) != 1 {
 		t.Fatalf("expected 1 notarization, got %d", len(store.Notarizations()))
+	}
+	notary := store.Notarizations()[0]
+	if !notary.CreatedAt.Equal(fixedNow) {
+		t.Fatalf("expected deterministic notarization time %s, got %s", fixedNow, notary.CreatedAt)
 	}
 }
 
 func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 	store := NewMemoryStore()
-	server, processID := newServerForCompleteTests(t, store, fakeAuthorizer{
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
 		decide: func(Actor, string, WorkflowSub, int, bool) (bool, error) {
 			return false, nil
 		},
@@ -70,7 +77,7 @@ func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 
 func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 	store := NewMemoryStore()
-	server, processID := newServerForCompleteTests(t, store, fakeAuthorizer{
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
 		decide: func(Actor, string, WorkflowSub, int, bool) (bool, error) {
 			return false, errors.New("cerbos down")
 		},
@@ -89,13 +96,14 @@ func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 	}
 }
 
-func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Authorizer) (*Server, string) {
+func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Authorizer) (*Server, string, time.Time) {
 	t.Helper()
 	cfgPath := writeTestConfig(t)
 	tmpl := template.Must(template.New("test").Parse(`
 {{define "action_list.html"}}{{.Error}}{{end}}
 {{define "backoffice_process.html"}}{{.Error}}{{end}}
 `))
+	fixedNow := time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC)
 
 	process := Process{
 		ID:        primitive.NewObjectID(),
@@ -118,8 +126,9 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 		authorizer: authorizer,
 		sse:        newSSEHub(),
 		configPath: cfgPath,
+		now:        func() time.Time { return fixedNow },
 	}
-	return server, process.ID.Hex()
+	return server, process.ID.Hex(), fixedNow
 }
 
 type fakeAuthorizer struct {

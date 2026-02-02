@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -31,9 +32,11 @@ func TestMemoryStoreUpdateProcessProgressEncodesKey(t *testing.T) {
 func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 	cfgPath := writeTestConfig(t)
 	store := NewMemoryStore()
+	fixedNow := time.Date(2026, 2, 2, 13, 0, 0, 0, time.UTC)
 	server := &Server{
 		store:         store,
 		sse:           newSSEHub(),
+		now:           func() time.Time { return fixedNow },
 		workflowDefID: primitive.NewObjectID(),
 		configPath:    cfgPath,
 	}
@@ -59,6 +62,9 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 	}
 	if len(processes[0].Progress) != 6 {
 		t.Fatalf("expected 6 configured substeps in progress map, got %d", len(processes[0].Progress))
+	}
+	if !processes[0].CreatedAt.Equal(fixedNow) {
+		t.Fatalf("expected deterministic createdAt %s, got %s", fixedNow, processes[0].CreatedAt)
 	}
 	if _, ok := processes[0].Progress["1_1"]; !ok {
 		t.Fatalf("expected encoded key 1_1 in progress, got %#v", processes[0].Progress)

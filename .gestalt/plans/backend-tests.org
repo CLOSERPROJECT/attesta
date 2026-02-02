@@ -93,7 +93,7 @@
      - Test fake authorizer supports scripted outcomes: allow/deny/error based on inputs.
    - Tests :: Unit tests for handler authorization and dependency failure mapping (502).
    - Done when :: Handler tests can force allow/deny/error without network.
-** TODO [#B] Make time deterministic where it affects assertions
+** DONE [#B] Make time deterministic where it affects assertions
    - Why :: `time.Now().UTC()` makes “doneAt/createdAt” assertions flaky.
    - Change :: Add a `now func() time.Time` field on `Server` (default `time.Now`) and use it where timestamps are written.
    - Tests :: Assert exact timestamps in process creation/completion and notarization creation.

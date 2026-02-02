@@ -86,6 +86,7 @@ type Server struct {
 	tmpl          *template.Template
 	authorizer    Authorizer
 	sse           *SSEHub
+	now           func() time.Time
 	workflowDefID primitive.ObjectID
 	configPath    string
 	configMu      sync.Mutex
@@ -250,6 +251,7 @@ func main() {
 		tmpl:          tmpl,
 		authorizer:    NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:           newSSEHub(),
+		now:           time.Now,
 		workflowDefID: primitive.NewObjectID(),
 		configPath:    envOr("WORKFLOW_CONFIG", "config/workflow.yaml"),
 	}
@@ -319,7 +321,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	process := Process{
 		WorkflowDefID: s.workflowDefID,
-		CreatedAt:     time.Now().UTC(),
+		CreatedAt:     s.nowUTC(),
 		CreatedBy:     "demo",
 		Status:        "active",
 		Progress:      map[string]ProcessStep{},
@@ -528,7 +530,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	now := time.Now().UTC()
+	now := s.nowUTC()
 	progressUpdate := ProcessStep{
 		State:  "done",
 		DoneAt: &now,
@@ -1200,6 +1202,13 @@ func digestPayload(payload map[string]interface{}) string {
 	data, _ := json.Marshal(payload)
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
+}
+
+func (s *Server) nowUTC() time.Time {
+	if s.now == nil {
+		return time.Now().UTC()
+	}
+	return s.now().UTC()
 }
 
 func (s *Server) renderActionError(w http.ResponseWriter, status int, message string, process *Process, actor Actor) {
