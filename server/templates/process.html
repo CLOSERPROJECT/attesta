@@ -7,9 +7,13 @@
     </div>
   </section>
   <section class="panel">
-    <h2>Backoffice access</h2>
-    <p class="muted">Open the backoffice in a new window to impersonate roles and complete steps.</p>
-    <a class="secondary" href="/backoffice" target="_blank" rel="noopener">Open backoffice</a>
+    <h2>Downloads</h2>
+    <p class="muted">Export attachments and notarized data for this process.</p>
+    <div class="stack" style="gap: 10px;">
+      <a class="primary" href="/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
+      <a class="secondary" href="/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
+      <a class="secondary" href="/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
+    </div>
   </section>
 </div>
 {{end}}
