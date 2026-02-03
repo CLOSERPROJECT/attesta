@@ -19,9 +19,18 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017
       CERBOS_URL: http://cerbos:3592
+      SERVICE_FQDN_ATTESTA_3000:
     depends_on:
       - mongodb
       - cerbos
+
+  mongoexpress:
+    image: mongo-express:1.0.2
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017
+      SERVICE_FQDN_MONGOEXPRESS_8081:
+    depends_on:
+      - mongodb
 
 volumes:
   mongodb_data:
