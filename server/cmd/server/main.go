@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -135,6 +136,52 @@ type TimelineStep struct {
 	Substeps []TimelineSubstep
 }
 
+type NotarizedAttachment struct {
+	AttachmentID string `json:"attachment_id"`
+	Filename     string `json:"filename"`
+	ContentType  string `json:"content_type"`
+	SizeBytes    int64  `json:"size_bytes"`
+	SHA256       string `json:"sha256"`
+}
+
+type NotarizedSubstep struct {
+	SubstepID  string                 `json:"substep_id"`
+	Title      string                 `json:"title"`
+	Role       string                 `json:"role"`
+	Status     string                 `json:"status"`
+	DoneAt     string                 `json:"done_at,omitempty"`
+	DoneBy     string                 `json:"done_by,omitempty"`
+	DoneRole   string                 `json:"done_role,omitempty"`
+	Payload    map[string]interface{} `json:"payload,omitempty"`
+	Digest     string                 `json:"digest,omitempty"`
+	Attachment *NotarizedAttachment   `json:"attachment,omitempty"`
+}
+
+type NotarizedStep struct {
+	StepID   string             `json:"step_id"`
+	Title    string             `json:"title"`
+	Substeps []NotarizedSubstep `json:"substeps"`
+}
+
+type MerkleLeaf struct {
+	SubstepID string `json:"substep_id"`
+	Hash      string `json:"hash"`
+}
+
+type MerkleTree struct {
+	Leaves []MerkleLeaf `json:"leaves"`
+	Levels [][]string   `json:"levels"`
+	Root   string       `json:"root"`
+}
+
+type NotarizedProcessExport struct {
+	ProcessID string          `json:"process_id"`
+	CreatedAt string          `json:"created_at"`
+	Status    string          `json:"status"`
+	Steps     []NotarizedStep `json:"steps"`
+	Merkle    MerkleTree      `json:"merkle"`
+}
+
 type ActionView struct {
 	ProcessID  string
 	SubstepID  string
@@ -238,9 +285,24 @@ type ActionListView struct {
 	Timeline    []TimelineStep
 }
 
+type ProcessListItem struct {
+	ID              string
+	Status          string
+	CreatedAt       string
+	CreatedAtTime   time.Time
+	DoneSubsteps    int
+	TotalSubsteps   int
+	Percent         int
+	LastNotarizedAt string
+	LastDigestShort string
+}
+
 type HomeView struct {
 	PageBase
 	LatestProcessID string
+	Sort            string
+	Processes       []ProcessListItem
+	History         []ProcessListItem
 }
 
 type ProcessPageView struct {
@@ -327,12 +389,103 @@ func (s *Server) pageBase(body string) PageBase {
 	return PageBase{Body: body, ViteDevServer: s.viteDevServer}
 }
 
+func normalizeHomeSortKey(value string) string {
+	switch value {
+	case "time_asc", "time_desc", "progress_asc", "progress_desc", "status":
+		return value
+	default:
+		return "time_desc"
+	}
+}
+
+func countWorkflowSubsteps(def WorkflowDef) int {
+	count := 0
+	for _, step := range sortedSteps(def) {
+		count += len(step.Substep)
+	}
+	return count
+}
+
+func processProgressStats(def WorkflowDef, process *Process) (doneCount int, lastAt string, lastDigestShort string) {
+	if process == nil {
+		return 0, "", ""
+	}
+	var latest time.Time
+	first := true
+	for _, sub := range orderedSubsteps(def) {
+		progress, ok := process.Progress[sub.SubstepID]
+		if !ok || progress.State != "done" {
+			continue
+		}
+		doneCount++
+		if progress.DoneAt == nil {
+			continue
+		}
+		if first || progress.DoneAt.After(latest) {
+			latest = *progress.DoneAt
+			first = false
+			digest := ""
+			if progress.Data != nil {
+				digest = digestPayload(progress.Data)
+			}
+			if len(digest) > 12 {
+				digest = digest[:12]
+			}
+			lastDigestShort = digest
+		}
+	}
+	if !first {
+		lastAt = latest.Format(time.RFC3339)
+	}
+	return doneCount, lastAt, lastDigestShort
+}
+
+func sortHomeProcessList(items []ProcessListItem, sortKey string) {
+	switch sortKey {
+	case "time_asc":
+		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.Before(items[j].CreatedAtTime) })
+	case "progress_asc":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Percent == items[j].Percent {
+				return items[i].CreatedAtTime.After(items[j].CreatedAtTime)
+			}
+			return items[i].Percent < items[j].Percent
+		})
+	case "progress_desc":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Percent == items[j].Percent {
+				return items[i].CreatedAtTime.After(items[j].CreatedAtTime)
+			}
+			return items[i].Percent > items[j].Percent
+		})
+	case "status":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Status == items[j].Status {
+				if items[i].Percent == items[j].Percent {
+					return items[i].CreatedAtTime.After(items[j].CreatedAtTime)
+				}
+				return items[i].Percent > items[j].Percent
+			}
+			if items[i].Status == "active" {
+				return true
+			}
+			if items[j].Status == "active" {
+				return false
+			}
+			return items[i].Status < items[j].Status
+		})
+	default:
+		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.After(items[j].CreatedAtTime) })
+	}
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := s.runtimeConfig(); err != nil {
+	cfg, err := s.runtimeConfig()
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -341,8 +494,57 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if latest, err := s.loadLatestProcess(ctx); err == nil {
 		latestID = latest.ID.Hex()
 	}
+	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
+	processesRaw, err := s.store.ListRecentProcesses(ctx, 0)
+	if err != nil {
+		processesRaw = nil
+	}
 
-	if err := s.tmpl.ExecuteTemplate(w, "home.html", HomeView{PageBase: s.pageBase("home_body"), LatestProcessID: latestID}); err != nil {
+	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
+	var processes []ProcessListItem
+	var history []ProcessListItem
+	for _, process := range processesRaw {
+		process.Progress = normalizeProgressKeys(process.Progress)
+		status := strings.TrimSpace(process.Status)
+		if status == "" {
+			status = "active"
+		}
+		if status != "done" && isProcessDone(cfg.Workflow, &process) {
+			status = "done"
+		}
+		doneCount, lastAt, lastDigest := processProgressStats(cfg.Workflow, &process)
+		percent := 0
+		if totalSubsteps > 0 {
+			percent = int(float64(doneCount) / float64(totalSubsteps) * 100)
+		}
+		item := ProcessListItem{
+			ID:              process.ID.Hex(),
+			Status:          status,
+			CreatedAt:       process.CreatedAt.Format(time.RFC3339),
+			CreatedAtTime:   process.CreatedAt,
+			DoneSubsteps:    doneCount,
+			TotalSubsteps:   totalSubsteps,
+			Percent:         percent,
+			LastNotarizedAt: lastAt,
+			LastDigestShort: lastDigest,
+		}
+		processes = append(processes, item)
+		if status == "done" {
+			history = append(history, item)
+		}
+	}
+
+	sortHomeProcessList(processes, sortKey)
+	sortHomeProcessList(history, sortKey)
+
+	view := HomeView{
+		PageBase:        s.pageBase("home_body"),
+		LatestProcessID: latestID,
+		Sort:            sortKey,
+		Processes:       processes,
+		History:         history,
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -391,6 +593,18 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 	processID := parts[0]
 	if len(parts) == 1 && r.Method == http.MethodGet {
 		s.handleProcessPage(w, r, processID)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "files.zip" && r.Method == http.MethodGet {
+		s.handleDownloadAllFiles(w, r, processID)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "notarized.json" && r.Method == http.MethodGet {
+		s.handleNotarizedJSON(w, r, processID)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "merkle.json" && r.Method == http.MethodGet {
+		s.handleMerkleJSON(w, r, processID)
 		return
 	}
 	if len(parts) == 2 && parts[1] == "timeline" && r.Method == http.MethodGet {
@@ -443,6 +657,94 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, processID string) {
+	cfg, err := s.runtimeConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	files := collectProcessAttachments(cfg.Workflow, process)
+	filename := fmt.Sprintf("process-%s-files.zip", process.ID.Hex())
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	manifest := map[string]interface{}{
+		"process_id": process.ID.Hex(),
+		"generated":  s.nowUTC().Format(time.RFC3339),
+		"files":      files,
+	}
+	if data, err := json.MarshalIndent(manifest, "", "  "); err == nil {
+		if entry, err := zipWriter.Create("manifest.json"); err == nil {
+			_, _ = entry.Write(data)
+		}
+	}
+
+	nameCounts := map[string]int{}
+	for _, file := range files {
+		attachmentID, err := primitive.ObjectIDFromHex(file.AttachmentID)
+		if err != nil {
+			continue
+		}
+		download, err := s.store.OpenAttachmentDownload(r.Context(), attachmentID)
+		if err != nil {
+			continue
+		}
+		defer download.Close()
+
+		safeName := sanitizeAttachmentFilename(file.Filename)
+		baseName := fmt.Sprintf("%s-%s", strings.ReplaceAll(file.SubstepID, ".", "_"), safeName)
+		nameCounts[baseName]++
+		entryName := baseName
+		if nameCounts[baseName] > 1 {
+			entryName = fmt.Sprintf("%s-%d", baseName, nameCounts[baseName])
+		}
+		entry, err := zipWriter.Create(entryName)
+		if err != nil {
+			continue
+		}
+		_, _ = io.Copy(entry, download)
+	}
+}
+
+func (s *Server) handleNotarizedJSON(w http.ResponseWriter, r *http.Request, processID string) {
+	cfg, err := s.runtimeConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	export := buildNotarizedExport(cfg.Workflow, process)
+	writeJSON(w, export)
+}
+
+func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, processID string) {
+	cfg, err := s.runtimeConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	export := buildNotarizedExport(cfg.Workflow, process)
+	writeJSON(w, export.Merkle)
 }
 
 func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Request, processID, substepID string) {
@@ -1258,6 +1560,192 @@ func buildTimeline(def WorkflowDef, process *Process, roleMeta map[string]RoleMe
 		timeline = append(timeline, row)
 	}
 	return timeline
+}
+
+type ProcessAttachmentExport struct {
+	SubstepID    string `json:"substep_id"`
+	AttachmentID string `json:"attachment_id"`
+	Filename     string `json:"filename"`
+	ContentType  string `json:"content_type,omitempty"`
+	SizeBytes    int64  `json:"size_bytes,omitempty"`
+	SHA256       string `json:"sha256,omitempty"`
+}
+
+func collectProcessAttachments(def WorkflowDef, process *Process) []ProcessAttachmentExport {
+	if process == nil {
+		return nil
+	}
+	var files []ProcessAttachmentExport
+	for _, sub := range orderedSubsteps(def) {
+		if sub.InputType != "file" {
+			continue
+		}
+		progress, ok := process.Progress[sub.SubstepID]
+		if !ok || progress.State != "done" {
+			continue
+		}
+		meta := attachmentMetaFromPayload(progress.Data, sub.InputKey)
+		if meta == nil || meta.AttachmentID == "" {
+			continue
+		}
+		files = append(files, ProcessAttachmentExport{
+			SubstepID:    sub.SubstepID,
+			AttachmentID: meta.AttachmentID,
+			Filename:     meta.Filename,
+			ContentType:  meta.ContentType,
+			SizeBytes:    meta.SizeBytes,
+			SHA256:       meta.SHA256,
+		})
+	}
+	return files
+}
+
+func attachmentMetaFromPayload(data map[string]interface{}, inputKey string) *NotarizedAttachment {
+	if data == nil {
+		return nil
+	}
+	raw, ok := data[inputKey]
+	if !ok {
+		return nil
+	}
+	payload, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	meta := &NotarizedAttachment{}
+	if value, ok := payload["attachmentId"].(string); ok {
+		meta.AttachmentID = value
+	}
+	if value, ok := payload["filename"].(string); ok {
+		meta.Filename = value
+	}
+	if value, ok := payload["contentType"].(string); ok {
+		meta.ContentType = value
+	}
+	if value, ok := payload["sha256"].(string); ok {
+		meta.SHA256 = value
+	}
+	if value, ok := payload["size"].(int64); ok {
+		meta.SizeBytes = value
+	} else if value, ok := payload["size"].(float64); ok {
+		meta.SizeBytes = int64(value)
+	}
+	if meta.AttachmentID == "" && meta.Filename == "" && meta.SHA256 == "" {
+		return nil
+	}
+	return meta
+}
+
+func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExport {
+	export := NotarizedProcessExport{}
+	if process == nil {
+		return export
+	}
+	status := strings.TrimSpace(process.Status)
+	if status == "" {
+		status = "active"
+	}
+	if status != "done" && isProcessDone(def, process) {
+		status = "done"
+	}
+	export.ProcessID = process.ID.Hex()
+	export.CreatedAt = process.CreatedAt.Format(time.RFC3339)
+	export.Status = status
+
+	availableMap := computeAvailability(def, process)
+	var leaves []MerkleLeaf
+	for _, step := range sortedSteps(def) {
+		stepEntry := NotarizedStep{StepID: step.StepID, Title: step.Title}
+		for _, sub := range sortedSubsteps(step) {
+			entry := NotarizedSubstep{
+				SubstepID: sub.SubstepID,
+				Title:     sub.Title,
+				Role:      sub.Role,
+			}
+			state := "locked"
+			if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
+				state = "done"
+				if progress.DoneAt != nil {
+					entry.DoneAt = progress.DoneAt.Format(time.RFC3339)
+				}
+				if progress.DoneBy != nil {
+					entry.DoneBy = progress.DoneBy.UserID
+					entry.DoneRole = progress.DoneBy.Role
+				}
+				entry.Payload = progress.Data
+				entry.Digest = digestPayload(progress.Data)
+				if sub.InputType == "file" {
+					entry.Attachment = attachmentMetaFromPayload(progress.Data, sub.InputKey)
+				}
+			} else if availableMap[sub.SubstepID] {
+				state = "available"
+			}
+			entry.Status = state
+
+			leafHash := hashMerkleLeaf(sub.SubstepID, entry)
+			leaves = append(leaves, MerkleLeaf{SubstepID: sub.SubstepID, Hash: leafHash})
+			stepEntry.Substeps = append(stepEntry.Substeps, entry)
+		}
+		export.Steps = append(export.Steps, stepEntry)
+	}
+	export.Merkle = buildMerkleTree(leaves)
+	return export
+}
+
+func hashMerkleLeaf(substepID string, entry NotarizedSubstep) string {
+	payload := struct {
+		SubstepID string                 `json:"substep_id"`
+		Status    string                 `json:"status"`
+		DoneAt    string                 `json:"done_at,omitempty"`
+		DoneBy    string                 `json:"done_by,omitempty"`
+		DoneRole  string                 `json:"done_role,omitempty"`
+		Payload   map[string]interface{} `json:"payload,omitempty"`
+	}{
+		SubstepID: substepID,
+		Status:    entry.Status,
+		DoneAt:    entry.DoneAt,
+		DoneBy:    entry.DoneBy,
+		DoneRole:  entry.DoneRole,
+		Payload:   entry.Payload,
+	}
+	data, _ := json.Marshal(payload)
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
+}
+
+func buildMerkleTree(leaves []MerkleLeaf) MerkleTree {
+	tree := MerkleTree{Leaves: leaves}
+	if len(leaves) == 0 {
+		return tree
+	}
+	level := make([]string, 0, len(leaves))
+	for _, leaf := range leaves {
+		level = append(level, leaf.Hash)
+	}
+	tree.Levels = append(tree.Levels, append([]string(nil), level...))
+	for len(level) > 1 {
+		var next []string
+		for i := 0; i < len(level); i += 2 {
+			left := level[i]
+			right := left
+			if i+1 < len(level) {
+				right = level[i+1]
+			}
+			sum := sha256.Sum256([]byte(left + right))
+			next = append(next, hex.EncodeToString(sum[:]))
+		}
+		level = next
+		tree.Levels = append(tree.Levels, append([]string(nil), level...))
+	}
+	tree.Root = level[0]
+	return tree
+}
+
+func writeJSON(w http.ResponseWriter, value interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	_ = encoder.Encode(value)
 }
 
 func orderedSubsteps(def WorkflowDef) []WorkflowSub {
