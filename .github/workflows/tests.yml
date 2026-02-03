@@ -7,6 +7,12 @@ on:
       - '*.org'
     branches:
       - master
+  push:
+    paths-ignore:
+      - '*.md'
+      - '*.org'
+    branches:
+      - master
 
 jobs:
   test:
