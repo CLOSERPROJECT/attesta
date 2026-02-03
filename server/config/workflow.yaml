@@ -17,6 +17,12 @@ workflow:
           role: "dep1"
           inputKey: "batchId"
           inputType: "string"
+        - id: "1.3"
+          title: "Upload gallium certification"
+          order: 3
+          role: "dep1"
+          inputKey: "Gallium certification"
+          inputType: "file"
     - id: "2"
       title: "Refinement"
       order: 2

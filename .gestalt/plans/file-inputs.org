@@ -3,7 +3,7 @@
 #+DATE: 2026-02-03
 #+KEYWORDS: workflow.yaml, file upload, HTMX, multipart, MongoDB, timeline, notarization
 
-* WIP [#A] Confirm scope and UX decisions
+* DONE [#A] Confirm scope and UX decisions
   - Effort :: S
   - Goal :: Lock down what “file input” means per substep and what users see/do in backoffice + timeline.
   - Notes :: This repo is intentionally small/monolithic (single `server/cmd/server/main.go`). Prefer minimal, local helpers (deviation from VSA/REPR/Hex) unless the change would meaningfully improve clarity.
@@ -21,7 +21,7 @@
     - Unit test missing file => `400`.
     - Unit test oversize (limit set low in test) => `413`.
   - Done when :: The size limit is configurable via env and error mapping matches existing UI patterns.
-** TODO [#A] Capture confirmed download UX and auth policy
+** DONE [#A] Capture confirmed download UX and auth policy
   - Why :: The file needs to be visible in both the process timeline and the backoffice to validate the feature quickly.
   - Change ::
     - Show download links in:
@@ -33,11 +33,11 @@
     - Handler test: download works without `demo_user` cookie.
   - Done when :: The same file is downloadable from both timelines with no auth requirement.
 
-* TODO [#A] Extend workflow config semantics (`inputType: "file"`)
+* DONE [#A] Extend workflow config semantics (`inputType: "file"`)
   - Effort :: S
   - Goal :: Allow substeps to declare that their input is a file, driven purely by YAML.
   - Notes :: Existing `inputType` values include `"number"` and string-like values (`"string"` in `server/config/workflow.yaml`, `"text"` in tests). Keep backward compatibility; add `"file"` as a new supported value.
-** TODO [#A] Add a file substep to Step "1"
+** DONE [#A] Add a file substep to Step "1"
   - Why :: The default workflow should demonstrate the feature immediately with minimal changes.
   - Change ::
     - In `server/config/workflow.yaml`, add a new substep under `workflow.steps[id="1"]`:
@@ -50,7 +50,7 @@
   - Tests ::
     - Add/adjust handler tests that complete substep `1.3` with multipart upload.
   - Done when :: Backoffice shows a file picker for substep `1.3` and completing it stores metadata + enables download.
-** TODO [#B] Validate/normalize `inputType` values on config load
+** DONE [#B] Validate/normalize `inputType` values on config load
   - Why :: Today unknown input types silently behave like “string”; for files we want explicit behavior and clearer errors.
   - Change ::
     - In `server/cmd/server/main.go` `getConfig()`, add lightweight validation/normalization:
@@ -61,11 +61,11 @@
     - New unit test for invalid `inputType` in config provider => `500`/clear error (depending on how config is supplied in tests).
   - Done when :: Invalid configs fail fast with a helpful message.
 
-* TODO [#A] Add file-upload handling to “complete substep”
+* DONE [#A] Add file-upload handling to “complete substep”
   - Effort :: M
   - Goal :: When a substep’s `inputType` is `file`, completing the substep uploads a file and stores a verifiable reference in the notarized payload.
   - Notes :: Keep the existing route shape: `POST /process/:id/substep/:substepId/complete`. Only the request encoding changes for file steps.
-** TODO [#A] Define the request contract (HTML/HTMX)
+** DONE [#A] Define the request contract (HTML/HTMX)
   - Why :: The handler currently assumes `application/x-www-form-urlencoded` with `value=...`.
   - Change ::
     - For non-file substeps: keep `name="value"` and URL-encoded posts as-is.
@@ -74,7 +74,7 @@
   - Tests ::
     - Template test (optional) or handler test that a multipart request can complete a file substep.
   - Done when :: File substeps submit multipart with the input key as the file field name.
-** TODO [#A] Implement robust parsing + error mapping in `handleCompleteSubstep`
+** DONE [#A] Implement robust parsing + error mapping in `handleCompleteSubstep`
   - Why :: `ParseForm()` on multipart uses default limits; we need explicit size limits and clear errors.
   - Change ::
     - In `server/cmd/server/main.go` `handleCompleteSubstep(...)`, branch on `substep.InputType`:
@@ -91,7 +91,7 @@
   - Tests ::
     - `server/cmd/server/complete_handler_test.go`: add coverage for missing file, oversize file, successful file completion.
   - Done when :: The handler supports both encodings and enforces a size limit.
-** TODO [#A] Ensure notarization covers file content integrity
+** DONE [#A] Ensure notarization covers file content integrity
   - Why :: Current notarization digests only the payload JSON; if the payload contains only an ID, content integrity isn’t guaranteed.
   - Change ::
     - Compute `sha256` of uploaded file content server-side during upload.
@@ -103,11 +103,11 @@
     - Unit test: uploaded content produces expected sha256 and is present in stored progress/notarization payload.
   - Done when :: The notarized payload includes a stable content digest for the uploaded file.
 
-* TODO [#A] Persist attachments and add a download endpoint
+* DONE [#A] Persist attachments and add a download endpoint
   - Effort :: M
   - Goal :: Store uploaded file bytes + metadata and allow the UI to retrieve them via a stable URL.
   - Notes :: Store everything in MongoDB. Use Mongo GridFS (via the existing `go.mongodb.org/mongo-driver` dependency) so PDFs/Excels aren’t constrained by Mongo’s 16MB document limit, while keeping the API surface small.
-** TODO [#A] Add an attachment model + store port
+** DONE [#A] Add an attachment model + store port
   - Why :: `Store` currently only knows about processes and notarizations.
   - Change ::
     - Add an `Attachment` struct (new file suggestion: `server/cmd/server/attachments.go`) capturing:
@@ -125,7 +125,7 @@
   - Tests ::
     - Unit tests for MemoryStore insert/load semantics.
   - Done when :: The server can store and retrieve attachment bytes by ID in both stores.
-** TODO [#A] Add `GET /process/:id/substep/:substepId/file` (or equivalent) route
+** DONE [#A] Add `GET /process/:id/substep/:substepId/file` (or equivalent) route
   - Why :: A process/substep-scoped URL is easy to reason about and avoids exposing raw attachment IDs in the UI if desired.
   - Change ::
     - Extend `server/cmd/server/main.go` `handleProcessRoutes(...)` to route a new GET endpoint (candidate: `/process/:id/substep/:substepId/file`).
@@ -143,11 +143,11 @@
     - Handler test: substep not done => `404` (or `409`, decide and document).
   - Done when :: A completed file substep produces a working download link.
 
-* TODO [#B] Update UI rendering for file substeps and timeline display
+* DONE [#B] Update UI rendering for file substeps and timeline display
   - Effort :: M
   - Goal :: Make file steps usable from backoffice with HTMX and understandable in the timeline.
   - Notes :: HTMX file uploads require `hx-encoding="multipart/form-data"`. The current timeline prints `Data` via `printf`, which won’t create links.
-** TODO [#A] Render the correct input control per `InputType`
+** DONE [#A] Render the correct input control per `InputType`
   - Why :: `server/templates/action_list.html` always renders `<input type="text" name="value">`.
   - Change ::
     - In `server/templates/action_list.html`:
@@ -157,7 +157,7 @@
   - Tests ::
     - Optional snapshot-ish template test is likely overkill; rely on handler tests + manual demo verification.
   - Done when :: Backoffice shows a file picker for file substeps and existing steps still work.
-** TODO [#B] Improve timeline display for file payloads
+** DONE [#B] Improve timeline display for file payloads
   - Why :: Users should be able to see what was uploaded and optionally download it from the timeline.
   - Change ::
     - Extend `TimelineSubstep` (in `server/cmd/server/main.go`) to carry a safe display model, e.g.:
@@ -169,11 +169,11 @@
     - Unit test: timeline builder produces expected file link/metadata for a completed file substep.
   - Done when :: Timeline shows file name + link instead of opaque map output.
 
-* TODO [#C] Documentation and operational notes
+* DONE [#C] Documentation and operational notes
   - Effort :: S
   - Goal :: Make the new capability discoverable and safe to run locally.
   - Notes :: Keep docs minimal; this is a demo repo.
-** TODO [#C] Document how to declare file inputs in YAML and how to use them
+** DONE [#C] Document how to declare file inputs in YAML and how to use them
   - Why :: The feature is driven by config; future edits should be straightforward.
   - Change ::
     - Update `README.md` or `QUICKSTART.md` with:

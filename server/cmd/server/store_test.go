@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -59,13 +62,73 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 	if len(processes) != 1 {
 		t.Fatalf("expected one process, got %d", len(processes))
 	}
-	if len(processes[0].Progress) != 6 {
-		t.Fatalf("expected 6 configured substeps in progress map, got %d", len(processes[0].Progress))
+	if len(processes[0].Progress) != 7 {
+		t.Fatalf("expected 7 configured substeps in progress map, got %d", len(processes[0].Progress))
 	}
 	if !processes[0].CreatedAt.Equal(fixedNow) {
 		t.Fatalf("expected deterministic createdAt %s, got %s", fixedNow, processes[0].CreatedAt)
 	}
 	if _, ok := processes[0].Progress["1_1"]; !ok {
 		t.Fatalf("expected encoded key 1_1 in progress, got %#v", processes[0].Progress)
+	}
+}
+
+func TestMemoryStoreAttachmentRoundTrip(t *testing.T) {
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	payload := []byte("hello attachment")
+
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   "1.3",
+		Filename:    "cert.pdf",
+		ContentType: "application/pdf",
+		MaxBytes:    1024,
+		UploadedAt:  time.Date(2026, 2, 2, 10, 0, 0, 0, time.UTC),
+	}, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatalf("save attachment: %v", err)
+	}
+	if attachment.ID.IsZero() {
+		t.Fatal("expected non-empty attachment id")
+	}
+	if attachment.SizeBytes != int64(len(payload)) {
+		t.Fatalf("expected size %d, got %d", len(payload), attachment.SizeBytes)
+	}
+	if attachment.SHA256 == "" {
+		t.Fatal("expected sha256 digest")
+	}
+
+	meta, err := store.LoadAttachmentByID(t.Context(), attachment.ID)
+	if err != nil {
+		t.Fatalf("load attachment metadata: %v", err)
+	}
+	if meta.Filename != "cert.pdf" {
+		t.Fatalf("expected filename cert.pdf, got %q", meta.Filename)
+	}
+
+	reader, err := store.OpenAttachmentDownload(t.Context(), attachment.ID)
+	if err != nil {
+		t.Fatalf("open attachment download: %v", err)
+	}
+	defer reader.Close()
+	downloaded, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read attachment content: %v", err)
+	}
+	if string(downloaded) != string(payload) {
+		t.Fatalf("expected content %q, got %q", payload, downloaded)
+	}
+}
+
+func TestMemoryStoreAttachmentTooLarge(t *testing.T) {
+	store := NewMemoryStore()
+	_, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID: primitive.NewObjectID(),
+		SubstepID: "1.3",
+		MaxBytes:  4,
+	}, bytes.NewReader([]byte("toolarge")))
+	if !errors.Is(err, ErrAttachmentTooLarge) {
+		t.Fatalf("expected ErrAttachmentTooLarge, got %v", err)
 	}
 }

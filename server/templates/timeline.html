@@ -23,7 +23,13 @@
               {{if eq .Status "done"}}
                 <span class="actor">by {{.DoneBy}} ({{.DoneRole}})</span>
                 <span class="time">{{.DoneAt}}</span>
-                <span class="data">data: {{printf "%v" .Data}}</span>
+                {{if .FileURL}}
+                  <span class="data">file: {{.FileName}}</span>
+                  <a class="secondary" href="{{.FileURL}}">Download</a>
+                  {{if .FileSHA256}}<span class="data">sha256: {{.FileSHA256}}</span>{{end}}
+                {{else if .DisplayValue}}
+                  <span class="data">value: {{.DisplayValue}}</span>
+                {{end}}
               {{end}}
             </div>
           </li>

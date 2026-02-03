@@ -67,6 +67,15 @@ curl -X POST http://localhost:3000/process/PROCESS_ID/substep/2.1/complete \
 - MongoDB is expected at `mongodb://localhost:27017`.
 - Timeline updates pull `/process/:id/timeline` when SSE events arrive.
 
+## File inputs
+```yaml
+inputKey: "Gallium certification"
+inputType: "file"
+```
+- File steps use multipart upload from backoffice and expose a process/substep download URL.
+- Upload size is controlled by `ATTACHMENT_MAX_BYTES` (default `26214400`, i.e. 25 MiB).
+- Files are stored in Mongo GridFS bucket `attachments` (`attachments.files` + `attachments.chunks`).
+
 ## Tests
 Unit tests:
 ```bash

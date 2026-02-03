@@ -103,6 +103,7 @@ func seedBackofficeFixtures(store *MemoryStore) (primitive.ObjectID, primitive.O
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "done"},
 			"1_2": {State: "done"},
+			"1_3": {State: "done"},
 			"2_1": {State: "pending"},
 			"2_2": {State: "pending"},
 			"3_1": {State: "pending"},
@@ -116,6 +117,7 @@ func seedBackofficeFixtures(store *MemoryStore) (primitive.ObjectID, primitive.O
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "done"},
 			"1_2": {State: "done"},
+			"1_3": {State: "done"},
 			"2_1": {State: "done"},
 			"2_2": {State: "done"},
 			"3_1": {State: "done"},

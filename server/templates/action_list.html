@@ -19,10 +19,17 @@
             hx-post="/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
             hx-target="#action-area"
             hx-swap="innerHTML"
+            {{if eq .InputType "file"}}enctype="multipart/form-data" hx-encoding="multipart/form-data"{{end}}
           >
             <label>
               {{.InputKey}}
-              <input type="text" name="value" placeholder="Enter {{.InputType}}" {{if .Disabled}}disabled{{end}} />
+              {{if eq .InputType "number"}}
+                <input type="number" name="value" placeholder="Enter number" {{if .Disabled}}disabled{{end}} />
+              {{else if eq .InputType "file"}}
+                <input type="file" name="{{.InputKey}}" {{if .Disabled}}disabled{{end}} />
+              {{else}}
+                <input type="text" name="value" placeholder="Enter value" {{if .Disabled}}disabled{{end}} />
+              {{end}}
             </label>
             <button type="submit" {{if .Disabled}}disabled{{end}}>Complete</button>
           </form>
