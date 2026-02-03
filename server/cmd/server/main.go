@@ -104,6 +104,7 @@ type Server struct {
 	configMu       sync.Mutex
 	configModTime  time.Time
 	config         *RuntimeConfig
+	viteDevServer  string
 }
 
 type SSEHub struct {
@@ -200,13 +201,18 @@ type ProcessSummary struct {
 	NextRole    string
 }
 
+type PageBase struct {
+	Body          string
+	ViteDevServer string
+}
+
 type BackofficeLandingView struct {
-	Body  string
+	PageBase
 	Users []UserView
 }
 
 type DepartmentDashboardView struct {
-	Body            string
+	PageBase
 	CurrentUser     Actor
 	RoleLabel       string
 	TodoActions     []ActionTodo
@@ -215,7 +221,7 @@ type DepartmentDashboardView struct {
 }
 
 type DepartmentProcessView struct {
-	Body        string
+	PageBase
 	CurrentUser Actor
 	RoleLabel   string
 	ProcessID   string
@@ -233,12 +239,12 @@ type ActionListView struct {
 }
 
 type HomeView struct {
-	Body            string
+	PageBase
 	LatestProcessID string
 }
 
 type ProcessPageView struct {
-	Body      string
+	PageBase
 	ProcessID string
 	Timeline  []TimelineStep
 }
@@ -269,6 +275,7 @@ func main() {
 		now:           time.Now,
 		workflowDefID: primitive.NewObjectID(),
 		configPath:    envOr("WORKFLOW_CONFIG", "config/workflow.yaml"),
+		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 	}
 
 	mux := http.NewServeMux()
@@ -316,6 +323,10 @@ func logRequests(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) pageBase(body string) PageBase {
+	return PageBase{Body: body, ViteDevServer: s.viteDevServer}
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -331,7 +342,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		latestID = latest.ID.Hex()
 	}
 
-	if err := s.tmpl.ExecuteTemplate(w, "home.html", HomeView{Body: "home_body", LatestProcessID: latestID}); err != nil {
+	if err := s.tmpl.ExecuteTemplate(w, "home.html", HomeView{PageBase: s.pageBase("home_body"), LatestProcessID: latestID}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -410,7 +421,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		return
 	}
 	timeline := buildTimeline(cfg.Workflow, process, s.roleMetaMap(cfg))
-	view := ProcessPageView{Body: "process_body", ProcessID: process.ID.Hex(), Timeline: timeline}
+	view := ProcessPageView{PageBase: s.pageBase("process_body"), ProcessID: process.ID.Hex(), Timeline: timeline}
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -499,8 +510,8 @@ func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
 	path = strings.Trim(path, "/")
 	if path == "" {
 		view := BackofficeLandingView{
-			Body:  "backoffice_landing_body",
-			Users: s.userViews(cfg),
+			PageBase: s.pageBase("backoffice_landing_body"),
+			Users:    s.userViews(cfg),
 		}
 		if err := s.tmpl.ExecuteTemplate(w, "backoffice_landing.html", view); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -928,7 +939,7 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, role)
 	view := DepartmentDashboardView{
-		Body:            "dept_dashboard_body",
+		PageBase:        s.pageBase("dept_dashboard_body"),
 		CurrentUser:     actor,
 		RoleLabel:       s.roleLabel(cfg, role),
 		TodoActions:     todoActions,
@@ -965,7 +976,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 	}
 	actions := buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
-		Body:        "dept_process_body",
+		PageBase:    s.pageBase("dept_process_body"),
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, role),
 		ProcessID:   process.ID.Hex(),
@@ -1589,7 +1600,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, process *Pro
 		processID = process.ID.Hex()
 	}
 	view := DepartmentProcessView{
-		Body:        "dept_process_body",
+		PageBase:    s.pageBase("dept_process_body"),
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, actor.Role),
 		ProcessID:   processID,

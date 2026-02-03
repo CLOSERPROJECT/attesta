@@ -7,22 +7,13 @@ tasks:
       - task: start
 
   start:
-    desc: Bring up the stack and show status.
+    desc: Bring up infra and show status.
     cmds:
       - docker compose -f deployment/docker-compose.local.yaml up -d
       - docker compose -f deployment/docker-compose.local.yaml ps
 
-  up:
-    desc: Start infra, build assets, and run the Go server.
-    cmds:
-      - "docker compose -f deployment/docker-compose.local.yaml up -d"
-      - "sh -c 'cd web && npm install'"
-      - "sh -c 'cd web && npm run build'"
-      - "sh -c 'cd server && go mod tidy'"
-      - "sh -c 'cd server && go run ./cmd/server'"
-
-  docker:
-    desc: Build and start the full Docker Compose stack.
+  start:build:
+    desc: Bring up infra (build images) and show status.
     cmds:
       - docker compose -f deployment/docker-compose.local.yaml up -d --build
       - docker compose -f deployment/docker-compose.local.yaml ps
@@ -64,15 +55,35 @@ tasks:
     cmds:
       - docker exec closer-mongodb mongosh --eval "db.adminCommand('ping')"
 
-  cerbos-health:
-    desc: Check Cerbos health endpoint.
+  dev:
+    desc: Hot reload backend + frontend (Go via air, Vite HMR).
     cmds:
-      - curl http://localhost:3592/_cerbos/health
+      - task: start
+      - |
+          sh -c '
+          task dev:server &
+          server_pid=$!
+          task dev:web &
+          web_pid=$!
+          wait $server_pid $web_pid
+          '
+
+  dev:server:
+    desc: Hot reload Go server.
+    cmds:
+      - sh -c 'cd server && go install github.com/air-verse/air@latest'
+      - sh -c 'cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
+
+  dev:web:
+    desc: Vite dev server (HMR).
+    cmds:
+      - sh -c 'cd web && npm install'
+      - sh -c 'cd web && npm run dev'
 
   test:
     desc: Run backend unit tests.
     cmds:
-      - "sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./...'"
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./...'
 
   cover:
     desc: Run backend tests with a 70% coverage gate.

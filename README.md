@@ -95,3 +95,16 @@ docker compose -f deployment/docker-compose.local.yaml up -d
 cd server
 go test -tags=integration ./...
 ```
+
+## License
+© 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company.
+
+Licensed under the GNU AGPLv3 (see `LICENSE`).
+
+## Funding
+CLOSER (Circular raw materiaLs for european Open Strategic autonomy on chips and microElectronics pRoduction, Project No. 101161109) is funded by the European Union under the Interregional Innovation Investments (I3) Instrument of the European Regional Development Fund, managed by the European Innovation Council and SMEs Executive Agency (EISMEA).
+
+This repository/website is part of the CLOSER project and has received funding from the European Union. Views and opinions expressed are those of the author(s) only and do not necessarily reflect those of the European Union or EISMEA. Neither the European Union nor the granting authority can be held responsible for them.
+
+## Troubleshooting
+- `open Dockerfile.local`: you’re on an old checkout — `deployment/Dockerfile.local` is required by `deployment/docker-compose.local.yaml`.

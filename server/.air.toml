@@ -1,0 +1,10 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/attesta-server ./cmd/server"
+  bin = "tmp/attesta-server"
+  include_ext = ["go", "html", "yaml"]
+  exclude_dir = ["tmp", "vendor", "node_modules"]
+  delay = 200
+  stop_on_error = true
