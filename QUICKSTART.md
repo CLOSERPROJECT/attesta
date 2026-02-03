@@ -9,7 +9,7 @@ This demo runs MongoDB + Cerbos with Docker Compose, a Go server, and a Vite-bui
 
 ## Start services
 ```bash
-docker compose up -d
+docker compose -f deployment/docker-compose.local.yaml up -d
 ```
 
 ## Build frontend assets

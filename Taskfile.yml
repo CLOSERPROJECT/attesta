@@ -9,27 +9,33 @@ tasks:
   start:
     desc: Bring up the stack and show status.
     cmds:
-      - docker compose up -d
-      - docker compose ps
+      - docker compose -f deployment/docker-compose.local.yaml up -d
+      - docker compose -f deployment/docker-compose.local.yaml ps
 
   up:
     desc: Start infra, build assets, and run the Go server.
     cmds:
-      - "docker compose up -d"
+      - "docker compose -f deployment/docker-compose.local.yaml up -d"
       - "sh -c 'cd web && npm install'"
       - "sh -c 'cd web && npm run build'"
       - "sh -c 'cd server && go mod tidy'"
       - "sh -c 'cd server && go run ./cmd/server'"
 
+  docker:
+    desc: Build and start the full Docker Compose stack.
+    cmds:
+      - docker compose -f deployment/docker-compose.local.yaml up -d --build
+      - docker compose -f deployment/docker-compose.local.yaml ps
+
   stop:
     desc: Stop services and keep volumes.
     cmds:
-      - docker compose down
+      - docker compose -f deployment/docker-compose.local.yaml down
 
   reset:
     desc: Stop services and remove volumes.
     cmds:
-      - docker compose down -v
+      - docker compose -f deployment/docker-compose.local.yaml down -v
 
   purge:
     desc: Purge all database data after confirmation.
@@ -37,7 +43,7 @@ tasks:
       - |
           read -r -p "This will delete all MongoDB data. Type PURGE to continue: " confirm
           if [ "$confirm" = "PURGE" ]; then
-            docker compose down -v --remove-orphans
+            docker compose -f deployment/docker-compose.local.yaml down -v --remove-orphans
             docker volume rm -f mongodb_data "${PWD##*/}_mongodb_data" >/dev/null 2>&1 || true
           else
             echo "Purge cancelled."
@@ -46,12 +52,12 @@ tasks:
   status:
     desc: Show service status.
     cmds:
-      - docker compose ps
+      - docker compose -f deployment/docker-compose.local.yaml ps
 
   logs:
     desc: Tail Docker logs.
     cmds:
-      - docker compose logs -f
+      - docker compose -f deployment/docker-compose.local.yaml logs -f
 
   mongo-ping:
     desc: Ping MongoDB from the container.

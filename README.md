@@ -10,7 +10,7 @@ Small end-to-end demo with Go + HTMX + SSE + MongoDB + Cerbos.
 ## Quick start
 ```bash
 # 1) Infra
-docker compose up -d
+docker compose -f deployment/docker-compose.local.yaml up -d
 
 # 2) Build frontend assets
 cd web
@@ -82,7 +82,7 @@ task cover
 
 Optional integration test command (Docker-backed):
 ```bash
-docker compose up -d
+docker compose -f deployment/docker-compose.local.yaml up -d
 cd server
 go test -tags=integration ./...
 ```

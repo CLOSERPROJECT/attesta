@@ -1,0 +1,28 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    volumes:
+      - mongodb_data:/data/db
+
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:0.50.0
+    restart: unless-stopped
+    command: ["server", "--config=/config/config.yaml"]
+    volumes:
+      - ../cerbos/policies:/policies
+      - ../cerbos/config:/config
+
+  attesta:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.coolify
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+      CERBOS_URL: http://cerbos:3592
+    depends_on:
+      - mongodb
+      - cerbos
+
+volumes:
+  mongodb_data:
+    driver: local

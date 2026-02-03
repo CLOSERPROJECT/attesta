@@ -15,8 +15,8 @@ services:
     ports:
       - "3592:3592"
     volumes:
-      - ./cerbos/policies:/policies
-      - ./cerbos/config:/config
+      - ../cerbos/policies:/policies
+      - ../cerbos/config:/config
 
   mongo-express:
     image: mongo-express:1.0.2
@@ -27,6 +27,20 @@ services:
       - "8081:8081"
     depends_on:
       - mongodb
+
+  attesta:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.local
+    container_name: attesta
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+      CERBOS_URL: http://cerbos:3592
+    ports:
+      - "3030:3000"
+    depends_on:
+      - mongodb
+      - cerbos
 
 volumes:
   mongodb_data:
