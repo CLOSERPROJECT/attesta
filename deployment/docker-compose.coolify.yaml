@@ -3,12 +3,11 @@ services:
     image: mongo:7.0
 
   cerbos:
-    image: ghcr.io/cerbos/cerbos:0.50.0
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.cerbos
     restart: unless-stopped
     command: ["server", "--config=/config/config.yaml"]
-    volumes:
-      - ./cerbos/policies:/policies
-      - ./cerbos/config:/config
 
   attesta:
     build:
