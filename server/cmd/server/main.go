@@ -238,9 +238,24 @@ type ActionListView struct {
 	Timeline    []TimelineStep
 }
 
+type ProcessListItem struct {
+	ID              string
+	Status          string
+	CreatedAt       string
+	CreatedAtTime   time.Time
+	DoneSubsteps    int
+	TotalSubsteps   int
+	Percent         int
+	LastNotarizedAt string
+	LastDigestShort string
+}
+
 type HomeView struct {
 	PageBase
 	LatestProcessID string
+	Sort            string
+	Processes       []ProcessListItem
+	History         []ProcessListItem
 }
 
 type ProcessPageView struct {
@@ -327,12 +342,103 @@ func (s *Server) pageBase(body string) PageBase {
 	return PageBase{Body: body, ViteDevServer: s.viteDevServer}
 }
 
+func normalizeHomeSortKey(value string) string {
+	switch value {
+	case "time_asc", "time_desc", "progress_asc", "progress_desc", "status":
+		return value
+	default:
+		return "time_desc"
+	}
+}
+
+func countWorkflowSubsteps(def WorkflowDef) int {
+	count := 0
+	for _, step := range sortedSteps(def) {
+		count += len(step.Substep)
+	}
+	return count
+}
+
+func processProgressStats(def WorkflowDef, process *Process) (doneCount int, lastAt string, lastDigestShort string) {
+	if process == nil {
+		return 0, "", ""
+	}
+	var latest time.Time
+	first := true
+	for _, sub := range orderedSubsteps(def) {
+		progress, ok := process.Progress[sub.SubstepID]
+		if !ok || progress.State != "done" {
+			continue
+		}
+		doneCount++
+		if progress.DoneAt == nil {
+			continue
+		}
+		if first || progress.DoneAt.After(latest) {
+			latest = *progress.DoneAt
+			first = false
+			digest := ""
+			if progress.Data != nil {
+				digest = digestPayload(progress.Data)
+			}
+			if len(digest) > 12 {
+				digest = digest[:12]
+			}
+			lastDigestShort = digest
+		}
+	}
+	if !first {
+		lastAt = latest.Format(time.RFC3339)
+	}
+	return doneCount, lastAt, lastDigestShort
+}
+
+func sortHomeProcessList(items []ProcessListItem, sortKey string) {
+	switch sortKey {
+	case "time_asc":
+		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.Before(items[j].CreatedAtTime) })
+	case "progress_asc":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Percent == items[j].Percent {
+				return items[i].CreatedAtTime.After(items[j].CreatedAtTime)
+			}
+			return items[i].Percent < items[j].Percent
+		})
+	case "progress_desc":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Percent == items[j].Percent {
+				return items[i].CreatedAtTime.After(items[j].CreatedAtTime)
+			}
+			return items[i].Percent > items[j].Percent
+		})
+	case "status":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Status == items[j].Status {
+				if items[i].Percent == items[j].Percent {
+					return items[i].CreatedAtTime.After(items[j].CreatedAtTime)
+				}
+				return items[i].Percent > items[j].Percent
+			}
+			if items[i].Status == "active" {
+				return true
+			}
+			if items[j].Status == "active" {
+				return false
+			}
+			return items[i].Status < items[j].Status
+		})
+	default:
+		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.After(items[j].CreatedAtTime) })
+	}
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := s.runtimeConfig(); err != nil {
+	cfg, err := s.runtimeConfig()
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -341,8 +447,57 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if latest, err := s.loadLatestProcess(ctx); err == nil {
 		latestID = latest.ID.Hex()
 	}
+	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
+	processesRaw, err := s.store.ListRecentProcesses(ctx, 0)
+	if err != nil {
+		processesRaw = nil
+	}
 
-	if err := s.tmpl.ExecuteTemplate(w, "home.html", HomeView{PageBase: s.pageBase("home_body"), LatestProcessID: latestID}); err != nil {
+	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
+	var processes []ProcessListItem
+	var history []ProcessListItem
+	for _, process := range processesRaw {
+		process.Progress = normalizeProgressKeys(process.Progress)
+		status := strings.TrimSpace(process.Status)
+		if status == "" {
+			status = "active"
+		}
+		if status != "done" && isProcessDone(cfg.Workflow, &process) {
+			status = "done"
+		}
+		doneCount, lastAt, lastDigest := processProgressStats(cfg.Workflow, &process)
+		percent := 0
+		if totalSubsteps > 0 {
+			percent = int(float64(doneCount) / float64(totalSubsteps) * 100)
+		}
+		item := ProcessListItem{
+			ID:              process.ID.Hex(),
+			Status:          status,
+			CreatedAt:       process.CreatedAt.Format(time.RFC3339),
+			CreatedAtTime:   process.CreatedAt,
+			DoneSubsteps:    doneCount,
+			TotalSubsteps:   totalSubsteps,
+			Percent:         percent,
+			LastNotarizedAt: lastAt,
+			LastDigestShort: lastDigest,
+		}
+		processes = append(processes, item)
+		if status == "done" {
+			history = append(history, item)
+		}
+	}
+
+	sortHomeProcessList(processes, sortKey)
+	sortHomeProcessList(history, sortKey)
+
+	view := HomeView{
+		PageBase:        s.pageBase("home_body"),
+		LatestProcessID: latestID,
+		Sort:            sortKey,
+		Processes:       processes,
+		History:         history,
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

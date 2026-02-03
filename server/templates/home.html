@@ -1,16 +1,93 @@
 {{define "home_body"}}
-<section class="hero">
-  <div>
-    <h1>Start a process</h1>
-    <p class="muted">Create a new process instance and follow the sequential steps.</p>
-    <form method="post" action="/process/start">
-      <button class="primary" type="submit">Start a process</button>
-    </form>
-    {{if .LatestProcessID}}
-      <p class="muted">Latest process: <a href="/process/{{.LatestProcessID}}">{{.LatestProcessID}}</a></p>
+<div class="stack">
+  <section class="hero">
+    <div>
+      <h1>Start a process</h1>
+      <p class="muted">Create a new process instance and follow the sequential steps.</p>
+      <form method="post" action="/process/start">
+        <button class="primary" type="submit">Start a process</button>
+      </form>
+      {{if .LatestProcessID}}
+        <p class="muted">Latest process: <a href="/process/{{.LatestProcessID}}">{{.LatestProcessID}}</a></p>
+      {{end}}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="process-toolbar">
+      <h2 style="margin: 0;">All processes</h2>
+      <form method="get" action="/" class="process-sort">
+        <label class="muted" for="sort" style="font-size: 13px;">Sort</label>
+        <select id="sort" name="sort" onchange="this.form.submit()">
+          <option value="time_desc" {{if eq .Sort "time_desc"}}selected{{end}}>Newest</option>
+          <option value="time_asc" {{if eq .Sort "time_asc"}}selected{{end}}>Oldest</option>
+          <option value="progress_desc" {{if eq .Sort "progress_desc"}}selected{{end}}>Most advanced</option>
+          <option value="progress_asc" {{if eq .Sort "progress_asc"}}selected{{end}}>Least advanced</option>
+          <option value="status" {{if eq .Sort "status"}}selected{{end}}>Status</option>
+        </select>
+      </form>
+    </div>
+
+    {{if .Processes}}
+      <ul class="process-list">
+        {{range .Processes}}
+          <li class="process-item">
+            <div class="process-head">
+              <a href="/process/{{.ID}}">{{.ID}}</a>
+              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+            </div>
+            <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
+              <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
+            </div>
+            <div class="substep-meta" style="margin-top: 10px;">
+              <span>{{.DoneSubsteps}} / {{.TotalSubsteps}} ({{.Percent}}%)</span>
+              <span>Created: {{.CreatedAt}}</span>
+              {{if .LastNotarizedAt}}
+                <span>Last notarized: {{.LastNotarizedAt}}</span>
+              {{end}}
+              {{if .LastDigestShort}}
+                <span class="pill">sha256 {{.LastDigestShort}}</span>
+              {{end}}
+            </div>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted" style="margin: 12px 0 0;">No processes yet.</p>
     {{end}}
-  </div>
-</section>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top: 0;">History</h2>
+    {{if .History}}
+      <ul class="process-list">
+        {{range .History}}
+          <li class="process-item">
+            <div class="process-head">
+              <a href="/process/{{.ID}}">{{.ID}}</a>
+              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+            </div>
+            <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
+              <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
+            </div>
+            <div class="substep-meta" style="margin-top: 10px;">
+              <span>{{.DoneSubsteps}} / {{.TotalSubsteps}} ({{.Percent}}%)</span>
+              <span>Created: {{.CreatedAt}}</span>
+              {{if .LastNotarizedAt}}
+                <span>Last notarized: {{.LastNotarizedAt}}</span>
+              {{end}}
+              {{if .LastDigestShort}}
+                <span class="pill">sha256 {{.LastDigestShort}}</span>
+              {{end}}
+            </div>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted" style="margin: 12px 0 0;">No finished processes yet.</p>
+    {{end}}
+  </section>
+</div>
 {{end}}
 
 {{define "home.html"}}
