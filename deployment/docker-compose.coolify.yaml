@@ -1,8 +1,6 @@
 services:
   mongodb:
     image: mongo:7.0
-    volumes:
-      - mongodb_data:/data/db
 
   cerbos:
     image: ghcr.io/cerbos/cerbos:0.50.0
@@ -31,7 +29,3 @@ services:
       SERVICE_FQDN_MONGOEXPRESS_8081:
     depends_on:
       - mongodb
-
-volumes:
-  mongodb_data:
-    driver: local
