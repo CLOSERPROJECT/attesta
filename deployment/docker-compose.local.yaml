@@ -15,8 +15,8 @@ services:
     ports:
       - "3592:3592"
     volumes:
-      - ./cerbos/policies:/policies
-      - ./cerbos/config:/config
+      - ../cerbos/policies:/policies
+      - ../cerbos/config:/config
 
   mongo-express:
     image: mongo-express:1.0.2
@@ -30,7 +30,7 @@ services:
 
   attesta:
     build:
-      context: .
+      context: ..
       dockerfile: deployment/Dockerfile.local
     container_name: attesta
     environment:
