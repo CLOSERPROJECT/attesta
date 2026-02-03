@@ -15,12 +15,8 @@ jobs:
     steps:
       - name: 🔔 Checkout
         uses: actions/checkout@v6
-      - name: 🐹 Set up go@1.25.5
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.25.5'
+      - name: 🥢 Set up go@1.25.5 and task@latest
+        uses: jdx/mise-action@v3
       - name: 🧪 Run tests
-        run: |
-          GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./...
-        working-directory: ./server
+        run: task cover
         shell: bash
