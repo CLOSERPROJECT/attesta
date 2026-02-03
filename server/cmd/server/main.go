@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -281,6 +282,19 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+func attachmentMaxBytes() int64 {
+	const defaultMaxBytes = int64(25 * 1024 * 1024)
+	raw := strings.TrimSpace(os.Getenv("ATTACHMENT_MAX_BYTES"))
+	if raw == "" {
+		return defaultMaxBytes
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return defaultMaxBytes
+	}
+	return value
+}
+
 func logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -516,19 +530,50 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
-		return
-	}
-	value := strings.TrimSpace(r.FormValue("value"))
-	if value == "" {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Value is required.", process, actor)
-		return
-	}
-	payload, err := normalizePayload(substep, value)
-	if err != nil {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
-		return
+	var payload map[string]interface{}
+	if substep.InputType == "file" {
+		r.Body = http.MaxBytesReader(w, r.Body, attachmentMaxBytes())
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			if isRequestTooLarge(err) {
+				s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
+				return
+			}
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
+			return
+		}
+		files := r.MultipartForm.File[substep.InputKey]
+		if len(files) == 0 {
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "File is required.", process, actor)
+			return
+		}
+		if len(files) != 1 {
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Only one file is allowed.", process, actor)
+			return
+		}
+		file := files[0]
+		payload = map[string]interface{}{
+			substep.InputKey: map[string]interface{}{
+				"filename":    file.Filename,
+				"contentType": file.Header.Get("Content-Type"),
+				"size":        file.Size,
+			},
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
+			return
+		}
+		value := strings.TrimSpace(r.FormValue("value"))
+		if value == "" {
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Value is required.", process, actor)
+			return
+		}
+		var err error
+		payload, err = normalizePayload(substep, value)
+		if err != nil {
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
+			return
+		}
 	}
 
 	now := s.nowUTC()
@@ -574,6 +619,15 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	s.renderDepartmentProcessPage(w, process, actor, "")
+}
+
+func isRequestTooLarge(err error) bool {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "request body too large") || strings.Contains(msg, "message too large")
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {

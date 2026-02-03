@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -154,6 +156,67 @@ func TestHandleCompleteSubstepFormAndValueValidation(t *testing.T) {
 	}
 }
 
+func TestHandleCompleteSubstepFileRequiresUpload(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID := newServerForFileCompleteTests(store)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", &body)
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "File is required.") {
+		t.Fatalf("expected missing file message, got %q", rr.Body.String())
+	}
+}
+
+func TestHandleCompleteSubstepFileTooLargeReturns413(t *testing.T) {
+	t.Setenv("ATTACHMENT_MAX_BYTES", "8")
+
+	store := NewMemoryStore()
+	server, processID := newServerForFileCompleteTests(store)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("attachment", "test.txt")
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write([]byte("content-too-large")); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", &body)
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "File too large.") {
+		t.Fatalf("expected size error message, got %q", rr.Body.String())
+	}
+}
+
 func TestHandleCompleteSubstepStoreFailures(t *testing.T) {
 	store := NewMemoryStore()
 	store.UpdateProgressErr = assertErr("update")
@@ -230,3 +293,38 @@ func TestHandleCompleteSubstepFinalCompletionMarksProcessDone(t *testing.T) {
 type assertErr string
 
 func (e assertErr) Error() string { return string(e) }
+
+func newServerForFileCompleteTests(store *MemoryStore) (*Server, string) {
+	process := Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	}
+	store.SeedProcess(process)
+
+	server := &Server{
+		store:      store,
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			cfg := testRuntimeConfig()
+			cfg.Workflow.Steps = []WorkflowStep{
+				{
+					StepID: "1",
+					Title:  "Step 1",
+					Order:  1,
+					Substep: []WorkflowSub{
+						{SubstepID: "1.1", Title: "Upload", Order: 1, Role: "dep1", InputKey: "attachment", InputType: "file"},
+					},
+				},
+			}
+			return cfg, nil
+		},
+		now: func() time.Time { return time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC) },
+	}
+	return server, process.ID.Hex()
+}
