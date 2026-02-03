@@ -1,0 +1,183 @@
+#+TITLE: File inputs per workflow substep
+#+SUBTITLE: Add support for uploading and viewing files when `inputType: "file"` in `server/config/workflow.yaml`
+#+DATE: 2026-02-03
+#+KEYWORDS: workflow.yaml, file upload, HTMX, multipart, MongoDB, timeline, notarization
+
+* DONE [#A] Confirm scope and UX decisions
+  - Effort :: S
+  - Goal :: Lock down what “file input” means per substep and what users see/do in backoffice + timeline.
+  - Notes :: This repo is intentionally small/monolithic (single `server/cmd/server/main.go`). Prefer minimal, local helpers (deviation from VSA/REPR/Hex) unless the change would meaningfully improve clarity.
+** DONE [#A] Capture confirmed constraints and defaults
+  - Why :: Uploads introduce size/security concerns; we want a predictable demo experience and an easy way to tune limits.
+  - Change ::
+    - File types: allow any for now (store reported/detected `Content-Type` and show it in UI).
+    - Required: a file is required when `inputType: "file"`.
+    - Cardinality: exactly 1 file per substep completion.
+    - Upload size limit: pick a “PDF/Excel friendly” default and make it easy to change:
+      - Env var: `ATTACHMENT_MAX_BYTES`
+      - Default: `26214400` (25 MiB)
+      - Enforcement: reject larger uploads with `413` and a human message.
+  - Tests ::
+    - Unit test missing file => `400`.
+    - Unit test oversize (limit set low in test) => `413`.
+  - Done when :: The size limit is configurable via env and error mapping matches existing UI patterns.
+** DONE [#A] Capture confirmed download UX and auth policy
+  - Why :: The file needs to be visible in both the process timeline and the backoffice to validate the feature quickly.
+  - Change ::
+    - Show download links in:
+      - Home process timeline (`/process/:id`)
+      - Backoffice timeline/action views
+    - Authorization: allow anyone to download for now (no cookie/Cerbos checks).
+    - Keep a future-friendly shape (process+substep scoped route) so auth can be added later without breaking URLs.
+  - Tests ::
+    - Handler test: download works without `demo_user` cookie.
+  - Done when :: The same file is downloadable from both timelines with no auth requirement.
+
+* DONE [#A] Extend workflow config semantics (`inputType: "file"`)
+  - Effort :: S
+  - Goal :: Allow substeps to declare that their input is a file, driven purely by YAML.
+  - Notes :: Existing `inputType` values include `"number"` and string-like values (`"string"` in `server/config/workflow.yaml`, `"text"` in tests). Keep backward compatibility; add `"file"` as a new supported value.
+** DONE [#A] Add a file substep to Step "1"
+  - Why :: The default workflow should demonstrate the feature immediately with minimal changes.
+  - Change ::
+    - In `server/config/workflow.yaml`, add a new substep under `workflow.steps[id="1"]`:
+      - `id: "1.3"`
+      - `title: "Upload gallium certification"`
+      - `order: 3`
+      - `role: "dep1"` (keep Step 1 owned by dep1 to preserve narrative)
+      - `inputKey: "Gallium certification"`
+      - `inputType: "file"`
+  - Tests ::
+    - Add/adjust handler tests that complete substep `1.3` with multipart upload.
+  - Done when :: Backoffice shows a file picker for substep `1.3` and completing it stores metadata + enables download.
+** DONE [#B] Validate/normalize `inputType` values on config load
+  - Why :: Today unknown input types silently behave like “string”; for files we want explicit behavior and clearer errors.
+  - Change ::
+    - In `server/cmd/server/main.go` `getConfig()`, add lightweight validation/normalization:
+      - Accept: `number`, `string`, `text`, `file`
+      - Normalize: treat `text` as `string` internally so the UI can switch on fewer cases.
+    - Decide whether to treat unknown values as error (suggestion: error to avoid surprising runtime behavior).
+  - Tests ::
+    - New unit test for invalid `inputType` in config provider => `500`/clear error (depending on how config is supplied in tests).
+  - Done when :: Invalid configs fail fast with a helpful message.
+
+* DONE [#A] Add file-upload handling to “complete substep”
+  - Effort :: M
+  - Goal :: When a substep’s `inputType` is `file`, completing the substep uploads a file and stores a verifiable reference in the notarized payload.
+  - Notes :: Keep the existing route shape: `POST /process/:id/substep/:substepId/complete`. Only the request encoding changes for file steps.
+** DONE [#A] Define the request contract (HTML/HTMX)
+  - Why :: The handler currently assumes `application/x-www-form-urlencoded` with `value=...`.
+  - Change ::
+    - For non-file substeps: keep `name="value"` and URL-encoded posts as-is.
+    - For file substeps: render `<input type="file" name="{{.InputKey}}">` and submit as `multipart/form-data`.
+    - Add `hx-encoding="multipart/form-data"` for HTMX forms on file substeps so the same endpoint works with `hx-post`.
+  - Tests ::
+    - Template test (optional) or handler test that a multipart request can complete a file substep.
+  - Done when :: File substeps submit multipart with the input key as the file field name.
+** DONE [#A] Implement robust parsing + error mapping in `handleCompleteSubstep`
+  - Why :: `ParseForm()` on multipart uses default limits; we need explicit size limits and clear errors.
+  - Change ::
+    - In `server/cmd/server/main.go` `handleCompleteSubstep(...)`, branch on `substep.InputType`:
+      - `number`/string-like: keep `ParseForm()` and `FormValue("value")`.
+      - `file`:
+        - Read `ATTACHMENT_MAX_BYTES` (default `26214400`) and wrap the request body with `http.MaxBytesReader(...)` (so oversized uploads reliably map to `413`).
+        - Call `ParseMultipartForm(maxMemory)` (small `maxMemory`, let Go spill to temp file if needed).
+        - Read the uploaded file via `r.FormFile(substep.InputKey)` (field name equals YAML `inputKey`, including spaces).
+        - Stream the file into Mongo storage (GridFS) without buffering full content in memory.
+    - Map errors consistently to existing UX patterns:
+      - malformed multipart => `400 "Invalid form."`
+      - missing file => `400 "File is required."`
+      - too large => `413 "File too large."`
+  - Tests ::
+    - `server/cmd/server/complete_handler_test.go`: add coverage for missing file, oversize file, successful file completion.
+  - Done when :: The handler supports both encodings and enforces a size limit.
+** DONE [#A] Ensure notarization covers file content integrity
+  - Why :: Current notarization digests only the payload JSON; if the payload contains only an ID, content integrity isn’t guaranteed.
+  - Change ::
+    - Compute `sha256` of uploaded file content server-side during upload.
+    - Include digest + metadata in the substep payload under the `inputKey` object:
+      - Shape: `{ "<inputKey>": { "attachmentId": "<hex>", "filename": "...", "contentType": "...", "size": 123, "sha256": "..." } }`
+      - Store `attachmentId` as a hex string (not `primitive.ObjectID`) so templates and JSON remain predictable.
+    - Keep `digestPayload(payload)` unchanged so notarization now indirectly commits to the file digest.
+  - Tests ::
+    - Unit test: uploaded content produces expected sha256 and is present in stored progress/notarization payload.
+  - Done when :: The notarized payload includes a stable content digest for the uploaded file.
+
+* DONE [#A] Persist attachments and add a download endpoint
+  - Effort :: M
+  - Goal :: Store uploaded file bytes + metadata and allow the UI to retrieve them via a stable URL.
+  - Notes :: Store everything in MongoDB. Use Mongo GridFS (via the existing `go.mongodb.org/mongo-driver` dependency) so PDFs/Excels aren’t constrained by Mongo’s 16MB document limit, while keeping the API surface small.
+** DONE [#A] Add an attachment model + store port
+  - Why :: `Store` currently only knows about processes and notarizations.
+  - Change ::
+    - Add an `Attachment` struct (new file suggestion: `server/cmd/server/attachments.go`) capturing:
+      - `ID` (Mongo ObjectID / GridFS file id)
+      - `ProcessID`, `SubstepID`
+      - `Filename`, `ContentType`, `SizeBytes`, `SHA256`
+      - `UploadedAt`
+    - Extend `server/cmd/server/store.go` `Store` interface with:
+      - `SaveAttachment(ctx, attachmentMeta, content io.Reader) (Attachment, error)` (streams bytes; returns `ID`, `SizeBytes`, `SHA256`)
+      - `LoadAttachmentByID(ctx, id) (*Attachment, error)` (loads metadata only)
+      - `OpenAttachmentDownload(ctx, id) (io.ReadCloser, error)` (streams bytes)
+    - Implement for `MongoStore` using GridFS bucket (bucket name: `attachments`, producing `attachments.files` + `attachments.chunks`) with metadata stored on the GridFS file document.
+    - Implement for `MemoryStore` using in-memory byte slices for tests.
+    - Add a single sentinel error for size limit exceed (e.g., `ErrAttachmentTooLarge`) so `handleCompleteSubstep` can map it to `413` even if the overflow is detected while streaming to GridFS.
+  - Tests ::
+    - Unit tests for MemoryStore insert/load semantics.
+  - Done when :: The server can store and retrieve attachment bytes by ID in both stores.
+** DONE [#A] Add `GET /process/:id/substep/:substepId/file` (or equivalent) route
+  - Why :: A process/substep-scoped URL is easy to reason about and avoids exposing raw attachment IDs in the UI if desired.
+  - Change ::
+    - Extend `server/cmd/server/main.go` `handleProcessRoutes(...)` to route a new GET endpoint (candidate: `/process/:id/substep/:substepId/file`).
+    - Endpoint behavior:
+      - Load process and ensure substep exists and `inputType == "file"`.
+      - Ensure substep is `done` and read `attachmentId` (hex string) from progress data at `Data[inputKey].attachmentId`.
+      - Convert `attachmentId` hex -> `primitive.ObjectID` and stream bytes from GridFS.
+      - Respond with:
+        - `Content-Type` from stored metadata (fallback `application/octet-stream`)
+        - `Content-Disposition: attachment; filename="..."` (sanitize filename)
+      - Error mapping:
+        - missing/invalid => `404`
+  - Tests ::
+    - Handler test: successful download returns bytes + headers.
+    - Handler test: substep not done => `404` (or `409`, decide and document).
+  - Done when :: A completed file substep produces a working download link.
+
+* DONE [#B] Update UI rendering for file substeps and timeline display
+  - Effort :: M
+  - Goal :: Make file steps usable from backoffice with HTMX and understandable in the timeline.
+  - Notes :: HTMX file uploads require `hx-encoding="multipart/form-data"`. The current timeline prints `Data` via `printf`, which won’t create links.
+** DONE [#A] Render the correct input control per `InputType`
+  - Why :: `server/templates/action_list.html` always renders `<input type="text" name="value">`.
+  - Change ::
+    - In `server/templates/action_list.html`:
+      - If `InputType == "number"` render `<input type="number" name="value" ...>`.
+      - If string-like render `<input type="text" name="value" ...>`.
+      - If `InputType == "file"` render `<input type="file" name="{{.InputKey}}" ...>` and set `enctype` + `hx-encoding`.
+  - Tests ::
+    - Optional snapshot-ish template test is likely overkill; rely on handler tests + manual demo verification.
+  - Done when :: Backoffice shows a file picker for file substeps and existing steps still work.
+** DONE [#B] Improve timeline display for file payloads
+  - Why :: Users should be able to see what was uploaded and optionally download it from the timeline.
+  - Change ::
+    - Extend `TimelineSubstep` (in `server/cmd/server/main.go`) to carry a safe display model, e.g.:
+      - `DisplayValue string` for number/text
+      - `FileName`, `FileSHA256`, `FileURL` for file
+    - Update `buildTimeline(...)` to populate these fields using the workflow definition’s `inputType` and the stored payload.
+    - Update `server/templates/timeline.html` to render file metadata + a download link when present, and render scalar values without dumping raw maps.
+  - Tests ::
+    - Unit test: timeline builder produces expected file link/metadata for a completed file substep.
+  - Done when :: Timeline shows file name + link instead of opaque map output.
+
+* DONE [#C] Documentation and operational notes
+  - Effort :: S
+  - Goal :: Make the new capability discoverable and safe to run locally.
+  - Notes :: Keep docs minimal; this is a demo repo.
+** DONE [#C] Document how to declare file inputs in YAML and how to use them
+  - Why :: The feature is driven by config; future edits should be straightforward.
+  - Change ::
+    - Update `README.md` or `QUICKSTART.md` with:
+      - A short snippet showing `inputType: "file"` and expected behavior.
+      - Mention upload size limit (`ATTACHMENT_MAX_BYTES`) and where files are stored (Mongo GridFS bucket `attachments`, i.e. `attachments.files` and `attachments.chunks`).
+  - Tests :: N/A
+  - Done when :: Docs describe config + UX in <10 lines.

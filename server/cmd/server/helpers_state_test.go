@@ -12,8 +12,8 @@ func TestComputeAvailability(t *testing.T) {
 	}{
 		{name: "nil process", process: nil, available: "1.1"},
 		{name: "empty progress", process: processWithDone(), available: "1.1"},
-		{name: "partial progress", process: processWithDone("1.1", "1.2"), available: "2.1"},
-		{name: "fully done", process: processWithDone("1.1", "1.2", "2.1", "2.2", "3.1", "3.2"), available: ""},
+		{name: "partial progress", process: processWithDone("1.1", "1.2"), available: "1.3"},
+		{name: "fully done", process: processWithDone("1.1", "1.2", "1.3", "2.1", "2.2", "3.1", "3.2"), available: ""},
 	}
 
 	for _, tc := range cases {
@@ -38,7 +38,7 @@ func TestSequenceAndDoneHelpers(t *testing.T) {
 	if isSequenceOK(def, processWithDone(), "2.1") {
 		t.Fatal("expected 2.1 to be blocked when previous steps are pending")
 	}
-	if !isSequenceOK(def, processWithDone("1.1", "1.2"), "2.1") {
+	if !isSequenceOK(def, processWithDone("1.1", "1.2", "1.3"), "2.1") {
 		t.Fatal("expected 2.1 to be sequence-OK after 1.x done")
 	}
 	if isSequenceOK(def, nil, "2.1") {
@@ -48,7 +48,7 @@ func TestSequenceAndDoneHelpers(t *testing.T) {
 	if isProcessDone(def, processWithDone("1.1")) {
 		t.Fatal("expected partially done process to be incomplete")
 	}
-	if !isProcessDone(def, processWithDone("1.1", "1.2", "2.1", "2.2", "3.1", "3.2")) {
+	if !isProcessDone(def, processWithDone("1.1", "1.2", "1.3", "2.1", "2.2", "3.1", "3.2")) {
 		t.Fatal("expected all done process to be complete")
 	}
 }
@@ -73,7 +73,12 @@ func TestNextAvailableHelpers(t *testing.T) {
 		t.Fatalf("expected dep1 next available substep 1.2, got %#v (ok=%t)", roleSub, ok)
 	}
 
-	if _, ok := nextAvailableSubstepForRole(def, processWithDone("1.1", "1.2"), "dep1"); ok {
+	roleSub, ok = nextAvailableSubstepForRole(def, processWithDone("1.1", "1.2"), "dep1")
+	if !ok || roleSub.SubstepID != "1.3" {
+		t.Fatalf("expected dep1 next available substep 1.3, got %#v (ok=%t)", roleSub, ok)
+	}
+
+	if _, ok := nextAvailableSubstepForRole(def, processWithDone("1.1", "1.2", "1.3"), "dep1"); ok {
 		t.Fatal("expected no dep1 substep available after dep1 work is done")
 	}
 }

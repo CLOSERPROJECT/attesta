@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,10 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,6 +83,14 @@ type FakeNotary struct {
 	Digest string `bson:"digest"`
 }
 
+type AttachmentPayload struct {
+	AttachmentID string
+	Filename     string
+	ContentType  string
+	Size         int64
+	SHA256       string
+}
+
 type Server struct {
 	mongo          *mongo.Client
 	store          Store
@@ -101,17 +112,20 @@ type SSEHub struct {
 }
 
 type TimelineSubstep struct {
-	SubstepID  string
-	Title      string
-	Role       string
-	RoleLabel  string
-	RoleColor  string
-	RoleBorder string
-	Status     string
-	DoneBy     string
-	DoneRole   string
-	DoneAt     string
-	Data       map[string]interface{}
+	SubstepID    string
+	Title        string
+	Role         string
+	RoleLabel    string
+	RoleColor    string
+	RoleBorder   string
+	Status       string
+	DoneBy       string
+	DoneRole     string
+	DoneAt       string
+	DisplayValue string
+	FileName     string
+	FileSHA256   string
+	FileURL      string
 }
 
 type TimelineStep struct {
@@ -281,6 +295,19 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+func attachmentMaxBytes() int64 {
+	const defaultMaxBytes = int64(25 * 1024 * 1024)
+	raw := strings.TrimSpace(os.Getenv("ATTACHMENT_MAX_BYTES"))
+	if raw == "" {
+		return defaultMaxBytes
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return defaultMaxBytes
+	}
+	return value
+}
+
 func logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -363,6 +390,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
 	}
+	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "file" && r.Method == http.MethodGet {
+		s.handleDownloadSubstepFile(w, r, processID, parts[2])
+		return
+	}
 	http.NotFound(w, r)
 }
 
@@ -400,6 +431,61 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 	timeline := buildTimeline(cfg.Workflow, process, s.roleMetaMap(cfg))
 	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Request, processID, substepID string) {
+	cfg, err := s.runtimeConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	substep, _, err := findSubstep(cfg.Workflow, substepID)
+	if err != nil || substep.InputType != "file" {
+		http.NotFound(w, r)
+		return
+	}
+	progress, ok := process.Progress[substepID]
+	if !ok || progress.State != "done" {
+		http.NotFound(w, r)
+		return
+	}
+	attachmentPayload, ok := readAttachmentPayload(progress.Data, substep.InputKey)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	attachmentID, err := primitive.ObjectIDFromHex(attachmentPayload.AttachmentID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	attachment, err := s.store.LoadAttachmentByID(r.Context(), attachmentID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	download, err := s.store.OpenAttachmentDownload(r.Context(), attachmentID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer download.Close()
+
+	contentType := strings.TrimSpace(attachment.ContentType)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	filename := sanitizeAttachmentFilename(attachment.Filename)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	if _, err := io.Copy(w, download); err != nil {
+		return
 	}
 }
 
@@ -516,22 +602,24 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
-		return
-	}
-	value := strings.TrimSpace(r.FormValue("value"))
-	if value == "" {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Value is required.", process, actor)
-		return
-	}
-	payload, err := normalizePayload(substep, value)
+	now := s.nowUTC()
+	payload, err := s.parseCompletionPayload(w, r, process.ID, substep, now)
 	if err != nil {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
+		switch {
+		case errors.Is(err, ErrAttachmentTooLarge):
+			s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
+		case errors.Is(err, errFileRequired):
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "File is required.", process, actor)
+		case errors.Is(err, errInvalidForm):
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
+		case errors.Is(err, errValueRequired):
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Value is required.", process, actor)
+		default:
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
+		}
 		return
 	}
 
-	now := s.nowUTC()
 	progressUpdate := ProcessStep{
 		State:  "done",
 		DoneAt: &now,
@@ -574,6 +662,201 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	s.renderDepartmentProcessPage(w, process, actor, "")
+}
+
+var (
+	errInvalidForm   = errors.New("invalid form")
+	errValueRequired = errors.New("value required")
+	errFileRequired  = errors.New("file required")
+)
+
+func (s *Server) parseCompletionPayload(w http.ResponseWriter, r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
+	if substep.InputType != "file" {
+		return parseScalarPayload(r, substep)
+	}
+	return s.parseFilePayload(w, r, processID, substep, now)
+}
+
+func parseScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
+	if err := r.ParseForm(); err != nil {
+		return nil, errInvalidForm
+	}
+	value := strings.TrimSpace(r.FormValue("value"))
+	if value == "" {
+		return nil, errValueRequired
+	}
+	payload, err := normalizePayload(substep, value)
+	if err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (s *Server) parseFilePayload(w http.ResponseWriter, r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
+	maxBytes := attachmentMaxBytes()
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		if isRequestTooLarge(err) {
+			return nil, ErrAttachmentTooLarge
+		}
+		return nil, errInvalidForm
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
+	files := r.MultipartForm.File[substep.InputKey]
+	if len(files) != 1 {
+		return nil, errFileRequired
+	}
+	part := files[0]
+	file, err := part.Open()
+	if err != nil {
+		return nil, errInvalidForm
+	}
+	defer file.Close()
+
+	contentType := strings.TrimSpace(part.Header.Get("Content-Type"))
+	reader := io.Reader(file)
+	if contentType == "" {
+		header := make([]byte, 512)
+		count, readErr := io.ReadFull(file, header)
+		switch {
+		case readErr == nil:
+		case errors.Is(readErr, io.EOF), errors.Is(readErr, io.ErrUnexpectedEOF):
+		default:
+			return nil, errInvalidForm
+		}
+		sniffed := bytes.TrimSpace(header[:count])
+		if len(sniffed) > 0 {
+			contentType = http.DetectContentType(sniffed)
+		}
+		reader = io.MultiReader(bytes.NewReader(header[:count]), file)
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	attachment, err := s.store.SaveAttachment(r.Context(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   substep.SubstepID,
+		Filename:    part.Filename,
+		ContentType: contentType,
+		MaxBytes:    maxBytes,
+		UploadedAt:  now,
+	}, reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		substep.InputKey: map[string]interface{}{
+			"attachmentId": attachment.ID.Hex(),
+			"filename":     attachment.Filename,
+			"contentType":  attachment.ContentType,
+			"size":         attachment.SizeBytes,
+			"sha256":       attachment.SHA256,
+		},
+	}, nil
+}
+
+func isRequestTooLarge(err error) bool {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "request body too large") || strings.Contains(msg, "message too large")
+}
+
+func readAttachmentPayload(data map[string]interface{}, inputKey string) (AttachmentPayload, bool) {
+	if data == nil {
+		return AttachmentPayload{}, false
+	}
+	raw, ok := data[inputKey]
+	if !ok {
+		return AttachmentPayload{}, false
+	}
+
+	values, ok := raw.(map[string]interface{})
+	if !ok {
+		if typed, ok := raw.(primitive.M); ok {
+			values = map[string]interface{}(typed)
+		} else {
+			return AttachmentPayload{}, false
+		}
+	}
+
+	attachmentID, _ := asString(values["attachmentId"])
+	filename, _ := asString(values["filename"])
+	contentType, _ := asString(values["contentType"])
+	size, _ := asInt64(values["size"])
+	sha256Digest, _ := asString(values["sha256"])
+	if attachmentID == "" {
+		return AttachmentPayload{}, false
+	}
+	return AttachmentPayload{
+		AttachmentID: attachmentID,
+		Filename:     filename,
+		ContentType:  contentType,
+		Size:         size,
+		SHA256:       sha256Digest,
+	}, true
+}
+
+func asString(value interface{}) (string, bool) {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed), true
+	case fmt.Stringer:
+		return strings.TrimSpace(typed.String()), true
+	case nil:
+		return "", false
+	default:
+		return strings.TrimSpace(fmt.Sprintf("%v", typed)), true
+	}
+}
+
+func asInt64(value interface{}) (int64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int32:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case float32:
+		return int64(typed), true
+	case float64:
+		return int64(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func sanitizeAttachmentFilename(filename string) string {
+	filename = strings.TrimSpace(filename)
+	if filename == "" {
+		return "attachment"
+	}
+	replacer := strings.NewReplacer(
+		"\x00", "",
+		"\r", "_",
+		"\n", "_",
+		"\\", "_",
+		"/", "_",
+		"\"", "",
+	)
+	filename = replacer.Replace(filename)
+	if filename == "" {
+		return "attachment"
+	}
+	return filename
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -769,6 +1052,9 @@ func (s *Server) getConfig() (RuntimeConfig, error) {
 	if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
 		return RuntimeConfig{}, errors.New("workflow config is empty")
 	}
+	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
+		return RuntimeConfig{}, err
+	}
 	s.config = &cfg
 	s.configModTime = info.ModTime()
 	return cfg, nil
@@ -937,7 +1223,17 @@ func buildTimeline(def WorkflowDef, process *Process, roleMeta map[string]RoleMe
 					if progress.DoneAt != nil {
 						entry.DoneAt = progress.DoneAt.Format(time.RFC3339)
 					}
-					entry.Data = progress.Data
+					if sub.InputType == "file" {
+						if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
+							entry.FileName = attachment.Filename
+							entry.FileSHA256 = attachment.SHA256
+							entry.FileURL = fmt.Sprintf("/process/%s/substep/%s/file", process.ID.Hex(), sub.SubstepID)
+						}
+					} else {
+						if value, ok := progress.Data[sub.InputKey]; ok {
+							entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
+						}
+					}
 				} else if availableMap[sub.SubstepID] {
 					entry.Status = "available"
 				} else {
@@ -1188,6 +1484,33 @@ func findSubstep(def WorkflowDef, substepID string) (WorkflowSub, WorkflowStep, 
 		}
 	}
 	return WorkflowSub{}, WorkflowStep{}, errors.New("not found")
+}
+
+func normalizeInputTypes(workflow *WorkflowDef) error {
+	for stepIndex := range workflow.Steps {
+		for substepIndex := range workflow.Steps[stepIndex].Substep {
+			inputType, err := normalizeInputType(workflow.Steps[stepIndex].Substep[substepIndex].InputType)
+			if err != nil {
+				substep := workflow.Steps[stepIndex].Substep[substepIndex]
+				return fmt.Errorf("invalid inputType for substep %s: %w", substep.SubstepID, err)
+			}
+			workflow.Steps[stepIndex].Substep[substepIndex].InputType = inputType
+		}
+	}
+	return nil
+}
+
+func normalizeInputType(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "number":
+		return "number", nil
+	case "string", "text":
+		return "string", nil
+	case "file":
+		return "file", nil
+	default:
+		return "", fmt.Errorf("unsupported value %q (allowed: number, string, text, file)", value)
+	}
 }
 
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {

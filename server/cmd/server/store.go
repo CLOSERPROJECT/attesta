@@ -1,14 +1,23 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
+	"mime"
+	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -20,10 +29,35 @@ type Store interface {
 	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, substepID string, progress ProcessStep) error
 	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, status string) error
 	InsertNotarization(ctx context.Context, notarization Notarization) error
+	SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error)
+	LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error)
+	OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error)
 }
 
 type MongoStore struct {
 	db *mongo.Database
+}
+
+var ErrAttachmentTooLarge = errors.New("attachment too large")
+
+type Attachment struct {
+	ID          primitive.ObjectID
+	ProcessID   primitive.ObjectID
+	SubstepID   string
+	Filename    string
+	ContentType string
+	SizeBytes   int64
+	SHA256      string
+	UploadedAt  time.Time
+}
+
+type AttachmentUpload struct {
+	ProcessID   primitive.ObjectID
+	SubstepID   string
+	Filename    string
+	ContentType string
+	MaxBytes    int64
+	UploadedAt  time.Time
 }
 
 func (s *MongoStore) InsertProcess(ctx context.Context, process Process) (primitive.ObjectID, error) {
@@ -93,10 +127,114 @@ func (s *MongoStore) InsertNotarization(ctx context.Context, notarization Notari
 	return err
 }
 
+func (s *MongoStore) SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error) {
+	bucket, err := s.attachmentsBucket()
+	if err != nil {
+		return Attachment{}, err
+	}
+
+	filename := strings.TrimSpace(upload.Filename)
+	if filename == "" {
+		filename = "attachment"
+	}
+	contentType := strings.TrimSpace(upload.ContentType)
+	if contentType == "" {
+		contentType = detectAttachmentContentType(filename)
+	}
+
+	uploadedAt := upload.UploadedAt
+	if uploadedAt.IsZero() {
+		uploadedAt = time.Now().UTC()
+	}
+
+	id := primitive.NewObjectID()
+	tracker := newAttachmentTracker(upload.MaxBytes)
+	reader := io.TeeReader(content, tracker)
+	uploadOpts := options.GridFSUpload().SetMetadata(bson.M{
+		"processId":   upload.ProcessID,
+		"substepId":   upload.SubstepID,
+		"contentType": contentType,
+		"uploadedAt":  uploadedAt,
+	})
+	if err := bucket.UploadFromStreamWithID(id, filename, reader, uploadOpts); err != nil {
+		if errors.Is(err, ErrAttachmentTooLarge) {
+			_ = bucket.Delete(id)
+			return Attachment{}, ErrAttachmentTooLarge
+		}
+		return Attachment{}, err
+	}
+	sha := tracker.SHA256()
+	if _, err := s.db.Collection("attachments.files").UpdateOne(
+		ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"metadata.sha256": sha}},
+	); err != nil {
+		return Attachment{}, err
+	}
+
+	return Attachment{
+		ID:          id,
+		ProcessID:   upload.ProcessID,
+		SubstepID:   upload.SubstepID,
+		Filename:    filename,
+		ContentType: contentType,
+		SizeBytes:   tracker.Size(),
+		SHA256:      sha,
+		UploadedAt:  uploadedAt,
+	}, nil
+}
+
+func (s *MongoStore) LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error) {
+	var doc struct {
+		ID         primitive.ObjectID `bson:"_id"`
+		Filename   string             `bson:"filename"`
+		Length     int64              `bson:"length"`
+		UploadDate time.Time          `bson:"uploadDate"`
+		Metadata   struct {
+			ProcessID   primitive.ObjectID `bson:"processId"`
+			SubstepID   string             `bson:"substepId"`
+			ContentType string             `bson:"contentType"`
+			UploadedAt  time.Time          `bson:"uploadedAt"`
+			SHA256      string             `bson:"sha256"`
+		} `bson:"metadata"`
+	}
+	if err := s.db.Collection("attachments.files").FindOne(ctx, bson.M{"_id": id}).Decode(&doc); err != nil {
+		return nil, err
+	}
+	uploadedAt := doc.Metadata.UploadedAt
+	if uploadedAt.IsZero() {
+		uploadedAt = doc.UploadDate
+	}
+	attachment := &Attachment{
+		ID:          doc.ID,
+		ProcessID:   doc.Metadata.ProcessID,
+		SubstepID:   doc.Metadata.SubstepID,
+		Filename:    doc.Filename,
+		ContentType: doc.Metadata.ContentType,
+		SizeBytes:   doc.Length,
+		SHA256:      doc.Metadata.SHA256,
+		UploadedAt:  uploadedAt,
+	}
+	return attachment, nil
+}
+
+func (s *MongoStore) OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error) {
+	bucket, err := s.attachmentsBucket()
+	if err != nil {
+		return nil, err
+	}
+	return bucket.OpenDownloadStream(id)
+}
+
+func (s *MongoStore) attachmentsBucket() (*gridfs.Bucket, error) {
+	return gridfs.NewBucket(s.db, options.GridFSBucket().SetName("attachments"))
+}
+
 type MemoryStore struct {
 	mu            sync.RWMutex
 	processes     map[primitive.ObjectID]Process
 	notarizations []Notarization
+	attachments   map[primitive.ObjectID]memoryAttachment
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -107,8 +245,16 @@ type MemoryStore struct {
 	InsertNotarizeErr error
 }
 
+type memoryAttachment struct {
+	meta    Attachment
+	content []byte
+}
+
 func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{processes: map[primitive.ObjectID]Process{}}
+	return &MemoryStore{
+		processes:   map[primitive.ObjectID]Process{},
+		attachments: map[primitive.ObjectID]memoryAttachment{},
+	}
 }
 
 func (s *MemoryStore) SeedProcess(process Process) primitive.ObjectID {
@@ -252,6 +398,73 @@ func (s *MemoryStore) InsertNotarization(_ context.Context, notarization Notariz
 	return nil
 }
 
+func (s *MemoryStore) SaveAttachment(_ context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error) {
+	filename := strings.TrimSpace(upload.Filename)
+	if filename == "" {
+		filename = "attachment"
+	}
+	contentType := strings.TrimSpace(upload.ContentType)
+	if contentType == "" {
+		contentType = detectAttachmentContentType(filename)
+	}
+
+	uploadedAt := upload.UploadedAt
+	if uploadedAt.IsZero() {
+		uploadedAt = time.Now().UTC()
+	}
+
+	var body bytes.Buffer
+	tracker := newAttachmentTracker(upload.MaxBytes)
+	reader := io.TeeReader(content, tracker)
+	if _, err := io.Copy(&body, reader); err != nil {
+		if errors.Is(err, ErrAttachmentTooLarge) {
+			return Attachment{}, ErrAttachmentTooLarge
+		}
+		return Attachment{}, err
+	}
+
+	attachment := Attachment{
+		ID:          primitive.NewObjectID(),
+		ProcessID:   upload.ProcessID,
+		SubstepID:   upload.SubstepID,
+		Filename:    filename,
+		ContentType: contentType,
+		SizeBytes:   tracker.Size(),
+		SHA256:      tracker.SHA256(),
+		UploadedAt:  uploadedAt,
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.attachments[attachment.ID] = memoryAttachment{
+		meta:    attachment,
+		content: body.Bytes(),
+	}
+	return attachment, nil
+}
+
+func (s *MemoryStore) LoadAttachmentByID(_ context.Context, id primitive.ObjectID) (*Attachment, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	item, ok := s.attachments[id]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	attachment := item.meta
+	return &attachment, nil
+}
+
+func (s *MemoryStore) OpenAttachmentDownload(_ context.Context, id primitive.ObjectID) (io.ReadCloser, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	item, ok := s.attachments[id]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	content := append([]byte(nil), item.content...)
+	return io.NopCloser(bytes.NewReader(content)), nil
+}
+
 func cloneProcess(process Process) Process {
 	cloned := process
 	cloned.Progress = make(map[string]ProcessStep, len(process.Progress))
@@ -278,4 +491,54 @@ func cloneProcessStep(step ProcessStep) ProcessStep {
 		}
 	}
 	return cloned
+}
+
+type attachmentTracker struct {
+	maxBytes int64
+	size     int64
+	hasher   hashWriter
+}
+
+type hashWriter interface {
+	Write(p []byte) (int, error)
+	Sum(b []byte) []byte
+}
+
+func newAttachmentTracker(maxBytes int64) *attachmentTracker {
+	return &attachmentTracker{
+		maxBytes: maxBytes,
+		hasher:   sha256.New(),
+	}
+}
+
+func (t *attachmentTracker) Write(p []byte) (int, error) {
+	next := t.size + int64(len(p))
+	if t.maxBytes > 0 && next > t.maxBytes {
+		return 0, ErrAttachmentTooLarge
+	}
+	t.size = next
+	if _, err := t.hasher.Write(p); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (t *attachmentTracker) Size() int64 {
+	return t.size
+}
+
+func (t *attachmentTracker) SHA256() string {
+	return hex.EncodeToString(t.hasher.Sum(nil))
+}
+
+func detectAttachmentContentType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		return "application/octet-stream"
+	}
+	mimeType := mime.TypeByExtension(ext)
+	if strings.TrimSpace(mimeType) == "" {
+		return "application/octet-stream"
+	}
+	return mimeType
 }

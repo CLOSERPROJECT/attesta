@@ -143,6 +143,7 @@ func seedProcessWithPending(store *MemoryStore) primitive.ObjectID {
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "pending"},
 			"1_2": {State: "pending"},
+			"1_3": {State: "pending"},
 			"2_1": {State: "pending"},
 			"2_2": {State: "pending"},
 			"3_1": {State: "pending"},

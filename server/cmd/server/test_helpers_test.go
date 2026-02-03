@@ -13,7 +13,8 @@ func testRuntimeConfig() RuntimeConfig {
 					Order:  1,
 					Substep: []WorkflowSub{
 						{SubstepID: "1.1", Title: "A", Order: 1, Role: "dep1", InputKey: "value", InputType: "number"},
-						{SubstepID: "1.2", Title: "B", Order: 2, Role: "dep1", InputKey: "note", InputType: "text"},
+						{SubstepID: "1.2", Title: "B", Order: 2, Role: "dep1", InputKey: "note", InputType: "string"},
+						{SubstepID: "1.3", Title: "C", Order: 3, Role: "dep1", InputKey: "attachment", InputType: "file"},
 					},
 				},
 				{
@@ -21,8 +22,8 @@ func testRuntimeConfig() RuntimeConfig {
 					Title:  "Step 2",
 					Order:  2,
 					Substep: []WorkflowSub{
-						{SubstepID: "2.1", Title: "C", Order: 1, Role: "dep2", InputKey: "value", InputType: "number"},
-						{SubstepID: "2.2", Title: "D", Order: 2, Role: "dep2", InputKey: "note", InputType: "text"},
+						{SubstepID: "2.1", Title: "D", Order: 1, Role: "dep2", InputKey: "value", InputType: "number"},
+						{SubstepID: "2.2", Title: "E", Order: 2, Role: "dep2", InputKey: "note", InputType: "string"},
 					},
 				},
 				{
@@ -30,8 +31,8 @@ func testRuntimeConfig() RuntimeConfig {
 					Title:  "Step 3",
 					Order:  3,
 					Substep: []WorkflowSub{
-						{SubstepID: "3.1", Title: "E", Order: 1, Role: "dep3", InputKey: "value", InputType: "number"},
-						{SubstepID: "3.2", Title: "F", Order: 2, Role: "dep3", InputKey: "note", InputType: "text"},
+						{SubstepID: "3.1", Title: "F", Order: 1, Role: "dep3", InputKey: "value", InputType: "number"},
+						{SubstepID: "3.2", Title: "G", Order: 2, Role: "dep3", InputKey: "note", InputType: "string"},
 					},
 				},
 			},
