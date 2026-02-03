@@ -19,6 +19,7 @@ Thumbs.db
 web/node_modules/
 web/dist/
 *.local
+!deployment/Dockerfile.local
 
 # Go
 bin/

@@ -5,23 +5,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Closer Demo</title>
+    {{if .ViteDevServer}}
+    <script type="module" src="{{.ViteDevServer}}/@vite/client"></script>
+    <script type="module" src="{{.ViteDevServer}}/src/main.js"></script>
+    {{else}}
     <link rel="stylesheet" href="/static/assets/main.css" />
+    <script defer src="/static/assets/app.js"></script>
+    {{end}}
     <script
       src="https://unpkg.com/htmx.org@1.9.12"
       integrity="sha384-LORzM0VqaO8k6G7L6oUkW3FQ7P1VnacFccW9dSgqkdtpUm4nFQdEF9zOUbJ8m8+H"
       crossorigin="anonymous"
     ></script>
-    <script defer src="/static/assets/app.js"></script>
   </head>
   <body>
     <header class="topbar">
       <div>
-        <span class="brand">ATTESTA</span>
-        <span class="tag">closerproject demo</span>
+        <a class="brand" href="/">ATTESTA</a>
+        <span class="tag">Process manager</span>
       </div>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/backoffice">Backoffice</a>
+        <button type="button" class="theme-toggle" id="theme-toggle">Dark</button>
       </nav>
     </header>
     <main class="page">
@@ -32,6 +38,54 @@
       "dept_dashboard_body" .}} {{else if eq .Body "dept_process_body"}}
       {{template "dept_process_body" .}} {{end}}
     </main>
+    <footer
+      class="site-footer"
+      style="
+        padding: 18px 32px 24px;
+        border-top: 1px solid var(--border);
+        background: var(--chrome-bg);
+      "
+    >
+      <p
+        style="
+          margin: 0 0 8px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.4;
+        "
+      >
+        © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
+        under the GNU AGPLv3.
+      </p>
+      <p
+        style="
+          margin: 0 0 8px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.4;
+        "
+      >
+        CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
+        chips and microElectronics pRoduction, Project No. 101161109) is funded
+        by the European Union under the Interregional Innovation Investments
+        (I3) Instrument of the European Regional Development Fund, managed by
+        the European Innovation Council and SMEs Executive Agency (EISMEA).
+      </p>
+      <p
+        style="
+          margin: 0;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.4;
+        "
+      >
+        This repository/website is part of the CLOSER project and has received
+        funding from the European Union. Views and opinions expressed are those
+        of the author(s) only and do not necessarily reflect those of the
+        European Union or EISMEA. Neither the European Union nor the granting
+        authority can be held responsible for them.
+      </p>
+    </footer>
   </body>
 </html>
 {{end}}

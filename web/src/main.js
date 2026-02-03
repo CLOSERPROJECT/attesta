@@ -1,5 +1,51 @@
 import "./styles.css";
 
+const themeStorageKey = "attesta_theme";
+const themeToggle = document.getElementById("theme-toggle");
+
+const getPreferredTheme = () => {
+  try {
+    const stored = localStorage.getItem(themeStorageKey);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch (err) {
+  }
+
+  if (
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+};
+
+const applyTheme = (theme) => {
+  document.documentElement.dataset.theme = theme;
+  if (themeToggle) {
+    themeToggle.textContent = theme === "dark" ? "Light" : "Dark";
+  }
+};
+
+const setTheme = (theme) => {
+  applyTheme(theme);
+  try {
+    localStorage.setItem(themeStorageKey, theme);
+  } catch (err) {
+  }
+};
+
+applyTheme(getPreferredTheme());
+
+if (themeToggle) {
+  themeToggle.addEventListener("click", () => {
+    const current = document.documentElement.dataset.theme;
+    setTheme(current === "dark" ? "light" : "dark");
+  });
+}
+
 const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
 const timeline = document.getElementById("timeline");
