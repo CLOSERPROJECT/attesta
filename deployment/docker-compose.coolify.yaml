@@ -15,7 +15,7 @@ services:
       dockerfile: deployment/Dockerfile.coolify
     environment:
       MONGODB_URI: mongodb://${SERVICE_NAME_MONGODB}:27017
-      CERBOS_URL: http://${SERVICE_NAME_MONGODB}:3592
+      CERBOS_URL: http://${SERVICE_NAME_CERBOS}:3592
       SERVICE_FQDN_ATTESTA_3000:
     depends_on:
       - mongodb
