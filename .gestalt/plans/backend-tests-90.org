@@ -89,7 +89,7 @@
      - `normalizeInputType` and `normalizeInputTypes`: case/whitespace, unknown values.
    - Tests :: Pure unit tests (no server needed).
    - Done when :: Each helper has explicit coverage for both valid and invalid inputs.
-** WIP [#B] Cover sorting + display helpers (`sortHomeProcessList`, `buildProcessSummary`, `actorForRole`, `roleMetaMap`)
+** DONE [#B] Cover sorting + display helpers (`sortHomeProcessList`, `buildProcessSummary`, `actorForRole`, `roleMetaMap`)
    - Why :: Dashboards and home page ordering are user-visible; wrong ordering is a subtle bug.
    - Change :: Add unit tests for:
      - `sortHomeProcessList`: mixed statuses and timestamps ordering rules.
@@ -97,7 +97,7 @@
      - `actorForRole` + `roleMetaMap`: unknown role behavior and defaulting.
    - Tests :: Use minimal `WorkflowDef` and `Process` fixtures (reuse existing test config builder).
    - Done when :: Ordering and summary derivations are deterministic and pinned by tests.
-** TODO [#B] Cover attachment helpers (`sanitizeAttachmentFilename`, `detectAttachmentContentType`)
+** WIP [#B] Cover attachment helpers (`sanitizeAttachmentFilename`, `detectAttachmentContentType`)
    - Why :: Download filenames and content-types are security- and UX-relevant.
    - Change :: Add tests for:
      - `sanitizeAttachmentFilename`: path traversal, control chars, empty input, unicode edge cases (keep expectations aligned with current behavior).
