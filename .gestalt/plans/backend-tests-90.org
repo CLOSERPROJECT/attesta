@@ -187,7 +187,7 @@
    - Tests :: Fake GridFS bucket + fake collections; inject `UploadedAt` and provide small readers for content.
    - Done when :: Attachment adapter logic is covered for defaults, happy path, and key error branches.
 
-* WIP [#A] Update the coverage gate and keep it ergonomic
+* DONE [#A] Update the coverage gate and keep it ergonomic
   - Effort :: S
   - Goal :: Make “≥90%” enforceable and easy to reproduce locally.
   - Notes :: Avoid adding new tooling; keep this within `Taskfile.yml` and standard Go tools.
@@ -208,11 +208,11 @@
    - Tests :: N/A (docs).
    - Done when :: Docs mention 90% with the exact command(s) and expectations.
 
-* WIP [#C] Optional: keep a thin integration slice (not part of the gate)
+* DONE [#C] Optional: keep a thin integration slice (not part of the gate)
   - Effort :: S
   - Goal :: Retain end-to-end confidence for Mongo + Cerbos without making CI brittle.
   - Notes :: This is explicitly not required for the 90% unit coverage gate.
-** WIP [#C] Add/maintain integration tests behind `integration` build tag
+** DONE [#C] Add/maintain integration tests behind `integration` build tag
    - Why :: Even with good unit tests, real driver behavior and Cerbos policy wiring can drift.
    - Change :: Keep a small set of integration tests:
      - Cerbos allow/deny matches policy expectations.
