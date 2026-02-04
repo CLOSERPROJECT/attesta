@@ -118,7 +118,7 @@
      - Negative: store errors -> 500 (or current behavior; codify).
    - Tests :: Use `httptest` with a seeded `MemoryStore`; assert JSON decodes and includes stable fields (e.g., processId).
    - Done when :: Both endpoints have at least 1 success + 2 negatives, and JSON shape is pinned.
-** WIP [#A] Cover file download paths (`handleDownloadSubstepFile`, `handleDownloadAllFiles`)
+** DONE [#A] Cover file download paths (`handleDownloadSubstepFile`, `handleDownloadAllFiles`)
    - Why :: Streaming responses and header logic are easy to break and currently not fully exercised.
    - Change :: Add handler tests:
      - Positive: download a stored attachment by ID; assert `Content-Disposition`, `Content-Type`, and body bytes.
@@ -127,7 +127,7 @@
      - Positive: “download all” returns expected archive response headers (exact archive format as implemented).
    - Tests :: Use `MemoryStore.SaveAttachment` to seed attachments; avoid large payloads.
    - Done when :: Download endpoints are covered for both metadata headers and body streaming.
-** TODO [#B] Cover action error rendering (`renderActionError` + request variant)
+** WIP [#B] Cover action error rendering (`renderActionError` + request variant)
    - Why :: This is the central error UX for substep completion; it currently has uncovered branches.
    - Change :: Add unit/handler tests that force error paths and assert:
      - Status code mapping (400/403/409/502/500).
