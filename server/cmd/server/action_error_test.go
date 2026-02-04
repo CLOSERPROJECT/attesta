@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -96,5 +97,28 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 				t.Fatalf("expected error message in body, got %q", body)
 			}
 		})
+	}
+}
+
+func TestRenderActionViewsReturn500WhenConfigFails(t *testing.T) {
+	server := &Server{
+		tmpl: testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return RuntimeConfig{}, errors.New("config down")
+		},
+	}
+	process := &Process{ID: primitive.NewObjectID(), Progress: map[string]ProcessStep{}}
+	actor := Actor{UserID: "u1", Role: "dep1"}
+
+	listRec := httptest.NewRecorder()
+	server.renderActionList(listRec, process, actor, "error")
+	if listRec.Code != http.StatusInternalServerError {
+		t.Fatalf("renderActionList status = %d, want %d", listRec.Code, http.StatusInternalServerError)
+	}
+
+	pageRec := httptest.NewRecorder()
+	server.renderDepartmentProcessPage(pageRec, process, actor, "error")
+	if pageRec.Code != http.StatusInternalServerError {
+		t.Fatalf("renderDepartmentProcessPage status = %d, want %d", pageRec.Code, http.StatusInternalServerError)
 	}
 }

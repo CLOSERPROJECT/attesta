@@ -150,7 +150,7 @@
    - Tests :: Inject deterministic `now` so `requestId` is stable; assert on decoded JSON rather than raw bytes.
    - Done when :: The adapter has both happy path and failure-mode coverage and no external dependency.
 
-* WIP [#A] Unit-test the Mongo store adapter (no MongoDB required)
+* DONE [#A] Unit-test the Mongo store adapter (no MongoDB required)
   - Effort :: L
   - Goal :: Bring `MongoStore` methods out of 0% coverage while staying CI-safe.
   - Notes :: This is the biggest lever to reach ≥90% because many uncovered statements live in `MongoStore` methods.
@@ -175,7 +175,7 @@
      - `UpdateProcessStatus` and `InsertNotarization`: happy path + error propagation.
    - Tests :: Use fakes that record filter/update payloads and return configured results.
    - Done when :: Each method has at least one happy-path test and one failure-path test.
-** WIP [#A] Add MongoStore unit tests for attachments (GridFS)
+** DONE [#A] Add MongoStore unit tests for attachments (GridFS)
    - Why :: Attachment upload/download code has multiple branches (defaults, size limit, SHA update) and is currently uncovered.
    - Change :: Add tests covering:
      - `SaveAttachment` defaults: blank filename -> “attachment”; blank content-type -> detected; zero UploadedAt -> `time.Now().UTC()`.
@@ -187,11 +187,11 @@
    - Tests :: Fake GridFS bucket + fake collections; inject `UploadedAt` and provide small readers for content.
    - Done when :: Attachment adapter logic is covered for defaults, happy path, and key error branches.
 
-* TODO [#A] Update the coverage gate and keep it ergonomic
+* WIP [#A] Update the coverage gate and keep it ergonomic
   - Effort :: S
   - Goal :: Make “≥90%” enforceable and easy to reproduce locally.
   - Notes :: Avoid adding new tooling; keep this within `Taskfile.yml` and standard Go tools.
-** TODO [#A] Raise Taskfile gate from 70% to 90%
+** WIP [#A] Raise Taskfile gate from 70% to 90%
    - Why :: CI currently enforces 70%; changing the target must be mechanical and visible.
    - Change :: Update `Taskfile.yml` `cover` task:
      - Description reflects 90%.

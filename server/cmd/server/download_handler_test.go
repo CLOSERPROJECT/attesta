@@ -205,3 +205,63 @@ func TestHandleDownloadSubstepFileReturns404ForInvalidOrMissingAttachment(t *tes
 		})
 	}
 }
+
+func TestHandleDownloadSubstepFileDefaultsContentTypeWhenMissing(t *testing.T) {
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:  processID,
+		SubstepID:  "1.3",
+		Filename:   "payload.bin",
+		MaxBytes:   1024,
+		UploadedAt: time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC),
+	}, bytes.NewReader([]byte("bin")))
+	if err != nil {
+		t.Fatalf("save attachment: %v", err)
+	}
+
+	store.mu.Lock()
+	mem := store.attachments[attachment.ID]
+	mem.meta.ContentType = ""
+	store.attachments[attachment.ID] = mem
+	store.mu.Unlock()
+
+	store.SeedProcess(Process{
+		ID:        processID,
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_3": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": attachment.ID.Hex(),
+						"filename":     attachment.Filename,
+						"contentType":  attachment.ContentType,
+						"size":         attachment.SizeBytes,
+						"sha256":       attachment.SHA256,
+					},
+				},
+			},
+		},
+	})
+
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/substep/1.3/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "application/octet-stream" {
+		t.Fatalf("content-type = %q, want application/octet-stream", got)
+	}
+}

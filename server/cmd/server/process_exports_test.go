@@ -261,3 +261,20 @@ func TestHandleDownloadAllFilesZip(t *testing.T) {
 		t.Fatalf("expected sanitized attachment entry name in zip")
 	}
 }
+
+func TestHandleDownloadAllFilesConfigError(t *testing.T) {
+	server := &Server{
+		store: NewMemoryStore(),
+		configProvider: func() (RuntimeConfig, error) {
+			return RuntimeConfig{}, errors.New("config down")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/files.zip", nil)
+	rec := httptest.NewRecorder()
+	server.handleDownloadAllFiles(rec, req, primitive.NewObjectID().Hex())
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}

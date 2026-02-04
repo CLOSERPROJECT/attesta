@@ -159,3 +159,17 @@ func TestRoleMetaMapAndActorForRole(t *testing.T) {
 		t.Fatalf("empty role fallback mismatch: %#v", empty)
 	}
 }
+
+func TestDefaultRole(t *testing.T) {
+	server := &Server{}
+	cfg := RuntimeConfig{
+		Departments: []Department{{ID: "dep1"}, {ID: "dep2"}},
+	}
+	if got := server.defaultRole(cfg); got != "dep1" {
+		t.Fatalf("defaultRole = %q, want dep1", got)
+	}
+
+	if got := server.defaultRole(RuntimeConfig{}); got != "" {
+		t.Fatalf("defaultRole for empty config = %q, want empty", got)
+	}
+}

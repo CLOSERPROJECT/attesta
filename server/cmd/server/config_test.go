@@ -122,3 +122,114 @@ users:
 		t.Fatalf("expected invalid inputType in error, got %v", err)
 	}
 }
+
+func TestRuntimeConfigUsesGetConfigWhenProviderMissing(t *testing.T) {
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "workflow.yaml")
+	content := `workflow:
+  name: "Demo"
+  steps:
+    - id: "1"
+      title: "Step 1"
+      order: 1
+      substeps:
+        - id: "1.1"
+          title: "Input"
+          order: 1
+          role: "dep1"
+          inputKey: "value"
+          inputType: "text"
+departments:
+  - id: "dep1"
+    name: "Department 1"
+users:
+  - id: "u1"
+    name: "User 1"
+    departmentId: "dep1"
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+
+	server := &Server{configPath: configPath}
+	cfg, err := server.runtimeConfig()
+	if err != nil {
+		t.Fatalf("runtimeConfig(): %v", err)
+	}
+	if cfg.Workflow.Name != "Demo" {
+		t.Fatalf("workflow name = %q, want Demo", cfg.Workflow.Name)
+	}
+	if cfg.Workflow.Steps[0].Substep[0].InputType != "string" {
+		t.Fatalf("input type should be normalized to string, got %q", cfg.Workflow.Steps[0].Substep[0].InputType)
+	}
+}
+
+func TestGetConfigUsesCachedValueWhenFileUnchanged(t *testing.T) {
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "workflow.yaml")
+	content := `workflow:
+  name: "Demo"
+  steps:
+    - id: "1"
+      title: "Step 1"
+      order: 1
+      substeps:
+        - id: "1.1"
+          title: "Input"
+          order: 1
+          role: "dep1"
+          inputKey: "value"
+          inputType: "string"
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("stat temp config: %v", err)
+	}
+
+	cached := RuntimeConfig{
+		Workflow: WorkflowDef{
+			Name: "Cached",
+			Steps: []WorkflowStep{
+				{
+					StepID: "1",
+					Substep: []WorkflowSub{
+						{SubstepID: "1.1", InputType: "string"},
+					},
+				},
+			},
+		},
+	}
+	server := &Server{configPath: configPath, config: &cached, configModTime: info.ModTime()}
+
+	cfg, err := server.getConfig()
+	if err != nil {
+		t.Fatalf("getConfig(): %v", err)
+	}
+	if cfg.Workflow.Name != "Cached" {
+		t.Fatalf("expected cached config to be returned, got %q", cfg.Workflow.Name)
+	}
+}
+
+func TestGetConfigRejectsEmptyWorkflow(t *testing.T) {
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "workflow.yaml")
+	content := `workflow:
+  name: ""
+  steps: []
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+
+	server := &Server{configPath: configPath}
+	_, err := server.getConfig()
+	if err == nil {
+		t.Fatal("expected empty workflow error")
+	}
+	if !strings.Contains(err.Error(), "workflow config is empty") {
+		t.Fatalf("expected empty workflow message, got %v", err)
+	}
+}
