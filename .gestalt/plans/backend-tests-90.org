@@ -70,7 +70,7 @@
    - Tests :: N/A (decision).
    - Done when :: The seam choice is explicit, and it’s clear what gets mocked and what remains real.
 
-* WIP [#A] Raise coverage on pure helpers + deterministic logic
+* DONE [#A] Raise coverage on pure helpers + deterministic logic
   - Effort :: M
   - Goal :: Push helper functions to ~90–100% coverage cheaply and safely (no IO).
   - Notes :: Favor table-driven tests; pin edge cases that cause user-facing behavior changes (sorting, sanitization, normalization).
@@ -97,7 +97,7 @@
      - `actorForRole` + `roleMetaMap`: unknown role behavior and defaulting.
    - Tests :: Use minimal `WorkflowDef` and `Process` fixtures (reuse existing test config builder).
    - Done when :: Ordering and summary derivations are deterministic and pinned by tests.
-** WIP [#B] Cover attachment helpers (`sanitizeAttachmentFilename`, `detectAttachmentContentType`)
+** DONE [#B] Cover attachment helpers (`sanitizeAttachmentFilename`, `detectAttachmentContentType`)
    - Why :: Download filenames and content-types are security- and UX-relevant.
    - Change :: Add tests for:
      - `sanitizeAttachmentFilename`: path traversal, control chars, empty input, unicode edge cases (keep expectations aligned with current behavior).
@@ -105,11 +105,11 @@
    - Tests :: Pure unit tests.
    - Done when :: Helper behavior is locked in with clear expectations for “dangerous” inputs.
 
-* TODO [#A] Expand handler coverage to remaining branches (still unit tests)
+* WIP [#A] Expand handler coverage to remaining branches (still unit tests)
   - Effort :: M
   - Goal :: Cover “rare but important” branches: JSON endpoints, file download, and error rendering paths.
   - Notes :: Keep tests stable by asserting status/headers and small HTML/JSON markers, not full documents.
-** TODO [#A] Cover JSON endpoints (`handleNotarizedJSON`, `handleMerkleJSON`)
+** WIP [#A] Cover JSON endpoints (`handleNotarizedJSON`, `handleMerkleJSON`)
    - Why :: They are currently under-covered and represent “export” contracts (clients may rely on them).
    - Change :: Add handler tests:
      - Positive: valid process ID returns `200` with `application/json` and expected shape (top-level keys).
