@@ -3,7 +3,7 @@
 #+DATE: 2026-02-04
 #+KEYWORDS: go, testing, coverage, httptest, hex, ports-adapters, mongodb, gridfs, cerbos, sse, htmx
 
-* WIP [#A] Confirm coverage target + scope
+* DONE [#A] Confirm coverage target + scope
   - Effort :: S
   - Goal :: Make “≥90% coverage” precise and keep the gate CI-stable (no Docker, no external services).
   - Notes :: Current CI runs `task cover` only; it does not start MongoDB/Cerbos services.
@@ -16,11 +16,9 @@
      - Unit suite alone must pass (no `-tags=integration` required for gate)
    - Tests :: N/A (decision).
    - Done when :: The agreed definition is in this plan and mirrored in `Taskfile.yml` (and docs if needed).
-** TODO [#A] Confirm whether adapter code counts toward the 90% (Mongo/Cerbos)
+** DONE [#A] Confirm whether adapter code counts toward the 90% (Mongo/Cerbos)
    - Why :: The largest uncovered areas are “adapters” (MongoStore, CerbosAuthorizer). Reaching 90% requires either testing them or formally excluding them from the gate.
-   - Change :: Choose one approach:
-     - Option A (recommended): Adapters count; make them unit-testable with minimal seams (no external services).
-     - Option B: Redefine gate scope to exclude adapters (requires structural/build changes; likely more disruptive).
+   - Change :: Option A chosen: adapters count; make them unit-testable with minimal seams (no external services).
    - Tests :: N/A (decision).
    - Done when :: A single approach is chosen and the rest of the plan follows it consistently.
 
