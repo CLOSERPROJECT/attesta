@@ -154,7 +154,7 @@
   - Effort :: L
   - Goal :: Bring `MongoStore` methods out of 0% coverage while staying CI-safe.
   - Notes :: This is the biggest lever to reach ≥90% because many uncovered statements live in `MongoStore` methods.
-** WIP [#A] Introduce a minimal “mongo driver port” seam (Hex-style, internal)
+** DONE [#A] Introduce a minimal “mongo driver port” seam (Hex-style, internal)
    - Why :: Without a seam, tests would need a real MongoDB, which CI doesn’t provide.
    - Change :: Refactor `MongoStore` construction to depend on tiny internal interfaces for:
      - `Collection(name)` returning a collection port
@@ -164,7 +164,7 @@
      Keep the public `Store` interface unchanged.
    - Tests :: Add fakes implementing the ports in `server/cmd/server/*_test.go`; assert arguments and simulate driver responses.
    - Done when :: Production behavior remains identical but unit tests can drive both success and error branches deterministically.
-** TODO [#A] Add MongoStore unit tests for process + notarization CRUD
+** WIP [#A] Add MongoStore unit tests for process + notarization CRUD
    - Why :: These methods contribute many uncovered statements and are central to persistence correctness.
    - Change :: Add tests covering:
      - `InsertProcess`: success + invalid inserted ID type + driver error.
