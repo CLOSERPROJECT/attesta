@@ -22,7 +22,7 @@
    - Tests :: N/A (decision).
    - Done when :: A single approach is chosen and the rest of the plan follows it consistently.
 
-* WIP [#A] Measure baseline + identify coverage hotspots
+* DONE [#A] Measure baseline + identify coverage hotspots
   - Effort :: S
   - Goal :: Convert “improve coverage” into a concrete, ordered to-do list with the highest ROI first.
   - Notes :: Use `go tool cover -func` to sort by lowest-covered functions; avoid chasing tiny helpers first.
@@ -57,7 +57,7 @@
      - 66.7% `main.go:1339 runtimeConfig` — reachable with config tests.
      - 70.0% `main.go:2058 renderActionList` and `main.go:2080 renderDepartmentProcessPage` — reachable with HTMX/non-HTMX render tests.
    - Coverage ROI note :: The two adapter files + helper/JSON/download gaps are enough to close >16 points without integration tags.
-** WIP [#B] Decide the minimal seam for MongoStore unit tests (no MongoDB)
+** DONE [#B] Decide the minimal seam for MongoStore unit tests (no MongoDB)
    - Why :: `MongoStore` currently depends directly on `*mongo.Database` and GridFS types, making pure unit tests hard.
    - Change :: Option A chosen. Keep runtime behavior, add small internal ports around mongo-driver:
      - `mongoDatabasePort`: `Collection(name)` and `newGridFSBucket(name)`.
@@ -70,11 +70,11 @@
    - Tests :: N/A (decision).
    - Done when :: The seam choice is explicit, and it’s clear what gets mocked and what remains real.
 
-* TODO [#A] Raise coverage on pure helpers + deterministic logic
+* WIP [#A] Raise coverage on pure helpers + deterministic logic
   - Effort :: M
   - Goal :: Push helper functions to ~90–100% coverage cheaply and safely (no IO).
   - Notes :: Favor table-driven tests; pin edge cases that cause user-facing behavior changes (sorting, sanitization, normalization).
-** TODO [#A] Cover env + middleware helpers (`envOr`, `logRequests`)
+** WIP [#A] Cover env + middleware helpers (`envOr`, `logRequests`)
    - Why :: These are easy wins and reduce “0% functions” that drag totals down.
    - Change :: Add unit tests for:
      - `envOr`: unset vs set env var; empty value behavior.
