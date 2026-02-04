@@ -22,11 +22,11 @@
    - Tests :: N/A (decision).
    - Done when :: A single approach is chosen and the rest of the plan follows it consistently.
 
-* TODO [#A] Measure baseline + identify coverage hotspots
+* WIP [#A] Measure baseline + identify coverage hotspots
   - Effort :: S
   - Goal :: Convert “improve coverage” into a concrete, ordered to-do list with the highest ROI first.
   - Notes :: Use `go tool cover -func` to sort by lowest-covered functions; avoid chasing tiny helpers first.
-** TODO [#A] Record baseline numbers and top misses
+** WIP [#A] Record baseline numbers and top misses
    - Why :: Without a baseline and a “top 20 misses” list, coverage work drifts and becomes inefficient.
    - Change :: Capture (in the PR description / notes):
      - Baseline `total` coverage.
@@ -34,6 +34,29 @@
      - A short note for each: “untested because unreachable” vs “untested because needs seam”.
    - Tests :: N/A (measurement).
    - Done when :: There is a ranked list of targets that plausibly yields +16–20 coverage points.
+   - Baseline :: 73.6% total (measured on 2026-02-04 with `cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out`).
+   - Top misses :: Ranked by lowest function coverage from `go tool cover -func`:
+     - 0.0% `store.go` Mongo adapter methods (`InsertProcess`, `LoadProcessByID`, `LoadLatestProcess`, `ListRecentProcesses`, `UpdateProcessProgress`, `UpdateProcessStatus`, `InsertNotarization`) — needs seam.
+     - 0.0% `store.go` attachment methods (`SaveAttachment`, `LoadAttachmentByID`, `OpenAttachmentDownload`, `attachmentsBucket`) — needs seam.
+     - 0.0% `authorizer.go` (`NewCerbosAuthorizer`, `CanComplete`) — needs seam (`httptest.Server`).
+     - 0.0% `main.go:1761 buildProcessSummary` — reachable with pure unit tests.
+     - 0.0% `main.go:2044 renderActionError` — reachable with handler/error-path tests.
+     - 0.0% `main.go:735 handleMerkleJSON` — reachable with endpoint tests.
+     - 0.0% `main.go:360 envOr` — reachable with helper tests.
+     - 0.0% `main.go:380 logRequests` — reachable with middleware tests.
+     - 27.3% `main.go:1132 asInt64` — reachable with table-driven helper tests.
+     - 30.4% `main.go:443 sortHomeProcessList` — reachable with deterministic list fixtures.
+     - 42.9% `store.go:534 detectAttachmentContentType` — reachable with helper tests.
+     - 50.0% `main.go:1421 actorForRole` — reachable with role mapping tests.
+     - 60.0% `main.go:1119 asString` — reachable with helper tests.
+     - 60.0% `main.go:1346 getConfig` — reachable with config/reload tests.
+     - 60.0% `main.go:586 handleProcessRoutes` — reachable with route dispatch tests.
+     - 60.0% `main.go:720 handleNotarizedJSON` — reachable with endpoint tests.
+     - 61.0% `main.go:750 handleDownloadSubstepFile` — reachable with attachment handler tests.
+     - 66.7% `main.go:1008 parseFilePayload` — reachable with multipart tests.
+     - 66.7% `main.go:1339 runtimeConfig` — reachable with config tests.
+     - 70.0% `main.go:2058 renderActionList` and `main.go:2080 renderDepartmentProcessPage` — reachable with HTMX/non-HTMX render tests.
+   - Coverage ROI note :: The two adapter files + helper/JSON/download gaps are enough to close >16 points without integration tags.
 ** TODO [#B] Decide the minimal seam for MongoStore unit tests (no MongoDB)
    - Why :: `MongoStore` currently depends directly on `*mongo.Database` and GridFS types, making pure unit tests hard.
    - Change :: Pick the simplest viable seam, preferably without changing behavior:
