@@ -105,7 +105,7 @@
    - Tests :: Pure unit tests.
    - Done when :: Helper behavior is locked in with clear expectations for “dangerous” inputs.
 
-* WIP [#A] Expand handler coverage to remaining branches (still unit tests)
+* DONE [#A] Expand handler coverage to remaining branches (still unit tests)
   - Effort :: M
   - Goal :: Cover “rare but important” branches: JSON endpoints, file download, and error rendering paths.
   - Notes :: Keep tests stable by asserting status/headers and small HTML/JSON markers, not full documents.
@@ -127,7 +127,7 @@
      - Positive: “download all” returns expected archive response headers (exact archive format as implemented).
    - Tests :: Use `MemoryStore.SaveAttachment` to seed attachments; avoid large payloads.
    - Done when :: Download endpoints are covered for both metadata headers and body streaming.
-** WIP [#B] Cover action error rendering (`renderActionError` + request variant)
+** DONE [#B] Cover action error rendering (`renderActionError` + request variant)
    - Why :: This is the central error UX for substep completion; it currently has uncovered branches.
    - Change :: Add unit/handler tests that force error paths and assert:
      - Status code mapping (400/403/409/502/500).
@@ -136,11 +136,11 @@
    - Tests :: Prefer calling the rendering helper directly when possible; otherwise trigger through `/complete`.
    - Done when :: Error rendering helpers are executed across both HTMX and full-page paths.
 
-* TODO [#A] Unit-test the Cerbos authorizer adapter (no Cerbos required)
+* WIP [#A] Unit-test the Cerbos authorizer adapter (no Cerbos required)
   - Effort :: S
   - Goal :: Eliminate 0%-covered adapter logic and pin the JSON contract with Cerbos.
   - Notes :: Use `httptest.Server` to capture requests and serve canned responses.
-** TODO [#A] Add `CerbosAuthorizer.CanComplete` tests (request + response mapping)
+** WIP [#A] Add `CerbosAuthorizer.CanComplete` tests (request + response mapping)
    - Why :: Authorization drift is high-risk; the request payload is part of the policy contract.
    - Change :: Add tests for:
      - Builds `POST {CERBOS_URL}/api/check` with JSON and `Content-Type: application/json`.
