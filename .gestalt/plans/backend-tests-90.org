@@ -81,7 +81,7 @@
      - `logRequests`: wraps handler, preserves status/body, adds log line (assert via a controllable logger sink if available; otherwise assert it does not change response).
    - Tests :: New `*_test.go` in `server/cmd/server` using `httptest`.
    - Done when :: Both helpers have positive + edge-case coverage without brittle log assertions.
-** WIP [#A] Cover input/normalization helpers (`asString`, `asInt64`, `normalizeInputType(s)`)
+** DONE [#A] Cover input/normalization helpers (`asString`, `asInt64`, `normalizeInputType(s)`)
    - Why :: Validation behavior drives 400 vs success and is prone to regressions.
    - Change :: Add table-driven tests for:
      - `asString`: strings, numbers, nil, unexpected types.
@@ -89,7 +89,7 @@
      - `normalizeInputType` and `normalizeInputTypes`: case/whitespace, unknown values.
    - Tests :: Pure unit tests (no server needed).
    - Done when :: Each helper has explicit coverage for both valid and invalid inputs.
-** TODO [#B] Cover sorting + display helpers (`sortHomeProcessList`, `buildProcessSummary`, `actorForRole`, `roleMetaMap`)
+** WIP [#B] Cover sorting + display helpers (`sortHomeProcessList`, `buildProcessSummary`, `actorForRole`, `roleMetaMap`)
    - Why :: Dashboards and home page ordering are user-visible; wrong ordering is a subtle bug.
    - Change :: Add unit tests for:
      - `sortHomeProcessList`: mixed statuses and timestamps ordering rules.
