@@ -26,7 +26,7 @@
   - Effort :: S
   - Goal :: Convert “improve coverage” into a concrete, ordered to-do list with the highest ROI first.
   - Notes :: Use `go tool cover -func` to sort by lowest-covered functions; avoid chasing tiny helpers first.
-** WIP [#A] Record baseline numbers and top misses
+** DONE [#A] Record baseline numbers and top misses
    - Why :: Without a baseline and a “top 20 misses” list, coverage work drifts and becomes inefficient.
    - Change :: Capture (in the PR description / notes):
      - Baseline `total` coverage.
@@ -57,11 +57,16 @@
      - 66.7% `main.go:1339 runtimeConfig` — reachable with config tests.
      - 70.0% `main.go:2058 renderActionList` and `main.go:2080 renderDepartmentProcessPage` — reachable with HTMX/non-HTMX render tests.
    - Coverage ROI note :: The two adapter files + helper/JSON/download gaps are enough to close >16 points without integration tags.
-** TODO [#B] Decide the minimal seam for MongoStore unit tests (no MongoDB)
+** WIP [#B] Decide the minimal seam for MongoStore unit tests (no MongoDB)
    - Why :: `MongoStore` currently depends directly on `*mongo.Database` and GridFS types, making pure unit tests hard.
-   - Change :: Pick the simplest viable seam, preferably without changing behavior:
-     - Option A (recommended): Introduce tiny internal “mongo driver port” interfaces and wrap the real driver in a thin adapter (Hex: port/adapters).
-     - Option B: Use mongo-driver test harnesses (only if stable in CI and doesn’t add runtime coupling).
+   - Change :: Option A chosen. Keep runtime behavior, add small internal ports around mongo-driver:
+     - `mongoDatabasePort`: `Collection(name)` and `newGridFSBucket(name)`.
+     - `mongoCollectionPort`: `InsertOne`, `FindOne`, `Find`, `UpdateOne`, `FindOneAndUpdate`.
+     - `mongoSingleResultPort`: `Decode`, `Err`.
+     - `mongoCursorPort`: `Next`, `Decode`, `Close`.
+     - `gridFSBucketPort`: `UploadFromStreamWithID`, `OpenDownloadStream`, `Delete`.
+     - Keep `Store` public interface unchanged; only `MongoStore` internals use ports.
+   - Mocking plan :: In tests, fake these ports and assert filters/options/update docs; in prod, use thin wrappers to real mongo-driver types.
    - Tests :: N/A (decision).
    - Done when :: The seam choice is explicit, and it’s clear what gets mocked and what remains real.
 
