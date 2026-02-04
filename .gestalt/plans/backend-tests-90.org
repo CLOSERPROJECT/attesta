@@ -191,7 +191,7 @@
   - Effort :: S
   - Goal :: Make “≥90%” enforceable and easy to reproduce locally.
   - Notes :: Avoid adding new tooling; keep this within `Taskfile.yml` and standard Go tools.
-** WIP [#A] Raise Taskfile gate from 70% to 90%
+** DONE [#A] Raise Taskfile gate from 70% to 90%
    - Why :: CI currently enforces 70%; changing the target must be mechanical and visible.
    - Change :: Update `Taskfile.yml` `cover` task:
      - Description reflects 90%.
@@ -200,7 +200,7 @@
      - (Optional) allow `COVER_MIN` env var override for local experimentation, defaulting to 90.0.
    - Tests :: Verify locally by temporarily setting `COVER_MIN=99.9` to ensure the gate fails (manual check during implementation).
    - Done when :: `task cover` fails below 90.0 and passes at/above 90.0 in CI.
-** TODO [#B] Document the new expectation (90%) where developers look
+** WIP [#B] Document the new expectation (90%) where developers look
    - Why :: Coverage goals rot if not visible in onboarding docs.
    - Change :: Update `README.md` and/or `QUICKSTART.md` to state:
      - `task cover` enforces ≥90% unit-test coverage.
