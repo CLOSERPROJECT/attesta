@@ -184,7 +184,7 @@ func TestHandleDownloadAllFilesZip(t *testing.T) {
 	attachment, err := store.SaveAttachment(context.Background(), AttachmentUpload{
 		ProcessID:   processID,
 		SubstepID:   "1.3",
-		Filename:    "alpha.txt",
+		Filename:    "../alpha.txt",
 		ContentType: "text/plain",
 		MaxBytes:    1 << 20,
 		UploadedAt:  now,
@@ -229,6 +229,12 @@ func TestHandleDownloadAllFilesZip(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
+	if got := rec.Header().Get("Content-Type"); got != "application/zip" {
+		t.Fatalf("content-type = %q, want application/zip", got)
+	}
+	if got := rec.Header().Get("Content-Disposition"); got != `attachment; filename="process-`+processID.Hex()+`-files.zip"` {
+		t.Fatalf("content-disposition = %q, want process archive filename", got)
+	}
 
 	reader, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
 	if err != nil {
@@ -238,18 +244,20 @@ func TestHandleDownloadAllFilesZip(t *testing.T) {
 		t.Fatalf("expected zip entries")
 	}
 	foundManifest := false
-	foundFile := false
+	foundExpectedFile := false
 	for _, file := range reader.File {
 		if file.Name == "manifest.json" {
 			foundManifest = true
 			continue
 		}
-		foundFile = true
+		if file.Name == "1_3-.._alpha.txt" {
+			foundExpectedFile = true
+		}
 	}
 	if !foundManifest {
 		t.Fatalf("expected manifest.json in zip")
 	}
-	if !foundFile {
-		t.Fatalf("expected attachment file in zip")
+	if !foundExpectedFile {
+		t.Fatalf("expected sanitized attachment entry name in zip")
 	}
 }
