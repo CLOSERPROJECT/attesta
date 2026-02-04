@@ -83,7 +83,7 @@ task test
 # or: cd server && go test ./...
 ```
 
-Coverage with 70% gate:
+Coverage with 90% gate:
 ```bash
 task cover
 # or: cd server && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out

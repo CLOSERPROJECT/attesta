@@ -36,7 +36,7 @@ Unit tests:
 task test
 ```
 
-Coverage with gate:
+Coverage with 90% gate:
 ```bash
 task cover
 ```
