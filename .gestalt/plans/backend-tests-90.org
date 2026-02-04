@@ -136,11 +136,11 @@
    - Tests :: Prefer calling the rendering helper directly when possible; otherwise trigger through `/complete`.
    - Done when :: Error rendering helpers are executed across both HTMX and full-page paths.
 
-* WIP [#A] Unit-test the Cerbos authorizer adapter (no Cerbos required)
+* DONE [#A] Unit-test the Cerbos authorizer adapter (no Cerbos required)
   - Effort :: S
   - Goal :: Eliminate 0%-covered adapter logic and pin the JSON contract with Cerbos.
   - Notes :: Use `httptest.Server` to capture requests and serve canned responses.
-** WIP [#A] Add `CerbosAuthorizer.CanComplete` tests (request + response mapping)
+** DONE [#A] Add `CerbosAuthorizer.CanComplete` tests (request + response mapping)
    - Why :: Authorization drift is high-risk; the request payload is part of the policy contract.
    - Change :: Add tests for:
      - Builds `POST {CERBOS_URL}/api/check` with JSON and `Content-Type: application/json`.
@@ -150,11 +150,11 @@
    - Tests :: Inject deterministic `now` so `requestId` is stable; assert on decoded JSON rather than raw bytes.
    - Done when :: The adapter has both happy path and failure-mode coverage and no external dependency.
 
-* TODO [#A] Unit-test the Mongo store adapter (no MongoDB required)
+* WIP [#A] Unit-test the Mongo store adapter (no MongoDB required)
   - Effort :: L
   - Goal :: Bring `MongoStore` methods out of 0% coverage while staying CI-safe.
   - Notes :: This is the biggest lever to reach ≥90% because many uncovered statements live in `MongoStore` methods.
-** TODO [#A] Introduce a minimal “mongo driver port” seam (Hex-style, internal)
+** WIP [#A] Introduce a minimal “mongo driver port” seam (Hex-style, internal)
    - Why :: Without a seam, tests would need a real MongoDB, which CI doesn’t provide.
    - Change :: Refactor `MongoStore` construction to depend on tiny internal interfaces for:
      - `Collection(name)` returning a collection port
