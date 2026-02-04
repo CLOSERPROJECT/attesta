@@ -74,14 +74,14 @@
   - Effort :: M
   - Goal :: Push helper functions to ~90–100% coverage cheaply and safely (no IO).
   - Notes :: Favor table-driven tests; pin edge cases that cause user-facing behavior changes (sorting, sanitization, normalization).
-** WIP [#A] Cover env + middleware helpers (`envOr`, `logRequests`)
+** DONE [#A] Cover env + middleware helpers (`envOr`, `logRequests`)
    - Why :: These are easy wins and reduce “0% functions” that drag totals down.
    - Change :: Add unit tests for:
      - `envOr`: unset vs set env var; empty value behavior.
      - `logRequests`: wraps handler, preserves status/body, adds log line (assert via a controllable logger sink if available; otherwise assert it does not change response).
    - Tests :: New `*_test.go` in `server/cmd/server` using `httptest`.
    - Done when :: Both helpers have positive + edge-case coverage without brittle log assertions.
-** TODO [#A] Cover input/normalization helpers (`asString`, `asInt64`, `normalizeInputType(s)`)
+** WIP [#A] Cover input/normalization helpers (`asString`, `asInt64`, `normalizeInputType(s)`)
    - Why :: Validation behavior drives 400 vs success and is prone to regressions.
    - Change :: Add table-driven tests for:
      - `asString`: strings, numbers, nil, unexpected types.
