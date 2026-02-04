@@ -36,10 +36,11 @@ Unit tests:
 task test
 ```
 
-Coverage with gate:
+Coverage with 90% unit-test gate:
 ```bash
 task cover
 ```
+`task cover` enforces `>= 90.0%` total coverage on the unit suite.
 
 Optional integration command:
 ```bash

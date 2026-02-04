@@ -9,6 +9,16 @@ This repo is a small end-to-end demo:
 
 See: `README.md`, `QUICKSTART.md`, `DOCKER.md`.
 
+## Agent behavior expectations
+
+When acting as a coding agent in this repository:
+
+- Prefer **minimal, localized changes**
+- Do not refactor for style or architecture unless explicitly requested
+- Match existing patterns, even if they are imperfect
+- Read relevant code before making changes (especially `server/cmd/server/main.go`)
+- Ask before making breaking changes to routes, workflow config, or persistence
+
 ## Layout
 - `server/` — Go module (`server/go.mod`)
   - `server/cmd/server/` — all backend code (single `package main`) and most logic.

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -46,5 +49,59 @@ func TestIsHTMXRequest(t *testing.T) {
 	missing := httptest.NewRequest(http.MethodGet, "/", nil)
 	if isHTMXRequest(missing) {
 		t.Fatal("expected missing HX-Request header to return false")
+	}
+}
+
+func TestEnvOr(t *testing.T) {
+	if got := envOr("ATTESTA_TEST_ENV_OR_UNSET", "fallback"); got != "fallback" {
+		t.Fatalf("envOr for unset value = %q, want fallback", got)
+	}
+
+	t.Setenv("ATTESTA_TEST_ENV_OR_SET", "configured")
+	if got := envOr("ATTESTA_TEST_ENV_OR_SET", "fallback"); got != "configured" {
+		t.Fatalf("envOr for set value = %q, want configured", got)
+	}
+
+	t.Setenv("ATTESTA_TEST_ENV_OR_EMPTY", "")
+	if got := envOr("ATTESTA_TEST_ENV_OR_EMPTY", "fallback"); got != "fallback" {
+		t.Fatalf("envOr for empty value = %q, want fallback", got)
+	}
+}
+
+func TestLogRequests(t *testing.T) {
+	var logs bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	oldPrefix := log.Prefix()
+	log.SetOutput(&logs)
+	log.SetFlags(0)
+	log.SetPrefix("")
+	t.Cleanup(func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+		log.SetPrefix(oldPrefix)
+	})
+
+	handler := logRequests(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+	if rec.Body.String() != "ok" {
+		t.Fatalf("body = %q, want %q", rec.Body.String(), "ok")
+	}
+	line := strings.TrimSpace(logs.String())
+	if !strings.Contains(line, "GET /ping") {
+		t.Fatalf("log line = %q, want method and path", line)
+	}
+	if !strings.Contains(line, "/ping ") {
+		t.Fatalf("log line = %q, want elapsed duration", line)
 	}
 }

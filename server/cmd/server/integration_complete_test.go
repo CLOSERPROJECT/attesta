@@ -4,7 +4,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -107,6 +109,65 @@ func TestIntegrationCompleteSubstepWithMongoAndCerbos(t *testing.T) {
 
 		cleanupIntegrationProcess(t, db, processID)
 	})
+}
+
+func TestIntegrationMongoGridFSAttachmentRoundTrip(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		t.Skipf("skip integration test: mongo unavailable: %v", err)
+	}
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+	if err := client.Ping(ctx, nil); err != nil {
+		t.Skipf("skip integration test: mongo ping failed: %v", err)
+	}
+
+	db := client.Database("closer_demo_integration_test")
+	store := &MongoStore{db: db}
+	processID := primitive.NewObjectID()
+	content := []byte("integration-gridfs-content")
+
+	attachment, err := store.SaveAttachment(context.Background(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   "1.3",
+		Filename:    "integration.txt",
+		ContentType: "text/plain",
+		MaxBytes:    1024,
+		UploadedAt:  time.Now().UTC(),
+	}, bytes.NewReader(content))
+	if err != nil {
+		t.Fatalf("SaveAttachment: %v", err)
+	}
+	t.Cleanup(func() {
+		bucket, bucketErr := store.attachmentsBucket()
+		if bucketErr == nil {
+			_ = bucket.Delete(attachment.ID)
+		}
+	})
+
+	meta, err := store.LoadAttachmentByID(context.Background(), attachment.ID)
+	if err != nil {
+		t.Fatalf("LoadAttachmentByID: %v", err)
+	}
+	if meta.Filename != "integration.txt" {
+		t.Fatalf("filename = %q, want integration.txt", meta.Filename)
+	}
+
+	reader, err := store.OpenAttachmentDownload(context.Background(), attachment.ID)
+	if err != nil {
+		t.Fatalf("OpenAttachmentDownload: %v", err)
+	}
+	defer reader.Close()
+	downloaded, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read download stream: %v", err)
+	}
+	if string(downloaded) != string(content) {
+		t.Fatalf("downloaded = %q, want %q", downloaded, content)
+	}
 }
 
 func integrationServer(store Store, authorizer Authorizer) *Server {
