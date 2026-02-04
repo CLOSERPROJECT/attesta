@@ -200,7 +200,7 @@
      - (Optional) allow `COVER_MIN` env var override for local experimentation, defaulting to 90.0.
    - Tests :: Verify locally by temporarily setting `COVER_MIN=99.9` to ensure the gate fails (manual check during implementation).
    - Done when :: `task cover` fails below 90.0 and passes at/above 90.0 in CI.
-** WIP [#B] Document the new expectation (90%) where developers look
+** DONE [#B] Document the new expectation (90%) where developers look
    - Why :: Coverage goals rot if not visible in onboarding docs.
    - Change :: Update `README.md` and/or `QUICKSTART.md` to state:
      - `task cover` enforces ≥90% unit-test coverage.
@@ -208,11 +208,11 @@
    - Tests :: N/A (docs).
    - Done when :: Docs mention 90% with the exact command(s) and expectations.
 
-* TODO [#C] Optional: keep a thin integration slice (not part of the gate)
+* WIP [#C] Optional: keep a thin integration slice (not part of the gate)
   - Effort :: S
   - Goal :: Retain end-to-end confidence for Mongo + Cerbos without making CI brittle.
   - Notes :: This is explicitly not required for the 90% unit coverage gate.
-** TODO [#C] Add/maintain integration tests behind `integration` build tag
+** WIP [#C] Add/maintain integration tests behind `integration` build tag
    - Why :: Even with good unit tests, real driver behavior and Cerbos policy wiring can drift.
    - Change :: Keep a small set of integration tests:
      - Cerbos allow/deny matches policy expectations.
