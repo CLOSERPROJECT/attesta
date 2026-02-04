@@ -164,8 +164,8 @@ func (b *fakeGridFSBucket) UploadFromStreamWithID(id interface{}, filename strin
 	if b.uploadFn != nil {
 		return b.uploadFn(id, filename, source, opts...)
 	}
-	_, _ = io.Copy(io.Discard, source)
-	return nil
+	_, err := io.Copy(io.Discard, source)
+	return err
 }
 
 func (b *fakeGridFSBucket) OpenDownloadStream(fileID interface{}) (io.ReadCloser, error) {

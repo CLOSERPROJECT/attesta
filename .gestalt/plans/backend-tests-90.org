@@ -164,7 +164,7 @@
      Keep the public `Store` interface unchanged.
    - Tests :: Add fakes implementing the ports in `server/cmd/server/*_test.go`; assert arguments and simulate driver responses.
    - Done when :: Production behavior remains identical but unit tests can drive both success and error branches deterministically.
-** WIP [#A] Add MongoStore unit tests for process + notarization CRUD
+** DONE [#A] Add MongoStore unit tests for process + notarization CRUD
    - Why :: These methods contribute many uncovered statements and are central to persistence correctness.
    - Change :: Add tests covering:
      - `InsertProcess`: success + invalid inserted ID type + driver error.
@@ -175,7 +175,7 @@
      - `UpdateProcessStatus` and `InsertNotarization`: happy path + error propagation.
    - Tests :: Use fakes that record filter/update payloads and return configured results.
    - Done when :: Each method has at least one happy-path test and one failure-path test.
-** TODO [#A] Add MongoStore unit tests for attachments (GridFS)
+** WIP [#A] Add MongoStore unit tests for attachments (GridFS)
    - Why :: Attachment upload/download code has multiple branches (defaults, size limit, SHA update) and is currently uncovered.
    - Change :: Add tests covering:
      - `SaveAttachment` defaults: blank filename -> “attachment”; blank content-type -> detected; zero UploadedAt -> `time.Now().UTC()`.
