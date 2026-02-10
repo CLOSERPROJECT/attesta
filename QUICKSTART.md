@@ -30,6 +30,8 @@ go run ./cmd/server
 - Home: http://localhost:3000
 - Backoffice: http://localhost:3000/backoffice
 
+The entry pages are workflow pickers. Business routes are workflow-scoped under `/w/{workflowKey}/...`.
+
 ## Run tests
 Unit tests:
 ```bash
