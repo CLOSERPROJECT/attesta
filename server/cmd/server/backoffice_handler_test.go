@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +87,39 @@ func TestHandleBackofficeRoutes(t *testing.T) {
 	}
 	if !strings.Contains(processRec.Body.String(), "PROCESS_PAGE") {
 		t.Fatalf("expected process page marker, got %q", processRec.Body.String())
+	}
+}
+
+func TestHandleBackofficePickerRendersScopedWorkflowLinks(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
+
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{
+		tmpl:      tmpl,
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/backoffice", nil)
+	rec := httptest.NewRecorder()
+	server.handleBackoffice(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	if location := rec.Header().Get("Location"); location != "" {
+		t.Fatalf("expected no implicit redirect, got location %q", location)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Main workflow") || !strings.Contains(body, "Secondary workflow") {
+		t.Fatalf("expected both workflow labels, got %q", body)
+	}
+	if !strings.Contains(body, `href="/w/workflow/backoffice"`) {
+		t.Fatalf("expected scoped backoffice href for workflow key, got %q", body)
+	}
+	if !strings.Contains(body, `href="/w/secondary/backoffice"`) {
+		t.Fatalf("expected scoped backoffice href for secondary key, got %q", body)
 	}
 }
 

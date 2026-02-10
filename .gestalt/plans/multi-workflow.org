@@ -107,3 +107,18 @@ Why: Multi-workflow touches routing, auth, persistence, templates, and SSE.
 Change: Run `cd server && go test ./...` and targeted integration checks (`go test -tags=integration ./...` when dependencies are up). Validate manual acceptance: pick workflow on `/` and `/backoffice`, create process, complete substep, ensure other workflow cannot read/mutate same process, and Cerbos denies workflow mismatch.
 Tests: Unit + integration + manual smoke checklist.
 Done when: All tests pass and acceptance checklist is green with at least two workflow YAML files in `server/config`.
+
+* WIP [#A] Fix backoffice landing workflow picker regression
+Effort: S
+Goal: Ensure `/backoffice` reliably offers workflow selection and validates isolation with distinct users per workflow.
+Notes: This is a corrective slice after the initial multi-workflow rollout; no new dependencies and no route contract changes.
+** DONE [#A] Re-enable or correct workflow choices on `/backoffice`
+Why: The current behavior is reported broken; operators must be able to choose the target workflow from the backoffice landing before role/process navigation.
+Change: In `server/cmd/server/main.go` and `server/templates/backoffice.html`, enforce that `GET /backoffice` always renders a workflow picker sourced from catalog DTOs (same source as `/`). Verify links target `/w/{key}/backoffice` for each configured workflow and never auto-select implicitly.
+Tests: Extend `server/cmd/server/backoffice_handler_test.go` with a failing-first case for `/backoffice` rendering all configured workflows and correct scoped hrefs.
+Done when: Visiting `/backoffice` with at least two workflow YAML files always shows both choices and navigates into the selected scoped backoffice landing.
+** WIP [#A] Use distinct user sets per workflow for end-to-end validation
+Why: Reusing the same impersonated users across workflows can hide scope leaks in cookie/session and Cerbos checks.
+Change: In `server/config/workflow*.yaml`, assign non-overlapping demo users per workflow (unique `userId` values per role per workflow). Validate impersonation flow uses workflow-bound identities and denies cross-workflow cookie reuse.
+Tests: Add/adjust handler tests in `server/cmd/server/impersonate_handler_test.go` and `server/cmd/server/complete_handler_test.go` to assert workflow A user cannot complete workflow B route/process, plus manual smoke checks from `/backoffice` picker.
+Done when: Each workflow is operated by its own user set, impersonation remains functional per workflow, and cross-workflow action attempts are denied consistently.
