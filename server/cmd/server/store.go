@@ -35,7 +35,144 @@ type Store interface {
 }
 
 type MongoStore struct {
+	db     *mongo.Database
+	dbPort mongoDatabasePort
+}
+
+type mongoDatabasePort interface {
+	Collection(name string) mongoCollectionPort
+	NewGridFSBucket(name string) (gridFSBucketPort, error)
+}
+
+type mongoCollectionPort interface {
+	InsertOne(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error)
+	FindOne(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort
+	Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error)
+	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
+	FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
+}
+
+type mongoSingleResultPort interface {
+	Decode(v interface{}) error
+	Err() error
+}
+
+type mongoCursorPort interface {
+	Next(ctx context.Context) bool
+	Decode(val interface{}) error
+	Close(ctx context.Context) error
+}
+
+type gridFSBucketPort interface {
+	UploadFromStreamWithID(id interface{}, filename string, source io.Reader, opts ...*options.UploadOptions) error
+	OpenDownloadStream(fileID interface{}) (io.ReadCloser, error)
+	Delete(fileID interface{}) error
+}
+
+type mongoDriverDatabase struct {
 	db *mongo.Database
+}
+
+func (d mongoDriverDatabase) Collection(name string) mongoCollectionPort {
+	return mongoDriverCollection{collection: d.db.Collection(name)}
+}
+
+func (d mongoDriverDatabase) NewGridFSBucket(name string) (gridFSBucketPort, error) {
+	bucket, err := gridfs.NewBucket(d.db, options.GridFSBucket().SetName(name))
+	if err != nil {
+		return nil, err
+	}
+	return mongoDriverGridFSBucket{bucket: bucket}, nil
+}
+
+type mongoDriverCollection struct {
+	collection *mongo.Collection
+}
+
+func (c mongoDriverCollection) InsertOne(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+	return c.collection.InsertOne(ctx, document, opts...)
+}
+
+func (c mongoDriverCollection) FindOne(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+	return mongoDriverSingleResult{result: c.collection.FindOne(ctx, filter, opts...)}
+}
+
+func (c mongoDriverCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+	cursor, err := c.collection.Find(ctx, filter, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return mongoDriverCursor{cursor: cursor}, nil
+}
+
+func (c mongoDriverCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	return c.collection.UpdateOne(ctx, filter, update, opts...)
+}
+
+func (c mongoDriverCollection) FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+	return mongoDriverSingleResult{result: c.collection.FindOneAndUpdate(ctx, filter, update, opts...)}
+}
+
+type mongoDriverSingleResult struct {
+	result *mongo.SingleResult
+}
+
+func (r mongoDriverSingleResult) Decode(v interface{}) error {
+	return r.result.Decode(v)
+}
+
+func (r mongoDriverSingleResult) Err() error {
+	return r.result.Err()
+}
+
+type mongoDriverCursor struct {
+	cursor *mongo.Cursor
+}
+
+func (c mongoDriverCursor) Next(ctx context.Context) bool {
+	return c.cursor.Next(ctx)
+}
+
+func (c mongoDriverCursor) Decode(val interface{}) error {
+	return c.cursor.Decode(val)
+}
+
+func (c mongoDriverCursor) Close(ctx context.Context) error {
+	return c.cursor.Close(ctx)
+}
+
+type mongoDriverGridFSBucket struct {
+	bucket *gridfs.Bucket
+}
+
+func (b mongoDriverGridFSBucket) UploadFromStreamWithID(id interface{}, filename string, source io.Reader, opts ...*options.UploadOptions) error {
+	return b.bucket.UploadFromStreamWithID(id, filename, source, opts...)
+}
+
+func (b mongoDriverGridFSBucket) OpenDownloadStream(fileID interface{}) (io.ReadCloser, error) {
+	return b.bucket.OpenDownloadStream(fileID)
+}
+
+func (b mongoDriverGridFSBucket) Delete(fileID interface{}) error {
+	return b.bucket.Delete(fileID)
+}
+
+func NewMongoStore(db *mongo.Database) *MongoStore {
+	return &MongoStore{
+		db:     db,
+		dbPort: mongoDriverDatabase{db: db},
+	}
+}
+
+func (s *MongoStore) database() mongoDatabasePort {
+	if s.dbPort != nil {
+		return s.dbPort
+	}
+	if s.db == nil {
+		return nil
+	}
+	s.dbPort = mongoDriverDatabase{db: s.db}
+	return s.dbPort
 }
 
 var ErrAttachmentTooLarge = errors.New("attachment too large")
@@ -61,7 +198,7 @@ type AttachmentUpload struct {
 }
 
 func (s *MongoStore) InsertProcess(ctx context.Context, process Process) (primitive.ObjectID, error) {
-	result, err := s.db.Collection("processes").InsertOne(ctx, process)
+	result, err := s.database().Collection("processes").InsertOne(ctx, process)
 	if err != nil {
 		return primitive.NilObjectID, err
 	}
@@ -74,7 +211,7 @@ func (s *MongoStore) InsertProcess(ctx context.Context, process Process) (primit
 
 func (s *MongoStore) LoadProcessByID(ctx context.Context, id primitive.ObjectID) (*Process, error) {
 	var process Process
-	if err := s.db.Collection("processes").FindOne(ctx, bson.M{"_id": id}).Decode(&process); err != nil {
+	if err := s.database().Collection("processes").FindOne(ctx, bson.M{"_id": id}).Decode(&process); err != nil {
 		return nil, err
 	}
 	return &process, nil
@@ -83,7 +220,7 @@ func (s *MongoStore) LoadProcessByID(ctx context.Context, id primitive.ObjectID)
 func (s *MongoStore) LoadLatestProcess(ctx context.Context) (*Process, error) {
 	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
 	var process Process
-	if err := s.db.Collection("processes").FindOne(ctx, bson.M{}, opts).Decode(&process); err != nil {
+	if err := s.database().Collection("processes").FindOne(ctx, bson.M{}, opts).Decode(&process); err != nil {
 		return nil, err
 	}
 	return &process, nil
@@ -91,7 +228,7 @@ func (s *MongoStore) LoadLatestProcess(ctx context.Context) (*Process, error) {
 
 func (s *MongoStore) ListRecentProcesses(ctx context.Context, limit int64) ([]Process, error) {
 	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(limit)
-	cursor, err := s.db.Collection("processes").Find(ctx, bson.M{}, opts)
+	cursor, err := s.database().Collection("processes").Find(ctx, bson.M{}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -114,16 +251,16 @@ func (s *MongoStore) UpdateProcessProgress(ctx context.Context, id primitive.Obj
 			"progress." + encodeProgressKey(substepID): progress,
 		},
 	}
-	return s.db.Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": id}, update).Err()
+	return s.database().Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": id}, update).Err()
 }
 
 func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, status string) error {
-	_, err := s.db.Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"status": status}})
+	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"status": status}})
 	return err
 }
 
 func (s *MongoStore) InsertNotarization(ctx context.Context, notarization Notarization) error {
-	_, err := s.db.Collection("notarizations").InsertOne(ctx, notarization)
+	_, err := s.database().Collection("notarizations").InsertOne(ctx, notarization)
 	return err
 }
 
@@ -164,7 +301,7 @@ func (s *MongoStore) SaveAttachment(ctx context.Context, upload AttachmentUpload
 		return Attachment{}, err
 	}
 	sha := tracker.SHA256()
-	if _, err := s.db.Collection("attachments.files").UpdateOne(
+	if _, err := s.database().Collection("attachments.files").UpdateOne(
 		ctx,
 		bson.M{"_id": id},
 		bson.M{"$set": bson.M{"metadata.sha256": sha}},
@@ -198,7 +335,7 @@ func (s *MongoStore) LoadAttachmentByID(ctx context.Context, id primitive.Object
 			SHA256      string             `bson:"sha256"`
 		} `bson:"metadata"`
 	}
-	if err := s.db.Collection("attachments.files").FindOne(ctx, bson.M{"_id": id}).Decode(&doc); err != nil {
+	if err := s.database().Collection("attachments.files").FindOne(ctx, bson.M{"_id": id}).Decode(&doc); err != nil {
 		return nil, err
 	}
 	uploadedAt := doc.Metadata.UploadedAt
@@ -226,8 +363,8 @@ func (s *MongoStore) OpenAttachmentDownload(ctx context.Context, id primitive.Ob
 	return bucket.OpenDownloadStream(id)
 }
 
-func (s *MongoStore) attachmentsBucket() (*gridfs.Bucket, error) {
-	return gridfs.NewBucket(s.db, options.GridFSBucket().SetName("attachments"))
+func (s *MongoStore) attachmentsBucket() (gridFSBucketPort, error) {
+	return s.database().NewGridFSBucket("attachments")
 }
 
 type MemoryStore struct {

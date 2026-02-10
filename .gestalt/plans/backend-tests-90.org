@@ -1,0 +1,221 @@
+#+TITLE: Backend Tests (Go server)
+#+SUBTITLE: Reach ≥90% coverage with unit tests (CI-safe)
+#+DATE: 2026-02-04
+#+KEYWORDS: go, testing, coverage, httptest, hex, ports-adapters, mongodb, gridfs, cerbos, sse, htmx
+
+* DONE [#A] Confirm coverage target + scope
+  - Effort :: S
+  - Goal :: Make “≥90% coverage” precise and keep the gate CI-stable (no Docker, no external services).
+  - Notes :: Current CI runs `task cover` only; it does not start MongoDB/Cerbos services.
+** DONE [#A] Decide the exact gate definition (command + threshold)
+   - Why :: “90%” can mean module-wide, per-package, unit-only vs integration-inclusive, and different coverpkg scopes.
+   - Change :: Confirm and document:
+     - Command of record: `cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./... -coverprofile=coverage.out`
+     - Gate source: module-wide `total` from `go tool cover -func=coverage.out`
+     - Threshold: `>= 90.0%` (one decimal, numeric compare)
+     - Unit suite alone must pass (no `-tags=integration` required for gate)
+   - Tests :: N/A (decision).
+   - Done when :: The agreed definition is in this plan and mirrored in `Taskfile.yml` (and docs if needed).
+** DONE [#A] Confirm whether adapter code counts toward the 90% (Mongo/Cerbos)
+   - Why :: The largest uncovered areas are “adapters” (MongoStore, CerbosAuthorizer). Reaching 90% requires either testing them or formally excluding them from the gate.
+   - Change :: Option A chosen: adapters count; make them unit-testable with minimal seams (no external services).
+   - Tests :: N/A (decision).
+   - Done when :: A single approach is chosen and the rest of the plan follows it consistently.
+
+* DONE [#A] Measure baseline + identify coverage hotspots
+  - Effort :: S
+  - Goal :: Convert “improve coverage” into a concrete, ordered to-do list with the highest ROI first.
+  - Notes :: Use `go tool cover -func` to sort by lowest-covered functions; avoid chasing tiny helpers first.
+** DONE [#A] Record baseline numbers and top misses
+   - Why :: Without a baseline and a “top 20 misses” list, coverage work drifts and becomes inefficient.
+   - Change :: Capture (in the PR description / notes):
+     - Baseline `total` coverage.
+     - Lowest-covered functions (especially 0% items) and the files they live in.
+     - A short note for each: “untested because unreachable” vs “untested because needs seam”.
+   - Tests :: N/A (measurement).
+   - Done when :: There is a ranked list of targets that plausibly yields +16–20 coverage points.
+   - Baseline :: 73.6% total (measured on 2026-02-04 with `cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out`).
+   - Top misses :: Ranked by lowest function coverage from `go tool cover -func`:
+     - 0.0% `store.go` Mongo adapter methods (`InsertProcess`, `LoadProcessByID`, `LoadLatestProcess`, `ListRecentProcesses`, `UpdateProcessProgress`, `UpdateProcessStatus`, `InsertNotarization`) — needs seam.
+     - 0.0% `store.go` attachment methods (`SaveAttachment`, `LoadAttachmentByID`, `OpenAttachmentDownload`, `attachmentsBucket`) — needs seam.
+     - 0.0% `authorizer.go` (`NewCerbosAuthorizer`, `CanComplete`) — needs seam (`httptest.Server`).
+     - 0.0% `main.go:1761 buildProcessSummary` — reachable with pure unit tests.
+     - 0.0% `main.go:2044 renderActionError` — reachable with handler/error-path tests.
+     - 0.0% `main.go:735 handleMerkleJSON` — reachable with endpoint tests.
+     - 0.0% `main.go:360 envOr` — reachable with helper tests.
+     - 0.0% `main.go:380 logRequests` — reachable with middleware tests.
+     - 27.3% `main.go:1132 asInt64` — reachable with table-driven helper tests.
+     - 30.4% `main.go:443 sortHomeProcessList` — reachable with deterministic list fixtures.
+     - 42.9% `store.go:534 detectAttachmentContentType` — reachable with helper tests.
+     - 50.0% `main.go:1421 actorForRole` — reachable with role mapping tests.
+     - 60.0% `main.go:1119 asString` — reachable with helper tests.
+     - 60.0% `main.go:1346 getConfig` — reachable with config/reload tests.
+     - 60.0% `main.go:586 handleProcessRoutes` — reachable with route dispatch tests.
+     - 60.0% `main.go:720 handleNotarizedJSON` — reachable with endpoint tests.
+     - 61.0% `main.go:750 handleDownloadSubstepFile` — reachable with attachment handler tests.
+     - 66.7% `main.go:1008 parseFilePayload` — reachable with multipart tests.
+     - 66.7% `main.go:1339 runtimeConfig` — reachable with config tests.
+     - 70.0% `main.go:2058 renderActionList` and `main.go:2080 renderDepartmentProcessPage` — reachable with HTMX/non-HTMX render tests.
+   - Coverage ROI note :: The two adapter files + helper/JSON/download gaps are enough to close >16 points without integration tags.
+** DONE [#B] Decide the minimal seam for MongoStore unit tests (no MongoDB)
+   - Why :: `MongoStore` currently depends directly on `*mongo.Database` and GridFS types, making pure unit tests hard.
+   - Change :: Option A chosen. Keep runtime behavior, add small internal ports around mongo-driver:
+     - `mongoDatabasePort`: `Collection(name)` and `newGridFSBucket(name)`.
+     - `mongoCollectionPort`: `InsertOne`, `FindOne`, `Find`, `UpdateOne`, `FindOneAndUpdate`.
+     - `mongoSingleResultPort`: `Decode`, `Err`.
+     - `mongoCursorPort`: `Next`, `Decode`, `Close`.
+     - `gridFSBucketPort`: `UploadFromStreamWithID`, `OpenDownloadStream`, `Delete`.
+     - Keep `Store` public interface unchanged; only `MongoStore` internals use ports.
+   - Mocking plan :: In tests, fake these ports and assert filters/options/update docs; in prod, use thin wrappers to real mongo-driver types.
+   - Tests :: N/A (decision).
+   - Done when :: The seam choice is explicit, and it’s clear what gets mocked and what remains real.
+
+* DONE [#A] Raise coverage on pure helpers + deterministic logic
+  - Effort :: M
+  - Goal :: Push helper functions to ~90–100% coverage cheaply and safely (no IO).
+  - Notes :: Favor table-driven tests; pin edge cases that cause user-facing behavior changes (sorting, sanitization, normalization).
+** DONE [#A] Cover env + middleware helpers (`envOr`, `logRequests`)
+   - Why :: These are easy wins and reduce “0% functions” that drag totals down.
+   - Change :: Add unit tests for:
+     - `envOr`: unset vs set env var; empty value behavior.
+     - `logRequests`: wraps handler, preserves status/body, adds log line (assert via a controllable logger sink if available; otherwise assert it does not change response).
+   - Tests :: New `*_test.go` in `server/cmd/server` using `httptest`.
+   - Done when :: Both helpers have positive + edge-case coverage without brittle log assertions.
+** DONE [#A] Cover input/normalization helpers (`asString`, `asInt64`, `normalizeInputType(s)`)
+   - Why :: Validation behavior drives 400 vs success and is prone to regressions.
+   - Change :: Add table-driven tests for:
+     - `asString`: strings, numbers, nil, unexpected types.
+     - `asInt64`: ints, floats, numeric strings, invalid strings, nil.
+     - `normalizeInputType` and `normalizeInputTypes`: case/whitespace, unknown values.
+   - Tests :: Pure unit tests (no server needed).
+   - Done when :: Each helper has explicit coverage for both valid and invalid inputs.
+** DONE [#B] Cover sorting + display helpers (`sortHomeProcessList`, `buildProcessSummary`, `actorForRole`, `roleMetaMap`)
+   - Why :: Dashboards and home page ordering are user-visible; wrong ordering is a subtle bug.
+   - Change :: Add unit tests for:
+     - `sortHomeProcessList`: mixed statuses and timestamps ordering rules.
+     - `buildProcessSummary`: presence/absence of next action, completion status, derived fields.
+     - `actorForRole` + `roleMetaMap`: unknown role behavior and defaulting.
+   - Tests :: Use minimal `WorkflowDef` and `Process` fixtures (reuse existing test config builder).
+   - Done when :: Ordering and summary derivations are deterministic and pinned by tests.
+** DONE [#B] Cover attachment helpers (`sanitizeAttachmentFilename`, `detectAttachmentContentType`)
+   - Why :: Download filenames and content-types are security- and UX-relevant.
+   - Change :: Add tests for:
+     - `sanitizeAttachmentFilename`: path traversal, control chars, empty input, unicode edge cases (keep expectations aligned with current behavior).
+     - `detectAttachmentContentType`: known extensions, unknown extensions, no extension.
+   - Tests :: Pure unit tests.
+   - Done when :: Helper behavior is locked in with clear expectations for “dangerous” inputs.
+
+* DONE [#A] Expand handler coverage to remaining branches (still unit tests)
+  - Effort :: M
+  - Goal :: Cover “rare but important” branches: JSON endpoints, file download, and error rendering paths.
+  - Notes :: Keep tests stable by asserting status/headers and small HTML/JSON markers, not full documents.
+** DONE [#A] Cover JSON endpoints (`handleNotarizedJSON`, `handleMerkleJSON`)
+   - Why :: They are currently under-covered and represent “export” contracts (clients may rely on them).
+   - Change :: Add handler tests:
+     - Positive: valid process ID returns `200` with `application/json` and expected shape (top-level keys).
+     - Negative: invalid ObjectID -> 404.
+     - Negative: missing process -> 404.
+     - Negative: store errors -> 500 (or current behavior; codify).
+   - Tests :: Use `httptest` with a seeded `MemoryStore`; assert JSON decodes and includes stable fields (e.g., processId).
+   - Done when :: Both endpoints have at least 1 success + 2 negatives, and JSON shape is pinned.
+** DONE [#A] Cover file download paths (`handleDownloadSubstepFile`, `handleDownloadAllFiles`)
+   - Why :: Streaming responses and header logic are easy to break and currently not fully exercised.
+   - Change :: Add handler tests:
+     - Positive: download a stored attachment by ID; assert `Content-Disposition`, `Content-Type`, and body bytes.
+     - Negative: invalid/missing attachment -> 404.
+     - Negative: filename sanitization edge cases reflected in header.
+     - Positive: “download all” returns expected archive response headers (exact archive format as implemented).
+   - Tests :: Use `MemoryStore.SaveAttachment` to seed attachments; avoid large payloads.
+   - Done when :: Download endpoints are covered for both metadata headers and body streaming.
+** DONE [#B] Cover action error rendering (`renderActionError` + request variant)
+   - Why :: This is the central error UX for substep completion; it currently has uncovered branches.
+   - Change :: Add unit/handler tests that force error paths and assert:
+     - Status code mapping (400/403/409/502/500).
+     - HTMX vs non-HTMX response differences (partial vs full render).
+     - Presence of the error message in the response body.
+   - Tests :: Prefer calling the rendering helper directly when possible; otherwise trigger through `/complete`.
+   - Done when :: Error rendering helpers are executed across both HTMX and full-page paths.
+
+* DONE [#A] Unit-test the Cerbos authorizer adapter (no Cerbos required)
+  - Effort :: S
+  - Goal :: Eliminate 0%-covered adapter logic and pin the JSON contract with Cerbos.
+  - Notes :: Use `httptest.Server` to capture requests and serve canned responses.
+** DONE [#A] Add `CerbosAuthorizer.CanComplete` tests (request + response mapping)
+   - Why :: Authorization drift is high-risk; the request payload is part of the policy contract.
+   - Change :: Add tests for:
+     - Builds `POST {CERBOS_URL}/api/check` with JSON and `Content-Type: application/json`.
+     - Includes `sequenceOk`, `roleRequired`, `processId`, `substepId`, and actor principal fields.
+     - Response mapping: allow -> true, deny/unknown -> false.
+     - Non-200 -> error; invalid JSON -> error.
+   - Tests :: Inject deterministic `now` so `requestId` is stable; assert on decoded JSON rather than raw bytes.
+   - Done when :: The adapter has both happy path and failure-mode coverage and no external dependency.
+
+* DONE [#A] Unit-test the Mongo store adapter (no MongoDB required)
+  - Effort :: L
+  - Goal :: Bring `MongoStore` methods out of 0% coverage while staying CI-safe.
+  - Notes :: This is the biggest lever to reach ≥90% because many uncovered statements live in `MongoStore` methods.
+** DONE [#A] Introduce a minimal “mongo driver port” seam (Hex-style, internal)
+   - Why :: Without a seam, tests would need a real MongoDB, which CI doesn’t provide.
+   - Change :: Refactor `MongoStore` construction to depend on tiny internal interfaces for:
+     - `Collection(name)` returning a collection port
+     - CRUD methods used (`InsertOne`, `FindOne`, `Find`, `UpdateOne`, `FindOneAndUpdate`)
+     - Cursor iteration/decoding for `ListRecentProcesses`
+     - GridFS bucket creation + upload/download/delete used in attachments
+     Keep the public `Store` interface unchanged.
+   - Tests :: Add fakes implementing the ports in `server/cmd/server/*_test.go`; assert arguments and simulate driver responses.
+   - Done when :: Production behavior remains identical but unit tests can drive both success and error branches deterministically.
+** DONE [#A] Add MongoStore unit tests for process + notarization CRUD
+   - Why :: These methods contribute many uncovered statements and are central to persistence correctness.
+   - Change :: Add tests covering:
+     - `InsertProcess`: success + invalid inserted ID type + driver error.
+     - `LoadProcessByID`: success + not-found/error propagation.
+     - `LoadLatestProcess`: correct sort option passed + error propagation.
+     - `ListRecentProcesses`: cursor decode skip behavior and close behavior (as implemented).
+     - `UpdateProcessProgress`: uses `encodeProgressKey` in update doc + error propagation.
+     - `UpdateProcessStatus` and `InsertNotarization`: happy path + error propagation.
+   - Tests :: Use fakes that record filter/update payloads and return configured results.
+   - Done when :: Each method has at least one happy-path test and one failure-path test.
+** DONE [#A] Add MongoStore unit tests for attachments (GridFS)
+   - Why :: Attachment upload/download code has multiple branches (defaults, size limit, SHA update) and is currently uncovered.
+   - Change :: Add tests covering:
+     - `SaveAttachment` defaults: blank filename -> “attachment”; blank content-type -> detected; zero UploadedAt -> `time.Now().UTC()`.
+     - Size limit: when tracker hits `ErrAttachmentTooLarge`, ensure delete is attempted and the exported error is `ErrAttachmentTooLarge`.
+     - Metadata SHA update: update to `attachments.files` is called with expected path.
+     - `LoadAttachmentByID`: uploadedAt fallback logic (`metadata.uploadedAt` zero -> use `uploadDate`).
+     - `OpenAttachmentDownload`: bucket open is called and error propagates.
+     - `attachmentsBucket`: uses bucket name `attachments`.
+   - Tests :: Fake GridFS bucket + fake collections; inject `UploadedAt` and provide small readers for content.
+   - Done when :: Attachment adapter logic is covered for defaults, happy path, and key error branches.
+
+* DONE [#A] Update the coverage gate and keep it ergonomic
+  - Effort :: S
+  - Goal :: Make “≥90%” enforceable and easy to reproduce locally.
+  - Notes :: Avoid adding new tooling; keep this within `Taskfile.yml` and standard Go tools.
+** DONE [#A] Raise Taskfile gate from 70% to 90%
+   - Why :: CI currently enforces 70%; changing the target must be mechanical and visible.
+   - Change :: Update `Taskfile.yml` `cover` task:
+     - Description reflects 90%.
+     - Numeric compare uses `90.0`.
+     - Keep `GOCACHE=${GOCACHE:-/tmp/gocache-attesta}` for both `go test` and `go tool cover`.
+     - (Optional) allow `COVER_MIN` env var override for local experimentation, defaulting to 90.0.
+   - Tests :: Verify locally by temporarily setting `COVER_MIN=99.9` to ensure the gate fails (manual check during implementation).
+   - Done when :: `task cover` fails below 90.0 and passes at/above 90.0 in CI.
+** DONE [#B] Document the new expectation (90%) where developers look
+   - Why :: Coverage goals rot if not visible in onboarding docs.
+   - Change :: Update `README.md` and/or `QUICKSTART.md` to state:
+     - `task cover` enforces ≥90% unit-test coverage.
+     - Integration tests remain optional and separate.
+   - Tests :: N/A (docs).
+   - Done when :: Docs mention 90% with the exact command(s) and expectations.
+
+* DONE [#C] Optional: keep a thin integration slice (not part of the gate)
+  - Effort :: S
+  - Goal :: Retain end-to-end confidence for Mongo + Cerbos without making CI brittle.
+  - Notes :: This is explicitly not required for the 90% unit coverage gate.
+** DONE [#C] Add/maintain integration tests behind `integration` build tag
+   - Why :: Even with good unit tests, real driver behavior and Cerbos policy wiring can drift.
+   - Change :: Keep a small set of integration tests:
+     - Cerbos allow/deny matches policy expectations.
+     - Mongo GridFS upload/download roundtrip.
+   - Tests :: `cd server && go test -tags=integration ./...` (tests skip when services unavailable).
+   - Done when :: Integration suite is fast, high-value, and never required for unit coverage gate.

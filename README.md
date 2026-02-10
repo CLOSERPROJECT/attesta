@@ -83,11 +83,12 @@ task test
 # or: cd server && go test ./...
 ```
 
-Coverage with 70% gate:
+Coverage with 90% unit-test gate:
 ```bash
 task cover
 # or: cd server && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out
 ```
+`task cover` only runs the unit suite (`go test ./...`) and enforces `>= 90.0%` total coverage.
 
 Optional integration test command (Docker-backed):
 ```bash
