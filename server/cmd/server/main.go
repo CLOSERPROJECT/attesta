@@ -102,10 +102,10 @@ type Server struct {
 	now            func() time.Time
 	configProvider func() (RuntimeConfig, error)
 	workflowDefID  primitive.ObjectID
-	configPath     string
+	configDir      string
 	configMu       sync.Mutex
-	configModTime  time.Time
-	config         *RuntimeConfig
+	catalogModTime map[string]time.Time
+	catalog        map[string]RuntimeConfig
 	viteDevServer  string
 }
 
@@ -329,6 +329,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	defaultConfigPath := envOr("WORKFLOW_CONFIG", "config/workflow.yaml")
+	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
+	if configDir == "" {
+		configDir = filepath.Dir(defaultConfigPath)
+	}
+
 	server := &Server{
 		mongo:         client,
 		store:         &MongoStore{db: db},
@@ -337,7 +343,7 @@ func main() {
 		sse:           newSSEHub(),
 		now:           time.Now,
 		workflowDefID: primitive.NewObjectID(),
-		configPath:    envOr("WORKFLOW_CONFIG", "config/workflow.yaml"),
+		configDir:     configDir,
 		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 	}
 
@@ -585,19 +591,21 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) defaultWorkflowKey() string {
-	base := strings.TrimSpace(filepath.Base(strings.TrimSpace(s.configPath)))
-	if base == "" || base == "." || base == string(filepath.Separator) {
+	catalog, err := s.workflowCatalog()
+	if err == nil {
+		if _, ok := catalog["workflow"]; ok {
+			return "workflow"
+		}
+		keys := sortedWorkflowKeys(catalog)
+		if len(keys) > 0 {
+			return keys[0]
+		}
+	}
+	base := strings.TrimSpace(filepath.Base(strings.TrimSpace(s.configDir)))
+	if base == "" || base == "." || base == string(filepath.Separator) || base == "config" {
 		return "workflow"
 	}
-	ext := filepath.Ext(base)
-	if ext != "" {
-		base = strings.TrimSuffix(base, ext)
-	}
-	base = strings.TrimSpace(base)
-	if base == "" {
-		return "workflow"
-	}
-	return base
+	return strings.TrimSpace(base)
 }
 
 func (s *Server) resolveLegacyProcessWorkflowKey(ctx context.Context, processID string) (string, bool) {
@@ -1429,36 +1437,131 @@ func (s *Server) runtimeConfig() (RuntimeConfig, error) {
 	if s.configProvider != nil {
 		return s.configProvider()
 	}
-	return s.getConfig()
+	key := s.defaultWorkflowKey()
+	cfg, err := s.workflowByKey(key)
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	return cfg, nil
 }
 
 func (s *Server) getConfig() (RuntimeConfig, error) {
+	return s.runtimeConfig()
+}
+
+func sortedWorkflowKeys(catalog map[string]RuntimeConfig) []string {
+	keys := make([]string, 0, len(catalog))
+	for key := range catalog {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sameCatalogModTimes(a, b map[string]time.Time) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for path, modA := range a {
+		modB, ok := b[path]
+		if !ok || !modA.Equal(modB) {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 
-	info, err := os.Stat(s.configPath)
+	dir := strings.TrimSpace(s.configDir)
+	if dir == "" {
+		dir = "config"
+	}
+
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return RuntimeConfig{}, fmt.Errorf("config not found: %w", err)
+		return nil, fmt.Errorf("config dir not found: %w", err)
 	}
-	if s.config != nil && !info.ModTime().After(s.configModTime) {
-		return *s.config, nil
+
+	paths := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+			continue
+		}
+		paths = append(paths, filepath.Join(dir, name))
 	}
-	data, err := os.ReadFile(s.configPath)
+	sort.Strings(paths)
+	if len(paths) == 0 {
+		return nil, errors.New("workflow config catalog is empty")
+	}
+
+	modTimes := make(map[string]time.Time, len(paths))
+	for _, path := range paths {
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			return nil, fmt.Errorf("config stat failed for %s: %w", path, statErr)
+		}
+		modTimes[path] = info.ModTime()
+	}
+	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
+		cached := make(map[string]RuntimeConfig, len(s.catalog))
+		for key, cfg := range s.catalog {
+			cached[key] = cfg
+		}
+		return cached, nil
+	}
+
+	catalog := make(map[string]RuntimeConfig, len(paths))
+	for _, path := range paths {
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil, fmt.Errorf("read config %s: %w", path, readErr)
+		}
+		var cfg RuntimeConfig
+		if unmarshalErr := yaml.Unmarshal(data, &cfg); unmarshalErr != nil {
+			return nil, fmt.Errorf("parse config %s: %w", path, unmarshalErr)
+		}
+		if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
+			return nil, fmt.Errorf("workflow config is empty in %s", filepath.Base(path))
+		}
+		if normalizeErr := normalizeInputTypes(&cfg.Workflow); normalizeErr != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
+		}
+		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+		if key == "" {
+			return nil, fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
+		}
+		if _, exists := catalog[key]; exists {
+			return nil, fmt.Errorf("duplicate workflow key %q", key)
+		}
+		catalog[key] = cfg
+	}
+
+	s.catalog = catalog
+	s.catalogModTime = modTimes
+
+	cloned := make(map[string]RuntimeConfig, len(catalog))
+	for key, cfg := range catalog {
+		cloned[key] = cfg
+	}
+	return cloned, nil
+}
+
+func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {
+	catalog, err := s.workflowCatalog()
 	if err != nil {
-		return RuntimeConfig{}, fmt.Errorf("read config: %w", err)
-	}
-	var cfg RuntimeConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return RuntimeConfig{}, fmt.Errorf("parse config: %w", err)
-	}
-	if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
-		return RuntimeConfig{}, errors.New("workflow config is empty")
-	}
-	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
 		return RuntimeConfig{}, err
 	}
-	s.config = &cfg
-	s.configModTime = info.ModTime()
+	cfg, ok := catalog[key]
+	if !ok {
+		return RuntimeConfig{}, fmt.Errorf("workflow %q not found", key)
+	}
 	return cfg, nil
 }
 

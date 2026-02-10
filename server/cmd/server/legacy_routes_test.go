@@ -21,7 +21,7 @@ func TestLegacyProcessReadRouteRedirectsToWorkflowScopedURL(t *testing.T) {
 	}
 	store.SeedProcess(process)
 
-	server := &Server{store: store, configPath: "config/workflow.yaml"}
+	server := &Server{store: store, configDir: "config"}
 	req := httptest.NewRequest(http.MethodGet, "/process/"+process.ID.Hex(), nil)
 	rec := httptest.NewRecorder()
 
@@ -36,7 +36,7 @@ func TestLegacyProcessReadRouteRedirectsToWorkflowScopedURL(t *testing.T) {
 }
 
 func TestLegacyReadRouteReturns404WhenProcessCannotBeResolved(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), configPath: "config/workflow.yaml"}
+	server := &Server{store: NewMemoryStore(), configDir: "config"}
 	req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex(), nil)
 	rec := httptest.NewRecorder()
 
@@ -59,7 +59,7 @@ func TestLegacyBackofficeProcessReadRouteRedirectsToWorkflowScopedURL(t *testing
 	}
 	store.SeedProcess(process)
 
-	server := &Server{store: store, configPath: "config/workflow.yaml"}
+	server := &Server{store: store, configDir: "config"}
 	req := httptest.NewRequest(http.MethodGet, "/backoffice/dep1/process/"+process.ID.Hex(), nil)
 	rec := httptest.NewRecorder()
 

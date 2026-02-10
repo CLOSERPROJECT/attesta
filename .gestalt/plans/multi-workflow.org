@@ -13,11 +13,11 @@ Change: Adopt this contract: (1) `GET /` and `GET /backoffice` become workflow p
 Tests: Add route-level tests asserting redirect and `400` behavior for legacy endpoints.
 Done when: Compatibility policy is codified in handler tests and no unresolved route ambiguity remains.
 
-* TODO [#A] Introduce workflow catalog loading from `server/config`
+* WIP [#A] Introduce workflow catalog loading from `server/config`
 Effort: M
 Goal: Load, validate, and cache multiple workflow YAML files from one directory.
 Notes: Keep dependencies unchanged; use standard library + existing YAML package.
-** TODO [#A] Replace single config path with catalog provider
+** DONE [#A] Replace single config path with catalog provider
 Why: `Server.configPath` + `getConfig()` only supports one file and one cached config.
 Change: In `server/cmd/server/main.go`, replace single-config fields with catalog fields (directory path, per-file modtimes, parsed catalog cache). Add `workflowCatalog()` and `workflowByKey(key)` helpers. Discover files from `config/*.yaml`; derive `workflowKey` from filename (basename without extension); validate uniqueness and non-empty `workflow.name` and `steps`.
 Tests: Update `server/cmd/server/config_test.go` to cover multi-file discovery, invalid file rejection, duplicate key handling, and cache invalidation when one file changes.
