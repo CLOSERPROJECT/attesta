@@ -481,6 +481,9 @@ func (s *MemoryStore) LoadLatestProcessByWorkflow(_ context.Context, workflowKey
 			first = false
 		}
 	}
+	if first {
+		return nil, mongo.ErrNoDocuments
+	}
 	cloned := cloneProcess(latest)
 	return &cloned, nil
 }

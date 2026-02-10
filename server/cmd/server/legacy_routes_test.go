@@ -73,6 +73,18 @@ func TestLegacyBackofficeProcessReadRouteRedirectsToWorkflowScopedURL(t *testing
 	}
 }
 
+func TestLegacyBackofficeProcessReadRouteReturns404WhenUnresolvable(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), configDir: "config"}
+	req := httptest.NewRequest(http.MethodGet, "/backoffice/dep1/process/"+primitive.NewObjectID().Hex(), nil)
+	rec := httptest.NewRecorder()
+
+	server.handleLegacyBackoffice(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestLegacyMutatingRoutesRequireWorkflowContext(t *testing.T) {
 	server := &Server{}
 
@@ -105,6 +117,38 @@ func TestLegacyMutatingRoutesRequireWorkflowContext(t *testing.T) {
 			tc.call(rec, req)
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+			}
+		})
+	}
+}
+
+func TestLegacyMutatingRoutesRejectWrongMethod(t *testing.T) {
+	server := &Server{}
+
+	tests := []struct {
+		name string
+		path string
+		call func(http.ResponseWriter, *http.Request)
+	}{
+		{
+			name: "start process get",
+			path: "/process/start",
+			call: server.handleLegacyStartProcess,
+		},
+		{
+			name: "impersonate get",
+			path: "/impersonate",
+			call: server.handleLegacyImpersonate,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+			tc.call(rec, req)
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 			}
 		})
 	}

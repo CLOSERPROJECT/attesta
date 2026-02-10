@@ -24,5 +24,5 @@ jobs:
       - name: 🥢 Set up go@1.25.5 and task@latest
         uses: jdx/mise-action@v3
       - name: 🧪 Run tests
-        run: task cover
+        run: COVER_MIN=90.0 task cover
         shell: bash

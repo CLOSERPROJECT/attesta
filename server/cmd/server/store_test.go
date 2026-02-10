@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestMemoryStoreUpdateProcessProgressEncodesKey(t *testing.T) {
@@ -199,5 +200,45 @@ func TestMemoryStoreDefaultWorkflowFallbackAndWriteBack(t *testing.T) {
 	}
 	if updated.WorkflowKey != "workflow" {
 		t.Fatalf("expected workflow key write-back, got %q", updated.WorkflowKey)
+	}
+}
+
+func TestMemoryStoreWorkflowQueriesAndMissingProcessErrors(t *testing.T) {
+	store := NewMemoryStore()
+	id := store.SeedProcess(Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress:  map[string]ProcessStep{},
+	})
+
+	if _, ok := store.SnapshotProcess(primitive.NewObjectID()); ok {
+		t.Fatal("expected missing snapshot lookup to return false")
+	}
+
+	if _, err := store.LoadLatestProcessByWorkflow(t.Context(), "secondary"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("LoadLatestProcessByWorkflow mismatch err = %v, want %v", err, mongo.ErrNoDocuments)
+	}
+
+	missingID := primitive.NewObjectID()
+	if err := store.UpdateProcessProgress(t.Context(), missingID, "workflow", "1.1", ProcessStep{State: "done"}); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("UpdateProcessProgress missing err = %v, want %v", err, mongo.ErrNoDocuments)
+	}
+	if err := store.UpdateProcessStatus(t.Context(), missingID, "workflow", "done"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("UpdateProcessStatus missing err = %v, want %v", err, mongo.ErrNoDocuments)
+	}
+
+	if err := store.UpdateProcessStatus(t.Context(), id, "workflow", "done"); err != nil {
+		t.Fatalf("UpdateProcessStatus existing err: %v", err)
+	}
+	if err := store.UpdateProcessProgress(t.Context(), id, "workflow", "1.1", ProcessStep{State: "done"}); err != nil {
+		t.Fatalf("UpdateProcessProgress existing err: %v", err)
+	}
+}
+
+func TestMemoryStoreMissingAttachmentDownload(t *testing.T) {
+	store := NewMemoryStore()
+	if _, err := store.OpenAttachmentDownload(t.Context(), primitive.NewObjectID()); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("OpenAttachmentDownload missing err = %v, want %v", err, mongo.ErrNoDocuments)
 	}
 }

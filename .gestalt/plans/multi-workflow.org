@@ -122,3 +122,18 @@ Why: Reusing the same impersonated users across workflows can hide scope leaks i
 Change: In `server/config/workflow*.yaml`, assign non-overlapping demo users per workflow (unique `userId` values per role per workflow). Validate impersonation flow uses workflow-bound identities and denies cross-workflow cookie reuse.
 Tests: Add/adjust handler tests in `server/cmd/server/impersonate_handler_test.go` and `server/cmd/server/complete_handler_test.go` to assert workflow A user cannot complete workflow B route/process, plus manual smoke checks from `/backoffice` picker.
 Done when: Each workflow is operated by its own user set, impersonation remains functional per workflow, and cross-workflow action attempts are denied consistently.
+
+* DONE [#A] Enforce 90% minimum test coverage gate
+Effort: M
+Goal: Make automated verification fail when total backend coverage is below 90%.
+Notes: This is now a hard quality constraint; keep tooling unchanged and avoid adding dependencies.
+** DONE [#A] Raise coverage threshold in local and CI checks
+Why: The current gate is lower and allows merges that do not meet the agreed confidence level.
+Change: Update coverage threshold in `Taskfile.yml` and any duplicated CI gate so both local `task cover` and CI apply the same 90% minimum consistently.
+Tests: Run coverage check in passing and failing conditions to verify deterministic exit codes around the 90% cutoff.
+Done when: Local and CI pipelines both fail below 90% and pass at 90% or above.
+** DONE [#A] Add targeted tests to close the gap
+Why: Increasing the threshold without expanding coverage will block delivery.
+Change: Add focused tests in low-coverage multi-workflow slices (route dispatch fallbacks, backoffice/home workflow pickers, impersonation workflow scope, workflow/process mismatch guards) using existing `server/cmd/server/*_test.go` patterns.
+Tests: Run `cd server && go test ./...` and `task cover`, confirming total reported coverage is at least 90%.
+Done when: Full backend test suite passes and measured coverage is >=90% without relaxing assertions.
