@@ -268,6 +268,43 @@ func TestHandleCompleteSubstepReturns404ForWorkflowMismatch(t *testing.T) {
 	}
 }
 
+func TestHandleCompleteSubstepDeniesCrossWorkflowCookieReuse(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	id, _ := primitive.ObjectIDFromHex(processID)
+	process, ok := store.SnapshotProcess(id)
+	if !ok {
+		t.Fatalf("process %s not found", processID)
+	}
+	process.WorkflowKey = "secondary"
+	store.SeedProcess(process)
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "secondary",
+		Cfg: testRuntimeConfig(),
+	}))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1|workflow"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, rr.Code)
+	}
+
+	updated, ok := store.SnapshotProcess(id)
+	if !ok {
+		t.Fatalf("process %s not found after completion", processID)
+	}
+	if updated.Progress["1_1"].State != "pending" {
+		t.Fatalf("expected no mutation when workflow cookie mismatches, got state %q", updated.Progress["1_1"].State)
+	}
+}
+
 func TestHandleCompleteSubstepFileUploadStoresMetadataAndDigest(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID := newServerForFileCompleteTests(store)

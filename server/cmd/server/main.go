@@ -1185,6 +1185,10 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	if actor.UserID == "" {
 		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
 	}
+	if actor.WorkflowKey != "" && actor.WorkflowKey != workflowKey {
+		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", nil, actor)
+		return
+	}
 
 	ctx := r.Context()
 	process, err := s.loadProcess(ctx, processID)
