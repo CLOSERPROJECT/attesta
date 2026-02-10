@@ -1,5 +1,5 @@
 {{define "dept_dashboard_body"}}
-<div class="two-col" data-dept-role="{{.CurrentUser.Role}}">
+<div class="two-col" data-dept-role="{{.CurrentUser.Role}}" data-workflow-key="{{.WorkflowKey}}">
   <div id="dept-dashboard">
     {{template "dept_dashboard_content" .}}
   </div>
@@ -17,7 +17,7 @@
         {{range .TodoActions}}
           <li class="process-item">
             <div class="process-head">
-              <a href="/backoffice/{{$.CurrentUser.Role}}/process/{{.ProcessID}}">{{.ProcessID}}</a>
+              <a href="{{$.WorkflowPath}}/backoffice/{{$.CurrentUser.Role}}/process/{{.ProcessID}}">{{.ProcessID}}</a>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
             <p class="muted">{{.SubstepID}} - {{.Title}}</p>
@@ -37,7 +37,7 @@
         {{range .ActiveProcesses}}
           <li class="process-item">
             <div class="process-head">
-              <a href="/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
+              <a href="{{$.WorkflowPath}}/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
             {{if .NextSubstep}}
@@ -57,7 +57,7 @@
         {{range .DoneProcesses}}
           <li class="process-item">
             <div class="process-head">
-              <a href="/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
+              <a href="{{$.WorkflowPath}}/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
           </li>

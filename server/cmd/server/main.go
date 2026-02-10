@@ -52,6 +52,7 @@ type WorkflowSub struct {
 type Process struct {
 	ID            primitive.ObjectID     `bson:"_id,omitempty"`
 	WorkflowDefID primitive.ObjectID     `bson:"workflowDefId"`
+	WorkflowKey   string                 `bson:"workflowKey,omitempty"`
 	CreatedAt     time.Time              `bson:"createdAt"`
 	CreatedBy     string                 `bson:"createdBy"`
 	Status        string                 `bson:"status"`
@@ -66,8 +67,9 @@ type ProcessStep struct {
 }
 
 type Actor struct {
-	UserID string `bson:"userId"`
-	Role   string `bson:"role"`
+	UserID      string `bson:"userId"`
+	Role        string `bson:"role"`
+	WorkflowKey string `bson:"workflowKey,omitempty"`
 }
 
 type Notarization struct {
@@ -252,11 +254,32 @@ type ProcessSummary struct {
 type PageBase struct {
 	Body          string
 	ViteDevServer string
+	WorkflowKey   string
+	WorkflowName  string
+	WorkflowPath  string
 }
 
 type BackofficeLandingView struct {
 	PageBase
 	Users []UserView
+}
+
+type WorkflowOption struct {
+	Key  string
+	Name string
+}
+
+type WorkflowPickerView struct {
+	PageBase
+	Workflows []WorkflowOption
+}
+
+type HomeWorkflowPickerView struct {
+	WorkflowPickerView
+}
+
+type BackofficeWorkflowPickerView struct {
+	WorkflowPickerView
 }
 
 type DepartmentDashboardView struct {
@@ -279,6 +302,7 @@ type DepartmentProcessView struct {
 }
 
 type ActionListView struct {
+	WorkflowKey string
 	ProcessID   string
 	CurrentUser Actor
 	Actions     []ActionView
@@ -310,6 +334,13 @@ type ProcessPageView struct {
 	PageBase
 	ProcessID string
 	Timeline  []TimelineStep
+}
+
+type workflowContextKey struct{}
+
+type workflowContextValue struct {
+	Key string
+	Cfg RuntimeConfig
 }
 
 func main() {
@@ -349,6 +380,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
+	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
 	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
@@ -392,8 +424,48 @@ func logRequests(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) pageBase(body string) PageBase {
-	return PageBase{Body: body, ViteDevServer: s.viteDevServer}
+func workflowPath(key string) string {
+	return "/w/" + strings.TrimSpace(key)
+}
+
+func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
+	base := PageBase{
+		Body:          body,
+		ViteDevServer: s.viteDevServer,
+		WorkflowKey:   strings.TrimSpace(workflowKey),
+		WorkflowName:  strings.TrimSpace(workflowName),
+	}
+	if base.WorkflowKey != "" {
+		base.WorkflowPath = workflowPath(base.WorkflowKey)
+	}
+	return base
+}
+
+func (s *Server) workflowOptions() ([]WorkflowOption, error) {
+	catalog, err := s.workflowCatalog()
+	if err != nil {
+		return nil, err
+	}
+	keys := sortedWorkflowKeys(catalog)
+	options := make([]WorkflowOption, 0, len(keys))
+	for _, key := range keys {
+		cfg := catalog[key]
+		options = append(options, WorkflowOption{Key: key, Name: cfg.Workflow.Name})
+	}
+	return options, nil
+}
+
+func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error) {
+	if value := r.Context().Value(workflowContextKey{}); value != nil {
+		if selected, ok := value.(workflowContextValue); ok {
+			return selected.Key, selected.Cfg, nil
+		}
+	}
+	cfg, err := s.runtimeConfig()
+	if err != nil {
+		return "", RuntimeConfig{}, err
+	}
+	return s.defaultWorkflowKey(), cfg, nil
 }
 
 func normalizeHomeSortKey(value string) string {
@@ -491,18 +563,89 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	cfg, err := s.runtimeConfig()
+	options, err := s.workflowOptions()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	view := HomeWorkflowPickerView{
+		WorkflowPickerView: WorkflowPickerView{
+			PageBase:  s.pageBase("home_picker_body", "", ""),
+			Workflows: options,
+		},
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func cloneRequestWithPath(r *http.Request, path string) *http.Request {
+	clone := r.Clone(r.Context())
+	if clone.URL != nil {
+		copied := *clone.URL
+		copied.Path = path
+		clone.URL = &copied
+	}
+	clone.RequestURI = path
+	return clone
+}
+
+func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/w/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		http.NotFound(w, r)
+		return
+	}
+	workflowKey := strings.TrimSpace(parts[0])
+	cfg, err := s.workflowByKey(workflowKey)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	scopedReq := r.WithContext(context.WithValue(r.Context(), workflowContextKey{}, workflowContextValue{
+		Key: workflowKey,
+		Cfg: cfg,
+	}))
+	if len(parts) == 1 || (len(parts) == 2 && parts[1] == "") {
+		s.handleWorkflowHome(w, scopedReq)
+		return
+	}
+	rest := "/" + strings.Join(parts[1:], "/")
+	switch {
+	case rest == "/process/start":
+		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, rest))
+		return
+	case strings.HasPrefix(rest, "/process/"):
+		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, rest))
+		return
+	case rest == "/backoffice" || strings.HasPrefix(rest, "/backoffice/"):
+		s.handleBackoffice(w, cloneRequestWithPath(scopedReq, rest))
+		return
+	case rest == "/impersonate":
+		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
+		return
+	case rest == "/events":
+		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
+		return
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	ctx := r.Context()
 	latestID := ""
-	if latest, err := s.loadLatestProcess(ctx); err == nil {
+	if latest, err := s.loadLatestProcess(ctx, workflowKey); err == nil {
 		latestID = latest.ID.Hex()
 	}
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
-	processesRaw, err := s.store.ListRecentProcesses(ctx, 0)
+	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
 		processesRaw = nil
 	}
@@ -545,7 +688,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	sortHomeProcessList(history, sortKey)
 
 	view := HomeView{
-		PageBase:        s.pageBase("home_body"),
+		PageBase:        s.pageBase("home_body", workflowKey, cfg.Workflow.Name),
 		LatestProcessID: latestID,
 		Sort:            sortKey,
 		Processes:       processes,
@@ -561,7 +704,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -569,6 +712,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	process := Process{
 		WorkflowDefID: s.workflowDefID,
+		WorkflowKey:   workflowKey,
 		CreatedAt:     s.nowUTC(),
 		CreatedBy:     "demo",
 		Status:        "active",
@@ -585,9 +729,9 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, role := range s.roles(cfg) {
-		s.sse.Broadcast("role:"+role, "role-updated")
+		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
-	http.Redirect(w, r, fmt.Sprintf("/process/%s", id.Hex()), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s/process/%s", workflowPath(workflowKey), id.Hex()), http.StatusSeeOther)
 }
 
 func (s *Server) defaultWorkflowKey() string {
@@ -609,10 +753,25 @@ func (s *Server) defaultWorkflowKey() string {
 }
 
 func (s *Server) resolveLegacyProcessWorkflowKey(ctx context.Context, processID string) (string, bool) {
-	if _, err := s.loadProcess(ctx, processID); err != nil {
+	process, err := s.loadProcess(ctx, processID)
+	if err != nil {
 		return "", false
 	}
+	if key := strings.TrimSpace(process.WorkflowKey); key != "" {
+		return key, true
+	}
 	return s.defaultWorkflowKey(), true
+}
+
+func (s *Server) processBelongsToWorkflow(process *Process, workflowKey string) bool {
+	if process == nil {
+		return false
+	}
+	current := strings.TrimSpace(process.WorkflowKey)
+	if current == workflowKey {
+		return true
+	}
+	return current == "" && workflowKey == s.defaultWorkflowKey()
 }
 
 func legacyProcessPath(path string) (processID string, parts []string, ok bool) {
@@ -720,7 +879,7 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -731,15 +890,19 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
-	timeline := buildTimeline(cfg.Workflow, process, s.roleMetaMap(cfg))
-	view := ProcessPageView{PageBase: s.pageBase("process_body"), ProcessID: process.ID.Hex(), Timeline: timeline}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
+	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -750,20 +913,28 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
-	timeline := buildTimeline(cfg.Workflow, process, s.roleMetaMap(cfg))
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
 	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
 		http.NotFound(w, r)
 		return
 	}
@@ -815,13 +986,17 @@ func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, 
 }
 
 func (s *Server) handleNotarizedJSON(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
 	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
 		http.NotFound(w, r)
 		return
 	}
@@ -830,7 +1005,7 @@ func (s *Server) handleNotarizedJSON(w http.ResponseWriter, r *http.Request, pro
 }
 
 func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, processID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -840,18 +1015,26 @@ func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, proces
 		http.NotFound(w, r)
 		return
 	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.NotFound(w, r)
+		return
+	}
 	export := buildNotarizedExport(cfg.Workflow, process)
 	writeJSON(w, export.Merkle)
 }
 
 func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
 	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
 		http.NotFound(w, r)
 		return
 	}
@@ -900,16 +1083,34 @@ func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/backoffice")
 	path = strings.Trim(path, "/")
+	_, scoped := r.Context().Value(workflowContextKey{}).(workflowContextValue)
 	if path == "" {
+		if !scoped {
+			options, listErr := s.workflowOptions()
+			if listErr != nil {
+				http.Error(w, listErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			view := BackofficeWorkflowPickerView{
+				WorkflowPickerView: WorkflowPickerView{
+					PageBase:  s.pageBase("backoffice_picker_body", "", ""),
+					Workflows: options,
+				},
+			}
+			if err := s.tmpl.ExecuteTemplate(w, "backoffice.html", view); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
 		view := BackofficeLandingView{
-			PageBase: s.pageBase("backoffice_landing_body"),
+			PageBase: s.pageBase("backoffice_landing_body", workflowKey, cfg.Workflow.Name),
 			Users:    s.userViews(cfg),
 		}
 		if err := s.tmpl.ExecuteTemplate(w, "backoffice_landing.html", view); err != nil {
@@ -956,33 +1157,42 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid impersonation", http.StatusBadRequest)
 		return
 	}
-	if cfg, err := s.runtimeConfig(); err == nil && !s.isKnownRole(cfg, role) {
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !s.isKnownRole(cfg, role) {
 		http.Error(w, "unknown role", http.StatusBadRequest)
 		return
 	}
 	cookie := &http.Cookie{
 		Name:  "demo_user",
-		Value: fmt.Sprintf("%s|%s", userID, role),
+		Value: fmt.Sprintf("%s|%s|%s", userID, role, workflowKey),
 		Path:  "/",
 	}
 	http.SetCookie(w, cookie)
-	http.Redirect(w, r, fmt.Sprintf("/backoffice/%s", role), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s/backoffice/%s", workflowPath(workflowKey), role), http.StatusSeeOther)
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r)
+	actor := readActor(r, workflowKey)
 	if actor.UserID == "" {
-		actor = s.actorForRole(cfg, s.defaultRole(cfg))
+		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
 	}
 
 	ctx := r.Context()
 	process, err := s.loadProcess(ctx, processID)
 	if err != nil {
+		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
 		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
 		return
 	}
@@ -998,7 +1208,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
 	}
-	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, substep, step.Order, sequenceOK)
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, sequenceOK)
 	if err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
@@ -1037,7 +1247,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		Data:   payload,
 	}
 
-	if err := s.store.UpdateProcessProgress(ctx, process.ID, substepID, progressUpdate); err != nil {
+	if err := s.store.UpdateProcessProgress(ctx, process.ID, workflowKey, substepID, progressUpdate); err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
 		return
 	}
@@ -1060,18 +1270,18 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 
 	process, _ = s.loadProcess(ctx, processID)
 	if process != nil && isProcessDone(cfg.Workflow, process) {
-		_ = s.store.UpdateProcessStatus(ctx, process.ID, "done")
+		_ = s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done")
 	}
 
-	s.sse.Broadcast(processID, "process-updated")
+	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
 	for _, role := range s.roles(cfg) {
-		s.sse.Broadcast("role:"+role, "role-updated")
+		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
 	if isHTMXRequest(r) {
-		s.renderActionList(w, process, actor, "")
+		s.renderActionList(w, r, process, actor, "")
 		return
 	}
-	s.renderDepartmentProcessPage(w, process, actor, "")
+	s.renderDepartmentProcessPage(w, r, process, actor, "")
 }
 
 var (
@@ -1270,9 +1480,14 @@ func sanitizeAttachmentFilename(filename string) string {
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	queryWorkflow := strings.TrimSpace(r.URL.Query().Get("workflow"))
+	if queryWorkflow != "" && queryWorkflow != workflowKey {
+		http.Error(w, "workflow mismatch", http.StatusBadRequest)
 		return
 	}
 	processID := r.URL.Query().Get("processId")
@@ -1294,9 +1509,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	streamKey := processID
+	streamKey := "process:" + workflowKey + ":" + processID
 	if role != "" {
-		streamKey = "role:" + role
+		streamKey = "role:" + workflowKey + ":" + role
 	}
 	ch := s.sse.Subscribe(streamKey)
 	defer s.sse.Unsubscribe(streamKey, ch)
@@ -1319,26 +1534,26 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r)
+	actor := readActor(r, workflowKey)
 	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role)
+		actor = s.actorForRole(cfg, role, workflowKey)
 		cookie := &http.Cookie{
 			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s", actor.UserID, actor.Role),
+			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
 			Path:  "/",
 		}
 		http.SetCookie(w, cookie)
 	}
 
 	ctx := r.Context()
-	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, role)
+	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
 	view := DepartmentDashboardView{
-		PageBase:        s.pageBase("dept_dashboard_body"),
+		PageBase:        s.pageBase("dept_dashboard_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser:     actor,
 		RoleLabel:       s.roleLabel(cfg, role),
 		TodoActions:     todoActions,
@@ -1351,17 +1566,17 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request, role, processID string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r)
+	actor := readActor(r, workflowKey)
 	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role)
+		actor = s.actorForRole(cfg, role, workflowKey)
 		cookie := &http.Cookie{
 			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s", actor.UserID, actor.Role),
+			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
 			Path:  "/",
 		}
 		http.SetCookie(w, cookie)
@@ -1373,9 +1588,13 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
 	actions := buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
-		PageBase:    s.pageBase("dept_process_body"),
+		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, role),
 		ProcessID:   process.ID.Hex(),
@@ -1387,19 +1606,20 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 }
 
 func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http.Request, role string) {
-	cfg, err := s.runtimeConfig()
+	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r)
+	actor := readActor(r, workflowKey)
 	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role)
+		actor = s.actorForRole(cfg, role, workflowKey)
 	}
 
 	ctx := r.Context()
-	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, role)
+	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
 	view := DepartmentDashboardView{
+		PageBase:        s.pageBase("", workflowKey, cfg.Workflow.Name),
 		CurrentUser:     actor,
 		RoleLabel:       s.roleLabel(cfg, role),
 		TodoActions:     todoActions,
@@ -1424,8 +1644,8 @@ func (s *Server) loadProcess(ctx context.Context, id string) (*Process, error) {
 	return process, nil
 }
 
-func (s *Server) loadLatestProcess(ctx context.Context) (*Process, error) {
-	process, err := s.store.LoadLatestProcess(ctx)
+func (s *Server) loadLatestProcess(ctx context.Context, workflowKey string) (*Process, error) {
+	process, err := s.store.LoadLatestProcessByWorkflow(ctx, workflowKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1610,16 +1830,16 @@ func (s *Server) roles(cfg RuntimeConfig) []string {
 	return roles
 }
 
-func (s *Server) actorForRole(cfg RuntimeConfig, role string) Actor {
+func (s *Server) actorForRole(cfg RuntimeConfig, role, workflowKey string) Actor {
 	for _, user := range cfg.Users {
 		if user.DepartmentID == role {
-			return Actor{UserID: user.ID, Role: role}
+			return Actor{UserID: user.ID, Role: role, WorkflowKey: workflowKey}
 		}
 	}
 	if role == "" {
 		role = "unknown"
 	}
-	return Actor{UserID: role, Role: role}
+	return Actor{UserID: role, Role: role, WorkflowKey: workflowKey}
 }
 
 func (s *Server) defaultRole(cfg RuntimeConfig) string {
@@ -1646,8 +1866,8 @@ func (s *Server) userViews(cfg RuntimeConfig) []UserView {
 	return views
 }
 
-func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, role string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
-	processes, err := s.store.ListRecentProcesses(ctx, 25)
+func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, workflowKey, role string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
+	processes, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 25)
 	if err != nil {
 		return nil, nil, nil
 	}
@@ -1677,16 +1897,25 @@ func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, ro
 	return todo, active, done
 }
 
-func readActor(r *http.Request) Actor {
+func readActor(r *http.Request, routeWorkflowKey string) Actor {
 	cookie, err := r.Cookie("demo_user")
 	if err != nil {
 		return Actor{}
 	}
 	parts := strings.Split(cookie.Value, "|")
-	if len(parts) != 2 {
+	if len(parts) != 2 && len(parts) != 3 {
 		return Actor{}
 	}
-	return Actor{UserID: parts[0], Role: parts[1]}
+	actor := Actor{
+		UserID: strings.TrimSpace(parts[0]),
+		Role:   strings.TrimSpace(parts[1]),
+	}
+	if len(parts) == 3 {
+		actor.WorkflowKey = strings.TrimSpace(parts[2])
+	} else {
+		actor.WorkflowKey = strings.TrimSpace(routeWorkflowKey)
+	}
+	return actor
 }
 
 func sortedSteps(def WorkflowDef) []WorkflowStep {
@@ -1701,7 +1930,7 @@ func sortedSubsteps(step WorkflowStep) []WorkflowSub {
 	return subs
 }
 
-func buildTimeline(def WorkflowDef, process *Process, roleMeta map[string]RoleMeta) []TimelineStep {
+func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta) []TimelineStep {
 	steps := sortedSteps(def)
 	availableMap := computeAvailability(def, process)
 
@@ -1732,7 +1961,7 @@ func buildTimeline(def WorkflowDef, process *Process, roleMeta map[string]RoleMe
 						if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
 							entry.FileName = attachment.Filename
 							entry.FileSHA256 = attachment.SHA256
-							entry.FileURL = fmt.Sprintf("/process/%s/substep/%s/file", process.ID.Hex(), sub.SubstepID)
+							entry.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
 						}
 					} else {
 						if value, ok := progress.Data[sub.InputKey]; ok {
@@ -2235,29 +2464,37 @@ func (s *Server) nowUTC() time.Time {
 
 func (s *Server) renderActionError(w http.ResponseWriter, status int, message string, process *Process, actor Actor) {
 	w.WriteHeader(status)
-	s.renderActionList(w, process, actor, message)
+	s.renderActionList(w, nil, process, actor, message)
 }
 
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {
 	w.WriteHeader(status)
 	if isHTMXRequest(r) {
-		s.renderActionList(w, process, actor, message)
+		s.renderActionList(w, r, process, actor, message)
 		return
 	}
-	s.renderDepartmentProcessPage(w, process, actor, message)
+	s.renderDepartmentProcessPage(w, r, process, actor, message)
 }
 
-func (s *Server) renderActionList(w http.ResponseWriter, process *Process, actor Actor, message string) {
-	cfg, err := s.runtimeConfig()
+func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	workflowKey := s.defaultWorkflowKey()
+	cfg := RuntimeConfig{}
+	var err error
+	if r != nil {
+		workflowKey, cfg, err = s.selectedWorkflow(r)
+	} else {
+		cfg, err = s.runtimeConfig()
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	var timeline []TimelineStep
 	if process != nil {
-		timeline = buildTimeline(cfg.Workflow, process, s.roleMetaMap(cfg))
+		timeline = buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	}
 	view := ActionListView{
+		WorkflowKey: workflowKey,
 		ProcessID:   processIDString(process),
 		CurrentUser: actor,
 		Actions:     buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg)),
@@ -2269,8 +2506,15 @@ func (s *Server) renderActionList(w http.ResponseWriter, process *Process, actor
 	}
 }
 
-func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, process *Process, actor Actor, message string) {
-	cfg, err := s.runtimeConfig()
+func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	workflowKey := s.defaultWorkflowKey()
+	cfg := RuntimeConfig{}
+	var err error
+	if r != nil {
+		workflowKey, cfg, err = s.selectedWorkflow(r)
+	} else {
+		cfg, err = s.runtimeConfig()
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2280,7 +2524,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, process *Pro
 		processID = process.ID.Hex()
 	}
 	view := DepartmentProcessView{
-		PageBase:    s.pageBase("dept_process_body"),
+		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, actor.Role),
 		ProcessID:   processID,

@@ -88,7 +88,7 @@ func TestMongoStoreLoadProcessByID(t *testing.T) {
 	}
 }
 
-func TestMongoStoreLoadLatestProcess(t *testing.T) {
+func TestMongoStoreLoadLatestProcessByWorkflow(t *testing.T) {
 	want := Process{ID: primitive.NewObjectID(), CreatedAt: time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC)}
 	collection := &fakeMongoCollection{
 		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
@@ -101,12 +101,18 @@ func TestMongoStoreLoadLatestProcess(t *testing.T) {
 	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
 	store := &MongoStore{dbPort: db}
 
-	got, err := store.LoadLatestProcess(t.Context())
+	got, err := store.LoadLatestProcessByWorkflow(t.Context(), "wf-a")
 	if err != nil {
-		t.Fatalf("LoadLatestProcess returned error: %v", err)
+		t.Fatalf("LoadLatestProcessByWorkflow returned error: %v", err)
 	}
 	if got.ID != want.ID {
-		t.Fatalf("LoadLatestProcess id = %s, want %s", got.ID.Hex(), want.ID.Hex())
+		t.Fatalf("LoadLatestProcessByWorkflow id = %s, want %s", got.ID.Hex(), want.ID.Hex())
+	}
+	if len(collection.findOneFilters) != 1 {
+		t.Fatalf("expected one findOne filter, got %d", len(collection.findOneFilters))
+	}
+	if !reflect.DeepEqual(collection.findOneFilters[0], bson.M{"workflowKey": "wf-a"}) {
+		t.Fatalf("findOne filter = %#v, want workflow filter", collection.findOneFilters[0])
 	}
 	if len(collection.findOneOptionsCalls) != 1 || len(collection.findOneOptionsCalls[0]) != 1 {
 		t.Fatalf("expected one findOne options call, got %#v", collection.findOneOptionsCalls)
@@ -124,12 +130,12 @@ func TestMongoStoreLoadLatestProcess(t *testing.T) {
 	collection.findOneFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
 		return fakeSingleResult{err: loadErr}
 	}
-	if _, err := store.LoadLatestProcess(t.Context()); !errors.Is(err, loadErr) {
-		t.Fatalf("LoadLatestProcess error = %v, want %v", err, loadErr)
+	if _, err := store.LoadLatestProcessByWorkflow(t.Context(), "wf-a"); !errors.Is(err, loadErr) {
+		t.Fatalf("LoadLatestProcessByWorkflow error = %v, want %v", err, loadErr)
 	}
 }
 
-func TestMongoStoreListRecentProcesses(t *testing.T) {
+func TestMongoStoreListRecentProcessesByWorkflow(t *testing.T) {
 	cursor := &fakeCursor{
 		docs: []Process{
 			{ID: primitive.NewObjectID(), Status: "a"},
@@ -146,9 +152,9 @@ func TestMongoStoreListRecentProcesses(t *testing.T) {
 	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
 	store := &MongoStore{dbPort: db}
 
-	processes, err := store.ListRecentProcesses(t.Context(), 25)
+	processes, err := store.ListRecentProcessesByWorkflow(t.Context(), "wf-a", 25)
 	if err != nil {
-		t.Fatalf("ListRecentProcesses returned error: %v", err)
+		t.Fatalf("ListRecentProcessesByWorkflow returned error: %v", err)
 	}
 	if len(processes) != 2 {
 		t.Fatalf("expected decode failure to be skipped, got %d entries", len(processes))
@@ -156,13 +162,37 @@ func TestMongoStoreListRecentProcesses(t *testing.T) {
 	if !cursor.closed {
 		t.Fatal("expected cursor Close to be called")
 	}
+	if len(collection.findFilters) != 1 {
+		t.Fatalf("expected one find filter, got %d", len(collection.findFilters))
+	}
+	if !reflect.DeepEqual(collection.findFilters[0], bson.M{"workflowKey": "wf-a"}) {
+		t.Fatalf("find filter = %#v, want workflow filter", collection.findFilters[0])
+	}
 
 	findErr := errors.New("find failed")
 	collection.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
 		return nil, findErr
 	}
-	if _, err := store.ListRecentProcesses(t.Context(), 1); !errors.Is(err, findErr) {
-		t.Fatalf("ListRecentProcesses error = %v, want %v", err, findErr)
+	if _, err := store.ListRecentProcessesByWorkflow(t.Context(), "wf-a", 1); !errors.Is(err, findErr) {
+		t.Fatalf("ListRecentProcessesByWorkflow error = %v, want %v", err, findErr)
+	}
+}
+
+func TestMongoStoreDefaultWorkflowFallbackFilter(t *testing.T) {
+	collection := &fakeMongoCollection{
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeCursor{}, nil
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
+	store := &MongoStore{dbPort: db}
+
+	if _, err := store.ListRecentProcessesByWorkflow(t.Context(), "workflow", 10); err != nil {
+		t.Fatalf("ListRecentProcessesByWorkflow returned error: %v", err)
+	}
+	want := bson.M{"$or": []bson.M{{"workflowKey": "workflow"}, {"workflowKey": bson.M{"$exists": false}}}}
+	if len(collection.findFilters) != 1 || !reflect.DeepEqual(collection.findFilters[0], want) {
+		t.Fatalf("find filter = %#v, want %#v", collection.findFilters, want)
 	}
 }
 
@@ -177,7 +207,7 @@ func TestMongoStoreUpdateProcessProgress(t *testing.T) {
 	id := primitive.NewObjectID()
 	progress := ProcessStep{State: "done"}
 
-	if err := store.UpdateProcessProgress(t.Context(), id, "1.1", progress); err != nil {
+	if err := store.UpdateProcessProgress(t.Context(), id, "wf-a", "1.1", progress); err != nil {
 		t.Fatalf("UpdateProcessProgress returned error: %v", err)
 	}
 	if len(collection.findOneAndUpdFilter) != 1 || len(collection.findOneAndUpdUpdate) != 1 {
@@ -185,6 +215,7 @@ func TestMongoStoreUpdateProcessProgress(t *testing.T) {
 	}
 	expectedUpdate := bson.M{
 		"$set": bson.M{
+			"workflowKey":  "wf-a",
 			"progress.1_1": progress,
 		},
 	}
@@ -196,7 +227,7 @@ func TestMongoStoreUpdateProcessProgress(t *testing.T) {
 	collection.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
 		return fakeSingleResult{err: updateErr}
 	}
-	if err := store.UpdateProcessProgress(t.Context(), id, "1.1", progress); !errors.Is(err, updateErr) {
+	if err := store.UpdateProcessProgress(t.Context(), id, "wf-a", "1.1", progress); !errors.Is(err, updateErr) {
 		t.Fatalf("UpdateProcessProgress error = %v, want %v", err, updateErr)
 	}
 }
@@ -206,20 +237,20 @@ func TestMongoStoreUpdateProcessStatusAndInsertNotarization(t *testing.T) {
 	notarizations := &fakeMongoCollection{}
 	db := &fakeMongoDatabase{
 		collections: map[string]*fakeMongoCollection{
-			"processes":    processes,
+			"processes":     processes,
 			"notarizations": notarizations,
 		},
 	}
 	store := &MongoStore{dbPort: db}
 	id := primitive.NewObjectID()
 
-	if err := store.UpdateProcessStatus(t.Context(), id, "done"); err != nil {
+	if err := store.UpdateProcessStatus(t.Context(), id, "wf-a", "done"); err != nil {
 		t.Fatalf("UpdateProcessStatus returned error: %v", err)
 	}
 	if len(processes.updateOneFilters) != 1 || len(processes.updateOneUpdates) != 1 {
 		t.Fatalf("expected one UpdateOne call, got filters=%d updates=%d", len(processes.updateOneFilters), len(processes.updateOneUpdates))
 	}
-	expectedStatusUpdate := bson.M{"$set": bson.M{"status": "done"}}
+	expectedStatusUpdate := bson.M{"$set": bson.M{"status": "done", "workflowKey": "wf-a"}}
 	if !reflect.DeepEqual(processes.updateOneUpdates[0], expectedStatusUpdate) {
 		t.Fatalf("status update = %#v, want %#v", processes.updateOneUpdates[0], expectedStatusUpdate)
 	}
@@ -236,7 +267,7 @@ func TestMongoStoreUpdateProcessStatusAndInsertNotarization(t *testing.T) {
 	processes.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
 		return nil, updateErr
 	}
-	if err := store.UpdateProcessStatus(t.Context(), id, "done"); !errors.Is(err, updateErr) {
+	if err := store.UpdateProcessStatus(t.Context(), id, "wf-a", "done"); !errors.Is(err, updateErr) {
 		t.Fatalf("UpdateProcessStatus error = %v, want %v", err, updateErr)
 	}
 

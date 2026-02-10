@@ -105,3 +105,43 @@ func TestHandleProcessRoutesReturns404ForInvalidPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleWorkflowRoutesDispatchAndUnknownWorkflow(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
+
+	store := NewMemoryStore()
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	}
+	store.SeedProcess(process)
+
+	server := &Server{
+		store:      store,
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		now:        func() time.Time { return time.Date(2026, 2, 4, 11, 0, 0, 0, time.UTC) },
+		configDir:  tempDir,
+	}
+
+	okReq := httptest.NewRequest(http.MethodGet, "/w/workflow/process/"+process.ID.Hex(), nil)
+	okRec := httptest.NewRecorder()
+	server.handleWorkflowRoutes(okRec, okReq)
+	if okRec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", okRec.Code, http.StatusOK)
+	}
+
+	missingReq := httptest.NewRequest(http.MethodGet, "/w/missing/process/"+process.ID.Hex(), nil)
+	missingRec := httptest.NewRecorder()
+	server.handleWorkflowRoutes(missingRec, missingReq)
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", missingRec.Code, http.StatusNotFound)
+	}
+}

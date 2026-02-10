@@ -1,5 +1,5 @@
 {{define "process_body"}}
-<div class="two-col" data-process-id="{{.ProcessID}}">
+<div class="two-col" data-process-id="{{.ProcessID}}" data-workflow-key="{{.WorkflowKey}}">
   <section class="panel">
     <h2>Home / Process timeline</h2>
     <div id="timeline">
@@ -10,9 +10,9 @@
     <h2>Downloads</h2>
     <p class="muted">Export attachments and notarized data for this process.</p>
     <div class="stack" style="gap: 10px;">
-      <a class="primary" href="/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
-      <a class="secondary" href="/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
-      <a class="secondary" href="/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
+      <a class="primary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
+      <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
+      <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
     </div>
   </section>
 </div>

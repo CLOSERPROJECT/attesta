@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,9 +18,10 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 
 	activeID := primitive.NewObjectID()
 	active := Process{
-		ID:        activeID,
-		CreatedAt: now.Add(-2 * time.Hour),
-		Status:    "",
+		ID:          activeID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		Status:      "",
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-110 * time.Minute))},
 			"1_2": {State: "done", DoneAt: ptrTime(now.Add(-100 * time.Minute)), Data: map[string]interface{}{"note": "alpha"}},
@@ -33,9 +35,10 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 
 	doneID := primitive.NewObjectID()
 	done := Process{
-		ID:        doneID,
-		CreatedAt: now.Add(-1 * time.Hour),
-		Status:    "active",
+		ID:          doneID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Status:      "active",
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-70 * time.Minute))},
 			"1_2": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
@@ -58,9 +61,13 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
 	rec := httptest.NewRecorder()
-	server.handleHome(rec, req)
+	server.handleWorkflowHome(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -81,6 +88,32 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	}
 	if !strings.Contains(body, "HISTORY "+doneID.Hex()+":done") {
 		t.Fatalf("expected history to include only done process, got %q", body)
+	}
+}
+
+func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
+	writeWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow", "number")
+
+	server := &Server{
+		tmpl:      homePickerTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "PICK 2") {
+		t.Fatalf("expected picker marker, got %q", body)
+	}
+	if !strings.Contains(body, "workflow:Main workflow") || !strings.Contains(body, "secondary:Secondary workflow") {
+		t.Fatalf("expected workflow options in picker, got %q", body)
 	}
 }
 
@@ -112,6 +145,14 @@ PROC {{len .Processes}} HIST {{len .History}} SORT {{.Sort}}
 PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
 HISTORY {{range .History}}{{.ID}}:{{.Status}}|{{end}}
 {{end}}
+{{define "home.html"}}{{template "layout.html" .}}{{end}}
+`))
+}
+
+func homePickerTemplates() *template.Template {
+	return template.Must(template.New("test").Parse(`
+{{define "layout.html"}}{{template "home_picker_body" .}}{{end}}
+{{define "home_picker_body"}}PICK {{len .Workflows}} {{range .Workflows}}{{.Key}}:{{.Name}}|{{end}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))
 }

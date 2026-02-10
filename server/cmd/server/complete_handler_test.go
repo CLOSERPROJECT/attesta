@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"mime/multipart"
@@ -236,6 +237,34 @@ func TestHandleCompleteSubstepFileTooLargeReturns413(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "File too large.") {
 		t.Fatalf("expected size error message, got %q", rr.Body.String())
+	}
+}
+
+func TestHandleCompleteSubstepReturns404ForWorkflowMismatch(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	id, _ := primitive.ObjectIDFromHex(processID)
+	process, ok := store.SnapshotProcess(id)
+	if !ok {
+		t.Fatalf("process %s not found", processID)
+	}
+	process.WorkflowKey = "other"
+	store.SeedProcess(process)
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
 	}
 }
 

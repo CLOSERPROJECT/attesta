@@ -144,17 +144,17 @@ func TestRoleMetaMapAndActorForRole(t *testing.T) {
 		t.Fatalf("dep2 defaults mismatch: %#v", meta["dep2"])
 	}
 
-	known := server.actorForRole(cfg, "dep1")
+	known := server.actorForRole(cfg, "dep1", "workflow")
 	if known.UserID != "u1" || known.Role != "dep1" {
 		t.Fatalf("known actor mismatch: %#v", known)
 	}
 
-	unknown := server.actorForRole(cfg, "depX")
+	unknown := server.actorForRole(cfg, "depX", "workflow")
 	if unknown.UserID != "depX" || unknown.Role != "depX" {
 		t.Fatalf("unknown actor mismatch: %#v", unknown)
 	}
 
-	empty := server.actorForRole(cfg, "")
+	empty := server.actorForRole(cfg, "", "workflow")
 	if empty.UserID != "unknown" || empty.Role != "unknown" {
 		t.Fatalf("empty role fallback mismatch: %#v", empty)
 	}

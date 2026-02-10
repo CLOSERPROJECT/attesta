@@ -23,12 +23,12 @@ func TestHandleImpersonateSuccess(t *testing.T) {
 	if rr.Code != http.StatusSeeOther {
 		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, rr.Code)
 	}
-	if got := rr.Header().Get("Location"); got != "/backoffice/dep1" {
-		t.Fatalf("expected redirect to /backoffice/dep1, got %q", got)
+	if got := rr.Header().Get("Location"); got != "/w/workflow/backoffice/dep1" {
+		t.Fatalf("expected redirect to /w/workflow/backoffice/dep1, got %q", got)
 	}
 	cookies := rr.Result().Cookies()
-	if len(cookies) == 0 || cookies[0].Name != "demo_user" || cookies[0].Value != "u1|dep1" {
-		t.Fatalf("expected demo_user cookie u1|dep1, got %#v", cookies)
+	if len(cookies) == 0 || cookies[0].Name != "demo_user" || cookies[0].Value != "u1|dep1|workflow" {
+		t.Fatalf("expected demo_user cookie u1|dep1|workflow, got %#v", cookies)
 	}
 }
 

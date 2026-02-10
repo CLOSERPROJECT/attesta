@@ -17,7 +17,7 @@ func TestMemoryStoreUpdateProcessProgressEncodesKey(t *testing.T) {
 	store := NewMemoryStore()
 	id := store.SeedProcess(Process{Progress: map[string]ProcessStep{}})
 
-	if err := store.UpdateProcessProgress(t.Context(), id, "1.1", ProcessStep{State: "done"}); err != nil {
+	if err := store.UpdateProcessProgress(t.Context(), id, "workflow", "1.1", ProcessStep{State: "done"}); err != nil {
 		t.Fatalf("update progress: %v", err)
 	}
 
@@ -51,11 +51,11 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, rr.Code)
 	}
 	location := rr.Header().Get("Location")
-	if !strings.HasPrefix(location, "/process/") {
-		t.Fatalf("expected redirect location /process/:id, got %q", location)
+	if !strings.HasPrefix(location, "/w/workflow/process/") {
+		t.Fatalf("expected redirect location /w/workflow/process/:id, got %q", location)
 	}
 
-	processes, err := store.ListRecentProcesses(t.Context(), 10)
+	processes, err := store.ListRecentProcessesByWorkflow(t.Context(), "workflow", 10)
 	if err != nil {
 		t.Fatalf("list processes: %v", err)
 	}
@@ -67,6 +67,9 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 	}
 	if !processes[0].CreatedAt.Equal(fixedNow) {
 		t.Fatalf("expected deterministic createdAt %s, got %s", fixedNow, processes[0].CreatedAt)
+	}
+	if processes[0].WorkflowKey != "workflow" {
+		t.Fatalf("workflow key = %q, want workflow", processes[0].WorkflowKey)
 	}
 	if _, ok := processes[0].Progress["1_1"]; !ok {
 		t.Fatalf("expected encoded key 1_1 in progress, got %#v", processes[0].Progress)
@@ -130,5 +133,71 @@ func TestMemoryStoreAttachmentTooLarge(t *testing.T) {
 	}, bytes.NewReader([]byte("toolarge")))
 	if !errors.Is(err, ErrAttachmentTooLarge) {
 		t.Fatalf("expected ErrAttachmentTooLarge, got %v", err)
+	}
+}
+
+func TestMemoryStoreListRecentProcessesByWorkflowIsolation(t *testing.T) {
+	store := NewMemoryStore()
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "wf-a",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
+	})
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "wf-b",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
+	})
+
+	a, err := store.ListRecentProcessesByWorkflow(t.Context(), "wf-a", 10)
+	if err != nil {
+		t.Fatalf("list workflow wf-a: %v", err)
+	}
+	if len(a) != 1 || a[0].WorkflowKey != "wf-a" {
+		t.Fatalf("unexpected wf-a results: %#v", a)
+	}
+
+	b, err := store.ListRecentProcessesByWorkflow(t.Context(), "wf-b", 10)
+	if err != nil {
+		t.Fatalf("list workflow wf-b: %v", err)
+	}
+	if len(b) != 1 || b[0].WorkflowKey != "wf-b" {
+		t.Fatalf("unexpected wf-b results: %#v", b)
+	}
+}
+
+func TestMemoryStoreDefaultWorkflowFallbackAndWriteBack(t *testing.T) {
+	store := NewMemoryStore()
+	id := store.SeedProcess(Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+
+	processes, err := store.ListRecentProcessesByWorkflow(t.Context(), "workflow", 10)
+	if err != nil {
+		t.Fatalf("list fallback: %v", err)
+	}
+	if len(processes) != 1 {
+		t.Fatalf("expected fallback process visibility, got %d", len(processes))
+	}
+	if processes[0].WorkflowKey != "" {
+		t.Fatalf("expected missing workflow key before write-back, got %q", processes[0].WorkflowKey)
+	}
+
+	if err := store.UpdateProcessProgress(t.Context(), id, "workflow", "1.1", ProcessStep{State: "done"}); err != nil {
+		t.Fatalf("write-back update: %v", err)
+	}
+	updated, ok := store.SnapshotProcess(id)
+	if !ok {
+		t.Fatal("expected updated process")
+	}
+	if updated.WorkflowKey != "workflow" {
+		t.Fatalf("expected workflow key write-back, got %q", updated.WorkflowKey)
 	}
 }

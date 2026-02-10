@@ -15,8 +15,8 @@
           <form
             class="action-form"
             method="post"
-            action="/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
-            hx-post="/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+            action="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+            hx-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
             hx-target="#action-area"
             hx-swap="innerHTML"
             {{if eq .InputType "file"}}enctype="multipart/form-data" hx-encoding="multipart/form-data"{{end}}

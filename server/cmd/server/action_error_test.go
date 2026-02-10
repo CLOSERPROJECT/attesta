@@ -111,13 +111,13 @@ func TestRenderActionViewsReturn500WhenConfigFails(t *testing.T) {
 	actor := Actor{UserID: "u1", Role: "dep1"}
 
 	listRec := httptest.NewRecorder()
-	server.renderActionList(listRec, process, actor, "error")
+	server.renderActionList(listRec, nil, process, actor, "error")
 	if listRec.Code != http.StatusInternalServerError {
 		t.Fatalf("renderActionList status = %d, want %d", listRec.Code, http.StatusInternalServerError)
 	}
 
 	pageRec := httptest.NewRecorder()
-	server.renderDepartmentProcessPage(pageRec, process, actor, "error")
+	server.renderDepartmentProcessPage(pageRec, nil, process, actor, "error")
 	if pageRec.Code != http.StatusInternalServerError {
 		t.Fatalf("renderDepartmentProcessPage status = %d, want %d", pageRec.Code, http.StatusInternalServerError)
 	}

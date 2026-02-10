@@ -53,18 +53,23 @@ func testRuntimeConfig() RuntimeConfig {
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}
-  {{if eq .Body "home_body"}}{{template "home_body" .}}
+  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+  {{else if eq .Body "home_body"}}{{template "home_body" .}}
   {{else if eq .Body "process_body"}}{{template "process_body" .}}
+  {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
   {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
+{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}|{{end}}{{end}}
 {{define "home_body"}}HOME {{.LatestProcessID}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}}{{template "timeline.html" .Timeline}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "timeline.html"}}TIMELINE {{range .}}{{.StepID}} {{end}}{{end}}
+{{define "backoffice_picker_body"}}BACKOFFICE_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}|{{end}}{{end}}
 {{define "backoffice_landing_body"}}BACKOFFICE{{end}}
+{{define "backoffice.html"}}{{template "layout.html" .}}{{end}}
 {{define "backoffice_landing.html"}}{{template "layout.html" .}}{{end}}
 {{define "dept_dashboard_content"}}DASHBOARD {{.CurrentUser.Role}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dept_dashboard_body"}}{{template "dept_dashboard_content" .}}{{end}}

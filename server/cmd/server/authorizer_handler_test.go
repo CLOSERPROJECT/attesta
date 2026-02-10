@@ -15,7 +15,7 @@ import (
 func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, fixedNow := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(Actor, string, WorkflowSub, int, bool) (bool, error) {
+		decide: func(Actor, string, string, WorkflowSub, int, bool) (bool, error) {
 			return true, nil
 		},
 	})
@@ -56,7 +56,7 @@ func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(Actor, string, WorkflowSub, int, bool) (bool, error) {
+		decide: func(Actor, string, string, WorkflowSub, int, bool) (bool, error) {
 			return false, nil
 		},
 	})
@@ -77,7 +77,7 @@ func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(Actor, string, WorkflowSub, int, bool) (bool, error) {
+		decide: func(Actor, string, string, WorkflowSub, int, bool) (bool, error) {
 			return false, errors.New("cerbos down")
 		},
 	})
@@ -92,6 +92,27 @@ func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 
 	if rr.Code != http.StatusBadGateway {
 		t.Fatalf("expected status %d, got %d", http.StatusBadGateway, rr.Code)
+	}
+}
+
+func TestHandleCompleteSubstepAuthorizerDeniesWorkflowCookieMismatch(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
+		decide: func(actor Actor, _ string, workflowKey string, _ WorkflowSub, _ int, _ bool) (bool, error) {
+			return actor.WorkflowKey == workflowKey, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1|other"})
+
+	rr := httptest.NewRecorder()
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, rr.Code)
 	}
 }
 
@@ -129,12 +150,12 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 }
 
 type fakeAuthorizer struct {
-	decide func(actor Actor, processID string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error)
+	decide func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error)
 }
 
-func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
+func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
 	if f.decide == nil {
 		return true, nil
 	}
-	return f.decide(actor, processID, sub, stepOrder, sequenceOK)
+	return f.decide(actor, processID, workflowKey, sub, stepOrder, sequenceOK)
 }

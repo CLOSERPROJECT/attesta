@@ -1,14 +1,31 @@
+{{define "home_picker_body"}}
+<section class="panel landing">
+  <h1>Choose a workflow</h1>
+  <p class="muted">Select a workflow to start or continue process tracking.</p>
+  {{if .Workflows}}
+    <div class="impersonate">
+      {{range .Workflows}}
+        <a class="dept-button" href="/w/{{.Key}}/">{{.Name}}</a>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="muted">No workflows configured.</p>
+  {{end}}
+</section>
+{{end}}
+
 {{define "home_body"}}
 <div class="stack">
   <section class="hero">
     <div>
       <h1>Start a process</h1>
+      <p class="muted">Workflow: <strong>{{.WorkflowName}}</strong></p>
       <p class="muted">Create a new process instance and follow the sequential steps.</p>
-      <form method="post" action="/process/start">
+      <form method="post" action="{{.WorkflowPath}}/process/start">
         <button class="primary" type="submit">Start a process</button>
       </form>
       {{if .LatestProcessID}}
-        <p class="muted">Latest process: <a href="/process/{{.LatestProcessID}}">{{.LatestProcessID}}</a></p>
+        <p class="muted">Latest process: <a href="{{.WorkflowPath}}/process/{{.LatestProcessID}}">{{.LatestProcessID}}</a></p>
       {{end}}
     </div>
   </section>
@@ -16,7 +33,7 @@
   <section class="panel">
     <div class="process-toolbar">
       <h2 style="margin: 0;">All processes</h2>
-      <form method="get" action="/" class="process-sort">
+      <form method="get" action="{{.WorkflowPath}}/" class="process-sort">
         <label class="muted" for="sort" style="font-size: 13px;">Sort</label>
         <select id="sort" name="sort" onchange="this.form.submit()">
           <option value="time_desc" {{if eq .Sort "time_desc"}}selected{{end}}>Newest</option>
@@ -33,7 +50,7 @@
         {{range .Processes}}
           <li class="process-item">
             <div class="process-head">
-              <a href="/process/{{.ID}}">{{.ID}}</a>
+              <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
             <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
@@ -64,7 +81,7 @@
         {{range .History}}
           <li class="process-item">
             <div class="process-head">
-              <a href="/process/{{.ID}}">{{.ID}}</a>
+              <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
             <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">

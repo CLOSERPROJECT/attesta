@@ -52,8 +52,8 @@ func TestHandleEventsProcessStream(t *testing.T) {
 		close(done)
 	}()
 
-	waitForSSESubscriber(t, server.sse, processID)
-	server.sse.Broadcast(processID, "process-updated")
+	waitForSSESubscriber(t, server.sse, "process:workflow:"+processID)
+	server.sse.Broadcast("process:workflow:"+processID, "process-updated")
 	cancel()
 	waitForHandlerDone(t, done)
 
@@ -84,8 +84,8 @@ func TestHandleEventsRoleStream(t *testing.T) {
 		close(done)
 	}()
 
-	waitForSSESubscriber(t, server.sse, "role:dep1")
-	server.sse.Broadcast("role:dep1", "role-updated")
+	waitForSSESubscriber(t, server.sse, "role:workflow:dep1")
+	server.sse.Broadcast("role:workflow:dep1", "role-updated")
 	cancel()
 	waitForHandlerDone(t, done)
 
