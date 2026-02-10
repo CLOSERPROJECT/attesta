@@ -1,0 +1,109 @@
+#+TITLE: Multi-workflow Selection and Isolation Plan
+#+SUBTITLE: Support multiple YAML workflows with scoped UI, process data, and Cerbos authorization
+#+DATE: 2026-02-10
+#+KEYWORDS: attesta, workflow-catalog, routing, cerbos, isolation, sse
+
+* DONE [#A] Lock scope and compatibility contract
+Effort: S
+Goal: Freeze functional scope and avoid accidental breaking behavior while introducing workflow selection.
+Notes: Decision resolved in favor of minimal change with explicit workflow-scoped routes and compatibility redirects for old deep links.
+** DONE [#A] Define final behavior and non-breaking defaults
+Why: The app currently assumes one workflow in memory and global routes; multi-workflow needs deterministic selection and URL scoping.
+Change: Adopt this contract: (1) `GET /` and `GET /backoffice` become workflow pickers; (2) selected workflow redirects to workflow-scoped pages; (3) legacy read routes (`/process/:id`, `/backoffice/:role/process/:id`) issue `303` redirects to the matching workflow-scoped route when resolvable; (4) legacy mutating routes without workflow context return `400`.
+Tests: Add route-level tests asserting redirect and `400` behavior for legacy endpoints.
+Done when: Compatibility policy is codified in handler tests and no unresolved route ambiguity remains.
+
+* TODO [#A] Introduce workflow catalog loading from `server/config`
+Effort: M
+Goal: Load, validate, and cache multiple workflow YAML files from one directory.
+Notes: Keep dependencies unchanged; use standard library + existing YAML package.
+** TODO [#A] Replace single config path with catalog provider
+Why: `Server.configPath` + `getConfig()` only supports one file and one cached config.
+Change: In `server/cmd/server/main.go`, replace single-config fields with catalog fields (directory path, per-file modtimes, parsed catalog cache). Add `workflowCatalog()` and `workflowByKey(key)` helpers. Discover files from `config/*.yaml`; derive `workflowKey` from filename (basename without extension); validate uniqueness and non-empty `workflow.name` and `steps`.
+Tests: Update `server/cmd/server/config_test.go` to cover multi-file discovery, invalid file rejection, duplicate key handling, and cache invalidation when one file changes.
+Done when: Server can list >1 workflow config from `server/config` and return one by key with stable caching.
+** TODO [#B] Define catalog DTOs for templates and handlers
+Why: Home/backoffice pickers need a shared, explicit view model.
+Change: Add lightweight DTOs in `server/cmd/server/main.go` (or nearby): `WorkflowOption{Key, Name}`, `WorkflowPickerView{PageBase, Workflows}`; keep REPR style by creating distinct view structs per page (`HomeWorkflowPickerView`, `BackofficeWorkflowPickerView`) even if same fields initially.
+Tests: Handler tests assert picker pages render workflow name + link target per key.
+Done when: Picker handlers use typed DTOs and templates compile without reflection-based assumptions.
+
+* TODO [#A] Make routes workflow-scoped (home and backoffice)
+Effort: L
+Goal: Ensure every business page and action executes under a selected workflow context.
+Notes: Prefer explicit path scope over hidden cookie scope to reduce cross-flow mistakes.
+** TODO [#A] Add workflow-scoped route tree
+Why: Current routes (`/process/*`, `/backoffice/*`) cannot disambiguate workflow context.
+Change: In `server/cmd/server/main.go`, add route parser for `/w/{workflowKey}/...` and dispatch to existing handlers with `workflowKey` parameter. Target endpoints: `/w/{key}/`, `/w/{key}/process/start`, `/w/{key}/process/{id}`, `/w/{key}/process/{id}/timeline`, `/w/{key}/process/{id}/substep/{substepId}/complete`, `/w/{key}/process/{id}/substep/{substepId}/file`, `/w/{key}/backoffice`, `/w/{key}/backoffice/{role}`, `/w/{key}/backoffice/{role}/partial`, `/w/{key}/backoffice/{role}/process/{id}`, `/w/{key}/impersonate`, `/w/{key}/events`.
+Tests: Add/update `server/cmd/server/process_routes_test.go`, `server/cmd/server/backoffice_handler_test.go`, and `server/cmd/server/home_handler_test.go` for scoped routing and not-found behavior on unknown workflow key.
+Done when: All UI links/actions resolve to `/w/{key}/...` and unknown keys consistently return `404`.
+** TODO [#A] Render workflow pickers for home and backoffice entrypoints
+Why: User requirement asks for first page listing all workflows for both user and backoffice surfaces.
+Change: Update `server/templates/home.html` and `server/templates/backoffice.html` (or new picker templates) so `/` and `/backoffice` list workflows and link to `/w/{key}/` and `/w/{key}/backoffice`. Keep existing old landing content under workflow-scoped pages.
+Tests: Template/handler tests assert workflow list appears on both pickers; selected link lands on current existing landing behavior.
+Done when: Entry pages show all configured workflows and clicking one opens the prior landing UX within that workflow.
+
+* TODO [#A] Persist workflow identity on processes and enforce app-level isolation
+Effort: L
+Goal: Ensure process reads/writes are strictly scoped to the workflow they belong to.
+Notes: This is the core guardrail before Cerbos, and prevents cross-flow data leakage.
+** TODO [#A] Add `WorkflowKey` to process model and store filters
+Why: Existing `workflowDefID` is server-generated once and does not identify per-file workflow context.
+Change: In `server/cmd/server/main.go` and `server/cmd/server/store.go`, add `Process.WorkflowKey string` (BSON `workflowKey`). On process creation, set from selected workflow key. Replace global list/latest methods with scoped variants in `Store` (`LoadLatestProcessByWorkflow`, `ListRecentProcessesByWorkflow`) and apply Mongo filters `{workflowKey: key}` plus matching in `MemoryStore`.
+Tests: Update `server/cmd/server/store_test.go` and `server/cmd/server/store_mongo_crud_test.go` to validate list/latest isolation by workflow key.
+Done when: Home/dashboard/history for workflow A never include process data from workflow B.
+** TODO [#A] Enforce workflow/process match in every handler
+Why: A user can guess process IDs; handlers must reject cross-workflow process access.
+Change: For all process-based handlers in `server/cmd/server/main.go`, after `loadProcess`, verify `process.WorkflowKey == selectedWorkflowKey`; on mismatch return `404` (not `403`) to avoid workflow enumeration. Apply this to timeline, exports, completion, file download, and backoffice process pages.
+Tests: Extend `server/cmd/server/process_read_handler_test.go`, `server/cmd/server/download_handler_test.go`, and `server/cmd/server/complete_handler_test.go` with mismatch cases expecting `404`.
+Done when: Any attempt to use workflow A route with workflow B process ID returns `404` across all endpoints.
+
+* TODO [#A] Extend Cerbos contract to include workflow scope
+Effort: M
+Goal: Prevent authorization decisions from allowing cross-workflow completions.
+Notes: Keep policy simple: same role + sequence checks, plus workflow match.
+** TODO [#A] Include workflow attributes in check request and policy
+Why: Current Cerbos attrs only include role/sequence/process/substep and cannot distinguish flows.
+Change: Update `server/cmd/server/authorizer.go` interface + implementation to pass `workflowKey` and include `request.resource.attr.workflowKey`; include `request.principal.attr.workflowKey` in principal payload. Update `cerbos/policies/substep_policy.yaml` condition with equality check between principal and resource workflow keys.
+Tests: Update `server/cmd/server/authorizer_test.go` to assert both attrs are sent; add deny-case test for mismatched workflow attrs.
+Done when: Cerbos allows only when role, sequence, and workflow key all match.
+** TODO [#B] Scope impersonation identity by workflow
+Why: Current cookie `demo_user=user|role` is global and can bleed between workflows.
+Change: In `server/cmd/server/main.go`, extend actor model/cookie parsing to include workflow key (`user|role|workflowKey`) for workflow-scoped routes. Keep backward parser for old 2-part cookie, defaulting workflow to route key at read time.
+Tests: Update `server/cmd/server/helpers_request_test.go` and `server/cmd/server/impersonate_handler_test.go` for 3-part cookie format and backward compatibility.
+Done when: Completing actions in workflow A with a workflow B impersonation cookie is denied before mutation.
+
+* TODO [#B] Scope SSE channels and frontend refresh calls by workflow
+Effort: M
+Goal: Stop cross-workflow dashboard/timeline refreshes and keep live updates accurate.
+Notes: Minimal frontend change in existing `web/src/main.js`.
+** TODO [#B] Add workflow key to SSE subscriptions and refresh URLs
+Why: Current SSE channels for roles are global (`role:{role}`), causing cross-flow updates.
+Change: Update `server/cmd/server/main.go` event endpoint to accept `workflow` query and subscribe to namespaced channels (`process:{workflow}:{id}`, `role:{workflow}:{role}`). Update broadcasts after completion/start accordingly. In `web/src/main.js`, derive `workflowKey` from page dataset and call scoped URLs for `EventSource` and `fetch`.
+Tests: Update `server/cmd/server/events_handler_test.go`; add/adjust JS tests if present, otherwise handler + template dataset coverage in Go tests.
+Done when: Dashboard/timeline in one workflow no longer refresh from events emitted by other workflows.
+
+* TODO [#A] Update templates and page base contracts
+Effort: M
+Goal: Ensure all links/forms/nav remain in selected workflow context.
+Notes: Keep UX unchanged after selection except URL prefix.
+** TODO [#A] Add workflow context to page base and templates
+Why: Hardcoded links currently point to global routes (`/process/...`, `/backoffice/...`).
+Change: Extend `PageBase` with `WorkflowKey` (and optionally `WorkflowName`) in `server/cmd/server/main.go`. Update templates: `server/templates/layout.html`, `server/templates/process.html`, `server/templates/backoffice_department.html`, `server/templates/backoffice_process.html`, `server/templates/action_list.html`, and `server/templates/home.html`/`server/templates/backoffice.html` picker variants to generate scoped links and form actions.
+Tests: Existing handler template tests (`home_handler_test.go`, `backoffice_handler_test.go`, `process_read_handler_test.go`) updated to assert scoped paths.
+Done when: No rendered link/form action points to unscoped business routes.
+
+* TODO [#A] Complete verification and rollout/migration
+Effort: S
+Goal: Ship safely with deterministic migration behavior for existing processes.
+Notes: Existing DB records without `workflowKey` must not break runtime.
+** TODO [#A] Migration and fallback strategy
+Why: Existing processes likely miss `workflowKey`; strict filtering would hide them.
+Change: Add one-time compatibility fallback in store query layer: for configured default workflow key, include records where `workflowKey` is missing; on first successful write to such process, persist inferred key. Document this in `README.md` or `QUICKSTART.md`.
+Tests: Add store tests for missing `workflowKey` fallback and write-back behavior.
+Done when: Pre-existing data is visible in default workflow, and newly created/updated records always contain `workflowKey`.
+** TODO [#A] Full regression run and acceptance checklist
+Why: Multi-workflow touches routing, auth, persistence, templates, and SSE.
+Change: Run `cd server && go test ./...` and targeted integration checks (`go test -tags=integration ./...` when dependencies are up). Validate manual acceptance: pick workflow on `/` and `/backoffice`, create process, complete substep, ensure other workflow cannot read/mutate same process, and Cerbos denies workflow mismatch.
+Tests: Unit + integration + manual smoke checklist.
+Done when: All tests pass and acceptance checklist is green with at least two workflow YAML files in `server/config`.

@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -343,11 +344,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
 	mux.HandleFunc("/", server.handleHome)
-	mux.HandleFunc("/process/start", server.handleStartProcess)
-	mux.HandleFunc("/process/", server.handleProcessRoutes)
-	mux.HandleFunc("/backoffice", server.handleBackoffice)
-	mux.HandleFunc("/backoffice/", server.handleBackoffice)
-	mux.HandleFunc("/impersonate", server.handleImpersonate)
+	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
+	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
+	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
+	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
+	mux.HandleFunc("/impersonate", server.handleLegacyImpersonate)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -581,6 +582,94 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		s.sse.Broadcast("role:"+role, "role-updated")
 	}
 	http.Redirect(w, r, fmt.Sprintf("/process/%s", id.Hex()), http.StatusSeeOther)
+}
+
+func (s *Server) defaultWorkflowKey() string {
+	base := strings.TrimSpace(filepath.Base(strings.TrimSpace(s.configPath)))
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		return "workflow"
+	}
+	ext := filepath.Ext(base)
+	if ext != "" {
+		base = strings.TrimSuffix(base, ext)
+	}
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return "workflow"
+	}
+	return base
+}
+
+func (s *Server) resolveLegacyProcessWorkflowKey(ctx context.Context, processID string) (string, bool) {
+	if _, err := s.loadProcess(ctx, processID); err != nil {
+		return "", false
+	}
+	return s.defaultWorkflowKey(), true
+}
+
+func legacyProcessPath(path string) (processID string, parts []string, ok bool) {
+	raw := strings.TrimPrefix(path, "/process/")
+	parts = strings.Split(raw, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", nil, false
+	}
+	return parts[0], parts, true
+}
+
+func (s *Server) handleLegacyStartProcess(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		http.Error(w, "workflow context required", http.StatusBadRequest)
+		return
+	}
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (s *Server) handleLegacyProcessRoutes(w http.ResponseWriter, r *http.Request) {
+	processID, parts, ok := legacyProcessPath(r.URL.Path)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if len(parts) == 1 && r.Method == http.MethodGet {
+		if key, found := s.resolveLegacyProcessWorkflowKey(r.Context(), processID); found {
+			http.Redirect(w, r, fmt.Sprintf("/w/%s/process/%s", key, processID), http.StatusSeeOther)
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
+	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "complete" && r.Method == http.MethodPost {
+		http.Error(w, "workflow context required", http.StatusBadRequest)
+		return
+	}
+	s.handleProcessRoutes(w, r)
+}
+
+func (s *Server) handleLegacyBackoffice(w http.ResponseWriter, r *http.Request) {
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/backoffice"), "/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 3 && parts[1] == "process" && r.Method == http.MethodGet {
+		processID := strings.TrimSpace(parts[2])
+		if processID == "" {
+			http.NotFound(w, r)
+			return
+		}
+		if key, found := s.resolveLegacyProcessWorkflowKey(r.Context(), processID); found {
+			http.Redirect(w, r, fmt.Sprintf("/w/%s/backoffice/%s/process/%s", key, parts[0], processID), http.StatusSeeOther)
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
+	s.handleBackoffice(w, r)
+}
+
+func (s *Server) handleLegacyImpersonate(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		http.Error(w, "workflow context required", http.StatusBadRequest)
+		return
+	}
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
