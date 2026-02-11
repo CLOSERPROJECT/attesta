@@ -158,7 +158,7 @@ Change: Update `server/templates/home.html` (`home_picker_body`) and `server/tem
 Tests: Update picker template tests (`server/cmd/server/home_handler_test.go`, `server/cmd/server/backoffice_handler_test.go`) to assert card content (name/description/stats) and scoped `href`s.
 Done when: Both pickers display cards with correct content, are keyboard-focusable, and the updated Go tests pass.
 
-* WIP [#B] Make workflow picker landing full-width and card grid responsive
+* DONE [#B] Make workflow picker landing full-width and card grid responsive
 Effort: S
 Goal: Improve `/` and `/backoffice` workflow picker layout so the landing panel uses the available width, cards have a consistent “designed” size, and mobile renders one card per row.
 Notes: Apply changes only to workflow picker pages; keep other `.landing` panels (e.g. backoffice department picker) at their current width unless explicitly requested.
@@ -172,7 +172,7 @@ Why: The current `auto-fit` grid can produce awkward card widths on large screen
 Change: In `web/src/styles.css`, change `.workflow-grid` to use explicit breakpoints and a constrained card width so cards keep a predictable size while the panel can be full width. Suggested targets: (1) phones: 1 column; (2) tablets: 2 columns; (3) desktop: 3 columns; (4) wide: 4 columns. Use `justify-content: center` and `grid-template-columns: repeat(N, minmax(240px, 280px))` (or similar) to avoid overly wide cards on large monitors.
 Tests: No automated CSS layout tests; validate manually via responsive browser emulation at common widths (e.g. 390px phone, 768px tablet, 1024px desktop, 1440px wide).
 Done when: Pickers show 1 card per row on phones, ~3 columns on typical desktop widths, ~4 on wide screens, and cards stay within the chosen size bounds without overflow.
-** WIP [#B] Rebuild web bundle and do a quick UI smoke check
+** DONE [#B] Rebuild web bundle and do a quick UI smoke check
 Why: The backend serves `web/dist` assets; CSS changes must be compiled into the Vite output for non-dev mode.
 Change: Run `cd web && npm install && npm run build` (if needed) and verify the picker pages (`/` and `/backoffice`) in the browser for both light/dark themes.
 Tests: Run `cd server && go test ./...` to ensure template/test assertions still pass after class/markup changes.
