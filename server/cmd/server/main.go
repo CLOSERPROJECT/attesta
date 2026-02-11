@@ -28,9 +28,10 @@ import (
 )
 
 type WorkflowDef struct {
-	ID    primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
-	Name  string             `bson:"name" yaml:"name"`
-	Steps []WorkflowStep     `bson:"steps" yaml:"steps"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
+	Name        string             `bson:"name" yaml:"name"`
+	Description string             `bson:"description,omitempty" yaml:"description,omitempty"`
+	Steps       []WorkflowStep     `bson:"steps" yaml:"steps"`
 }
 
 type WorkflowStep struct {
@@ -265,8 +266,9 @@ type BackofficeLandingView struct {
 }
 
 type WorkflowOption struct {
-	Key  string
-	Name string
+	Key         string
+	Name        string
+	Description string
 }
 
 type WorkflowPickerView struct {
@@ -450,7 +452,11 @@ func (s *Server) workflowOptions() ([]WorkflowOption, error) {
 	options := make([]WorkflowOption, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
-		options = append(options, WorkflowOption{Key: key, Name: cfg.Workflow.Name})
+		options = append(options, WorkflowOption{
+			Key:         key,
+			Name:        cfg.Workflow.Name,
+			Description: strings.TrimSpace(cfg.Workflow.Description),
+		})
 	}
 	return options, nil
 }

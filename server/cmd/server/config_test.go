@@ -88,7 +88,7 @@ func TestNormalizeInputTypes(t *testing.T) {
 
 func TestWorkflowCatalogLoadsMultipleFiles(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
 
 	server := &Server{configDir: tempDir}
@@ -102,8 +102,14 @@ func TestWorkflowCatalogLoadsMultipleFiles(t *testing.T) {
 	if catalog["workflow"].Workflow.Name != "Main workflow" {
 		t.Fatalf("workflow key mismatch: got %q", catalog["workflow"].Workflow.Name)
 	}
+	if catalog["workflow"].Workflow.Description != "Main workflow description" {
+		t.Fatalf("workflow description mismatch: got %q", catalog["workflow"].Workflow.Description)
+	}
 	if catalog["secondary"].Workflow.Name != "Secondary workflow" {
 		t.Fatalf("secondary key mismatch: got %q", catalog["secondary"].Workflow.Name)
+	}
+	if catalog["secondary"].Workflow.Description != "" {
+		t.Fatalf("secondary workflow description = %q, want empty", catalog["secondary"].Workflow.Description)
 	}
 }
 
@@ -189,10 +195,16 @@ func TestWorkflowByKeyAndRuntimeConfigUseCatalog(t *testing.T) {
 	}
 }
 
-func writeWorkflowConfig(t *testing.T, path, name, inputType string) {
+func writeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {
 	t.Helper()
 	content := "workflow:\n" +
 		"  name: \"" + name + "\"\n" +
+		func() string {
+			if len(description) == 0 || strings.TrimSpace(description[0]) == "" {
+				return ""
+			}
+			return "  description: \"" + description[0] + "\"\n"
+		}() +
 		"  steps:\n" +
 		"    - id: \"1\"\n" +
 		"      title: \"Step 1\"\n" +

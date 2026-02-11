@@ -93,7 +93,7 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 
 func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow", "number")
 
 	server := &Server{
@@ -112,8 +112,11 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	if !strings.Contains(body, "PICK 2") {
 		t.Fatalf("expected picker marker, got %q", body)
 	}
-	if !strings.Contains(body, "workflow:Main workflow") || !strings.Contains(body, "secondary:Secondary workflow") {
+	if !strings.Contains(body, "workflow:Main workflow:Main workflow description") || !strings.Contains(body, "secondary:Secondary workflow") {
 		t.Fatalf("expected workflow options in picker, got %q", body)
+	}
+	if strings.Contains(body, "secondary:Secondary workflow:") {
+		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
 	}
 }
 
@@ -152,7 +155,7 @@ HISTORY {{range .History}}{{.ID}}:{{.Status}}|{{end}}
 func homePickerTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_picker_body" .}}{{end}}
-{{define "home_picker_body"}}PICK {{len .Workflows}} {{range .Workflows}}{{.Key}}:{{.Name}}|{{end}}{{end}}
+{{define "home_picker_body"}}PICK {{len .Workflows}} {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}|{{end}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))
 }

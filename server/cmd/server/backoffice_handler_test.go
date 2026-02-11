@@ -125,7 +125,7 @@ func TestHandleBackofficePickerRendersScopedWorkflowLinks(t *testing.T) {
 
 func TestHandleBackofficeRendersWorkflowPicker(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow", "number")
 
 	server := &Server{
@@ -144,8 +144,11 @@ func TestHandleBackofficeRendersWorkflowPicker(t *testing.T) {
 	if !strings.Contains(body, "BACKOFFICE_PICKER") {
 		t.Fatalf("expected picker marker, got %q", body)
 	}
-	if !strings.Contains(body, "workflow:Main workflow") || !strings.Contains(body, "secondary:Secondary workflow") {
+	if !strings.Contains(body, "workflow:Main workflow:Main workflow description") || !strings.Contains(body, "secondary:Secondary workflow") {
 		t.Fatalf("expected workflow options in picker, got %q", body)
+	}
+	if strings.Contains(body, "secondary:Secondary workflow:") {
+		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
 	}
 }
 

@@ -5,9 +5,12 @@
   {{if .Workflows}}
     <div class="impersonate">
       {{range .Workflows}}
-        <form method="post" action="/w/{{.Key}}/backoffice">
-          <button class="primary" type="submit">{{.Name}}</button>
-        </form>
+        <a class="secondary" href="/w/{{.Key}}/backoffice">
+          {{if .Description}}
+            <p class="muted">{{.Description}}</p>
+          {{end}}
+          <strong>{{.Name}}</strong>
+        </a>
       {{end}}
     </div>
   {{else}}

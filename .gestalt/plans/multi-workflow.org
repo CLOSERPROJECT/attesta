@@ -137,3 +137,23 @@ Why: Increasing the threshold without expanding coverage will block delivery.
 Change: Add focused tests in low-coverage multi-workflow slices (route dispatch fallbacks, backoffice/home workflow pickers, impersonation workflow scope, workflow/process mismatch guards) using existing `server/cmd/server/*_test.go` patterns.
 Tests: Run `cd server && go test ./...` and `task cover`, confirming total reported coverage is at least 90%.
 Done when: Full backend test suite passes and measured coverage is >=90% without relaxing assertions.
+
+* WIP [#B] Turn workflow picker buttons into workflow cards with status counts
+Effort: M
+Goal: Upgrade the workflow selection UX on `/` and `/backoffice` to show richer cards (name + optional description + per-workflow process counts).
+Notes: Keep the existing workflow-scoped routes (`/w/{key}/...`) and avoid new dependencies; cards should work without JS.
+** DONE [#A] Add optional workflow description to YAML and picker DTOs
+Why: Cards should show a short “what is this workflow” line when available; YAML currently only includes a name.
+Change: Extend `WorkflowDef` in `server/cmd/server/main.go` with `Description string` (`yaml:"description"`, optional). Update picker DTOs (`WorkflowOption` or a new `WorkflowCardOption`) to include `Description` sourced from `cfg.Workflow.Description`. Update `server/cmd/server/config_test.go` and test helpers (e.g., `writeWorkflowConfig` in `server/cmd/server/helpers_home_test.go`) to cover description present/absent.
+Tests: Config parsing tests assert description is optional and preserved; picker handler tests assert description renders only when set.
+Done when: A workflow config can include `workflow.description` and picker templates can render it without requiring it.
+** WIP [#A] Compute “not started / started / terminated” counts per workflow for pickers
+Why: The workflow choice should communicate how many process instances are available in each state before the user enters a workflow.
+Change: Define a small view model (e.g., `WorkflowProcessCounts{NotStarted, Started, Terminated int}`) and attach it to each workflow card. In `handleHome` and the unscoped branch of `handleBackoffice` (when rendering pickers), compute counts per workflow by listing all processes for that workflow via `store.ListRecentProcessesByWorkflow(ctx, key, 0)`. For each process: normalize progress keys; derive `status` like `handleWorkflowHome` (default `"active"`, promote to `"done"` when `isProcessDone(cfg.Workflow, &process)`); compute `doneCount` via `processProgressStats(cfg.Workflow, &process)`; then classify: `Terminated` if `status == "done"`, `NotStarted` if `status != "done"` and `doneCount == 0`, otherwise `Started`. Keep default-workflow fallback behavior (missing `workflowKey`) intact via existing store filters.
+Tests: Add handler tests seeding a `MemoryStore` with a mix of (a) zero-progress active, (b) partially completed active, and (c) completed processes across two workflow keys; assert rendered counts per workflow on both `/` and `/backoffice`.
+Done when: Picker pages show accurate per-workflow counts and tests cover “status missing but done via progress” and multi-workflow separation.
+** TODO [#B] Render pickers as accessible card grid and style them
+Why: Buttons are hard to scan and don’t surface key information; cards make workflow choice clearer and more attractive.
+Change: Update `server/templates/home.html` (`home_picker_body`) and `server/templates/backoffice.html` (`backoffice_picker_body`) to render a grid of cards. Prefer anchor-based navigation (`<a href="/w/{{.Key}}/">` and `<a href="/w/{{.Key}}/backoffice">`) so the entire card is clickable and matches existing tests expecting scoped `href`s. Card content: workflow name, optional description, and three small stat lines/badges (“Not started”, “Started”, “Terminated”) with counts. Add minimal CSS in `web/src/styles.css` for layout and hover/focus states; rebuild `web/dist` via `npm run build` so server-served assets include the new styling.
+Tests: Update picker template tests (`server/cmd/server/home_handler_test.go`, `server/cmd/server/backoffice_handler_test.go`) to assert card content (name/description/stats) and scoped `href`s.
+Done when: Both pickers display cards with correct content, are keyboard-focusable, and the updated Go tests pass.
