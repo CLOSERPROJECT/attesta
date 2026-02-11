@@ -401,7 +401,7 @@ button[disabled] {
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--panel);
   color: var(--ink);
 }
 
