@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"html/template"
 )
 
 func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
@@ -117,6 +118,42 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	}
 	if strings.Contains(body, "secondary:Secondary workflow:Secondary workflow description:") {
 		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
+	}
+}
+
+func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
+
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{
+		tmpl:      tmpl,
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
+		t.Fatalf("expected workflow card grid markup, got %q", body)
+	}
+	if !strings.Contains(body, `href="/w/workflow/"`) {
+		t.Fatalf("expected scoped workflow href for workflow key, got %q", body)
+	}
+	if !strings.Contains(body, `href="/w/secondary/"`) {
+		t.Fatalf("expected scoped workflow href for secondary key, got %q", body)
+	}
+	if !strings.Contains(body, "Main workflow description") {
+		t.Fatalf("expected description content in cards, got %q", body)
+	}
+	if !strings.Contains(body, "Not started") || !strings.Contains(body, "Started") || !strings.Contains(body, "Terminated") {
+		t.Fatalf("expected status labels in cards, got %q", body)
 	}
 }
 

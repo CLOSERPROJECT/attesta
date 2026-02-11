@@ -3,16 +3,27 @@
   <h1>Backoffice workflows</h1>
   <p class="muted">Pick a workflow and then choose a department.</p>
   {{if .Workflows}}
-    <div class="impersonate">
+    <div class="workflow-grid">
       {{range .Workflows}}
-        <a class="secondary" href="/w/{{.Key}}/backoffice">
+        <a class="workflow-card" href="/w/{{.Key}}/backoffice">
+          <h2 class="workflow-card-title">{{.Name}}</h2>
           {{if .Description}}
-            <p class="muted">{{.Description}}</p>
+            <p class="workflow-card-description">{{.Description}}</p>
           {{end}}
-          <strong>{{.Name}}</strong>
-          <span class="muted">Not started: {{.Counts.NotStarted}}</span>
-          <span class="muted">Started: {{.Counts.Started}}</span>
-          <span class="muted">Terminated: {{.Counts.Terminated}}</span>
+          <dl class="workflow-card-stats">
+            <div>
+              <dt>Not started</dt>
+              <dd>{{.Counts.NotStarted}}</dd>
+            </div>
+            <div>
+              <dt>Started</dt>
+              <dd>{{.Counts.Started}}</dd>
+            </div>
+            <div>
+              <dt>Terminated</dt>
+              <dd>{{.Counts.Terminated}}</dd>
+            </div>
+          </dl>
         </a>
       {{end}}
     </div>

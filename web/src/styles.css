@@ -338,6 +338,75 @@ button[disabled] {
   margin-bottom: 12px;
 }
 
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.workflow-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--panel), var(--surface-2));
+  box-shadow: 0 8px 18px var(--shadow);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.workflow-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px var(--shadow);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.workflow-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.workflow-card-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.workflow-card-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.workflow-card-stats {
+  margin: 2px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-card-stats div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.workflow-card-stats dt,
+.workflow-card-stats dd {
+  margin: 0;
+}
+
+.workflow-card-stats dd {
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .current-user {
   margin-top: 0;
   font-size: 14px;

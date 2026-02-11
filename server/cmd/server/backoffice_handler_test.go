@@ -92,7 +92,7 @@ func TestHandleBackofficeRoutes(t *testing.T) {
 
 func TestHandleBackofficePickerRendersScopedWorkflowLinks(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
 
 	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
@@ -112,14 +112,23 @@ func TestHandleBackofficePickerRendersScopedWorkflowLinks(t *testing.T) {
 		t.Fatalf("expected no implicit redirect, got location %q", location)
 	}
 	body := rec.Body.String()
+	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
+		t.Fatalf("expected workflow card grid markup, got %q", body)
+	}
 	if !strings.Contains(body, "Main workflow") || !strings.Contains(body, "Secondary workflow") {
 		t.Fatalf("expected both workflow labels, got %q", body)
+	}
+	if !strings.Contains(body, "Main workflow description") {
+		t.Fatalf("expected optional description in card content, got %q", body)
 	}
 	if !strings.Contains(body, `href="/w/workflow/backoffice"`) {
 		t.Fatalf("expected scoped backoffice href for workflow key, got %q", body)
 	}
 	if !strings.Contains(body, `href="/w/secondary/backoffice"`) {
 		t.Fatalf("expected scoped backoffice href for secondary key, got %q", body)
+	}
+	if !strings.Contains(body, "Not started") || !strings.Contains(body, "Started") || !strings.Contains(body, "Terminated") {
+		t.Fatalf("expected status labels in cards, got %q", body)
 	}
 }
 
