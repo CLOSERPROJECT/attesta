@@ -345,7 +345,8 @@ button[disabled] {
 
 .workflow-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: minmax(240px, 280px);
+  justify-content: center;
   gap: 12px;
   margin-top: 12px;
 }
@@ -534,5 +535,23 @@ button[disabled] {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+}
+
+@media (min-width: 640px) {
+  .workflow-grid {
+    grid-template-columns: repeat(2, minmax(240px, 280px));
+  }
+}
+
+@media (min-width: 1024px) {
+  .workflow-grid {
+    grid-template-columns: repeat(3, minmax(240px, 280px));
+  }
+}
+
+@media (min-width: 1360px) {
+  .workflow-grid {
+    grid-template-columns: repeat(4, minmax(240px, 280px));
   }
 }
