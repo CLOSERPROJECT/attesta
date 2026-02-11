@@ -10,6 +10,9 @@
             <p class="muted">{{.Description}}</p>
           {{end}}
           <strong>{{.Name}}</strong>
+          <span class="muted">Not started: {{.Counts.NotStarted}}</span>
+          <span class="muted">Started: {{.Counts.Started}}</span>
+          <span class="muted">Terminated: {{.Counts.Terminated}}</span>
         </a>
       {{end}}
     </div>

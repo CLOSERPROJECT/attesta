@@ -147,8 +147,95 @@ func TestHandleBackofficeRendersWorkflowPicker(t *testing.T) {
 	if !strings.Contains(body, "workflow:Main workflow:Main workflow description") || !strings.Contains(body, "secondary:Secondary workflow") {
 		t.Fatalf("expected workflow options in picker, got %q", body)
 	}
-	if strings.Contains(body, "secondary:Secondary workflow:") {
+	if strings.Contains(body, "secondary:Secondary workflow:Secondary workflow description:") {
 		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
+	}
+}
+
+func TestHandleBackofficeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTwoSubstepWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow")
+	writeTwoSubstepWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow")
+
+	now := time.Date(2026, 2, 10, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-6 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+			"1_2": {State: "pending"},
+		},
+	})
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-5 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "pending"},
+		},
+	})
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-4 * time.Hour),
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "done"},
+		},
+	})
+	store.SeedProcess(Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: now.Add(-3 * time.Hour),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+			"1_2": {State: "pending"},
+		},
+	})
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "secondary",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "pending"},
+		},
+	})
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "secondary",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "done"},
+		},
+	})
+
+	server := &Server{
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+		store:     store,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/backoffice", nil)
+	rec := httptest.NewRecorder()
+	server.handleBackoffice(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "workflow:Main workflow:2/1/1") {
+		t.Fatalf("expected workflow counts 2/1/1, got %q", body)
+	}
+	if !strings.Contains(body, "secondary:Secondary workflow:0/1/1") {
+		t.Fatalf("expected secondary counts 0/1/1, got %q", body)
 	}
 }
 

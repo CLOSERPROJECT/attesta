@@ -269,6 +269,13 @@ type WorkflowOption struct {
 	Key         string
 	Name        string
 	Description string
+	Counts      WorkflowProcessCounts
+}
+
+type WorkflowProcessCounts struct {
+	NotStarted int
+	Started    int
+	Terminated int
 }
 
 type WorkflowPickerView struct {
@@ -443,7 +450,39 @@ func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	return base
 }
 
-func (s *Server) workflowOptions() ([]WorkflowOption, error) {
+func deriveProcessStatus(def WorkflowDef, process *Process) string {
+	if process == nil {
+		return "active"
+	}
+	status := strings.TrimSpace(process.Status)
+	if status == "" {
+		status = "active"
+	}
+	if status != "done" && isProcessDone(def, process) {
+		status = "done"
+	}
+	return status
+}
+
+func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcessCounts {
+	counts := WorkflowProcessCounts{}
+	for _, process := range processes {
+		process.Progress = normalizeProgressKeys(process.Progress)
+		status := deriveProcessStatus(def, &process)
+		doneCount, _, _ := processProgressStats(def, &process)
+		switch {
+		case status == "done":
+			counts.Terminated++
+		case doneCount == 0:
+			counts.NotStarted++
+		default:
+			counts.Started++
+		}
+	}
+	return counts
+}
+
+func (s *Server) workflowOptions(ctx context.Context) ([]WorkflowOption, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return nil, err
@@ -456,7 +495,16 @@ func (s *Server) workflowOptions() ([]WorkflowOption, error) {
 			Key:         key,
 			Name:        cfg.Workflow.Name,
 			Description: strings.TrimSpace(cfg.Workflow.Description),
+			Counts:      WorkflowProcessCounts{},
 		})
+		if s.store == nil {
+			continue
+		}
+		processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
+		if listErr != nil {
+			return nil, listErr
+		}
+		options[len(options)-1].Counts = workflowProcessCounts(cfg.Workflow, processes)
 	}
 	return options, nil
 }
@@ -569,7 +617,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	options, err := s.workflowOptions()
+	options, err := s.workflowOptions(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -661,13 +709,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	var history []ProcessListItem
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
-		status := strings.TrimSpace(process.Status)
-		if status == "" {
-			status = "active"
-		}
-		if status != "done" && isProcessDone(cfg.Workflow, &process) {
-			status = "done"
-		}
+		status := deriveProcessStatus(cfg.Workflow, &process)
 		doneCount, lastAt, lastDigest := processProgressStats(cfg.Workflow, &process)
 		percent := 0
 		if totalSubsteps > 0 {
@@ -1099,7 +1141,7 @@ func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
 	_, scoped := r.Context().Value(workflowContextKey{}).(workflowContextValue)
 	if path == "" {
 		if !scoped {
-			options, listErr := s.workflowOptions()
+			options, listErr := s.workflowOptions(r.Context())
 			if listErr != nil {
 				http.Error(w, listErr.Error(), http.StatusInternalServerError)
 				return
@@ -1887,13 +1929,7 @@ func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, wo
 	var done []ProcessSummary
 	for _, process := range processes {
 		process.Progress = normalizeProgressKeys(process.Progress)
-		status := process.Status
-		if status == "" {
-			status = "active"
-		}
-		if status != "done" && isProcessDone(cfg.Workflow, &process) {
-			status = "done"
-		}
+		status := deriveProcessStatus(cfg.Workflow, &process)
 		summary := buildProcessSummaryForRole(cfg.Workflow, &process, status, role)
 		if status == "done" {
 			done = append(done, summary)
