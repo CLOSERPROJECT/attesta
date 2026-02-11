@@ -159,6 +159,11 @@ a:hover {
   max-width: 520px;
 }
 
+.landing.landing-wide {
+  max-width: none;
+  width: 100%;
+}
+
 h1,
 h2,
 h3 {

@@ -157,3 +157,23 @@ Why: Buttons are hard to scan and don’t surface key information; cards make wo
 Change: Update `server/templates/home.html` (`home_picker_body`) and `server/templates/backoffice.html` (`backoffice_picker_body`) to render a grid of cards. Prefer anchor-based navigation (`<a href="/w/{{.Key}}/">` and `<a href="/w/{{.Key}}/backoffice">`) so the entire card is clickable and matches existing tests expecting scoped `href`s. Card content: workflow name, optional description, and three small stat lines/badges (“Not started”, “Started”, “Terminated”) with counts. Add minimal CSS in `web/src/styles.css` for layout and hover/focus states; rebuild `web/dist` via `npm run build` so server-served assets include the new styling.
 Tests: Update picker template tests (`server/cmd/server/home_handler_test.go`, `server/cmd/server/backoffice_handler_test.go`) to assert card content (name/description/stats) and scoped `href`s.
 Done when: Both pickers display cards with correct content, are keyboard-focusable, and the updated Go tests pass.
+
+* WIP [#B] Make workflow picker landing full-width and card grid responsive
+Effort: S
+Goal: Improve `/` and `/backoffice` workflow picker layout so the landing panel uses the available width, cards have a consistent “designed” size, and mobile renders one card per row.
+Notes: Apply changes only to workflow picker pages; keep other `.landing` panels (e.g. backoffice department picker) at their current width unless explicitly requested.
+** DONE [#A] Add a dedicated “wide picker” class to the picker panels
+Why: `.landing` is capped (`max-width`) and is used by multiple pages; the workflow picker should be full-width without affecting other landings.
+Change: In `server/templates/home.html` (`home_picker_body`) and `server/templates/backoffice.html` (`backoffice_picker_body`), add a class like `landing-wide` to the `<section class="panel landing ...">` wrapper. In `web/src/styles.css`, override only for that class (`.landing.landing-wide { max-width: none; width: 100%; }`) so the panel spans the available page width (still inside `.page` padding).
+Tests: Update picker handler/template tests to assert the workflow picker section includes `landing-wide` while other landing pages still render without it.
+Done when: Picker panels occupy full width inside `.page`, and other `.landing` panels remain unchanged.
+** WIP [#A] Fix card sizing to target 4/3-per-row desktop, 1-per-row mobile
+Why: The current `auto-fit` grid can produce awkward card widths on large screens, and can render 2-up on “large phones” unless explicitly constrained.
+Change: In `web/src/styles.css`, change `.workflow-grid` to use explicit breakpoints and a constrained card width so cards keep a predictable size while the panel can be full width. Suggested targets: (1) phones: 1 column; (2) tablets: 2 columns; (3) desktop: 3 columns; (4) wide: 4 columns. Use `justify-content: center` and `grid-template-columns: repeat(N, minmax(240px, 280px))` (or similar) to avoid overly wide cards on large monitors.
+Tests: No automated CSS layout tests; validate manually via responsive browser emulation at common widths (e.g. 390px phone, 768px tablet, 1024px desktop, 1440px wide).
+Done when: Pickers show 1 card per row on phones, ~3 columns on typical desktop widths, ~4 on wide screens, and cards stay within the chosen size bounds without overflow.
+** TODO [#B] Rebuild web bundle and do a quick UI smoke check
+Why: The backend serves `web/dist` assets; CSS changes must be compiled into the Vite output for non-dev mode.
+Change: Run `cd web && npm install && npm run build` (if needed) and verify the picker pages (`/` and `/backoffice`) in the browser for both light/dark themes.
+Tests: Run `cd server && go test ./...` to ensure template/test assertions still pass after class/markup changes.
+Done when: Built assets include the new layout, and backend tests remain green.

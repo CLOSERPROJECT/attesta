@@ -112,6 +112,9 @@ func TestHandleBackofficePickerRendersScopedWorkflowLinks(t *testing.T) {
 		t.Fatalf("expected no implicit redirect, got location %q", location)
 	}
 	body := rec.Body.String()
+	if !strings.Contains(body, `class="panel landing landing-wide"`) {
+		t.Fatalf("expected backoffice picker section to include landing-wide class, got %q", body)
+	}
 	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
 		t.Fatalf("expected workflow card grid markup, got %q", body)
 	}
@@ -129,6 +132,34 @@ func TestHandleBackofficePickerRendersScopedWorkflowLinks(t *testing.T) {
 	}
 	if !strings.Contains(body, "Not started") || !strings.Contains(body, "Started") || !strings.Contains(body, "Terminated") {
 		t.Fatalf("expected status labels in cards, got %q", body)
+	}
+}
+
+func TestHandleBackofficeLandingDoesNotUseLandingWideClass(t *testing.T) {
+	server := &Server{
+		tmpl: template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/backoffice", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleBackoffice(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `class="panel landing"`) {
+		t.Fatalf("expected backoffice landing to use landing class, got %q", body)
+	}
+	if strings.Contains(body, `class="panel landing landing-wide"`) {
+		t.Fatalf("expected backoffice landing to keep default width, got %q", body)
 	}
 }
 
