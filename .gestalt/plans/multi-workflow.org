@@ -177,3 +177,8 @@ Why: The backend serves `web/dist` assets; CSS changes must be compiled into the
 Change: Run `cd web && npm install && npm run build` (if needed) and verify the picker pages (`/` and `/backoffice`) in the browser for both light/dark themes.
 Tests: Run `cd server && go test ./...` to ensure template/test assertions still pass after class/markup changes.
 Done when: Built assets include the new layout, and backend tests remain green.
+** DONE [#C] Left-align picker grid and use flexible `fr` columns
+Why: Centered, width-capped tracks leave visible blank space at row start on wide panels.
+Change: In `web/src/styles.css`, set `.workflow-grid` to `justify-content: start` and switch base/breakpoint column tracks from `minmax(240px, 280px)` to flexible `1fr`-based tracks.
+Tests: Rebuild web bundle and run backend tests.
+Done when: Cards start from the left edge and columns expand to fill available row width at each breakpoint.
