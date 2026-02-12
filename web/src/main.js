@@ -48,6 +48,7 @@ if (themeToggle) {
 
 const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
+const workflowKey = root?.dataset?.workflowKey;
 const timeline = document.getElementById("timeline");
 
 const focusNextActionInput = () => {
@@ -59,11 +60,13 @@ const focusNextActionInput = () => {
   }
 };
 
-if (processId && timeline) {
-  const source = new EventSource(`/events?processId=${processId}`);
+if (processId && workflowKey && timeline) {
+  const source = new EventSource(
+    `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`
+  );
   source.addEventListener("process-updated", async () => {
     try {
-      const response = await fetch(`/process/${processId}/timeline`);
+      const response = await fetch(`/w/${workflowKey}/process/${processId}/timeline`);
       if (!response.ok) {
         return;
       }
@@ -88,12 +91,15 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
 const deptRoot = document.querySelector("[data-dept-role]");
 if (deptRoot) {
   const role = deptRoot.dataset.deptRole;
+  const deptWorkflowKey = deptRoot.dataset.workflowKey;
   const dashboard = document.getElementById("dept-dashboard");
-  if (role && dashboard) {
-    const source = new EventSource(`/events?role=${role}`);
+  if (role && deptWorkflowKey && dashboard) {
+    const source = new EventSource(
+      `/w/${deptWorkflowKey}/events?workflow=${deptWorkflowKey}&role=${role}`
+    );
     source.addEventListener("role-updated", async () => {
       try {
-        const response = await fetch(`/backoffice/${role}/partial`);
+        const response = await fetch(`/w/${deptWorkflowKey}/backoffice/${role}/partial`);
         if (!response.ok) {
           return;
         }

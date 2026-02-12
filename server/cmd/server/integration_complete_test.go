@@ -185,9 +185,10 @@ func integrationServer(store Store, authorizer Authorizer) *Server {
 func seedIntegrationProcess(t *testing.T, db *mongo.Database, store Store) primitive.ObjectID {
 	t.Helper()
 	process := Process{
-		ID:        primitive.NewObjectID(),
-		CreatedAt: time.Now().UTC(),
-		Status:    "active",
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "pending"},
 			"1_2": {State: "pending"},
@@ -201,7 +202,6 @@ func seedIntegrationProcess(t *testing.T, db *mongo.Database, store Store) primi
 	if _, err := store.InsertProcess(context.Background(), process); err != nil {
 		t.Fatalf("insert integration process: %v", err)
 	}
-	cleanupIntegrationProcess(t, db, process.ID)
 	return process.ID
 }
 

@@ -1,9 +1,9 @@
 {{define "dept_process_body"}}
-<div class="two-col" data-process-id="{{.ProcessID}}">
+<div class="two-col" data-process-id="{{.ProcessID}}" data-workflow-key="{{.WorkflowKey}}">
   <section class="panel">
     <h1>{{.RoleLabel}} actions</h1>
     <p class="muted">Process <strong>{{.ProcessID}}</strong></p>
-    <a class="secondary" href="/backoffice/{{.CurrentUser.Role}}">Back to dashboard</a>
+    <a class="secondary" href="{{.WorkflowPath}}/backoffice/{{.CurrentUser.Role}}">Back to dashboard</a>
   </section>
   <section class="panel">
     <h2>Available actions</h2>

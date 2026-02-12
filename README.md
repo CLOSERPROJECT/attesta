@@ -37,35 +37,36 @@ Open:
 - SSE broadcasts realtime updates to timelines.
 
 ## Curl examples
-Start a process:
+Start a process in a selected workflow (`workflow`):
 ```bash
-curl -X POST http://localhost:3000/process/start -i
+curl -X POST http://localhost:3000/w/workflow/process/start -i
 ```
 
 Impersonate dep1:
 ```bash
-curl -X POST http://localhost:3000/impersonate \
+curl -X POST http://localhost:3000/w/workflow/impersonate \
   -d 'userId=u1' -d 'role=dep1' -i
 ```
 
 Complete substep 1.1 (dep1):
 ```bash
-curl -X POST http://localhost:3000/process/PROCESS_ID/substep/1.1/complete \
-  -H 'Cookie: demo_user=u1|dep1' \
+curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/1.1/complete \
+  -H 'Cookie: demo_user=u1|dep1|workflow' \
   -d 'value=10'
 ```
 
 Attempt out-of-sequence (should fail):
 ```bash
-curl -X POST http://localhost:3000/process/PROCESS_ID/substep/2.1/complete \
-  -H 'Cookie: demo_user=u2|dep2' \
+curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/complete \
+  -H 'Cookie: demo_user=u2|dep2|workflow' \
   -d 'value=5'
 ```
 
 ## Notes
 - Cerbos PDP is expected at `http://localhost:3592`.
 - MongoDB is expected at `mongodb://localhost:27017`.
-- Timeline updates pull `/process/:id/timeline` when SSE events arrive.
+- Timeline updates pull `/w/:workflow/process/:id/timeline` when SSE events arrive.
+- Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
 
 ## File inputs
 ```yaml

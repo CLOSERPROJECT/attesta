@@ -30,7 +30,7 @@ func TestBuildTimelineFileSubstepDisplay(t *testing.T) {
 		},
 	}
 
-	timeline := buildTimeline(cfg.Workflow, process, map[string]RoleMeta{})
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{})
 	if len(timeline) == 0 || len(timeline[0].Substeps) < 3 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -42,7 +42,7 @@ func TestBuildTimelineFileSubstepDisplay(t *testing.T) {
 	if fileEntry.FileName != "cert.pdf" {
 		t.Fatalf("expected filename cert.pdf, got %q", fileEntry.FileName)
 	}
-	wantURL := "/process/" + processID.Hex() + "/substep/1.3/file"
+	wantURL := "/w/workflow/process/" + processID.Hex() + "/substep/1.3/file"
 	if fileEntry.FileURL != wantURL {
 		t.Fatalf("expected file URL %q, got %q", wantURL, fileEntry.FileURL)
 	}

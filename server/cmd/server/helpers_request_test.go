@@ -17,7 +17,8 @@ func TestReadActor(t *testing.T) {
 	}{
 		{name: "missing cookie", cookie: nil, want: Actor{}},
 		{name: "malformed cookie", cookie: &http.Cookie{Name: "demo_user", Value: "broken"}, want: Actor{}},
-		{name: "valid cookie", cookie: &http.Cookie{Name: "demo_user", Value: "u1|dep1"}, want: Actor{UserID: "u1", Role: "dep1"}},
+		{name: "valid legacy cookie", cookie: &http.Cookie{Name: "demo_user", Value: "u1|dep1"}, want: Actor{UserID: "u1", Role: "dep1", WorkflowKey: "workflow"}},
+		{name: "valid scoped cookie", cookie: &http.Cookie{Name: "demo_user", Value: "u1|dep1|wf-a"}, want: Actor{UserID: "u1", Role: "dep1", WorkflowKey: "wf-a"}},
 	}
 
 	for _, tc := range tests {
@@ -26,7 +27,7 @@ func TestReadActor(t *testing.T) {
 			if tc.cookie != nil {
 				req.AddCookie(tc.cookie)
 			}
-			if got := readActor(req); got != tc.want {
+			if got := readActor(req, "workflow"); got != tc.want {
 				t.Fatalf("readActor() = %#v, want %#v", got, tc.want)
 			}
 		})

@@ -12,3 +12,4 @@ resourcePolicy:
             of:
               - expr: request.resource.attr.sequenceOk == true
               - expr: request.resource.attr.roleRequired in request.principal.roles
+              - expr: request.resource.attr.workflowKey == request.principal.attr.workflowKey

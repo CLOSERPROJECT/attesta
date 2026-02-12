@@ -1,11 +1,47 @@
+{{define "backoffice_picker_body"}}
+<section class="panel landing landing-wide">
+  <h1>Backoffice workflows</h1>
+  <p class="muted">Pick a workflow and then choose a department.</p>
+  {{if .Workflows}}
+    <div class="workflow-grid">
+      {{range .Workflows}}
+        <a class="workflow-card" href="/w/{{.Key}}/backoffice">
+          <h2 class="workflow-card-title">{{.Name}}</h2>
+          {{if .Description}}
+            <p class="workflow-card-description">{{.Description}}</p>
+          {{end}}
+          <dl class="workflow-card-stats">
+            <div>
+              <dt>Not started</dt>
+              <dd>{{.Counts.NotStarted}}</dd>
+            </div>
+            <div>
+              <dt>Started</dt>
+              <dd>{{.Counts.Started}}</dd>
+            </div>
+            <div>
+              <dt>Terminated</dt>
+              <dd>{{.Counts.Terminated}}</dd>
+            </div>
+          </dl>
+        </a>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="muted">No workflows configured.</p>
+  {{end}}
+</section>
+{{end}}
+
 {{define "backoffice_landing_body"}}
 <section class="panel landing">
   <h1>Backoffice</h1>
+  <p class="muted">Workflow: <strong>{{.WorkflowName}}</strong></p>
   <p class="muted">Choose a department to continue.</p>
   {{if .Users}}
     <div class="impersonate">
       {{range .Users}}
-        <form method="post" action="/impersonate">
+        <form method="post" action="{{$.WorkflowPath}}/impersonate">
           <input type="hidden" name="userId" value="{{.ID}}" />
           <input type="hidden" name="role" value="{{.Role}}" />
           <button
@@ -23,5 +59,9 @@
 {{end}}
 
 {{define "backoffice_landing.html"}}
+  {{template "layout.html" .}}
+{{end}}
+
+{{define "backoffice.html"}}
   {{template "layout.html" .}}
 {{end}}

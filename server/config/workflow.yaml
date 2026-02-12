@@ -1,5 +1,6 @@
 workflow:
   name: "Gallium recycling notarization"
+  description: "Track the recycling process of gallium from intake to refinement and notarization"
   steps:
     - id: "1"
       title: "Incoming intake"

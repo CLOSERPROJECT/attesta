@@ -1,6 +1,9 @@
 package main
 
-import "html/template"
+import (
+	"html/template"
+	"os"
+)
 
 func testRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{
@@ -53,18 +56,23 @@ func testRuntimeConfig() RuntimeConfig {
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}
-  {{if eq .Body "home_body"}}{{template "home_body" .}}
+  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+  {{else if eq .Body "home_body"}}{{template "home_body" .}}
   {{else if eq .Body "process_body"}}{{template "process_body" .}}
+  {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
   {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
+{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "home_body"}}HOME {{.LatestProcessID}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}}{{template "timeline.html" .Timeline}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "timeline.html"}}TIMELINE {{range .}}{{.StepID}} {{end}}{{end}}
+{{define "backoffice_picker_body"}}BACKOFFICE_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "backoffice_landing_body"}}BACKOFFICE{{end}}
+{{define "backoffice.html"}}{{template "layout.html" .}}{{end}}
 {{define "backoffice_landing.html"}}{{template "layout.html" .}}{{end}}
 {{define "dept_dashboard_content"}}DASHBOARD {{.CurrentUser.Role}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dept_dashboard_body"}}{{template "dept_dashboard_content" .}}{{end}}
@@ -75,4 +83,42 @@ func testTemplates() *template.Template {
 {{define "action_list.html"}}ACTION_LIST {{.Error}}{{end}}
 {{define "error_banner.html"}}{{if .Error}}ERROR {{.Error}}{{end}}{{end}}
 `))
+}
+
+func writeTwoSubstepWorkflowConfig(t testHelperT, path, name string) {
+	t.Helper()
+	content := "workflow:\n" +
+		"  name: \"" + name + "\"\n" +
+		"  steps:\n" +
+		"    - id: \"1\"\n" +
+		"      title: \"Step 1\"\n" +
+		"      order: 1\n" +
+		"      substeps:\n" +
+		"        - id: \"1.1\"\n" +
+		"          title: \"Input 1\"\n" +
+		"          order: 1\n" +
+		"          role: \"dep1\"\n" +
+		"          inputKey: \"value1\"\n" +
+		"          inputType: \"string\"\n" +
+		"        - id: \"1.2\"\n" +
+		"          title: \"Input 2\"\n" +
+		"          order: 2\n" +
+		"          role: \"dep1\"\n" +
+		"          inputKey: \"value2\"\n" +
+		"          inputType: \"string\"\n" +
+		"departments:\n" +
+		"  - id: \"dep1\"\n" +
+		"    name: \"Department 1\"\n" +
+		"users:\n" +
+		"  - id: \"u1\"\n" +
+		"    name: \"User 1\"\n" +
+		"    departmentId: \"dep1\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config %s: %v", path, err)
+	}
+}
+
+type testHelperT interface {
+	Helper()
+	Fatalf(format string, args ...interface{})
 }

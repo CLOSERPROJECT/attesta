@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeInputType(t *testing.T) {
@@ -85,151 +86,144 @@ func TestNormalizeInputTypes(t *testing.T) {
 	}
 }
 
-func TestGetConfigRejectsInvalidInputType(t *testing.T) {
+func TestWorkflowCatalogLoadsMultipleFiles(t *testing.T) {
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "workflow.yaml")
-	content := `workflow:
-  name: "Demo"
-  steps:
-    - id: "1"
-      title: "Step 1"
-      order: 1
-      substeps:
-        - id: "1.1"
-          title: "Invalid"
-          order: 1
-          role: "dep1"
-          inputKey: "value"
-          inputType: "bad"
-departments:
-  - id: "dep1"
-    name: "Department 1"
-users:
-  - id: "u1"
-    name: "User 1"
-    departmentId: "dep1"
-`
-	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write temp config: %v", err)
-	}
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
 
-	server := &Server{configPath: configPath}
-	_, err := server.getConfig()
+	server := &Server{configDir: tempDir}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	if len(catalog) != 2 {
+		t.Fatalf("catalog size = %d, want 2", len(catalog))
+	}
+	if catalog["workflow"].Workflow.Name != "Main workflow" {
+		t.Fatalf("workflow key mismatch: got %q", catalog["workflow"].Workflow.Name)
+	}
+	if catalog["workflow"].Workflow.Description != "Main workflow description" {
+		t.Fatalf("workflow description mismatch: got %q", catalog["workflow"].Workflow.Description)
+	}
+	if catalog["secondary"].Workflow.Name != "Secondary workflow" {
+		t.Fatalf("secondary key mismatch: got %q", catalog["secondary"].Workflow.Name)
+	}
+	if catalog["secondary"].Workflow.Description != "" {
+		t.Fatalf("secondary workflow description = %q, want empty", catalog["secondary"].Workflow.Description)
+	}
+}
+
+func TestWorkflowCatalogRejectsInvalidFile(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "bad.yaml"), "Bad workflow", "unsupported")
+
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
 	if err == nil {
 		t.Fatal("expected invalid inputType error")
 	}
-	if !strings.Contains(err.Error(), "invalid inputType") {
-		t.Fatalf("expected invalid inputType in error, got %v", err)
+	if !strings.Contains(err.Error(), "bad.yaml") || !strings.Contains(err.Error(), "invalid inputType") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestRuntimeConfigUsesGetConfigWhenProviderMissing(t *testing.T) {
+func TestWorkflowCatalogRejectsDuplicateWorkflowKeys(t *testing.T) {
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "workflow.yaml")
-	content := `workflow:
-  name: "Demo"
-  steps:
-    - id: "1"
-      title: "Step 1"
-      order: 1
-      substeps:
-        - id: "1.1"
-          title: "Input"
-          order: 1
-          role: "dep1"
-          inputKey: "value"
-          inputType: "text"
-departments:
-  - id: "dep1"
-    name: "Department 1"
-users:
-  - id: "u1"
-    name: "User 1"
-    departmentId: "dep1"
-`
-	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write temp config: %v", err)
+	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yml"), "Alpha duplicate", "string")
+
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
+	if err == nil {
+		t.Fatal("expected duplicate workflow key error")
+	}
+	if !strings.Contains(err.Error(), "duplicate workflow key") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWorkflowCatalogInvalidatesCacheWhenFileChanges(t *testing.T) {
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "workflow.yaml")
+	writeWorkflowConfig(t, path, "First", "string")
+
+	server := &Server{configDir: tempDir}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(first): %v", err)
+	}
+	if catalog["workflow"].Workflow.Name != "First" {
+		t.Fatalf("name = %q, want First", catalog["workflow"].Workflow.Name)
 	}
 
-	server := &Server{configPath: configPath}
-	cfg, err := server.runtimeConfig()
+	writeWorkflowConfig(t, path, "Second", "string")
+	future := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(path, future, future); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	updated, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(updated): %v", err)
+	}
+	if updated["workflow"].Workflow.Name != "Second" {
+		t.Fatalf("name = %q, want Second", updated["workflow"].Workflow.Name)
+	}
+}
+
+func TestWorkflowByKeyAndRuntimeConfigUseCatalog(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "zeta.yaml"), "Zeta workflow", "string")
+
+	server := &Server{configDir: tempDir}
+	cfg, err := server.workflowByKey("zeta")
+	if err != nil {
+		t.Fatalf("workflowByKey(zeta): %v", err)
+	}
+	if cfg.Workflow.Name != "Zeta workflow" {
+		t.Fatalf("workflowByKey(zeta) name = %q", cfg.Workflow.Name)
+	}
+
+	defaultCfg, err := server.runtimeConfig()
 	if err != nil {
 		t.Fatalf("runtimeConfig(): %v", err)
 	}
-	if cfg.Workflow.Name != "Demo" {
-		t.Fatalf("workflow name = %q, want Demo", cfg.Workflow.Name)
-	}
-	if cfg.Workflow.Steps[0].Substep[0].InputType != "string" {
-		t.Fatalf("input type should be normalized to string, got %q", cfg.Workflow.Steps[0].Substep[0].InputType)
+	if defaultCfg.Workflow.Name != "Main workflow" {
+		t.Fatalf("runtimeConfig default = %q, want Main workflow", defaultCfg.Workflow.Name)
 	}
 }
 
-func TestGetConfigUsesCachedValueWhenFileUnchanged(t *testing.T) {
-	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "workflow.yaml")
-	content := `workflow:
-  name: "Demo"
-  steps:
-    - id: "1"
-      title: "Step 1"
-      order: 1
-      substeps:
-        - id: "1.1"
-          title: "Input"
-          order: 1
-          role: "dep1"
-          inputKey: "value"
-          inputType: "string"
-`
-	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write temp config: %v", err)
-	}
-	info, err := os.Stat(configPath)
-	if err != nil {
-		t.Fatalf("stat temp config: %v", err)
-	}
-
-	cached := RuntimeConfig{
-		Workflow: WorkflowDef{
-			Name: "Cached",
-			Steps: []WorkflowStep{
-				{
-					StepID: "1",
-					Substep: []WorkflowSub{
-						{SubstepID: "1.1", InputType: "string"},
-					},
-				},
-			},
-		},
-	}
-	server := &Server{configPath: configPath, config: &cached, configModTime: info.ModTime()}
-
-	cfg, err := server.getConfig()
-	if err != nil {
-		t.Fatalf("getConfig(): %v", err)
-	}
-	if cfg.Workflow.Name != "Cached" {
-		t.Fatalf("expected cached config to be returned, got %q", cfg.Workflow.Name)
-	}
-}
-
-func TestGetConfigRejectsEmptyWorkflow(t *testing.T) {
-	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "workflow.yaml")
-	content := `workflow:
-  name: ""
-  steps: []
-`
-	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write temp config: %v", err)
-	}
-
-	server := &Server{configPath: configPath}
-	_, err := server.getConfig()
-	if err == nil {
-		t.Fatal("expected empty workflow error")
-	}
-	if !strings.Contains(err.Error(), "workflow config is empty") {
-		t.Fatalf("expected empty workflow message, got %v", err)
+func writeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {
+	t.Helper()
+	content := "workflow:\n" +
+		"  name: \"" + name + "\"\n" +
+		func() string {
+			if len(description) == 0 || strings.TrimSpace(description[0]) == "" {
+				return ""
+			}
+			return "  description: \"" + description[0] + "\"\n"
+		}() +
+		"  steps:\n" +
+		"    - id: \"1\"\n" +
+		"      title: \"Step 1\"\n" +
+		"      order: 1\n" +
+		"      substeps:\n" +
+		"        - id: \"1.1\"\n" +
+		"          title: \"Input\"\n" +
+		"          order: 1\n" +
+		"          role: \"dep1\"\n" +
+		"          inputKey: \"value\"\n" +
+		"          inputType: \"" + inputType + "\"\n" +
+		"departments:\n" +
+		"  - id: \"dep1\"\n" +
+		"    name: \"Department 1\"\n" +
+		"users:\n" +
+		"  - id: \"u1\"\n" +
+		"    name: \"User 1\"\n" +
+		"    departmentId: \"dep1\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config %s: %v", path, err)
 	}
 }

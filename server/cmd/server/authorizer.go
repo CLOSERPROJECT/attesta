@@ -11,7 +11,7 @@ import (
 )
 
 type Authorizer interface {
-	CanComplete(ctx context.Context, actor Actor, processID string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error)
+	CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error)
 }
 
 type CerbosAuthorizer struct {
@@ -30,12 +30,15 @@ func NewCerbosAuthorizer(url string, client *http.Client, now func() time.Time) 
 	return &CerbosAuthorizer{url: url, client: client, now: now}
 }
 
-func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
+func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
 	request := map[string]interface{}{
 		"requestId": fmt.Sprintf("req-%d", a.now().UnixNano()),
 		"principal": map[string]interface{}{
 			"id":    actor.UserID,
 			"roles": []string{actor.Role},
+			"attr": map[string]interface{}{
+				"workflowKey": strings.TrimSpace(actor.WorkflowKey),
+			},
 		},
 		"resource": map[string]interface{}{
 			"kind": "substep",
@@ -47,6 +50,7 @@ func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, process
 						"substepOrder": sub.Order,
 						"substepId":    sub.SubstepID,
 						"processId":    processID,
+						"workflowKey":  strings.TrimSpace(workflowKey),
 						"sequenceOk":   sequenceOK,
 					},
 				},

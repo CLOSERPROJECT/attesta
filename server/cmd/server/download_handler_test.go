@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -263,5 +264,38 @@ func TestHandleDownloadSubstepFileDefaultsContentTypeWhenMissing(t *testing.T) {
 	}
 	if got := rr.Header().Get("Content-Type"); got != "application/octet-stream" {
 		t.Fatalf("content-type = %q, want application/octet-stream", got)
+	}
+}
+
+func TestHandleDownloadSubstepFileReturns404ForWorkflowMismatch(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "other",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_3": {State: "pending"},
+		},
+	})
+
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/substep/1.3/file", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
 	}
 }

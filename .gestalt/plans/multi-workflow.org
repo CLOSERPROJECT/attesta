@@ -1,0 +1,184 @@
+#+TITLE: Multi-workflow Selection and Isolation Plan
+#+SUBTITLE: Support multiple YAML workflows with scoped UI, process data, and Cerbos authorization
+#+DATE: 2026-02-10
+#+KEYWORDS: attesta, workflow-catalog, routing, cerbos, isolation, sse
+
+* DONE [#A] Lock scope and compatibility contract
+Effort: S
+Goal: Freeze functional scope and avoid accidental breaking behavior while introducing workflow selection.
+Notes: Decision resolved in favor of minimal change with explicit workflow-scoped routes and compatibility redirects for old deep links.
+** DONE [#A] Define final behavior and non-breaking defaults
+Why: The app currently assumes one workflow in memory and global routes; multi-workflow needs deterministic selection and URL scoping.
+Change: Adopt this contract: (1) `GET /` and `GET /backoffice` become workflow pickers; (2) selected workflow redirects to workflow-scoped pages; (3) legacy read routes (`/process/:id`, `/backoffice/:role/process/:id`) issue `303` redirects to the matching workflow-scoped route when resolvable; (4) legacy mutating routes without workflow context return `400`.
+Tests: Add route-level tests asserting redirect and `400` behavior for legacy endpoints.
+Done when: Compatibility policy is codified in handler tests and no unresolved route ambiguity remains.
+
+* DONE [#A] Introduce workflow catalog loading from `server/config`
+Effort: M
+Goal: Load, validate, and cache multiple workflow YAML files from one directory.
+Notes: Keep dependencies unchanged; use standard library + existing YAML package.
+** DONE [#A] Replace single config path with catalog provider
+Why: `Server.configPath` + `getConfig()` only supports one file and one cached config.
+Change: In `server/cmd/server/main.go`, replace single-config fields with catalog fields (directory path, per-file modtimes, parsed catalog cache). Add `workflowCatalog()` and `workflowByKey(key)` helpers. Discover files from `config/*.yaml`; derive `workflowKey` from filename (basename without extension); validate uniqueness and non-empty `workflow.name` and `steps`.
+Tests: Update `server/cmd/server/config_test.go` to cover multi-file discovery, invalid file rejection, duplicate key handling, and cache invalidation when one file changes.
+Done when: Server can list >1 workflow config from `server/config` and return one by key with stable caching.
+** DONE [#B] Define catalog DTOs for templates and handlers
+Why: Home/backoffice pickers need a shared, explicit view model.
+Change: Add lightweight DTOs in `server/cmd/server/main.go` (or nearby): `WorkflowOption{Key, Name}`, `WorkflowPickerView{PageBase, Workflows}`; keep REPR style by creating distinct view structs per page (`HomeWorkflowPickerView`, `BackofficeWorkflowPickerView`) even if same fields initially.
+Tests: Handler tests assert picker pages render workflow name + link target per key.
+Done when: Picker handlers use typed DTOs and templates compile without reflection-based assumptions.
+
+* DONE [#A] Make routes workflow-scoped (home and backoffice)
+Effort: L
+Goal: Ensure every business page and action executes under a selected workflow context.
+Notes: Prefer explicit path scope over hidden cookie scope to reduce cross-flow mistakes.
+** DONE [#A] Add workflow-scoped route tree
+Why: Current routes (`/process/*`, `/backoffice/*`) cannot disambiguate workflow context.
+Change: In `server/cmd/server/main.go`, add route parser for `/w/{workflowKey}/...` and dispatch to existing handlers with `workflowKey` parameter. Target endpoints: `/w/{key}/`, `/w/{key}/process/start`, `/w/{key}/process/{id}`, `/w/{key}/process/{id}/timeline`, `/w/{key}/process/{id}/substep/{substepId}/complete`, `/w/{key}/process/{id}/substep/{substepId}/file`, `/w/{key}/backoffice`, `/w/{key}/backoffice/{role}`, `/w/{key}/backoffice/{role}/partial`, `/w/{key}/backoffice/{role}/process/{id}`, `/w/{key}/impersonate`, `/w/{key}/events`.
+Tests: Add/update `server/cmd/server/process_routes_test.go`, `server/cmd/server/backoffice_handler_test.go`, and `server/cmd/server/home_handler_test.go` for scoped routing and not-found behavior on unknown workflow key.
+Done when: All UI links/actions resolve to `/w/{key}/...` and unknown keys consistently return `404`.
+** DONE [#A] Render workflow pickers for home and backoffice entrypoints
+Why: User requirement asks for first page listing all workflows for both user and backoffice surfaces.
+Change: Update `server/templates/home.html` and `server/templates/backoffice.html` (or new picker templates) so `/` and `/backoffice` list workflows and link to `/w/{key}/` and `/w/{key}/backoffice`. Keep existing old landing content under workflow-scoped pages.
+Tests: Template/handler tests assert workflow list appears on both pickers; selected link lands on current existing landing behavior.
+Done when: Entry pages show all configured workflows and clicking one opens the prior landing UX within that workflow.
+
+* DONE [#A] Persist workflow identity on processes and enforce app-level isolation
+Effort: L
+Goal: Ensure process reads/writes are strictly scoped to the workflow they belong to.
+Notes: This is the core guardrail before Cerbos, and prevents cross-flow data leakage.
+** DONE [#A] Add `WorkflowKey` to process model and store filters
+Why: Existing `workflowDefID` is server-generated once and does not identify per-file workflow context.
+Change: In `server/cmd/server/main.go` and `server/cmd/server/store.go`, add `Process.WorkflowKey string` (BSON `workflowKey`). On process creation, set from selected workflow key. Replace global list/latest methods with scoped variants in `Store` (`LoadLatestProcessByWorkflow`, `ListRecentProcessesByWorkflow`) and apply Mongo filters `{workflowKey: key}` plus matching in `MemoryStore`.
+Tests: Update `server/cmd/server/store_test.go` and `server/cmd/server/store_mongo_crud_test.go` to validate list/latest isolation by workflow key.
+Done when: Home/dashboard/history for workflow A never include process data from workflow B.
+** DONE [#A] Enforce workflow/process match in every handler
+Why: A user can guess process IDs; handlers must reject cross-workflow process access.
+Change: For all process-based handlers in `server/cmd/server/main.go`, after `loadProcess`, verify `process.WorkflowKey == selectedWorkflowKey`; on mismatch return `404` (not `403`) to avoid workflow enumeration. Apply this to timeline, exports, completion, file download, and backoffice process pages.
+Tests: Extend `server/cmd/server/process_read_handler_test.go`, `server/cmd/server/download_handler_test.go`, and `server/cmd/server/complete_handler_test.go` with mismatch cases expecting `404`.
+Done when: Any attempt to use workflow A route with workflow B process ID returns `404` across all endpoints.
+
+* DONE [#A] Extend Cerbos contract to include workflow scope
+Effort: M
+Goal: Prevent authorization decisions from allowing cross-workflow completions.
+Notes: Keep policy simple: same role + sequence checks, plus workflow match.
+** DONE [#A] Include workflow attributes in check request and policy
+Why: Current Cerbos attrs only include role/sequence/process/substep and cannot distinguish flows.
+Change: Update `server/cmd/server/authorizer.go` interface + implementation to pass `workflowKey` and include `request.resource.attr.workflowKey`; include `request.principal.attr.workflowKey` in principal payload. Update `cerbos/policies/substep_policy.yaml` condition with equality check between principal and resource workflow keys.
+Tests: Update `server/cmd/server/authorizer_test.go` to assert both attrs are sent; add deny-case test for mismatched workflow attrs.
+Done when: Cerbos allows only when role, sequence, and workflow key all match.
+** DONE [#B] Scope impersonation identity by workflow
+Why: Current cookie `demo_user=user|role` is global and can bleed between workflows.
+Change: In `server/cmd/server/main.go`, extend actor model/cookie parsing to include workflow key (`user|role|workflowKey`) for workflow-scoped routes. Keep backward parser for old 2-part cookie, defaulting workflow to route key at read time.
+Tests: Update `server/cmd/server/helpers_request_test.go` and `server/cmd/server/impersonate_handler_test.go` for 3-part cookie format and backward compatibility.
+Done when: Completing actions in workflow A with a workflow B impersonation cookie is denied before mutation.
+
+* DONE [#B] Scope SSE channels and frontend refresh calls by workflow
+Effort: M
+Goal: Stop cross-workflow dashboard/timeline refreshes and keep live updates accurate.
+Notes: Minimal frontend change in existing `web/src/main.js`.
+** DONE [#B] Add workflow key to SSE subscriptions and refresh URLs
+Why: Current SSE channels for roles are global (`role:{role}`), causing cross-flow updates.
+Change: Update `server/cmd/server/main.go` event endpoint to accept `workflow` query and subscribe to namespaced channels (`process:{workflow}:{id}`, `role:{workflow}:{role}`). Update broadcasts after completion/start accordingly. In `web/src/main.js`, derive `workflowKey` from page dataset and call scoped URLs for `EventSource` and `fetch`.
+Tests: Update `server/cmd/server/events_handler_test.go`; add/adjust JS tests if present, otherwise handler + template dataset coverage in Go tests.
+Done when: Dashboard/timeline in one workflow no longer refresh from events emitted by other workflows.
+
+* DONE [#A] Update templates and page base contracts
+Effort: M
+Goal: Ensure all links/forms/nav remain in selected workflow context.
+Notes: Keep UX unchanged after selection except URL prefix.
+** DONE [#A] Add workflow context to page base and templates
+Why: Hardcoded links currently point to global routes (`/process/...`, `/backoffice/...`).
+Change: Extend `PageBase` with `WorkflowKey` (and optionally `WorkflowName`) in `server/cmd/server/main.go`. Update templates: `server/templates/layout.html`, `server/templates/process.html`, `server/templates/backoffice_department.html`, `server/templates/backoffice_process.html`, `server/templates/action_list.html`, and `server/templates/home.html`/`server/templates/backoffice.html` picker variants to generate scoped links and form actions.
+Tests: Existing handler template tests (`home_handler_test.go`, `backoffice_handler_test.go`, `process_read_handler_test.go`) updated to assert scoped paths.
+Done when: No rendered link/form action points to unscoped business routes.
+
+* DONE [#A] Complete verification and rollout/migration
+Effort: S
+Goal: Ship safely with deterministic migration behavior for existing processes.
+Notes: Existing DB records without `workflowKey` must not break runtime.
+** DONE [#A] Migration and fallback strategy
+Why: Existing processes likely miss `workflowKey`; strict filtering would hide them.
+Change: Add one-time compatibility fallback in store query layer: for configured default workflow key, include records where `workflowKey` is missing; on first successful write to such process, persist inferred key. Document this in `README.md` or `QUICKSTART.md`.
+Tests: Add store tests for missing `workflowKey` fallback and write-back behavior.
+Done when: Pre-existing data is visible in default workflow, and newly created/updated records always contain `workflowKey`.
+** DONE [#A] Full regression run and acceptance checklist
+Why: Multi-workflow touches routing, auth, persistence, templates, and SSE.
+Change: Run `cd server && go test ./...` and targeted integration checks (`go test -tags=integration ./...` when dependencies are up). Validate manual acceptance: pick workflow on `/` and `/backoffice`, create process, complete substep, ensure other workflow cannot read/mutate same process, and Cerbos denies workflow mismatch.
+Tests: Unit + integration + manual smoke checklist.
+Done when: All tests pass and acceptance checklist is green with at least two workflow YAML files in `server/config`.
+
+* DONE [#A] Fix backoffice landing workflow picker regression
+Effort: S
+Goal: Ensure `/backoffice` reliably offers workflow selection and validates isolation with distinct users per workflow.
+Notes: This is a corrective slice after the initial multi-workflow rollout; no new dependencies and no route contract changes.
+** DONE [#A] Re-enable or correct workflow choices on `/backoffice`
+Why: The current behavior is reported broken; operators must be able to choose the target workflow from the backoffice landing before role/process navigation.
+Change: In `server/cmd/server/main.go` and `server/templates/backoffice.html`, enforce that `GET /backoffice` always renders a workflow picker sourced from catalog DTOs (same source as `/`). Verify links target `/w/{key}/backoffice` for each configured workflow and never auto-select implicitly.
+Tests: Extend `server/cmd/server/backoffice_handler_test.go` with a failing-first case for `/backoffice` rendering all configured workflows and correct scoped hrefs.
+Done when: Visiting `/backoffice` with at least two workflow YAML files always shows both choices and navigates into the selected scoped backoffice landing.
+** DONE [#A] Use distinct user sets per workflow for end-to-end validation
+Why: Reusing the same impersonated users across workflows can hide scope leaks in cookie/session and Cerbos checks.
+Change: In `server/config/workflow*.yaml`, assign non-overlapping demo users per workflow (unique `userId` values per role per workflow). Validate impersonation flow uses workflow-bound identities and denies cross-workflow cookie reuse.
+Tests: Add/adjust handler tests in `server/cmd/server/impersonate_handler_test.go` and `server/cmd/server/complete_handler_test.go` to assert workflow A user cannot complete workflow B route/process, plus manual smoke checks from `/backoffice` picker.
+Done when: Each workflow is operated by its own user set, impersonation remains functional per workflow, and cross-workflow action attempts are denied consistently.
+
+* DONE [#A] Enforce 90% minimum test coverage gate
+Effort: M
+Goal: Make automated verification fail when total backend coverage is below 90%.
+Notes: This is now a hard quality constraint; keep tooling unchanged and avoid adding dependencies.
+** DONE [#A] Raise coverage threshold in local and CI checks
+Why: The current gate is lower and allows merges that do not meet the agreed confidence level.
+Change: Update coverage threshold in `Taskfile.yml` and any duplicated CI gate so both local `task cover` and CI apply the same 90% minimum consistently.
+Tests: Run coverage check in passing and failing conditions to verify deterministic exit codes around the 90% cutoff.
+Done when: Local and CI pipelines both fail below 90% and pass at 90% or above.
+** DONE [#A] Add targeted tests to close the gap
+Why: Increasing the threshold without expanding coverage will block delivery.
+Change: Add focused tests in low-coverage multi-workflow slices (route dispatch fallbacks, backoffice/home workflow pickers, impersonation workflow scope, workflow/process mismatch guards) using existing `server/cmd/server/*_test.go` patterns.
+Tests: Run `cd server && go test ./...` and `task cover`, confirming total reported coverage is at least 90%.
+Done when: Full backend test suite passes and measured coverage is >=90% without relaxing assertions.
+
+* DONE [#B] Turn workflow picker buttons into workflow cards with status counts
+Effort: M
+Goal: Upgrade the workflow selection UX on `/` and `/backoffice` to show richer cards (name + optional description + per-workflow process counts).
+Notes: Keep the existing workflow-scoped routes (`/w/{key}/...`) and avoid new dependencies; cards should work without JS.
+** DONE [#A] Add optional workflow description to YAML and picker DTOs
+Why: Cards should show a short “what is this workflow” line when available; YAML currently only includes a name.
+Change: Extend `WorkflowDef` in `server/cmd/server/main.go` with `Description string` (`yaml:"description"`, optional). Update picker DTOs (`WorkflowOption` or a new `WorkflowCardOption`) to include `Description` sourced from `cfg.Workflow.Description`. Update `server/cmd/server/config_test.go` and test helpers (e.g., `writeWorkflowConfig` in `server/cmd/server/helpers_home_test.go`) to cover description present/absent.
+Tests: Config parsing tests assert description is optional and preserved; picker handler tests assert description renders only when set.
+Done when: A workflow config can include `workflow.description` and picker templates can render it without requiring it.
+** DONE [#A] Compute “not started / started / terminated” counts per workflow for pickers
+Why: The workflow choice should communicate how many process instances are available in each state before the user enters a workflow.
+Change: Define a small view model (e.g., `WorkflowProcessCounts{NotStarted, Started, Terminated int}`) and attach it to each workflow card. In `handleHome` and the unscoped branch of `handleBackoffice` (when rendering pickers), compute counts per workflow by listing all processes for that workflow via `store.ListRecentProcessesByWorkflow(ctx, key, 0)`. For each process: normalize progress keys; derive `status` like `handleWorkflowHome` (default `"active"`, promote to `"done"` when `isProcessDone(cfg.Workflow, &process)`); compute `doneCount` via `processProgressStats(cfg.Workflow, &process)`; then classify: `Terminated` if `status == "done"`, `NotStarted` if `status != "done"` and `doneCount == 0`, otherwise `Started`. Keep default-workflow fallback behavior (missing `workflowKey`) intact via existing store filters.
+Tests: Add handler tests seeding a `MemoryStore` with a mix of (a) zero-progress active, (b) partially completed active, and (c) completed processes across two workflow keys; assert rendered counts per workflow on both `/` and `/backoffice`.
+Done when: Picker pages show accurate per-workflow counts and tests cover “status missing but done via progress” and multi-workflow separation.
+** DONE [#B] Render pickers as accessible card grid and style them
+Why: Buttons are hard to scan and don’t surface key information; cards make workflow choice clearer and more attractive.
+Change: Update `server/templates/home.html` (`home_picker_body`) and `server/templates/backoffice.html` (`backoffice_picker_body`) to render a grid of cards. Prefer anchor-based navigation (`<a href="/w/{{.Key}}/">` and `<a href="/w/{{.Key}}/backoffice">`) so the entire card is clickable and matches existing tests expecting scoped `href`s. Card content: workflow name, optional description, and three small stat lines/badges (“Not started”, “Started”, “Terminated”) with counts. Add minimal CSS in `web/src/styles.css` for layout and hover/focus states; rebuild `web/dist` via `npm run build` so server-served assets include the new styling.
+Tests: Update picker template tests (`server/cmd/server/home_handler_test.go`, `server/cmd/server/backoffice_handler_test.go`) to assert card content (name/description/stats) and scoped `href`s.
+Done when: Both pickers display cards with correct content, are keyboard-focusable, and the updated Go tests pass.
+
+* DONE [#B] Make workflow picker landing full-width and card grid responsive
+Effort: S
+Goal: Improve `/` and `/backoffice` workflow picker layout so the landing panel uses the available width, cards have a consistent “designed” size, and mobile renders one card per row.
+Notes: Apply changes only to workflow picker pages; keep other `.landing` panels (e.g. backoffice department picker) at their current width unless explicitly requested.
+** DONE [#A] Add a dedicated “wide picker” class to the picker panels
+Why: `.landing` is capped (`max-width`) and is used by multiple pages; the workflow picker should be full-width without affecting other landings.
+Change: In `server/templates/home.html` (`home_picker_body`) and `server/templates/backoffice.html` (`backoffice_picker_body`), add a class like `landing-wide` to the `<section class="panel landing ...">` wrapper. In `web/src/styles.css`, override only for that class (`.landing.landing-wide { max-width: none; width: 100%; }`) so the panel spans the available page width (still inside `.page` padding).
+Tests: Update picker handler/template tests to assert the workflow picker section includes `landing-wide` while other landing pages still render without it.
+Done when: Picker panels occupy full width inside `.page`, and other `.landing` panels remain unchanged.
+** DONE [#A] Fix card sizing to target 4/3-per-row desktop, 1-per-row mobile
+Why: The current `auto-fit` grid can produce awkward card widths on large screens, and can render 2-up on “large phones” unless explicitly constrained.
+Change: In `web/src/styles.css`, change `.workflow-grid` to use explicit breakpoints and a constrained card width so cards keep a predictable size while the panel can be full width. Suggested targets: (1) phones: 1 column; (2) tablets: 2 columns; (3) desktop: 3 columns; (4) wide: 4 columns. Use `justify-content: center` and `grid-template-columns: repeat(N, minmax(240px, 280px))` (or similar) to avoid overly wide cards on large monitors.
+Tests: No automated CSS layout tests; validate manually via responsive browser emulation at common widths (e.g. 390px phone, 768px tablet, 1024px desktop, 1440px wide).
+Done when: Pickers show 1 card per row on phones, ~3 columns on typical desktop widths, ~4 on wide screens, and cards stay within the chosen size bounds without overflow.
+** DONE [#B] Rebuild web bundle and do a quick UI smoke check
+Why: The backend serves `web/dist` assets; CSS changes must be compiled into the Vite output for non-dev mode.
+Change: Run `cd web && npm install && npm run build` (if needed) and verify the picker pages (`/` and `/backoffice`) in the browser for both light/dark themes.
+Tests: Run `cd server && go test ./...` to ensure template/test assertions still pass after class/markup changes.
+Done when: Built assets include the new layout, and backend tests remain green.
+** DONE [#C] Left-align picker grid and use flexible `fr` columns
+Why: Centered, width-capped tracks leave visible blank space at row start on wide panels.
+Change: In `web/src/styles.css`, set `.workflow-grid` to `justify-content: start` and switch base/breakpoint column tracks from `minmax(240px, 280px)` to flexible `1fr`-based tracks.
+Tests: Rebuild web bundle and run backend tests.
+Done when: Cards start from the left edge and columns expand to fill available row width at each breakpoint.

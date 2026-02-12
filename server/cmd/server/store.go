@@ -24,10 +24,10 @@ import (
 type Store interface {
 	InsertProcess(ctx context.Context, process Process) (primitive.ObjectID, error)
 	LoadProcessByID(ctx context.Context, id primitive.ObjectID) (*Process, error)
-	LoadLatestProcess(ctx context.Context) (*Process, error)
-	ListRecentProcesses(ctx context.Context, limit int64) ([]Process, error)
-	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, substepID string, progress ProcessStep) error
-	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, status string) error
+	LoadLatestProcessByWorkflow(ctx context.Context, workflowKey string) (*Process, error)
+	ListRecentProcessesByWorkflow(ctx context.Context, workflowKey string, limit int64) ([]Process, error)
+	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error
+	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error
 	InsertNotarization(ctx context.Context, notarization Notarization) error
 	SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error)
 	LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error)
@@ -217,18 +217,26 @@ func (s *MongoStore) LoadProcessByID(ctx context.Context, id primitive.ObjectID)
 	return &process, nil
 }
 
-func (s *MongoStore) LoadLatestProcess(ctx context.Context) (*Process, error) {
+func (s *MongoStore) LoadLatestProcessByWorkflow(ctx context.Context, workflowKey string) (*Process, error) {
+	filter := bson.M{"workflowKey": workflowKey}
+	if workflowKey == "workflow" {
+		filter = bson.M{"$or": []bson.M{{"workflowKey": workflowKey}, {"workflowKey": bson.M{"$exists": false}}}}
+	}
 	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
 	var process Process
-	if err := s.database().Collection("processes").FindOne(ctx, bson.M{}, opts).Decode(&process); err != nil {
+	if err := s.database().Collection("processes").FindOne(ctx, filter, opts).Decode(&process); err != nil {
 		return nil, err
 	}
 	return &process, nil
 }
 
-func (s *MongoStore) ListRecentProcesses(ctx context.Context, limit int64) ([]Process, error) {
+func (s *MongoStore) ListRecentProcessesByWorkflow(ctx context.Context, workflowKey string, limit int64) ([]Process, error) {
+	filter := bson.M{"workflowKey": workflowKey}
+	if workflowKey == "workflow" {
+		filter = bson.M{"$or": []bson.M{{"workflowKey": workflowKey}, {"workflowKey": bson.M{"$exists": false}}}}
+	}
 	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(limit)
-	cursor, err := s.database().Collection("processes").Find(ctx, bson.M{}, opts)
+	cursor, err := s.database().Collection("processes").Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -245,17 +253,18 @@ func (s *MongoStore) ListRecentProcesses(ctx context.Context, limit int64) ([]Pr
 	return processes, nil
 }
 
-func (s *MongoStore) UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, substepID string, progress ProcessStep) error {
+func (s *MongoStore) UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error {
 	update := bson.M{
 		"$set": bson.M{
+			"workflowKey": workflowKey,
 			"progress." + encodeProgressKey(substepID): progress,
 		},
 	}
 	return s.database().Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": id}, update).Err()
 }
 
-func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, status string) error {
-	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"status": status}})
+func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error {
+	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"status": status, "workflowKey": workflowKey}})
 	return err
 }
 
@@ -449,7 +458,7 @@ func (s *MemoryStore) LoadProcessByID(_ context.Context, id primitive.ObjectID) 
 	return &cloned, nil
 }
 
-func (s *MemoryStore) LoadLatestProcess(_ context.Context) (*Process, error) {
+func (s *MemoryStore) LoadLatestProcessByWorkflow(_ context.Context, workflowKey string) (*Process, error) {
 	if s.LoadLatestErr != nil {
 		return nil, s.LoadLatestErr
 	}
@@ -461,16 +470,25 @@ func (s *MemoryStore) LoadLatestProcess(_ context.Context) (*Process, error) {
 	var latest Process
 	first := true
 	for _, process := range s.processes {
+		key := strings.TrimSpace(process.WorkflowKey)
+		if key != workflowKey {
+			if !(workflowKey == "workflow" && key == "") {
+				continue
+			}
+		}
 		if first || process.CreatedAt.After(latest.CreatedAt) {
 			latest = process
 			first = false
 		}
 	}
+	if first {
+		return nil, mongo.ErrNoDocuments
+	}
 	cloned := cloneProcess(latest)
 	return &cloned, nil
 }
 
-func (s *MemoryStore) ListRecentProcesses(_ context.Context, limit int64) ([]Process, error) {
+func (s *MemoryStore) ListRecentProcessesByWorkflow(_ context.Context, workflowKey string, limit int64) ([]Process, error) {
 	if s.ListProcessesErr != nil {
 		return nil, s.ListProcessesErr
 	}
@@ -478,6 +496,12 @@ func (s *MemoryStore) ListRecentProcesses(_ context.Context, limit int64) ([]Pro
 	defer s.mu.RUnlock()
 	items := make([]Process, 0, len(s.processes))
 	for _, process := range s.processes {
+		key := strings.TrimSpace(process.WorkflowKey)
+		if key != workflowKey {
+			if !(workflowKey == "workflow" && key == "") {
+				continue
+			}
+		}
 		items = append(items, cloneProcess(process))
 	}
 	sort.Slice(items, func(i, j int) bool {
@@ -489,7 +513,7 @@ func (s *MemoryStore) ListRecentProcesses(_ context.Context, limit int64) ([]Pro
 	return items, nil
 }
 
-func (s *MemoryStore) UpdateProcessProgress(_ context.Context, id primitive.ObjectID, substepID string, progress ProcessStep) error {
+func (s *MemoryStore) UpdateProcessProgress(_ context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error {
 	if s.UpdateProgressErr != nil {
 		return s.UpdateProgressErr
 	}
@@ -502,12 +526,13 @@ func (s *MemoryStore) UpdateProcessProgress(_ context.Context, id primitive.Obje
 	if process.Progress == nil {
 		process.Progress = map[string]ProcessStep{}
 	}
+	process.WorkflowKey = strings.TrimSpace(workflowKey)
 	process.Progress[encodeProgressKey(substepID)] = cloneProcessStep(progress)
 	s.processes[id] = process
 	return nil
 }
 
-func (s *MemoryStore) UpdateProcessStatus(_ context.Context, id primitive.ObjectID, status string) error {
+func (s *MemoryStore) UpdateProcessStatus(_ context.Context, id primitive.ObjectID, workflowKey, status string) error {
 	if s.UpdateStatusErr != nil {
 		return s.UpdateStatusErr
 	}
@@ -517,6 +542,7 @@ func (s *MemoryStore) UpdateProcessStatus(_ context.Context, id primitive.Object
 	if !ok {
 		return mongo.ErrNoDocuments
 	}
+	process.WorkflowKey = strings.TrimSpace(workflowKey)
 	process.Status = status
 	s.processes[id] = process
 	return nil

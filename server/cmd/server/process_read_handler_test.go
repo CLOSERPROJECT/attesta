@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -132,6 +133,37 @@ func TestHandleTimelineTemplateErrorReturns500(t *testing.T) {
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+}
+
+func TestHandleProcessRoutesRejectsWorkflowMismatch(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "other",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex(), nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleProcessRoutes(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
 
