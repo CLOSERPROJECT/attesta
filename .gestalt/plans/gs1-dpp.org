@@ -7,6 +7,7 @@ Summary:
 - Add optional per-workflow `dpp` config (GTIN + where to read LOT/SERIAL).
 - On process completion, assign/store GS1 identifiers on the process (idempotent).
 - Serve a public DPP landing page at the GS1 Digital Link path, with HTML + JSON output.
+- On completed workflow process pages, surface a “DPP” link that navigates to the DPP landing page.
 
 * DONE [#A] Lock down identifiers + configuration shape
   - Effort :: S
@@ -137,6 +138,33 @@ Summary:
      - Handler test for process page when DPP exists: response contains `/01/`.
    - Done when ::
      - Finished processes show a clickable Digital Link in the UI.
+
+* DONE [#A] Show a clear “DPP” link on completed workflow pages
+  - Effort :: S
+  - Goal :: When the workflow is completed, the user sees an obvious “DPP” call-to-action that opens the DPP landing page created above.
+  - Notes :: This is a UX/labeling requirement: it is not a file download; it should be presented as navigation to the DPP page. Keep the link hidden unless `process.dpp` exists.
+** DONE [#A] Add/adjust the process page UI to include a “DPP” entry (not “Open DPP link”)
+   - Why :: The current wording/placement may be easy to miss; “DPP” is the product term users will look for.
+   - Change ::
+     - In `server/templates/process.html`:
+       - Under the existing “Downloads” panel, add a distinct entry labeled exactly “DPP” (button/link).
+       - `href` must be `.DPPURL`.
+       - Render only when `.DPPURL` is non-empty (which implies the workflow has completed and DPP identifiers exist).
+     - If a DPP link already exists, adjust the label to “DPP” and (optionally) add a muted hint like “GS1 Digital Link”.
+   - Tests ::
+     - Manual: complete a process and open `/w/<workflow>/process/<id>`; confirm a “DPP” link is visible and navigates to `/01/...`.
+   - Done when ::
+     - The completed workflow’s process page shows a “DPP” link that opens the DPP landing page.
+** DONE [#B] (Optional) Make the DPP link appear without manual refresh after final completion
+   - Why :: Users may complete the final substep and expect the DPP link to appear immediately on the already-open process page.
+   - Change ::
+     - Ensure whatever the client refreshes on `process-updated` also refreshes the DPP link area:
+       - Either include the DPP link block in the `/process/:id/timeline` partial render, or
+       - Add a small dedicated partial (e.g., `/process/:id/dpp`) and refresh it alongside the timeline.
+   - Tests ::
+     - Manual: keep `/w/<workflow>/process/<id>` open; complete the last substep from another tab; confirm the DPP link appears without hard reload.
+   - Done when ::
+     - DPP link appears via SSE updates after completion without a full page reload.
 
 * DONE [#A] Test plan + rollout/migration notes
   - Effort :: M
