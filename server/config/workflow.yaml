@@ -86,6 +86,9 @@ dpp:
   enabled: true
   gtin: "09506000134352"
   lotInputKey: "batchId"
+  lotDefault: ""
+  serialInputKey: ""
+  serialStrategy: ""
   productName: "Recycled Gallium Batch"
   productDescription: "Gallium intake and refinement process with notarized checkpoints."
   ownerName: "Attesta Demo Operator"
