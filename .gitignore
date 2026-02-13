@@ -1,3 +1,5 @@
+server/gen
+
 # Docker volumes and runtime data
 *.log
 .env
