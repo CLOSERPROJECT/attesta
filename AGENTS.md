@@ -163,6 +163,7 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 - Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}`:
   - HTML landing page (template: `server/templates/dpp.html`)
   - JSON (`Accept: application/json` or `?format=json`)
+- DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.
 
 ## Templates and static assets

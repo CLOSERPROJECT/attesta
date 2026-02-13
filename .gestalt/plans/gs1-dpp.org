@@ -125,6 +125,50 @@ Summary:
    - Done when ::
      - The HTML page is readable, uses existing styling, and includes the identifiers + workflow-derived content.
 
+* DONE [#A] Show per-step user-entered data directly in DPP Traceability (remove Documents section)
+  - Effort :: M
+  - Goal :: Make the DPP page self-explanatory by showing the values entered for each substep directly in the Traceability section, and show file links inline (so a separate Documents section is unnecessary).
+  - Notes :: Target structure similar to `dpp.eecc.de` (clear header/overview + traceability entries containing human-readable data + file links + integrity section). Decision: for now, all step values are public on the DPP page.
+** DONE [#A] Add a display-oriented traceability view model for HTML rendering
+   - Why :: `NotarizedSubstep.Payload` is a `map[string]interface{}` which is hard to render nicely (ordering, types, nested file payload), and DPP should remain readable like the reference page.
+   - Change ::
+     - In `server/cmd/server/main.go` and/or `server/cmd/server/dpp.go`, introduce DPP-only view structs used by the HTML template (do not change JSON output):
+       - `DPPTraceStepView{StepID, Title, Substeps []DPPTraceSubstepView}`
+       - `DPPTraceSubstepView{SubstepID, Title, Role, DoneAt, DoneBy, Status, Fields []DPPTraceFieldView, File *DPPTraceFileView}`
+       - `DPPTraceFieldView{Label, Value}` rendered for scalar inputs (and any extra payload keys).
+       - `DPPTraceFileView{Name, URL, ContentType, SizeBytes}` rendered for file inputs; omit raw `attachmentId` from HTML unless explicitly desired.
+     - In `handleDigitalLinkDPP(...)`:
+       - Build `view.Traceability` from `export.Steps[*].Substeps[*]`:
+         - For non-file substeps: convert payload keys/values into a sorted list of `Fields` (stringify numbers predictably; skip empty values).
+         - For file substeps: read `sub.Attachment` (already extracted) to populate `File` and do not dump the nested raw attachment payload map.
+   - Tests ::
+     - Unit-test the helper that converts `map[string]interface{}` to sorted `[]DPPTraceFieldView` (numbers, strings, empty values, unexpected nested types).
+   - Done when ::
+     - DPP handler can render a stable, readable set of “fields” per substep without relying on Go template `range` over maps.
+** DONE [#A] Update `server/templates/dpp.html` to show values + file links inline and remove the Documents section
+   - Why :: Users should see “what was entered” at a glance within Traceability, and file access should be attached to the step that produced it.
+   - Change ::
+     - In `server/templates/dpp.html`:
+       - In the Traceability section, for each substep:
+         - Render scalar `Fields` as a small definition list or key/value list (label + value).
+         - If `File` is present, render a “Download” link next to the file name (and optionally show content type and size).
+         - Remove the per-substep “digest:” display line in Traceability (integrity is already covered in the Integrity section).
+       - Remove the entire “Documents” section.
+       - Keep the Integrity section as-is (Merkle root + leaves).
+     - Ensure the page still reads well on mobile (use existing CSS utilities: `stack`, `panel`, `muted`, `pill`).
+   - Tests ::
+     - Handler/template smoke test: response includes an example payload value and includes a file download link when an attachment exists.
+   - Done when ::
+     - A completed workflow DPP page shows substep values and file links in Traceability and no longer shows a separate Documents section.
+** DONE [#C] (Deferred) Consider inline viewing for attachments
+   - Why :: Inline viewing can improve UX for PDFs/images, but is explicitly out of scope for now (download-only).
+   - Change ::
+     - No changes in this iteration.
+   - Tests ::
+     - N/A
+   - Done when ::
+     - A follow-up iteration explicitly opts into inline viewing semantics.
+
 * DONE [#B] Wire DPP URL into existing UI (optional but recommended)
   - Effort :: S
   - Goal :: Make it easy for users to discover/copy the DPP link once a process is completed.
