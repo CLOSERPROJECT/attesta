@@ -234,11 +234,47 @@ func TestMemoryStoreWorkflowQueriesAndMissingProcessErrors(t *testing.T) {
 	if err := store.UpdateProcessProgress(t.Context(), id, "workflow", "1.1", ProcessStep{State: "done"}); err != nil {
 		t.Fatalf("UpdateProcessProgress existing err: %v", err)
 	}
+	if _, err := store.LoadProcessByDigitalLink(t.Context(), "09506000134352", "lot-a", "serial-a"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("LoadProcessByDigitalLink missing err = %v, want %v", err, mongo.ErrNoDocuments)
+	}
 }
 
 func TestMemoryStoreMissingAttachmentDownload(t *testing.T) {
 	store := NewMemoryStore()
 	if _, err := store.OpenAttachmentDownload(t.Context(), primitive.NewObjectID()); !errors.Is(err, mongo.ErrNoDocuments) {
 		t.Fatalf("OpenAttachmentDownload missing err = %v, want %v", err, mongo.ErrNoDocuments)
+	}
+}
+
+func TestMemoryStoreDigitalLinkRoundTrip(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "done",
+		Progress:  map[string]ProcessStep{},
+	})
+
+	dpp := ProcessDPP{
+		GTIN:        "09506000134352",
+		Lot:         "LOT-001",
+		Serial:      "SERIAL-001",
+		GeneratedAt: time.Now().UTC(),
+	}
+	if err := store.UpdateProcessDPP(t.Context(), processID, "workflow", dpp); err != nil {
+		t.Fatalf("UpdateProcessDPP: %v", err)
+	}
+	process, err := store.LoadProcessByDigitalLink(t.Context(), dpp.GTIN, dpp.Lot, dpp.Serial)
+	if err != nil {
+		t.Fatalf("LoadProcessByDigitalLink: %v", err)
+	}
+	if process.ID != processID {
+		t.Fatalf("process id = %s, want %s", process.ID.Hex(), processID.Hex())
+	}
+	if process.DPP == nil {
+		t.Fatal("expected process.DPP to be set")
+	}
+	if process.DPP.GTIN != dpp.GTIN || process.DPP.Lot != dpp.Lot || process.DPP.Serial != dpp.Serial {
+		t.Fatalf("unexpected dpp data: %#v", process.DPP)
 	}
 }

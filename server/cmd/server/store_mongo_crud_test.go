@@ -88,6 +88,36 @@ func TestMongoStoreLoadProcessByID(t *testing.T) {
 	}
 }
 
+func TestMongoStoreLoadProcessByDigitalLinkUsesDPPFields(t *testing.T) {
+	want := Process{ID: primitive.NewObjectID(), Status: "done"}
+	collection := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Process)) = want
+				return nil
+			}}
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
+	store := &MongoStore{dbPort: db}
+
+	_, err := store.LoadProcessByDigitalLink(t.Context(), "09506000134352", "LOT-001", "SERIAL-001")
+	if err != nil {
+		t.Fatalf("LoadProcessByDigitalLink returned error: %v", err)
+	}
+	if len(collection.findOneFilters) != 1 {
+		t.Fatalf("expected one findOne filter, got %d", len(collection.findOneFilters))
+	}
+	expected := bson.M{
+		"dpp.gtin":   "09506000134352",
+		"dpp.lot":    "LOT-001",
+		"dpp.serial": "SERIAL-001",
+	}
+	if !reflect.DeepEqual(collection.findOneFilters[0], expected) {
+		t.Fatalf("filter = %#v, want %#v", collection.findOneFilters[0], expected)
+	}
+}
+
 func TestMongoStoreLoadLatestProcessByWorkflow(t *testing.T) {
 	want := Process{ID: primitive.NewObjectID(), CreatedAt: time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC)}
 	collection := &fakeMongoCollection{
@@ -277,5 +307,38 @@ func TestMongoStoreUpdateProcessStatusAndInsertNotarization(t *testing.T) {
 	}
 	if err := store.InsertNotarization(t.Context(), notary); !errors.Is(err, insertErr) {
 		t.Fatalf("InsertNotarization error = %v, want %v", err, insertErr)
+	}
+}
+
+func TestMongoStoreUpdateProcessDPP(t *testing.T) {
+	processes := &fakeMongoCollection{}
+	db := &fakeMongoDatabase{
+		collections: map[string]*fakeMongoCollection{
+			"processes": processes,
+		},
+	}
+	store := &MongoStore{dbPort: db}
+	id := primitive.NewObjectID()
+	dpp := ProcessDPP{
+		GTIN:        "09506000134352",
+		Lot:         "LOT-001",
+		Serial:      "SERIAL-001",
+		GeneratedAt: time.Date(2026, 2, 13, 12, 0, 0, 0, time.UTC),
+	}
+
+	if err := store.UpdateProcessDPP(t.Context(), id, "wf-a", dpp); err != nil {
+		t.Fatalf("UpdateProcessDPP returned error: %v", err)
+	}
+	if len(processes.updateOneUpdates) != 1 {
+		t.Fatalf("expected one UpdateOne call, got %d", len(processes.updateOneUpdates))
+	}
+	expectedUpdate := bson.M{
+		"$set": bson.M{
+			"workflowKey": "wf-a",
+			"dpp":         dpp,
+		},
+	}
+	if !reflect.DeepEqual(processes.updateOneUpdates[0], expectedUpdate) {
+		t.Fatalf("update = %#v, want %#v", processes.updateOneUpdates[0], expectedUpdate)
 	}
 }

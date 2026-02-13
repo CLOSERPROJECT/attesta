@@ -58,6 +58,14 @@ type Process struct {
 	CreatedBy     string                 `bson:"createdBy"`
 	Status        string                 `bson:"status"`
 	Progress      map[string]ProcessStep `bson:"progress"`
+	DPP           *ProcessDPP            `bson:"dpp,omitempty"`
+}
+
+type ProcessDPP struct {
+	GTIN        string    `bson:"gtin"`
+	Lot         string    `bson:"lot"`
+	Serial      string    `bson:"serial"`
+	GeneratedAt time.Time `bson:"generatedAt"`
 }
 
 type ProcessStep struct {
