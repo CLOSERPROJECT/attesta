@@ -282,6 +282,100 @@ func TestHandleProcessDownloadsPartialIncludesDPPLink(t *testing.T) {
 	}
 }
 
+func TestHandleProcessDownloadsPartialNotFoundAndMismatch(t *testing.T) {
+	t.Run("missing process", func(t *testing.T) {
+		server := &Server{
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/downloads", nil)
+		rr := httptest.NewRecorder()
+		server.handleProcessRoutes(rr, req)
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
+		}
+	})
+
+	t.Run("workflow mismatch", func(t *testing.T) {
+		store := NewMemoryStore()
+		processID := store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "other",
+			CreatedAt:   time.Now().UTC(),
+			Status:      "done",
+			Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+		})
+		server := &Server{
+			store: store,
+			tmpl:  testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+		rr := httptest.NewRecorder()
+		server.handleProcessRoutes(rr, req)
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
+		}
+	})
+}
+
+func TestHandleProcessDownloadsPartialTemplateAndConfigErrors(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+	})
+
+	t.Run("template error", func(t *testing.T) {
+		tmpl := template.Must(template.New("broken").Parse(`{{define "process_downloads"}}{{template "missing" .}}{{end}}`))
+		server := &Server{
+			store: store,
+			tmpl:  tmpl,
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+		rr := httptest.NewRecorder()
+		server.handleProcessRoutes(rr, req)
+		if rr.Code != http.StatusInternalServerError {
+			t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+		}
+	})
+
+	t.Run("config error", func(t *testing.T) {
+		server := &Server{
+			store: store,
+			tmpl:  testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, context.DeadlineExceeded
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+		rr := httptest.NewRecorder()
+		server.handleProcessRoutes(rr, req)
+		if rr.Code != http.StatusInternalServerError {
+			t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+		}
+	})
+}
+
 func seedProcessWithPending(store *MemoryStore) primitive.ObjectID {
 	process := Process{
 		ID:        primitive.NewObjectID(),

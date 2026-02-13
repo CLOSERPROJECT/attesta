@@ -79,6 +79,68 @@ func TestDPPFirstStringValueAndBuildProcessDPP(t *testing.T) {
 	}
 }
 
+func TestBuildProcessDPPErrorsAndStrategyValidation(t *testing.T) {
+	def := testRuntimeConfig().Workflow
+	now := time.Date(2026, 2, 13, 11, 0, 0, 0, time.UTC)
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done", Data: map[string]interface{}{"value": float64(10)}},
+		},
+	}
+
+	cfg := DPPConfig{
+		Enabled:        true,
+		GTIN:           "09506000134352",
+		LotInputKey:    "note",
+		SerialInputKey: "serialCode",
+		SerialStrategy: "process_id_hex",
+	}
+
+	if _, err := buildProcessDPP(def, cfg, nil, now); err == nil {
+		t.Fatal("expected error for nil process")
+	}
+
+	cfg.Enabled = false
+	if _, err := buildProcessDPP(def, cfg, process, now); err == nil {
+		t.Fatal("expected error when dpp is disabled")
+	}
+	cfg.Enabled = true
+
+	cfg.GTIN = ""
+	if _, err := buildProcessDPP(def, cfg, process, now); err == nil {
+		t.Fatal("expected missing gtin error")
+	}
+	cfg.GTIN = "09506000134352"
+
+	if _, err := buildProcessDPP(def, cfg, process, now); err == nil {
+		t.Fatal("expected missing lot error")
+	}
+
+	cfg.LotDefault = "LOT-DEFAULT"
+	cfg.SerialStrategy = "unsupported"
+	if _, err := buildProcessDPP(def, cfg, process, now); err == nil {
+		t.Fatal("expected unsupported serial strategy error")
+	}
+}
+
+func TestParseDigitalLinkPathUnescapeErrors(t *testing.T) {
+	_, _, _, err := parseDigitalLinkPath("/01/09506000134352/10/%ZZ/21/SERIAL-001")
+	if err == nil {
+		t.Fatal("expected lot unescape error")
+	}
+
+	_, _, _, err = parseDigitalLinkPath("/01/09506000134352/10/LOT-001/21/%ZZ")
+	if err == nil {
+		t.Fatal("expected serial unescape error")
+	}
+
+	_, _, _, err = parseDigitalLinkPath("/01/09506000134352/10/ /21/SERIAL-001")
+	if err == nil {
+		t.Fatal("expected missing lot or serial error")
+	}
+}
+
 func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 	def := testRuntimeConfig().Workflow
 	process := &Process{
