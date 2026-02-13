@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -124,4 +125,74 @@ func digitalLinkURL(gtin, lot, serial string) string {
 	return "/01/" + url.PathEscape(strings.TrimSpace(gtin)) +
 		"/10/" + url.PathEscape(strings.TrimSpace(lot)) +
 		"/21/" + url.PathEscape(strings.TrimSpace(serial))
+}
+
+func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string) []DPPTraceabilityStep {
+	steps := make([]DPPTraceabilityStep, 0, len(def.Steps))
+	if process == nil {
+		return steps
+	}
+	availableMap := computeAvailability(def, process)
+	for _, step := range sortedSteps(def) {
+		stepView := DPPTraceabilityStep{
+			StepID: step.StepID,
+			Title:  step.Title,
+		}
+		for _, sub := range sortedSubsteps(step) {
+			subView := DPPTraceabilitySubstep{
+				SubstepID: sub.SubstepID,
+				Title:     sub.Title,
+				Role:      sub.Role,
+				Status:    "locked",
+			}
+			progress, done := process.Progress[sub.SubstepID]
+			if done && progress.State == "done" {
+				subView.Status = "done"
+				if progress.DoneAt != nil {
+					subView.DoneAt = progress.DoneAt.Format(time.RFC3339)
+				}
+				if progress.DoneBy != nil {
+					subView.DoneBy = progress.DoneBy.UserID
+				}
+				subView.Digest = digestPayload(progress.Data)
+				subView.Values = dppTraceValues(progress.Data)
+				if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
+					subView.FileName = attachment.Filename
+					subView.FileSHA256 = attachment.SHA256
+					subView.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
+				}
+			} else if availableMap[sub.SubstepID] {
+				subView.Status = "available"
+			}
+			stepView.Substeps = append(stepView.Substeps, subView)
+		}
+		steps = append(steps, stepView)
+	}
+	return steps
+}
+
+func dppTraceValues(data map[string]interface{}) []DPPTraceabilityValue {
+	if len(data) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	values := make([]DPPTraceabilityValue, 0, len(keys))
+	for _, key := range keys {
+		raw := data[key]
+		if nested, ok := raw.(map[string]interface{}); ok {
+			if _, hasAttachment := nested["attachmentId"]; hasAttachment {
+				continue
+			}
+		}
+		text := strings.TrimSpace(fmt.Sprintf("%v", raw))
+		if text == "" {
+			continue
+		}
+		values = append(values, DPPTraceabilityValue{Key: key, Value: text})
+	}
+	return values
 }

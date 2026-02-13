@@ -78,3 +78,60 @@ func TestDPPFirstStringValueAndBuildProcessDPP(t *testing.T) {
 		t.Fatalf("serial fallback = %q, want %q", dpp.Serial, process.ID.Hex())
 	}
 }
+
+func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
+	def := testRuntimeConfig().Workflow
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data:  map[string]interface{}{"value": float64(10)},
+			},
+			"1.2": {
+				State: "done",
+				Data:  map[string]interface{}{"note": "LOT-2026"},
+			},
+			"1.3": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": "65f2a79b8e7f7d8f3c7c99aa",
+						"filename":     "cert.pdf",
+						"sha256":       "abc123",
+					},
+				},
+			},
+		},
+	}
+
+	view := buildDPPTraceabilityView(def, process, "workflow")
+	if len(view) == 0 {
+		t.Fatal("expected non-empty traceability view")
+	}
+
+	var foundValue bool
+	var foundFile bool
+	for _, step := range view {
+		for _, sub := range step.Substeps {
+			if sub.SubstepID == "1.2" {
+				for _, value := range sub.Values {
+					if value.Key == "note" && value.Value == "LOT-2026" {
+						foundValue = true
+					}
+				}
+			}
+			if sub.SubstepID == "1.3" {
+				if sub.FileName == "cert.pdf" && sub.FileURL != "" {
+					foundFile = true
+				}
+			}
+		}
+	}
+	if !foundValue {
+		t.Fatal("expected traceability value entry for substep 1.2")
+	}
+	if !foundFile {
+		t.Fatal("expected inline file metadata for substep 1.3")
+	}
+}

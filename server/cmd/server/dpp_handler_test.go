@@ -137,6 +137,12 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if !strings.Contains(body, "Merkle root:") {
 		t.Fatalf("expected merkle marker in body, got %q", body)
 	}
+	if !strings.Contains(body, "value: 1") {
+		t.Fatalf("expected inline traceability value in body, got %q", body)
+	}
+	if strings.Contains(body, ">Documents<") {
+		t.Fatalf("expected Documents section removed from body, got %q", body)
+	}
 }
 
 func seedDPPProcess(store *MemoryStore) Process {

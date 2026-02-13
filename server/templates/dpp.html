@@ -24,7 +24,7 @@
 <section class="panel stack">
   <h2>Traceability</h2>
   <div class="timeline">
-    {{range .Export.Steps}}
+    {{range .Traceability}}
       <div class="timeline-step">
         <h3>Step {{.StepID}} - {{.Title}}</h3>
         <ul>
@@ -39,6 +39,14 @@
                 <span class="role">role: {{.Role}}</span>
                 {{if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
                 {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
+                {{range .Values}}
+                  <span class="data">{{.Key}}: {{.Value}}</span>
+                {{end}}
+                {{if .FileURL}}
+                  <span class="data">file: {{.FileName}}</span>
+                  <a class="secondary" href="{{.FileURL}}">Download</a>
+                  {{if .FileSHA256}}<span class="data">sha256: {{.FileSHA256}}</span>{{end}}
+                {{end}}
                 {{if .Digest}}<span class="data">digest: {{.Digest}}</span>{{end}}
               </div>
             </li>
@@ -47,23 +55,6 @@
       </div>
     {{end}}
   </div>
-</section>
-
-<section class="panel stack">
-  <h2>Documents</h2>
-  <ul>
-    {{range .Export.Steps}}
-      {{range .Substeps}}
-        {{if .Attachment}}
-          <li>
-            <span>{{.SubstepID}} - {{.Attachment.Filename}}</span>
-            <a class="secondary" href="{{$.WorkflowPath}}/process/{{$.ProcessID}}/substep/{{.SubstepID}}/file">Download</a>
-            {{if .Attachment.SHA256}}<span class="muted">sha256: {{.Attachment.SHA256}}</span>{{end}}
-          </li>
-        {{end}}
-      {{end}}
-    {{end}}
-  </ul>
 </section>
 
 <section class="panel stack">

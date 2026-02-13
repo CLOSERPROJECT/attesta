@@ -376,7 +376,33 @@ type DPPPageView struct {
 	Serial      string
 	IssuedAt    string
 	Workflow    WorkflowDef
+	Traceability []DPPTraceabilityStep
 	Export      NotarizedProcessExport
+}
+
+type DPPTraceabilityStep struct {
+	StepID   string
+	Title    string
+	Substeps []DPPTraceabilitySubstep
+}
+
+type DPPTraceabilitySubstep struct {
+	SubstepID  string
+	Title      string
+	Role       string
+	Status     string
+	DoneAt     string
+	DoneBy     string
+	Digest     string
+	Values     []DPPTraceabilityValue
+	FileName   string
+	FileSHA256 string
+	FileURL    string
+}
+
+type DPPTraceabilityValue struct {
+	Key   string
+	Value string
 }
 
 type workflowContextKey struct{}
@@ -1034,15 +1060,16 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	view := DPPPageView{
-		PageBase:    s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
-		ProcessID:   process.ID.Hex(),
-		DigitalLink: link,
-		GTIN:        gtin,
-		Lot:         lot,
-		Serial:      serial,
-		IssuedAt:    issuedAt,
-		Workflow:    cfg.Workflow,
-		Export:      export,
+		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
+		ProcessID:    process.ID.Hex(),
+		DigitalLink:  link,
+		GTIN:         gtin,
+		Lot:          lot,
+		Serial:       serial,
+		IssuedAt:     issuedAt,
+		Workflow:     cfg.Workflow,
+		Traceability: buildDPPTraceabilityView(cfg.Workflow, process, workflowKey),
+		Export:       export,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
