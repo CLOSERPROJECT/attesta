@@ -2514,6 +2514,11 @@ func normalizeDPPConfig(cfg *DPPConfig) error {
 	if cfg.SerialStrategy == "" {
 		cfg.SerialStrategy = "process_id_hex"
 	}
+	normalizedStrategy, err := normalizeDPPSerialStrategy(cfg.SerialStrategy)
+	if err != nil {
+		return err
+	}
+	cfg.SerialStrategy = normalizedStrategy
 
 	if !cfg.Enabled {
 		return nil
@@ -2544,6 +2549,19 @@ func normalizeGTIN(raw string) (string, error) {
 		trimmed = strings.Repeat("0", 14-len(trimmed)) + trimmed
 	}
 	return trimmed, nil
+}
+
+func normalizeDPPSerialStrategy(raw string) (string, error) {
+	strategy := strings.TrimSpace(raw)
+	if strategy == "" {
+		strategy = "process_id_hex"
+	}
+	switch strategy {
+	case "process_id_hex":
+		return strategy, nil
+	default:
+		return "", fmt.Errorf("unsupported dpp.serialStrategy %q (allowed: process_id_hex)", raw)
+	}
 }
 
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
