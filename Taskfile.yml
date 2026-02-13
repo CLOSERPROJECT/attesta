@@ -71,6 +71,8 @@ tasks:
   dev:server:
     desc: Hot reload Go server.
     cmds:
+      - task: goa:generate
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
       - sh -c 'cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
 
@@ -79,6 +81,24 @@ tasks:
     cmds:
       - sh -c 'cd web && npm install'
       - sh -c 'cd web && npm run dev'
+
+  run:server:
+    desc: Generate Goa artifacts, sync Go deps, and run the backend on localhost:3000.
+    cmds:
+      - task: goa:generate
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server'
+
+  goa:generate:
+    desc: Generate Goa code and OpenAPI spec.
+    cmds:
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go generate ./design'
+
+  goa:generate:all:
+    desc: Regenerate Goa artifacts and verify Go build graph.
+    cmds:
+      - task: goa:generate
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./...'
 
   test:
     desc: Run backend unit tests.

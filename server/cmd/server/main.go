@@ -369,15 +369,15 @@ type ProcessPageView struct {
 
 type DPPPageView struct {
 	PageBase
-	ProcessID   string
-	DigitalLink string
-	GTIN        string
-	Lot         string
-	Serial      string
-	IssuedAt    string
-	Workflow    WorkflowDef
+	ProcessID    string
+	DigitalLink  string
+	GTIN         string
+	Lot          string
+	Serial       string
+	IssuedAt     string
+	Workflow     WorkflowDef
 	Traceability []DPPTraceabilityStep
-	Export      NotarizedProcessExport
+	Export       NotarizedProcessExport
 }
 
 type DPPTraceabilityStep struct {
@@ -449,6 +449,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
+	mux.HandleFunc("/docs", server.handleDocs)
+	mux.HandleFunc("/docs/", server.handleDocs)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
@@ -692,6 +694,75 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+const swaggerUIPage = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attesta API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    #swagger-ui { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: '/docs/openapi3.json',
+      dom_id: '#swagger-ui',
+      deepLinking: true
+    });
+  </script>
+</body>
+</html>`
+
+func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/docs":
+		http.Redirect(w, r, "/docs/", http.StatusMovedPermanently)
+		return
+	case "/docs/":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, swaggerUIPage)
+		return
+	case "/docs/openapi3.json":
+		s.serveOpenAPIFile(w, r, "openapi3.json", "application/json; charset=utf-8")
+		return
+	case "/docs/openapi3.yaml":
+		s.serveOpenAPIFile(w, r, "openapi3.yaml", "application/yaml; charset=utf-8")
+		return
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func openAPIDocCandidates(filename string) []string {
+	return []string{
+		filepath.Join("gen", "http", filename),
+		filepath.Join("..", "gen", "http", filename),
+		filepath.Join("..", "..", "gen", "http", filename),
+	}
+}
+
+func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filename, contentType string) {
+	var foundPath string
+	for _, candidate := range openAPIDocCandidates(filename) {
+		if _, err := os.Stat(candidate); err == nil {
+			foundPath = candidate
+			break
+		}
+	}
+	if foundPath == "" {
+		http.Error(w, "OpenAPI spec not found. Run `task goa:generate`.", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	http.ServeFile(w, r, foundPath)
 }
 
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {

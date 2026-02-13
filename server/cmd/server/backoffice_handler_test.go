@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -309,6 +310,91 @@ func TestHandleBackofficeUnknownRoleAndMissingProcess(t *testing.T) {
 	if missingRec.Code != http.StatusNotFound {
 		t.Fatalf("expected missing process status %d, got %d", http.StatusNotFound, missingRec.Code)
 	}
+}
+
+func TestBackofficeHandlersErrorPaths(t *testing.T) {
+	t.Run("backoffice selected workflow error", func(t *testing.T) {
+		server := &Server{
+			tmpl: testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, errors.New("config down")
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/backoffice", nil)
+		rec := httptest.NewRecorder()
+		server.handleBackoffice(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("department selected workflow errors", func(t *testing.T) {
+		server := &Server{
+			tmpl: testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, errors.New("config down")
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/backoffice/dep1", nil)
+
+		dashRec := httptest.NewRecorder()
+		server.handleDepartmentDashboard(dashRec, req, "dep1")
+		if dashRec.Code != http.StatusInternalServerError {
+			t.Fatalf("dashboard status = %d, want %d", dashRec.Code, http.StatusInternalServerError)
+		}
+
+		partialRec := httptest.NewRecorder()
+		server.handleDepartmentDashboardPartial(partialRec, req, "dep1")
+		if partialRec.Code != http.StatusInternalServerError {
+			t.Fatalf("partial status = %d, want %d", partialRec.Code, http.StatusInternalServerError)
+		}
+
+		processRec := httptest.NewRecorder()
+		server.handleDepartmentProcess(processRec, req, "dep1", primitive.NewObjectID().Hex())
+		if processRec.Code != http.StatusInternalServerError {
+			t.Fatalf("process status = %d, want %d", processRec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("department template errors", func(t *testing.T) {
+		store := NewMemoryStore()
+		processID := store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "workflow",
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress: map[string]ProcessStep{
+				"1_1": {State: "pending"},
+			},
+		})
+		server := &Server{
+			store: store,
+			tmpl:  template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
+		}
+		req := httptest.NewRequest(http.MethodGet, "/backoffice/dep1", nil)
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+
+		dashRec := httptest.NewRecorder()
+		server.handleDepartmentDashboard(dashRec, req, "dep1")
+		if dashRec.Code != http.StatusInternalServerError {
+			t.Fatalf("dashboard status = %d, want %d", dashRec.Code, http.StatusInternalServerError)
+		}
+
+		partialRec := httptest.NewRecorder()
+		server.handleDepartmentDashboardPartial(partialRec, req, "dep1")
+		if partialRec.Code != http.StatusInternalServerError {
+			t.Fatalf("partial status = %d, want %d", partialRec.Code, http.StatusInternalServerError)
+		}
+
+		processRec := httptest.NewRecorder()
+		server.handleDepartmentProcess(processRec, req, "dep1", processID.Hex())
+		if processRec.Code != http.StatusInternalServerError {
+			t.Fatalf("process status = %d, want %d", processRec.Code, http.StatusInternalServerError)
+		}
+	})
 }
 
 func seedBackofficeFixtures(store *MemoryStore) (primitive.ObjectID, primitive.ObjectID) {

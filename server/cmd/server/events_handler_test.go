@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -96,6 +97,47 @@ func TestHandleEventsRoleStream(t *testing.T) {
 	if !strings.Contains(body, "data: role-updated") {
 		t.Fatalf("expected role data payload, got %q", body)
 	}
+}
+
+func TestHandleEventsStreamingUnsupported(t *testing.T) {
+	server := &Server{
+		sse: newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/events?processId=p-1", nil)
+	rec := &nonFlusherResponseWriter{header: make(http.Header)}
+
+	server.handleEvents(rec, req)
+
+	if rec.code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.code, http.StatusInternalServerError)
+	}
+	if !strings.Contains(rec.body.String(), "streaming unsupported") {
+		t.Fatalf("expected streaming unsupported message, got %q", rec.body.String())
+	}
+}
+
+type nonFlusherResponseWriter struct {
+	header http.Header
+	body   bytes.Buffer
+	code   int
+}
+
+func (w *nonFlusherResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *nonFlusherResponseWriter) Write(p []byte) (int, error) {
+	if w.code == 0 {
+		w.code = http.StatusOK
+	}
+	return w.body.Write(p)
+}
+
+func (w *nonFlusherResponseWriter) WriteHeader(code int) {
+	w.code = code
 }
 
 func waitForSSESubscriber(t *testing.T, hub *SSEHub, key string) {

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -298,4 +299,79 @@ func TestHandleDownloadSubstepFileReturns404ForWorkflowMismatch(t *testing.T) {
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
 	}
+}
+
+func TestHandleDownloadSubstepFileAdditionalErrorPaths(t *testing.T) {
+	t.Run("selected workflow error", func(t *testing.T) {
+		server := &Server{
+			store: NewMemoryStore(),
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, errors.New("config down")
+			},
+		}
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/substep/1.3/file", nil)
+		server.handleDownloadSubstepFile(rec, req, primitive.NewObjectID().Hex(), "1.3")
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("substep input is not file", func(t *testing.T) {
+		store := NewMemoryStore()
+		processID := store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "workflow",
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress: map[string]ProcessStep{
+				"1_1": {
+					State: "done",
+					Data:  map[string]interface{}{"value": int64(12)},
+				},
+			},
+		})
+
+		server := &Server{
+			store: store,
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/substep/1.1/file", nil)
+		rec := httptest.NewRecorder()
+		server.handleDownloadSubstepFile(rec, req, processID.Hex(), "1.1")
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("missing attachment payload", func(t *testing.T) {
+		store := NewMemoryStore()
+		processID := store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "workflow",
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress: map[string]ProcessStep{
+				"1_3": {
+					State: "done",
+					Data:  map[string]interface{}{"other": "value"},
+				},
+			},
+		})
+
+		server := &Server{
+			store: store,
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/substep/1.3/file", nil)
+		rec := httptest.NewRecorder()
+		server.handleDownloadSubstepFile(rec, req, processID.Hex(), "1.3")
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
 }
