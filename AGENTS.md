@@ -57,7 +57,7 @@ cd server
 go test ./...
 ```
 
-Coverage with a 70% gate (this is what CI runs):
+Coverage with a 90% gate (this is what CI runs):
 ```bash
 task cover
 ```
