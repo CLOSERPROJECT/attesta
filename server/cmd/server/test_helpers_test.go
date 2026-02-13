@@ -69,6 +69,7 @@ func testTemplates() *template.Template {
 {{define "home_body"}}HOME {{.LatestProcessID}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "timeline.html" .Timeline}}{{end}}
+{{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
 {{define "dpp.html"}}{{template "layout.html" .}}{{end}}

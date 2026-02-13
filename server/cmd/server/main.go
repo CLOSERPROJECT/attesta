@@ -950,6 +950,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleTimelinePartial(w, r, processID)
 		return
 	}
+	if len(parts) == 2 && parts[1] == "downloads" && r.Method == http.MethodGet {
+		s.handleProcessDownloadsPartial(w, r, processID)
+		return
+	}
 	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "complete" && r.Method == http.MethodPost {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
@@ -1063,6 +1067,33 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 	}
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Request, processID string) {
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	view := ProcessPageView{
+		PageBase:  s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
+		ProcessID: process.ID.Hex(),
+	}
+	if process.DPP != nil {
+		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "process_downloads", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

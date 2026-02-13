@@ -248,6 +248,40 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 	}
 }
 
+func TestHandleProcessDownloadsPartialIncludesDPPLink(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+		DPP: &ProcessDPP{
+			GTIN:   "09506000134352",
+			Lot:    "LOT-001",
+			Serial: "SERIAL-001",
+		},
+	})
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "/01/") {
+		t.Fatalf("expected DPP URL in downloads response, got %q", rr.Body.String())
+	}
+}
+
 func seedProcessWithPending(store *MemoryStore) primitive.ObjectID {
 	process := Process{
 		ID:        primitive.NewObjectID(),

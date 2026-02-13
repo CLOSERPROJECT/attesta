@@ -50,6 +50,7 @@ const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
 const workflowKey = root?.dataset?.workflowKey;
 const timeline = document.getElementById("timeline");
+const processDownloads = document.getElementById("process-downloads");
 
 const focusNextActionInput = () => {
   const nextInput = document.querySelector(
@@ -74,6 +75,21 @@ if (processId && workflowKey && timeline) {
       timeline.innerHTML = html;
     } catch (err) {
       // keep UI responsive even if SSE fails
+    }
+    if (processDownloads) {
+      try {
+        const response = await fetch(`/w/${workflowKey}/process/${processId}/downloads`);
+        if (!response.ok) {
+          return;
+        }
+        const html = await response.text();
+        const current = document.getElementById("process-downloads");
+        if (current) {
+          current.outerHTML = html;
+        }
+      } catch (err) {
+        // keep UI responsive even if SSE fails
+      }
     }
   });
 }

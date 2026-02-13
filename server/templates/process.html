@@ -6,7 +6,12 @@
       {{template "timeline.html" .Timeline}}
     </div>
   </section>
-  <section class="panel">
+  {{template "process_downloads" .}}
+</div>
+{{end}}
+
+{{define "process_downloads"}}
+  <section class="panel" id="process-downloads">
     <h2>Downloads</h2>
     <p class="muted">Export attachments and notarized data for this process.</p>
     <div class="stack" style="gap: 10px;">
@@ -18,7 +23,6 @@
       {{end}}
     </div>
   </section>
-</div>
 {{end}}
 
 {{define "process.html"}}
