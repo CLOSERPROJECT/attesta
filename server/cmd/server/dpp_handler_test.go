@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -102,6 +104,38 @@ func TestHandleDigitalLinkDPPInvalidPath(t *testing.T) {
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
+	}
+}
+
+func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
+
+	store := NewMemoryStore()
+	process := seedDPPProcess(store)
+	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	server := &Server{
+		store:     store,
+		tmpl:      tmpl,
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "GTIN:") || !strings.Contains(body, "LOT:") || !strings.Contains(body, "SERIAL:") {
+		t.Fatalf("expected identifiers in body, got %q", body)
+	}
+	if !strings.Contains(body, "Merkle root:") {
+		t.Fatalf("expected merkle marker in body, got %q", body)
 	}
 }
 

@@ -36,6 +36,7 @@
       {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
       {{else if eq .Body "home_body"}}{{template "home_body" .}}
       {{else if eq .Body "process_body"}}{{template "process_body" .}}
+      {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
       {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
       {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
       {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
