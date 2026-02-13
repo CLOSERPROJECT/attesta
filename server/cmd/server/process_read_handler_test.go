@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -205,6 +206,45 @@ func TestHandleProcessPageIncludesDPPLinkWhenPresent(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "/01/") {
 		t.Fatalf("expected DPP URL in response, got %q", rr.Body.String())
+	}
+}
+
+func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+		DPP: &ProcessDPP{
+			GTIN:   "09506000134352",
+			Lot:    "LOT-001",
+			Serial: "SERIAL-001",
+		},
+	})
+	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	server := &Server{
+		store: store,
+		tmpl:  tmpl,
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex(), nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, ">DPP<") {
+		t.Fatalf("expected DPP link label in response, got %q", body)
 	}
 }
 
