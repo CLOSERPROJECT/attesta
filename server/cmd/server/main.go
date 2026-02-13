@@ -225,6 +225,19 @@ type RuntimeConfig struct {
 	Workflow    WorkflowDef  `yaml:"workflow"`
 	Departments []Department `yaml:"departments"`
 	Users       []User       `yaml:"users"`
+	DPP         DPPConfig    `yaml:"dpp"`
+}
+
+type DPPConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	GTIN               string `yaml:"gtin"`
+	LotInputKey        string `yaml:"lotInputKey"`
+	LotDefault         string `yaml:"lotDefault"`
+	SerialInputKey     string `yaml:"serialInputKey"`
+	SerialStrategy     string `yaml:"serialStrategy"`
+	ProductName        string `yaml:"productName"`
+	ProductDescription string `yaml:"productDescription"`
+	OwnerName          string `yaml:"ownerName"`
 }
 
 type RoleMeta struct {
@@ -1805,6 +1818,9 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		if normalizeErr := normalizeInputTypes(&cfg.Workflow); normalizeErr != nil {
 			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
 		}
+		if normalizeErr := normalizeDPPConfig(&cfg.DPP); normalizeErr != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
+		}
 		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 		if key == "" {
 			return nil, fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
@@ -2477,6 +2493,57 @@ func normalizeInputType(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported value %q (allowed: number, string, text, file)", value)
 	}
+}
+
+func normalizeDPPConfig(cfg *DPPConfig) error {
+	cfg.GTIN = strings.TrimSpace(cfg.GTIN)
+	cfg.LotInputKey = strings.TrimSpace(cfg.LotInputKey)
+	cfg.LotDefault = strings.TrimSpace(cfg.LotDefault)
+	cfg.SerialInputKey = strings.TrimSpace(cfg.SerialInputKey)
+	cfg.SerialStrategy = strings.TrimSpace(cfg.SerialStrategy)
+	cfg.ProductName = strings.TrimSpace(cfg.ProductName)
+	cfg.ProductDescription = strings.TrimSpace(cfg.ProductDescription)
+	cfg.OwnerName = strings.TrimSpace(cfg.OwnerName)
+
+	if cfg.LotInputKey == "" {
+		cfg.LotInputKey = "batchId"
+	}
+	if cfg.LotDefault == "" {
+		cfg.LotDefault = "defaultProduct"
+	}
+	if cfg.SerialStrategy == "" {
+		cfg.SerialStrategy = "process_id_hex"
+	}
+
+	if !cfg.Enabled {
+		return nil
+	}
+
+	normalizedGTIN, err := normalizeGTIN(cfg.GTIN)
+	if err != nil {
+		return err
+	}
+	cfg.GTIN = normalizedGTIN
+	return nil
+}
+
+func normalizeGTIN(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", errors.New("dpp.gtin is required when dpp.enabled=true")
+	}
+	for _, char := range trimmed {
+		if char < '0' || char > '9' {
+			return "", fmt.Errorf("dpp.gtin must contain only digits: %q", raw)
+		}
+	}
+	if len(trimmed) > 14 {
+		return "", fmt.Errorf("dpp.gtin must be at most 14 digits: %q", raw)
+	}
+	if len(trimmed) < 14 {
+		trimmed = strings.Repeat("0", 14-len(trimmed)) + trimmed
+	}
+	return trimmed, nil
 }
 
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
