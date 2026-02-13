@@ -68,6 +68,24 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 - Timeline updates pull `/w/:workflow/process/:id/timeline` when SSE events arrive.
 - Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
 
+## DPP Digital Link configuration
+Configure GS1 Digital Link generation per workflow YAML (`server/config/*.yaml`):
+
+```yaml
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+  lotInputKey: "batchId"
+  lotDefault: "defaultProduct"
+  serialInputKey: "serialCode"
+  serialStrategy: "process_id_hex"
+```
+
+- Generated links follow `/01/{GTIN}/10/{LOT}/21/{SERIAL}` and resolve to a public DPP page.
+- DPP identifiers are generated only when a process first reaches `done`.
+- Default rollout behavior is minimal: already-completed processes are not automatically backfilled.
+- Recommended backfill approach: add a small admin-only CLI/endpoint that scans `status=done` + missing `dpp`, computes identifiers, and updates `process.dpp`.
+
 ## File inputs
 ```yaml
 inputKey: "Gallium certification"
