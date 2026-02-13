@@ -1344,6 +1344,15 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	process, _ = s.loadProcess(ctx, processID)
 	if process != nil && isProcessDone(cfg.Workflow, process) {
 		_ = s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done")
+		if cfg.DPP.Enabled && process.DPP == nil {
+			dpp, dppErr := buildProcessDPP(cfg.Workflow, cfg.DPP, process, now)
+			if dppErr != nil {
+				log.Printf("failed to build dpp for process %s: %v", process.ID.Hex(), dppErr)
+			} else if updateErr := s.store.UpdateProcessDPP(ctx, process.ID, workflowKey, dpp); updateErr != nil {
+				log.Printf("failed to persist dpp for process %s: %v", process.ID.Hex(), updateErr)
+			}
+		}
+		process, _ = s.loadProcess(ctx, processID)
 	}
 
 	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
