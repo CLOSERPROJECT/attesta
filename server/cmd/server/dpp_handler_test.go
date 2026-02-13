@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -145,6 +146,62 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	}
 }
 
+func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	store := NewMemoryStore()
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": "65f2a79b8e7f7d8f3c7c99aa",
+						"filename":     "cert.pdf",
+						"sha256":       "abc123",
+					},
+				},
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	server := &Server{
+		store:     store,
+		tmpl:      tmpl,
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "cert.pdf") || !strings.Contains(body, "Download") {
+		t.Fatalf("expected inline file link in traceability, got %q", body)
+	}
+	if strings.Contains(body, ">Documents<") {
+		t.Fatalf("expected no Documents section, got %q", body)
+	}
+}
+
 func seedDPPProcess(store *MemoryStore) Process {
 	process := Process{
 		ID:          primitive.NewObjectID(),
@@ -163,4 +220,31 @@ func seedDPPProcess(store *MemoryStore) Process {
 	}
 	store.SeedProcess(process)
 	return process
+}
+
+func writeFileWorkflowConfig(t *testing.T, path string) {
+	t.Helper()
+	content := "workflow:\n" +
+		"  name: \"Demo workflow\"\n" +
+		"  steps:\n" +
+		"    - id: \"1\"\n" +
+		"      title: \"Step 1\"\n" +
+		"      order: 1\n" +
+		"      substeps:\n" +
+		"        - id: \"1.1\"\n" +
+		"          title: \"Upload\"\n" +
+		"          order: 1\n" +
+		"          role: \"dep1\"\n" +
+		"          inputKey: \"attachment\"\n" +
+		"          inputType: \"file\"\n" +
+		"departments:\n" +
+		"  - id: \"dep1\"\n" +
+		"    name: \"Department 1\"\n" +
+		"users:\n" +
+		"  - id: \"u1\"\n" +
+		"    name: \"User 1\"\n" +
+		"    departmentId: \"dep1\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config %s: %v", path, err)
+	}
 }
