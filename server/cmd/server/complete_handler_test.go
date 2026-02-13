@@ -503,6 +503,133 @@ func TestHandleCompleteSubstepFinalCompletionMarksProcessDone(t *testing.T) {
 	}
 }
 
+func TestHandleCompleteSubstepFinalCompletionGeneratesDPP(t *testing.T) {
+	store := NewMemoryStore()
+	process := Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", Data: map[string]interface{}{"value": float64(10)}},
+			"1_2": {State: "done", Data: map[string]interface{}{"note": "LOT-2026"}},
+			"1_3": {State: "done"},
+			"2_1": {State: "done"},
+			"2_2": {State: "done"},
+			"3_1": {State: "done"},
+			"3_2": {State: "pending"},
+		},
+	}
+	store.SeedProcess(process)
+	server := &Server{
+		store:      store,
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			cfg := testRuntimeConfig()
+			cfg.DPP = DPPConfig{
+				Enabled:        true,
+				GTIN:           "09506000134352",
+				LotInputKey:    "note",
+				SerialStrategy: "process_id_hex",
+			}
+			return cfg, nil
+		},
+		now: func() time.Time { return time.Date(2026, 2, 2, 15, 0, 0, 0, time.UTC) },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+process.ID.Hex()+"/substep/3.2/complete", strings.NewReader("value=done"))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u3|dep3"})
+	rr := httptest.NewRecorder()
+	server.handleCompleteSubstep(rr, req, process.ID.Hex(), "3.2")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	snapshot, ok := store.SnapshotProcess(process.ID)
+	if !ok {
+		t.Fatal("expected process snapshot")
+	}
+	if snapshot.DPP == nil {
+		t.Fatal("expected process DPP to be generated")
+	}
+	if snapshot.DPP.GTIN != "09506000134352" {
+		t.Fatalf("gtin = %q, want 09506000134352", snapshot.DPP.GTIN)
+	}
+	if snapshot.DPP.Lot != "LOT-2026" {
+		t.Fatalf("lot = %q, want LOT-2026", snapshot.DPP.Lot)
+	}
+	if snapshot.DPP.Serial != process.ID.Hex() {
+		t.Fatalf("serial = %q, want %q", snapshot.DPP.Serial, process.ID.Hex())
+	}
+}
+
+func TestHandleCompleteSubstepFinalCompletionDPPIdempotent(t *testing.T) {
+	store := NewMemoryStore()
+	process := Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", Data: map[string]interface{}{"value": float64(10)}},
+			"1_2": {State: "done", Data: map[string]interface{}{"note": "LOT-2026"}},
+			"1_3": {State: "done"},
+			"2_1": {State: "done"},
+			"2_2": {State: "done"},
+			"3_1": {State: "done"},
+			"3_2": {State: "pending"},
+		},
+	}
+	store.SeedProcess(process)
+	server := &Server{
+		store:      store,
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			cfg := testRuntimeConfig()
+			cfg.DPP = DPPConfig{
+				Enabled:        true,
+				GTIN:           "09506000134352",
+				LotInputKey:    "note",
+				SerialStrategy: "process_id_hex",
+			}
+			return cfg, nil
+		},
+		now: func() time.Time { return time.Date(2026, 2, 2, 15, 0, 0, 0, time.UTC) },
+	}
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/process/"+process.ID.Hex()+"/substep/3.2/complete", strings.NewReader("value=done"))
+	firstReq.Header.Set("HX-Request", "true")
+	firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	firstReq.AddCookie(&http.Cookie{Name: "demo_user", Value: "u3|dep3"})
+	firstRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(firstRec, firstReq, process.ID.Hex(), "3.2")
+
+	before, ok := store.SnapshotProcess(process.ID)
+	if !ok || before.DPP == nil {
+		t.Fatal("expected process DPP after first completion")
+	}
+	want := *before.DPP
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/process/"+process.ID.Hex()+"/substep/3.2/complete", strings.NewReader("value=changed"))
+	secondReq.Header.Set("HX-Request", "true")
+	secondReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	secondReq.AddCookie(&http.Cookie{Name: "demo_user", Value: "u3|dep3"})
+	secondRec := httptest.NewRecorder()
+	server.handleCompleteSubstep(secondRec, secondReq, process.ID.Hex(), "3.2")
+
+	after, ok := store.SnapshotProcess(process.ID)
+	if !ok || after.DPP == nil {
+		t.Fatal("expected process DPP after second completion")
+	}
+	if *after.DPP != want {
+		t.Fatalf("expected stable DPP value %#v, got %#v", want, *after.DPP)
+	}
+}
+
 type assertErr string
 
 func (e assertErr) Error() string { return string(e) }

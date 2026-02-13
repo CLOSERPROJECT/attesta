@@ -1,0 +1,73 @@
+{{define "dpp_body"}}
+<section class="panel stack">
+  <h2>Digital Product Passport</h2>
+  <p class="muted">GS1 Digital Link landing page for product and process traceability.</p>
+  <div class="stack" style="gap: 8px;">
+    <div><strong>GTIN:</strong> {{.GTIN}}</div>
+    <div><strong>LOT:</strong> {{.Lot}}</div>
+    <div><strong>SERIAL:</strong> {{.Serial}}</div>
+    {{if .IssuedAt}}<div><strong>Issued at:</strong> {{.IssuedAt}}</div>{{end}}
+    <div><strong>Canonical link:</strong> <code>{{.DigitalLink}}</code></div>
+  </div>
+</section>
+
+<section class="panel stack">
+  <h2>Overview</h2>
+  <div class="stack" style="gap: 8px;">
+    <div><strong>Workflow:</strong> {{.Workflow.Name}}</div>
+    {{if .Workflow.Description}}<div class="muted">{{.Workflow.Description}}</div>{{end}}
+    <div><strong>Process ID:</strong> {{.ProcessID}}</div>
+    <div><strong>Status:</strong> {{.Export.Status}}</div>
+  </div>
+</section>
+
+<section class="panel stack">
+  <h2>Traceability</h2>
+  <div class="timeline">
+    {{range .Traceability}}
+      <div class="timeline-step">
+        <h3>Step {{.StepID}} - {{.Title}}</h3>
+        <ul>
+          {{range .Substeps}}
+            <li class="substep substep-{{.Status}}">
+              <div class="substep-head">
+                <span class="pill">{{.SubstepID}}</span>
+                <span class="title">{{.Title}}</span>
+                <span class="status">{{.Status}}</span>
+              </div>
+              <div class="substep-meta">
+                <span class="role">role: {{.Role}}</span>
+                {{if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
+                {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
+                {{range .Values}}
+                  <span class="data">{{.Key}}: {{.Value}}</span>
+                {{end}}
+                {{if .FileURL}}
+                  <span class="data">file: {{.FileName}}</span>
+                  <a class="secondary" href="{{.FileURL}}">Download</a>
+                  {{if .FileSHA256}}<span class="data">sha256: {{.FileSHA256}}</span>{{end}}
+                {{end}}
+                {{if .Digest}}<span class="data">digest: {{.Digest}}</span>{{end}}
+              </div>
+            </li>
+          {{end}}
+        </ul>
+      </div>
+    {{end}}
+  </div>
+</section>
+
+<section class="panel stack">
+  <h2>Integrity</h2>
+  <div><strong>Merkle root:</strong> <code>{{.Export.Merkle.Root}}</code></div>
+  <ul>
+    {{range .Export.Merkle.Leaves}}
+      <li><code>{{.SubstepID}}</code> <code>{{.Hash}}</code></li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+
+{{define "dpp.html"}}
+  {{template "layout.html" .}}
+{{end}}

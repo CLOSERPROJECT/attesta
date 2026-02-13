@@ -32,6 +32,17 @@ go run ./cmd/server
 
 The entry pages are workflow pickers. Business routes are workflow-scoped under `/w/{workflowKey}/...`.
 
+## Configure DPP Digital Link (optional)
+Edit `server/config/workflow.yaml` and add:
+
+```yaml
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+```
+
+When enabled, completing a workflow generates a Digital Link at `/01/{GTIN}/10/{LOT}/21/{SERIAL}`.
+
 ## Run tests
 Unit tests:
 ```bash

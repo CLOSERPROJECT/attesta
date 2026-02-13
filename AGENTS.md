@@ -57,7 +57,7 @@ cd server
 go test ./...
 ```
 
-Coverage with a 70% gate (this is what CI runs):
+Coverage with a 90% gate (this is what CI runs):
 ```bash
 task cover
 ```
@@ -156,6 +156,16 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
   (see `handleEvents()` in `server/cmd/server/main.go:862-909`).
 - Frontend listens via `EventSource` and refreshes partial HTML via `fetch()` (`web/src/main.js`).
 
+### DPP / GS1 Digital Link
+- Workflow YAML supports optional `dpp:` config (`enabled`, `gtin`, `lotInputKey`, `lotDefault`, `serialInputKey`, `serialStrategy`, plus presentation fields).
+- `gtin` is normalized/validated at config load (must resolve to 14 digits when enabled).
+- On first transition to process `done`, backend stores `process.dpp` (`gtin`, `lot`, `serial`, `generatedAt`) and keeps identifiers stable on repeated completion calls.
+- Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}`:
+  - HTML landing page (template: `server/templates/dpp.html`)
+  - JSON (`Accept: application/json` or `?format=json`)
+- DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
+- Process page downloads panel now shows a DPP link when `process.DPP` exists.
+
 ## Templates and static assets
 - Templates are parsed from `server/templates/*.html` (`server/cmd/server/main.go:258-261`).
 - Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).
@@ -175,4 +185,3 @@ Observed Dockerfiles:
 ## Known gotchas / inconsistencies (as checked in this repo)
 - `DOCKER.md` lists Cerbos image `ghcr.io/cerbos/cerbos:0.39.0`, but `deployment/docker-compose.local.yaml` and `deployment/Dockerfile.cerbos` use **0.50.0**.
 - `Taskfile.yml` includes a `cerbos-health` task that runs `curl`.
-

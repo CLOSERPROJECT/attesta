@@ -58,6 +58,14 @@ type Process struct {
 	CreatedBy     string                 `bson:"createdBy"`
 	Status        string                 `bson:"status"`
 	Progress      map[string]ProcessStep `bson:"progress"`
+	DPP           *ProcessDPP            `bson:"dpp,omitempty"`
+}
+
+type ProcessDPP struct {
+	GTIN        string    `bson:"gtin"`
+	Lot         string    `bson:"lot"`
+	Serial      string    `bson:"serial"`
+	GeneratedAt time.Time `bson:"generatedAt"`
 }
 
 type ProcessStep struct {
@@ -225,6 +233,19 @@ type RuntimeConfig struct {
 	Workflow    WorkflowDef  `yaml:"workflow"`
 	Departments []Department `yaml:"departments"`
 	Users       []User       `yaml:"users"`
+	DPP         DPPConfig    `yaml:"dpp"`
+}
+
+type DPPConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	GTIN               string `yaml:"gtin"`
+	LotInputKey        string `yaml:"lotInputKey"`
+	LotDefault         string `yaml:"lotDefault"`
+	SerialInputKey     string `yaml:"serialInputKey"`
+	SerialStrategy     string `yaml:"serialStrategy"`
+	ProductName        string `yaml:"productName"`
+	ProductDescription string `yaml:"productDescription"`
+	OwnerName          string `yaml:"ownerName"`
 }
 
 type RoleMeta struct {
@@ -343,6 +364,45 @@ type ProcessPageView struct {
 	PageBase
 	ProcessID string
 	Timeline  []TimelineStep
+	DPPURL    string
+}
+
+type DPPPageView struct {
+	PageBase
+	ProcessID   string
+	DigitalLink string
+	GTIN        string
+	Lot         string
+	Serial      string
+	IssuedAt    string
+	Workflow    WorkflowDef
+	Traceability []DPPTraceabilityStep
+	Export      NotarizedProcessExport
+}
+
+type DPPTraceabilityStep struct {
+	StepID   string
+	Title    string
+	Substeps []DPPTraceabilitySubstep
+}
+
+type DPPTraceabilitySubstep struct {
+	SubstepID  string
+	Title      string
+	Role       string
+	Status     string
+	DoneAt     string
+	DoneBy     string
+	Digest     string
+	Values     []DPPTraceabilityValue
+	FileName   string
+	FileSHA256 string
+	FileURL    string
+}
+
+type DPPTraceabilityValue struct {
+	Key   string
+	Value string
 }
 
 type workflowContextKey struct{}
@@ -389,6 +449,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
+	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
@@ -915,6 +976,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleTimelinePartial(w, r, processID)
 		return
 	}
+	if len(parts) == 2 && parts[1] == "downloads" && r.Method == http.MethodGet {
+		s.handleProcessDownloadsPartial(w, r, processID)
+		return
+	}
 	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "complete" && r.Method == http.MethodPost {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
@@ -944,7 +1009,69 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	if process.DPP != nil {
+		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
+	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	process.Progress = normalizeProgressKeys(process.Progress)
+
+	workflowKey := strings.TrimSpace(process.WorkflowKey)
+	if workflowKey == "" {
+		workflowKey = s.defaultWorkflowKey()
+	}
+	cfg, err := s.workflowByKey(workflowKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	export := buildNotarizedExport(cfg.Workflow, process)
+	link := digitalLinkURL(gtin, lot, serial)
+	if prefersJSONResponse(r) {
+		response := map[string]interface{}{
+			"digital_link": link,
+			"workflow": map[string]string{
+				"key":         workflowKey,
+				"name":        cfg.Workflow.Name,
+				"description": cfg.Workflow.Description,
+			},
+			"export": export,
+		}
+		writeJSON(w, response)
+		return
+	}
+
+	issuedAt := ""
+	if process.DPP != nil && !process.DPP.GeneratedAt.IsZero() {
+		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
+	}
+	view := DPPPageView{
+		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
+		ProcessID:    process.ID.Hex(),
+		DigitalLink:  link,
+		GTIN:         gtin,
+		Lot:          lot,
+		Serial:       serial,
+		IssuedAt:     issuedAt,
+		Workflow:     cfg.Workflow,
+		Traceability: buildDPPTraceabilityView(cfg.Workflow, process, workflowKey),
+		Export:       export,
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -967,6 +1094,33 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 	}
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Request, processID string) {
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.Error(w, "process not found", http.StatusNotFound)
+		return
+	}
+	view := ProcessPageView{
+		PageBase:  s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
+		ProcessID: process.ID.Hex(),
+	}
+	if process.DPP != nil {
+		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "process_downloads", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -1323,6 +1477,15 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	process, _ = s.loadProcess(ctx, processID)
 	if process != nil && isProcessDone(cfg.Workflow, process) {
 		_ = s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done")
+		if cfg.DPP.Enabled && process.DPP == nil {
+			dpp, dppErr := buildProcessDPP(cfg.Workflow, cfg.DPP, process, now)
+			if dppErr != nil {
+				log.Printf("failed to build dpp for process %s: %v", process.ID.Hex(), dppErr)
+			} else if updateErr := s.store.UpdateProcessDPP(ctx, process.ID, workflowKey, dpp); updateErr != nil {
+				log.Printf("failed to persist dpp for process %s: %v", process.ID.Hex(), updateErr)
+			}
+		}
+		process, _ = s.loadProcess(ctx, processID)
 	}
 
 	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
@@ -1803,6 +1966,9 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 			return nil, fmt.Errorf("workflow config is empty in %s", filepath.Base(path))
 		}
 		if normalizeErr := normalizeInputTypes(&cfg.Workflow); normalizeErr != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
+		}
+		if normalizeErr := normalizeDPPConfig(&cfg.DPP); normalizeErr != nil {
 			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
 		}
 		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
@@ -2479,6 +2645,75 @@ func normalizeInputType(value string) (string, error) {
 	}
 }
 
+func normalizeDPPConfig(cfg *DPPConfig) error {
+	cfg.GTIN = strings.TrimSpace(cfg.GTIN)
+	cfg.LotInputKey = strings.TrimSpace(cfg.LotInputKey)
+	cfg.LotDefault = strings.TrimSpace(cfg.LotDefault)
+	cfg.SerialInputKey = strings.TrimSpace(cfg.SerialInputKey)
+	cfg.SerialStrategy = strings.TrimSpace(cfg.SerialStrategy)
+	cfg.ProductName = strings.TrimSpace(cfg.ProductName)
+	cfg.ProductDescription = strings.TrimSpace(cfg.ProductDescription)
+	cfg.OwnerName = strings.TrimSpace(cfg.OwnerName)
+
+	if cfg.LotInputKey == "" {
+		cfg.LotInputKey = "batchId"
+	}
+	if cfg.LotDefault == "" {
+		cfg.LotDefault = "defaultProduct"
+	}
+	if cfg.SerialStrategy == "" {
+		cfg.SerialStrategy = "process_id_hex"
+	}
+	normalizedStrategy, err := normalizeDPPSerialStrategy(cfg.SerialStrategy)
+	if err != nil {
+		return err
+	}
+	cfg.SerialStrategy = normalizedStrategy
+
+	if !cfg.Enabled {
+		return nil
+	}
+
+	normalizedGTIN, err := normalizeGTIN(cfg.GTIN)
+	if err != nil {
+		return err
+	}
+	cfg.GTIN = normalizedGTIN
+	return nil
+}
+
+func normalizeGTIN(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", errors.New("dpp.gtin is required when dpp.enabled=true")
+	}
+	for _, char := range trimmed {
+		if char < '0' || char > '9' {
+			return "", fmt.Errorf("dpp.gtin must contain only digits: %q", raw)
+		}
+	}
+	if len(trimmed) > 14 {
+		return "", fmt.Errorf("dpp.gtin must be at most 14 digits: %q", raw)
+	}
+	if len(trimmed) < 14 {
+		trimmed = strings.Repeat("0", 14-len(trimmed)) + trimmed
+	}
+	return trimmed, nil
+}
+
+func normalizeDPPSerialStrategy(raw string) (string, error) {
+	strategy := strings.TrimSpace(raw)
+	if strategy == "" {
+		strategy = "process_id_hex"
+	}
+	switch strategy {
+	case "process_id_hex":
+		return strategy, nil
+	default:
+		return "", fmt.Errorf("unsupported dpp.serialStrategy %q (allowed: process_id_hex)", raw)
+	}
+}
+
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
 	payload := map[string]interface{}{}
 	switch sub.InputType {
@@ -2493,6 +2728,14 @@ func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, er
 		payload[sub.InputKey] = value
 	}
 	return payload, nil
+}
+
+func prefersJSONResponse(r *http.Request) bool {
+	if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("format")), "json") {
+		return true
+	}
+	accept := strings.ToLower(strings.TrimSpace(r.Header.Get("Accept")))
+	return strings.Contains(accept, "application/json")
 }
 
 func digestPayload(payload map[string]interface{}) string {

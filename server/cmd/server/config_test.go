@@ -195,6 +195,76 @@ func TestWorkflowByKeyAndRuntimeConfigUseCatalog(t *testing.T) {
 	}
 }
 
+func TestWorkflowCatalogConfigWithoutDPPRemainsValid(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+
+	server := &Server{configDir: tempDir}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	cfg := catalog["workflow"]
+	if cfg.DPP.Enabled {
+		t.Fatal("dpp.enabled = true, want false")
+	}
+	if cfg.DPP.GTIN != "" {
+		t.Fatalf("dpp.gtin = %q, want empty", cfg.DPP.GTIN)
+	}
+}
+
+func TestWorkflowCatalogRejectsEnabledDPPWithoutGTIN(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n")
+
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
+	if err == nil {
+		t.Fatal("expected dpp.gtin validation error")
+	}
+	if !strings.Contains(err.Error(), "dpp.gtin is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWorkflowCatalogRejectsEnabledDPPWithInvalidGTIN(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"abc123\"\n")
+
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
+	if err == nil {
+		t.Fatal("expected dpp.gtin validation error")
+	}
+	if !strings.Contains(err.Error(), "dpp.gtin must contain only digits") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+
+	server := &Server{configDir: tempDir}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	cfg := catalog["workflow"]
+	if cfg.DPP.GTIN != "09506000134352" {
+		t.Fatalf("dpp.gtin = %q, want %q", cfg.DPP.GTIN, "09506000134352")
+	}
+	if cfg.DPP.LotInputKey != "batchId" {
+		t.Fatalf("dpp.lotInputKey = %q, want %q", cfg.DPP.LotInputKey, "batchId")
+	}
+	if cfg.DPP.LotDefault != "defaultProduct" {
+		t.Fatalf("dpp.lotDefault = %q, want %q", cfg.DPP.LotDefault, "defaultProduct")
+	}
+	if cfg.DPP.SerialStrategy != "process_id_hex" {
+		t.Fatalf("dpp.serialStrategy = %q, want %q", cfg.DPP.SerialStrategy, "process_id_hex")
+	}
+}
+
 func writeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {
 	t.Helper()
 	content := "workflow:\n" +
@@ -223,6 +293,34 @@ func writeWorkflowConfig(t *testing.T, path, name, inputType string, description
 		"  - id: \"u1\"\n" +
 		"    name: \"User 1\"\n" +
 		"    departmentId: \"dep1\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config %s: %v", path, err)
+	}
+}
+
+func writeWorkflowConfigWithDPP(t *testing.T, path, dppBlock string) {
+	t.Helper()
+	content := "workflow:\n" +
+		"  name: \"Workflow\"\n" +
+		"  steps:\n" +
+		"    - id: \"1\"\n" +
+		"      title: \"Step 1\"\n" +
+		"      order: 1\n" +
+		"      substeps:\n" +
+		"        - id: \"1.1\"\n" +
+		"          title: \"Input\"\n" +
+		"          order: 1\n" +
+		"          role: \"dep1\"\n" +
+		"          inputKey: \"value\"\n" +
+		"          inputType: \"string\"\n" +
+		"departments:\n" +
+		"  - id: \"dep1\"\n" +
+		"    name: \"Department 1\"\n" +
+		"users:\n" +
+		"  - id: \"u1\"\n" +
+		"    name: \"User 1\"\n" +
+		"    departmentId: \"dep1\"\n" +
+		"dpp:\n" + dppBlock
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write temp config %s: %v", path, err)
 	}

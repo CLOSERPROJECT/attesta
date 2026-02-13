@@ -6,16 +6,23 @@
       {{template "timeline.html" .Timeline}}
     </div>
   </section>
-  <section class="panel">
+  {{template "process_downloads" .}}
+</div>
+{{end}}
+
+{{define "process_downloads"}}
+  <section class="panel" id="process-downloads">
     <h2>Downloads</h2>
     <p class="muted">Export attachments and notarized data for this process.</p>
     <div class="stack" style="gap: 10px;">
       <a class="primary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
       <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
       <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
+      {{if .DPPURL}}
+      <a class="secondary" href="{{.DPPURL}}">DPP</a>
+      {{end}}
     </div>
   </section>
-</div>
 {{end}}
 
 {{define "process.html"}}

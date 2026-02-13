@@ -25,9 +25,11 @@ type Store interface {
 	InsertProcess(ctx context.Context, process Process) (primitive.ObjectID, error)
 	LoadProcessByID(ctx context.Context, id primitive.ObjectID) (*Process, error)
 	LoadLatestProcessByWorkflow(ctx context.Context, workflowKey string) (*Process, error)
+	LoadProcessByDigitalLink(ctx context.Context, gtin, lot, serial string) (*Process, error)
 	ListRecentProcessesByWorkflow(ctx context.Context, workflowKey string, limit int64) ([]Process, error)
 	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error
 	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error
+	UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error
 	InsertNotarization(ctx context.Context, notarization Notarization) error
 	SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error)
 	LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error)
@@ -253,6 +255,19 @@ func (s *MongoStore) ListRecentProcessesByWorkflow(ctx context.Context, workflow
 	return processes, nil
 }
 
+func (s *MongoStore) LoadProcessByDigitalLink(ctx context.Context, gtin, lot, serial string) (*Process, error) {
+	filter := bson.M{
+		"dpp.gtin":   strings.TrimSpace(gtin),
+		"dpp.lot":    strings.TrimSpace(lot),
+		"dpp.serial": strings.TrimSpace(serial),
+	}
+	var process Process
+	if err := s.database().Collection("processes").FindOne(ctx, filter).Decode(&process); err != nil {
+		return nil, err
+	}
+	return &process, nil
+}
+
 func (s *MongoStore) UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error {
 	update := bson.M{
 		"$set": bson.M{
@@ -265,6 +280,17 @@ func (s *MongoStore) UpdateProcessProgress(ctx context.Context, id primitive.Obj
 
 func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error {
 	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"status": status, "workflowKey": workflowKey}})
+	return err
+}
+
+func (s *MongoStore) UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error {
+	update := bson.M{
+		"$set": bson.M{
+			"workflowKey": workflowKey,
+			"dpp":         dpp,
+		},
+	}
+	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, update)
 	return err
 }
 
@@ -548,6 +574,39 @@ func (s *MemoryStore) UpdateProcessStatus(_ context.Context, id primitive.Object
 	return nil
 }
 
+func (s *MemoryStore) UpdateProcessDPP(_ context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	process, ok := s.processes[id]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	process.WorkflowKey = strings.TrimSpace(workflowKey)
+	dppCopy := dpp
+	process.DPP = &dppCopy
+	s.processes[id] = process
+	return nil
+}
+
+func (s *MemoryStore) LoadProcessByDigitalLink(_ context.Context, gtin, lot, serial string) (*Process, error) {
+	trimGTIN := strings.TrimSpace(gtin)
+	trimLot := strings.TrimSpace(lot)
+	trimSerial := strings.TrimSpace(serial)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, process := range s.processes {
+		if process.DPP == nil {
+			continue
+		}
+		if process.DPP.GTIN == trimGTIN && process.DPP.Lot == trimLot && process.DPP.Serial == trimSerial {
+			cloned := cloneProcess(process)
+			return &cloned, nil
+		}
+	}
+	return nil, mongo.ErrNoDocuments
+}
+
 func (s *MemoryStore) InsertNotarization(_ context.Context, notarization Notarization) error {
 	if s.InsertNotarizeErr != nil {
 		return s.InsertNotarizeErr
@@ -630,6 +689,10 @@ func (s *MemoryStore) OpenAttachmentDownload(_ context.Context, id primitive.Obj
 
 func cloneProcess(process Process) Process {
 	cloned := process
+	if process.DPP != nil {
+		dpp := *process.DPP
+		cloned.DPP = &dpp
+	}
 	cloned.Progress = make(map[string]ProcessStep, len(process.Progress))
 	for key, value := range process.Progress {
 		cloned.Progress[key] = cloneProcessStep(value)

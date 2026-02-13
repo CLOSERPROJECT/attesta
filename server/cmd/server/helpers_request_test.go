@@ -106,3 +106,29 @@ func TestLogRequests(t *testing.T) {
 		t.Fatalf("log line = %q, want elapsed duration", line)
 	}
 }
+
+func TestPrefersJSONResponse(t *testing.T) {
+	tests := []struct {
+		name   string
+		path   string
+		accept string
+		want   bool
+	}{
+		{name: "format json query", path: "/dpp?format=json", want: true},
+		{name: "format json case insensitive", path: "/dpp?format=JSON", want: true},
+		{name: "accept json header", path: "/dpp", accept: "text/html, application/json", want: true},
+		{name: "accept text only", path: "/dpp", accept: "text/html", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.accept != "" {
+				req.Header.Set("Accept", tc.accept)
+			}
+			if got := prefersJSONResponse(req); got != tc.want {
+				t.Fatalf("prefersJSONResponse() = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
