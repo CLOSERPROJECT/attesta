@@ -13,6 +13,9 @@
       <a class="primary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
       <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
       <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
+      {{if .DPPURL}}
+      <a class="secondary" href="{{.DPPURL}}">Open DPP link</a>
+      {{end}}
     </div>
   </section>
 </div>

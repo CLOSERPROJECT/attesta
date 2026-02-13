@@ -167,6 +167,47 @@ func TestHandleProcessRoutesRejectsWorkflowMismatch(t *testing.T) {
 	}
 }
 
+func TestHandleProcessPageIncludesDPPLinkWhenPresent(t *testing.T) {
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "done"},
+			"1_3": {State: "done"},
+			"2_1": {State: "done"},
+			"2_2": {State: "done"},
+			"3_1": {State: "done"},
+			"3_2": {State: "done"},
+		},
+		DPP: &ProcessDPP{
+			GTIN:   "09506000134352",
+			Lot:    "LOT-001",
+			Serial: "SERIAL-001",
+		},
+	})
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex(), nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "/01/") {
+		t.Fatalf("expected DPP URL in response, got %q", rr.Body.String())
+	}
+}
+
 func seedProcessWithPending(store *MemoryStore) primitive.ObjectID {
 	process := Process{
 		ID:        primitive.NewObjectID(),
