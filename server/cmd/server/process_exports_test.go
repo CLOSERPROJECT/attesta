@@ -278,3 +278,41 @@ func TestHandleDownloadAllFilesConfigError(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
+
+func TestProcessExportHandlersConfigError(t *testing.T) {
+	server := &Server{
+		store: NewMemoryStore(),
+		configProvider: func() (RuntimeConfig, error) {
+			return RuntimeConfig{}, errors.New("config down")
+		},
+	}
+	processID := primitive.NewObjectID().Hex()
+
+	tests := []struct {
+		name string
+		call func(*httptest.ResponseRecorder, *http.Request)
+	}{
+		{
+			name: "notarized",
+			call: func(rec *httptest.ResponseRecorder, req *http.Request) {
+				server.handleNotarizedJSON(rec, req, processID)
+			},
+		},
+		{
+			name: "merkle",
+			call: func(rec *httptest.ResponseRecorder, req *http.Request) {
+				server.handleMerkleJSON(rec, req, processID)
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/process/"+processID+"/"+tc.name+".json", nil)
+			rec := httptest.NewRecorder()
+			tc.call(rec, req)
+			if rec.Code != http.StatusInternalServerError {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+			}
+		})
+	}
+}

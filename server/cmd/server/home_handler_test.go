@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -265,6 +266,81 @@ func TestSortHomeProcessListByStatus(t *testing.T) {
 	if items[0].Status != "active" {
 		t.Fatalf("expected active first, got %q", items[0].Status)
 	}
+}
+
+func TestHandleHomeErrorPaths(t *testing.T) {
+	t.Run("workflow options error", func(t *testing.T) {
+		server := &Server{
+			tmpl:      homePickerTemplates(),
+			configDir: t.TempDir(),
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("template error", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+
+		server := &Server{
+			tmpl:      template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
+			configDir: tempDir,
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, errors.New("not used")
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+}
+
+func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
+	t.Run("selected workflow error", func(t *testing.T) {
+		server := &Server{
+			tmpl: testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, errors.New("config down")
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+		rec := httptest.NewRecorder()
+		server.handleWorkflowHome(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("template error", func(t *testing.T) {
+		server := &Server{
+			store: NewMemoryStore(),
+			tmpl:  template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+
+		rec := httptest.NewRecorder()
+		server.handleWorkflowHome(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
 }
 
 func homeTestTemplates() *template.Template {
