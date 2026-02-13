@@ -1,0 +1,166 @@
+#+TITLE: GS1 Digital Link DPP on workflow completion
+#+SUBTITLE: Generate and serve a DPP landing page at `/01/{GTIN}/10/{LOT}/21/{SERIAL}` when a process completes
+#+DATE: 2026-02-13
+#+KEYWORDS: gs1, digital-link, dpp, go, net-http, html-template, mongodb, workflow, htmx
+
+Summary:
+- Add optional per-workflow `dpp` config (GTIN + where to read LOT/SERIAL).
+- On process completion, assign/store GS1 identifiers on the process (idempotent).
+- Serve a public DPP landing page at the GS1 Digital Link path, with HTML + JSON output.
+
+* DONE [#A] Lock down identifiers + configuration shape
+  - Effort :: S
+  - Goal :: Make the GS1 Digital Link URL deterministic and configurable per workflow without breaking existing configs.
+  - Notes :: Keep to the subset needed by the user examples: `01` (GTIN), `10` (batch/lot), `21` (serial). Avoid new dependencies.
+** DONE [#A] Define `dpp` config in workflow YAML (backwards-compatible)
+   - Why :: The app supports multiple workflows (catalog of YAML files), so GTIN/identifier rules must be per workflow.
+   - Change ::
+     - Extend `RuntimeConfig` to accept an optional `dpp:` section (YAML):
+       - `enabled` (bool, default false)
+       - `gtin` (string; required when enabled; normalize to 14 digits or fail config load)
+       - `lotInputKey` (string; default `batchId`; read from any completed substep payload by key)
+       - `lotDefault` (string; default `defaultProduct`; used when `lotInputKey` not found)
+       - `serialInputKey` (string; optional; read from payload if present)
+       - `serialStrategy` (string; default `process_id_hex`; used when `serialInputKey` missing)
+       - Optional presentation fields: `productName`, `productDescription`, `ownerName` (purely for the landing page header)
+     - Files:
+       - `server/cmd/server/main.go` (or a new `server/cmd/server/dpp.go`) for config structs.
+       - Update `server/config/workflow.yaml` with a realistic `dpp:` block (GTIN + lot mapping).
+   - Tests ::
+     - Add a config load test proving old YAMLs (no `dpp:`) still parse.
+     - Add config validation tests for: missing/invalid GTIN when `enabled: true`.
+   - Done when ::
+     - A workflow YAML can enable DPP with only `gtin` set, and the server starts.
+** DONE [#A] Decide the default SERIAL policy (recommended: deterministic, no counters)
+   - Why :: The URL must be stable and collision-free without introducing extra state/migrations.
+   - Change ::
+     - Decision: use `serialStrategy = process_id_hex` meaning SERIAL := `process._id` hex string (accepted).
+     - Document a “nice-looking numeric serial” alternative as optional follow-up:
+       - `serialStrategy = counter` using an atomic Mongo counter collection.
+   - Tests ::
+     - Unit test for `serialStrategy=process_id_hex` producing non-empty, URL-safe SERIAL.
+   - Done when ::
+     - The plan and config schema clearly define how SERIAL is picked in all cases.
+
+* DONE [#A] Persist GS1 identifiers at completion (idempotent)
+  - Effort :: M
+  - Goal :: When a process transitions to `done`, store its (GTIN, LOT, SERIAL) so the Digital Link can resolve without guessing.
+  - Notes :: Do not block the user’s final “complete substep” action if DPP generation fails; log and continue.
+** DONE [#A] Extend the Process model with optional DPP identifiers
+   - Why :: The Digital Link route must find the right process by (GTIN, LOT, SERIAL) efficiently.
+   - Change ::
+     - Extend `type Process` with an optional `DPP` embedded struct:
+       - `bson:"dpp,omitempty"`
+       - fields: `gtin`, `lot`, `serial`, `generatedAt`
+     - Add Store methods (keep naming consistent with existing Store):
+       - `UpdateProcessDPP(ctx, processID, workflowKey, dpp)` (sets `process.dpp` + `workflowKey`)
+       - `LoadProcessByDigitalLink(ctx, gtin, lot, serial)` (queries by `process.dpp.*`)
+     - Implement in both stores:
+       - `server/cmd/server/store.go` (`MongoStore`, `MemoryStore`)
+   - Tests ::
+     - Unit tests for `MemoryStore` update + lookup roundtrip.
+     - Mongo wrapper tests (port-based fakes) asserting the query filter uses `dpp.gtin`, `dpp.lot`, `dpp.serial`.
+   - Done when ::
+     - A completed process can be looked up uniquely by its Digital Link identifiers in both stores.
+** DONE [#A] Generate DPP identifiers only on the first “done” transition
+   - Why :: The completion handler can be hit multiple times; DPP generation must not create duplicates or change issued identifiers.
+   - Change ::
+     - In `Server.handleCompleteSubstep` after `isProcessDone(...)` becomes true:
+       - If `process.DPP` already set, do nothing.
+       - Else compute `(gtin, lot, serial)` using the workflow’s `dpp` config and call `UpdateProcessDPP`.
+     - Compute LOT by scanning `process.Progress[*].Data` for `lotInputKey` (first non-empty string wins).
+     - Compute SERIAL:
+       - Prefer `serialInputKey` found in payload.
+       - Else apply `serialStrategy`.
+     - Ensure values are stored unescaped; escape only when building URLs.
+     - Files:
+       - `server/cmd/server/main.go` (hook point) + `server/cmd/server/dpp.go` (helpers).
+   - Tests ::
+     - Handler-level test: complete a minimal workflow end-to-end, assert `process.DPP` is set once.
+     - Idempotency test: call the last completion twice, assert DPP identifiers unchanged.
+   - Done when ::
+     - Completing the last substep makes the Digital Link resolvable, and repeated calls do not mutate identifiers.
+
+* DONE [#A] Serve the DPP landing page at the GS1 Digital Link path
+  - Effort :: M
+  - Goal :: `GET /01/{gtin}/10/{lot}/21/{serial}` returns an HTML landing page similar in spirit to the provided examples, and can also return JSON for machines.
+  - Notes :: Public (no auth) access is accepted; use `http.ServeMux` longest-prefix matching and register `/01/` to avoid interfering with `/` and `/w/`.
+** DONE [#A] Add a public route handler for `/01/` (GS1 Digital Link subset)
+   - Why :: The requested URL structure matches GS1 Digital Link, and should live at the site root for QR/scan usage.
+   - Change ::
+     - In `main()`, add `mux.HandleFunc(\"/01/\", server.handleDigitalLinkDPP)` before/alongside other handlers.
+     - Implement `handleDigitalLinkDPP(w, r)`:
+       - Parse path segments expecting exactly: `01/{gtin}/10/{lot}/21/{serial}` (accept optional trailing slash).
+       - `url.PathUnescape` each value; validate GTIN (digits only, len 14 after normalization rules).
+       - `store.LoadProcessByDigitalLink(ctx, gtin, lot, serial)`; 404 if not found.
+       - Load the workflow config using `process.WorkflowKey` (fallback to `defaultWorkflowKey()` for legacy).
+       - Build a “passport payload” using existing helpers:
+         - `buildNotarizedExport(cfg.Workflow, process)` for integrity + attachments metadata.
+       - Content negotiation:
+         - If `Accept` contains `application/json` OR `?format=json`, return JSON `{digital_link, workflow, export}`.
+         - Else render HTML template.
+     - Files:
+       - `server/cmd/server/main.go` (route registration)
+       - `server/cmd/server/dpp.go` (path parsing + URL building helpers)
+   - Tests ::
+     - Handler tests for: 200 HTML, 200 JSON, 404 unknown, 404 invalid path shape.
+   - Done when ::
+     - Visiting a generated Digital Link URL in a browser shows an HTML DPP page; `curl -H 'Accept: application/json'` returns JSON.
+** DONE [#B] Add an HTML template for the DPP landing page (structure similar to examples)
+   - Why :: The examples are SPA-based; here we need a server-rendered landing page that is scannable and useful without JS.
+   - Change ::
+     - Add `server/templates/dpp.html` defining:
+       - A header section with product name + identifiers (GTIN/LOT/SERIAL) and “issued at”.
+       - Sections/cards:
+         - Overview (workflow name/description, process id, status)
+         - Traceability (render `export.steps` with done/available/locked status)
+         - Documents (list attachments with download links to existing endpoints)
+         - Integrity (Merkle root + per-substep digests)
+       - A prominent canonical link display of the Digital Link URL (copyable).
+     - Update `server/templates/layout.html` to route `Body == \"dpp_body\"`.
+     - Ensure template works with existing CSS utility classes (`panel`, `stack`, etc.) and doesn’t require new web build output.
+   - Tests ::
+     - Template render smoke test via handler test: body contains key markers (e.g., `GTIN`, `LOT`, `SERIAL`, and Merkle root).
+   - Done when ::
+     - The HTML page is readable, uses existing styling, and includes the identifiers + workflow-derived content.
+
+* DONE [#B] Wire DPP URL into existing UI (optional but recommended)
+  - Effort :: S
+  - Goal :: Make it easy for users to discover/copy the DPP link once a process is completed.
+  - Notes :: Keep UI changes localized; do not redesign pages.
+** DONE [#B] Add a “DPP link” to the Process page Downloads panel when done
+   - Why :: Users should not have to infer the Digital Link structure manually.
+   - Change ::
+     - Extend `ProcessPageView` with `DPPURL` (string, empty if not generated).
+     - In `handleProcessPage`, if `process.DPP != nil`, compute `DPPURL` with `url.PathEscape` and show a link in `server/templates/process.html`.
+   - Tests ::
+     - Handler test for process page when DPP exists: response contains `/01/`.
+   - Done when ::
+     - Finished processes show a clickable Digital Link in the UI.
+
+* DONE [#A] Test plan + rollout/migration notes
+  - Effort :: M
+  - Goal :: Keep CI stable (unit tests only) and provide a safe rollout path with existing data.
+  - Notes :: No breaking route changes; the new `/01/` prefix is additive.
+** DONE [#A] Add focused unit tests (handlers + store + helpers)
+   - Why :: This feature touches routing, persistence, and completion logic; regressions should be caught without Mongo/Cerbos.
+   - Change ::
+     - New tests (suggested files):
+       - `server/cmd/server/dpp_helpers_test.go` (path parsing, URL building, identifier extraction from payloads)
+       - `server/cmd/server/dpp_handler_test.go` (HTML/JSON/404 behavior using `MemoryStore`)
+     - Update `server/cmd/server/test_helpers_test.go` templates to recognize `dpp_body` if needed.
+   - Tests ::
+     - Run `cd server && go test ./...` (unit suite).
+   - Done when ::
+     - All new tests pass and existing tests remain unchanged in intent.
+** DONE [#C] Rollout + backfill strategy for already-completed processes
+   - Why :: Existing “done” processes won’t have `process.dpp` populated.
+   - Change ::
+     - Document operational options:
+       - (Minimal) Only new completions generate DPP.
+       - (Recommended) Add a small admin-only CLI/endpoint to backfill: scan `processes` where `status=done` and `dpp` missing, compute/store identifiers.
+     - Add to `README.md` or `QUICKSTART.md` a short section: “Configure DPP Digital Link (GTIN, LOT, SERIAL)”.
+   - Tests ::
+     - N/A (ops/doc).
+   - Done when ::
+     - There is an explicit, documented expectation for existing data and how to backfill if desired.
