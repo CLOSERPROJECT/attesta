@@ -364,6 +364,19 @@ type ProcessPageView struct {
 	PageBase
 	ProcessID string
 	Timeline  []TimelineStep
+	DPPURL    string
+}
+
+type DPPPageView struct {
+	PageBase
+	ProcessID   string
+	DigitalLink string
+	GTIN        string
+	Lot         string
+	Serial      string
+	IssuedAt    string
+	Workflow    WorkflowDef
+	Export      NotarizedProcessExport
 }
 
 type workflowContextKey struct{}
@@ -410,6 +423,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
+	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
@@ -965,7 +979,68 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	if process.DPP != nil {
+		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
+	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	process.Progress = normalizeProgressKeys(process.Progress)
+
+	workflowKey := strings.TrimSpace(process.WorkflowKey)
+	if workflowKey == "" {
+		workflowKey = s.defaultWorkflowKey()
+	}
+	cfg, err := s.workflowByKey(workflowKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	export := buildNotarizedExport(cfg.Workflow, process)
+	link := digitalLinkURL(gtin, lot, serial)
+	if prefersJSONResponse(r) {
+		response := map[string]interface{}{
+			"digital_link": link,
+			"workflow": map[string]string{
+				"key":         workflowKey,
+				"name":        cfg.Workflow.Name,
+				"description": cfg.Workflow.Description,
+			},
+			"export": export,
+		}
+		writeJSON(w, response)
+		return
+	}
+
+	issuedAt := ""
+	if process.DPP != nil && !process.DPP.GeneratedAt.IsZero() {
+		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
+	}
+	view := DPPPageView{
+		PageBase:    s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
+		ProcessID:   process.ID.Hex(),
+		DigitalLink: link,
+		GTIN:        gtin,
+		Lot:         lot,
+		Serial:      serial,
+		IssuedAt:    issuedAt,
+		Workflow:    cfg.Workflow,
+		Export:      export,
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -2595,6 +2670,14 @@ func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, er
 		payload[sub.InputKey] = value
 	}
 	return payload, nil
+}
+
+func prefersJSONResponse(r *http.Request) bool {
+	if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("format")), "json") {
+		return true
+	}
+	accept := strings.ToLower(strings.TrimSpace(r.Header.Get("Accept")))
+	return strings.Contains(accept, "application/json")
 }
 
 func digestPayload(payload map[string]interface{}) string {

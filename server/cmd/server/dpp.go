@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -87,4 +88,40 @@ func dppFirstStringValue(def WorkflowDef, process *Process, key string) string {
 		}
 	}
 	return ""
+}
+
+func parseDigitalLinkPath(path string) (string, string, string, error) {
+	trimmed := strings.Trim(strings.TrimSpace(path), "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 6 || parts[0] != "01" || parts[2] != "10" || parts[4] != "21" {
+		return "", "", "", errors.New("invalid digital link path")
+	}
+	gtinRaw, err := url.PathUnescape(parts[1])
+	if err != nil {
+		return "", "", "", err
+	}
+	gtin, err := normalizeGTIN(gtinRaw)
+	if err != nil {
+		return "", "", "", err
+	}
+	lot, err := url.PathUnescape(parts[3])
+	if err != nil {
+		return "", "", "", err
+	}
+	serial, err := url.PathUnescape(parts[5])
+	if err != nil {
+		return "", "", "", err
+	}
+	lot = strings.TrimSpace(lot)
+	serial = strings.TrimSpace(serial)
+	if lot == "" || serial == "" {
+		return "", "", "", errors.New("missing lot or serial")
+	}
+	return gtin, lot, serial, nil
+}
+
+func digitalLinkURL(gtin, lot, serial string) string {
+	return "/01/" + url.PathEscape(strings.TrimSpace(gtin)) +
+		"/10/" + url.PathEscape(strings.TrimSpace(lot)) +
+		"/21/" + url.PathEscape(strings.TrimSpace(serial))
 }
