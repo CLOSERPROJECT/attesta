@@ -11,6 +11,7 @@ COPY server/go.mod server/go.sum ./
 RUN go mod download
 COPY server/ ./
 ENV CGO_ENABLED=0
+RUN go generate ./design
 RUN go build -trimpath -o /app/bin/attesta ./cmd/server
 
 FROM alpine:3.20
@@ -19,6 +20,7 @@ WORKDIR /app
 COPY --from=go-build /app/bin/attesta /app/server/attesta
 COPY --from=go-build /app/server/templates /app/server/templates
 COPY --from=go-build /app/server/config /app/server/config
+COPY --from=go-build /app/server/gen/http /app/server/gen/http
 COPY --from=web-build /app/web/dist /app/web/dist
 WORKDIR /app/server
 EXPOSE 3000
