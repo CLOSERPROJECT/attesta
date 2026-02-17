@@ -75,6 +75,99 @@ func TestHandleDownloadSubstepFileAllowsAnonymousAccess(t *testing.T) {
 	}
 }
 
+func TestHandleDownloadProcessAttachmentAllowsAnonymousAccess(t *testing.T) {
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	fileBytes := []byte("generic-attachment-content")
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   "3.1",
+		Filename:    "qa-evidence.txt",
+		ContentType: "text/plain",
+		MaxBytes:    1024,
+		UploadedAt:  time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC),
+	}, bytes.NewReader(fileBytes))
+	if err != nil {
+		t.Fatalf("save attachment: %v", err)
+	}
+
+	store.SeedProcess(Process{
+		ID:        processID,
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "text/plain" {
+		t.Fatalf("expected content type text/plain, got %q", got)
+	}
+	if got := rr.Header().Get("Content-Disposition"); !strings.Contains(got, `filename="qa-evidence.txt"`) {
+		t.Fatalf("expected content disposition with filename, got %q", got)
+	}
+	if rr.Body.String() != string(fileBytes) {
+		t.Fatalf("expected body %q, got %q", fileBytes, rr.Body.String())
+	}
+}
+
+func TestHandleDownloadProcessAttachmentReturns404ForProcessMismatch(t *testing.T) {
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	otherProcessID := primitive.NewObjectID()
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   otherProcessID,
+		SubstepID:   "3.1",
+		Filename:    "qa-evidence.txt",
+		ContentType: "text/plain",
+		MaxBytes:    1024,
+		UploadedAt:  time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC),
+	}, bytes.NewReader([]byte("wrong process")))
+	if err != nil {
+		t.Fatalf("save attachment: %v", err)
+	}
+
+	store.SeedProcess(Process{
+		ID:        processID,
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
+	}
+}
+
 func TestHandleDownloadSubstepFileReturns404WhenNotDone(t *testing.T) {
 	store := NewMemoryStore()
 	processID := store.SeedProcess(Process{

@@ -6,7 +6,10 @@
       {{template "timeline.html" .Timeline}}
     </div>
   </section>
-  {{template "process_downloads" .}}
+  <div class="stack" style="gap: 16px;">
+    {{template "process_dpp" .}}
+    {{template "process_downloads" .}}
+  </div>
 </div>
 {{end}}
 
@@ -14,15 +17,46 @@
   <section class="panel" id="process-downloads">
     <h2>Downloads</h2>
     <p class="muted">Export attachments and notarized data for this process.</p>
+    {{if .Attachments}}
+      <div class="panel-block" style="margin-bottom: 12px;">
+        <p class="muted" style="margin: 0 0 8px;">Attachments</p>
+        <ul class="process-attachments-list">
+          {{range .Attachments}}
+            <li>
+              <a href="{{.URL}}">{{.Filename}}</a>
+              <span class="muted">({{.SubstepID}})</span>
+            </li>
+          {{end}}
+        </ul>
+      </div>
+    {{end}}
     <div class="stack" style="gap: 10px;">
       <a class="primary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
       <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
       <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
-      {{if .DPPURL}}
-      <a class="secondary" href="{{.DPPURL}}">DPP</a>
-      {{end}}
     </div>
   </section>
+{{end}}
+
+{{define "process_dpp"}}
+  {{if .DPPURL}}
+    <section class="panel dpp-downloads-section dpp-process-panel">
+      <h2>DPP</h2>
+      <div class="stack" style="gap: 8px;">
+        <div>
+          <strong>GS1 Digital Link:</strong>
+          <a href="{{.DPPURL}}"><code>{{.DPPURL}}</code></a>
+        </div>
+        {{if .DPPGS1}}
+          <div>
+            <strong>GS1 (01/10/21):</strong>
+            <code>{{.DPPGS1}}</code>
+          </div>
+        {{end}}
+        <button type="button" class="secondary js-share-link" data-share-url="{{.DPPURL}}" data-share-label="DPP link">Share DPP link</button>
+      </div>
+    </section>
+  {{end}}
 {{end}}
 
 {{define "process.html"}}

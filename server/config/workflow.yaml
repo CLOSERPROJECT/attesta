@@ -48,8 +48,66 @@ workflow:
           title: "QA sign-off"
           order: 1
           role: "dep3"
-          inputKey: "qaNote"
-          inputType: "string"
+          inputKey: "qaChecklist"
+          inputType: "formata"
+          schema:
+            type: "object"
+            required: ["inspectorName", "result", "purityScore", "riskBand"]
+            properties:
+              inspectorName:
+                type: "string"
+                title: "Inspector name"
+              testMethod:
+                type: "string"
+                title: "Test method"
+                enum: ["xrf", "icp_ms", "wet_chemistry", "visual_only"]
+              result:
+                type: "string"
+                title: "QA result"
+                enum: ["pass", "conditional_pass", "rework", "reject"]
+              riskBand:
+                type: "string"
+                title: "Risk band"
+                enum: ["low", "medium", "high", "critical"]
+              purityScore:
+                type: "number"
+                title: "Purity score (range 0-100)"
+                minimum: 0
+                maximum: 100
+              confidenceLevel:
+                type: "integer"
+                title: "Confidence level (range 1-5)"
+                minimum: 1
+                maximum: 5
+              notes:
+                type: "string"
+                title: "QA notes"
+              evidenceFile:
+                type: "string"
+                format: "data-url"
+                title: "Evidence file"
+          uiSchema:
+            ui:order: ["inspectorName", "testMethod", "result", "riskBand", "purityScore", "confidenceLevel", "notes", "evidenceFile"]
+            testMethod:
+              ui:help: "Select how QA validation was performed."
+            riskBand:
+              ui:help: "Choose the risk classification for this batch."
+            purityScore:
+              ui:components:
+                numberWidget: "rangeWidget"
+              ui:help: "Numeric range value between 0 and 100."
+            confidenceLevel:
+              ui:components:
+                numberWidget: "rangeWidget"
+              ui:help: "Numeric range value between 1 and 5."
+            notes:
+              ui:components:
+                textWidget: "textareaWidget"
+              ui:help: "Write a detailed QA narrative and exceptions."
+            evidenceFile:
+              ui:components:
+                stringField: "fileField"
+              ui:help: "Upload QA evidence."
         - id: "3.2"
           title: "Finalize notarization"
           order: 2

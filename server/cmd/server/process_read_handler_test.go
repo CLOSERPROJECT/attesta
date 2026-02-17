@@ -246,9 +246,15 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 	if !strings.Contains(body, ">DPP<") {
 		t.Fatalf("expected DPP link label in response, got %q", body)
 	}
+	if !strings.Contains(body, "(01)09506000134352(10)LOT-001(21)SERIAL-001") {
+		t.Fatalf("expected GS1 element string in response, got %q", body)
+	}
+	if !strings.Contains(body, "Share DPP link") {
+		t.Fatalf("expected DPP share button in response, got %q", body)
+	}
 }
 
-func TestHandleProcessDownloadsPartialIncludesDPPLink(t *testing.T) {
+func TestHandleProcessDownloadsPartialExcludesDPPSection(t *testing.T) {
 	store := NewMemoryStore()
 	processID := store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
@@ -262,9 +268,13 @@ func TestHandleProcessDownloadsPartialIncludesDPPLink(t *testing.T) {
 			Serial: "SERIAL-001",
 		},
 	})
+	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
 	server := &Server{
 		store: store,
-		tmpl:  testTemplates(),
+		tmpl:  tmpl,
 		configProvider: func() (RuntimeConfig, error) {
 			return testRuntimeConfig(), nil
 		},
@@ -277,8 +287,71 @@ func TestHandleProcessDownloadsPartialIncludesDPPLink(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "/01/") {
-		t.Fatalf("expected DPP URL in downloads response, got %q", rr.Body.String())
+	if strings.Contains(rr.Body.String(), "/01/") {
+		t.Fatalf("expected downloads response to exclude DPP block, got %q", rr.Body.String())
+	}
+}
+
+func TestHandleProcessDownloadsPartialBackfillsDPPForDoneProcess(t *testing.T) {
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          processID,
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", Data: map[string]interface{}{"value": 10}},
+			"1_2": {State: "done", Data: map[string]interface{}{"note": "LOT-SECONDARY"}},
+			"1_3": {State: "done", Data: map[string]interface{}{"attachment": map[string]interface{}{"attachmentId": primitive.NewObjectID().Hex()}}},
+			"2_1": {State: "done", Data: map[string]interface{}{"value": 20}},
+			"2_2": {State: "done", Data: map[string]interface{}{"note": "ok"}},
+			"3_1": {State: "done", Data: map[string]interface{}{"value": 30}},
+			"3_2": {State: "done", Data: map[string]interface{}{"note": "done"}},
+		},
+		DPP: nil,
+	})
+
+	server := &Server{
+		store: store,
+		tmpl: func() *template.Template {
+			tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
+			if err != nil {
+				t.Fatalf("parse templates: %v", err)
+			}
+			return tmpl
+		}(),
+		configProvider: func() (RuntimeConfig, error) {
+			cfg := testRuntimeConfig()
+			cfg.DPP = DPPConfig{
+				Enabled:        true,
+				GTIN:           "09506000134352",
+				LotInputKey:    "note",
+				SerialStrategy: "process_id_hex",
+			}
+			return cfg, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if strings.Contains(rr.Body.String(), "/01/09506000134352/10/LOT-SECONDARY/21/") {
+		t.Fatalf("expected downloads response to exclude DPP block, got %q", rr.Body.String())
+	}
+
+	snapshot, ok := store.processes[processID]
+	if !ok {
+		t.Fatal("expected process to still exist in memory store")
+	}
+	if snapshot.DPP == nil {
+		t.Fatal("expected DPP to be backfilled and persisted")
+	}
+	if snapshot.Status != "done" {
+		t.Fatalf("expected process status done after backfill, got %q", snapshot.Status)
 	}
 }
 

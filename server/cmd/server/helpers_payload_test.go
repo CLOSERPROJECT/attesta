@@ -27,6 +27,22 @@ func TestNormalizePayload(t *testing.T) {
 	if got := textPayload["note"]; got != "ok" {
 		t.Fatalf("expected text payload value "+`"ok"`+", got %#v", got)
 	}
+
+	formataSub := WorkflowSub{InputType: "formata", InputKey: "details"}
+	formataPayload, err := normalizePayload(formataSub, `{"status":"ok","weight":42}`)
+	if err != nil {
+		t.Fatalf("expected formata payload to parse, got error: %v", err)
+	}
+	value, ok := formataPayload["details"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected formata payload object, got %#v", formataPayload["details"])
+	}
+	if value["status"] != "ok" {
+		t.Fatalf("expected formata payload status %q, got %#v", "ok", value["status"])
+	}
+	if _, err := normalizePayload(formataSub, "[]"); err == nil {
+		t.Fatal("expected formata payload parse failure for non-object JSON")
+	}
 }
 
 func TestDigestPayloadStability(t *testing.T) {
