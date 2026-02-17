@@ -48,9 +48,9 @@ workflow:
                 type: "string"
                 title: "Comments"
           uiSchema:
-            properties:
-              comments:
-                ui:widget: "textarea"
+            comments:
+              "ui:components":
+                textWidget: "textareaWidget"
     - id: "3"
       title: "Approval"
       order: 3

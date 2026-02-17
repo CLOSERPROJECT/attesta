@@ -159,11 +159,34 @@ const normalizeFormataSchema = (schema) => {
   return normalized;
 };
 
+const normalizeUiOptions = (options) => {
+  if (!options || typeof options !== "object" || Array.isArray(options)) {
+    return {};
+  }
+  return { ...options };
+};
+
 const normalizeFieldUiSchema = (fieldUi) => {
   if (!fieldUi || typeof fieldUi !== "object" || Array.isArray(fieldUi)) {
     return {};
   }
   const normalized = { ...fieldUi };
+  const options = normalizeUiOptions(normalized["ui:options"]);
+  const description = normalized["ui:description"];
+  const help = normalized["ui:help"];
+  if (typeof description === "string" && description.trim() !== "" && typeof options.description !== "string") {
+    options.description = description;
+  }
+  if (typeof help === "string" && help.trim() !== "" && typeof options.help !== "string") {
+    options.help = help;
+  }
+  if (Object.keys(options).length > 0) {
+    normalized["ui:options"] = options;
+  } else {
+    delete normalized["ui:options"];
+  }
+  delete normalized["ui:description"];
+  delete normalized["ui:help"];
   const widget = normalized["ui:widget"];
   if (widget) {
     const components = { ...(normalized["ui:components"] ?? {}) };
@@ -186,18 +209,25 @@ const normalizeFormataUiSchema = (uiSchema) => {
   }
   const source = uiSchema.properties && typeof uiSchema.properties === "object" ? uiSchema.properties : uiSchema;
   const normalized = {};
+  const rootOptions = normalizeUiOptions(uiSchema["ui:options"]);
   if (Array.isArray(uiSchema["ui:order"])) {
-    normalized["ui:order"] = uiSchema["ui:order"];
+    rootOptions.order = uiSchema["ui:order"];
   }
-  for (const [key, value] of Object.entries(source)) {
-    if (key === "properties") {
+  if (Object.keys(rootOptions).length > 0) {
+    normalized["ui:options"] = rootOptions;
+  }
+  for (const [key, value] of Object.entries(uiSchema)) {
+    if (key === "ui:options" || key === "ui:order" || key === "properties") {
       continue;
     }
     if (key.startsWith("ui:")) {
       normalized[key] = value;
-      continue;
     }
-    normalized[key] = normalizeFieldUiSchema(value);
+  }
+  for (const [key, value] of Object.entries(source)) {
+    if (key !== "properties" && !key.startsWith("ui:")) {
+      normalized[key] = normalizeFieldUiSchema(value);
+    }
   }
   return normalized;
 };
@@ -370,57 +400,25 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
   return true;
 };
 
-const formataSelectPatchCSS = `
-[data-slot="select-trigger"] {
-  min-width: 240px !important;
-  min-height: 40px !important;
-  padding: 8px 12px !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 10px !important;
-  background: var(--panel) !important;
-  color: var(--ink) !important;
-}
-
-[data-slot="popover-content"],
-[data-slot="select-content"] {
-  z-index: 2147483641 !important;
-  min-width: max(260px, var(--radix-select-trigger-width, 0px)) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  background: var(--panel) !important;
-  color: var(--ink) !important;
-  box-shadow: 0 14px 30px var(--shadow) !important;
-  overflow: hidden !important;
-}
-
-[data-slot="select-item"],
-[role="option"] {
-  min-height: 38px !important;
-  padding: 10px 12px !important;
-  line-height: 1.35 !important;
-}
-
-[data-slot="select-item"] + [data-slot="select-item"],
-[role="option"] + [role="option"] {
-  border-top: 1px solid var(--border) !important;
-}
-
-[data-slot="select-item"][data-highlighted],
-[role="option"][data-highlighted],
-[data-slot="select-item"]:hover,
-[role="option"]:hover {
-  background: var(--surface-2) !important;
+const formataSelectPopoverPatchCSS = `
+[data-slot="select-content"],
+[role="listbox"] {
+  z-index: 2147483642 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 `;
 
-const applyFormataSelectPatch = (component) => {
+const applyFormataSelectPopoverPatch = (component) => {
   const root = component?.shadowRoot;
-  if (!root || root.querySelector("style[data-attesta-formata-select-patch='true']")) {
+  if (!root || root.querySelector("style[data-attesta-formata-select-popover-patch='true']")) {
     return;
   }
   const style = document.createElement("style");
-  style.dataset.attestaFormataSelectPatch = "true";
-  style.textContent = formataSelectPatchCSS;
+  style.dataset.attestaFormataSelectPopoverPatch = "true";
+  style.textContent = formataSelectPopoverPatchCSS;
   root.appendChild(style);
 };
 
@@ -457,7 +455,7 @@ const initializeFormataForms = async (container = document) => {
     component.uiSchema = uiSchema;
     component.uischema = uiSchema;
     host.appendChild(component);
-    applyFormataSelectPatch(component);
+    applyFormataSelectPopoverPatch(component);
 
     const form = component.closest("form");
     if (!form) {
