@@ -407,6 +407,55 @@ button.secondary {
   overflow: visible;
 }
 
+.action-submitted {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.action-submitted-values {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px 10px;
+}
+
+.action-submitted-values dt,
+.action-submitted-values dd {
+  margin: 0;
+}
+
+.action-submitted-values dt {
+  color: var(--muted);
+  font-family: "Source Code Pro", monospace;
+  font-size: 12px;
+}
+
+.action-submitted-attachments {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  display: grid;
+  gap: 6px;
+}
+
+.action-submitted-attachments li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-submitted-attachments code {
+  font-family: "Source Code Pro", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
 .impersonate {
   display: flex;
   flex-wrap: wrap;

@@ -77,7 +77,7 @@ Summary
   Done when:
   - `buildActionList` yields non-empty `Values`/`Attachments` for done actions, without affecting available/locked actions.
 
-* WIP [#A] Update Backoffice template to swap form → submitted display
+* DONE [#A] Update Backoffice template to swap form → submitted display
   Effort: 45–60m
   Goal: Ensure the UI stops showing the input controls after completion.
   Notes:
@@ -97,13 +97,13 @@ Summary
   Done when:
   - Completing any substep results in the action card re-rendering without the input field/button.
 
-* TODO [#B] Add minimal styling for submitted values
+* WIP [#B] Add minimal styling for submitted values
   Effort: 20–30m
   Goal: Keep the done-state readable and consistent with existing design.
   Notes:
   - Prefer minimal CSS additions; reuse existing `.muted`, `.pill`, `.secondary`.
 
-** TODO [#B] Style “Submitted” block in `web/src/styles.css`
+** DONE [#B] Style “Submitted” block in `web/src/styles.css`
   Why: Raw key/value lists can look cramped without spacing.
   Change:
   - Add a small class (e.g. `.action-submitted`) with:
