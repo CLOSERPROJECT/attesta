@@ -6,6 +6,77 @@ workflow:
       title: "Incoming intake"
       order: 1
       substeps:
+        - id: "1.0"
+          title: "Record formata"
+          order: 0
+          role: "dep1"
+          inputKey: "qa"
+          inputType: "formata"
+          schema:
+            type: "object"
+            required: ["inspectorName", "result", "purityScore", "riskBand"]
+            properties:
+              inspectorName:
+                type: "string"
+                title: "Inspector name"
+              testMethod:
+                type: "string"
+                title: "Test method"
+                enum: ["xrf", "icp_ms", "wet_chemistry", "visual_only"]
+              result:
+                type: "string"
+                title: "QA result"
+                enum: ["pass", "conditional_pass", "rework", "reject"]
+              riskBand:
+                type: "string"
+                title: "Risk band"
+                enum: ["low", "medium", "high", "critical"]
+              purityScore:
+                type: "number"
+                title: "Purity score (range 0-100)"
+                minimum: 0
+                maximum: 100
+              confidenceLevel:
+                type: "integer"
+                title: "Confidence level (range 1-5)"
+                minimum: 1
+                maximum: 5
+              notes:
+                type: "string"
+                title: "QA notes"
+              evidenceFile:
+                type: "string"
+                format: "data-url"
+                title: "Evidence file"
+          uiSchema:
+            "ui:options":
+              order: ["inspectorName", "testMethod", "result", "riskBand", "purityScore", "confidenceLevel", "notes", "evidenceFile"]
+            testMethod:
+              "ui:options":
+                help: "Select how QA validation was performed."
+            riskBand:
+              "ui:options":
+                help: "Choose the risk classification for this batch."
+            purityScore:
+              "ui:components":
+                numberWidget: "rangeWidget"
+              "ui:options":
+                help: "Numeric range value between 0 and 100."
+            confidenceLevel:
+              "ui:components":
+                numberWidget: "rangeWidget"
+              "ui:options":
+                help: "Numeric range value between 1 and 5."
+            notes:
+              "ui:components":
+                textWidget: "textareaWidget"
+              "ui:options":
+                help: "Write a detailed QA narrative and exceptions."
+            evidenceFile:
+              "ui:components":
+                stringField: "fileField"
+              "ui:options":
+                help: "Upload QA evidence."
         - id: "1.1"
           title: "Record incoming gallium (kg)"
           order: 1
@@ -48,8 +119,73 @@ workflow:
           title: "QA sign-off"
           order: 1
           role: "dep3"
-          inputKey: "qaNote"
-          inputType: "string"
+          inputKey: "qaChecklist"
+          inputType: "formata"
+          schema:
+            type: "object"
+            required: ["inspectorName", "result", "purityScore", "riskBand"]
+            properties:
+              inspectorName:
+                type: "string"
+                title: "Inspector name"
+              testMethod:
+                type: "string"
+                title: "Test method"
+                enum: ["xrf", "icp_ms", "wet_chemistry", "visual_only"]
+              result:
+                type: "string"
+                title: "QA result"
+                enum: ["pass", "conditional_pass", "rework", "reject"]
+              riskBand:
+                type: "string"
+                title: "Risk band"
+                enum: ["low", "medium", "high", "critical"]
+              purityScore:
+                type: "number"
+                title: "Purity score (range 0-100)"
+                minimum: 0
+                maximum: 100
+              confidenceLevel:
+                type: "integer"
+                title: "Confidence level (range 1-5)"
+                minimum: 1
+                maximum: 5
+              notes:
+                type: "string"
+                title: "QA notes"
+              evidenceFile:
+                type: "string"
+                format: "data-url"
+                title: "Evidence file"
+          uiSchema:
+            "ui:options":
+              order: ["inspectorName", "testMethod", "result", "riskBand", "purityScore", "confidenceLevel", "notes", "evidenceFile"]
+            testMethod:
+              "ui:options":
+                help: "Select how QA validation was performed."
+            riskBand:
+              "ui:options":
+                help: "Choose the risk classification for this batch."
+            purityScore:
+              "ui:components":
+                numberWidget: "rangeWidget"
+              "ui:options":
+                help: "Numeric range value between 0 and 100."
+            confidenceLevel:
+              "ui:components":
+                numberWidget: "rangeWidget"
+              "ui:options":
+                help: "Numeric range value between 1 and 5."
+            notes:
+              "ui:components":
+                textWidget: "textareaWidget"
+              "ui:options":
+                help: "Write a detailed QA narrative and exceptions."
+            evidenceFile:
+              "ui:components":
+                stringField: "fileField"
+              "ui:options":
+                help: "Upload QA evidence."
         - id: "3.2"
           title: "Finalize notarization"
           order: 2

@@ -45,7 +45,13 @@
                 {{if .FileURL}}
                   <span class="data">file: {{.FileName}}</span>
                   <a class="secondary" href="{{.FileURL}}">Download</a>
-                  {{if .FileSHA256}}<span class="data">sha256: {{.FileSHA256}}</span>{{end}}
+                  {{if .FileSHA256}}
+                    <span class="data data-hash">
+                      <span>sha256:</span>
+                      <code class="hash-value" title="{{.FileSHA256}}">{{.FileSHA256}}</code>
+                      <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
+                    </span>
+                  {{end}}
                 {{end}}
                 {{if .Digest}}<span class="data">digest: {{.Digest}}</span>{{end}}
               </div>

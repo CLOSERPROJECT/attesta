@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -193,5 +195,88 @@ func TestParseFilePayloadRequiresSingleFile(t *testing.T) {
 	_, err := server.parseFilePayload(rec, req, processID, substep, time.Now().UTC())
 	if err != errFileRequired {
 		t.Fatalf("parseFilePayload error = %v, want errFileRequired", err)
+	}
+}
+
+func TestParseFormataPayloadStoresDataURLAttachment(t *testing.T) {
+	store := NewMemoryStore()
+	server := &Server{store: store}
+	processID := primitive.NewObjectID()
+	now := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
+	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+
+	form := url.Values{}
+	form.Set("value", `{"notes":"ready","evidenceFile":"data:text/plain;base64,aGVsbG8="}`)
+	req := httptest.NewRequest(http.MethodPost, "/complete", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	payload, err := server.parseFormataPayload(req, processID, substep, now)
+	if err != nil {
+		t.Fatalf("parseFormataPayload returned error: %v", err)
+	}
+
+	root, ok := payload["qaChecklist"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected qaChecklist object, got %#v", payload["qaChecklist"])
+	}
+	if root["notes"] != "ready" {
+		t.Fatalf("notes = %#v, want %q", root["notes"], "ready")
+	}
+
+	fileMeta, ok := root["evidenceFile"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected evidenceFile attachment object, got %#v", root["evidenceFile"])
+	}
+	attachmentIDRaw, ok := fileMeta["attachmentId"].(string)
+	if !ok || attachmentIDRaw == "" {
+		t.Fatalf("expected attachmentId in evidenceFile payload, got %#v", fileMeta["attachmentId"])
+	}
+
+	attachmentID, err := primitive.ObjectIDFromHex(attachmentIDRaw)
+	if err != nil {
+		t.Fatalf("attachmentId parse error: %v", err)
+	}
+
+	download, err := store.OpenAttachmentDownload(t.Context(), attachmentID)
+	if err != nil {
+		t.Fatalf("OpenAttachmentDownload: %v", err)
+	}
+	defer download.Close()
+
+	content, err := io.ReadAll(download)
+	if err != nil {
+		t.Fatalf("ReadAll attachment content: %v", err)
+	}
+	if string(content) != "hello" {
+		t.Fatalf("attachment content = %q, want %q", string(content), "hello")
+	}
+}
+
+func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T) {
+	store := NewMemoryStore()
+	server := &Server{store: store}
+	processID := primitive.NewObjectID()
+	now := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
+	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+
+	form := url.Values{}
+	form.Set("inspector", "alice")
+	form.Set("outcome", "accepted")
+	req := httptest.NewRequest(http.MethodPost, "/complete", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	payload, err := server.parseFormataPayload(req, processID, substep, now)
+	if err != nil {
+		t.Fatalf("parseFormataPayload returned error: %v", err)
+	}
+	root, ok := payload["qaChecklist"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected qaChecklist object, got %#v", payload["qaChecklist"])
+	}
+	if root["inspector"] != "alice" {
+		t.Fatalf("inspector = %#v, want %q", root["inspector"], "alice")
+	}
+	if root["outcome"] != "accepted" {
+		t.Fatalf("outcome = %#v, want %q", root["outcome"], "accepted")
 	}
 }

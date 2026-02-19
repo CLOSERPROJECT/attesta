@@ -19,6 +19,8 @@ func TestNormalizeInputType(t *testing.T) {
 		{name: "string", input: "string", want: "string"},
 		{name: "text alias", input: "text", want: "string"},
 		{name: "file", input: "file", want: "file"},
+		{name: "formata", input: "formata", want: "formata"},
+		{name: "schema alias", input: "schema", want: "formata"},
 		{name: "trim and case", input: "  TeXt  ", want: "string"},
 		{name: "unsupported", input: "unsupported", wantErr: true},
 	}
@@ -50,6 +52,7 @@ func TestNormalizeInputTypes(t *testing.T) {
 					{SubstepID: "1.1", InputType: " text "},
 					{SubstepID: "1.2", InputType: "NUMBER"},
 					{SubstepID: "1.3", InputType: "file"},
+					{SubstepID: "1.4", InputType: "formata", Schema: map[string]interface{}{"type": "object"}},
 				},
 			},
 		},
@@ -67,6 +70,9 @@ func TestNormalizeInputTypes(t *testing.T) {
 	if workflow.Steps[0].Substep[2].InputType != "file" {
 		t.Fatalf("substep 1.3 type = %q, want %q", workflow.Steps[0].Substep[2].InputType, "file")
 	}
+	if workflow.Steps[0].Substep[3].InputType != "formata" {
+		t.Fatalf("substep 1.4 type = %q, want %q", workflow.Steps[0].Substep[3].InputType, "formata")
+	}
 
 	invalid := WorkflowDef{
 		Steps: []WorkflowStep{
@@ -82,6 +88,23 @@ func TestNormalizeInputTypes(t *testing.T) {
 		t.Fatal("normalizeInputTypes(invalid): expected error")
 	}
 	if !strings.Contains(err.Error(), "invalid inputType for substep 2.1") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	missingSchema := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				Substep: []WorkflowSub{
+					{SubstepID: "3.1", InputType: "formata"},
+				},
+			},
+		},
+	}
+	err = normalizeInputTypes(&missingSchema)
+	if err == nil {
+		t.Fatal("normalizeInputTypes(formata without schema): expected error")
+	}
+	if !strings.Contains(err.Error(), "schema is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

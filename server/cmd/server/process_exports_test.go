@@ -262,6 +262,75 @@ func TestHandleDownloadAllFilesZip(t *testing.T) {
 	}
 }
 
+func TestCollectProcessAttachmentsIncludesNestedFormataAttachments(t *testing.T) {
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 3, 9, 0, 0, 0, time.UTC)
+	processID := primitive.NewObjectID()
+
+	attachment, err := store.SaveAttachment(context.Background(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   "3.1",
+		Filename:    "evidence.txt",
+		ContentType: "text/plain",
+		MaxBytes:    1 << 20,
+		UploadedAt:  now,
+	}, bytes.NewReader([]byte("formata file")))
+	if err != nil {
+		t.Fatalf("save attachment: %v", err)
+	}
+
+	process := &Process{
+		ID:        processID,
+		CreatedAt: now,
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"3.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"qaChecklist": map[string]interface{}{
+						"notes": "ok",
+						"evidenceFile": map[string]interface{}{
+							"attachmentId": attachment.ID.Hex(),
+							"filename":     attachment.Filename,
+							"contentType":  attachment.ContentType,
+							"size":         attachment.SizeBytes,
+							"sha256":       attachment.SHA256,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "3",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "3.1",
+						Order:     1,
+						InputKey:  "qaChecklist",
+						InputType: "formata",
+					},
+				},
+			},
+		},
+	}
+
+	files := collectProcessAttachments(def, process)
+	if len(files) != 1 {
+		t.Fatalf("attachment count = %d, want 1", len(files))
+	}
+	if files[0].AttachmentID != attachment.ID.Hex() {
+		t.Fatalf("attachment id = %q, want %q", files[0].AttachmentID, attachment.ID.Hex())
+	}
+	if files[0].SubstepID != "3.1" {
+		t.Fatalf("substep id = %q, want %q", files[0].SubstepID, "3.1")
+	}
+}
+
 func TestHandleDownloadAllFilesConfigError(t *testing.T) {
 	server := &Server{
 		store: NewMemoryStore(),

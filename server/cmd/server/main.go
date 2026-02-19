@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,9 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -42,12 +45,14 @@ type WorkflowStep struct {
 }
 
 type WorkflowSub struct {
-	SubstepID string `bson:"substepId" yaml:"id"`
-	Title     string `bson:"title" yaml:"title"`
-	Order     int    `bson:"order" yaml:"order"`
-	Role      string `bson:"role" yaml:"role"`
-	InputKey  string `bson:"inputKey" yaml:"inputKey"`
-	InputType string `bson:"inputType" yaml:"inputType"`
+	SubstepID string                 `bson:"substepId" yaml:"id"`
+	Title     string                 `bson:"title" yaml:"title"`
+	Order     int                    `bson:"order" yaml:"order"`
+	Role      string                 `bson:"role" yaml:"role"`
+	InputKey  string                 `bson:"inputKey" yaml:"inputKey"`
+	InputType string                 `bson:"inputType" yaml:"inputType"`
+	Schema    map[string]interface{} `bson:"schema,omitempty" yaml:"schema,omitempty"`
+	UISchema  map[string]interface{} `bson:"uiSchema,omitempty" yaml:"uiSchema,omitempty"`
 }
 
 type Process struct {
@@ -195,18 +200,36 @@ type NotarizedProcessExport struct {
 }
 
 type ActionView struct {
-	ProcessID  string
-	SubstepID  string
-	Title      string
-	Role       string
-	RoleLabel  string
-	RoleColor  string
-	RoleBorder string
-	InputKey   string
-	InputType  string
-	Status     string
-	Disabled   bool
-	Reason     string
+	ProcessID    string
+	SubstepID    string
+	Title        string
+	Role         string
+	RoleLabel    string
+	RoleColor    string
+	RoleBorder   string
+	InputKey     string
+	InputType    string
+	FormSchema   string
+	FormUISchema string
+	Status       string
+	DoneAt       string
+	DoneBy       string
+	DoneRole     string
+	Values       []ActionKV
+	Attachments  []ActionAttachmentView
+	Disabled     bool
+	Reason       string
+}
+
+type ActionKV struct {
+	Key   string
+	Value string
+}
+
+type ActionAttachmentView struct {
+	Filename string
+	URL      string
+	SHA256   string
 }
 
 type ActionTodo struct {
@@ -362,9 +385,17 @@ type HomeView struct {
 
 type ProcessPageView struct {
 	PageBase
-	ProcessID string
-	Timeline  []TimelineStep
-	DPPURL    string
+	ProcessID   string
+	Timeline    []TimelineStep
+	DPPURL      string
+	DPPGS1      string
+	Attachments []ProcessDownloadAttachment
+}
+
+type ProcessDownloadAttachment struct {
+	SubstepID string
+	Filename  string
+	URL       string
 }
 
 type DPPPageView struct {
@@ -1055,6 +1086,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
 	}
+	if len(parts) == 4 && parts[1] == "attachment" && parts[3] == "file" && r.Method == http.MethodGet {
+		s.handleDownloadProcessAttachment(w, r, processID, parts[2])
+		return
+	}
 	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "file" && r.Method == http.MethodGet {
 		s.handleDownloadSubstepFile(w, r, processID, parts[2])
 		return
@@ -1078,10 +1113,13 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
+	process = s.ensureProcessCompletionArtifacts(ctx, cfg, workflowKey, process)
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	view.Attachments = buildProcessDownloadAttachments(workflowKey, process, collectProcessAttachments(cfg.Workflow, process))
 	if process.DPP != nil {
 		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+		view.DPPGS1 = gs1ElementString(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1184,16 +1222,56 @@ func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Re
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
+	process = s.ensureProcessCompletionArtifacts(r.Context(), cfg, workflowKey, process)
 	view := ProcessPageView{
 		PageBase:  s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
 		ProcessID: process.ID.Hex(),
 	}
+	view.Attachments = buildProcessDownloadAttachments(workflowKey, process, collectProcessAttachments(cfg.Workflow, process))
 	if process.DPP != nil {
 		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+		view.DPPGS1 = gs1ElementString(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "process_downloads", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) ensureProcessCompletionArtifacts(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process) *Process {
+	if process == nil || !isProcessDone(cfg.Workflow, process) {
+		return process
+	}
+
+	updated := false
+	if strings.TrimSpace(process.Status) != "done" {
+		if err := s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done"); err != nil {
+			log.Printf("failed to persist process status for %s: %v", process.ID.Hex(), err)
+		} else {
+			updated = true
+		}
+	}
+
+	if cfg.DPP.Enabled && process.DPP == nil {
+		dpp, err := buildProcessDPP(cfg.Workflow, cfg.DPP, process, s.nowUTC())
+		if err != nil {
+			log.Printf("failed to build dpp for process %s: %v", process.ID.Hex(), err)
+		} else if err := s.store.UpdateProcessDPP(ctx, process.ID, workflowKey, dpp); err != nil {
+			log.Printf("failed to persist dpp for process %s: %v", process.ID.Hex(), err)
+		} else {
+			updated = true
+		}
+	}
+
+	if !updated {
+		return process
+	}
+	reloaded, err := s.store.LoadProcessByID(ctx, process.ID)
+	if err != nil {
+		log.Printf("failed to reload process %s after completion artifact update: %v", process.ID.Hex(), err)
+		return process
+	}
+	reloaded.Progress = normalizeProgressKeys(reloaded.Progress)
+	return reloaded
 }
 
 func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, processID string) {
@@ -1355,6 +1433,54 @@ func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.Request, processID, attachmentID string) {
+	workflowKey, _, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.NotFound(w, r)
+		return
+	}
+	attachmentObjectID, err := primitive.ObjectIDFromHex(strings.TrimSpace(attachmentID))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	attachment, err := s.store.LoadAttachmentByID(r.Context(), attachmentObjectID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if attachment.ProcessID != process.ID {
+		http.NotFound(w, r)
+		return
+	}
+	download, err := s.store.OpenAttachmentDownload(r.Context(), attachmentObjectID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer download.Close()
+
+	contentType := strings.TrimSpace(attachment.ContentType)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	filename := sanitizeAttachmentFilename(attachment.Filename)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	if _, err := io.Copy(w, download); err != nil {
+		return
+	}
+}
+
 func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
@@ -1491,6 +1617,14 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	if !sequenceOK {
+		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && actor.Role == substep.Role {
+			if isHTMXRequest(r) {
+				s.renderActionList(w, r, process, actor, "")
+				return
+			}
+			s.renderDepartmentProcessPage(w, r, process, actor, "")
+			return
+		}
 		s.renderActionErrorForRequest(w, r, http.StatusConflict, "Step is locked: complete previous steps first.", process, actor)
 		return
 	}
@@ -1577,10 +1711,13 @@ var (
 )
 
 func (s *Server) parseCompletionPayload(w http.ResponseWriter, r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	if substep.InputType != "file" {
-		return parseScalarPayload(r, substep)
+	if substep.InputType == "file" {
+		return s.parseFilePayload(w, r, processID, substep, now)
 	}
-	return s.parseFilePayload(w, r, processID, substep, now)
+	if substep.InputType == "formata" {
+		return s.parseFormataPayload(r, processID, substep, now)
+	}
+	return parseScalarPayload(r, substep)
 }
 
 func parseScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
@@ -1663,6 +1800,202 @@ func (s *Server) parseFilePayload(w http.ResponseWriter, r *http.Request, proces
 			"sha256":       attachment.SHA256,
 		},
 	}, nil
+}
+
+type decodedDataURL struct {
+	ContentType string
+	Data        []byte
+}
+
+func (s *Server) parseFormataPayload(r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
+	payload, err := parseFormataScalarPayload(r, substep)
+	if err != nil {
+		return nil, err
+	}
+	raw := payload[substep.InputKey]
+	converted, err := s.persistFormataAttachments(r.Context(), processID, substep, raw, now, []string{substep.InputKey})
+	if err != nil {
+		return nil, err
+	}
+	payload[substep.InputKey] = converted
+	return payload, nil
+}
+
+func parseFormataScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
+	if err := r.ParseForm(); err != nil {
+		return nil, errInvalidForm
+	}
+	rawValue := strings.TrimSpace(r.FormValue("value"))
+	if rawValue == "" {
+		fallback := formMapWithoutValue(r.PostForm)
+		if len(fallback) == 0 {
+			rawValue = "{}"
+		} else {
+			data, err := json.Marshal(fallback)
+			if err != nil {
+				return nil, errInvalidForm
+			}
+			rawValue = string(data)
+		}
+	}
+	payload, err := normalizePayload(substep, rawValue)
+	if err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func formMapWithoutValue(values url.Values) map[string]interface{} {
+	if len(values) == 0 {
+		return nil
+	}
+	result := map[string]interface{}{}
+	for key, rawValues := range values {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" || trimmedKey == "value" {
+			continue
+		}
+		switch len(rawValues) {
+		case 0:
+			continue
+		case 1:
+			result[trimmedKey] = strings.TrimSpace(rawValues[0])
+		default:
+			items := make([]string, 0, len(rawValues))
+			for _, item := range rawValues {
+				items = append(items, strings.TrimSpace(item))
+			}
+			result[trimmedKey] = items
+		}
+	}
+	return result
+}
+
+func (s *Server) persistFormataAttachments(ctx context.Context, processID primitive.ObjectID, substep WorkflowSub, raw interface{}, now time.Time, path []string) (interface{}, error) {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		normalized := make(map[string]interface{}, len(typed))
+		for key, value := range typed {
+			nextPath := append(append([]string(nil), path...), key)
+			converted, err := s.persistFormataAttachments(ctx, processID, substep, value, now, nextPath)
+			if err != nil {
+				return nil, err
+			}
+			normalized[key] = converted
+		}
+		return normalized, nil
+	case primitive.M:
+		return s.persistFormataAttachments(ctx, processID, substep, map[string]interface{}(typed), now, path)
+	case []interface{}:
+		normalized := make([]interface{}, len(typed))
+		for index, value := range typed {
+			nextPath := append(append([]string(nil), path...), strconv.Itoa(index))
+			converted, err := s.persistFormataAttachments(ctx, processID, substep, value, now, nextPath)
+			if err != nil {
+				return nil, err
+			}
+			normalized[index] = converted
+		}
+		return normalized, nil
+	case string:
+		dataURL, ok := decodeDataURL(typed)
+		if !ok {
+			return typed, nil
+		}
+		filename := formataAttachmentFilename(substep.SubstepID, path, dataURL.ContentType)
+		attachment, err := s.store.SaveAttachment(ctx, AttachmentUpload{
+			ProcessID:   processID,
+			SubstepID:   substep.SubstepID,
+			Filename:    filename,
+			ContentType: dataURL.ContentType,
+			MaxBytes:    attachmentMaxBytes(),
+			UploadedAt:  now,
+		}, bytes.NewReader(dataURL.Data))
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"attachmentId": attachment.ID.Hex(),
+			"filename":     attachment.Filename,
+			"contentType":  attachment.ContentType,
+			"size":         attachment.SizeBytes,
+			"sha256":       attachment.SHA256,
+		}, nil
+	default:
+		return raw, nil
+	}
+}
+
+func decodeDataURL(raw string) (decodedDataURL, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(strings.ToLower(trimmed), "data:") {
+		return decodedDataURL{}, false
+	}
+	commaIndex := strings.Index(trimmed, ",")
+	if commaIndex < 0 {
+		return decodedDataURL{}, false
+	}
+	metadata := strings.TrimSpace(trimmed[len("data:"):commaIndex])
+	payload := trimmed[commaIndex+1:]
+	if payload == "" {
+		return decodedDataURL{}, false
+	}
+
+	isBase64 := strings.HasSuffix(strings.ToLower(metadata), ";base64")
+	if isBase64 {
+		metadata = strings.TrimSpace(metadata[:len(metadata)-len(";base64")])
+	}
+	contentType := metadata
+	if semicolon := strings.Index(contentType, ";"); semicolon >= 0 {
+		contentType = contentType[:semicolon]
+	}
+	contentType = strings.TrimSpace(contentType)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	if isBase64 {
+		cleaned := strings.Map(func(r rune) rune {
+			switch r {
+			case '\n', '\r', '\t', ' ':
+				return -1
+			default:
+				return r
+			}
+		}, payload)
+		data, err := base64.StdEncoding.DecodeString(cleaned)
+		if err != nil {
+			return decodedDataURL{}, false
+		}
+		return decodedDataURL{ContentType: contentType, Data: data}, true
+	}
+
+	decoded, err := url.PathUnescape(payload)
+	if err != nil {
+		return decodedDataURL{}, false
+	}
+	return decodedDataURL{ContentType: contentType, Data: []byte(decoded)}, true
+}
+
+func formataAttachmentFilename(substepID string, path []string, contentType string) string {
+	fieldPath := strings.TrimSpace(strings.Join(path, "_"))
+	fieldPath = strings.Trim(strings.ReplaceAll(fieldPath, ".", "_"), "_")
+	if fieldPath == "" {
+		fieldPath = "attachment"
+	}
+	fieldPath = sanitizeAttachmentFilename(fieldPath)
+	if !strings.Contains(fieldPath, ".") {
+		mediaType, _, _ := mime.ParseMediaType(contentType)
+		extensions, _ := mime.ExtensionsByType(strings.TrimSpace(mediaType))
+		if len(extensions) > 0 {
+			fieldPath += extensions[0]
+		}
+	}
+	prefix := strings.Trim(strings.ReplaceAll(strings.TrimSpace(substepID), ".", "_"), "_")
+	if prefix == "" {
+		return fieldPath
+	}
+	return prefix + "-" + fieldPath
 }
 
 func isRequestTooLarge(err error) bool {
@@ -1878,7 +2211,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
-	actions := buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg))
+	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
 		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser: actor,
@@ -2280,28 +2613,84 @@ func collectProcessAttachments(def WorkflowDef, process *Process) []ProcessAttac
 		return nil
 	}
 	var files []ProcessAttachmentExport
+	seen := map[string]struct{}{}
 	for _, sub := range orderedSubsteps(def) {
-		if sub.InputType != "file" {
-			continue
-		}
 		progress, ok := process.Progress[sub.SubstepID]
 		if !ok || progress.State != "done" {
 			continue
 		}
-		meta := attachmentMetaFromPayload(progress.Data, sub.InputKey)
-		if meta == nil || meta.AttachmentID == "" {
-			continue
+		for _, meta := range attachmentsFromValue(progress.Data) {
+			if meta.AttachmentID == "" {
+				continue
+			}
+			key := sub.SubstepID + ":" + meta.AttachmentID
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			files = append(files, ProcessAttachmentExport{
+				SubstepID:    sub.SubstepID,
+				AttachmentID: meta.AttachmentID,
+				Filename:     meta.Filename,
+				ContentType:  meta.ContentType,
+				SizeBytes:    meta.SizeBytes,
+				SHA256:       meta.SHA256,
+			})
 		}
-		files = append(files, ProcessAttachmentExport{
-			SubstepID:    sub.SubstepID,
-			AttachmentID: meta.AttachmentID,
-			Filename:     meta.Filename,
-			ContentType:  meta.ContentType,
-			SizeBytes:    meta.SizeBytes,
-			SHA256:       meta.SHA256,
-		})
 	}
 	return files
+}
+
+func buildProcessDownloadAttachments(workflowKey string, process *Process, files []ProcessAttachmentExport) []ProcessDownloadAttachment {
+	if process == nil || len(files) == 0 {
+		return nil
+	}
+	ordered := append([]ProcessAttachmentExport(nil), files...)
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].SubstepID != ordered[j].SubstepID {
+			return ordered[i].SubstepID < ordered[j].SubstepID
+		}
+		if ordered[i].Filename != ordered[j].Filename {
+			return ordered[i].Filename < ordered[j].Filename
+		}
+		return ordered[i].AttachmentID < ordered[j].AttachmentID
+	})
+	views := make([]ProcessDownloadAttachment, 0, len(ordered))
+	for _, file := range ordered {
+		if strings.TrimSpace(file.AttachmentID) == "" {
+			continue
+		}
+		views = append(views, ProcessDownloadAttachment{
+			SubstepID: file.SubstepID,
+			Filename:  sanitizeAttachmentFilename(file.Filename),
+			URL:       fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), file.AttachmentID),
+		})
+	}
+	return views
+}
+
+func attachmentsFromValue(raw interface{}) []NotarizedAttachment {
+	var files []NotarizedAttachment
+	collectAttachmentsFromValue(raw, &files)
+	return files
+}
+
+func collectAttachmentsFromValue(raw interface{}, files *[]NotarizedAttachment) {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		if meta := attachmentMetaFromMap(typed); meta != nil {
+			*files = append(*files, *meta)
+		}
+		for _, nested := range typed {
+			collectAttachmentsFromValue(nested, files)
+		}
+	case primitive.M:
+		collectAttachmentsFromValue(map[string]interface{}(typed), files)
+	case []interface{}:
+		for _, nested := range typed {
+			collectAttachmentsFromValue(nested, files)
+		}
+	}
 }
 
 func attachmentMetaFromPayload(data map[string]interface{}, inputKey string) *NotarizedAttachment {
@@ -2312,27 +2701,35 @@ func attachmentMetaFromPayload(data map[string]interface{}, inputKey string) *No
 	if !ok {
 		return nil
 	}
-	payload, ok := raw.(map[string]interface{})
-	if !ok {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		return attachmentMetaFromMap(typed)
+	case primitive.M:
+		return attachmentMetaFromMap(map[string]interface{}(typed))
+	default:
+		return nil
+	}
+}
+
+func attachmentMetaFromMap(payload map[string]interface{}) *NotarizedAttachment {
+	if payload == nil {
 		return nil
 	}
 	meta := &NotarizedAttachment{}
-	if value, ok := payload["attachmentId"].(string); ok {
+	if value, ok := asString(payload["attachmentId"]); ok {
 		meta.AttachmentID = value
 	}
-	if value, ok := payload["filename"].(string); ok {
+	if value, ok := asString(payload["filename"]); ok {
 		meta.Filename = value
 	}
-	if value, ok := payload["contentType"].(string); ok {
+	if value, ok := asString(payload["contentType"]); ok {
 		meta.ContentType = value
 	}
-	if value, ok := payload["sha256"].(string); ok {
+	if value, ok := asString(payload["sha256"]); ok {
 		meta.SHA256 = value
 	}
-	if value, ok := payload["size"].(int64); ok {
+	if value, ok := asInt64(payload["size"]); ok {
 		meta.SizeBytes = value
-	} else if value, ok := payload["size"].(float64); ok {
-		meta.SizeBytes = int64(value)
 	}
 	if meta.AttachmentID == "" && meta.Filename == "" && meta.SHA256 == "" {
 		return nil
@@ -2549,7 +2946,7 @@ func buildRoleTodos(def WorkflowDef, process *Process, role string) []ActionTodo
 	return todos
 }
 
-func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bool, roleMeta map[string]RoleMeta) []ActionView {
+func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleMeta map[string]RoleMeta) []ActionView {
 	var actions []ActionView
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
@@ -2575,22 +2972,171 @@ func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bo
 		} else if sub.Role != actor.Role {
 			reason = "Role mismatch"
 		}
+		formSchema := ""
+		formUISchema := ""
+		doneAt := ""
+		doneBy := ""
+		doneRole := ""
+		var values []ActionKV
+		var attachments []ActionAttachmentView
+		if status == "done" && process != nil {
+			if progress, ok := process.Progress[sub.SubstepID]; ok {
+				if progress.DoneAt != nil {
+					doneAt = progress.DoneAt.UTC().Format(time.RFC3339)
+				}
+				if progress.DoneBy != nil {
+					doneBy = strings.TrimSpace(progress.DoneBy.UserID)
+					doneRole = strings.TrimSpace(progress.DoneBy.Role)
+				}
+				if sub.InputType == "formata" {
+					values = flattenDisplayValues("", progress.Data[sub.InputKey])
+				} else if value, ok := progress.Data[sub.InputKey]; ok && !isAttachmentMetaValue(value) {
+					values = flattenDisplayValues(sub.InputKey, value)
+				}
+				attachments = buildActionAttachments(workflowKey, process, progress.Data)
+			}
+		}
+		if sub.InputType == "formata" {
+			formSchema = marshalJSONCompact(sub.Schema)
+			formUISchema = marshalJSONCompact(sub.UISchema)
+		}
 		actions = append(actions, ActionView{
-			ProcessID:  processIDString(process),
-			SubstepID:  sub.SubstepID,
-			Title:      sub.Title,
-			Role:       sub.Role,
-			RoleLabel:  meta.Label,
-			RoleColor:  meta.Color,
-			RoleBorder: meta.Border,
-			InputKey:   sub.InputKey,
-			InputType:  sub.InputType,
-			Status:     status,
-			Disabled:   disabled,
-			Reason:     reason,
+			ProcessID:    processIDString(process),
+			SubstepID:    sub.SubstepID,
+			Title:        sub.Title,
+			Role:         sub.Role,
+			RoleLabel:    meta.Label,
+			RoleColor:    meta.Color,
+			RoleBorder:   meta.Border,
+			InputKey:     sub.InputKey,
+			InputType:    sub.InputType,
+			FormSchema:   formSchema,
+			FormUISchema: formUISchema,
+			Status:       status,
+			DoneAt:       doneAt,
+			DoneBy:       doneBy,
+			DoneRole:     doneRole,
+			Values:       values,
+			Attachments:  attachments,
+			Disabled:     disabled,
+			Reason:       reason,
 		})
 	}
 	return actions
+}
+
+func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
+	key := strings.TrimSpace(inputKey)
+	var out []ActionKV
+	collectDisplayValues(key, raw, &out)
+	if len(out) > 1 {
+		sort.Slice(out, func(i, j int) bool {
+			return out[i].Key < out[j].Key
+		})
+	}
+	return out
+}
+
+func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		if isAttachmentMetaMap(typed) {
+			return
+		}
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			nextPath := key
+			if strings.TrimSpace(path) != "" {
+				nextPath = path + "." + key
+			}
+			collectDisplayValues(nextPath, typed[key], out)
+		}
+	case primitive.M:
+		collectDisplayValues(path, map[string]interface{}(typed), out)
+	case []interface{}:
+		for idx, nested := range typed {
+			nextPath := fmt.Sprintf("[%d]", idx)
+			if strings.TrimSpace(path) != "" {
+				nextPath = fmt.Sprintf("%s[%d]", path, idx)
+			}
+			collectDisplayValues(nextPath, nested, out)
+		}
+	default:
+		value := truncateDisplayValue(strings.TrimSpace(fmt.Sprintf("%v", typed)))
+		key := path
+		if strings.TrimSpace(key) == "" {
+			key = "value"
+		}
+		*out = append(*out, ActionKV{Key: key, Value: value})
+	}
+}
+
+func truncateDisplayValue(value string) string {
+	const maxLen = 200
+	if len(value) <= maxLen {
+		return value
+	}
+	return value[:maxLen] + "..."
+}
+
+func isAttachmentMetaValue(raw interface{}) bool {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		return isAttachmentMetaMap(typed)
+	case primitive.M:
+		return isAttachmentMetaMap(map[string]interface{}(typed))
+	default:
+		return false
+	}
+}
+
+func isAttachmentMetaMap(payload map[string]interface{}) bool {
+	return attachmentMetaFromMap(payload) != nil
+}
+
+func buildActionAttachments(workflowKey string, process *Process, data map[string]interface{}) []ActionAttachmentView {
+	if process == nil {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	attachments := make([]ActionAttachmentView, 0)
+	for _, meta := range attachmentsFromValue(data) {
+		id := strings.TrimSpace(meta.AttachmentID)
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		attachments = append(attachments, ActionAttachmentView{
+			Filename: sanitizeAttachmentFilename(meta.Filename),
+			URL:      fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id),
+			SHA256:   strings.TrimSpace(meta.SHA256),
+		})
+	}
+	sort.Slice(attachments, func(i, j int) bool {
+		if attachments[i].Filename != attachments[j].Filename {
+			return attachments[i].Filename < attachments[j].Filename
+		}
+		return attachments[i].URL < attachments[j].URL
+	})
+	return attachments
+}
+
+func marshalJSONCompact(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func processIDString(process *Process) string {
@@ -2692,12 +3238,15 @@ func findSubstep(def WorkflowDef, substepID string) (WorkflowSub, WorkflowStep, 
 func normalizeInputTypes(workflow *WorkflowDef) error {
 	for stepIndex := range workflow.Steps {
 		for substepIndex := range workflow.Steps[stepIndex].Substep {
-			inputType, err := normalizeInputType(workflow.Steps[stepIndex].Substep[substepIndex].InputType)
+			substep := &workflow.Steps[stepIndex].Substep[substepIndex]
+			inputType, err := normalizeInputType(substep.InputType)
 			if err != nil {
-				substep := workflow.Steps[stepIndex].Substep[substepIndex]
 				return fmt.Errorf("invalid inputType for substep %s: %w", substep.SubstepID, err)
 			}
-			workflow.Steps[stepIndex].Substep[substepIndex].InputType = inputType
+			substep.InputType = inputType
+			if err := normalizeSubstepInputConfig(substep); err != nil {
+				return fmt.Errorf("invalid inputType for substep %s: %w", substep.SubstepID, err)
+			}
 		}
 	}
 	return nil
@@ -2711,9 +3260,21 @@ func normalizeInputType(value string) (string, error) {
 		return "string", nil
 	case "file":
 		return "file", nil
+	case "formata", "schema", "jsonschema":
+		return "formata", nil
 	default:
-		return "", fmt.Errorf("unsupported value %q (allowed: number, string, text, file)", value)
+		return "", fmt.Errorf("unsupported value %q (allowed: number, string, text, file, formata)", value)
 	}
+}
+
+func normalizeSubstepInputConfig(substep *WorkflowSub) error {
+	if substep.InputType != "formata" {
+		return nil
+	}
+	if len(substep.Schema) == 0 {
+		return errors.New("schema is required when inputType=formata")
+	}
+	return nil
 }
 
 func normalizeDPPConfig(cfg *DPPConfig) error {
@@ -2795,6 +3356,16 @@ func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, er
 			return nil, errors.New("Value must be a number.")
 		}
 		payload[sub.InputKey] = number
+	case "formata":
+		var decoded interface{}
+		if err := json.Unmarshal([]byte(value), &decoded); err != nil {
+			return nil, errors.New("Value must be a valid JSON object.")
+		}
+		valueObject, ok := decoded.(map[string]interface{})
+		if !ok {
+			return nil, errors.New("Value must be a valid JSON object.")
+		}
+		payload[sub.InputKey] = valueObject
 	default:
 		payload[sub.InputKey] = value
 	}
@@ -2857,7 +3428,7 @@ func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, proces
 		WorkflowKey: workflowKey,
 		ProcessID:   processIDString(process),
 		CurrentUser: actor,
-		Actions:     buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
 		Error:       message,
 		Timeline:    timeline,
 	}
@@ -2888,7 +3459,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, actor.Role),
 		ProcessID:   processID,
-		Actions:     buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
 		Error:       message,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {

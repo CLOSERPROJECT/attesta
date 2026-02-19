@@ -127,6 +127,16 @@ func digitalLinkURL(gtin, lot, serial string) string {
 		"/21/" + url.PathEscape(strings.TrimSpace(serial))
 }
 
+func gs1ElementString(gtin, lot, serial string) string {
+	trimmedGTIN := strings.TrimSpace(gtin)
+	trimmedLot := strings.TrimSpace(lot)
+	trimmedSerial := strings.TrimSpace(serial)
+	if trimmedGTIN == "" || trimmedLot == "" || trimmedSerial == "" {
+		return ""
+	}
+	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
+}
+
 func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string) []DPPTraceabilityStep {
 	steps := make([]DPPTraceabilityStep, 0, len(def.Steps))
 	if process == nil {

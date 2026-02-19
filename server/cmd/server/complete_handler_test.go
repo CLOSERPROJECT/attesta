@@ -607,6 +607,9 @@ func TestHandleCompleteSubstepFinalCompletionDPPIdempotent(t *testing.T) {
 	firstReq.AddCookie(&http.Cookie{Name: "demo_user", Value: "u3|dep3"})
 	firstRec := httptest.NewRecorder()
 	server.handleCompleteSubstep(firstRec, firstReq, process.ID.Hex(), "3.2")
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("first completion status = %d, want %d", firstRec.Code, http.StatusOK)
+	}
 
 	before, ok := store.SnapshotProcess(process.ID)
 	if !ok || before.DPP == nil {
@@ -620,6 +623,9 @@ func TestHandleCompleteSubstepFinalCompletionDPPIdempotent(t *testing.T) {
 	secondReq.AddCookie(&http.Cookie{Name: "demo_user", Value: "u3|dep3"})
 	secondRec := httptest.NewRecorder()
 	server.handleCompleteSubstep(secondRec, secondReq, process.ID.Hex(), "3.2")
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("second completion status = %d, want %d", secondRec.Code, http.StatusOK)
+	}
 
 	after, ok := store.SnapshotProcess(process.ID)
 	if !ok || after.DPP == nil {

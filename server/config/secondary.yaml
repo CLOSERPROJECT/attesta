@@ -31,8 +31,26 @@ workflow:
           title: "Record inspection outcome"
           order: 2
           role: "dep2"
-          inputKey: "outcome"
-          inputType: "string"
+          inputKey: "inspectionOutcome"
+          inputType: "formata"
+          schema:
+            type: "object"
+            required: ["outcome", "inspector"]
+            properties:
+              outcome:
+                type: "string"
+                title: "Outcome"
+                enum: ["accepted", "rejected", "needs_review"]
+              inspector:
+                type: "string"
+                title: "Inspector"
+              comments:
+                type: "string"
+                title: "Comments"
+          uiSchema:
+            comments:
+              "ui:components":
+                textWidget: "textareaWidget"
     - id: "3"
       title: "Approval"
       order: 3
@@ -68,3 +86,14 @@ users:
   - id: "u6"
     name: "User 6"
     departmentId: "dep3"
+
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+  lotInputKey: "shipmentRef"
+  lotDefault: ""
+  serialInputKey: ""
+  serialStrategy: "process_id_hex"
+  productName: "Gallium shipment audit"
+  productDescription: "Shipment intake, inspection, and approval with traceable checkpoints."
+  ownerName: "Attesta Demo Operator"

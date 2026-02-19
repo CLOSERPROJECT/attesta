@@ -199,6 +199,17 @@ button[disabled] {
   font-weight: 600;
 }
 
+button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.hash-copy {
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1;
+}
+
 .timeline {
   display: flex;
   flex-direction: column;
@@ -271,6 +282,23 @@ button[disabled] {
   color: var(--muted);
 }
 
+.data-hash {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(100%, 520px);
+}
+
+.hash-value {
+  display: inline-block;
+  max-width: min(100%, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 .pill {
   font-family: "Source Code Pro", monospace;
   font-size: 12px;
@@ -290,6 +318,7 @@ button[disabled] {
   border: 1px solid var(--border);
   padding: 12px;
   background: var(--surface-2);
+  overflow: visible;
 }
 
 .action-card.action-available {
@@ -318,6 +347,8 @@ button[disabled] {
   flex-wrap: wrap;
   gap: 10px;
   align-items: flex-end;
+  position: relative;
+  z-index: 1;
 }
 
 .action-form label {
@@ -327,6 +358,13 @@ button[disabled] {
   color: var(--muted);
 }
 
+.action-form label.action-field-formata {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  gap: 8px;
+}
+
 .action-form input {
   padding: 8px 10px;
   border-radius: 8px;
@@ -334,6 +372,88 @@ button[disabled] {
   min-width: 160px;
   background: var(--panel);
   color: var(--ink);
+}
+
+.action-form select {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.action-form option {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.action-form .js-formata-host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 980px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px;
+  overflow: visible;
+}
+
+.action-form formata-form {
+  display: block;
+  width: 100%;
+  background: transparent;
+  overflow: visible;
+}
+
+.action-submitted {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.action-submitted-values {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px 10px;
+}
+
+.action-submitted-values dt,
+.action-submitted-values dd {
+  margin: 0;
+}
+
+.action-submitted-values dt {
+  color: var(--muted);
+  font-family: "Source Code Pro", monospace;
+  font-size: 12px;
+}
+
+.action-submitted-attachments {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  display: grid;
+  gap: 6px;
+}
+
+.action-submitted-attachments li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-submitted-attachments code {
+  font-family: "Source Code Pro", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
 }
 
 .impersonate {
@@ -426,6 +546,26 @@ button[disabled] {
 
 .panel-block {
   margin-top: 18px;
+}
+
+.process-attachments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.dpp-downloads-section code {
+  word-break: break-all;
+}
+
+.dpp-process-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface-2);
 }
 
 .dashboard-grid {
