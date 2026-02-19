@@ -212,8 +212,24 @@ type ActionView struct {
 	FormSchema   string
 	FormUISchema string
 	Status       string
+	DoneAt       string
+	DoneBy       string
+	DoneRole     string
+	Values       []ActionKV
+	Attachments  []ActionAttachmentView
 	Disabled     bool
 	Reason       string
+}
+
+type ActionKV struct {
+	Key   string
+	Value string
+}
+
+type ActionAttachmentView struct {
+	Filename string
+	URL      string
+	SHA256   string
 }
 
 type ActionTodo struct {

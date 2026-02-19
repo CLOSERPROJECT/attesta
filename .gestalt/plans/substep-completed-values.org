@@ -1,0 +1,135 @@
+#+TITLE: Show Completed Substep Inputs (Backoffice)
+#+SUBTITLE: Replace completed action forms with read-only submitted values + file links
+#+DATE: 2026-02-19
+#+KEYWORDS: go, templates, htmx, backoffice, workflow, substep, formata, attachments
+
+Summary
+- When an action/substep is in `done` state, the Backoffice UI should stop rendering the editable `<form>` and instead render a read-only “Submitted” view that shows the user-entered value(s) plus download links for any attachments (including nested Formata attachments).
+- Scope: Backoffice process page actions (`server/templates/action_list.html`) and the server-side view model that feeds it (`buildActionList`).
+- Non-goals: Changing routes, persistence format, Cerbos rules, or timeline/DPP rendering (optional follow-up).
+
+* DONE [#A] Confirm UX scope + acceptance criteria
+  Effort: 20m
+  Goal: Lock down exactly where the form disappears and what replaces it.
+  Notes:
+  - Assumption (recommended): this applies to Backoffice “Available actions” cards (the only place that renders substep forms today).
+  - After a successful completion POST (HTMX swap), the same action card remains visible but becomes read-only.
+
+** DONE [#A] Define “completed display” rules per input type
+  Why: We need deterministic rendering for string/number/file/formata payloads.
+  Change:
+  - For `Status=done`:
+    - Hide the `<form>` entirely.
+    - Show a compact read-only section with:
+      - Submitted scalar values (key/value).
+      - Attachment links (filename + download URL; include sha256 if available).
+      - Optional: done metadata (doneAt, doneBy, doneRole) if the backend already has it.
+  - Rendering rules:
+    - `inputType=string|text|number`: show `InputKey: <value>` (formatted similar to timeline).
+    - `inputType=file`: show `file: <filename>` + “Download” link.
+    - `inputType=formata`: show flattened key paths (e.g. `details.status: ok`, `details.weight: 42`) and attachment links for any embedded uploads.
+  Tests:
+  - Document examples (1 scalar, 1 file, 1 formata with nested attachment) as fixtures for later unit tests.
+  Done when:
+  - Team agrees on exact “done card” content for all input types used in workflows.
+
+* WIP [#A] Extend action view model with completed outputs
+  Effort: 1.5–2h
+  Goal: Provide templates enough data to render submitted values/attachments for done actions.
+  Notes:
+  - Keep changes minimal/localized; avoid refactors of routing or storage.
+
+** DONE [#A] Add completed fields to `ActionView`
+  Why: `server/templates/action_list.html` currently only knows `InputType`, `InputKey`, and `Status`, so it can’t render submitted values.
+  Change:
+  - Update `ActionView` in `server/cmd/server/main.go` to include (names are suggestions):
+    - `DoneAt string`, `DoneBy string`, `DoneRole string` (optional, but nice).
+    - `Values []ActionKV` where `ActionKV{Key, Value string}`.
+    - `Attachments []ActionAttachmentView` where `ActionAttachmentView{Filename, URL, SHA256 string}`.
+  - Add small helper structs near `ActionView` to avoid template maps.
+  Tests:
+  - Compile-only coverage via existing tests (ensures templates/stubs still build).
+  Done when:
+  - `ActionView` can carry both scalar values and attachment links for completed substeps.
+
+** WIP [#A] Populate completed fields in `buildActionList`
+  Why: The server is the source of truth for process progress and attachment IDs/URLs.
+  Change:
+  - In `buildActionList` (in `server/cmd/server/main.go`), when `status == "done"` and `process != nil`:
+    - Read `progress := process.Progress[sub.SubstepID]`.
+    - Build `Values` from `progress.Data`:
+      - For non-formata: `InputKey` only.
+      - For formata: flatten nested object stored under `InputKey` into key-path/value strings.
+      - Skip attachment metadata maps when generating `Values`.
+    - Build `Attachments` from `attachmentsFromValue(progress.Data)` (already exists and recurses nested objects/arrays):
+      - For each attachment meta, generate URL using the existing route:
+        `/<workflowPath>/process/<processID>/attachment/<attachmentId>/file`
+      - De-dup by `attachmentId`.
+    - (Optional) Set `DoneAt/DoneBy/DoneRole` from `progress.DoneAt`/`progress.DoneBy`.
+  - Add a helper for flattening, e.g. `flattenDisplayValues(inputKey string, raw any) []ActionKV`:
+    - Uses dot/array index notation (`details.items[0].name`) or a simple dotted path with numeric segments.
+    - Truncates very long values (e.g. > 200 chars) to keep cards readable.
+  Tests:
+  - New unit tests (suggested file: `server/cmd/server/action_list_builder_test.go`):
+    - Scalar substep: `Values` contains `{InputKey, "..."}` and no form fields needed.
+    - File substep: `Attachments` contains the correct URL and filename.
+    - Formata substep: `Values` are flattened; nested attachment produces `Attachments` entry.
+  Done when:
+  - `buildActionList` yields non-empty `Values`/`Attachments` for done actions, without affecting available/locked actions.
+
+* TODO [#A] Update Backoffice template to swap form → submitted display
+  Effort: 45–60m
+  Goal: Ensure the UI stops showing the input controls after completion.
+  Notes:
+  - This is purely a template change; no JS should be required for the swap because HTMX already refreshes `#action-area`.
+
+** TODO [#A] Render read-only “Submitted” block for `Status=done`
+  Why: The user experience should confirm what was submitted and prevent re-entry confusion.
+  Change:
+  - In `server/templates/action_list.html`:
+    - Wrap the existing `<form>` in `{{if ne .Status "done"}} ... {{end}}`.
+    - Add a new block under the header for done actions:
+      - If `.Values`: render a list of `key: value`.
+      - If `.Attachments`: render download links per attachment (filename + optional sha).
+      - Keep the existing “Status: done - Already completed” line (or replace with nicer copy, but minimalism preferred).
+  Tests:
+  - Handler tests don’t assert HTML structure today; rely on new Go unit tests + manual check.
+  Done when:
+  - Completing any substep results in the action card re-rendering without the input field/button.
+
+* TODO [#B] Add minimal styling for submitted values
+  Effort: 20–30m
+  Goal: Keep the done-state readable and consistent with existing design.
+  Notes:
+  - Prefer minimal CSS additions; reuse existing `.muted`, `.pill`, `.secondary`.
+
+** TODO [#B] Style “Submitted” block in `web/src/styles.css`
+  Why: Raw key/value lists can look cramped without spacing.
+  Change:
+  - Add a small class (e.g. `.action-submitted`) with:
+    - vertical spacing between rows,
+    - monospace for hashes,
+    - subtle background/border for attachments list (optional).
+  Tests:
+  - Visual/manual: open backoffice process page; complete one scalar + one formata substep; confirm layout.
+  Done when:
+  - Done cards are visually distinct and easy to scan.
+
+* TODO [#B] Manual verification checklist
+  Effort: 20–40m
+  Goal: Ensure the behavior works end-to-end with HTMX + Formata.
+  Notes:
+  - This is especially important because Formata is initialized via `htmx:afterSwap`.
+
+** TODO [#B] Verify flows for scalar, file, and formata
+  Why: Different payload parsers and attachment persistence paths exist.
+  Change:
+  - Run the app and verify:
+    - Scalar completion → form disappears; value shows.
+    - File completion → form disappears; filename + download works.
+    - Formata completion → formata component disappears; flattened values show; any embedded uploads have download links.
+    - Locked actions remain unchanged (still disabled), unless product wants otherwise.
+  Tests:
+  - `cd server && go test ./...` (unit)
+  Done when:
+  - No regressions: completion works, HTMX swap works, and no console errors from Formata initialization.
