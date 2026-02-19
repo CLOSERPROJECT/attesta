@@ -407,38 +407,6 @@ button.secondary {
   overflow: visible;
 }
 
-[data-radix-popper-content-wrapper] {
-  z-index: 2147483640 !important;
-}
-
-[data-slot="select-content"],
-[role="listbox"] {
-  z-index: 2147483642 !important;
-  min-width: max(240px, var(--radix-select-trigger-width, 0px));
-  background: #ffffff !important;
-  color: #111827 !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 10px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-}
-
-[data-slot="select-item"],
-[role="option"] {
-  min-height: 36px;
-  padding: 8px 10px;
-  line-height: 1.35;
-  background: #ffffff !important;
-  color: #111827 !important;
-}
-
-[data-slot="select-item"][data-highlighted],
-[role="option"][data-highlighted],
-[data-slot="select-item"]:hover,
-[role="option"]:hover {
-  background: #f3f4f6 !important;
-}
-
 .impersonate {
   display: flex;
   flex-wrap: wrap;

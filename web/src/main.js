@@ -400,28 +400,6 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
   return true;
 };
 
-const formataSelectPopoverPatchCSS = `
-[data-slot="select-content"],
-[role="listbox"] {
-  z-index: 2147483642 !important;
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-`;
-
-const applyFormataSelectPopoverPatch = (component) => {
-  const root = component?.shadowRoot;
-  if (!root || root.querySelector("style[data-attesta-formata-select-popover-patch='true']")) {
-    return;
-  }
-  const style = document.createElement("style");
-  style.dataset.attestaFormataSelectPopoverPatch = "true";
-  style.textContent = formataSelectPopoverPatchCSS;
-  root.appendChild(style);
-};
-
 const initializeFormataForms = async (container = document) => {
   const hosts = container.querySelectorAll(".js-formata-host");
   if (hosts.length === 0) {
@@ -455,7 +433,6 @@ const initializeFormataForms = async (container = document) => {
     component.uiSchema = uiSchema;
     component.uischema = uiSchema;
     host.appendChild(component);
-    applyFormataSelectPopoverPatch(component);
 
     const form = component.closest("form");
     if (!form) {
