@@ -33,7 +33,7 @@ Summary
   Done when:
   - Team agrees on exact “done card” content for all input types used in workflows.
 
-* WIP [#A] Extend action view model with completed outputs
+* DONE [#A] Extend action view model with completed outputs
   Effort: 1.5–2h
   Goal: Provide templates enough data to render submitted values/attachments for done actions.
   Notes:
@@ -77,13 +77,13 @@ Summary
   Done when:
   - `buildActionList` yields non-empty `Values`/`Attachments` for done actions, without affecting available/locked actions.
 
-* TODO [#A] Update Backoffice template to swap form → submitted display
+* WIP [#A] Update Backoffice template to swap form → submitted display
   Effort: 45–60m
   Goal: Ensure the UI stops showing the input controls after completion.
   Notes:
   - This is purely a template change; no JS should be required for the swap because HTMX already refreshes `#action-area`.
 
-** TODO [#A] Render read-only “Submitted” block for `Status=done`
+** DONE [#A] Render read-only “Submitted” block for `Status=done`
   Why: The user experience should confirm what was submitted and prevent re-entry confusion.
   Change:
   - In `server/templates/action_list.html`:
