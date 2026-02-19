@@ -52,7 +52,7 @@ Summary
   Done when:
   - `ActionView` can carry both scalar values and attachment links for completed substeps.
 
-** WIP [#A] Populate completed fields in `buildActionList`
+** DONE [#A] Populate completed fields in `buildActionList`
   Why: The server is the source of truth for process progress and attachment IDs/URLs.
   Change:
   - In `buildActionList` (in `server/cmd/server/main.go`), when `status == "done"` and `process != nil`:

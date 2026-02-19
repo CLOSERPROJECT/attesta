@@ -2211,7 +2211,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
-	actions := buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg))
+	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
 		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser: actor,
@@ -2946,7 +2946,7 @@ func buildRoleTodos(def WorkflowDef, process *Process, role string) []ActionTodo
 	return todos
 }
 
-func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bool, roleMeta map[string]RoleMeta) []ActionView {
+func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleMeta map[string]RoleMeta) []ActionView {
 	var actions []ActionView
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
@@ -2974,6 +2974,28 @@ func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bo
 		}
 		formSchema := ""
 		formUISchema := ""
+		doneAt := ""
+		doneBy := ""
+		doneRole := ""
+		var values []ActionKV
+		var attachments []ActionAttachmentView
+		if status == "done" && process != nil {
+			if progress, ok := process.Progress[sub.SubstepID]; ok {
+				if progress.DoneAt != nil {
+					doneAt = progress.DoneAt.UTC().Format(time.RFC3339)
+				}
+				if progress.DoneBy != nil {
+					doneBy = strings.TrimSpace(progress.DoneBy.UserID)
+					doneRole = strings.TrimSpace(progress.DoneBy.Role)
+				}
+				if sub.InputType == "formata" {
+					values = flattenDisplayValues(sub.InputKey, progress.Data[sub.InputKey])
+				} else if value, ok := progress.Data[sub.InputKey]; ok && !isAttachmentMetaValue(value) {
+					values = flattenDisplayValues(sub.InputKey, value)
+				}
+				attachments = buildActionAttachments(workflowKey, process, progress.Data)
+			}
+		}
 		if sub.InputType == "formata" {
 			formSchema = marshalJSONCompact(sub.Schema)
 			formUISchema = marshalJSONCompact(sub.UISchema)
@@ -2991,11 +3013,110 @@ func buildActionList(def WorkflowDef, process *Process, actor Actor, onlyRole bo
 			FormSchema:   formSchema,
 			FormUISchema: formUISchema,
 			Status:       status,
+			DoneAt:       doneAt,
+			DoneBy:       doneBy,
+			DoneRole:     doneRole,
+			Values:       values,
+			Attachments:  attachments,
 			Disabled:     disabled,
 			Reason:       reason,
 		})
 	}
 	return actions
+}
+
+func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
+	key := strings.TrimSpace(inputKey)
+	if key == "" {
+		key = "value"
+	}
+	var out []ActionKV
+	collectDisplayValues(key, raw, &out)
+	if len(out) > 1 {
+		sort.Slice(out, func(i, j int) bool {
+			return out[i].Key < out[j].Key
+		})
+	}
+	return out
+}
+
+func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		if isAttachmentMetaMap(typed) {
+			return
+		}
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			collectDisplayValues(path+"."+key, typed[key], out)
+		}
+	case primitive.M:
+		collectDisplayValues(path, map[string]interface{}(typed), out)
+	case []interface{}:
+		for idx, nested := range typed {
+			collectDisplayValues(fmt.Sprintf("%s[%d]", path, idx), nested, out)
+		}
+	default:
+		value := truncateDisplayValue(strings.TrimSpace(fmt.Sprintf("%v", typed)))
+		*out = append(*out, ActionKV{Key: path, Value: value})
+	}
+}
+
+func truncateDisplayValue(value string) string {
+	const maxLen = 200
+	if len(value) <= maxLen {
+		return value
+	}
+	return value[:maxLen] + "..."
+}
+
+func isAttachmentMetaValue(raw interface{}) bool {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		return isAttachmentMetaMap(typed)
+	case primitive.M:
+		return isAttachmentMetaMap(map[string]interface{}(typed))
+	default:
+		return false
+	}
+}
+
+func isAttachmentMetaMap(payload map[string]interface{}) bool {
+	return attachmentMetaFromMap(payload) != nil
+}
+
+func buildActionAttachments(workflowKey string, process *Process, data map[string]interface{}) []ActionAttachmentView {
+	if process == nil {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	attachments := make([]ActionAttachmentView, 0)
+	for _, meta := range attachmentsFromValue(data) {
+		id := strings.TrimSpace(meta.AttachmentID)
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		attachments = append(attachments, ActionAttachmentView{
+			Filename: sanitizeAttachmentFilename(meta.Filename),
+			URL:      fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id),
+			SHA256:   strings.TrimSpace(meta.SHA256),
+		})
+	}
+	sort.Slice(attachments, func(i, j int) bool {
+		if attachments[i].Filename != attachments[j].Filename {
+			return attachments[i].Filename < attachments[j].Filename
+		}
+		return attachments[i].URL < attachments[j].URL
+	})
+	return attachments
 }
 
 func marshalJSONCompact(value interface{}) string {
@@ -3298,7 +3419,7 @@ func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, proces
 		WorkflowKey: workflowKey,
 		ProcessID:   processIDString(process),
 		CurrentUser: actor,
-		Actions:     buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
 		Error:       message,
 		Timeline:    timeline,
 	}
@@ -3329,7 +3450,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, actor.Role),
 		ProcessID:   processID,
-		Actions:     buildActionList(cfg.Workflow, process, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
 		Error:       message,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {
