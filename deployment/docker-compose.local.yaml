@@ -18,6 +18,74 @@ services:
       - ../cerbos/policies:/policies
       - ../cerbos/config:/config
 
+  appwrite-mariadb:
+    image: mariadb:10.11
+    container_name: attesta-appwrite-mariadb
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_ROOT_PASSWORD: appwrite-root
+      MYSQL_DATABASE: appwrite
+      MYSQL_USER: appwrite
+      MYSQL_PASSWORD: appwrite
+    volumes:
+      - appwrite_mariadb_data:/var/lib/mysql
+
+  appwrite-redis:
+    image: redis:7.2-alpine
+    container_name: attesta-appwrite-redis
+    restart: unless-stopped
+    volumes:
+      - appwrite_redis_data:/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: attesta-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_UI_PORT:-18025}:8025"
+
+  appwrite:
+    image: appwrite/appwrite:1.8.0
+    container_name: attesta-appwrite
+    restart: unless-stopped
+    environment:
+      _APP_ENV: development
+      _APP_OPENSSL_KEY_V1: "this-key-is-for-local-demo-only-change-me-1234"
+      _APP_DOMAIN: localhost
+      _APP_DOMAIN_TARGET: localhost
+      _APP_SYSTEM_EMAIL_NAME: "Attesta Demo"
+      _APP_SYSTEM_EMAIL_ADDRESS: "noreply@localhost"
+      _APP_SYSTEM_SECURITY_EMAIL_ADDRESS: "security@localhost"
+      _APP_OPTIONS_ABUSE: disabled
+      _APP_OPTIONS_ROUTER_FORCE_HTTPS: disabled
+      _APP_OPTIONS_FORCE_HTTPS: disabled
+      _APP_USAGE_STATS: disabled
+      _APP_EMAIL_SMTP_HOST: mailpit
+      _APP_EMAIL_SMTP_PORT: 1025
+      _APP_EMAIL_SMTP_SECURE: ""
+      _APP_EMAIL_SMTP_USERNAME: ""
+      _APP_EMAIL_SMTP_PASSWORD: ""
+      _APP_EMAIL_SMTP_SENDER_NAME: "Attesta Demo"
+      _APP_EMAIL_SMTP_SENDER_EMAIL: "noreply@localhost"
+      _APP_REDIS_HOST: appwrite-redis
+      _APP_REDIS_PORT: 6379
+      _APP_DB_HOST: appwrite-mariadb
+      _APP_DB_PORT: 3306
+      _APP_DB_SCHEMA: appwrite
+      _APP_DB_USER: appwrite
+      _APP_DB_PASS: appwrite
+      _APP_DB_ROOT_PASS: appwrite-root
+    depends_on:
+      - appwrite-mariadb
+      - appwrite-redis
+      - mailpit
+    volumes:
+      - appwrite_uploads:/storage/uploads
+      - appwrite_cache:/storage/cache
+      - appwrite_configs:/storage/config
+      - appwrite_certificates:/storage/certificates
+
   mongo-express:
     image: mongo-express:1.0.2
     container_name: closer-mongo-express
@@ -36,12 +104,33 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017
       CERBOS_URL: http://cerbos:3592
+      APPWRITE_ENDPOINT: http://appwrite/v1
+      APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-}
+      APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
+      APPWRITE_TEAMS_STRICT: ${APPWRITE_TEAMS_STRICT:-false}
+      APPWRITE_SYNC_FROM_WORKFLOW: ${APPWRITE_SYNC_FROM_WORKFLOW:-false}
+      APPWRITE_SYNC_STRICT: ${APPWRITE_SYNC_STRICT:-false}
+      APPWRITE_SYNC_DEFAULT_PASSWORD: ${APPWRITE_SYNC_DEFAULT_PASSWORD:-TempPassw0rd!}
+      APPWRITE_SYNC_MEMBERSHIP_URL: ${APPWRITE_SYNC_MEMBERSHIP_URL:-http://localhost:3030}
     ports:
       - "3030:3000"
     depends_on:
       - mongodb
       - cerbos
+      - appwrite
 
 volumes:
   mongodb_data:
+    driver: local
+  appwrite_mariadb_data:
+    driver: local
+  appwrite_redis_data:
+    driver: local
+  appwrite_uploads:
+    driver: local
+  appwrite_cache:
+    driver: local
+  appwrite_configs:
+    driver: local
+  appwrite_certificates:
     driver: local

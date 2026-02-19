@@ -10,6 +10,8 @@ workflow:
           title: "Record incoming gallium (kg)"
           order: 1
           role: "dep1"
+          appwriteTeamIds:
+            - "team-intake"
           inputKey: "incomingKg"
           inputType: "number"
         - id: "1.2"
@@ -22,6 +24,8 @@ workflow:
           title: "Upload gallium certification"
           order: 3
           role: "dep1"
+          appwriteTeamIds:
+            - "team-intake"
           inputKey: "Gallium certification"
           inputType: "file"
     - id: "2"
@@ -32,12 +36,16 @@ workflow:
           title: "Record refined gallium output (kg)"
           order: 1
           role: "dep2"
+          appwriteTeamIds:
+            - "team-refinery"
           inputKey: "refinedKg"
           inputType: "number"
         - id: "2.2"
           title: "Record purity (%)"
           order: 2
           role: "dep2"
+          appwriteTeamIds:
+            - "team-refinery"
           inputKey: "purityPct"
           inputType: "number"
     - id: "3"
@@ -48,12 +56,16 @@ workflow:
           title: "QA sign-off"
           order: 1
           role: "dep3"
+          appwriteTeamIds:
+            - "team-qa"
           inputKey: "qaNote"
           inputType: "string"
         - id: "3.2"
           title: "Finalize notarization"
           order: 2
           role: "dep3"
+          appwriteTeamIds:
+            - "team-qa"
           inputKey: "finalHash"
           inputType: "string"
 
@@ -62,25 +74,31 @@ departments:
     name: "Company 1"
     color: "#d7e9f2"
     border: "#6e99b2"
+    appwriteTeamId: "team-intake"
   - id: "dep2"
     name: "Department 2"
     color: "#e0f1d9"
     border: "#7da36c"
+    appwriteTeamId: "team-refinery"
   - id: "dep3"
     name: "Department 3"
     color: "#f5e3c9"
     border: "#c2945a"
+    appwriteTeamId: "team-qa"
 
 users:
   - id: "u1"
     name: "User 1"
     departmentId: "dep1"
+    email: "u1@example.local"
   - id: "u2"
     name: "User 2"
     departmentId: "dep2"
+    email: "u2@example.local"
   - id: "u3"
     name: "User 3"
     departmentId: "dep3"
+    email: "u3@example.local"
 
 dpp:
   enabled: true

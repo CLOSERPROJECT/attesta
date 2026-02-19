@@ -42,12 +42,13 @@ type WorkflowStep struct {
 }
 
 type WorkflowSub struct {
-	SubstepID string `bson:"substepId" yaml:"id"`
-	Title     string `bson:"title" yaml:"title"`
-	Order     int    `bson:"order" yaml:"order"`
-	Role      string `bson:"role" yaml:"role"`
-	InputKey  string `bson:"inputKey" yaml:"inputKey"`
-	InputType string `bson:"inputType" yaml:"inputType"`
+	SubstepID       string   `bson:"substepId" yaml:"id"`
+	Title           string   `bson:"title" yaml:"title"`
+	Order           int      `bson:"order" yaml:"order"`
+	Role            string   `bson:"role" yaml:"role"`
+	InputKey        string   `bson:"inputKey" yaml:"inputKey"`
+	InputType       string   `bson:"inputType" yaml:"inputType"`
+	AppwriteTeamIDs []string `bson:"appwriteTeamIds,omitempty" yaml:"appwriteTeamIds,omitempty"`
 }
 
 type Process struct {
@@ -217,16 +218,19 @@ type ActionTodo struct {
 }
 
 type Department struct {
-	ID     string `yaml:"id"`
-	Name   string `yaml:"name"`
-	Color  string `yaml:"color"`
-	Border string `yaml:"border"`
+	ID             string `yaml:"id"`
+	Name           string `yaml:"name"`
+	Color          string `yaml:"color"`
+	Border         string `yaml:"border"`
+	AppwriteTeamID string `yaml:"appwriteTeamId,omitempty"`
 }
 
 type User struct {
-	ID           string `yaml:"id"`
-	Name         string `yaml:"name"`
-	DepartmentID string `yaml:"departmentId"`
+	ID              string   `yaml:"id"`
+	Name            string   `yaml:"name"`
+	DepartmentID    string   `yaml:"departmentId"`
+	Email           string   `yaml:"email,omitempty"`
+	AppwriteTeamIDs []string `yaml:"appwriteTeamIds,omitempty"`
 }
 
 type RuntimeConfig struct {
@@ -436,15 +440,26 @@ func main() {
 	}
 
 	server := &Server{
-		mongo:         client,
-		store:         &MongoStore{db: db},
-		tmpl:          tmpl,
-		authorizer:    NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
+		mongo: client,
+		store: &MongoStore{db: db},
+		tmpl:  tmpl,
+		authorizer: NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now).WithTeamResolver(
+			NewTeamResolverFromEnv(http.DefaultClient),
+			envBool("APPWRITE_TEAMS_STRICT", false),
+		),
 		sse:           newSSEHub(),
 		now:           time.Now,
 		workflowDefID: primitive.NewObjectID(),
 		configDir:     configDir,
 		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+	}
+	if envBool("APPWRITE_SYNC_FROM_WORKFLOW", false) {
+		if err := server.syncAppwriteFromWorkflows(ctx); err != nil {
+			if envBool("APPWRITE_SYNC_STRICT", false) {
+				log.Fatal(err)
+			}
+			log.Printf("appwrite sync warning: %v", err)
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -459,6 +474,7 @@ func main() {
 	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
 	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
 	mux.HandleFunc("/impersonate", server.handleLegacyImpersonate)
+	mux.HandleFunc("/debug/teams", server.handleLegacyDebugTeams)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -473,6 +489,18 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func attachmentMaxBytes() int64 {
@@ -811,6 +839,9 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/impersonate":
 		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
 		return
+	case rest == "/debug/teams":
+		s.handleDebugTeams(w, cloneRequestWithPath(scopedReq, rest))
+		return
 	case rest == "/events":
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -932,6 +963,40 @@ func (s *Server) defaultWorkflowKey() string {
 	return strings.TrimSpace(base)
 }
 
+func (s *Server) syncAppwriteFromWorkflows(ctx context.Context) error {
+	authorizer, ok := s.authorizer.(*CerbosAuthorizer)
+	if !ok || authorizer == nil {
+		return errors.New("appwrite sync requires CerbosAuthorizer")
+	}
+	resolver, ok := authorizer.teamResolver.(*AppwriteTeamResolver)
+	if !ok || resolver == nil {
+		return errors.New("appwrite sync requires APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY")
+	}
+
+	options := AppwriteSyncOptions{
+		DefaultPassword: strings.TrimSpace(envOr("APPWRITE_SYNC_DEFAULT_PASSWORD", "TempPassw0rd!")),
+		MembershipURL:   strings.TrimSpace(envOr("APPWRITE_SYNC_MEMBERSHIP_URL", "http://localhost:3030")),
+	}
+	if options.DefaultPassword == "" {
+		return errors.New("APPWRITE_SYNC_DEFAULT_PASSWORD must not be empty")
+	}
+
+	catalog, err := s.workflowCatalog()
+	if err != nil {
+		return err
+	}
+	keys := sortedWorkflowKeys(catalog)
+	for _, key := range keys {
+		cfg := catalog[key]
+		report, syncErr := resolver.SyncRuntimeConfig(ctx, cfg, options)
+		if syncErr != nil {
+			return fmt.Errorf("workflow %s: %w", key, syncErr)
+		}
+		log.Printf("appwrite sync workflow=%s teams_created=%d users_created=%d memberships_created=%d", key, report.TeamsCreated, report.UsersCreated, report.MembershipsCreated)
+	}
+	return nil
+}
+
 func (s *Server) resolveLegacyProcessWorkflowKey(ctx context.Context, processID string) (string, bool) {
 	process, err := s.loadProcess(ctx, processID)
 	if err != nil {
@@ -1017,6 +1082,24 @@ func (s *Server) handleLegacyImpersonate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (s *Server) handleLegacyDebugTeams(w http.ResponseWriter, r *http.Request) {
+	workflowKey := strings.TrimSpace(r.URL.Query().Get("workflow"))
+	if workflowKey != "" {
+		cfg, err := s.workflowByKey(workflowKey)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		scopedReq := r.WithContext(context.WithValue(r.Context(), workflowContextKey{}, workflowContextValue{
+			Key: workflowKey,
+			Cfg: cfg,
+		}))
+		s.handleDebugTeams(w, scopedReq)
+		return
+	}
+	s.handleDebugTeams(w, r)
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
@@ -1817,6 +1900,96 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func (s *Server) handleDebugTeams(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	actor := readActor(r, workflowKey)
+	if actor.UserID == "" {
+		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
+	}
+
+	teamIDs := []string{}
+	appwriteEnabled := false
+	strictMode := false
+	resolverType := "unavailable"
+	resolveErr := ""
+
+	if authorizer, ok := s.authorizer.(*CerbosAuthorizer); ok && authorizer != nil {
+		resolver := authorizer.teamResolver
+		if resolver == nil {
+			resolver = NoopTeamResolver{}
+		}
+		strictMode = authorizer.strictTeamSync
+		appwriteEnabled = teamResolverEnabled(resolver)
+		resolverType = fmt.Sprintf("%T", resolver)
+		resolvedTeamIDs, err := resolver.TeamIDsForUser(r.Context(), actor.UserID)
+		if err != nil {
+			resolveErr = err.Error()
+			if !strictMode {
+				appwriteEnabled = false
+			}
+		} else {
+			teamIDs = normalizeIDs(resolvedTeamIDs)
+		}
+	}
+
+	type teamRestrictedSubstep struct {
+		SubstepID       string   `json:"substepId"`
+		Title           string   `json:"title"`
+		Role            string   `json:"role"`
+		RequiredTeamIDs []string `json:"requiredTeamIds"`
+		TeamMatch       bool     `json:"teamMatch"`
+	}
+	restricted := []teamRestrictedSubstep{}
+	for _, sub := range orderedSubsteps(cfg.Workflow) {
+		required := normalizeIDs(sub.AppwriteTeamIDs)
+		if len(required) == 0 {
+			continue
+		}
+		matched := false
+		for _, requiredTeamID := range required {
+			for _, teamID := range teamIDs {
+				if requiredTeamID == teamID {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				break
+			}
+		}
+		restricted = append(restricted, teamRestrictedSubstep{
+			SubstepID:       sub.SubstepID,
+			Title:           sub.Title,
+			Role:            sub.Role,
+			RequiredTeamIDs: required,
+			TeamMatch:       matched,
+		})
+	}
+
+	response := map[string]interface{}{
+		"workflowKey": workflowKey,
+		"actor":       actor,
+		"appwrite": map[string]interface{}{
+			"enabled":      appwriteEnabled,
+			"strictMode":   strictMode,
+			"resolverType": resolverType,
+			"teamIds":      teamIDs,
+			"error":        resolveErr,
+		},
+		"teamRestrictedSubsteps": restricted,
+	}
+	writeJSON(w, response)
 }
 
 func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {

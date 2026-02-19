@@ -71,6 +71,7 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 		{name: "events validation", method: http.MethodGet, path: "/w/workflow/events", want: http.StatusBadRequest},
 		{name: "impersonate method guard", method: http.MethodGet, path: "/w/workflow/impersonate", want: http.StatusMethodNotAllowed},
 		{name: "start method guard", method: http.MethodGet, path: "/w/workflow/process/start", want: http.StatusMethodNotAllowed},
+		{name: "debug teams method guard", method: http.MethodPost, path: "/w/workflow/debug/teams", want: http.StatusMethodNotAllowed},
 		{name: "backoffice unknown role", method: http.MethodGet, path: "/w/workflow/backoffice/unknown", want: http.StatusNotFound},
 	}
 

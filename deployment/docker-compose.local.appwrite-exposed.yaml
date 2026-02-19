@@ -1,0 +1,4 @@
+services:
+  appwrite:
+    ports:
+      - "${APPWRITE_HTTP_PORT:-19080}:80"

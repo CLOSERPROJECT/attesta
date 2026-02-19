@@ -69,6 +69,22 @@ func TestEnvOr(t *testing.T) {
 	}
 }
 
+func TestEnvBool(t *testing.T) {
+	if got := envBool("ATTESTA_TEST_ENV_BOOL_UNSET", true); !got {
+		t.Fatalf("envBool unset = %t, want true fallback", got)
+	}
+
+	t.Setenv("ATTESTA_TEST_ENV_BOOL_SET", "false")
+	if got := envBool("ATTESTA_TEST_ENV_BOOL_SET", true); got {
+		t.Fatalf("envBool set false = %t, want false", got)
+	}
+
+	t.Setenv("ATTESTA_TEST_ENV_BOOL_INVALID", "nope")
+	if got := envBool("ATTESTA_TEST_ENV_BOOL_INVALID", false); got {
+		t.Fatalf("envBool invalid = %t, want false fallback", got)
+	}
+}
+
 func TestLogRequests(t *testing.T) {
 	var logs bytes.Buffer
 	oldWriter := log.Writer()

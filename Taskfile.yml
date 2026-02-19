@@ -12,6 +12,12 @@ tasks:
       - docker compose -f deployment/docker-compose.local.yaml up -d
       - docker compose -f deployment/docker-compose.local.yaml ps
 
+  start:appwrite-ui:
+    desc: Bring up infra and expose Appwrite console on host.
+    cmds:
+      - docker compose -f deployment/docker-compose.local.yaml -f deployment/docker-compose.local.appwrite-exposed.yaml up -d
+      - docker compose -f deployment/docker-compose.local.yaml -f deployment/docker-compose.local.appwrite-exposed.yaml ps
+
   start:build:
     desc: Bring up infra (build images) and show status.
     cmds:
