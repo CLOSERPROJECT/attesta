@@ -144,9 +144,6 @@ const normalizeFormataSchema = (schema) => {
     return undefined;
   }
   const normalized = { ...schema };
-  if (!normalized.$schema) {
-    normalized.$schema = "https://json-schema.org/draft/2020-12/schema";
-  }
   if (!normalized.type) {
     normalized.type = "object";
   }
@@ -431,7 +428,6 @@ const initializeFormataForms = async (container = document) => {
     }
     component.schema = schema;
     component.uiSchema = uiSchema;
-    component.uischema = uiSchema;
     host.appendChild(component);
 
     const form = component.closest("form");
