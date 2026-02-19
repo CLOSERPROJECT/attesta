@@ -2989,7 +2989,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 					doneRole = strings.TrimSpace(progress.DoneBy.Role)
 				}
 				if sub.InputType == "formata" {
-					values = flattenDisplayValues(sub.InputKey, progress.Data[sub.InputKey])
+					values = flattenDisplayValues("", progress.Data[sub.InputKey])
 				} else if value, ok := progress.Data[sub.InputKey]; ok && !isAttachmentMetaValue(value) {
 					values = flattenDisplayValues(sub.InputKey, value)
 				}
@@ -3027,9 +3027,6 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 
 func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
 	key := strings.TrimSpace(inputKey)
-	if key == "" {
-		key = "value"
-	}
 	var out []ActionKV
 	collectDisplayValues(key, raw, &out)
 	if len(out) > 1 {
@@ -3052,17 +3049,29 @@ func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			collectDisplayValues(path+"."+key, typed[key], out)
+			nextPath := key
+			if strings.TrimSpace(path) != "" {
+				nextPath = path + "." + key
+			}
+			collectDisplayValues(nextPath, typed[key], out)
 		}
 	case primitive.M:
 		collectDisplayValues(path, map[string]interface{}(typed), out)
 	case []interface{}:
 		for idx, nested := range typed {
-			collectDisplayValues(fmt.Sprintf("%s[%d]", path, idx), nested, out)
+			nextPath := fmt.Sprintf("[%d]", idx)
+			if strings.TrimSpace(path) != "" {
+				nextPath = fmt.Sprintf("%s[%d]", path, idx)
+			}
+			collectDisplayValues(nextPath, nested, out)
 		}
 	default:
 		value := truncateDisplayValue(strings.TrimSpace(fmt.Sprintf("%v", typed)))
-		*out = append(*out, ActionKV{Key: path, Value: value})
+		key := path
+		if strings.TrimSpace(key) == "" {
+			key = "value"
+		}
+		*out = append(*out, ActionKV{Key: key, Value: value})
 	}
 }
 
