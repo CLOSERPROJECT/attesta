@@ -97,7 +97,7 @@ Summary
   Done when:
   - Completing any substep results in the action card re-rendering without the input field/button.
 
-* WIP [#B] Add minimal styling for submitted values
+* DONE [#B] Add minimal styling for submitted values
   Effort: 20–30m
   Goal: Keep the done-state readable and consistent with existing design.
   Notes:
@@ -115,13 +115,13 @@ Summary
   Done when:
   - Done cards are visually distinct and easy to scan.
 
-* TODO [#B] Manual verification checklist
+* DONE [#B] Manual verification checklist
   Effort: 20–40m
   Goal: Ensure the behavior works end-to-end with HTMX + Formata.
   Notes:
   - This is especially important because Formata is initialized via `htmx:afterSwap`.
 
-** TODO [#B] Verify flows for scalar, file, and formata
+** DONE [#B] Verify flows for scalar, file, and formata
   Why: Different payload parsers and attachment persistence paths exist.
   Change:
   - Run the app and verify:

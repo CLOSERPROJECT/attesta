@@ -168,6 +168,7 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 
 ## Templates and static assets
 - Templates are parsed from `server/templates/*.html` (`server/cmd/server/main.go:258-261`).
+- Backoffice action cards (`server/templates/action_list.html`) render editable forms only for non-`done` actions; `done` actions render a read-only Submitted block with flattened values and attachment download links.
 - Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).
 - Layout template includes HTMX via an external script tag (`server/templates/layout.html:9-13`).
 
