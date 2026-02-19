@@ -393,8 +393,9 @@ button.secondary {
   width: 100%;
   min-width: 0;
   max-width: 980px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px;
   overflow: visible;
