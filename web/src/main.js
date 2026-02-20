@@ -3,6 +3,18 @@ import "./styles.css";
 const themeStorageKey = "attesta_theme";
 const themeToggle = document.getElementById("theme-toggle");
 
+const syncFormataDarkMode = (theme) => {
+  const isDark = theme === "dark";
+  const components = document.querySelectorAll("formata-form.js-formata-form");
+  for (const component of components) {
+    if (isDark) {
+      component.setAttribute("dark-mode", "");
+    } else {
+      component.removeAttribute("dark-mode");
+    }
+  }
+};
+
 const getPreferredTheme = () => {
   try {
     const stored = localStorage.getItem(themeStorageKey);
@@ -24,6 +36,7 @@ const getPreferredTheme = () => {
 
 const applyTheme = (theme) => {
   document.documentElement.dataset.theme = theme;
+  syncFormataDarkMode(theme);
   if (themeToggle) {
     themeToggle.textContent = theme === "dark" ? "Light" : "Dark";
   }
@@ -423,6 +436,9 @@ const initializeFormataForms = async (container = document) => {
     const component = document.createElement("formata-form");
     component.className = "js-formata-form";
     component.setAttribute("prevent-page-reload", "");
+    if (document.documentElement.dataset.theme === "dark") {
+      component.setAttribute("dark-mode", "");
+    }
     if (host.dataset.formataDisabled === "true") {
       component.setAttribute("disabled", "");
     }

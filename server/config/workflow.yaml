@@ -82,7 +82,15 @@ workflow:
           order: 1
           role: "dep1"
           inputKey: "incomingKg"
-          inputType: "number"
+          inputType: "formata"
+          schema:
+            type: object
+            properties:
+              incomingKg:
+                type: number
+                title: incomingKg
+            required:
+            - incomingKg
         - id: "1.2"
           title: "Attach batch ID"
           order: 2
