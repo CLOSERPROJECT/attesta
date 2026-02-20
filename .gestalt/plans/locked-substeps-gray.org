@@ -1,0 +1,87 @@
+#+TITLE: Grey out locked substep forms
+#+SUBTITLE: Muted “Formata” (and other) inputs when sequence-locked
+#+DATE: 2026-02-20
+#+KEYWORDS: workflow, ui, htmx, formata, css, locked
+
+Summary: Make it visually obvious that a substep is locked by sequence (you must complete earlier substeps first) by greying/muting the action card + Formata widget when `ActionView.Status == "locked"` / `ActionView.Disabled == true`.
+
+* DONE [#A] Confirm lock signals and render locations
+  :PROPERTIES:
+  :Effort: 0.5h
+  :Goal: Identify the exact DOM hooks for “locked” and “disabled” actions.
+  :Notes: Keep changes minimal and localized; no route/persistence changes.
+  :END:
+** DONE [#A] Map backend state → template output
+   :PROPERTIES:
+   :Why: The UI already computes `Status`/`Disabled`; the plan should reuse those instead of adding new state.
+   :Change: Verify `buildActionList()` sets `ActionView.Status` to `locked|available|done` and `ActionView.Disabled` accordingly; confirm `server/templates/action_list.html` renders `div.action-card.action-{{.Status}}`, and Formata renders `.js-formata-host[data-formata-disabled="true"]` when disabled.
+   :Tests: None (pure inspection).
+   :Done when: We have a list of stable CSS selectors to target, and confirm locked Formata already emits `data-formata-disabled="true"`.
+   :END:
+
+* WIP [#A] Add muted styling for locked action cards
+  :PROPERTIES:
+  :Effort: 1.0h
+  :Goal: Locked substeps look obviously inactive (greyed), without changing behavior.
+  :Notes: Prefer CSS-only; avoid JS changes. Keep accessibility in mind (do not rely only on color).
+  :END:
+** WIP [#A] Style `.action-card.action-locked` and disabled Formata host
+   :PROPERTIES:
+   :Why: Today the timeline already dims locked substeps, but the action card + embedded Formata form can still look “editable”.
+   :Change: Update `web/src/styles.css`:
+   - Add a locked visual treatment for `.action-card.action-locked` (e.g., slightly lower opacity/saturation + subtle background).
+   - Specifically dim the Formata container when disabled: `.js-formata-host[data-formata-disabled="true"] { opacity: …; filter: …; }`.
+   - Optional (decide and keep minimal): reduce emphasis for inputs/labels inside locked cards; keep the “Status: locked - Locked by sequence” line readable.
+   :Tests: None (visual change).
+   :Done when: Locked cards are clearly muted compared to available cards in both light and dark themes.
+   :END:
+** TODO [#B] (Optional) Make the “Open form builder” link clearly inactive when locked
+   :PROPERTIES:
+   :Why: A still-clickable builder link can confuse users when the substep is locked.
+   :Change: In `server/templates/action_list.html`, when `.Disabled` is true for `InputType == "formata"`, either:
+   - render the link but add a class (e.g. `class="muted"` + `aria-disabled="true"`) and style it as inactive, OR
+   - hide the link entirely while locked (minimal text replacement: “Locked: complete previous steps first.”).
+   :Tests: Template render test asserts the locked variant (link present-but-muted or absent, depending on chosen behavior).
+   :Done when: Locked Formata actions no longer look like they invite editing via the builder link.
+   :END:
+
+* TODO [#B] Add regression tests for “locked Formata is disabled”
+  :PROPERTIES:
+  :Effort: 1.0h
+  :Goal: Ensure future refactors keep emitting the locked hooks used by CSS.
+  :Notes: Tests should assert HTML hooks, not CSS pixels.
+  :END:
+** TODO [#B] Unit test `buildActionList` for locked + Formata disabled
+   :PROPERTIES:
+   :Why: The UI relies on `ActionView.Status` and `ActionView.Disabled` for rendering and CSS hooks.
+   :Change: Add a test file like `server/cmd/server/action_list_locked_test.go`:
+   - Create a tiny `WorkflowDef` with two substeps for the same role where substep #2 is `InputType: formata`.
+   - Seed a `Process` with no completed progress so only substep #1 is available, substep #2 is locked.
+   - Assert for substep #2: `Status == "locked"`, `Disabled == true`, `Reason == "Locked by sequence"`.
+   :Tests: `go test ./...` (or `task test`).
+   :Done when: Test fails if `Status`/`Disabled`/`Reason` change unexpectedly for locked Formata substeps.
+   :END:
+** TODO [#B] Template render test for `data-formata-disabled="true"` on locked actions
+   :PROPERTIES:
+   :Why: CSS targets `.js-formata-host[data-formata-disabled="true"]`; we should lock this contract in.
+   :Change: Add a template test (e.g. `server/cmd/server/action_list_template_locked_test.go`) that:
+   - Parses real templates via `template.ParseGlob("server/templates/*.html")` (as other handler tests do with a relative join).
+   - Executes `action_list.html` with an `ActionListView` containing a locked Formata action (or uses `buildActionList` output).
+   - Asserts the output contains `action-card action-locked` and `data-formata-disabled="true"`.
+   :Tests: `go test ./...`.
+   :Done when: The HTML contract for locked Formata is covered by unit tests.
+   :END:
+
+* TODO [#C] Ship the updated frontend bundle
+  :PROPERTIES:
+  :Effort: 0.5h
+  :Goal: Ensure the server-served CSS reflects the new locked styling.
+  :Notes: This repo serves `web/dist`; confirm whether dist is committed in this branch workflow.
+  :END:
+** TODO [#C] Rebuild Vite output and verify locally
+   :PROPERTIES:
+   :Why: Backend serves `../web/dist` under `/static/`; changes to `web/src/styles.css` must propagate.
+   :Change: Run `npm install` (if needed) and `npm run build` in `web/`, then verify locked cards are muted in the backoffice process view.
+   :Tests: Smoke check in browser; optional `task test` for backend.
+   :Done when: `web/dist` contains the updated CSS and the UI clearly communicates “start from the first substep”.
+   :END:

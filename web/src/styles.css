@@ -325,6 +325,19 @@ button.secondary {
   border-color: var(--accent);
 }
 
+.action-card.action-locked {
+  border-style: dashed;
+  background: linear-gradient(160deg, var(--surface-2), var(--panel));
+}
+
+.action-card.action-locked .action-form {
+  opacity: 0.82;
+}
+
+.action-card.action-locked .action-form label {
+  color: var(--muted);
+}
+
 .action-head {
   display: flex;
   align-items: center;
@@ -399,6 +412,11 @@ button.secondary {
   border-radius: 12px;
   padding: 8px;
   overflow: visible;
+}
+
+.action-form .js-formata-host[data-formata-disabled="true"] {
+  opacity: 0.62;
+  filter: saturate(0.55) grayscale(0.2);
 }
 
 .action-form formata-form {
