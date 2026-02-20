@@ -19,7 +19,7 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Done when: We have a list of stable CSS selectors to target, and confirm locked Formata already emits `data-formata-disabled="true"`.
    :END:
 
-* WIP [#A] Add muted styling for locked action cards
+* DONE [#A] Add muted styling for locked action cards
   :PROPERTIES:
   :Effort: 1.0h
   :Goal: Locked substeps look obviously inactive (greyed), without changing behavior.
@@ -35,7 +35,7 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Tests: None (visual change).
    :Done when: Locked cards are clearly muted compared to available cards in both light and dark themes.
    :END:
-** WIP [#B] (Optional) Make the “Open form builder” link clearly inactive when locked
+** DONE [#B] (Optional) Make the “Open form builder” link clearly inactive when locked
    :PROPERTIES:
    :Why: A still-clickable builder link can confuse users when the substep is locked.
    :Change: In `server/templates/action_list.html`, when `.Disabled` is true for `InputType == "formata"`, either:
@@ -45,13 +45,13 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Done when: Locked Formata actions no longer look like they invite editing via the builder link.
    :END:
 
-* TODO [#B] Add regression tests for “locked Formata is disabled”
+* WIP [#B] Add regression tests for “locked Formata is disabled”
   :PROPERTIES:
   :Effort: 1.0h
   :Goal: Ensure future refactors keep emitting the locked hooks used by CSS.
   :Notes: Tests should assert HTML hooks, not CSS pixels.
   :END:
-** TODO [#B] Unit test `buildActionList` for locked + Formata disabled
+** DONE [#B] Unit test `buildActionList` for locked + Formata disabled
    :PROPERTIES:
    :Why: The UI relies on `ActionView.Status` and `ActionView.Disabled` for rendering and CSS hooks.
    :Change: Add a test file like `server/cmd/server/action_list_locked_test.go`:
