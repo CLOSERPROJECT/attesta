@@ -25,7 +25,7 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
   :Goal: Locked substeps look obviously inactive (greyed), without changing behavior.
   :Notes: Prefer CSS-only; avoid JS changes. Keep accessibility in mind (do not rely only on color).
   :END:
-** WIP [#A] Style `.action-card.action-locked` and disabled Formata host
+** DONE [#A] Style `.action-card.action-locked` and disabled Formata host
    :PROPERTIES:
    :Why: Today the timeline already dims locked substeps, but the action card + embedded Formata form can still look “editable”.
    :Change: Update `web/src/styles.css`:
@@ -35,7 +35,7 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Tests: None (visual change).
    :Done when: Locked cards are clearly muted compared to available cards in both light and dark themes.
    :END:
-** TODO [#B] (Optional) Make the “Open form builder” link clearly inactive when locked
+** WIP [#B] (Optional) Make the “Open form builder” link clearly inactive when locked
    :PROPERTIES:
    :Why: A still-clickable builder link can confuse users when the substep is locked.
    :Change: In `server/templates/action_list.html`, when `.Disabled` is true for `InputType == "formata"`, either:

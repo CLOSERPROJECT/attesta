@@ -35,7 +35,11 @@
                 {{else if eq .InputType "file"}}
                   <input type="file" name="{{.InputKey}}" {{if .Disabled}}disabled{{end}} />
                 {{else if eq .InputType "formata"}}
-                  <a href="https://closerproject.github.io/formata-arch/" target="_blank" rel="noopener noreferrer">Open form builder</a>
+                  {{if .Disabled}}
+                    <span class="muted">Locked: complete previous steps first.</span>
+                  {{else}}
+                    <a href="https://closerproject.github.io/formata-arch/" target="_blank" rel="noopener noreferrer">Open form builder</a>
+                  {{end}}
                   <div
                     class="js-formata-host"
                     data-formata-schema='{{.FormSchema}}'
