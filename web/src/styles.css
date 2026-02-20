@@ -417,8 +417,15 @@ button.secondary {
 .action-form .js-formata-host[data-formata-disabled="true"] {
   opacity: 0.62;
   filter: saturate(0.55) grayscale(0.2);
-  pointer-events: none;
-  user-select: none;
+  position: relative;
+  cursor: not-allowed;
+}
+
+.action-form .js-formata-host[data-formata-disabled="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   cursor: not-allowed;
 }
 
