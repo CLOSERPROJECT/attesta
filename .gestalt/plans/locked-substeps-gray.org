@@ -45,7 +45,7 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Done when: Locked Formata actions no longer look like they invite editing via the builder link.
    :END:
 
-* WIP [#B] Add regression tests for “locked Formata is disabled”
+* DONE [#B] Add regression tests for “locked Formata is disabled”
   :PROPERTIES:
   :Effort: 1.0h
   :Goal: Ensure future refactors keep emitting the locked hooks used by CSS.
@@ -61,7 +61,7 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Tests: `go test ./...` (or `task test`).
    :Done when: Test fails if `Status`/`Disabled`/`Reason` change unexpectedly for locked Formata substeps.
    :END:
-** TODO [#B] Template render test for `data-formata-disabled="true"` on locked actions
+** DONE [#B] Template render test for `data-formata-disabled="true"` on locked actions
    :PROPERTIES:
    :Why: CSS targets `.js-formata-host[data-formata-disabled="true"]`; we should lock this contract in.
    :Change: Add a template test (e.g. `server/cmd/server/action_list_template_locked_test.go`) that:
