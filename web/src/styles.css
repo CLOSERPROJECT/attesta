@@ -417,6 +417,17 @@ button.secondary {
 .action-form .js-formata-host[data-formata-disabled="true"] {
   opacity: 0.62;
   filter: saturate(0.55) grayscale(0.2);
+  pointer-events: none;
+  user-select: none;
+  cursor: not-allowed;
+}
+
+.action-form .js-formata-host[data-formata-disabled="true"] *,
+.action-card.action-locked .action-form input:disabled,
+.action-card.action-locked .action-form select:disabled,
+.action-card.action-locked .action-form textarea:disabled,
+.action-card.action-locked .action-form button:disabled {
+  cursor: not-allowed;
 }
 
 .action-form formata-form {
