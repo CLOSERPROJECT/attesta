@@ -72,13 +72,13 @@ Summary: Make it visually obvious that a substep is locked by sequence (you must
    :Done when: The HTML contract for locked Formata is covered by unit tests.
    :END:
 
-* TODO [#C] Ship the updated frontend bundle
+* DONE [#C] Ship the updated frontend bundle
   :PROPERTIES:
   :Effort: 0.5h
   :Goal: Ensure the server-served CSS reflects the new locked styling.
   :Notes: This repo serves `web/dist`; confirm whether dist is committed in this branch workflow.
   :END:
-** TODO [#C] Rebuild Vite output and verify locally
+** DONE [#C] Rebuild Vite output and verify locally
    :PROPERTIES:
    :Why: Backend serves `../web/dist` under `/static/`; changes to `web/src/styles.css` must propagate.
    :Change: Run `npm install` (if needed) and `npm run build` in `web/`, then verify locked cards are muted in the backoffice process view.
