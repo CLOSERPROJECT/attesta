@@ -148,6 +148,54 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 	}
 }
 
+func TestBuildActionListLockedFormataDisabled(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "First",
+						Order:     1,
+						Role:      "dep1",
+						InputKey:  "value",
+						InputType: "text",
+					},
+					{
+						SubstepID: "1.2",
+						Title:     "Second Formata",
+						Order:     2,
+						Role:      "dep1",
+						InputKey:  "payload",
+						InputType: "formata",
+						Schema: map[string]interface{}{
+							"type": "object",
+						},
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID:       primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{},
+	}
+
+	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	action := findAction(t, actions, "1.2")
+
+	if action.Status != "locked" {
+		t.Fatalf("expected status locked, got %q", action.Status)
+	}
+	if !action.Disabled {
+		t.Fatal("expected locked formata action to be disabled")
+	}
+	if action.Reason != "Locked by sequence" {
+		t.Fatalf("expected lock reason, got %q", action.Reason)
+	}
+}
+
 func findAction(t *testing.T, actions []ActionView, substepID string) ActionView {
 	t.Helper()
 	for _, action := range actions {

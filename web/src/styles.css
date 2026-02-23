@@ -325,6 +325,19 @@ button.secondary {
   border-color: var(--accent);
 }
 
+.action-card.action-locked {
+  border-style: dashed;
+  background: linear-gradient(160deg, var(--surface-2), var(--panel));
+}
+
+.action-card.action-locked .action-form {
+  opacity: 0.82;
+}
+
+.action-card.action-locked .action-form label {
+  color: var(--muted);
+}
+
 .action-head {
   display: flex;
   align-items: center;
@@ -393,11 +406,35 @@ button.secondary {
   width: 100%;
   min-width: 0;
   max-width: 980px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px;
   overflow: visible;
+}
+
+.action-form .js-formata-host[data-formata-disabled="true"] {
+  opacity: 0.62;
+  filter: saturate(0.55) grayscale(0.2);
+  position: relative;
+  cursor: not-allowed;
+}
+
+.action-form .js-formata-host[data-formata-disabled="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: not-allowed;
+}
+
+.action-form .js-formata-host[data-formata-disabled="true"] *,
+.action-card.action-locked .action-form input:disabled,
+.action-card.action-locked .action-form select:disabled,
+.action-card.action-locked .action-form textarea:disabled,
+.action-card.action-locked .action-form button:disabled {
+  cursor: not-allowed;
 }
 
 .action-form formata-form {
