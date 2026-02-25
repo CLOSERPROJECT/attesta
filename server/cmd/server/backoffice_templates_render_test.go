@@ -33,10 +33,10 @@ func TestBackofficeTemplatesRenderWorkflowAndStepTitles(t *testing.T) {
 		t.Fatalf("dashboard status = %d, want %d", dashboardRec.Code, http.StatusOK)
 	}
 	dashboardBody := dashboardRec.Body.String()
-	if !strings.Contains(dashboardBody, "Demo workflow - Step 2") {
+	if !strings.Contains(dashboardBody, "Demo workflow > Step 2") {
 		t.Fatalf("expected dashboard to include workflow and active step title, got %q", dashboardBody)
 	}
-	if !strings.Contains(dashboardBody, "Demo workflow - Step 3") {
+	if !strings.Contains(dashboardBody, "Demo workflow > Step 3") {
 		t.Fatalf("expected dashboard to include workflow and done step title, got %q", dashboardBody)
 	}
 
@@ -51,7 +51,7 @@ func TestBackofficeTemplatesRenderWorkflowAndStepTitles(t *testing.T) {
 		t.Fatalf("process status = %d, want %d", processRec.Code, http.StatusOK)
 	}
 	processBody := processRec.Body.String()
-	if !strings.Contains(processBody, "Demo workflow - Step 2") {
+	if !strings.Contains(processBody, "Demo workflow > Step 2") {
 		t.Fatalf("expected process page to include workflow and current step title, got %q", processBody)
 	}
 }
