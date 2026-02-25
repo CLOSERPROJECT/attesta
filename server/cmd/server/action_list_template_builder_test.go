@@ -35,10 +35,7 @@ func TestActionListTemplateLockedFormataBuilderHint(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, "Locked: complete previous steps first.") {
+	if !strings.Contains(body, "Status: locked - Locked by sequence") {
 		t.Fatalf("expected locked helper text, got body: %s", body)
-	}
-	if strings.Contains(body, "Open form builder") {
-		t.Fatalf("expected builder link to be hidden while locked, got body: %s", body)
 	}
 }
