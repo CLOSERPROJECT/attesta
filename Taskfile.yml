@@ -110,6 +110,7 @@ tasks:
     cmds:
       - |
           sh -c '
+          set -eu
           cd server
           min=${COVER_MIN:-90.0}
           GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen") -coverprofile=coverage.out
