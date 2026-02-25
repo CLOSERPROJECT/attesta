@@ -83,12 +83,12 @@ Change:
 Tests: Template-rendering test should assert the response includes `Demo workflow` and `Step 2` for the active fixture.
 Done when: The process page header consistently shows process id + workflow + step.
 
-* WIP [#B] Add/adjust tests to lock in behavior
+* DONE [#B] Add/adjust tests to lock in behavior
 Effort: S
 Goal: Ensure regressions are caught when templates or step-resolution logic changes.
 Notes: Prefer tests that parse real templates (`server/templates/*.html`) for confidence; keep assertions flexible (substring-based).
 
-** WIP [#B] Add integration-style unit test rendering real templates
+** DONE [#B] Add integration-style unit test rendering real templates
 Why: The current `testTemplates()` shortcuts don’t validate actual HTML templates.
 Change:
 - Add a new test file (e.g. `server/cmd/server/backoffice_templates_render_test.go`) that:
@@ -101,12 +101,12 @@ Change:
 Tests: Run `go test ./...` (and `task test` in CI) to ensure no breakage.
 Done when: Tests fail on missing workflow/step labels and pass when labels render.
 
-* TODO [#C] Manual verification checklist
+* WIP [#C] Manual verification checklist
 Effort: XS
 Goal: Confirm UX in the browser across real workflow configs under `server/config/*.yaml`.
 Notes: Include at least two workflows to ensure the workflow name is meaningful.
 
-** TODO [#C] Smoke-test pages with multiple workflows
+** WIP [#C] Smoke-test pages with multiple workflows
 Why: The feature is primarily for human orientation; visual confirmation is valuable.
 Change:
 - Start the app with at least 2 workflow configs available.
