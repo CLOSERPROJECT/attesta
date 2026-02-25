@@ -101,12 +101,12 @@ Change:
 Tests: Run `go test ./...` (and `task test` in CI) to ensure no breakage.
 Done when: Tests fail on missing workflow/step labels and pass when labels render.
 
-* WIP [#C] Manual verification checklist
+* DONE [#C] Manual verification checklist
 Effort: XS
 Goal: Confirm UX in the browser across real workflow configs under `server/config/*.yaml`.
 Notes: Include at least two workflows to ensure the workflow name is meaningful.
 
-** WIP [#C] Smoke-test pages with multiple workflows
+** DONE [#C] Smoke-test pages with multiple workflows
 Why: The feature is primarily for human orientation; visual confirmation is valuable.
 Change:
 - Start the app with at least 2 workflow configs available.
