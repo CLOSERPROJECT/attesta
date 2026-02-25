@@ -4,29 +4,43 @@ Small end-to-end demo with Go + HTMX + SSE + MongoDB + Cerbos.
 
 ## Requirements
 - Go 1.25+
-- Node.js 18+
+- Node.js 18+ (with npm)
+- [Task](https://taskfile.dev)
 - Docker + Docker Compose
+or
+- mise + Docker + Docker compose
 
 ## Quick start
+
+This quickstart relies on the presence of [mise](https://mise.jdx.dev/installing-mise.html) and Docker + Docker compose on the machine or all the above requirements installed.
+In the second case you can skip the mise commands:
+
 ```bash
-# 1) Infra
-docker compose -f deployment/docker-compose.local.yaml up -d
+# Clone the repository
+git clone https://github.com/CLOSERPROJECT/attesta
+cd attesta
 
-# 2) Build frontend assets
-cd web
-npm install
-npm run build
+# Install requirements if not already present
+mise trust && mise install
 
-# 3) Run Go server
-cd ../server
-go mod tidy
-go run ./cmd/server
+# Run in a dev environment
+task dev
 ```
 
 Open:
 - Home: http://localhost:3000
 - Backoffice: http://localhost:3000/backoffice
 - Mongo Express (optional): http://localhost:8081
+
+## Add new streams
+
+1. Create a stream using the Attesta Stream Composer: https://closerproject.github.io/formata-arch/#/
+2. Click **Export** to download the YAML file.
+3. Copy the file into: `./server/config/`
+4. Give it a unique name.
+
+Attesta reads this folder live — no restart required.
+Your new stream will appear immediately on: http://localhost:3000
 
 ## What it does
 - Seeds a workflow definition on first run.
