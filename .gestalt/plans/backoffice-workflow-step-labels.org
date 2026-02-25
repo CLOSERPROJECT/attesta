@@ -65,7 +65,7 @@ Effort: S
 Goal: Update the two templates to show `WorkflowName` and the computed step title next to the process ID.
 Notes: Keep markup minimal; reuse existing classes (`muted`, `process-head`) to avoid CSS churn.
 
-** WIP [#B] Update `server/templates/backoffice_department.html`
+** DONE [#B] Update `server/templates/backoffice_department.html`
 Why: The dashboard lists many processes; adding context next to the ID reduces navigation and confusion in multi-workflow setups.
 Change:
 - In “Things to do”, “Active streams”, and “Previous history”:
@@ -74,7 +74,7 @@ Change:
 Tests: Template-rendering test should assert the HTML contains process id + workflow name + expected step title.
 Done when: Each process list item shows workflow and step information adjacent to the ID link.
 
-** TODO [#B] Update `server/templates/backoffice_process.html`
+** WIP [#B] Update `server/templates/backoffice_process.html`
 Why: The per-process view header currently shows only the process id; workflow + step improves user orientation.
 Change:
 - Extend the header line under “{{.RoleLabel}} actions” to include:
