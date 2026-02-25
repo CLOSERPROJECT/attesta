@@ -2216,11 +2216,12 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 	}
 	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
-		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
-		CurrentUser: actor,
-		RoleLabel:   s.roleLabel(cfg, role),
-		ProcessID:   process.ID.Hex(),
-		Actions:     actions,
+		PageBase:          s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
+		CurrentUser:       actor,
+		RoleLabel:         s.roleLabel(cfg, role),
+		ProcessID:         process.ID.Hex(),
+		CurrentStepTitle:  currentStepTitleForProcess(cfg.Workflow, process),
+		Actions:           actions,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2878,7 +2879,7 @@ func buildProcessSummary(def WorkflowDef, process *Process, status string) Proce
 }
 
 func buildProcessSummaryForRole(def WorkflowDef, process *Process, status, role string) ProcessSummary {
-	nextSubstep, ok := nextAvailableSubstepForRole(def, process, role)
+	nextSubstep, nextStep, ok := nextAvailableSubstepForRoleWithStep(def, process, role)
 	summary := ProcessSummary{
 		ID:        process.ID.Hex(),
 		Status:    status,
@@ -2888,6 +2889,11 @@ func buildProcessSummaryForRole(def WorkflowDef, process *Process, status, role 
 		summary.NextSubstep = nextSubstep.SubstepID
 		summary.NextTitle = nextSubstep.Title
 		summary.NextRole = nextSubstep.Role
+		summary.StepTitle = nextStep.Title
+	} else if status == "done" {
+		if title, found := lastStepTitle(def); found {
+			summary.StepTitle = title
+		}
 	}
 	return summary
 }
@@ -2964,26 +2970,44 @@ func buildRoleTodos(def WorkflowDef, process *Process, role string) []ActionTodo
 	}
 	availMap := computeAvailability(def, process)
 	var todos []ActionTodo
-	for _, sub := range orderedSubsteps(def) {
-		if sub.Role != role {
-			continue
-		}
-		status := "locked"
-		if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
-			status = "done"
-		} else if availMap[sub.SubstepID] {
-			status = "available"
-		}
-		if status == "available" {
-			todos = append(todos, ActionTodo{
-				ProcessID: process.ID.Hex(),
-				SubstepID: sub.SubstepID,
-				Title:     sub.Title,
-				Status:    status,
-			})
+	for _, step := range sortedSteps(def) {
+		for _, sub := range sortedSubsteps(step) {
+			if sub.Role != role {
+				continue
+			}
+			status := "locked"
+			if value, ok := process.Progress[sub.SubstepID]; ok && value.State == "done" {
+				status = "done"
+			} else if availMap[sub.SubstepID] {
+				status = "available"
+			}
+			if status == "available" {
+				todos = append(todos, ActionTodo{
+					ProcessID: process.ID.Hex(),
+					SubstepID: sub.SubstepID,
+					Title:     sub.Title,
+					StepTitle: step.Title,
+					Status:    status,
+				})
+			}
 		}
 	}
 	return todos
+}
+
+func currentStepTitleForProcess(def WorkflowDef, process *Process) string {
+	if process == nil {
+		return ""
+	}
+	if _, step, ok := nextAvailableSubstepWithStep(def, process); ok {
+		return step.Title
+	}
+	if deriveProcessStatus(def, process) == "done" {
+		if title, ok := lastStepTitle(def); ok {
+			return title
+		}
+	}
+	return ""
 }
 
 func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleMeta map[string]RoleMeta) []ActionView {
@@ -3495,12 +3519,13 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		processID = process.ID.Hex()
 	}
 	view := DepartmentProcessView{
-		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
-		CurrentUser: actor,
-		RoleLabel:   s.roleLabel(cfg, actor.Role),
-		ProcessID:   processID,
-		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
-		Error:       message,
+		PageBase:          s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
+		CurrentUser:       actor,
+		RoleLabel:         s.roleLabel(cfg, actor.Role),
+		ProcessID:         processID,
+		CurrentStepTitle:  currentStepTitleForProcess(cfg.Workflow, process),
+		Actions:           buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
+		Error:             message,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

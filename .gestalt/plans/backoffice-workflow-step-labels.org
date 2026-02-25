@@ -25,7 +25,7 @@ Change:
 Tests: Add unit tests for at least (a) an active process in step 2 and (b) a done process (final step), using the existing `testRuntimeConfig()` step titles.
 Done when: The rules above are written into code as helpers and reflected in templates with predictable output.
 
-* WIP [#A] Expose step titles in backoffice view models
+* DONE [#A] Expose step titles in backoffice view models
 Effort: M
 Goal: Compute step titles from `cfg.Workflow.Steps[*].Title` and pass them to templates.
 Notes: Prefer minimal/local changes in `server/cmd/server/main.go`; keep existing fields working (`NextSubstep`, `NextTitle`) and add new ones.
@@ -51,7 +51,7 @@ Change:
 Tests: Compile-time coverage via existing tests; add assertions in new tests that step title is present for the seeded processes.
 Done when: Handlers build views with non-empty step titles where expected.
 
-** WIP [#A] Wire step titles into existing builders/handlers
+** DONE [#A] Wire step titles into existing builders/handlers
 Why: The data is currently computed only at substep granularity (`NextTitle`, todo substep `Title`).
 Change:
 - Update `buildRoleTodos(...)` to iterate steps/substeps (not only `orderedSubsteps`) so it can attach `StepTitle` while creating `ActionTodo`.
@@ -60,12 +60,12 @@ Change:
 Tests: Add a regression test that `handleBackoffice` for `/backoffice/dep2/process/{activeID}` renders a header including `Demo workflow` and `Step 2`.
 Done when: Both dashboard and process page views have step titles derived from the YAML workflow definition.
 
-* TODO [#B] Render workflow + step near process ID in templates
+* WIP [#B] Render workflow + step near process ID in templates
 Effort: S
 Goal: Update the two templates to show `WorkflowName` and the computed step title next to the process ID.
 Notes: Keep markup minimal; reuse existing classes (`muted`, `process-head`) to avoid CSS churn.
 
-** TODO [#B] Update `server/templates/backoffice_department.html`
+** WIP [#B] Update `server/templates/backoffice_department.html`
 Why: The dashboard lists many processes; adding context next to the ID reduces navigation and confusion in multi-workflow setups.
 Change:
 - In “Things to do”, “Active streams”, and “Previous history”:

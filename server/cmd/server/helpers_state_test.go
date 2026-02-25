@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 func TestComputeAvailability(t *testing.T) {
 	def := testRuntimeConfig().Workflow
@@ -113,6 +117,35 @@ func TestStepTitleHelpers(t *testing.T) {
 	lastTitle, ok := lastStepTitle(def)
 	if !ok || lastTitle != "Step 3" {
 		t.Fatalf("expected last step title Step 3, got %q (ok=%t)", lastTitle, ok)
+	}
+}
+
+func TestBackofficeStepTitlesInBuilders(t *testing.T) {
+	def := testRuntimeConfig().Workflow
+
+	activeProcess := processWithDone("1.1", "1.2", "1.3")
+	activeProcess.ID = primitive.NewObjectID()
+	todos := buildRoleTodos(def, activeProcess, "dep2")
+	if len(todos) == 0 {
+		t.Fatal("expected dep2 todo actions")
+	}
+	if todos[0].StepTitle != "Step 2" {
+		t.Fatalf("expected dep2 todo step title Step 2, got %q", todos[0].StepTitle)
+	}
+
+	doneProcess := processWithDone("1.1", "1.2", "1.3", "2.1", "2.2", "3.1", "3.2")
+	doneProcess.ID = primitive.NewObjectID()
+	doneSummary := buildProcessSummaryForRole(def, doneProcess, "done", "dep2")
+	if doneSummary.StepTitle != "Step 3" {
+		t.Fatalf("expected done summary step title Step 3, got %q", doneSummary.StepTitle)
+	}
+
+	current := currentStepTitleForProcess(def, activeProcess)
+	if current != "Step 2" {
+		t.Fatalf("expected current step title Step 2 for active process, got %q", current)
+	}
+	if currentStepTitleForProcess(def, doneProcess) != "Step 3" {
+		t.Fatalf("expected current step title Step 3 for done process")
 	}
 }
 
