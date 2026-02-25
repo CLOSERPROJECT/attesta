@@ -60,7 +60,7 @@ Change:
 Tests: Add a regression test that `handleBackoffice` for `/backoffice/dep2/process/{activeID}` renders a header including `Demo workflow` and `Step 2`.
 Done when: Both dashboard and process page views have step titles derived from the YAML workflow definition.
 
-* WIP [#B] Render workflow + step near process ID in templates
+* DONE [#B] Render workflow + step near process ID in templates
 Effort: S
 Goal: Update the two templates to show `WorkflowName` and the computed step title next to the process ID.
 Notes: Keep markup minimal; reuse existing classes (`muted`, `process-head`) to avoid CSS churn.
@@ -74,7 +74,7 @@ Change:
 Tests: Template-rendering test should assert the HTML contains process id + workflow name + expected step title.
 Done when: Each process list item shows workflow and step information adjacent to the ID link.
 
-** WIP [#B] Update `server/templates/backoffice_process.html`
+** DONE [#B] Update `server/templates/backoffice_process.html`
 Why: The per-process view header currently shows only the process id; workflow + step improves user orientation.
 Change:
 - Extend the header line under “{{.RoleLabel}} actions” to include:
@@ -83,12 +83,12 @@ Change:
 Tests: Template-rendering test should assert the response includes `Demo workflow` and `Step 2` for the active fixture.
 Done when: The process page header consistently shows process id + workflow + step.
 
-* TODO [#B] Add/adjust tests to lock in behavior
+* WIP [#B] Add/adjust tests to lock in behavior
 Effort: S
 Goal: Ensure regressions are caught when templates or step-resolution logic changes.
 Notes: Prefer tests that parse real templates (`server/templates/*.html`) for confidence; keep assertions flexible (substring-based).
 
-** TODO [#B] Add integration-style unit test rendering real templates
+** WIP [#B] Add integration-style unit test rendering real templates
 Why: The current `testTemplates()` shortcuts don’t validate actual HTML templates.
 Change:
 - Add a new test file (e.g. `server/cmd/server/backoffice_templates_render_test.go`) that:

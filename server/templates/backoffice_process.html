@@ -2,7 +2,7 @@
 <div class="two-col" data-process-id="{{.ProcessID}}" data-workflow-key="{{.WorkflowKey}}">
   <section class="panel">
     <h1>{{.RoleLabel}} actions</h1>
-    <p class="muted">Stream <strong>{{.ProcessID}}</strong></p>
+    <p class="muted">Stream <strong>{{.ProcessID}}</strong> - {{.WorkflowName}}{{if .CurrentStepTitle}} - {{.CurrentStepTitle}}{{end}}</p>
     <a class="secondary" href="{{.WorkflowPath}}/backoffice/{{.CurrentUser.Role}}">Back to dashboard</a>
   </section>
   <section class="panel">
