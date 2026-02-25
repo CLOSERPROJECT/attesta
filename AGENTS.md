@@ -168,6 +168,10 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 
 ## Templates and static assets
 - Templates are parsed from `server/templates/*.html` (`server/cmd/server/main.go:258-261`).
+- Backoffice department/process headers now show workflow name plus a computed step title:
+  - Todo actions use parent step title from the todo substep.
+  - Active streams use the step title of the role-scoped next available substep.
+  - Done streams/process headers fall back to the last workflow step title.
 - Backoffice action cards (`server/templates/action_list.html`) render editable forms only for non-`done` actions; `done` actions render a read-only Submitted block with flattened values and attachment download links.
 - Locked Formata actions render `action-card action-locked` and `.js-formata-host[data-formata-disabled="true"]`; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
 - Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).
@@ -176,6 +180,7 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 ## Testing patterns
 - Unit tests live next to code in `server/cmd/server/*_test.go`.
 - Most handler tests use `httptest.NewRequest`/`httptest.NewRecorder` and a `MemoryStore` (`server/cmd/server/store.go:233+`).
+- `server/cmd/server/backoffice_templates_render_test.go` parses real templates (`server/templates/*.html`) to assert workflow + step labels render in `/backoffice/:role` and `/backoffice/:role/process/:id`.
 - Integration tests are behind build tag `integration` (`server/cmd/server/integration_complete_test.go`) and skip if dependencies are unavailable.
 
 ## Deployment files
