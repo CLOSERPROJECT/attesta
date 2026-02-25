@@ -3,27 +3,37 @@
 Small end-to-end demo with Go + HTMX + SSE + MongoDB + Cerbos.
 
 ## Requirements
+
+You can run the project in one of two ways:
+### Manual toolchain
 - Go 1.25+
 - Node.js 18+ (with npm)
 - [Task](https://taskfile.dev)
 - Docker + Docker Compose
-or
-- mise + Docker + Docker compose
+
+### Using mise (recommended)
+- [mise](https://mise.jdx.dev/installing-mise.html)
+- Docker + Docker Compose
 
 ## Quick start
 
-This quickstart relies on the presence of [mise](https://mise.jdx.dev/installing-mise.html) and Docker + Docker compose on the machine or all the above requirements installed.
-In the second case you can skip the mise commands:
+You can run the project in one of two ways:
+Make sure you have installed **either**:
+- The full manual toolchain (Go, Node, Task, Docker), or
+- mise + Docker
+
+If you are using the manual toolchain, skip the `mise` commands below.
 
 ```bash
 # Clone the repository
 git clone https://github.com/CLOSERPROJECT/attesta
 cd attesta
 
-# Install requirements if not already present
-mise trust && mise install
+# If using mise:
+mise trust
+mise install
 
-# Run in a dev environment
+# Start the development environment
 task dev
 ```
 
