@@ -236,6 +236,7 @@ type ActionTodo struct {
 	ProcessID string
 	SubstepID string
 	Title     string
+	StepTitle string
 	Status    string
 }
 
@@ -294,6 +295,7 @@ type ProcessSummary struct {
 	NextSubstep string
 	NextTitle   string
 	NextRole    string
+	StepTitle   string
 }
 
 type PageBase struct {
@@ -346,12 +348,13 @@ type DepartmentDashboardView struct {
 
 type DepartmentProcessView struct {
 	PageBase
-	CurrentUser Actor
-	RoleLabel   string
-	ProcessID   string
-	Actions     []ActionView
-	Error       string
-	Timeline    []TimelineStep
+	CurrentUser      Actor
+	RoleLabel        string
+	ProcessID        string
+	CurrentStepTitle string
+	Actions          []ActionView
+	Error            string
+	Timeline         []TimelineStep
 }
 
 type ActionListView struct {

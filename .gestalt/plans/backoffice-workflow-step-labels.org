@@ -41,7 +41,7 @@ Change:
 Tests: Unit test helpers directly (fast), and/or cover via handler/template rendering tests below.
 Done when: Helpers return correct step titles for the seeded “active in step 2” and “done in step 3” fixtures.
 
-** WIP [#A] Extend dashboard/process DTOs with step titles
+** DONE [#A] Extend dashboard/process DTOs with step titles
 Why: Templates can only render what the view models provide.
 Change:
 - In `server/cmd/server/main.go`:
@@ -51,7 +51,7 @@ Change:
 Tests: Compile-time coverage via existing tests; add assertions in new tests that step title is present for the seeded processes.
 Done when: Handlers build views with non-empty step titles where expected.
 
-** TODO [#A] Wire step titles into existing builders/handlers
+** WIP [#A] Wire step titles into existing builders/handlers
 Why: The data is currently computed only at substep granularity (`NextTitle`, todo substep `Title`).
 Change:
 - Update `buildRoleTodos(...)` to iterate steps/substeps (not only `orderedSubsteps`) so it can attach `StepTitle` while creating `ActionTodo`.
