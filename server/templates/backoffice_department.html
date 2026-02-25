@@ -18,7 +18,7 @@
           <li class="process-item">
             <div class="process-head">
               <a href="{{$.WorkflowPath}}/backoffice/{{$.CurrentUser.Role}}/process/{{.ProcessID}}">{{.ProcessID}}</a>
-              <span class="muted">{{$.WorkflowName}}{{if .StepTitle}} - {{.StepTitle}}{{end}}</span>
+              <span class="muted">{{$.WorkflowName}}{{if .StepTitle}} > {{.StepTitle}}{{end}}</span>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
             <p class="muted">{{.SubstepID}} - {{.Title}}</p>
@@ -39,7 +39,7 @@
           <li class="process-item">
             <div class="process-head">
               <a href="{{$.WorkflowPath}}/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="muted">{{$.WorkflowName}}{{if .StepTitle}} - {{.StepTitle}}{{end}}</span>
+              <span class="muted">{{$.WorkflowName}}{{if .StepTitle}} > {{.StepTitle}}{{end}}</span>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
             {{if .NextSubstep}}
@@ -60,7 +60,7 @@
           <li class="process-item">
             <div class="process-head">
               <a href="{{$.WorkflowPath}}/backoffice/{{$.CurrentUser.Role}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="muted">{{$.WorkflowName}}{{if .StepTitle}} - {{.StepTitle}}{{end}}</span>
+              <span class="muted">{{$.WorkflowName}}{{if .StepTitle}} > {{.StepTitle}}{{end}}</span>
               <span class="status-tag status-{{.Status}}">{{.Status}}</span>
             </div>
           </li>
