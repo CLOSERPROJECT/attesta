@@ -2890,32 +2890,69 @@ func buildProcessSummaryForRole(def WorkflowDef, process *Process, status, role 
 }
 
 func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool) {
-	if process == nil {
-		return WorkflowSub{}, false
-	}
-	availMap := computeAvailability(def, process)
-	for _, sub := range orderedSubsteps(def) {
-		if availMap[sub.SubstepID] {
-			return sub, true
-		}
-	}
-	return WorkflowSub{}, false
+	substep, _, ok := nextAvailableSubstepWithStep(def, process)
+	return substep, ok
 }
 
 func nextAvailableSubstepForRole(def WorkflowDef, process *Process, role string) (WorkflowSub, bool) {
+	substep, _, ok := nextAvailableSubstepForRoleWithStep(def, process, role)
+	return substep, ok
+}
+
+func stepTitleForSubstep(def WorkflowDef, substepID string) (string, bool) {
+	if substepID == "" {
+		return "", false
+	}
+	_, step, err := findSubstep(def, substepID)
+	if err != nil || strings.TrimSpace(step.Title) == "" {
+		return "", false
+	}
+	return step.Title, true
+}
+
+func nextAvailableSubstepWithStep(def WorkflowDef, process *Process) (WorkflowSub, WorkflowStep, bool) {
 	if process == nil {
-		return WorkflowSub{}, false
+		return WorkflowSub{}, WorkflowStep{}, false
 	}
 	availMap := computeAvailability(def, process)
-	for _, sub := range orderedSubsteps(def) {
-		if sub.Role != role {
-			continue
-		}
-		if availMap[sub.SubstepID] {
-			return sub, true
+	for _, step := range sortedSteps(def) {
+		for _, sub := range sortedSubsteps(step) {
+			if availMap[sub.SubstepID] {
+				return sub, step, true
+			}
 		}
 	}
-	return WorkflowSub{}, false
+	return WorkflowSub{}, WorkflowStep{}, false
+}
+
+func nextAvailableSubstepForRoleWithStep(def WorkflowDef, process *Process, role string) (WorkflowSub, WorkflowStep, bool) {
+	if process == nil {
+		return WorkflowSub{}, WorkflowStep{}, false
+	}
+	availMap := computeAvailability(def, process)
+	for _, step := range sortedSteps(def) {
+		for _, sub := range sortedSubsteps(step) {
+			if sub.Role != role {
+				continue
+			}
+			if availMap[sub.SubstepID] {
+				return sub, step, true
+			}
+		}
+	}
+	return WorkflowSub{}, WorkflowStep{}, false
+}
+
+func lastStepTitle(def WorkflowDef) (string, bool) {
+	steps := sortedSteps(def)
+	if len(steps) == 0 {
+		return "", false
+	}
+	last := steps[len(steps)-1]
+	if strings.TrimSpace(last.Title) == "" {
+		return "", false
+	}
+	return last.Title, true
 }
 
 func buildRoleTodos(def WorkflowDef, process *Process, role string) []ActionTodo {

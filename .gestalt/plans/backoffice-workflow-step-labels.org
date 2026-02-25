@@ -30,7 +30,7 @@ Effort: M
 Goal: Compute step titles from `cfg.Workflow.Steps[*].Title` and pass them to templates.
 Notes: Prefer minimal/local changes in `server/cmd/server/main.go`; keep existing fields working (`NextSubstep`, `NextTitle`) and add new ones.
 
-** WIP [#A] Add helpers to resolve step title
+** DONE [#A] Add helpers to resolve step title
 Why: Step-title lookup will be used in multiple places (role todos, process summaries, process page header).
 Change:
 - In `server/cmd/server/main.go`, add small pure helpers (no new deps):
@@ -41,7 +41,7 @@ Change:
 Tests: Unit test helpers directly (fast), and/or cover via handler/template rendering tests below.
 Done when: Helpers return correct step titles for the seeded “active in step 2” and “done in step 3” fixtures.
 
-** TODO [#A] Extend dashboard/process DTOs with step titles
+** WIP [#A] Extend dashboard/process DTOs with step titles
 Why: Templates can only render what the view models provide.
 Change:
 - In `server/cmd/server/main.go`:
