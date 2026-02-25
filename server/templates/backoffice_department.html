@@ -31,7 +31,7 @@
 </section>
 <div class="stack">
   <section class="panel">
-    <h2>Active processes</h2>
+    <h2>Active streams</h2>
     {{if .ActiveProcesses}}
       <ul class="process-list">
         {{range .ActiveProcesses}}
@@ -47,7 +47,7 @@
         {{end}}
       </ul>
     {{else}}
-      <p class="muted">No active processes yet.</p>
+      <p class="muted">No active streams yet.</p>
     {{end}}
   </section>
   <section class="panel">
@@ -64,7 +64,7 @@
         {{end}}
       </ul>
     {{else}}
-      <p class="muted">No completed processes yet.</p>
+      <p class="muted">No completed streams yet.</p>
     {{end}}
   </section>
 </div>

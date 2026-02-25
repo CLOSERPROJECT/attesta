@@ -1,7 +1,7 @@
 {{define "backoffice_picker_body"}}
 <section class="panel landing landing-wide">
-  <h1>Backoffice workflows</h1>
-  <p class="muted">Pick a workflow and then choose a department.</p>
+  <h1>Backoffice streams</h1>
+  <p class="muted">Pick a stream and then choose a department.</p>
   {{if .Workflows}}
     <div class="workflow-grid">
       {{range .Workflows}}
@@ -28,7 +28,7 @@
       {{end}}
     </div>
   {{else}}
-    <p class="muted">No workflows configured.</p>
+    <p class="muted">No streams configured.</p>
   {{end}}
 </section>
 {{end}}
@@ -36,7 +36,7 @@
 {{define "backoffice_landing_body"}}
 <section class="panel landing">
   <h1>Backoffice</h1>
-  <p class="muted">Workflow: <strong>{{.WorkflowName}}</strong></p>
+  <p class="muted">Stream: <strong>{{.WorkflowName}}</strong></p>
   <p class="muted">Choose a department to continue.</p>
   {{if .Users}}
     <div class="impersonate">

@@ -1,7 +1,7 @@
 {{define "process_body"}}
 <div class="two-col" data-process-id="{{.ProcessID}}" data-workflow-key="{{.WorkflowKey}}">
   <section class="panel">
-    <h2>Home / Process timeline</h2>
+    <h2>Stream timeline</h2>
     <div id="timeline">
       {{template "timeline.html" .Timeline}}
     </div>
@@ -16,7 +16,7 @@
 {{define "process_downloads"}}
   <section class="panel" id="process-downloads">
     <h2>Downloads</h2>
-    <p class="muted">Export attachments and notarized data for this process.</p>
+    <p class="muted">Export attachments and notarized data for this stream.</p>
     {{if .Attachments}}
       <div class="panel-block" style="margin-bottom: 12px;">
         <p class="muted" style="margin: 0 0 8px;">Attachments</p>

@@ -1,7 +1,7 @@
 {{define "dpp_body"}}
 <section class="panel stack">
   <h2>Digital Product Passport</h2>
-  <p class="muted">GS1 Digital Link landing page for product and process traceability.</p>
+  <p class="muted">GS1 Digital Link landing page for product and stream traceability.</p>
   <div class="stack" style="gap: 8px;">
     <div><strong>GTIN:</strong> {{.GTIN}}</div>
     <div><strong>LOT:</strong> {{.Lot}}</div>
@@ -14,9 +14,9 @@
 <section class="panel stack">
   <h2>Overview</h2>
   <div class="stack" style="gap: 8px;">
-    <div><strong>Workflow:</strong> {{.Workflow.Name}}</div>
+    <div><strong>Stream:</strong> {{.Workflow.Name}}</div>
     {{if .Workflow.Description}}<div class="muted">{{.Workflow.Description}}</div>{{end}}
-    <div><strong>Process ID:</strong> {{.ProcessID}}</div>
+    <div><strong>Stream ID:</strong> {{.ProcessID}}</div>
     <div><strong>Status:</strong> {{.Export.Status}}</div>
   </div>
 </section>

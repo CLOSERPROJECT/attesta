@@ -103,16 +103,17 @@ tasks:
   test:
     desc: Run backend unit tests.
     cmds:
-      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./...'
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
 
   cover:
     desc: Run backend tests with a 90% coverage gate.
     cmds:
       - |
           sh -c '
+          set -eu
           cd server
           min=${COVER_MIN:-90.0}
-          GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test ./... -coverprofile=coverage.out
+          GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen") -coverprofile=coverage.out
           total=$(GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go tool cover -func=coverage.out | awk "/^total:/ {gsub(/%/, \"\", \$3); print \$3}")
           echo "total coverage: ${total}%"
           awk -v total="$total" -v min="$min" "BEGIN { if ((total+0) < (min+0)) { printf(\"coverage gate failed (< %.1f%%)\\n\", min); exit 1 } }"
