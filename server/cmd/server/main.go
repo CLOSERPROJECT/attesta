@@ -434,6 +434,17 @@ type ResetSetView struct {
 	Error string
 }
 
+type WorkflowRefValidationError struct {
+	Messages []string
+}
+
+func (e *WorkflowRefValidationError) Error() string {
+	if e == nil || len(e.Messages) == 0 {
+		return "workflow references are invalid"
+	}
+	return "workflow references are invalid: " + strings.Join(e.Messages, "; ")
+}
+
 type ProcessPageView struct {
 	PageBase
 	ProcessID   string
@@ -836,6 +847,9 @@ func (s *Server) workflowOptions(ctx context.Context) ([]WorkflowOption, error) 
 func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error) {
 	if value := r.Context().Value(workflowContextKey{}); value != nil {
 		if selected, ok := value.(workflowContextValue); ok {
+			if err := s.validateWorkflowRefs(r.Context(), selected.Cfg); err != nil {
+				return "", RuntimeConfig{}, err
+			}
 			return selected.Key, selected.Cfg, nil
 		}
 	}
@@ -843,7 +857,103 @@ func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error
 	if err != nil {
 		return "", RuntimeConfig{}, err
 	}
+	if err := s.validateWorkflowRefs(r.Context(), cfg); err != nil {
+		return "", RuntimeConfig{}, err
+	}
 	return s.defaultWorkflowKey(), cfg, nil
+}
+
+func (s *Server) validateWorkflowRefs(ctx context.Context, cfg RuntimeConfig) error {
+	if s == nil || s.store == nil {
+		return nil
+	}
+	if !s.enforceAuth {
+		return nil
+	}
+	if len(cfg.Organizations) == 0 && len(cfg.Roles) == 0 {
+		return nil
+	}
+
+	messages := []string{}
+	yamlOrgs := map[string]struct{}{}
+	for _, org := range cfg.Organizations {
+		slug := strings.TrimSpace(org.Slug)
+		if slug == "" {
+			continue
+		}
+		yamlOrgs[slug] = struct{}{}
+		if _, err := s.store.GetOrganizationBySlug(ctx, slug); err != nil {
+			messages = append(messages, "missing organization slug "+slug)
+		}
+	}
+
+	type roleRef struct {
+		orgSlug string
+	}
+	yamlRoles := map[string]roleRef{}
+	for _, role := range cfg.Roles {
+		orgSlug := strings.TrimSpace(role.OrgSlug)
+		roleSlug := strings.TrimSpace(role.Slug)
+		if orgSlug == "" || roleSlug == "" {
+			continue
+		}
+		yamlRoles[roleSlug] = roleRef{orgSlug: orgSlug}
+		if _, err := s.store.GetRoleBySlug(ctx, orgSlug, roleSlug); err != nil {
+			messages = append(messages, "missing role slug "+orgSlug+"/"+roleSlug)
+		}
+	}
+
+	for _, step := range cfg.Workflow.Steps {
+		stepOrg := strings.TrimSpace(step.OrganizationSlug)
+		if stepOrg != "" {
+			if _, ok := yamlOrgs[stepOrg]; !ok {
+				messages = append(messages, "step "+step.StepID+" references organization not in yaml: "+stepOrg)
+			}
+		}
+		for _, sub := range step.Substep {
+			roles := sub.Roles
+			if len(roles) == 0 && strings.TrimSpace(sub.Role) != "" {
+				roles = []string{strings.TrimSpace(sub.Role)}
+			}
+			if len(roles) == 0 {
+				messages = append(messages, "substep "+sub.SubstepID+" has no roles")
+				continue
+			}
+			for _, roleSlug := range roles {
+				trimmedRole := strings.TrimSpace(roleSlug)
+				roleMeta, ok := yamlRoles[trimmedRole]
+				if !ok {
+					messages = append(messages, "substep "+sub.SubstepID+" references role not in yaml: "+trimmedRole)
+					continue
+				}
+				if stepOrg != "" && roleMeta.orgSlug != stepOrg {
+					messages = append(messages, "substep "+sub.SubstepID+" role "+trimmedRole+" not in step organization "+stepOrg)
+					continue
+				}
+				if _, err := s.store.GetRoleBySlug(ctx, roleMeta.orgSlug, trimmedRole); err != nil {
+					messages = append(messages, "missing role slug "+roleMeta.orgSlug+"/"+trimmedRole)
+				}
+			}
+		}
+	}
+
+	if len(messages) == 0 {
+		return nil
+	}
+	return &WorkflowRefValidationError{Messages: dedupeStrings(messages)}
+}
+
+func dedupeStrings(items []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }
 
 func normalizeHomeSortKey(value string) string {

@@ -250,6 +250,79 @@ func TestWorkflowCatalogRejectsEnabledDPPWithoutGTIN(t *testing.T) {
 	}
 }
 
+func TestValidateWorkflowRefsMissingOrganization(t *testing.T) {
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{
+			{Slug: "org1", Name: "Organization 1"},
+		},
+		Roles: []WorkflowRole{
+			{OrgSlug: "org1", Slug: "dep1", Name: "Department 1"},
+		},
+		Workflow: WorkflowDef{
+			Name: "Workflow",
+			Steps: []WorkflowStep{
+				{
+					StepID:           "1",
+					Title:            "Step 1",
+					Order:            1,
+					OrganizationSlug: "org1",
+					Substep: []WorkflowSub{
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "string"},
+					},
+				},
+			},
+		},
+	}
+	server := &Server{store: NewMemoryStore(), enforceAuth: true}
+
+	err := server.validateWorkflowRefs(t.Context(), cfg)
+	if err == nil {
+		t.Fatal("expected missing organization validation error")
+	}
+	if !strings.Contains(err.Error(), "missing organization slug org1") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateWorkflowRefsMissingRole(t *testing.T) {
+	store := NewMemoryStore()
+	if _, err := store.CreateOrganization(t.Context(), Organization{Name: "Organization 1"}); err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{
+			{Slug: "organization-1", Name: "Organization 1"},
+		},
+		Roles: []WorkflowRole{
+			{OrgSlug: "organization-1", Slug: "dep1", Name: "Department 1"},
+		},
+		Workflow: WorkflowDef{
+			Name: "Workflow",
+			Steps: []WorkflowStep{
+				{
+					StepID:           "1",
+					Title:            "Step 1",
+					Order:            1,
+					OrganizationSlug: "organization-1",
+					Substep: []WorkflowSub{
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "string"},
+					},
+				},
+			},
+		},
+	}
+	server := &Server{store: store, enforceAuth: true}
+
+	err := server.validateWorkflowRefs(t.Context(), cfg)
+	if err == nil {
+		t.Fatal("expected missing role validation error")
+	}
+	if !strings.Contains(err.Error(), "missing role slug organization-1/dep1") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestWorkflowCatalogRejectsEnabledDPPWithInvalidGTIN(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"abc123\"\n")
