@@ -27,6 +27,8 @@
       <nav class="nav">
         <a href="{{if .WorkflowPath}}{{.WorkflowPath}}/{{else}}/{{end}}">Home</a>
         <a href="{{if .WorkflowPath}}{{.WorkflowPath}}/backoffice{{else}}/backoffice{{end}}">Backoffice</a>
+        {{if .ShowOrgsLink}}<a href="/admin/orgs">Orgs</a>{{end}}
+        {{if .ShowMyOrgLink}}<a href="/org-admin/users">My Org</a>{{end}}
         <button type="button" class="theme-toggle" id="theme-toggle">
           Dark
         </button>
