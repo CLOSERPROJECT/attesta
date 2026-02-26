@@ -112,3 +112,117 @@ func TestHandleBackofficeRedirectsToDashboardWhenAuthEnabled(t *testing.T) {
 		t.Fatalf("location = %q, want /w/workflow/dashboard", rec.Header().Get("Location"))
 	}
 }
+
+func TestHandleDashboardShowsOrgsLinkForPlatformAdmin(t *testing.T) {
+	body := renderDashboardForUser(t, AccountUser{
+		UserID:          "platform-admin-user",
+		Email:           "platform-admin@example.com",
+		IsPlatformAdmin: true,
+		Status:          "active",
+	})
+
+	if !strings.Contains(body, "NAV Home Backoffice Orgs |") {
+		t.Fatalf("expected orgs nav marker, got %q", body)
+	}
+	if strings.Contains(body, " MyOrg ") {
+		t.Fatalf("did not expect MyOrg marker, got %q", body)
+	}
+}
+
+func TestHandleDashboardShowsMyOrgLinkForOrgAdmin(t *testing.T) {
+	body := renderDashboardForUser(t, AccountUser{
+		UserID:    "org-admin-user",
+		Email:     "org-admin@example.com",
+		RoleSlugs: []string{"org-admin"},
+		OrgSlug:   "nav-test-org",
+		Status:    "active",
+	})
+
+	if !strings.Contains(body, "NAV Home Backoffice MyOrg |") {
+		t.Fatalf("expected my org nav marker, got %q", body)
+	}
+	if strings.Contains(body, " Orgs ") {
+		t.Fatalf("did not expect Orgs marker, got %q", body)
+	}
+}
+
+func TestHandleDashboardHidesAdminLinksForNonAdminUser(t *testing.T) {
+	body := renderDashboardForUser(t, AccountUser{
+		UserID:    "non-admin-user",
+		Email:     "non-admin@example.com",
+		RoleSlugs: []string{"dep1"},
+		Status:    "active",
+	})
+
+	if !strings.Contains(body, "NAV Home Backoffice |") {
+		t.Fatalf("expected base nav marker, got %q", body)
+	}
+	if strings.Contains(body, " Orgs ") || strings.Contains(body, " MyOrg ") {
+		t.Fatalf("did not expect admin nav markers, got %q", body)
+	}
+}
+
+func renderDashboardForUser(t *testing.T, user AccountUser) string {
+	t.Helper()
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 26, 17, 0, 0, 0, time.UTC)
+
+	if user.OrgSlug != "" {
+		org, err := store.CreateOrganization(t.Context(), Organization{Name: user.OrgSlug, CreatedAt: now})
+		if err != nil {
+			t.Fatalf("CreateOrganization error: %v", err)
+		}
+		user.OrgSlug = org.Slug
+		user.OrgID = nil
+		for _, roleSlug := range user.RoleSlugs {
+			if _, err := store.CreateRole(t.Context(), Role{
+				OrgID:     org.ID,
+				OrgSlug:   org.Slug,
+				Slug:      roleSlug,
+				Name:      roleSlug,
+				CreatedAt: now,
+			}); err != nil {
+				t.Fatalf("CreateRole error: %v", err)
+			}
+		}
+	}
+
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = now
+	}
+	createdUser, err := store.CreateUser(t.Context(), user)
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	session, err := store.CreateSession(t.Context(), Session{
+		SessionID:   "dash-session-" + createdUser.UserID,
+		UserID:      createdUser.UserID,
+		UserMongoID: createdUser.ID,
+		CreatedAt:   now,
+		LastLoginAt: now,
+		ExpiresAt:   now.Add(24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("CreateSession error: %v", err)
+	}
+
+	server := &Server{
+		store:       store,
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	rec := httptest.NewRecorder()
+	server.handleDashboard(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	return rec.Body.String()
+}
