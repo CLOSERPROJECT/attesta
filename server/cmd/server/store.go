@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -36,6 +37,83 @@ type Store interface {
 	OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error)
 }
 
+type Organization struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	Slug      string             `bson:"slug"`
+	Name      string             `bson:"name"`
+	Color     string             `bson:"color,omitempty"`
+	Border    string             `bson:"border,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+}
+
+type Role struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	OrgID     primitive.ObjectID `bson:"orgId"`
+	OrgSlug   string             `bson:"orgSlug"`
+	Slug      string             `bson:"slug"`
+	Name      string             `bson:"name"`
+	Color     string             `bson:"color,omitempty"`
+	Border    string             `bson:"border,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+}
+
+type AccountUser struct {
+	ID              primitive.ObjectID  `bson:"_id,omitempty"`
+	UserID          string              `bson:"userId"`
+	OrgID           *primitive.ObjectID `bson:"orgId,omitempty"`
+	OrgSlug         string              `bson:"orgSlug,omitempty"`
+	Email           string              `bson:"email"`
+	PasswordHash    string              `bson:"passwordHash"`
+	RoleSlugs       []string            `bson:"roleSlugs"`
+	Status          string              `bson:"status"`
+	IsPlatformAdmin bool                `bson:"isPlatformAdmin,omitempty"`
+	CreatedAt       time.Time           `bson:"createdAt"`
+	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
+}
+
+type Invite struct {
+	ID              primitive.ObjectID `bson:"_id,omitempty"`
+	OrgID           primitive.ObjectID `bson:"orgId"`
+	Email           string             `bson:"email"`
+	UserID          string             `bson:"userId"`
+	RoleSlugs       []string           `bson:"roleSlugs"`
+	TokenHash       string             `bson:"tokenHash"`
+	ExpiresAt       time.Time          `bson:"expiresAt"`
+	UsedAt          *time.Time         `bson:"usedAt,omitempty"`
+	CreatedAt       time.Time          `bson:"createdAt"`
+	CreatedByUserID string             `bson:"createdByUserId"`
+}
+
+type Session struct {
+	ID          primitive.ObjectID  `bson:"_id,omitempty"`
+	SessionID   string              `bson:"sessionId"`
+	UserID      string              `bson:"userId"`
+	UserMongoID primitive.ObjectID  `bson:"userMongoId"`
+	OrgID       *primitive.ObjectID `bson:"orgId,omitempty"`
+	CreatedAt   time.Time           `bson:"createdAt"`
+	LastLoginAt time.Time           `bson:"lastLoginAt"`
+	ExpiresAt   time.Time           `bson:"expiresAt"`
+}
+
+type PasswordReset struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	Email     string             `bson:"email"`
+	UserID    string             `bson:"userId"`
+	TokenHash string             `bson:"tokenHash"`
+	ExpiresAt time.Time          `bson:"expiresAt"`
+	UsedAt    *time.Time         `bson:"usedAt,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+}
+
+const (
+	collectionOrganizations = "organizations"
+	collectionRoles         = "roles"
+	collectionUsers         = "users"
+	collectionInvites       = "invites"
+	collectionSessions      = "sessions"
+	collectionPasswordReset = "password_resets"
+)
+
 type MongoStore struct {
 	db     *mongo.Database
 	dbPort mongoDatabasePort
@@ -52,6 +130,7 @@ type mongoCollectionPort interface {
 	Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error)
 	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
+	CreateIndexes(ctx context.Context, models []mongo.IndexModel) error
 }
 
 type mongoSingleResultPort interface {
@@ -113,6 +192,11 @@ func (c mongoDriverCollection) UpdateOne(ctx context.Context, filter interface{}
 
 func (c mongoDriverCollection) FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
 	return mongoDriverSingleResult{result: c.collection.FindOneAndUpdate(ctx, filter, update, opts...)}
+}
+
+func (c mongoDriverCollection) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
+	_, err := c.collection.Indexes().CreateMany(ctx, models)
+	return err
 }
 
 type mongoDriverSingleResult struct {
@@ -767,4 +851,59 @@ func detectAttachmentContentType(filename string) string {
 		return "application/octet-stream"
 	}
 	return mimeType
+}
+
+var nonSlugPattern = regexp.MustCompile(`[^a-z0-9]+`)
+
+func canonifySlug(input string) string {
+	normalized := strings.ToLower(strings.TrimSpace(input))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = nonSlugPattern.ReplaceAllString(normalized, "-")
+	normalized = strings.Trim(normalized, "-")
+	if normalized == "" {
+		return "item"
+	}
+	return normalized
+}
+
+func hashLookupToken(token string) string {
+	hash := sha256.Sum256([]byte(strings.TrimSpace(token)))
+	return hex.EncodeToString(hash[:])
+}
+
+func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
+	indexes := map[string][]mongo.IndexModel{
+		collectionOrganizations: {
+			{Keys: bson.D{{Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true)},
+		},
+		collectionRoles: {
+			{Keys: bson.D{{Key: "orgId", Value: 1}, {Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true)},
+		},
+		collectionUsers: {
+			{Keys: bson.D{{Key: "email", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "userId", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "orgId", Value: 1}}},
+		},
+		collectionInvites: {
+			{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+			{Keys: bson.D{{Key: "email", Value: 1}}},
+		},
+		collectionSessions: {
+			{Keys: bson.D{{Key: "sessionId", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+			{Keys: bson.D{{Key: "userId", Value: 1}}},
+		},
+		collectionPasswordReset: {
+			{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+		},
+	}
+
+	for name, models := range indexes {
+		if err := s.database().Collection(name).CreateIndexes(ctx, models); err != nil {
+			return err
+		}
+	}
+	return nil
 }

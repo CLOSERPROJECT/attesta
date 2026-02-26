@@ -54,6 +54,8 @@ type fakeMongoCollection struct {
 	updateOneUpdates    []interface{}
 	findOneAndUpdFilter []interface{}
 	findOneAndUpdUpdate []interface{}
+	createIndexesFn     func(ctx context.Context, models []mongo.IndexModel) error
+	createIndexesModels [][]mongo.IndexModel
 }
 
 func (c *fakeMongoCollection) InsertOne(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
@@ -98,6 +100,14 @@ func (c *fakeMongoCollection) FindOneAndUpdate(ctx context.Context, filter inter
 		return c.findOneAndUpdateFn(ctx, filter, update, opts...)
 	}
 	return fakeSingleResult{}
+}
+
+func (c *fakeMongoCollection) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
+	c.createIndexesModels = append(c.createIndexesModels, models)
+	if c.createIndexesFn != nil {
+		return c.createIndexesFn(ctx, models)
+	}
+	return nil
 }
 
 type fakeSingleResult struct {
