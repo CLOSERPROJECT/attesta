@@ -52,3 +52,31 @@ func TestBuildTimelineFileSubstepDisplay(t *testing.T) {
 		t.Fatalf("expected display value batch-1, got %q", valueEntry.DisplayValue)
 	}
 }
+
+func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
+	cfg := testRuntimeConfig()
+	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)
+	process := &Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				// Legacy actor shape: no orgSlug/roleSlugs fields.
+				DoneBy: &Actor{UserID: "legacy-user", Role: "dep1"},
+				Data:   map[string]interface{}{"value": 10.0},
+			},
+		},
+	}
+
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{})
+	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
+		t.Fatalf("unexpected timeline shape: %#v", timeline)
+	}
+	entry := timeline[0].Substeps[0]
+	if entry.DoneBy != "legacy-user" || entry.DoneRole != "dep1" {
+		t.Fatalf("unexpected legacy actor render: doneBy=%q doneRole=%q", entry.DoneBy, entry.DoneRole)
+	}
+}
