@@ -1,12 +1,11 @@
 workflow:
   name: "Gallium recycling notarization"
-  description: "Track the recycling process of gallium from intake to refinement and notarization"
   steps:
     - id: "1"
       title: "Incoming intake"
       order: 1
       substeps:
-        - id: "1.0"
+        - id: "1.1"
           title: "Record formata"
           order: 0
           role: "dep1"
@@ -77,7 +76,7 @@ workflow:
                 stringField: "fileField"
               "ui:options":
                 help: "Upload QA evidence."
-        - id: "1.1"
+        - id: "1.2"
           title: "Record incoming gallium (kg)"
           order: 1
           role: "dep1"
@@ -91,18 +90,40 @@ workflow:
                 title: incomingKg
             required:
             - incomingKg
-        - id: "1.2"
+            title: Record incoming gallium
+        - id: "1.3"
           title: "Attach batch ID"
           order: 2
           role: "dep1"
           inputKey: "batchId"
-          inputType: "string"
-        - id: "1.3"
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              batchId:
+                type: string
+                title: batchId
+            required:
+              - batchId
+            title: Batch ID reference
+        - id: "1.4"
           title: "Upload gallium certification"
           order: 3
           role: "dep1"
           inputKey: "Gallium certification"
           inputType: "file"
+          schema:
+            type: object
+            properties:
+              Certification:
+                title: Certification
+            required:
+              - Certification
+            title: Gallium certification
+          uiSchema:
+            Certification:
+              ui:components:
+                unknownField: unknownNativeFileField
     - id: "2"
       title: "Refinement"
       order: 2
@@ -112,13 +133,31 @@ workflow:
           order: 1
           role: "dep2"
           inputKey: "refinedKg"
-          inputType: "number"
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              refinedKg:
+                type: number
+                title: refinedKg
+            required:
+            - refinedKg
+            title: Record refined gallium output
         - id: "2.2"
           title: "Record purity (%)"
           order: 2
-          role: "dep2"
-          inputKey: "purityPct"
-          inputType: "number"
+          role: dep2
+          inputKey: purityPct
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              purityPct:
+                type: number
+                title: purityPct
+            required:
+            - purityPct
+            title: Record purity percentage
     - id: "3"
       title: "QA + Notarize"
       order: 3
@@ -197,9 +236,18 @@ workflow:
         - id: "3.2"
           title: "Finalize notarization"
           order: 2
-          role: "dep3"
-          inputKey: "finalHash"
-          inputType: "string"
+          role: dep3
+          inputKey: finalHash
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              finalHash:
+                type: string
+                title: finalHash
+            required:
+              - finalHash
+            title: Final hash
 
 departments:
   - id: "dep1"
