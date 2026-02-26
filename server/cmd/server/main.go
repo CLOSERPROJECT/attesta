@@ -329,6 +329,8 @@ type PageBase struct {
 	WorkflowKey   string
 	WorkflowName  string
 	WorkflowPath  string
+	ShowOrgsLink  bool
+	ShowMyOrgLink bool
 }
 
 type BackofficeLandingView struct {
@@ -809,6 +811,26 @@ func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	if base.WorkflowKey != "" {
 		base.WorkflowPath = workflowPath(base.WorkflowKey)
 	}
+	return base
+}
+
+func userIsOrgAdmin(user *AccountUser) bool {
+	if user == nil {
+		return false
+	}
+	if !containsRole(user.RoleSlugs, "org-admin") && !containsRole(user.RoleSlugs, "org_admin") {
+		return false
+	}
+	return strings.TrimSpace(user.OrgSlug) != "" && user.OrgID != nil
+}
+
+func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowName string) PageBase {
+	base := s.pageBase(body, workflowKey, workflowName)
+	if user == nil {
+		return base
+	}
+	base.ShowOrgsLink = user.IsPlatformAdmin
+	base.ShowMyOrgLink = userIsOrgAdmin(user)
 	return base
 }
 
@@ -1568,11 +1590,7 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 	if !ok {
 		return nil, false
 	}
-	if !containsRole(user.RoleSlugs, "org-admin") && !containsRole(user.RoleSlugs, "org_admin") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return nil, false
-	}
-	if strings.TrimSpace(user.OrgSlug) == "" || user.OrgID == nil {
+	if !userIsOrgAdmin(user) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return nil, false
 	}
