@@ -245,6 +245,7 @@ type ActionTodo struct {
 	ProcessID string
 	SubstepID string
 	Title     string
+	Role      string
 	Status    string
 }
 
@@ -365,6 +366,15 @@ type DepartmentDashboardView struct {
 	PageBase
 	CurrentUser     Actor
 	RoleLabel       string
+	TodoActions     []ActionTodo
+	ActiveProcesses []ProcessSummary
+	DoneProcesses   []ProcessSummary
+}
+
+type DashboardView struct {
+	PageBase
+	UserID          string
+	RoleSlugs       []string
 	TodoActions     []ActionTodo
 	ActiveProcesses []ProcessSummary
 	DoneProcesses   []ProcessSummary
@@ -558,6 +568,8 @@ func main() {
 	mux.HandleFunc("/invite/", server.handleInvite)
 	mux.HandleFunc("/reset", server.handleResetRequest)
 	mux.HandleFunc("/reset/", server.handleResetSet)
+	mux.HandleFunc("/dashboard", server.handleDashboard)
+	mux.HandleFunc("/dashboard/", server.handleDashboard)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
@@ -1566,6 +1578,9 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/backoffice" || strings.HasPrefix(rest, "/backoffice/"):
 		s.handleBackoffice(w, cloneRequestWithPath(scopedReq, rest))
 		return
+	case rest == "/dashboard" || rest == "/dashboard/" || strings.HasPrefix(rest, "/dashboard/"):
+		s.handleDashboard(w, cloneRequestWithPath(scopedReq, rest))
+		return
 	case rest == "/impersonate":
 		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -2215,6 +2230,15 @@ func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
+	if s.enforceAuth {
+		workflowKey, _, err := s.selectedWorkflow(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, workflowPath(workflowKey)+"/dashboard", http.StatusSeeOther)
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2272,6 +2296,35 @@ func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.NotFound(w, r)
+}
+
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := r.Context()
+	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboardForRoles(ctx, cfg, workflowKey, user.RoleSlugs)
+	view := DashboardView{
+		PageBase:        s.pageBase("dashboard_body", workflowKey, cfg.Workflow.Name),
+		UserID:          user.UserID,
+		RoleSlugs:       append([]string(nil), user.RoleSlugs...),
+		TodoActions:     todoActions,
+		ActiveProcesses: activeProcesses,
+		DoneProcesses:   doneProcesses,
+	}
+	templateName := "dashboard.html"
+	if strings.HasSuffix(strings.TrimSpace(r.URL.Path), "/partial") {
+		templateName = "dashboard_partial.html"
+	}
+	if err := s.tmpl.ExecuteTemplate(w, templateName, view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
@@ -3387,6 +3440,76 @@ func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, wo
 			todo = append(todo, buildRoleTodos(cfg.Workflow, &process, role)...)
 			if summary.NextSubstep != "" {
 				active = append(active, summary)
+			}
+		}
+	}
+	return todo, active, done
+}
+
+func (s *Server) loadProcessDashboardForRoles(ctx context.Context, cfg RuntimeConfig, workflowKey string, roles []string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
+	processes, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 25)
+	if err != nil {
+		return nil, nil, nil
+	}
+	roleSet := map[string]struct{}{}
+	for _, role := range roles {
+		trimmed := strings.TrimSpace(role)
+		if trimmed != "" {
+			roleSet[trimmed] = struct{}{}
+		}
+	}
+	todoSeen := map[string]struct{}{}
+	activeSeen := map[string]struct{}{}
+	doneSeen := map[string]struct{}{}
+	var todo []ActionTodo
+	var active []ProcessSummary
+	var done []ProcessSummary
+	for _, process := range processes {
+		process.Progress = normalizeProgressKeys(process.Progress)
+		status := deriveProcessStatus(cfg.Workflow, &process)
+		summary := buildProcessSummary(cfg.Workflow, &process, status)
+		if status == "done" {
+			if _, ok := doneSeen[summary.ID]; !ok {
+				doneSeen[summary.ID] = struct{}{}
+				done = append(done, summary)
+			}
+			continue
+		}
+		availMap := computeAvailability(cfg.Workflow, &process)
+		for _, sub := range orderedSubsteps(cfg.Workflow) {
+			allowedRoles := substepRoles(sub)
+			matched := ""
+			for _, role := range allowedRoles {
+				if _, ok := roleSet[role]; ok {
+					matched = role
+					break
+				}
+			}
+			if matched == "" {
+				continue
+			}
+			stepStatus := "locked"
+			if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
+				stepStatus = "done"
+			} else if availMap[sub.SubstepID] {
+				stepStatus = "available"
+			}
+			if stepStatus == "available" {
+				key := summary.ID + "|" + sub.SubstepID
+				if _, ok := todoSeen[key]; !ok {
+					todoSeen[key] = struct{}{}
+					todo = append(todo, ActionTodo{
+						ProcessID: summary.ID,
+						SubstepID: sub.SubstepID,
+						Title:     sub.Title,
+						Role:      matched,
+						Status:    stepStatus,
+					})
+				}
+				if _, ok := activeSeen[summary.ID]; !ok {
+					activeSeen[summary.ID] = struct{}{}
+					active = append(active, summary)
+				}
 			}
 		}
 	}

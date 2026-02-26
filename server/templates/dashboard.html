@@ -1,0 +1,74 @@
+{{define "dashboard_body"}}
+<section class="panel landing">
+  <h1>My Dashboard</h1>
+  <p class="muted">Workflow: <strong>{{.WorkflowName}}</strong></p>
+  <p class="muted">User: <strong>{{.UserID}}</strong></p>
+  {{if .RoleSlugs}}
+    <p class="muted">Roles: {{range $index, $role := .RoleSlugs}}{{if $index}}, {{end}}<code>{{$role}}</code>{{end}}</p>
+  {{end}}
+</section>
+
+<section class="panel">
+  <h2>Things to do</h2>
+  {{if .TodoActions}}
+    <ul class="process-list">
+      {{range .TodoActions}}
+        <li class="process-item">
+          <div class="process-head">
+            <a href="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}">{{.ProcessID}}</a>
+            <span class="pill">{{.SubstepID}}</span>
+            <span class="pill">{{.Role}}</span>
+          </div>
+          <p class="muted" style="margin: 8px 0 0;">{{.Title}}</p>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="muted">No pending actions.</p>
+  {{end}}
+</section>
+
+<section class="panel">
+  <h2>Active streams</h2>
+  {{if .ActiveProcesses}}
+    <ul class="process-list">
+      {{range .ActiveProcesses}}
+        <li class="process-item">
+          <div class="process-head">
+            <a href="/w/{{$.WorkflowKey}}/process/{{.ID}}">{{.ID}}</a>
+            <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+          </div>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="muted">No active streams.</p>
+  {{end}}
+</section>
+
+<section class="panel">
+  <h2>Completed streams</h2>
+  {{if .DoneProcesses}}
+    <ul class="process-list">
+      {{range .DoneProcesses}}
+        <li class="process-item">
+          <div class="process-head">
+            <a href="/w/{{$.WorkflowKey}}/process/{{.ID}}">{{.ID}}</a>
+            <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+          </div>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="muted">No completed streams.</p>
+  {{end}}
+</section>
+{{end}}
+
+{{define "dashboard.html"}}
+  {{template "layout.html" .}}
+{{end}}
+
+{{define "dashboard_partial.html"}}
+  {{template "dashboard_body" .}}
+{{end}}

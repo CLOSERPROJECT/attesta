@@ -57,6 +57,7 @@ func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}
   {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
   {{else if eq .Body "home_body"}}{{template "home_body" .}}
   {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
@@ -68,6 +69,9 @@ func testTemplates() *template.Template {
 {{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "home_body"}}HOME {{.LatestProcessID}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
+{{define "dashboard_body"}}DASHBOARD_ME {{.UserID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
+{{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
+{{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "timeline.html" .Timeline}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
