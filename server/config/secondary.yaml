@@ -3,9 +3,9 @@ workflow:
   steps:
     - id: "1"
       title: Shipment intake
+      organization: "org1"
       order: 0
       substeps:
-      organization: "org1"
         - id: "1.1"
           order: 1
           title: Record shipment weight (kg)
@@ -41,8 +41,8 @@ workflow:
     - id: "2"
       title: Inspection
       order: 1
-      substeps:
       organization: "org1"
+      substeps:
         - id: "2.1"
           order: 1
           title: Upload inspection report
@@ -95,8 +95,8 @@ workflow:
     - id: "3"
       title: Approval
       order: 3
-      substeps:
       organization: "org1"
+      substeps:
         - id: "3.1"
           order: 1
           title: Approve shipment
