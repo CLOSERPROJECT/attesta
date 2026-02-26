@@ -61,23 +61,9 @@ go mod tidy
 go run ./cmd/server
 ```
 
-Backend unit tests (from repo root):
-```bash
-task test
-# or:
-cd server
-go test ./...
-```
-
-Coverage with a 90% gate (this is what CI runs):
+Backend unit tests with a 90% gate (from repo root):
 ```bash
 task cover
-```
-
-Integration tests (Docker-backed; tests will `Skip` if Mongo/Cerbos are unavailable):
-```bash
-cd server
-go test -tags=integration ./...
 ```
 
 ### Frontend (Vite)
