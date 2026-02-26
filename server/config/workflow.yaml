@@ -4,13 +4,13 @@ workflow:
     - id: "1"
       title: "Incoming intake"
       order: 1
+      organization: "organization-1"
       substeps:
-      organization: "org1"
         - id: "1.1"
           title: "Record formata"
           order: 0
           roles:
-            - "dep1"
+            - "chemist"
           inputKey: "qa"
           inputType: "formata"
           schema:
@@ -82,7 +82,7 @@ workflow:
           title: "Record incoming gallium (kg)"
           order: 1
           roles:
-            - "dep1"
+            - "chemist"
           inputKey: "incomingKg"
           inputType: "formata"
           schema:
@@ -98,7 +98,7 @@ workflow:
           title: "Attach batch ID"
           order: 2
           roles:
-            - "dep1"
+            - "chemist"
           inputKey: "batchId"
           inputType: formata
           schema:
@@ -114,7 +114,7 @@ workflow:
           title: "Upload gallium certification"
           order: 3
           roles:
-            - "dep1"
+            - "chemist"
           inputKey: "Gallium certification"
           inputType: "file"
           schema:
@@ -132,13 +132,13 @@ workflow:
     - id: "2"
       title: "Refinement"
       order: 2
+      organization: "organization-1"
       substeps:
-      organization: "org1"
         - id: "2.1"
           title: "Record refined gallium output (kg)"
           order: 1
           roles:
-            - "dep2"
+            - "chemist"
           inputKey: "refinedKg"
           inputType: formata
           schema:
@@ -154,7 +154,7 @@ workflow:
           title: "Record purity (%)"
           order: 2
           roles:
-            - "dep2"
+            - "chemist"
           inputKey: purityPct
           inputType: formata
           schema:
@@ -169,13 +169,13 @@ workflow:
     - id: "3"
       title: "QA + Notarize"
       order: 3
+      organization: "organization-1"
       substeps:
-      organization: "org1"
         - id: "3.1"
           title: "QA sign-off"
           order: 1
           roles:
-            - "dep3"
+            - "chemist"
           inputKey: "qaChecklist"
           inputType: "formata"
           schema:
@@ -247,7 +247,7 @@ workflow:
           title: "Finalize notarization"
           order: 2
           roles:
-            - "dep3"
+            - "chemist"
           inputKey: finalHash
           inputType: formata
           schema:
@@ -261,52 +261,17 @@ workflow:
             title: Final hash
 
 organizations:
-  - slug: "org1"
+  - slug: "organization-1"
     name: "Organization 1"
     color: "#d7e9f2"
     border: "#6e99b2"
 
 roles:
-  - orgSlug: "org1"
-    slug: "dep1"
-    name: "Company 1"
+  - orgSlug: "organization-1"
+    slug: "chemist"
+    name: "Chemist"
     color: "#d7e9f2"
     border: "#6e99b2"
-  - orgSlug: "org1"
-    slug: "dep2"
-    name: "Department 2"
-    color: "#e0f1d9"
-    border: "#7da36c"
-  - orgSlug: "org1"
-    slug: "dep3"
-    name: "Department 3"
-    color: "#f5e3c9"
-    border: "#c2945a"
-
-departments:
-  - id: "dep1"
-    name: "Company 1"
-    color: "#d7e9f2"
-    border: "#6e99b2"
-  - id: "dep2"
-    name: "Department 2"
-    color: "#e0f1d9"
-    border: "#7da36c"
-  - id: "dep3"
-    name: "Department 3"
-    color: "#f5e3c9"
-    border: "#c2945a"
-
-users:
-  - id: "u1"
-    name: "User 1"
-    departmentId: "dep1"
-  - id: "u2"
-    name: "User 2"
-    departmentId: "dep2"
-  - id: "u3"
-    name: "User 3"
-    departmentId: "dep3"
 
 dpp:
   enabled: true
