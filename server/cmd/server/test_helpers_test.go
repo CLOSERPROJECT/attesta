@@ -56,6 +56,7 @@ func testRuntimeConfig() RuntimeConfig {
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}
+  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
   {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
   {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
   {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
