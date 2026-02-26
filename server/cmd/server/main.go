@@ -40,17 +40,19 @@ type WorkflowDef struct {
 }
 
 type WorkflowStep struct {
-	StepID  string        `bson:"stepId" yaml:"id"`
-	Title   string        `bson:"title" yaml:"title"`
-	Order   int           `bson:"order" yaml:"order"`
-	Substep []WorkflowSub `bson:"substeps" yaml:"substeps"`
+	StepID           string        `bson:"stepId" yaml:"id"`
+	Title            string        `bson:"title" yaml:"title"`
+	Order            int           `bson:"order" yaml:"order"`
+	OrganizationSlug string        `bson:"organization,omitempty" yaml:"organization"`
+	Substep          []WorkflowSub `bson:"substeps" yaml:"substeps"`
 }
 
 type WorkflowSub struct {
 	SubstepID string                 `bson:"substepId" yaml:"id"`
 	Title     string                 `bson:"title" yaml:"title"`
 	Order     int                    `bson:"order" yaml:"order"`
-	Role      string                 `bson:"role" yaml:"role"`
+	Role      string                 `bson:"role,omitempty" yaml:"role,omitempty"`
+	Roles     []string               `bson:"roles,omitempty" yaml:"roles,omitempty"`
 	InputKey  string                 `bson:"inputKey" yaml:"inputKey"`
 	InputType string                 `bson:"inputType" yaml:"inputType"`
 	Schema    map[string]interface{} `bson:"schema,omitempty" yaml:"schema,omitempty"`
@@ -256,10 +258,27 @@ type User struct {
 }
 
 type RuntimeConfig struct {
-	Workflow    WorkflowDef  `yaml:"workflow"`
-	Departments []Department `yaml:"departments"`
-	Users       []User       `yaml:"users"`
-	DPP         DPPConfig    `yaml:"dpp"`
+	Workflow      WorkflowDef            `yaml:"workflow"`
+	Organizations []WorkflowOrganization `yaml:"organizations"`
+	Roles         []WorkflowRole         `yaml:"roles"`
+	Departments   []Department           `yaml:"departments"`
+	Users         []User                 `yaml:"users"`
+	DPP           DPPConfig              `yaml:"dpp"`
+}
+
+type WorkflowOrganization struct {
+	Slug   string `yaml:"slug"`
+	Name   string `yaml:"name"`
+	Color  string `yaml:"color"`
+	Border string `yaml:"border"`
+}
+
+type WorkflowRole struct {
+	OrgSlug string `yaml:"orgSlug"`
+	Slug    string `yaml:"slug"`
+	Name    string `yaml:"name"`
+	Color   string `yaml:"color"`
+	Border  string `yaml:"border"`
 }
 
 type DPPConfig struct {
@@ -3008,6 +3027,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		if unmarshalErr := yaml.Unmarshal(data, &cfg); unmarshalErr != nil {
 			return nil, fmt.Errorf("parse config %s: %w", path, unmarshalErr)
 		}
+		normalizeWorkflowConfig(&cfg)
 		if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
 			return nil, fmt.Errorf("workflow config is empty in %s", filepath.Base(path))
 		}
@@ -3049,8 +3069,78 @@ func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {
 	return cfg, nil
 }
 
+func normalizeWorkflowConfig(cfg *RuntimeConfig) {
+	if cfg == nil {
+		return
+	}
+	defaultOrg := ""
+	if len(cfg.Organizations) > 0 {
+		defaultOrg = strings.TrimSpace(cfg.Organizations[0].Slug)
+	}
+	if defaultOrg == "" && len(cfg.Departments) > 0 {
+		defaultOrg = "default-org"
+		cfg.Organizations = []WorkflowOrganization{
+			{
+				Slug:   defaultOrg,
+				Name:   "Default organization",
+				Color:  "#f0f3ea",
+				Border: "#d9e0d0",
+			},
+		}
+	}
+
+	if len(cfg.Roles) == 0 && len(cfg.Departments) > 0 {
+		for _, dept := range cfg.Departments {
+			cfg.Roles = append(cfg.Roles, WorkflowRole{
+				OrgSlug: defaultOrg,
+				Slug:    strings.TrimSpace(dept.ID),
+				Name:    strings.TrimSpace(dept.Name),
+				Color:   strings.TrimSpace(dept.Color),
+				Border:  strings.TrimSpace(dept.Border),
+			})
+		}
+	}
+
+	for stepIdx := range cfg.Workflow.Steps {
+		step := &cfg.Workflow.Steps[stepIdx]
+		if strings.TrimSpace(step.OrganizationSlug) == "" {
+			step.OrganizationSlug = defaultOrg
+		}
+		for subIdx := range step.Substep {
+			sub := &step.Substep[subIdx]
+			if len(sub.Roles) == 0 && strings.TrimSpace(sub.Role) != "" {
+				sub.Roles = []string{strings.TrimSpace(sub.Role)}
+			}
+			if strings.TrimSpace(sub.Role) == "" && len(sub.Roles) > 0 {
+				sub.Role = strings.TrimSpace(sub.Roles[0])
+			}
+		}
+	}
+}
+
 func (s *Server) roleMetaMap(cfg RuntimeConfig) map[string]RoleMeta {
 	roles := map[string]RoleMeta{}
+	for _, role := range cfg.Roles {
+		meta := RoleMeta{
+			ID:     role.Slug,
+			Label:  role.Name,
+			Color:  role.Color,
+			Border: role.Border,
+		}
+		if meta.Label == "" {
+			meta.Label = role.Slug
+		}
+		if meta.Color == "" {
+			meta.Color = "#f0f3ea"
+		}
+		if meta.Border == "" {
+			meta.Border = "#d9e0d0"
+		}
+		roles[role.Slug] = meta
+	}
+	if len(roles) > 0 {
+		return roles
+	}
 	for _, dept := range cfg.Departments {
 		meta := RoleMeta{
 			ID:     dept.ID,
@@ -3078,6 +3168,11 @@ func (s *Server) roleLabel(cfg RuntimeConfig, role string) string {
 }
 
 func (s *Server) isKnownRole(cfg RuntimeConfig, role string) bool {
+	for _, item := range cfg.Roles {
+		if item.Slug == role {
+			return true
+		}
+	}
 	for _, dept := range cfg.Departments {
 		if dept.ID == role {
 			return true
@@ -3088,6 +3183,12 @@ func (s *Server) isKnownRole(cfg RuntimeConfig, role string) bool {
 
 func (s *Server) roles(cfg RuntimeConfig) []string {
 	var roles []string
+	for _, item := range cfg.Roles {
+		roles = append(roles, item.Slug)
+	}
+	if len(roles) > 0 {
+		return roles
+	}
 	for _, dept := range cfg.Departments {
 		roles = append(roles, dept.ID)
 	}
@@ -3107,6 +3208,9 @@ func (s *Server) actorForRole(cfg RuntimeConfig, role, workflowKey string) Actor
 }
 
 func (s *Server) defaultRole(cfg RuntimeConfig) string {
+	if len(cfg.Roles) > 0 {
+		return cfg.Roles[0].Slug
+	}
 	if len(cfg.Departments) > 0 {
 		return cfg.Departments[0].ID
 	}

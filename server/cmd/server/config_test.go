@@ -302,15 +302,20 @@ func writeWorkflowConfig(t *testing.T, path, name, inputType string, description
 		"    - id: \"1\"\n" +
 		"      title: \"Step 1\"\n" +
 		"      order: 1\n" +
+		"      organization: \"org1\"\n" +
 		"      substeps:\n" +
 		"        - id: \"1.1\"\n" +
 		"          title: \"Input\"\n" +
 		"          order: 1\n" +
-		"          role: \"dep1\"\n" +
+		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value\"\n" +
 		"          inputType: \"" + inputType + "\"\n" +
-		"departments:\n" +
-		"  - id: \"dep1\"\n" +
+		"organizations:\n" +
+		"  - slug: \"org1\"\n" +
+		"    name: \"Organization 1\"\n" +
+		"roles:\n" +
+		"  - orgSlug: \"org1\"\n" +
+		"    slug: \"dep1\"\n" +
 		"    name: \"Department 1\"\n" +
 		"users:\n" +
 		"  - id: \"u1\"\n" +
@@ -329,15 +334,20 @@ func writeWorkflowConfigWithDPP(t *testing.T, path, dppBlock string) {
 		"    - id: \"1\"\n" +
 		"      title: \"Step 1\"\n" +
 		"      order: 1\n" +
+		"      organization: \"org1\"\n" +
 		"      substeps:\n" +
 		"        - id: \"1.1\"\n" +
 		"          title: \"Input\"\n" +
 		"          order: 1\n" +
-		"          role: \"dep1\"\n" +
+		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value\"\n" +
 		"          inputType: \"string\"\n" +
-		"departments:\n" +
-		"  - id: \"dep1\"\n" +
+		"organizations:\n" +
+		"  - slug: \"org1\"\n" +
+		"    name: \"Organization 1\"\n" +
+		"roles:\n" +
+		"  - orgSlug: \"org1\"\n" +
+		"    slug: \"dep1\"\n" +
 		"    name: \"Department 1\"\n" +
 		"users:\n" +
 		"  - id: \"u1\"\n" +

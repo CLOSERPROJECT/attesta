@@ -97,21 +97,26 @@ func writeTwoSubstepWorkflowConfig(t testHelperT, path, name string) {
 		"    - id: \"1\"\n" +
 		"      title: \"Step 1\"\n" +
 		"      order: 1\n" +
+		"      organization: \"org1\"\n" +
 		"      substeps:\n" +
 		"        - id: \"1.1\"\n" +
 		"          title: \"Input 1\"\n" +
 		"          order: 1\n" +
-		"          role: \"dep1\"\n" +
+		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value1\"\n" +
 		"          inputType: \"string\"\n" +
 		"        - id: \"1.2\"\n" +
 		"          title: \"Input 2\"\n" +
 		"          order: 2\n" +
-		"          role: \"dep1\"\n" +
+		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value2\"\n" +
 		"          inputType: \"string\"\n" +
-		"departments:\n" +
-		"  - id: \"dep1\"\n" +
+		"organizations:\n" +
+		"  - slug: \"org1\"\n" +
+		"    name: \"Organization 1\"\n" +
+		"roles:\n" +
+		"  - orgSlug: \"org1\"\n" +
+		"    slug: \"dep1\"\n" +
 		"    name: \"Department 1\"\n" +
 		"users:\n" +
 		"  - id: \"u1\"\n" +
