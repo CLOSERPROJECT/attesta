@@ -478,6 +478,7 @@ type ProcessPageView struct {
 	PageBase
 	ProcessID   string
 	Timeline    []TimelineStep
+	ActionList  ActionListView
 	DPPURL      string
 	DPPGS1      string
 	Attachments []ProcessDownloadAttachment
@@ -2121,6 +2122,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2139,6 +2144,24 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	process = s.ensureProcessCompletionArtifacts(ctx, cfg, workflowKey, process)
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	actor := Actor{
+		UserID:      user.UserID,
+		OrgSlug:     user.OrgSlug,
+		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
+		WorkflowKey: workflowKey,
+	}
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+	}
+	if len(actor.RoleSlugs) > 0 {
+		actor.Role = actor.RoleSlugs[0]
+	}
+	view.ActionList = ActionListView{
+		WorkflowKey: workflowKey,
+		ProcessID:   process.ID.Hex(),
+		CurrentUser: actor,
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, false, s.roleMetaMap(cfg)),
+	}
 	view.Attachments = buildProcessDownloadAttachments(workflowKey, process, collectProcessAttachments(cfg.Workflow, process))
 	if process.DPP != nil {
 		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)

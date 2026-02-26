@@ -78,7 +78,7 @@ func testTemplates() *template.Template {
 {{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
-{{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "timeline.html" .Timeline}}{{end}}
+{{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{template "timeline.html" .Timeline}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
