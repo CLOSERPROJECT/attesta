@@ -595,7 +595,6 @@ func main() {
 	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
 	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
 	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
-	mux.HandleFunc("/impersonate", server.handleLegacyImpersonate)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -713,11 +712,7 @@ func (s *Server) currentUser(r *http.Request) (*AccountUser, *Session, error) {
 
 func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
 	if !s.enforceAuth {
-		legacy := readActor(r, "")
-		if legacy.UserID != "" {
-			return &AccountUser{UserID: legacy.UserID, RoleSlugs: []string{legacy.Role}}, nil, true
-		}
-		return &AccountUser{}, nil, true
+		return &AccountUser{UserID: "legacy-user"}, nil, true
 	}
 	user, session, err := s.currentUser(r)
 	if err == nil {
@@ -730,11 +725,7 @@ func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request
 
 func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
 	if !s.enforceAuth {
-		legacy := readActor(r, "")
-		if legacy.UserID != "" {
-			return &AccountUser{UserID: legacy.UserID, RoleSlugs: []string{legacy.Role}}, nil, true
-		}
-		return &AccountUser{}, nil, true
+		return &AccountUser{UserID: "legacy-user"}, nil, true
 	}
 	user, session, err := s.currentUser(r)
 	if err == nil {
@@ -1876,9 +1867,6 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/dashboard" || rest == "/dashboard/" || strings.HasPrefix(rest, "/dashboard/"):
 		s.handleDashboard(w, cloneRequestWithPath(scopedReq, rest))
 		return
-	case rest == "/impersonate":
-		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
-		return
 	case rest == "/events":
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -2083,14 +2071,6 @@ func (s *Server) handleLegacyBackoffice(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.handleBackoffice(w, r)
-}
-
-func (s *Server) handleLegacyImpersonate(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		http.Error(w, "workflow context required", http.StatusBadRequest)
-		return
-	}
-	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
@@ -2622,41 +2602,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
-		return
-	}
-	userID := r.FormValue("userId")
-	role := r.FormValue("role")
-	if userID == "" || role == "" {
-		http.Error(w, "invalid impersonation", http.StatusBadRequest)
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !s.isKnownRole(cfg, role) {
-		http.Error(w, "unknown role", http.StatusBadRequest)
-		return
-	}
-	cookie := &http.Cookie{
-		Name:  "demo_user",
-		Value: fmt.Sprintf("%s|%s|%s", userID, role, workflowKey),
-		Path:  "/",
-	}
-	http.SetCookie(w, cookie)
-	http.Redirect(w, r, fmt.Sprintf("%s/backoffice/%s", workflowPath(workflowKey), role), http.StatusSeeOther)
-}
-
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, session, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireAuthenticatedPost(w, r)
 	if !ok {
 		return
 	}
@@ -2673,15 +2620,6 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	if len(user.RoleSlugs) > 0 {
 		actor.Role = user.RoleSlugs[0]
-	}
-	if session == nil {
-		legacy := readActor(r, workflowKey)
-		if legacy.UserID != "" {
-			actor = legacy
-		}
-	}
-	if actor.UserID == "" {
-		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
 	}
 	if actor.WorkflowKey != "" && actor.WorkflowKey != workflowKey {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", nil, actor)
@@ -2717,6 +2655,10 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		activeRole = actor.RoleSlugs[0]
 	}
 	allowedRoles := substepRoles(substep)
+	if !s.enforceAuth && activeRole == "" && len(allowedRoles) > 0 {
+		activeRole = allowedRoles[0]
+		actor.RoleSlugs = append([]string(nil), allowedRoles...)
+	}
 	if activeRole == "" || !containsRole(actor.RoleSlugs, activeRole) || !containsRole(allowedRoles, activeRole) {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
 		return
@@ -3287,15 +3229,8 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
-	if !s.enforceAuth {
-		if strings.TrimSpace(actor.UserID) == "" {
-			actor = s.actorForRole(cfg, role, workflowKey)
-		}
-		http.SetCookie(w, &http.Cookie{
-			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
-			Path:  "/",
-		})
+	if strings.TrimSpace(actor.UserID) == "" {
+		actor = s.actorForRole(cfg, role, workflowKey)
 	}
 
 	ctx := r.Context()
@@ -3328,15 +3263,8 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
-	if !s.enforceAuth {
-		if strings.TrimSpace(actor.UserID) == "" {
-			actor = s.actorForRole(cfg, role, workflowKey)
-		}
-		http.SetCookie(w, &http.Cookie{
-			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
-			Path:  "/",
-		})
+	if strings.TrimSpace(actor.UserID) == "" {
+		actor = s.actorForRole(cfg, role, workflowKey)
 	}
 
 	ctx := r.Context()
@@ -3809,27 +3737,6 @@ func (s *Server) loadProcessDashboardForRoles(ctx context.Context, cfg RuntimeCo
 		}
 	}
 	return todo, active, done
-}
-
-func readActor(r *http.Request, routeWorkflowKey string) Actor {
-	cookie, err := r.Cookie("demo_user")
-	if err != nil {
-		return Actor{}
-	}
-	parts := strings.Split(cookie.Value, "|")
-	if len(parts) != 2 && len(parts) != 3 {
-		return Actor{}
-	}
-	actor := Actor{
-		UserID: strings.TrimSpace(parts[0]),
-		Role:   strings.TrimSpace(parts[1]),
-	}
-	if len(parts) == 3 {
-		actor.WorkflowKey = strings.TrimSpace(parts[2])
-	} else {
-		actor.WorkflowKey = strings.TrimSpace(routeWorkflowKey)
-	}
-	return actor
 }
 
 func containsRole(roles []string, role string) bool {

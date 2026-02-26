@@ -57,11 +57,6 @@ func TestHandleBackofficeRoutes(t *testing.T) {
 		t.Fatalf("expected dashboard counts for dep2, got %q", dashRec.Body.String())
 	}
 
-	cookies := dashRec.Result().Cookies()
-	if len(cookies) == 0 || cookies[0].Name != "demo_user" || !strings.Contains(cookies[0].Value, "|dep2|workflow") {
-		t.Fatalf("expected normalized dep2 cookie, got %#v", cookies)
-	}
-
 	partialReq := httptest.NewRequest(http.MethodGet, "/backoffice/dep2/partial", nil)
 	partialReq = partialReq.WithContext(context.WithValue(partialReq.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",

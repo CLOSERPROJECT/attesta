@@ -103,11 +103,6 @@ func TestLegacyMutatingRoutesRequireWorkflowContext(t *testing.T) {
 			path: "/process/" + primitive.NewObjectID().Hex() + "/substep/1.1/complete",
 			call: server.handleLegacyProcessRoutes,
 		},
-		{
-			name: "impersonate",
-			path: "/impersonate",
-			call: server.handleLegacyImpersonate,
-		},
 	}
 
 	for _, tc := range tests {
@@ -134,11 +129,6 @@ func TestLegacyMutatingRoutesRejectWrongMethod(t *testing.T) {
 			name: "start process get",
 			path: "/process/start",
 			call: server.handleLegacyStartProcess,
-		},
-		{
-			name: "impersonate get",
-			path: "/impersonate",
-			call: server.handleLegacyImpersonate,
 		},
 	}
 

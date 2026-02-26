@@ -69,7 +69,6 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 		{name: "missing key", method: http.MethodGet, path: "/w/", want: http.StatusNotFound},
 		{name: "unknown tail", method: http.MethodGet, path: "/w/workflow/unknown", want: http.StatusNotFound},
 		{name: "events validation", method: http.MethodGet, path: "/w/workflow/events", want: http.StatusBadRequest},
-		{name: "impersonate method guard", method: http.MethodGet, path: "/w/workflow/impersonate", want: http.StatusMethodNotAllowed},
 		{name: "start method guard", method: http.MethodGet, path: "/w/workflow/process/start", want: http.StatusMethodNotAllowed},
 		{name: "backoffice unknown role", method: http.MethodGet, path: "/w/workflow/backoffice/unknown", want: http.StatusNotFound},
 	}
