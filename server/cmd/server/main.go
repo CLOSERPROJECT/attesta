@@ -401,6 +401,19 @@ type InviteView struct {
 	Error string
 }
 
+type ResetRequestView struct {
+	PageBase
+	Email        string
+	ResetLink    string
+	Confirmation string
+}
+
+type ResetSetView struct {
+	PageBase
+	Token string
+	Error string
+}
+
 type ProcessPageView struct {
 	PageBase
 	ProcessID   string
@@ -507,6 +520,8 @@ func main() {
 	mux.HandleFunc("/login", server.handleLogin)
 	mux.HandleFunc("/logout", server.handleLogout)
 	mux.HandleFunc("/invite/", server.handleInvite)
+	mux.HandleFunc("/reset", server.handleResetRequest)
+	mux.HandleFunc("/reset/", server.handleResetSet)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
@@ -1192,6 +1207,151 @@ func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := s.store.MarkInviteUsed(r.Context(), token, s.nowUTC()); err != nil {
 			http.Error(w, "failed to finalize invite", http.StatusBadRequest)
+			return
+		}
+		updated, err := s.store.GetUserByUserID(r.Context(), user.UserID)
+		if err != nil {
+			http.Error(w, "failed to load user", http.StatusInternalServerError)
+			return
+		}
+		if err := s.issueSession(w, r, updated); err != nil {
+			http.Error(w, "failed to login", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func resetTTLHrs() int {
+	hours := intEnvOr("RESET_TTL_HOURS", 24)
+	if hours <= 0 {
+		return 24
+	}
+	return hours
+}
+
+func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		view := ResetRequestView{PageBase: s.pageBase("reset_request_body", "", "")}
+		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		view := ResetRequestView{
+			PageBase:     s.pageBase("reset_request_body", "", ""),
+			Email:        email,
+			Confirmation: "If the account exists, a reset link has been created.",
+			ResetLink:    "",
+		}
+
+		user, err := s.store.GetUserByEmail(r.Context(), email)
+		if err == nil && user != nil {
+			token, tokenErr := newSessionID()
+			if tokenErr != nil {
+				http.Error(w, "failed to create reset token", http.StatusInternalServerError)
+				return
+			}
+			_, createErr := s.store.CreatePasswordReset(r.Context(), PasswordReset{
+				Email:     email,
+				UserID:    user.UserID,
+				TokenHash: token,
+				ExpiresAt: s.nowUTC().Add(time.Duration(resetTTLHrs()) * time.Hour),
+				CreatedAt: s.nowUTC(),
+			})
+			if createErr == nil {
+				view.ResetLink = "/reset/" + token
+			}
+		}
+
+		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) loadActivePasswordReset(ctx context.Context, token string) (*PasswordReset, error) {
+	reset, err := s.store.LoadPasswordResetByTokenHash(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	now := s.nowUTC()
+	if reset.UsedAt != nil {
+		return nil, errors.New("reset token already used")
+	}
+	if !reset.ExpiresAt.IsZero() && reset.ExpiresAt.Before(now) {
+		return nil, errors.New("reset token expired")
+	}
+	return reset, nil
+}
+
+func (s *Server) handleResetSet(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/reset/"))
+	if token == "" || strings.Contains(token, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	reset, err := s.loadActivePasswordReset(r.Context(), token)
+	if err != nil {
+		http.Error(w, "invalid or expired reset token", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		view := ResetSetView{
+			PageBase: s.pageBase("reset_set_body", "", ""),
+			Token:    token,
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "reset_set.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		password := r.FormValue("password")
+		if err := validatePassword(password); err != nil {
+			view := ResetSetView{
+				PageBase: s.pageBase("reset_set_body", "", ""),
+				Token:    token,
+				Error:    err.Error(),
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "reset_set.html", view)
+			return
+		}
+
+		user, err := s.store.GetUserByUserID(r.Context(), reset.UserID)
+		if err != nil {
+			http.Error(w, "invalid reset user", http.StatusBadRequest)
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(password)), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "failed to reset password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.SetUserPasswordHash(r.Context(), user.UserID, string(hash)); err != nil {
+			http.Error(w, "failed to reset password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.MarkPasswordResetUsed(r.Context(), token, s.nowUTC()); err != nil {
+			http.Error(w, "failed to finalize reset", http.StatusBadRequest)
 			return
 		}
 		updated, err := s.store.GetUserByUserID(r.Context(), user.UserID)

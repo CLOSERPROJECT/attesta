@@ -36,6 +36,8 @@
       {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
       {{else if eq .Body "login_body"}}{{template "login_body" .}}
       {{else if eq .Body "invite_body"}}{{template "invite_body" .}}
+      {{else if eq .Body "reset_request_body"}}{{template "reset_request_body" .}}
+      {{else if eq .Body "reset_set_body"}}{{template "reset_set_body" .}}
       {{else if eq .Body "home_body"}}{{template "home_body" .}}
       {{else if eq .Body "process_body"}}{{template "process_body" .}}
       {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
