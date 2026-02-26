@@ -1,0 +1,22 @@
+{{define "invite_body"}}
+<section class="panel landing" style="max-width: 520px;">
+  <h1>Accept Invite</h1>
+  <p class="muted">Account: <strong>{{.Email}}</strong></p>
+  <p class="muted">Organization: <strong>{{.Org}}</strong></p>
+  {{if .Roles}}
+    <p class="muted">Roles: {{range $index, $role := .Roles}}{{if $index}}, {{end}}{{$role}}{{end}}</p>
+  {{end}}
+  {{if .Error}}
+    <p class="muted" style="color: #a91919;">{{.Error}}</p>
+  {{end}}
+  <form method="post" action="/invite/{{.Token}}" class="stack" style="gap: 12px;">
+    <label class="muted" for="password">Set password</label>
+    <input id="password" name="password" type="password" required />
+    <button class="primary" type="submit">Activate account</button>
+  </form>
+</section>
+{{end}}
+
+{{define "invite.html"}}
+  {{template "layout.html" .}}
+{{end}}

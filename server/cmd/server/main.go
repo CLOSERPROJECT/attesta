@@ -392,6 +392,15 @@ type LoginView struct {
 	Error string
 }
 
+type InviteView struct {
+	PageBase
+	Token string
+	Email string
+	Org   string
+	Roles []string
+	Error string
+}
+
 type ProcessPageView struct {
 	PageBase
 	ProcessID   string
@@ -497,6 +506,7 @@ func main() {
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", server.handleLogin)
 	mux.HandleFunc("/logout", server.handleLogout)
+	mux.HandleFunc("/invite/", server.handleInvite)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
@@ -968,6 +978,44 @@ func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filena
 	http.ServeFile(w, r, foundPath)
 }
 
+func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, user *AccountUser) error {
+	if user == nil {
+		return errors.New("user required")
+	}
+	now := s.nowUTC()
+	if err := s.store.SetUserLastLogin(r.Context(), user.UserID, now); err != nil {
+		return err
+	}
+	sessionID, err := newSessionID()
+	if err != nil {
+		return err
+	}
+	expiresAt := now.Add(time.Duration(sessionTTLDays()) * 24 * time.Hour)
+	session := Session{
+		SessionID:   sessionID,
+		UserID:      user.UserID,
+		UserMongoID: user.ID,
+		OrgID:       user.OrgID,
+		CreatedAt:   now,
+		LastLoginAt: now,
+		ExpiresAt:   expiresAt,
+	}
+	if _, err := s.store.CreateSession(r.Context(), session); err != nil {
+		return err
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "attesta_session",
+		Value:    sessionID,
+		Path:     "/",
+		Expires:  expiresAt,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   shouldSecureCookie(r),
+	})
+	return nil
+}
+
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -1012,40 +1060,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		now := s.nowUTC()
-		if err := s.store.SetUserLastLogin(r.Context(), user.UserID, now); err != nil {
+		if err := s.issueSession(w, r, user); err != nil {
 			http.Error(w, "login failed", http.StatusInternalServerError)
 			return
 		}
-		sessionID, err := newSessionID()
-		if err != nil {
-			http.Error(w, "login failed", http.StatusInternalServerError)
-			return
-		}
-		expiresAt := now.Add(time.Duration(sessionTTLDays()) * 24 * time.Hour)
-		session := Session{
-			SessionID:   sessionID,
-			UserID:      user.UserID,
-			UserMongoID: user.ID,
-			OrgID:       user.OrgID,
-			CreatedAt:   now,
-			LastLoginAt: now,
-			ExpiresAt:   expiresAt,
-		}
-		if _, err := s.store.CreateSession(r.Context(), session); err != nil {
-			http.Error(w, "login failed", http.StatusInternalServerError)
-			return
-		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "attesta_session",
-			Value:    sessionID,
-			Path:     "/",
-			Expires:  expiresAt,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-			Secure:   shouldSecureCookie(r),
-		})
 		http.Redirect(w, r, next, http.StatusSeeOther)
 		return
 	default:
@@ -1072,6 +1090,124 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		Secure:   shouldSecureCookie(r),
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func validatePassword(value string) error {
+	password := strings.TrimSpace(value)
+	if len(password) < 12 {
+		return errors.New("password must be at least 12 characters")
+	}
+	return nil
+}
+
+func (s *Server) loadActiveInvite(ctx context.Context, token string) (*Invite, error) {
+	invite, err := s.store.LoadInviteByTokenHash(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	now := s.nowUTC()
+	if invite.UsedAt != nil {
+		return nil, errors.New("invite already used")
+	}
+	if !invite.ExpiresAt.IsZero() && invite.ExpiresAt.Before(now) {
+		return nil, errors.New("invite expired")
+	}
+	return invite, nil
+}
+
+func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/invite/"))
+	if token == "" || strings.Contains(token, "/") {
+		http.NotFound(w, r)
+		return
+	}
+
+	invite, err := s.loadActiveInvite(r.Context(), token)
+	if err != nil {
+		http.Error(w, "invalid or expired invite", http.StatusBadRequest)
+		return
+	}
+
+	orgName := invite.OrgID.Hex()
+	if org, err := s.store.ListOrganizations(r.Context()); err == nil {
+		for _, item := range org {
+			if item.ID == invite.OrgID {
+				orgName = item.Name
+				break
+			}
+		}
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		view := InviteView{
+			PageBase: s.pageBase("invite_body", "", ""),
+			Token:    token,
+			Email:    invite.Email,
+			Org:      orgName,
+			Roles:    invite.RoleSlugs,
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "invite.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		password := r.FormValue("password")
+		if err := validatePassword(password); err != nil {
+			view := InviteView{
+				PageBase: s.pageBase("invite_body", "", ""),
+				Token:    token,
+				Email:    invite.Email,
+				Org:      orgName,
+				Roles:    invite.RoleSlugs,
+				Error:    err.Error(),
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "invite.html", view)
+			return
+		}
+
+		user, err := s.store.GetUserByUserID(r.Context(), invite.UserID)
+		if err != nil {
+			http.Error(w, "invalid invite user", http.StatusBadRequest)
+			return
+		}
+		if strings.ToLower(strings.TrimSpace(user.Email)) != strings.ToLower(strings.TrimSpace(invite.Email)) {
+			http.Error(w, "invite email mismatch", http.StatusBadRequest)
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(password)), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "failed to set password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.SetUserPasswordHash(r.Context(), user.UserID, string(hash)); err != nil {
+			http.Error(w, "failed to set password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.MarkInviteUsed(r.Context(), token, s.nowUTC()); err != nil {
+			http.Error(w, "failed to finalize invite", http.StatusBadRequest)
+			return
+		}
+		updated, err := s.store.GetUserByUserID(r.Context(), user.UserID)
+		if err != nil {
+			http.Error(w, "failed to load user", http.StatusInternalServerError)
+			return
+		}
+		if err := s.issueSession(w, r, updated); err != nil {
+			http.Error(w, "failed to login", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {
