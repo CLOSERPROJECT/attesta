@@ -924,7 +924,7 @@ func (s *MemoryStore) CreateUser(_ context.Context, user AccountUser) (AccountUs
 
 	user.UserID = strings.TrimSpace(user.UserID)
 	user.Email = strings.ToLower(strings.TrimSpace(user.Email))
-	user.OrgSlug = canonifySlug(user.OrgSlug)
+	user.OrgSlug = canonifyOptionalSlug(user.OrgSlug)
 	user.RoleSlugs = canonifyRoleSlugs(user.RoleSlugs)
 	if user.CreatedAt.IsZero() {
 		user.CreatedAt = time.Now().UTC()
@@ -1274,6 +1274,14 @@ func canonifyRoleSlugs(roleSlugs []string) []string {
 	return canon
 }
 
+func canonifyOptionalSlug(input string) string {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return ""
+	}
+	return canonifySlug(trimmed)
+}
+
 func hashLookupToken(token string) string {
 	hash := sha256.Sum256([]byte(strings.TrimSpace(token)))
 	return hex.EncodeToString(hash[:])
@@ -1419,7 +1427,7 @@ func (s *MongoStore) CreateUser(ctx context.Context, user AccountUser) (AccountU
 	}
 	user.Email = strings.ToLower(strings.TrimSpace(user.Email))
 	user.RoleSlugs = canonifyRoleSlugs(user.RoleSlugs)
-	user.OrgSlug = canonifySlug(user.OrgSlug)
+	user.OrgSlug = canonifyOptionalSlug(user.OrgSlug)
 	result, err := s.database().Collection(collectionUsers).InsertOne(ctx, user)
 	if err != nil {
 		return AccountUser{}, err

@@ -27,6 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -477,6 +478,9 @@ func main() {
 		configDir:     configDir,
 		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 	}
+	if err := bootstrapPlatformAdmin(ctx, server.store, server.now); err != nil {
+		log.Fatal(err)
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
@@ -504,6 +508,71 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func boolEnvOr(key string, fallback bool) bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if raw == "" {
+		return fallback
+	}
+	switch raw {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func intEnvOr(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func bootstrapPlatformAdmin(ctx context.Context, store Store, now func() time.Time) error {
+	if store == nil {
+		return nil
+	}
+	anyoneCanCreate := boolEnvOr("ANYONE_CAN_CREATE_ACCOUNT", true)
+	adminEmail := strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
+	adminPassword := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+	if !anyoneCanCreate && (adminEmail == "" || adminPassword == "") {
+		return errors.New("ADMIN_EMAIL and ADMIN_PASSWORD are required when ANYONE_CAN_CREATE_ACCOUNT=false")
+	}
+	if adminEmail == "" || adminPassword == "" {
+		return nil
+	}
+
+	if _, err := store.GetUserByEmail(ctx, adminEmail); err == nil {
+		return nil
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return err
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	userID := "platform-admin-" + canonifySlug(strings.Split(adminEmail, "@")[0])
+	_, err = store.CreateUser(ctx, AccountUser{
+		UserID:          userID,
+		Email:           adminEmail,
+		PasswordHash:    string(passwordHash),
+		RoleSlugs:       []string{},
+		Status:          "active",
+		IsPlatformAdmin: true,
+		CreatedAt:       now().UTC(),
+	})
+	return err
 }
 
 func attachmentMaxBytes() int64 {
