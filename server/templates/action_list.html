@@ -28,6 +28,21 @@
               {{end}}
               {{if eq .InputType "file"}}enctype="multipart/form-data" hx-encoding="multipart/form-data"{{end}}
             >
+              {{if .MatchingRoles}}
+                {{if eq (len .MatchingRoles) 1}}
+                  <input type="hidden" name="activeRole" value="{{index .MatchingRoles 0}}" />
+                {{else}}
+                  <label>
+                    Active role
+                    <select name="activeRole" required {{if .Disabled}}disabled{{end}}>
+                      <option value="">Select role</option>
+                      {{range .MatchingRoles}}
+                        <option value="{{.}}">{{.}}</option>
+                      {{end}}
+                    </select>
+                  </label>
+                {{end}}
+              {{end}}
               <label {{if eq .InputType "formata"}}class="action-field-formata"{{end}}>
                 {{.InputKey}}
                 {{if eq .InputType "number"}}

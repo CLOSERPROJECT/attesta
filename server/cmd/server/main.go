@@ -207,25 +207,27 @@ type NotarizedProcessExport struct {
 }
 
 type ActionView struct {
-	ProcessID    string
-	SubstepID    string
-	Title        string
-	Role         string
-	RoleLabel    string
-	RoleColor    string
-	RoleBorder   string
-	InputKey     string
-	InputType    string
-	FormSchema   string
-	FormUISchema string
-	Status       string
-	DoneAt       string
-	DoneBy       string
-	DoneRole     string
-	Values       []ActionKV
-	Attachments  []ActionAttachmentView
-	Disabled     bool
-	Reason       string
+	ProcessID     string
+	SubstepID     string
+	Title         string
+	Role          string
+	AllowedRoles  []string
+	MatchingRoles []string
+	RoleLabel     string
+	RoleColor     string
+	RoleBorder    string
+	InputKey      string
+	InputType     string
+	FormSchema    string
+	FormUISchema  string
+	Status        string
+	DoneAt        string
+	DoneBy        string
+	DoneRole      string
+	Values        []ActionKV
+	Attachments   []ActionAttachmentView
+	Disabled      bool
+	Reason        string
 }
 
 type ActionKV struct {
@@ -2354,6 +2356,24 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Substep not found.", process, actor)
 		return
 	}
+	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
+		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
+	}
+	if substep.InputType == "file" {
+		_ = r.ParseMultipartForm(attachmentMaxBytes())
+	} else {
+		_ = r.ParseForm()
+	}
+	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
+	if activeRole == "" && len(actor.RoleSlugs) == 1 {
+		activeRole = actor.RoleSlugs[0]
+	}
+	allowedRoles := substepRoles(substep)
+	if activeRole == "" || !containsRole(actor.RoleSlugs, activeRole) || !containsRole(allowedRoles, activeRole) {
+		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
+		return
+	}
+	actor.Role = activeRole
 
 	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
 	if s.authorizer == nil {
@@ -3404,6 +3424,41 @@ func containsRole(roles []string, role string) bool {
 	return false
 }
 
+func substepRoles(sub WorkflowSub) []string {
+	if len(sub.Roles) > 0 {
+		out := make([]string, 0, len(sub.Roles))
+		for _, role := range sub.Roles {
+			trimmed := strings.TrimSpace(role)
+			if trimmed == "" {
+				continue
+			}
+			out = append(out, trimmed)
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	if strings.TrimSpace(sub.Role) != "" {
+		return []string{strings.TrimSpace(sub.Role)}
+	}
+	return nil
+}
+
+func intersectRoles(allowed []string, owned []string) []string {
+	ownedSet := map[string]struct{}{}
+	for _, role := range owned {
+		ownedSet[strings.TrimSpace(role)] = struct{}{}
+	}
+	var matches []string
+	for _, role := range allowed {
+		trimmed := strings.TrimSpace(role)
+		if _, ok := ownedSet[trimmed]; ok {
+			matches = append(matches, trimmed)
+		}
+	}
+	return matches
+}
+
 func sortedSteps(def WorkflowDef) []WorkflowStep {
 	steps := append([]WorkflowStep(nil), def.Steps...)
 	sort.Slice(steps, func(i, j int) bool { return steps[i].Order < steps[j].Order })
@@ -3821,10 +3876,20 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
 	for _, sub := range ordered {
-		if onlyRole && sub.Role != actor.Role {
+		allowedRoles := substepRoles(sub)
+		ownedRoles := append([]string(nil), actor.RoleSlugs...)
+		if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
+			ownedRoles = []string{strings.TrimSpace(actor.Role)}
+		}
+		matchingRoles := intersectRoles(allowedRoles, ownedRoles)
+		primaryRole := sub.Role
+		if primaryRole == "" && len(allowedRoles) > 0 {
+			primaryRole = allowedRoles[0]
+		}
+		if onlyRole && strings.TrimSpace(actor.Role) != "" && !containsRole(allowedRoles, actor.Role) {
 			continue
 		}
-		meta := roleMetaFor(sub.Role, roleMeta)
+		meta := roleMetaFor(primaryRole, roleMeta)
 		status := "locked"
 		if process != nil {
 			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
@@ -3833,14 +3898,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				status = "available"
 			}
 		}
-		disabled := status != "available" || sub.Role != actor.Role
+		disabled := status != "available" || len(matchingRoles) == 0
 		reason := ""
 		if status == "locked" {
 			reason = "Locked by sequence"
 		} else if status == "done" {
 			reason = "Already completed"
-		} else if sub.Role != actor.Role {
-			reason = "Role mismatch"
+		} else if len(matchingRoles) == 0 {
+			reason = "Not authorized"
 		}
 		formSchema := ""
 		formUISchema := ""
@@ -3871,25 +3936,27 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			formUISchema = marshalJSONCompact(sub.UISchema)
 		}
 		actions = append(actions, ActionView{
-			ProcessID:    processIDString(process),
-			SubstepID:    sub.SubstepID,
-			Title:        sub.Title,
-			Role:         sub.Role,
-			RoleLabel:    meta.Label,
-			RoleColor:    meta.Color,
-			RoleBorder:   meta.Border,
-			InputKey:     sub.InputKey,
-			InputType:    sub.InputType,
-			FormSchema:   formSchema,
-			FormUISchema: formUISchema,
-			Status:       status,
-			DoneAt:       doneAt,
-			DoneBy:       doneBy,
-			DoneRole:     doneRole,
-			Values:       values,
-			Attachments:  attachments,
-			Disabled:     disabled,
-			Reason:       reason,
+			ProcessID:     processIDString(process),
+			SubstepID:     sub.SubstepID,
+			Title:         sub.Title,
+			Role:          primaryRole,
+			AllowedRoles:  allowedRoles,
+			MatchingRoles: matchingRoles,
+			RoleLabel:     meta.Label,
+			RoleColor:     meta.Color,
+			RoleBorder:    meta.Border,
+			InputKey:      sub.InputKey,
+			InputType:     sub.InputType,
+			FormSchema:    formSchema,
+			FormUISchema:  formUISchema,
+			Status:        status,
+			DoneAt:        doneAt,
+			DoneBy:        doneBy,
+			DoneRole:      doneRole,
+			Values:        values,
+			Attachments:   attachments,
+			Disabled:      disabled,
+			Reason:        reason,
 		})
 	}
 	return actions
