@@ -448,6 +448,21 @@ type ResetSetView struct {
 	Error string
 }
 
+type PlatformAdminView struct {
+	PageBase
+	Organizations []Organization
+	InviteLink    string
+	Error         string
+}
+
+type OrgAdminView struct {
+	PageBase
+	Organization Organization
+	Roles        []Role
+	InviteLink   string
+	Error        string
+}
+
 type WorkflowRefValidationError struct {
 	Messages []string
 }
@@ -570,6 +585,10 @@ func main() {
 	mux.HandleFunc("/reset/", server.handleResetSet)
 	mux.HandleFunc("/dashboard", server.handleDashboard)
 	mux.HandleFunc("/dashboard/", server.handleDashboard)
+	mux.HandleFunc("/admin/orgs", server.handleAdminOrgs)
+	mux.HandleFunc("/admin/orgs/", server.handleAdminOrgs)
+	mux.HandleFunc("/org-admin/roles", server.handleOrgAdminRoles)
+	mux.HandleFunc("/org-admin/users", server.handleOrgAdminUsers)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
@@ -1530,6 +1549,282 @@ func (s *Server) handleResetSet(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func randomUserIDFromEmail(email string) string {
+	local := strings.TrimSpace(strings.Split(strings.ToLower(strings.TrimSpace(email)), "@")[0])
+	if local == "" {
+		local = "user"
+	}
+	return canonifySlug(local) + "-" + fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !user.IsPlatformAdmin {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return user, true
+}
+
+func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !containsRole(user.RoleSlugs, "org-admin") && !containsRole(user.RoleSlugs, "org_admin") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	if strings.TrimSpace(user.OrgSlug) == "" || user.OrgID == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return user, true
+}
+
+func (s *Server) renderPlatformAdmin(w http.ResponseWriter, inviteLink, errMsg string) {
+	orgs, _ := s.store.ListOrganizations(context.Background())
+	view := PlatformAdminView{
+		PageBase:      s.pageBase("platform_admin_body", "", ""),
+		Organizations: orgs,
+		InviteLink:    strings.TrimSpace(inviteLink),
+		Error:         strings.TrimSpace(errMsg),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requirePlatformAdmin(w, r)
+	if !ok {
+		return
+	}
+	path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/admin/orgs"))
+	if path == "" || path == "/" {
+		switch r.Method {
+		case http.MethodGet:
+			s.renderPlatformAdmin(w, "", "")
+			return
+		case http.MethodPost:
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "invalid form", http.StatusBadRequest)
+				return
+			}
+			name := strings.TrimSpace(r.FormValue("name"))
+			if name == "" {
+				s.renderPlatformAdmin(w, "", "organization name is required")
+				return
+			}
+			if _, err := s.store.CreateOrganization(r.Context(), Organization{Name: name, CreatedAt: s.nowUTC()}); err != nil {
+				s.renderPlatformAdmin(w, "", "failed to create organization")
+				return
+			}
+			http.Redirect(w, r, "/admin/orgs", http.StatusSeeOther)
+			return
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+
+	orgSlug := strings.Trim(strings.TrimPrefix(path, "/"), "/")
+	org, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug)
+	if err != nil || org == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.renderPlatformAdmin(w, "", "")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+	if email == "" {
+		s.renderPlatformAdmin(w, "", "email is required")
+		return
+	}
+
+	roleSlug := "org-admin"
+	if _, roleErr := s.store.GetRoleBySlug(r.Context(), org.Slug, roleSlug); roleErr != nil {
+		_, _ = s.store.CreateRole(r.Context(), Role{
+			OrgID:     org.ID,
+			OrgSlug:   org.Slug,
+			Slug:      roleSlug,
+			Name:      "Org Admin",
+			CreatedAt: s.nowUTC(),
+		})
+	}
+
+	user, userErr := s.store.GetUserByEmail(r.Context(), email)
+	if userErr != nil || user == nil {
+		orgID := org.ID
+		createdUser, createErr := s.store.CreateUser(r.Context(), AccountUser{
+			UserID:    randomUserIDFromEmail(email),
+			OrgID:     &orgID,
+			OrgSlug:   org.Slug,
+			Email:     email,
+			RoleSlugs: []string{roleSlug},
+			Status:    "invited",
+			CreatedAt: s.nowUTC(),
+		})
+		if createErr != nil {
+			s.renderPlatformAdmin(w, "", "failed to create org admin user")
+			return
+		}
+		user = &createdUser
+	} else {
+		_ = s.store.SetUserRoles(r.Context(), user.UserID, append(user.RoleSlugs, roleSlug))
+	}
+
+	token, tokenErr := newSessionID()
+	if tokenErr != nil {
+		s.renderPlatformAdmin(w, "", "failed to create invite")
+		return
+	}
+	if _, inviteErr := s.store.CreateInvite(r.Context(), Invite{
+		OrgID:           org.ID,
+		Email:           email,
+		UserID:          user.UserID,
+		RoleSlugs:       []string{roleSlug},
+		TokenHash:       token,
+		ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
+		CreatedAt:       s.nowUTC(),
+		CreatedByUserID: admin.UserID,
+	}); inviteErr != nil {
+		s.renderPlatformAdmin(w, "", "failed to create invite")
+		return
+	}
+	s.renderPlatformAdmin(w, "/invite/"+token, "")
+}
+
+func (s *Server) renderOrgAdmin(w http.ResponseWriter, orgSlug, inviteLink, errMsg string) {
+	org, err := s.store.GetOrganizationBySlug(context.Background(), orgSlug)
+	if err != nil || org == nil {
+		http.Error(w, "organization not found", http.StatusNotFound)
+		return
+	}
+	roles, _ := s.store.ListRolesByOrg(context.Background(), orgSlug)
+	view := OrgAdminView{
+		PageBase:     s.pageBase("org_admin_body", "", ""),
+		Organization: *org,
+		Roles:        roles,
+		InviteLink:   strings.TrimSpace(inviteLink),
+		Error:        strings.TrimSpace(errMsg),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.requireOrgAdmin(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.renderOrgAdmin(w, user.OrgSlug, "", "")
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			s.renderOrgAdmin(w, user.OrgSlug, "", "role name is required")
+			return
+		}
+		_, err := s.store.CreateRole(r.Context(), Role{
+			OrgID:     *user.OrgID,
+			OrgSlug:   user.OrgSlug,
+			Name:      name,
+			CreatedAt: s.nowUTC(),
+		})
+		if err != nil {
+			s.renderOrgAdmin(w, user.OrgSlug, "", "failed to create role")
+			return
+		}
+		s.renderOrgAdmin(w, user.OrgSlug, "", "")
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireOrgAdmin(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.renderOrgAdmin(w, admin.OrgSlug, "", "")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+	roleSlug := strings.TrimSpace(r.FormValue("role"))
+	if email == "" || roleSlug == "" {
+		s.renderOrgAdmin(w, admin.OrgSlug, "", "email and role are required")
+		return
+	}
+	if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
+		s.renderOrgAdmin(w, admin.OrgSlug, "", "role not found")
+		return
+	}
+
+	user, userErr := s.store.GetUserByEmail(r.Context(), email)
+	if userErr != nil || user == nil {
+		orgID := *admin.OrgID
+		created, createErr := s.store.CreateUser(r.Context(), AccountUser{
+			UserID:    randomUserIDFromEmail(email),
+			OrgID:     &orgID,
+			OrgSlug:   admin.OrgSlug,
+			Email:     email,
+			RoleSlugs: []string{roleSlug},
+			Status:    "invited",
+			CreatedAt: s.nowUTC(),
+		})
+		if createErr != nil {
+			s.renderOrgAdmin(w, admin.OrgSlug, "", "failed to create user")
+			return
+		}
+		user = &created
+	} else {
+		_ = s.store.SetUserRoles(r.Context(), user.UserID, append(user.RoleSlugs, roleSlug))
+	}
+
+	token, tokenErr := newSessionID()
+	if tokenErr != nil {
+		s.renderOrgAdmin(w, admin.OrgSlug, "", "failed to create invite")
+		return
+	}
+	if _, err := s.store.CreateInvite(r.Context(), Invite{
+		OrgID:           *admin.OrgID,
+		Email:           email,
+		UserID:          user.UserID,
+		RoleSlugs:       []string{roleSlug},
+		TokenHash:       token,
+		ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
+		CreatedAt:       s.nowUTC(),
+		CreatedByUserID: admin.UserID,
+	}); err != nil {
+		s.renderOrgAdmin(w, admin.OrgSlug, "", "failed to create invite")
+		return
+	}
+	s.renderOrgAdmin(w, admin.OrgSlug, "/invite/"+token, "")
 }
 
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {

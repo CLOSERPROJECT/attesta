@@ -58,6 +58,8 @@ func testTemplates() *template.Template {
 {{define "layout.html"}}
   {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
   {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
+  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
+  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
   {{else if eq .Body "home_body"}}{{template "home_body" .}}
   {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
@@ -72,6 +74,10 @@ func testTemplates() *template.Template {
 {{define "dashboard_body"}}DASHBOARD_ME {{.UserID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
+{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
+{{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "timeline.html" .Timeline}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}

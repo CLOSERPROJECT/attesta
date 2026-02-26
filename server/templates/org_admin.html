@@ -1,0 +1,39 @@
+{{define "org_admin_body"}}
+<section class="panel landing">
+  <h1>Org Admin</h1>
+  <p class="muted">Organization: <strong>{{.Organization.Name}}</strong> (<code>{{.Organization.Slug}}</code>)</p>
+  {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
+  {{if .InviteLink}}
+    <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
+  {{end}}
+</section>
+
+<section class="panel">
+  <h2>Create Role</h2>
+  <form method="post" action="/org-admin/roles" class="stack" style="gap: 12px;">
+    <label class="muted" for="role-name">Role name</label>
+    <input id="role-name" name="name" type="text" required />
+    <button class="primary" type="submit">Create role</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Invite User</h2>
+  <form method="post" action="/org-admin/users" class="stack" style="gap: 12px;">
+    <label class="muted" for="user-email">Email</label>
+    <input id="user-email" name="email" type="email" required />
+    <label class="muted" for="role">Role</label>
+    <select id="role" name="role" required>
+      <option value="">Select role</option>
+      {{range .Roles}}
+        <option value="{{.Slug}}">{{.Name}} ({{.Slug}})</option>
+      {{end}}
+    </select>
+    <button class="primary" type="submit">Create invite</button>
+  </form>
+</section>
+{{end}}
+
+{{define "org_admin.html"}}
+  {{template "layout.html" .}}
+{{end}}
