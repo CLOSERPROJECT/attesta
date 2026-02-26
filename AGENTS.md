@@ -16,6 +16,9 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`.
 - Admin consoles:
   - Platform admin: `/admin/orgs`
   - Org admin: `/org-admin/roles`, `/org-admin/users`
+- Global topbar now renders role-aware admin links on authenticated pages:
+  - Platform admin sees `Orgs` (`/admin/orgs`)
+  - Org admin with org context sees `My Org` (`/org-admin/users`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 
 ## Agent behavior expectations
