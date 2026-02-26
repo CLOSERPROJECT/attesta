@@ -92,6 +92,17 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 - Timeline updates pull `/w/:workflow/process/:id/timeline` when SSE events arrive.
 - Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
 
+## Deployment Checklist
+1. Set auth/bootstrap env vars:
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+   - `ANYONE_CAN_CREATE_ACCOUNT` (recommended `false` in production)
+   - `SESSION_TTL_DAYS` and `COOKIE_SECURE=true` behind HTTPS
+2. Start services and verify Mongo + Cerbos health.
+3. Login as platform admin and create organizations.
+4. Create org admin invites, then create org roles/users from org admin pages.
+5. Ensure workflow YAML org/role slugs match Mongo entities.
+6. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
+
 ## DPP Digital Link configuration
 Configure GS1 Digital Link generation per workflow YAML (`server/config/*.yaml`):
 

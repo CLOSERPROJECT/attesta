@@ -9,6 +9,15 @@ This repo is a small end-to-end demo:
 
 See: `README.md`, `QUICKSTART.md`, `DOCKER.md`.
 
+## Current auth/org status (2026-02)
+- Demo impersonation has been removed from production code paths.
+- Session auth is active (`attesta_session` cookie) with login/logout/invite/reset flows.
+- Dashboard route is `/dashboard` (workflow-scoped variant: `/w/:workflow/dashboard`).
+- Admin consoles:
+  - Platform admin: `/admin/orgs`
+  - Org admin: `/org-admin/roles`, `/org-admin/users`
+- Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
+
 ## Agent behavior expectations
 
 When acting as a coding agent in this repository:
@@ -101,6 +110,8 @@ Backend environment variables (observed):
 - `CERBOS_URL` (default `http://localhost:3592`) — used in `server/cmd/server/main.go:267`
 - `WORKFLOW_CONFIG` (default `config/workflow.yaml`) — used in `server/cmd/server/main.go:271`
 - `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size; used in `server/cmd/server/main.go:298-309`
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ANYONE_CAN_CREATE_ACCOUNT`
+- `SESSION_TTL_DAYS`, `COOKIE_SECURE`
 
 Example env file: `.env.example`.
 
@@ -115,8 +126,12 @@ Key endpoints:
 - `GET /process/:id/timeline` (partial HTML)
 - `POST /process/:id/substep/:substepId/complete`
 - `GET /process/:id/substep/:substepId/file` (download)
-- `GET /backoffice` and `/backoffice/:role` (dashboard)
-- `POST /impersonate` (sets a cookie)
+- `GET /dashboard`
+- `GET/POST /login`, `POST /logout`
+- `GET/POST /invite/:token`
+- `GET/POST /reset`, `GET/POST /reset/:token`
+- `GET/POST /admin/orgs`, `GET/POST /admin/orgs/:slug`
+- `GET/POST /org-admin/roles`, `GET/POST /org-admin/users`
 - `GET /events` (SSE)
 
 ### Actor/role identity
