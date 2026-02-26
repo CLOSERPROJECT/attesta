@@ -1100,7 +1100,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
 		return
 	}
 	options, err := s.workflowOptions(r.Context())
@@ -1110,7 +1111,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := HomeWorkflowPickerView{
 		WorkflowPickerView: WorkflowPickerView{
-			PageBase:  s.pageBase("home_picker_body", "", ""),
+			PageBase:  s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows: options,
 		},
 	}
@@ -1597,10 +1598,10 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 	return user, true
 }
 
-func (s *Server) renderPlatformAdmin(w http.ResponseWriter, inviteLink, errMsg string) {
+func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, inviteLink, errMsg string) {
 	orgs, _ := s.store.ListOrganizations(context.Background())
 	view := PlatformAdminView{
-		PageBase:      s.pageBase("platform_admin_body", "", ""),
+		PageBase:      s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		Organizations: orgs,
 		InviteLink:    strings.TrimSpace(inviteLink),
 		Error:         strings.TrimSpace(errMsg),
@@ -1619,7 +1620,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	if path == "" || path == "/" {
 		switch r.Method {
 		case http.MethodGet:
-			s.renderPlatformAdmin(w, "", "")
+			s.renderPlatformAdmin(w, admin, "", "")
 			return
 		case http.MethodPost:
 			if err := r.ParseForm(); err != nil {
@@ -1628,11 +1629,11 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			}
 			name := strings.TrimSpace(r.FormValue("name"))
 			if name == "" {
-				s.renderPlatformAdmin(w, "", "organization name is required")
+				s.renderPlatformAdmin(w, admin, "", "organization name is required")
 				return
 			}
 			if _, err := s.store.CreateOrganization(r.Context(), Organization{Name: name, CreatedAt: s.nowUTC()}); err != nil {
-				s.renderPlatformAdmin(w, "", "failed to create organization")
+				s.renderPlatformAdmin(w, admin, "", "failed to create organization")
 				return
 			}
 			http.Redirect(w, r, "/admin/orgs", http.StatusSeeOther)
@@ -1650,7 +1651,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		s.renderPlatformAdmin(w, "", "")
+		s.renderPlatformAdmin(w, admin, "", "")
 		return
 	}
 	if err := r.ParseForm(); err != nil {
@@ -1659,7 +1660,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 	if email == "" {
-		s.renderPlatformAdmin(w, "", "email is required")
+		s.renderPlatformAdmin(w, admin, "", "email is required")
 		return
 	}
 
@@ -1687,7 +1688,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: s.nowUTC(),
 		})
 		if createErr != nil {
-			s.renderPlatformAdmin(w, "", "failed to create org admin user")
+			s.renderPlatformAdmin(w, admin, "", "failed to create org admin user")
 			return
 		}
 		user = &createdUser
@@ -1697,7 +1698,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 
 	token, tokenErr := newSessionID()
 	if tokenErr != nil {
-		s.renderPlatformAdmin(w, "", "failed to create invite")
+		s.renderPlatformAdmin(w, admin, "", "failed to create invite")
 		return
 	}
 	if _, inviteErr := s.store.CreateInvite(r.Context(), Invite{
@@ -1710,13 +1711,13 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:       s.nowUTC(),
 		CreatedByUserID: admin.UserID,
 	}); inviteErr != nil {
-		s.renderPlatformAdmin(w, "", "failed to create invite")
+		s.renderPlatformAdmin(w, admin, "", "failed to create invite")
 		return
 	}
-	s.renderPlatformAdmin(w, "/invite/"+token, "")
+	s.renderPlatformAdmin(w, admin, "/invite/"+token, "")
 }
 
-func (s *Server) renderOrgAdmin(w http.ResponseWriter, orgSlug, inviteLink, errMsg string) {
+func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlug, inviteLink, errMsg string) {
 	org, err := s.store.GetOrganizationBySlug(context.Background(), orgSlug)
 	if err != nil || org == nil {
 		http.Error(w, "organization not found", http.StatusNotFound)
@@ -1724,7 +1725,7 @@ func (s *Server) renderOrgAdmin(w http.ResponseWriter, orgSlug, inviteLink, errM
 	}
 	roles, _ := s.store.ListRolesByOrg(context.Background(), orgSlug)
 	view := OrgAdminView{
-		PageBase:     s.pageBase("org_admin_body", "", ""),
+		PageBase:     s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Organization: *org,
 		Roles:        roles,
 		InviteLink:   strings.TrimSpace(inviteLink),
@@ -1742,7 +1743,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		s.renderOrgAdmin(w, user.OrgSlug, "", "")
+		s.renderOrgAdmin(w, user, user.OrgSlug, "", "")
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
@@ -1751,7 +1752,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		}
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
-			s.renderOrgAdmin(w, user.OrgSlug, "", "role name is required")
+			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role name is required")
 			return
 		}
 		_, err := s.store.CreateRole(r.Context(), Role{
@@ -1761,10 +1762,10 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: s.nowUTC(),
 		})
 		if err != nil {
-			s.renderOrgAdmin(w, user.OrgSlug, "", "failed to create role")
+			s.renderOrgAdmin(w, user, user.OrgSlug, "", "failed to create role")
 			return
 		}
-		s.renderOrgAdmin(w, user.OrgSlug, "", "")
+		s.renderOrgAdmin(w, user, user.OrgSlug, "", "")
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1777,7 +1778,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		s.renderOrgAdmin(w, admin.OrgSlug, "", "")
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 		return
 	}
 	if err := r.ParseForm(); err != nil {
@@ -1787,11 +1788,11 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 	roleSlug := strings.TrimSpace(r.FormValue("role"))
 	if email == "" || roleSlug == "" {
-		s.renderOrgAdmin(w, admin.OrgSlug, "", "email and role are required")
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email and role are required")
 		return
 	}
 	if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
-		s.renderOrgAdmin(w, admin.OrgSlug, "", "role not found")
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
 		return
 	}
 
@@ -1808,7 +1809,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: s.nowUTC(),
 		})
 		if createErr != nil {
-			s.renderOrgAdmin(w, admin.OrgSlug, "", "failed to create user")
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create user")
 			return
 		}
 		user = &created
@@ -1818,7 +1819,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 
 	token, tokenErr := newSessionID()
 	if tokenErr != nil {
-		s.renderOrgAdmin(w, admin.OrgSlug, "", "failed to create invite")
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
 		return
 	}
 	if _, err := s.store.CreateInvite(r.Context(), Invite{
@@ -1831,10 +1832,10 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:       s.nowUTC(),
 		CreatedByUserID: admin.UserID,
 	}); err != nil {
-		s.renderOrgAdmin(w, admin.OrgSlug, "", "failed to create invite")
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
 		return
 	}
-	s.renderOrgAdmin(w, admin.OrgSlug, "/invite/"+token, "")
+	s.renderOrgAdmin(w, admin, admin.OrgSlug, "/invite/"+token, "")
 }
 
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {
@@ -1895,6 +1896,10 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1943,7 +1948,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	sortHomeProcessList(history, sortKey)
 
 	view := HomeView{
-		PageBase:        s.pageBase("home_body", workflowKey, cfg.Workflow.Name),
+		PageBase:        s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		LatestProcessID: latestID,
 		Sort:            sortKey,
 		Processes:       processes,
@@ -2161,7 +2166,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 	process = s.ensureProcessCompletionArtifacts(ctx, cfg, workflowKey, process)
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
-	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	view := ProcessPageView{PageBase: s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
 	actor := Actor{
 		UserID:      user.UserID,
 		OrgSlug:     user.OrgSlug,
@@ -2627,7 +2632,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboardForRoles(ctx, cfg, workflowKey, user.RoleSlugs)
 	view := DashboardView{
-		PageBase:        s.pageBase("dashboard_body", workflowKey, cfg.Workflow.Name),
+		PageBase:        s.pageBaseForUser(user, "dashboard_body", workflowKey, cfg.Workflow.Name),
 		UserID:          user.UserID,
 		RoleSlugs:       append([]string(nil), user.RoleSlugs...),
 		TodoActions:     todoActions,
@@ -3277,7 +3282,7 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
 	view := DepartmentDashboardView{
-		PageBase:        s.pageBase("dept_dashboard_body", workflowKey, cfg.Workflow.Name),
+		PageBase:        s.pageBaseForUser(user, "dept_dashboard_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser:     actor,
 		RoleLabel:       s.roleLabel(cfg, role),
 		TodoActions:     todoActions,
@@ -3320,7 +3325,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 	}
 	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
-		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
+		PageBase:    s.pageBaseForUser(user, "dept_process_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, role),
 		ProcessID:   process.ID.Hex(),
