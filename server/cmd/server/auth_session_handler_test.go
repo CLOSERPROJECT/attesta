@@ -1,9 +1,11 @@
 package main
 
 import (
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -143,5 +145,70 @@ func TestHandleLogoutClearsSession(t *testing.T) {
 	}
 	if _, err := store.LoadSessionByID(t.Context(), session.SessionID); err == nil {
 		t.Fatal("expected session to be deleted")
+	}
+}
+
+func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  tmpl,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	rec := httptest.NewRecorder()
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/users"`) {
+		t.Fatalf("expected login page without admin nav links, got %q", body)
+	}
+}
+
+func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
+	store := NewMemoryStore()
+	hash, err := bcrypt.GenerateFromPassword([]byte("valid-password-value"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "u-invalid-login",
+		Email:        "u-invalid-login@example.com",
+		PasswordHash: string(hash),
+		Status:       "active",
+		CreatedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{store: store, tmpl: tmpl}
+	form := url.Values{}
+	form.Set("email", "u-invalid-login@example.com")
+	form.Set("password", "wrong-password")
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if !strings.Contains(rec.Body.String(), "Invalid email or password.") {
+		t.Fatalf("expected invalid credentials message, got %q", rec.Body.String())
+	}
+}
+
+func TestHandleLoginMethodNotAllowed(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), tmpl: testTemplates()}
+	req := httptest.NewRequest(http.MethodPut, "/login", nil)
+	rec := httptest.NewRecorder()
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 }

@@ -113,8 +113,59 @@ func TestHandleBackofficeRedirectsToDashboardWhenAuthEnabled(t *testing.T) {
 	}
 }
 
+func TestHandleDashboardPartialRendersBodyOnly(t *testing.T) {
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 26, 17, 0, 0, 0, time.UTC)
+	user, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "u-dashboard-partial",
+		Email:     "dashboard-partial@example.com",
+		RoleSlugs: []string{"dep2"},
+		Status:    "active",
+		CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	session, err := store.CreateSession(t.Context(), Session{
+		SessionID:   "dash-session-partial",
+		UserID:      user.UserID,
+		UserMongoID: user.ID,
+		CreatedAt:   now,
+		LastLoginAt: now,
+		ExpiresAt:   now.Add(24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("CreateSession error: %v", err)
+	}
+
+	server := &Server{
+		store:       store,
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/partial", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	rec := httptest.NewRecorder()
+	server.handleDashboard(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "DASHBOARD_ME u-dashboard-partial") {
+		t.Fatalf("expected partial body marker, got %q", body)
+	}
+	if strings.Contains(body, "NAV Home Backoffice") {
+		t.Fatalf("did not expect layout nav in partial, got %q", body)
+	}
+}
+
 func TestHandleDashboardShowsOrgsLinkForPlatformAdmin(t *testing.T) {
-	body := renderDashboardForUser(t, AccountUser{
+	body := renderDashboardForUser(t, "/dashboard", AccountUser{
 		UserID:          "platform-admin-user",
 		Email:           "platform-admin@example.com",
 		IsPlatformAdmin: true,
@@ -130,7 +181,7 @@ func TestHandleDashboardShowsOrgsLinkForPlatformAdmin(t *testing.T) {
 }
 
 func TestHandleDashboardShowsMyOrgLinkForOrgAdmin(t *testing.T) {
-	body := renderDashboardForUser(t, AccountUser{
+	body := renderDashboardForUser(t, "/dashboard", AccountUser{
 		UserID:    "org-admin-user",
 		Email:     "org-admin@example.com",
 		RoleSlugs: []string{"org-admin"},
@@ -147,7 +198,7 @@ func TestHandleDashboardShowsMyOrgLinkForOrgAdmin(t *testing.T) {
 }
 
 func TestHandleDashboardHidesAdminLinksForNonAdminUser(t *testing.T) {
-	body := renderDashboardForUser(t, AccountUser{
+	body := renderDashboardForUser(t, "/dashboard", AccountUser{
 		UserID:    "non-admin-user",
 		Email:     "non-admin@example.com",
 		RoleSlugs: []string{"dep1"},
@@ -162,7 +213,36 @@ func TestHandleDashboardHidesAdminLinksForNonAdminUser(t *testing.T) {
 	}
 }
 
-func renderDashboardForUser(t *testing.T, user AccountUser) string {
+func TestHandleDashboardScopedShowsMyOrgLinkForOrgAdmin(t *testing.T) {
+	body := renderDashboardForUser(t, "/w/workflow/dashboard", AccountUser{
+		UserID:    "scoped-org-admin-user",
+		Email:     "scoped-org-admin@example.com",
+		RoleSlugs: []string{"org-admin"},
+		OrgSlug:   "nav-scoped-org",
+		Status:    "active",
+	})
+
+	if !strings.Contains(body, "NAV Home Backoffice MyOrg |") {
+		t.Fatalf("expected scoped my org nav marker, got %q", body)
+	}
+}
+
+func TestHandleDashboardShowsBothLinksWhenBothFlagsAreTrue(t *testing.T) {
+	body := renderDashboardForUser(t, "/dashboard", AccountUser{
+		UserID:          "dual-admin-user",
+		Email:           "dual-admin@example.com",
+		IsPlatformAdmin: true,
+		RoleSlugs:       []string{"org-admin"},
+		OrgSlug:         "dual-org",
+		Status:          "active",
+	})
+
+	if !strings.Contains(body, "NAV Home Backoffice Orgs MyOrg |") {
+		t.Fatalf("expected both nav markers in order, got %q", body)
+	}
+}
+
+func renderDashboardForUser(t *testing.T, path string, user AccountUser) string {
 	t.Helper()
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 26, 17, 0, 0, 0, time.UTC)
@@ -216,7 +296,13 @@ func renderDashboardForUser(t *testing.T, user AccountUser) string {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if strings.HasPrefix(path, "/w/workflow/") {
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+	}
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
 	rec := httptest.NewRecorder()
 	server.handleDashboard(rec, req)

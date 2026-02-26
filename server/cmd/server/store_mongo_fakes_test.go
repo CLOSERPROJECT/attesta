@@ -157,6 +157,70 @@ func (c *fakeCursor) Close(ctx context.Context) error {
 	return c.closeErr
 }
 
+type fakeAnyCursor struct {
+	items       []interface{}
+	decodeErrAt map[int]error
+	index       int
+	closed      bool
+	closeErr    error
+}
+
+func (c *fakeAnyCursor) Next(ctx context.Context) bool {
+	return c.index < len(c.items)
+}
+
+func (c *fakeAnyCursor) Decode(val interface{}) error {
+	if err, ok := c.decodeErrAt[c.index]; ok {
+		c.index++
+		return err
+	}
+	item := c.items[c.index]
+	c.index++
+	switch target := val.(type) {
+	case *Organization:
+		if v, ok := item.(Organization); ok {
+			*target = v
+			return nil
+		}
+	case *Role:
+		if v, ok := item.(Role); ok {
+			*target = v
+			return nil
+		}
+	case *AccountUser:
+		if v, ok := item.(AccountUser); ok {
+			*target = v
+			return nil
+		}
+	case *Session:
+		if v, ok := item.(Session); ok {
+			*target = v
+			return nil
+		}
+	case *Invite:
+		if v, ok := item.(Invite); ok {
+			*target = v
+			return nil
+		}
+	case *PasswordReset:
+		if v, ok := item.(PasswordReset); ok {
+			*target = v
+			return nil
+		}
+	case *Process:
+		if v, ok := item.(Process); ok {
+			*target = v
+			return nil
+		}
+	}
+	return errors.New("unsupported decode target")
+}
+
+func (c *fakeAnyCursor) Close(ctx context.Context) error {
+	c.closed = true
+	return c.closeErr
+}
+
 type fakeGridFSBucket struct {
 	uploadFn      func(id interface{}, filename string, source io.Reader, opts ...*options.UploadOptions) error
 	openFn        func(fileID interface{}) (io.ReadCloser, error)

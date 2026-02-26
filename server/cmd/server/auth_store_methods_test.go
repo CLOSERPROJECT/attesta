@@ -207,3 +207,334 @@ func TestMongoStoreAuthFilterShapes(t *testing.T) {
 		t.Fatalf("reset filter = %#v, want %#v", collection.findOneFilters[1], wantResetFilter)
 	}
 }
+
+func TestMongoStoreAuthMethodsCovered(t *testing.T) {
+	now := time.Date(2026, 2, 26, 18, 0, 0, 0, time.UTC)
+	orgID := primitive.NewObjectID()
+	roleID := primitive.NewObjectID()
+	userID := primitive.NewObjectID()
+	inviteID := primitive.NewObjectID()
+	sessionID := primitive.NewObjectID()
+	resetID := primitive.NewObjectID()
+
+	orgCollection := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return &mongo.InsertOneResult{InsertedID: orgID}, nil
+		},
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Organization)) = Organization{ID: orgID, Name: "Acme Org", Slug: "acme-org"}
+				return nil
+			}}
+		},
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{
+				Organization{ID: orgID, Name: "Acme Org", Slug: "acme-org"},
+			}}, nil
+		},
+	}
+	roleCollection := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return &mongo.InsertOneResult{InsertedID: roleID}, nil
+		},
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Role)) = Role{ID: roleID, OrgSlug: "acme-org", Slug: "org-admin", Name: "Org Admin"}
+				return nil
+			}}
+		},
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{
+				Role{ID: roleID, OrgSlug: "acme-org", Slug: "org-admin", Name: "Org Admin"},
+			}}, nil
+		},
+	}
+	userCollection := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return &mongo.InsertOneResult{InsertedID: userID}, nil
+		},
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*AccountUser)) = AccountUser{ID: userID, UserID: "u-1", Email: "admin@acme.org"}
+				return nil
+			}}
+		},
+	}
+	inviteCollection := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return &mongo.InsertOneResult{InsertedID: inviteID}, nil
+		},
+	}
+	sessionCollection := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return &mongo.InsertOneResult{InsertedID: sessionID}, nil
+		},
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Session)) = Session{ID: sessionID, SessionID: "session-1", UserID: "u-1"}
+				return nil
+			}}
+		},
+	}
+	resetCollection := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return &mongo.InsertOneResult{InsertedID: resetID}, nil
+		},
+	}
+
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionOrganizations: orgCollection,
+		collectionRoles:         roleCollection,
+		collectionUsers:         userCollection,
+		collectionInvites:       inviteCollection,
+		collectionSessions:      sessionCollection,
+		collectionPasswordReset: resetCollection,
+	}}
+	store := &MongoStore{dbPort: db}
+
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil || org.ID != orgID {
+		t.Fatalf("CreateOrganization result error=%v org=%+v", err, org)
+	}
+	if _, err := store.GetOrganizationBySlug(t.Context(), "acme-org"); err != nil {
+		t.Fatalf("GetOrganizationBySlug error: %v", err)
+	}
+	if _, err := store.ListOrganizations(t.Context()); err != nil {
+		t.Fatalf("ListOrganizations error: %v", err)
+	}
+
+	role, err := store.CreateRole(t.Context(), Role{OrgID: orgID, OrgSlug: "acme-org", Name: "Org Admin", CreatedAt: now})
+	if err != nil || role.ID != roleID {
+		t.Fatalf("CreateRole result error=%v role=%+v", err, role)
+	}
+	if _, err := store.GetRoleBySlug(t.Context(), "acme-org", "org-admin"); err != nil {
+		t.Fatalf("GetRoleBySlug error: %v", err)
+	}
+	if _, err := store.ListRolesByOrg(t.Context(), "acme-org"); err != nil {
+		t.Fatalf("ListRolesByOrg error: %v", err)
+	}
+
+	user, err := store.CreateUser(t.Context(), AccountUser{UserID: "u-1", Email: "Admin@Acme.Org", CreatedAt: now})
+	if err != nil || user.ID != userID {
+		t.Fatalf("CreateUser result error=%v user=%+v", err, user)
+	}
+	if _, err := store.GetUserByEmail(t.Context(), "admin@acme.org"); err != nil {
+		t.Fatalf("GetUserByEmail error: %v", err)
+	}
+	if _, err := store.GetUserByUserID(t.Context(), "u-1"); err != nil {
+		t.Fatalf("GetUserByUserID error: %v", err)
+	}
+	if err := store.SetUserPasswordHash(t.Context(), "u-1", "hash-1"); err != nil {
+		t.Fatalf("SetUserPasswordHash error: %v", err)
+	}
+	if err := store.SetUserLastLogin(t.Context(), "u-1", now); err != nil {
+		t.Fatalf("SetUserLastLogin error: %v", err)
+	}
+
+	invite, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:     orgID,
+		Email:     "invitee@acme.org",
+		UserID:    "u-2",
+		RoleSlugs: []string{"org-admin"},
+		TokenHash: "invite-token",
+		ExpiresAt: now.Add(24 * time.Hour),
+		CreatedAt: now,
+	})
+	if err != nil || invite.ID != inviteID {
+		t.Fatalf("CreateInvite result error=%v invite=%+v", err, invite)
+	}
+	if err := store.MarkInviteUsed(t.Context(), "invite-token", now); err != nil {
+		t.Fatalf("MarkInviteUsed error: %v", err)
+	}
+
+	session, err := store.CreateSession(t.Context(), Session{
+		SessionID:   "session-1",
+		UserID:      "u-1",
+		UserMongoID: userID,
+		CreatedAt:   now,
+		LastLoginAt: now,
+		ExpiresAt:   now.Add(30 * 24 * time.Hour),
+	})
+	if err != nil || session.ID != sessionID {
+		t.Fatalf("CreateSession result error=%v session=%+v", err, session)
+	}
+	if _, err := store.LoadSessionByID(t.Context(), "session-1"); err != nil {
+		t.Fatalf("LoadSessionByID error: %v", err)
+	}
+	if err := store.DeleteSession(t.Context(), "session-1"); err != nil {
+		t.Fatalf("DeleteSession error: %v", err)
+	}
+
+	reset, err := store.CreatePasswordReset(t.Context(), PasswordReset{
+		Email:     "admin@acme.org",
+		UserID:    "u-1",
+		TokenHash: "reset-token",
+		ExpiresAt: now.Add(24 * time.Hour),
+		CreatedAt: now,
+	})
+	if err != nil || reset.ID != resetID {
+		t.Fatalf("CreatePasswordReset result error=%v reset=%+v", err, reset)
+	}
+	if err := store.MarkPasswordResetUsed(t.Context(), "reset-token", now); err != nil {
+		t.Fatalf("MarkPasswordResetUsed error: %v", err)
+	}
+}
+
+func TestMongoStoreAuthMethodsErrors(t *testing.T) {
+	t.Run("create organization insert error", func(t *testing.T) {
+		orgCollection := &fakeMongoCollection{
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, errors.New("insert organization failed")
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionOrganizations: orgCollection,
+		}}}
+		if _, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme"}); err == nil {
+			t.Fatal("expected CreateOrganization error")
+		}
+	})
+
+	t.Run("list and get organizations errors", func(t *testing.T) {
+		orgCollection := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: errors.New("find one org failed")}
+			},
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return nil, errors.New("find orgs failed")
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionOrganizations: orgCollection,
+		}}}
+		if _, err := store.GetOrganizationBySlug(t.Context(), "acme"); err == nil {
+			t.Fatal("expected GetOrganizationBySlug error")
+		}
+		if _, err := store.ListOrganizations(t.Context()); err == nil {
+			t.Fatal("expected ListOrganizations error")
+		}
+	})
+
+	t.Run("role methods errors", func(t *testing.T) {
+		roleCollection := &fakeMongoCollection{
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, errors.New("insert role failed")
+			},
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: errors.New("find role failed")}
+			},
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return nil, errors.New("find roles failed")
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionRoles: roleCollection,
+		}}}
+		if _, err := store.CreateRole(t.Context(), Role{OrgSlug: "acme", Name: "Role"}); err == nil {
+			t.Fatal("expected CreateRole error")
+		}
+		if _, err := store.GetRoleBySlug(t.Context(), "acme", "role"); err == nil {
+			t.Fatal("expected GetRoleBySlug error")
+		}
+		if _, err := store.ListRolesByOrg(t.Context(), "acme"); err == nil {
+			t.Fatal("expected ListRolesByOrg error")
+		}
+	})
+
+	t.Run("user methods errors", func(t *testing.T) {
+		userCollection := &fakeMongoCollection{
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, errors.New("insert user failed")
+			},
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: errors.New("find user failed")}
+			},
+			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+				return nil, errors.New("update user failed")
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionUsers: userCollection,
+		}}}
+		if _, err := store.CreateUser(t.Context(), AccountUser{UserID: "u1", Email: "u1@example.com"}); err == nil {
+			t.Fatal("expected CreateUser error")
+		}
+		if _, err := store.GetUserByEmail(t.Context(), "u1@example.com"); err == nil {
+			t.Fatal("expected GetUserByEmail error")
+		}
+		if _, err := store.GetUserByUserID(t.Context(), "u1"); err == nil {
+			t.Fatal("expected GetUserByUserID error")
+		}
+		if err := store.SetUserPasswordHash(t.Context(), "u1", "hash"); err == nil {
+			t.Fatal("expected SetUserPasswordHash error")
+		}
+	})
+
+	t.Run("invite session reset errors", func(t *testing.T) {
+		inviteCollection := &fakeMongoCollection{
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, errors.New("insert invite failed")
+			},
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: errors.New("find invite failed")}
+			},
+			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+				return nil, errors.New("update invite failed")
+			},
+		}
+		sessionCollection := &fakeMongoCollection{
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, errors.New("insert session failed")
+			},
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: errors.New("find session failed")}
+			},
+			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+				return nil, errors.New("delete session failed")
+			},
+		}
+		resetCollection := &fakeMongoCollection{
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, errors.New("insert reset failed")
+			},
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: errors.New("find reset failed")}
+			},
+			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+				return nil, errors.New("mark reset failed")
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionInvites:       inviteCollection,
+			collectionSessions:      sessionCollection,
+			collectionPasswordReset: resetCollection,
+		}}}
+		if _, err := store.CreateInvite(t.Context(), Invite{Email: "x@example.com", TokenHash: "token"}); err == nil {
+			t.Fatal("expected CreateInvite error")
+		}
+		if _, err := store.LoadInviteByTokenHash(t.Context(), "token"); err == nil {
+			t.Fatal("expected LoadInviteByTokenHash error")
+		}
+		if err := store.MarkInviteUsed(t.Context(), "token", time.Now().UTC()); err == nil {
+			t.Fatal("expected MarkInviteUsed error")
+		}
+		if _, err := store.CreateSession(t.Context(), Session{SessionID: "s1"}); err == nil {
+			t.Fatal("expected CreateSession error")
+		}
+		if _, err := store.LoadSessionByID(t.Context(), "s1"); err == nil {
+			t.Fatal("expected LoadSessionByID error")
+		}
+		if err := store.DeleteSession(t.Context(), "s1"); err == nil {
+			t.Fatal("expected DeleteSession error")
+		}
+		if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{Email: "x@example.com", TokenHash: "reset"}); err == nil {
+			t.Fatal("expected CreatePasswordReset error")
+		}
+		if _, err := store.LoadPasswordResetByTokenHash(t.Context(), "reset"); err == nil {
+			t.Fatal("expected LoadPasswordResetByTokenHash error")
+		}
+		if err := store.MarkPasswordResetUsed(t.Context(), "reset", time.Now().UTC()); err == nil {
+			t.Fatal("expected MarkPasswordResetUsed error")
+		}
+	})
+}
