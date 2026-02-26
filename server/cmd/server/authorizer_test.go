@@ -43,11 +43,11 @@ func TestCerbosAuthorizerCanCompleteBuildsRequestAndMapsAllow(t *testing.T) {
 	fixed := time.Unix(1700000000, 123)
 	authorizer := NewCerbosAuthorizer(pdp.URL+"/", pdp.Client(), func() time.Time { return fixed })
 
-	allowed, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+	allowed, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1", "dep2"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 		SubstepID: "1.1",
 		Order:     2,
-		Role:      "dep1",
-	}, 1, true)
+		Roles:     []string{"dep1"},
+	}, 1, "org1", true)
 	if err != nil {
 		t.Fatalf("CanComplete returned error: %v", err)
 	}
@@ -73,20 +73,34 @@ func TestCerbosAuthorizerCanCompleteBuildsRequestAndMapsAllow(t *testing.T) {
 		t.Fatalf("principal.id = %#v, want u1", principal["id"])
 	}
 	roles := principal["roles"].([]interface{})
-	if len(roles) != 1 || roles[0] != "dep1" {
-		t.Fatalf("principal.roles = %#v, want [dep1]", roles)
+	if len(roles) != 1 || roles[0] != "authenticated" {
+		t.Fatalf("principal.roles = %#v, want [authenticated]", roles)
 	}
 	principalAttr := principal["attr"].(map[string]interface{})
+	if principalAttr["orgSlug"] != "org1" {
+		t.Fatalf("principal.attr.orgSlug = %#v, want org1", principalAttr["orgSlug"])
+	}
+	if principalAttr["activeRole"] != "dep1" {
+		t.Fatalf("principal.attr.activeRole = %#v, want dep1", principalAttr["activeRole"])
+	}
 	if principalAttr["workflowKey"] != "wf-a" {
 		t.Fatalf("principal.attr.workflowKey = %#v, want wf-a", principalAttr["workflowKey"])
+	}
+	roleSlugs := principalAttr["roleSlugs"].([]interface{})
+	if len(roleSlugs) != 2 || roleSlugs[0] != "dep1" || roleSlugs[1] != "dep2" {
+		t.Fatalf("principal.attr.roleSlugs = %#v, want [dep1 dep2]", roleSlugs)
 	}
 
 	resource := captured["resource"].(map[string]interface{})
 	instances := resource["instances"].(map[string]interface{})
 	sub := instances["1.1"].(map[string]interface{})
 	attr := sub["attr"].(map[string]interface{})
-	if attr["roleRequired"] != "dep1" {
-		t.Fatalf("roleRequired = %#v, want dep1", attr["roleRequired"])
+	if attr["orgSlug"] != "org1" {
+		t.Fatalf("orgSlug = %#v, want org1", attr["orgSlug"])
+	}
+	rolesAllowed := attr["rolesAllowed"].([]interface{})
+	if len(rolesAllowed) != 1 || rolesAllowed[0] != "dep1" {
+		t.Fatalf("rolesAllowed = %#v, want [dep1]", rolesAllowed)
 	}
 	if attr["processId"] != "proc-1" || attr["substepId"] != "1.1" {
 		t.Fatalf("process/substep attrs = %#v", attr)
@@ -131,11 +145,11 @@ func TestCerbosAuthorizerCanCompleteMapsDenyAndUnknownToFalse(t *testing.T) {
 			authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), func() time.Time {
 				return time.Unix(1700000000, 0)
 			})
-			allowed, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+			allowed, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 				SubstepID: "1.1",
 				Order:     1,
-				Role:      "dep1",
-			}, 1, true)
+				Roles:     []string{"dep1"},
+			}, 1, "org1", true)
 			if err != nil {
 				t.Fatalf("CanComplete returned error: %v", err)
 			}
@@ -153,11 +167,11 @@ func TestCerbosAuthorizerCanCompleteReturnsErrorForBadStatusAndBadJSON(t *testin
 	defer badStatus.Close()
 
 	authorizer := NewCerbosAuthorizer(badStatus.URL, badStatus.Client(), time.Now)
-	_, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+	_, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 		SubstepID: "1.1",
 		Order:     1,
-		Role:      "dep1",
-	}, 1, true)
+		Roles:     []string{"dep1"},
+	}, 1, "org1", true)
 	if err == nil {
 		t.Fatal("expected error for non-200 cerbos status")
 	}
@@ -168,11 +182,11 @@ func TestCerbosAuthorizerCanCompleteReturnsErrorForBadStatusAndBadJSON(t *testin
 	defer badJSON.Close()
 
 	authorizer = NewCerbosAuthorizer(badJSON.URL, badJSON.Client(), time.Now)
-	_, err = authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+	_, err = authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 		SubstepID: "1.1",
 		Order:     1,
-		Role:      "dep1",
-	}, 1, true)
+		Roles:     []string{"dep1"},
+	}, 1, "org1", true)
 	if err == nil {
 		t.Fatal("expected JSON decode error")
 	}

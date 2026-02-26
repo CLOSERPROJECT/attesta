@@ -15,7 +15,7 @@ import (
 func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, fixedNow := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(Actor, string, string, WorkflowSub, int, bool) (bool, error) {
+		decide: func(Actor, string, string, WorkflowSub, int, string, bool) (bool, error) {
 			return true, nil
 		},
 	})
@@ -56,7 +56,7 @@ func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(Actor, string, string, WorkflowSub, int, bool) (bool, error) {
+		decide: func(Actor, string, string, WorkflowSub, int, string, bool) (bool, error) {
 			return false, nil
 		},
 	})
@@ -77,7 +77,7 @@ func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(Actor, string, string, WorkflowSub, int, bool) (bool, error) {
+		decide: func(Actor, string, string, WorkflowSub, int, string, bool) (bool, error) {
 			return false, errors.New("cerbos down")
 		},
 	})
@@ -98,7 +98,7 @@ func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 func TestHandleCompleteSubstepAuthorizerDeniesWorkflowCookieMismatch(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
-		decide: func(actor Actor, _ string, workflowKey string, _ WorkflowSub, _ int, _ bool) (bool, error) {
+		decide: func(actor Actor, _ string, workflowKey string, _ WorkflowSub, _ int, _ string, _ bool) (bool, error) {
 			return actor.WorkflowKey == workflowKey, nil
 		},
 	})
@@ -150,12 +150,12 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 }
 
 type fakeAuthorizer struct {
-	decide func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error)
+	decide func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
 }
 
-func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
+func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
 	if f.decide == nil {
 		return true, nil
 	}
-	return f.decide(actor, processID, workflowKey, sub, stepOrder, sequenceOK)
+	return f.decide(actor, processID, workflowKey, sub, stepOrder, stepOrgSlug, sequenceOK)
 }

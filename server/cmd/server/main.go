@@ -85,9 +85,11 @@ type ProcessStep struct {
 }
 
 type Actor struct {
-	UserID      string `bson:"userId"`
-	Role        string `bson:"role"`
-	WorkflowKey string `bson:"workflowKey,omitempty"`
+	UserID      string   `bson:"userId"`
+	Role        string   `bson:"role"`
+	OrgSlug     string   `bson:"orgSlug,omitempty"`
+	RoleSlugs   []string `bson:"roleSlugs,omitempty"`
+	WorkflowKey string   `bson:"workflowKey,omitempty"`
 }
 
 type Notarization struct {
@@ -2315,6 +2317,8 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	actor := Actor{
 		UserID:      user.UserID,
+		OrgSlug:     user.OrgSlug,
+		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
 		WorkflowKey: workflowKey,
 	}
 	if len(user.RoleSlugs) > 0 {
@@ -2356,7 +2360,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
 	}
-	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, sequenceOK)
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, step.OrganizationSlug, sequenceOK)
 	if err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return

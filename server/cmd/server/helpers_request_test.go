@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -27,7 +28,7 @@ func TestReadActor(t *testing.T) {
 			if tc.cookie != nil {
 				req.AddCookie(tc.cookie)
 			}
-			if got := readActor(req, "workflow"); got != tc.want {
+			if got := readActor(req, "workflow"); !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("readActor() = %#v, want %#v", got, tc.want)
 			}
 		})
