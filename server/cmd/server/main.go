@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -384,6 +385,13 @@ type HomeView struct {
 	History         []ProcessListItem
 }
 
+type LoginView struct {
+	PageBase
+	Next  string
+	Email string
+	Error string
+}
+
 type ProcessPageView struct {
 	PageBase
 	ProcessID   string
@@ -487,13 +495,14 @@ func main() {
 	mux.HandleFunc("/docs", server.handleDocs)
 	mux.HandleFunc("/docs/", server.handleDocs)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
+	mux.HandleFunc("/login", server.handleLogin)
+	mux.HandleFunc("/logout", server.handleLogout)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
 	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
 	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
 	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
-	mux.HandleFunc("/impersonate", server.handleLegacyImpersonate)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -535,6 +544,97 @@ func intEnvOr(key string, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+func sessionTTLDays() int {
+	days := intEnvOr("SESSION_TTL_DAYS", 30)
+	if days <= 0 {
+		return 30
+	}
+	return days
+}
+
+func safeNextPath(r *http.Request, fallback string) string {
+	next := strings.TrimSpace(r.URL.Query().Get("next"))
+	if r.Method == http.MethodPost {
+		_ = r.ParseForm()
+		if formNext := strings.TrimSpace(r.FormValue("next")); formNext != "" {
+			next = formNext
+		}
+	}
+	if next == "" || !strings.HasPrefix(next, "/") {
+		return fallback
+	}
+	return next
+}
+
+func shouldSecureCookie(r *http.Request) bool {
+	if boolEnvOr("COOKIE_SECURE", false) {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+		return true
+	}
+	return r.TLS != nil
+}
+
+func newSessionID() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func (s *Server) readSession(r *http.Request) (*Session, error) {
+	cookie, err := r.Cookie("attesta_session")
+	if err != nil {
+		return nil, err
+	}
+	sessionID := strings.TrimSpace(cookie.Value)
+	if sessionID == "" {
+		return nil, mongo.ErrNoDocuments
+	}
+	session, err := s.store.LoadSessionByID(r.Context(), sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session.ExpiresAt.Before(s.nowUTC()) {
+		_ = s.store.DeleteSession(r.Context(), sessionID)
+		return nil, mongo.ErrNoDocuments
+	}
+	return session, nil
+}
+
+func (s *Server) currentUser(r *http.Request) (*AccountUser, *Session, error) {
+	session, err := s.readSession(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	user, err := s.store.GetUserByUserID(r.Context(), session.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return user, session, nil
+}
+
+func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+	user, session, err := s.currentUser(r)
+	if err == nil {
+		return user, session, true
+	}
+	target := "/login?next=" + url.QueryEscape(r.URL.RequestURI())
+	http.Redirect(w, r, target, http.StatusSeeOther)
+	return nil, nil, false
+}
+
+func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+	user, session, err := s.currentUser(r)
+	if err == nil {
+		return user, session, true
+	}
+	http.Error(w, "unauthorized", http.StatusUnauthorized)
+	return nil, nil, false
 }
 
 func bootstrapPlatformAdmin(ctx context.Context, store Store, now func() time.Time) error {
@@ -780,6 +880,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	options, err := s.workflowOptions(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -865,6 +968,112 @@ func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filena
 	http.ServeFile(w, r, foundPath)
 }
 
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		view := LoginView{
+			PageBase: s.pageBase("login_body", "", ""),
+			Next:     safeNextPath(r, "/"),
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "login.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		password := strings.TrimSpace(r.FormValue("password"))
+		next := safeNextPath(r, "/")
+
+		user, err := s.store.GetUserByEmail(r.Context(), email)
+		if err != nil || user == nil {
+			view := LoginView{
+				PageBase: s.pageBase("login_body", "", ""),
+				Email:    email,
+				Next:     next,
+				Error:    "Invalid email or password.",
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+			view := LoginView{
+				PageBase: s.pageBase("login_body", "", ""),
+				Email:    email,
+				Next:     next,
+				Error:    "Invalid email or password.",
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+			return
+		}
+
+		now := s.nowUTC()
+		if err := s.store.SetUserLastLogin(r.Context(), user.UserID, now); err != nil {
+			http.Error(w, "login failed", http.StatusInternalServerError)
+			return
+		}
+		sessionID, err := newSessionID()
+		if err != nil {
+			http.Error(w, "login failed", http.StatusInternalServerError)
+			return
+		}
+		expiresAt := now.Add(time.Duration(sessionTTLDays()) * 24 * time.Hour)
+		session := Session{
+			SessionID:   sessionID,
+			UserID:      user.UserID,
+			UserMongoID: user.ID,
+			OrgID:       user.OrgID,
+			CreatedAt:   now,
+			LastLoginAt: now,
+			ExpiresAt:   expiresAt,
+		}
+		if _, err := s.store.CreateSession(r.Context(), session); err != nil {
+			http.Error(w, "login failed", http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "attesta_session",
+			Value:    sessionID,
+			Path:     "/",
+			Expires:  expiresAt,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   shouldSecureCookie(r),
+		})
+		http.Redirect(w, r, next, http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if cookie, err := r.Cookie("attesta_session"); err == nil && strings.TrimSpace(cookie.Value) != "" {
+		_ = s.store.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "attesta_session",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   shouldSecureCookie(r),
+	})
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {
 	clone := r.Clone(r.Context())
 	if clone.URL != nil {
@@ -877,6 +1086,9 @@ func cloneRequestWithPath(r *http.Request, path string) *http.Request {
 }
 
 func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/w/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
@@ -907,9 +1119,6 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	case rest == "/backoffice" || strings.HasPrefix(rest, "/backoffice/"):
 		s.handleBackoffice(w, cloneRequestWithPath(scopedReq, rest))
-		return
-	case rest == "/impersonate":
-		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
 		return
 	case rest == "/events":
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
@@ -1072,6 +1281,9 @@ func (s *Server) handleLegacyStartProcess(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleLegacyProcessRoutes(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	processID, parts, ok := legacyProcessPath(r.URL.Path)
 	if !ok {
 		http.NotFound(w, r)
@@ -1093,6 +1305,9 @@ func (s *Server) handleLegacyProcessRoutes(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleLegacyBackoffice(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/backoffice"), "/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 3 && parts[1] == "process" && r.Method == http.MethodGet {
@@ -1644,14 +1859,21 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
+	user, _, ok := s.requireAuthenticatedPost(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.UserID == "" {
-		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
+	actor := Actor{
+		UserID:      user.UserID,
+		WorkflowKey: workflowKey,
+	}
+	if len(user.RoleSlugs) > 0 {
+		actor.Role = user.RoleSlugs[0]
 	}
 	if actor.WorkflowKey != "" && actor.WorkflowKey != workflowKey {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", nil, actor)
@@ -2168,6 +2390,9 @@ func sanitizeAttachmentFilename(filename string) string {
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPost(w, r); !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2222,21 +2447,20 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role, workflowKey)
-		cookie := &http.Cookie{
-			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
+	if !containsRole(user.RoleSlugs, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
+	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
 
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
@@ -2254,21 +2478,20 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request, role, processID string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role, workflowKey)
-		cookie := &http.Cookie{
-			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
+	if !containsRole(user.RoleSlugs, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
+	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
 
 	ctx := r.Context()
 	process, err := s.loadProcess(ctx, processID)
@@ -2294,15 +2517,20 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 }
 
 func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http.Request, role string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role, workflowKey)
+	if !containsRole(user.RoleSlugs, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
+	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
 
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
@@ -2601,6 +2829,16 @@ func readActor(r *http.Request, routeWorkflowKey string) Actor {
 		actor.WorkflowKey = strings.TrimSpace(routeWorkflowKey)
 	}
 	return actor
+}
+
+func containsRole(roles []string, role string) bool {
+	target := strings.TrimSpace(role)
+	for _, item := range roles {
+		if strings.TrimSpace(item) == target {
+			return true
+		}
+	}
+	return false
 }
 
 func sortedSteps(def WorkflowDef) []WorkflowStep {
