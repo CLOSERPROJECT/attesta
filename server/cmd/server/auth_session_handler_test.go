@@ -14,8 +14,9 @@ import (
 
 func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  testTemplates(),
+		store:       NewMemoryStore(),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -33,8 +34,9 @@ func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 
 func TestHandleCompleteSubstepUnauthenticatedReturnsUnauthorized(t *testing.T) {
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  testTemplates(),
+		store:       NewMemoryStore(),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
 	}
 	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/abc/substep/1.1/complete", strings.NewReader("value=1"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

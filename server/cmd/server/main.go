@@ -125,6 +125,7 @@ type Server struct {
 	catalogModTime map[string]time.Time
 	catalog        map[string]RuntimeConfig
 	viteDevServer  string
+	enforceAuth    bool
 }
 
 type SSEHub struct {
@@ -507,6 +508,7 @@ func main() {
 		workflowDefID: primitive.NewObjectID(),
 		configDir:     configDir,
 		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+		enforceAuth:   true,
 	}
 	if err := bootstrapPlatformAdmin(ctx, server.store, server.now); err != nil {
 		log.Fatal(err)
@@ -528,6 +530,7 @@ func main() {
 	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
 	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
 	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
+	mux.HandleFunc("/impersonate", server.handleLegacyImpersonate)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -644,6 +647,13 @@ func (s *Server) currentUser(r *http.Request) (*AccountUser, *Session, error) {
 }
 
 func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+	if !s.enforceAuth {
+		legacy := readActor(r, "")
+		if legacy.UserID != "" {
+			return &AccountUser{UserID: legacy.UserID, RoleSlugs: []string{legacy.Role}}, nil, true
+		}
+		return &AccountUser{}, nil, true
+	}
 	user, session, err := s.currentUser(r)
 	if err == nil {
 		return user, session, true
@@ -654,6 +664,13 @@ func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+	if !s.enforceAuth {
+		legacy := readActor(r, "")
+		if legacy.UserID != "" {
+			return &AccountUser{UserID: legacy.UserID, RoleSlugs: []string{legacy.Role}}, nil, true
+		}
+		return &AccountUser{}, nil, true
+	}
 	user, session, err := s.currentUser(r)
 	if err == nil {
 		return user, session, true
@@ -1416,6 +1433,9 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/backoffice" || strings.HasPrefix(rest, "/backoffice/"):
 		s.handleBackoffice(w, cloneRequestWithPath(scopedReq, rest))
 		return
+	case rest == "/impersonate":
+		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
+		return
 	case rest == "/events":
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -2155,7 +2175,7 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, session, ok := s.requireAuthenticatedPost(w, r)
 	if !ok {
 		return
 	}
@@ -2170,6 +2190,15 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	if len(user.RoleSlugs) > 0 {
 		actor.Role = user.RoleSlugs[0]
+	}
+	if session == nil {
+		legacy := readActor(r, workflowKey)
+		if legacy.UserID != "" {
+			actor = legacy
+		}
+	}
+	if actor.UserID == "" {
+		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
 	}
 	if actor.WorkflowKey != "" && actor.WorkflowKey != workflowKey {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", nil, actor)
@@ -2752,11 +2781,21 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !containsRole(user.RoleSlugs, role) {
+	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
+	if !s.enforceAuth {
+		if strings.TrimSpace(actor.UserID) == "" {
+			actor = s.actorForRole(cfg, role, workflowKey)
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:  "demo_user",
+			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
+			Path:  "/",
+		})
+	}
 
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
@@ -2783,11 +2822,21 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !containsRole(user.RoleSlugs, role) {
+	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
+	if !s.enforceAuth {
+		if strings.TrimSpace(actor.UserID) == "" {
+			actor = s.actorForRole(cfg, role, workflowKey)
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:  "demo_user",
+			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
+			Path:  "/",
+		})
+	}
 
 	ctx := r.Context()
 	process, err := s.loadProcess(ctx, processID)
@@ -2822,7 +2871,7 @@ func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !containsRole(user.RoleSlugs, role) {
+	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
