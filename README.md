@@ -103,6 +103,14 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 5. Ensure workflow YAML org/role slugs match Mongo entities.
 6. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
 
+## Org admin edge cases
+- `Delete account` is a soft delete: the backend sets `status=deleted`, clears `passwordHash`, and clears `roleSlugs`.
+- Invite status is derived from invite timestamps:
+  - `accepted` when `usedAt` is present
+  - `expired` when `usedAt` is empty and `expiresAt` is in the past
+  - `pending` otherwise
+- Inviting an email that already belongs to another organization is rejected.
+
 ## DPP Digital Link configuration
 Configure GS1 Digital Link generation per workflow YAML (`server/config/*.yaml`):
 
