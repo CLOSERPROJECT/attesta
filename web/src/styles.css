@@ -746,6 +746,40 @@ button.secondary {
   color: var(--ink);
 }
 
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 42px; /* space for icon */
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+
+/* Icon sizing */
+.toggle-password svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Hide the second icon by default */
+.icon-eye-off {
+  display: none;
+}
+
 .input-form input[type="color"] {
   appearance: none;
   -webkit-appearance: none;
