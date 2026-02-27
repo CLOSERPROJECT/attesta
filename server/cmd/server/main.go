@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -27,6 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,17 +40,19 @@ type WorkflowDef struct {
 }
 
 type WorkflowStep struct {
-	StepID  string        `bson:"stepId" yaml:"id"`
-	Title   string        `bson:"title" yaml:"title"`
-	Order   int           `bson:"order" yaml:"order"`
-	Substep []WorkflowSub `bson:"substeps" yaml:"substeps"`
+	StepID           string        `bson:"stepId" yaml:"id"`
+	Title            string        `bson:"title" yaml:"title"`
+	Order            int           `bson:"order" yaml:"order"`
+	OrganizationSlug string        `bson:"organization,omitempty" yaml:"organization"`
+	Substep          []WorkflowSub `bson:"substeps" yaml:"substeps"`
 }
 
 type WorkflowSub struct {
 	SubstepID string                 `bson:"substepId" yaml:"id"`
 	Title     string                 `bson:"title" yaml:"title"`
 	Order     int                    `bson:"order" yaml:"order"`
-	Role      string                 `bson:"role" yaml:"role"`
+	Role      string                 `bson:"role,omitempty" yaml:"role,omitempty"`
+	Roles     []string               `bson:"roles,omitempty" yaml:"roles,omitempty"`
 	InputKey  string                 `bson:"inputKey" yaml:"inputKey"`
 	InputType string                 `bson:"inputType" yaml:"inputType"`
 	Schema    map[string]interface{} `bson:"schema,omitempty" yaml:"schema,omitempty"`
@@ -81,9 +85,11 @@ type ProcessStep struct {
 }
 
 type Actor struct {
-	UserID      string `bson:"userId"`
-	Role        string `bson:"role"`
-	WorkflowKey string `bson:"workflowKey,omitempty"`
+	UserID      string   `bson:"userId"`
+	Role        string   `bson:"role"`
+	OrgSlug     string   `bson:"orgSlug,omitempty"`
+	RoleSlugs   []string `bson:"roleSlugs,omitempty"`
+	WorkflowKey string   `bson:"workflowKey,omitempty"`
 }
 
 type Notarization struct {
@@ -123,6 +129,7 @@ type Server struct {
 	catalogModTime map[string]time.Time
 	catalog        map[string]RuntimeConfig
 	viteDevServer  string
+	enforceAuth    bool
 }
 
 type SSEHub struct {
@@ -134,6 +141,7 @@ type TimelineSubstep struct {
 	SubstepID    string
 	Title        string
 	Role         string
+	RoleBadges   []TimelineRoleBadge
 	RoleLabel    string
 	RoleColor    string
 	RoleBorder   string
@@ -145,6 +153,13 @@ type TimelineSubstep struct {
 	FileName     string
 	FileSHA256   string
 	FileURL      string
+}
+
+type TimelineRoleBadge struct {
+	ID     string
+	Label  string
+	Color  string
+	Border string
 }
 
 type TimelineStep struct {
@@ -200,25 +215,35 @@ type NotarizedProcessExport struct {
 }
 
 type ActionView struct {
-	ProcessID    string
-	SubstepID    string
-	Title        string
-	Role         string
-	RoleLabel    string
-	RoleColor    string
-	RoleBorder   string
-	InputKey     string
-	InputType    string
-	FormSchema   string
-	FormUISchema string
-	Status       string
-	DoneAt       string
-	DoneBy       string
-	DoneRole     string
-	Values       []ActionKV
-	Attachments  []ActionAttachmentView
-	Disabled     bool
-	Reason       string
+	ProcessID     string
+	SubstepID     string
+	Title         string
+	Role          string
+	AllowedRoles  []string
+	RoleBadges    []ActionRoleBadge
+	MatchingRoles []string
+	RoleLabel     string
+	RoleColor     string
+	RoleBorder    string
+	InputKey      string
+	InputType     string
+	FormSchema    string
+	FormUISchema  string
+	Status        string
+	DoneAt        string
+	DoneBy        string
+	DoneRole      string
+	Values        []ActionKV
+	Attachments   []ActionAttachmentView
+	Disabled      bool
+	Reason        string
+}
+
+type ActionRoleBadge struct {
+	ID     string
+	Label  string
+	Color  string
+	Border string
 }
 
 type ActionKV struct {
@@ -236,6 +261,7 @@ type ActionTodo struct {
 	ProcessID string
 	SubstepID string
 	Title     string
+	Role      string
 	Status    string
 }
 
@@ -253,10 +279,27 @@ type User struct {
 }
 
 type RuntimeConfig struct {
-	Workflow    WorkflowDef  `yaml:"workflow"`
-	Departments []Department `yaml:"departments"`
-	Users       []User       `yaml:"users"`
-	DPP         DPPConfig    `yaml:"dpp"`
+	Workflow      WorkflowDef            `yaml:"workflow"`
+	Organizations []WorkflowOrganization `yaml:"organizations"`
+	Roles         []WorkflowRole         `yaml:"roles"`
+	Departments   []Department           `yaml:"departments"`
+	Users         []User                 `yaml:"users"`
+	DPP           DPPConfig              `yaml:"dpp"`
+}
+
+type WorkflowOrganization struct {
+	Slug   string `yaml:"slug"`
+	Name   string `yaml:"name"`
+	Color  string `yaml:"color"`
+	Border string `yaml:"border"`
+}
+
+type WorkflowRole struct {
+	OrgSlug string `yaml:"orgSlug"`
+	Slug    string `yaml:"slug"`
+	Name    string `yaml:"name"`
+	Color   string `yaml:"color"`
+	Border  string `yaml:"border"`
 }
 
 type DPPConfig struct {
@@ -302,6 +345,10 @@ type PageBase struct {
 	WorkflowKey   string
 	WorkflowName  string
 	WorkflowPath  string
+	UserEmail     string
+	ShowOrgsLink  bool
+	ShowMyOrgLink bool
+	ShowLogout    bool
 }
 
 type BackofficeLandingView struct {
@@ -339,6 +386,15 @@ type DepartmentDashboardView struct {
 	PageBase
 	CurrentUser     Actor
 	RoleLabel       string
+	TodoActions     []ActionTodo
+	ActiveProcesses []ProcessSummary
+	DoneProcesses   []ProcessSummary
+}
+
+type DashboardView struct {
+	PageBase
+	UserID          string
+	RoleSlugs       []string
 	TodoActions     []ActionTodo
 	ActiveProcesses []ProcessSummary
 	DoneProcesses   []ProcessSummary
@@ -383,10 +439,93 @@ type HomeView struct {
 	History         []ProcessListItem
 }
 
+type LoginView struct {
+	PageBase
+	Next  string
+	Email string
+	Error string
+}
+
+type InviteView struct {
+	PageBase
+	Token string
+	Email string
+	Org   string
+	Roles []string
+	Error string
+}
+
+type ResetRequestView struct {
+	PageBase
+	Email        string
+	ResetLink    string
+	Confirmation string
+}
+
+type ResetSetView struct {
+	PageBase
+	Token string
+	Error string
+}
+
+type PlatformAdminView struct {
+	PageBase
+	Organizations []Organization
+	InviteLink    string
+	Error         string
+}
+
+type OrgAdminView struct {
+	PageBase
+	Organization Organization
+	Roles        []Role
+	Users        []OrgAdminUserRow
+	Invites      []OrgAdminInviteRow
+	InviteLink   string
+	Error        string
+}
+
+type OrgAdminRoleOption struct {
+	Slug       string
+	Name       string
+	RoleColor  string
+	RoleBorder string
+	Selected   bool
+}
+
+type OrgAdminUserRow struct {
+	UserID      string
+	Email       string
+	Status      string
+	Activated   bool
+	RoleOptions []OrgAdminRoleOption
+}
+
+type OrgAdminInviteRow struct {
+	Email     string
+	RoleSlugs []string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	Status    string
+}
+
+type WorkflowRefValidationError struct {
+	Messages []string
+}
+
+func (e *WorkflowRefValidationError) Error() string {
+	if e == nil || len(e.Messages) == 0 {
+		return "workflow references are invalid"
+	}
+	return "workflow references are invalid: " + strings.Join(e.Messages, "; ")
+}
+
 type ProcessPageView struct {
 	PageBase
 	ProcessID   string
 	Timeline    []TimelineStep
+	ActionList  ActionListView
 	DPPURL      string
 	DPPGS1      string
 	Attachments []ProcessDownloadAttachment
@@ -476,6 +615,13 @@ func main() {
 		workflowDefID: primitive.NewObjectID(),
 		configDir:     configDir,
 		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+		enforceAuth:   true,
+	}
+	if err := ensureStoreIndexes(ctx, server.store); err != nil {
+		log.Printf("warning: failed to ensure auth indexes: %v", err)
+	}
+	if err := bootstrapPlatformAdmin(ctx, server.store, server.now); err != nil {
+		log.Fatal(err)
 	}
 
 	mux := http.NewServeMux()
@@ -483,13 +629,23 @@ func main() {
 	mux.HandleFunc("/docs", server.handleDocs)
 	mux.HandleFunc("/docs/", server.handleDocs)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
+	mux.HandleFunc("/login", server.handleLogin)
+	mux.HandleFunc("/logout", server.handleLogout)
+	mux.HandleFunc("/invite/", server.handleInvite)
+	mux.HandleFunc("/reset", server.handleResetRequest)
+	mux.HandleFunc("/reset/", server.handleResetSet)
+	mux.HandleFunc("/dashboard", server.handleDashboard)
+	mux.HandleFunc("/dashboard/", server.handleDashboard)
+	mux.HandleFunc("/admin/orgs", server.handleAdminOrgs)
+	mux.HandleFunc("/admin/orgs/", server.handleAdminOrgs)
+	mux.HandleFunc("/org-admin/roles", server.handleOrgAdminRoles)
+	mux.HandleFunc("/org-admin/users", server.handleOrgAdminUsers)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
 	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
 	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
 	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
-	mux.HandleFunc("/impersonate", server.handleLegacyImpersonate)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -504,6 +660,168 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func boolEnvOr(key string, fallback bool) bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if raw == "" {
+		return fallback
+	}
+	switch raw {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func intEnvOr(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func sessionTTLDays() int {
+	days := intEnvOr("SESSION_TTL_DAYS", 30)
+	if days <= 0 {
+		return 30
+	}
+	return days
+}
+
+func safeNextPath(r *http.Request, fallback string) string {
+	next := strings.TrimSpace(r.URL.Query().Get("next"))
+	if r.Method == http.MethodPost {
+		_ = r.ParseForm()
+		if formNext := strings.TrimSpace(r.FormValue("next")); formNext != "" {
+			next = formNext
+		}
+	}
+	if next == "" || !strings.HasPrefix(next, "/") {
+		return fallback
+	}
+	return next
+}
+
+func shouldSecureCookie(r *http.Request) bool {
+	if boolEnvOr("COOKIE_SECURE", false) {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+		return true
+	}
+	return r.TLS != nil
+}
+
+func newSessionID() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func (s *Server) readSession(r *http.Request) (*Session, error) {
+	cookie, err := r.Cookie("attesta_session")
+	if err != nil {
+		return nil, err
+	}
+	sessionID := strings.TrimSpace(cookie.Value)
+	if sessionID == "" {
+		return nil, mongo.ErrNoDocuments
+	}
+	session, err := s.store.LoadSessionByID(r.Context(), sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session.ExpiresAt.Before(s.nowUTC()) {
+		_ = s.store.DeleteSession(r.Context(), sessionID)
+		return nil, mongo.ErrNoDocuments
+	}
+	return session, nil
+}
+
+func (s *Server) currentUser(r *http.Request) (*AccountUser, *Session, error) {
+	session, err := s.readSession(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	user, err := s.store.GetUserByUserID(r.Context(), session.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return user, session, nil
+}
+
+func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+	if !s.enforceAuth {
+		return &AccountUser{UserID: "legacy-user"}, nil, true
+	}
+	user, session, err := s.currentUser(r)
+	if err == nil {
+		return user, session, true
+	}
+	target := "/login?next=" + url.QueryEscape(r.URL.RequestURI())
+	http.Redirect(w, r, target, http.StatusSeeOther)
+	return nil, nil, false
+}
+
+func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+	if !s.enforceAuth {
+		return &AccountUser{UserID: "legacy-user"}, nil, true
+	}
+	user, session, err := s.currentUser(r)
+	if err == nil {
+		return user, session, true
+	}
+	http.Error(w, "unauthorized", http.StatusUnauthorized)
+	return nil, nil, false
+}
+
+func bootstrapPlatformAdmin(ctx context.Context, store Store, now func() time.Time) error {
+	if store == nil {
+		return nil
+	}
+	anyoneCanCreate := boolEnvOr("ANYONE_CAN_CREATE_ACCOUNT", true)
+	adminEmail := strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
+	adminPassword := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+	if !anyoneCanCreate && (adminEmail == "" || adminPassword == "") {
+		return errors.New("ADMIN_EMAIL and ADMIN_PASSWORD are required when ANYONE_CAN_CREATE_ACCOUNT=false")
+	}
+	if adminEmail == "" || adminPassword == "" {
+		return nil
+	}
+
+	if _, err := store.GetUserByEmail(ctx, adminEmail); err == nil {
+		return nil
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return err
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	userID := "platform-admin-" + canonifySlug(strings.Split(adminEmail, "@")[0])
+	_, err = store.CreateUser(ctx, AccountUser{
+		UserID:          userID,
+		Email:           adminEmail,
+		PasswordHash:    string(passwordHash),
+		RoleSlugs:       []string{},
+		Status:          "active",
+		IsPlatformAdmin: true,
+		CreatedAt:       now().UTC(),
+	})
+	return err
 }
 
 func attachmentMaxBytes() int64 {
@@ -541,6 +859,28 @@ func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	if base.WorkflowKey != "" {
 		base.WorkflowPath = workflowPath(base.WorkflowKey)
 	}
+	return base
+}
+
+func userIsOrgAdmin(user *AccountUser) bool {
+	if user == nil {
+		return false
+	}
+	if !containsRole(user.RoleSlugs, "org-admin") && !containsRole(user.RoleSlugs, "org_admin") {
+		return false
+	}
+	return strings.TrimSpace(user.OrgSlug) != "" && user.OrgID != nil
+}
+
+func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowName string) PageBase {
+	base := s.pageBase(body, workflowKey, workflowName)
+	if user == nil {
+		return base
+	}
+	base.UserEmail = strings.TrimSpace(user.Email)
+	base.ShowLogout = s.enforceAuth
+	base.ShowOrgsLink = user.IsPlatformAdmin
+	base.ShowMyOrgLink = userIsOrgAdmin(user)
 	return base
 }
 
@@ -606,6 +946,9 @@ func (s *Server) workflowOptions(ctx context.Context) ([]WorkflowOption, error) 
 func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error) {
 	if value := r.Context().Value(workflowContextKey{}); value != nil {
 		if selected, ok := value.(workflowContextValue); ok {
+			if err := s.validateWorkflowRefs(r.Context(), selected.Cfg); err != nil {
+				return "", RuntimeConfig{}, err
+			}
 			return selected.Key, selected.Cfg, nil
 		}
 	}
@@ -613,7 +956,103 @@ func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error
 	if err != nil {
 		return "", RuntimeConfig{}, err
 	}
+	if err := s.validateWorkflowRefs(r.Context(), cfg); err != nil {
+		return "", RuntimeConfig{}, err
+	}
 	return s.defaultWorkflowKey(), cfg, nil
+}
+
+func (s *Server) validateWorkflowRefs(ctx context.Context, cfg RuntimeConfig) error {
+	if s == nil || s.store == nil {
+		return nil
+	}
+	if !s.enforceAuth {
+		return nil
+	}
+	if len(cfg.Organizations) == 0 && len(cfg.Roles) == 0 {
+		return nil
+	}
+
+	messages := []string{}
+	yamlOrgs := map[string]struct{}{}
+	for _, org := range cfg.Organizations {
+		slug := strings.TrimSpace(org.Slug)
+		if slug == "" {
+			continue
+		}
+		yamlOrgs[slug] = struct{}{}
+		if _, err := s.store.GetOrganizationBySlug(ctx, slug); err != nil {
+			messages = append(messages, "missing organization slug "+slug)
+		}
+	}
+
+	type roleRef struct {
+		orgSlug string
+	}
+	yamlRoles := map[string]roleRef{}
+	for _, role := range cfg.Roles {
+		orgSlug := strings.TrimSpace(role.OrgSlug)
+		roleSlug := strings.TrimSpace(role.Slug)
+		if orgSlug == "" || roleSlug == "" {
+			continue
+		}
+		yamlRoles[roleSlug] = roleRef{orgSlug: orgSlug}
+		if _, err := s.store.GetRoleBySlug(ctx, orgSlug, roleSlug); err != nil {
+			messages = append(messages, "missing role slug "+orgSlug+"/"+roleSlug)
+		}
+	}
+
+	for _, step := range cfg.Workflow.Steps {
+		stepOrg := strings.TrimSpace(step.OrganizationSlug)
+		if stepOrg != "" {
+			if _, ok := yamlOrgs[stepOrg]; !ok {
+				messages = append(messages, "step "+step.StepID+" references organization not in yaml: "+stepOrg)
+			}
+		}
+		for _, sub := range step.Substep {
+			roles := sub.Roles
+			if len(roles) == 0 && strings.TrimSpace(sub.Role) != "" {
+				roles = []string{strings.TrimSpace(sub.Role)}
+			}
+			if len(roles) == 0 {
+				messages = append(messages, "substep "+sub.SubstepID+" has no roles")
+				continue
+			}
+			for _, roleSlug := range roles {
+				trimmedRole := strings.TrimSpace(roleSlug)
+				roleMeta, ok := yamlRoles[trimmedRole]
+				if !ok {
+					messages = append(messages, "substep "+sub.SubstepID+" references role not in yaml: "+trimmedRole)
+					continue
+				}
+				if stepOrg != "" && roleMeta.orgSlug != stepOrg {
+					messages = append(messages, "substep "+sub.SubstepID+" role "+trimmedRole+" not in step organization "+stepOrg)
+					continue
+				}
+				if _, err := s.store.GetRoleBySlug(ctx, roleMeta.orgSlug, trimmedRole); err != nil {
+					messages = append(messages, "missing role slug "+roleMeta.orgSlug+"/"+trimmedRole)
+				}
+			}
+		}
+	}
+
+	if len(messages) == 0 {
+		return nil
+	}
+	return &WorkflowRefValidationError{Messages: dedupeStrings(messages)}
+}
+
+func dedupeStrings(items []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }
 
 func normalizeHomeSortKey(value string) string {
@@ -711,6 +1150,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	options, err := s.workflowOptions(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -718,7 +1161,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := HomeWorkflowPickerView{
 		WorkflowPickerView: WorkflowPickerView{
-			PageBase:  s.pageBase("home_picker_body", "", ""),
+			PageBase:  s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows: options,
 		},
 	}
@@ -796,6 +1239,864 @@ func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filena
 	http.ServeFile(w, r, foundPath)
 }
 
+func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, user *AccountUser) error {
+	if user == nil {
+		return errors.New("user required")
+	}
+	now := s.nowUTC()
+	if err := s.store.SetUserLastLogin(r.Context(), user.UserID, now); err != nil {
+		return err
+	}
+	sessionID, err := newSessionID()
+	if err != nil {
+		return err
+	}
+	expiresAt := now.Add(time.Duration(sessionTTLDays()) * 24 * time.Hour)
+	session := Session{
+		SessionID:   sessionID,
+		UserID:      user.UserID,
+		UserMongoID: user.ID,
+		OrgID:       user.OrgID,
+		CreatedAt:   now,
+		LastLoginAt: now,
+		ExpiresAt:   expiresAt,
+	}
+	if _, err := s.store.CreateSession(r.Context(), session); err != nil {
+		return err
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "attesta_session",
+		Value:    sessionID,
+		Path:     "/",
+		Expires:  expiresAt,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   shouldSecureCookie(r),
+	})
+	return nil
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		if s.enforceAuth {
+			if _, _, err := s.currentUser(r); err == nil {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
+		}
+		view := LoginView{
+			PageBase: s.pageBase("login_body", "", ""),
+			Next:     safeNextPath(r, "/"),
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "login.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		password := strings.TrimSpace(r.FormValue("password"))
+		next := safeNextPath(r, "/")
+
+		user, err := s.store.GetUserByEmail(r.Context(), email)
+		if err != nil || user == nil {
+			view := LoginView{
+				PageBase: s.pageBase("login_body", "", ""),
+				Email:    email,
+				Next:     next,
+				Error:    "Invalid email or password.",
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+			view := LoginView{
+				PageBase: s.pageBase("login_body", "", ""),
+				Email:    email,
+				Next:     next,
+				Error:    "Invalid email or password.",
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+			return
+		}
+
+		if err := s.issueSession(w, r, user); err != nil {
+			http.Error(w, "login failed", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, next, http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if cookie, err := r.Cookie("attesta_session"); err == nil && strings.TrimSpace(cookie.Value) != "" {
+		_ = s.store.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "attesta_session",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   shouldSecureCookie(r),
+	})
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func validatePassword(value string) error {
+	password := strings.TrimSpace(value)
+	if len(password) < 12 {
+		return errors.New("password must be at least 12 characters")
+	}
+	return nil
+}
+
+func (s *Server) loadActiveInvite(ctx context.Context, token string) (*Invite, error) {
+	invite, err := s.store.LoadInviteByTokenHash(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	now := s.nowUTC()
+	if invite.UsedAt != nil {
+		return nil, errors.New("invite already used")
+	}
+	if !invite.ExpiresAt.IsZero() && invite.ExpiresAt.Before(now) {
+		return nil, errors.New("invite expired")
+	}
+	return invite, nil
+}
+
+func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/invite/"))
+	if token == "" || strings.Contains(token, "/") {
+		http.NotFound(w, r)
+		return
+	}
+
+	invite, err := s.loadActiveInvite(r.Context(), token)
+	if err != nil {
+		http.Error(w, "invalid or expired invite", http.StatusBadRequest)
+		return
+	}
+
+	orgName := invite.OrgID.Hex()
+	if org, err := s.store.ListOrganizations(r.Context()); err == nil {
+		for _, item := range org {
+			if item.ID == invite.OrgID {
+				orgName = item.Name
+				break
+			}
+		}
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		view := InviteView{
+			PageBase: s.pageBase("invite_body", "", ""),
+			Token:    token,
+			Email:    invite.Email,
+			Org:      orgName,
+			Roles:    invite.RoleSlugs,
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "invite.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		password := r.FormValue("password")
+		if err := validatePassword(password); err != nil {
+			view := InviteView{
+				PageBase: s.pageBase("invite_body", "", ""),
+				Token:    token,
+				Email:    invite.Email,
+				Org:      orgName,
+				Roles:    invite.RoleSlugs,
+				Error:    err.Error(),
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "invite.html", view)
+			return
+		}
+
+		user, err := s.store.GetUserByUserID(r.Context(), invite.UserID)
+		if err != nil {
+			http.Error(w, "invalid invite user", http.StatusBadRequest)
+			return
+		}
+		if strings.ToLower(strings.TrimSpace(user.Email)) != strings.ToLower(strings.TrimSpace(invite.Email)) {
+			http.Error(w, "invite email mismatch", http.StatusBadRequest)
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(password)), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "failed to set password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.SetUserPasswordHash(r.Context(), user.UserID, string(hash)); err != nil {
+			http.Error(w, "failed to set password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.MarkInviteUsed(r.Context(), token, s.nowUTC()); err != nil {
+			http.Error(w, "failed to finalize invite", http.StatusBadRequest)
+			return
+		}
+		updated, err := s.store.GetUserByUserID(r.Context(), user.UserID)
+		if err != nil {
+			http.Error(w, "failed to load user", http.StatusInternalServerError)
+			return
+		}
+		if err := s.issueSession(w, r, updated); err != nil {
+			http.Error(w, "failed to login", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func resetTTLHrs() int {
+	hours := intEnvOr("RESET_TTL_HOURS", 24)
+	if hours <= 0 {
+		return 24
+	}
+	return hours
+}
+
+func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		view := ResetRequestView{PageBase: s.pageBase("reset_request_body", "", "")}
+		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		view := ResetRequestView{
+			PageBase:     s.pageBase("reset_request_body", "", ""),
+			Email:        email,
+			Confirmation: "If the account exists, a reset link has been created.",
+			ResetLink:    "",
+		}
+
+		user, err := s.store.GetUserByEmail(r.Context(), email)
+		if err == nil && user != nil {
+			token, tokenErr := newSessionID()
+			if tokenErr != nil {
+				http.Error(w, "failed to create reset token", http.StatusInternalServerError)
+				return
+			}
+			_, createErr := s.store.CreatePasswordReset(r.Context(), PasswordReset{
+				Email:     email,
+				UserID:    user.UserID,
+				TokenHash: token,
+				ExpiresAt: s.nowUTC().Add(time.Duration(resetTTLHrs()) * time.Hour),
+				CreatedAt: s.nowUTC(),
+			})
+			if createErr == nil {
+				view.ResetLink = "/reset/" + token
+			}
+		}
+
+		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) loadActivePasswordReset(ctx context.Context, token string) (*PasswordReset, error) {
+	reset, err := s.store.LoadPasswordResetByTokenHash(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	now := s.nowUTC()
+	if reset.UsedAt != nil {
+		return nil, errors.New("reset token already used")
+	}
+	if !reset.ExpiresAt.IsZero() && reset.ExpiresAt.Before(now) {
+		return nil, errors.New("reset token expired")
+	}
+	return reset, nil
+}
+
+func (s *Server) handleResetSet(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/reset/"))
+	if token == "" || strings.Contains(token, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	reset, err := s.loadActivePasswordReset(r.Context(), token)
+	if err != nil {
+		http.Error(w, "invalid or expired reset token", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		view := ResetSetView{
+			PageBase: s.pageBase("reset_set_body", "", ""),
+			Token:    token,
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "reset_set.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		password := r.FormValue("password")
+		if err := validatePassword(password); err != nil {
+			view := ResetSetView{
+				PageBase: s.pageBase("reset_set_body", "", ""),
+				Token:    token,
+				Error:    err.Error(),
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "reset_set.html", view)
+			return
+		}
+
+		user, err := s.store.GetUserByUserID(r.Context(), reset.UserID)
+		if err != nil {
+			http.Error(w, "invalid reset user", http.StatusBadRequest)
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(password)), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "failed to reset password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.SetUserPasswordHash(r.Context(), user.UserID, string(hash)); err != nil {
+			http.Error(w, "failed to reset password", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.MarkPasswordResetUsed(r.Context(), token, s.nowUTC()); err != nil {
+			http.Error(w, "failed to finalize reset", http.StatusBadRequest)
+			return
+		}
+		updated, err := s.store.GetUserByUserID(r.Context(), user.UserID)
+		if err != nil {
+			http.Error(w, "failed to load user", http.StatusInternalServerError)
+			return
+		}
+		if err := s.issueSession(w, r, updated); err != nil {
+			http.Error(w, "failed to login", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func randomUserIDFromEmail(email string) string {
+	local := strings.TrimSpace(strings.Split(strings.ToLower(strings.TrimSpace(email)), "@")[0])
+	if local == "" {
+		local = "user"
+	}
+	return canonifySlug(local) + "-" + fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+func isDuplicateSlugError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if mongo.IsDuplicateKeyError(err) {
+		return true
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(message, "slug already exists") ||
+		strings.Contains(message, "role already exists") ||
+		strings.Contains(message, "duplicate key")
+}
+
+func requestedRoleSlugs(form url.Values) []string {
+	roles := canonifyRoleSlugs(form["roles"])
+	if len(roles) > 0 {
+		return roles
+	}
+	legacyRole := strings.TrimSpace(form.Get("role"))
+	if legacyRole == "" {
+		return []string{}
+	}
+	return canonifyRoleSlugs([]string{legacyRole})
+}
+
+func accountMatchesOrg(user *AccountUser, orgID primitive.ObjectID, orgSlug string) bool {
+	if user == nil || user.OrgID == nil {
+		return false
+	}
+	if *user.OrgID != orgID {
+		return false
+	}
+	return strings.TrimSpace(user.OrgSlug) == strings.TrimSpace(orgSlug)
+}
+
+func ensureStoreIndexes(ctx context.Context, store Store) error {
+	mongoStore, ok := store.(*MongoStore)
+	if !ok || mongoStore == nil {
+		return nil
+	}
+	return mongoStore.EnsureAuthIndexes(ctx)
+}
+
+func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !user.IsPlatformAdmin {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return user, true
+}
+
+func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !userIsOrgAdmin(user) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return user, true
+}
+
+func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, inviteLink, errMsg string) {
+	orgs, _ := s.store.ListOrganizations(context.Background())
+	view := PlatformAdminView{
+		PageBase:      s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		Organizations: orgs,
+		InviteLink:    strings.TrimSpace(inviteLink),
+		Error:         strings.TrimSpace(errMsg),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requirePlatformAdmin(w, r)
+	if !ok {
+		return
+	}
+	path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/admin/orgs"))
+	if path == "" || path == "/" {
+		switch r.Method {
+		case http.MethodGet:
+			s.renderPlatformAdmin(w, admin, "", "")
+			return
+		case http.MethodPost:
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "invalid form", http.StatusBadRequest)
+				return
+			}
+			name := strings.TrimSpace(r.FormValue("name"))
+			color := strings.TrimSpace(r.FormValue("color"))
+			border := strings.TrimSpace(r.FormValue("border"))
+			if name == "" {
+				s.renderPlatformAdmin(w, admin, "", "organization name is required")
+				return
+			}
+			if existing, err := s.store.GetOrganizationBySlug(r.Context(), canonifySlug(name)); err == nil && existing != nil {
+				s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
+				return
+			}
+			if _, err := s.store.CreateOrganization(r.Context(), Organization{
+				Name:      name,
+				Color:     color,
+				Border:    border,
+				CreatedAt: s.nowUTC(),
+			}); err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
+					return
+				}
+				s.renderPlatformAdmin(w, admin, "", "failed to create organization")
+				return
+			}
+			http.Redirect(w, r, "/admin/orgs", http.StatusSeeOther)
+			return
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+
+	orgSlug := strings.Trim(strings.TrimPrefix(path, "/"), "/")
+	org, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug)
+	if err != nil || org == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.renderPlatformAdmin(w, admin, "", "")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+	if email == "" {
+		s.renderPlatformAdmin(w, admin, "", "email is required")
+		return
+	}
+
+	roleSlug := "org-admin"
+	if _, roleErr := s.store.GetRoleBySlug(r.Context(), org.Slug, roleSlug); roleErr != nil {
+		_, _ = s.store.CreateRole(r.Context(), Role{
+			OrgID:     org.ID,
+			OrgSlug:   org.Slug,
+			Slug:      roleSlug,
+			Name:      "Org Admin",
+			Color:     org.Color,
+			Border:    org.Border,
+			CreatedAt: s.nowUTC(),
+		})
+	}
+
+	user, userErr := s.store.GetUserByEmail(r.Context(), email)
+	if userErr != nil || user == nil {
+		orgID := org.ID
+		createdUser, createErr := s.store.CreateUser(r.Context(), AccountUser{
+			UserID:    randomUserIDFromEmail(email),
+			OrgID:     &orgID,
+			OrgSlug:   org.Slug,
+			Email:     email,
+			RoleSlugs: []string{roleSlug},
+			Status:    "invited",
+			CreatedAt: s.nowUTC(),
+		})
+		if createErr != nil {
+			s.renderPlatformAdmin(w, admin, "", "failed to create org admin user")
+			return
+		}
+		user = &createdUser
+	} else {
+		_ = s.store.SetUserRoles(r.Context(), user.UserID, append(user.RoleSlugs, roleSlug))
+	}
+
+	token, tokenErr := newSessionID()
+	if tokenErr != nil {
+		s.renderPlatformAdmin(w, admin, "", "failed to create invite")
+		return
+	}
+	if _, inviteErr := s.store.CreateInvite(r.Context(), Invite{
+		OrgID:           org.ID,
+		Email:           email,
+		UserID:          user.UserID,
+		RoleSlugs:       []string{roleSlug},
+		TokenHash:       token,
+		ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
+		CreatedAt:       s.nowUTC(),
+		CreatedByUserID: admin.UserID,
+	}); inviteErr != nil {
+		s.renderPlatformAdmin(w, admin, "", "failed to create invite")
+		return
+	}
+	s.renderPlatformAdmin(w, admin, "/invite/"+token, "")
+}
+
+func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlug, inviteLink, errMsg string) {
+	org, err := s.store.GetOrganizationBySlug(context.Background(), orgSlug)
+	if err != nil || org == nil {
+		http.Error(w, "organization not found", http.StatusNotFound)
+		return
+	}
+	roles, _ := s.store.ListRolesByOrg(context.Background(), orgSlug)
+	users, _ := s.store.ListUsersByOrgID(context.Background(), org.ID)
+	invites := []Invite{}
+	if user != nil {
+		invites, _ = s.store.ListInvitesByCreator(context.Background(), user.UserID, org.ID)
+	}
+
+	orgUsers := make([]OrgAdminUserRow, 0, len(users))
+	for _, orgUser := range users {
+		if strings.EqualFold(strings.TrimSpace(orgUser.Status), "deleted") {
+			continue
+		}
+		roleOptions := make([]OrgAdminRoleOption, 0, len(roles))
+		for _, role := range roles {
+			roleOptions = append(roleOptions, OrgAdminRoleOption{
+				Slug:       role.Slug,
+				Name:       role.Name,
+				RoleColor:  role.Color,
+				RoleBorder: role.Border,
+				Selected:   containsRole(orgUser.RoleSlugs, role.Slug),
+			})
+		}
+		orgUsers = append(orgUsers, OrgAdminUserRow{
+			UserID:      orgUser.UserID,
+			Email:       orgUser.Email,
+			Status:      orgUser.Status,
+			Activated:   strings.TrimSpace(orgUser.PasswordHash) != "",
+			RoleOptions: roleOptions,
+		})
+	}
+
+	now := s.nowUTC()
+	orgInvites := make([]OrgAdminInviteRow, 0, len(invites))
+	for _, invite := range invites {
+		status := "pending"
+		if invite.UsedAt != nil {
+			status = "accepted"
+		} else if invite.ExpiresAt.Before(now) {
+			status = "expired"
+		}
+		orgInvites = append(orgInvites, OrgAdminInviteRow{
+			Email:     invite.Email,
+			RoleSlugs: append([]string(nil), invite.RoleSlugs...),
+			CreatedAt: invite.CreatedAt,
+			ExpiresAt: invite.ExpiresAt,
+			UsedAt:    invite.UsedAt,
+			Status:    status,
+		})
+	}
+
+	view := OrgAdminView{
+		PageBase:     s.pageBaseForUser(user, "org_admin_body", "", ""),
+		Organization: *org,
+		Roles:        roles,
+		Users:        orgUsers,
+		Invites:      orgInvites,
+		InviteLink:   strings.TrimSpace(inviteLink),
+		Error:        strings.TrimSpace(errMsg),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.requireOrgAdmin(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.renderOrgAdmin(w, user, user.OrgSlug, "", "")
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		color := strings.TrimSpace(r.FormValue("color"))
+		border := strings.TrimSpace(r.FormValue("border"))
+		if name == "" {
+			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role name is required")
+			return
+		}
+		if existing, err := s.store.GetRoleBySlug(r.Context(), user.OrgSlug, canonifySlug(name)); err == nil && existing != nil {
+			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role slug already exists")
+			return
+		}
+		_, err := s.store.CreateRole(r.Context(), Role{
+			OrgID:     *user.OrgID,
+			OrgSlug:   user.OrgSlug,
+			Name:      name,
+			Color:     color,
+			Border:    border,
+			CreatedAt: s.nowUTC(),
+		})
+		if err != nil {
+			if isDuplicateSlugError(err) {
+				s.renderOrgAdmin(w, user, user.OrgSlug, "", "role slug already exists")
+				return
+			}
+			s.renderOrgAdmin(w, user, user.OrgSlug, "", "failed to create role")
+			return
+		}
+		s.renderOrgAdmin(w, user, user.OrgSlug, "", "")
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireOrgAdmin(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	intent := strings.TrimSpace(r.FormValue("intent"))
+	if intent == "" {
+		intent = "invite"
+	}
+
+	switch intent {
+	case "invite":
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		if email == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email is required")
+			return
+		}
+
+		selectedRoles := requestedRoleSlugs(r.Form)
+		for _, roleSlug := range selectedRoles {
+			if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+				return
+			}
+		}
+
+		user, userErr := s.store.GetUserByEmail(r.Context(), email)
+		if userErr != nil || user == nil {
+			orgID := *admin.OrgID
+			created, createErr := s.store.CreateUser(r.Context(), AccountUser{
+				UserID:    randomUserIDFromEmail(email),
+				OrgID:     &orgID,
+				OrgSlug:   admin.OrgSlug,
+				Email:     email,
+				RoleSlugs: selectedRoles,
+				Status:    "invited",
+				CreatedAt: s.nowUTC(),
+			})
+			if createErr != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create user")
+				return
+			}
+			user = &created
+		} else {
+			if !accountMatchesOrg(user, *admin.OrgID, admin.OrgSlug) {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email already belongs to another organization")
+				return
+			}
+			mergedRoles := canonifyRoleSlugs(append(append([]string{}, user.RoleSlugs...), selectedRoles...))
+			if err := s.store.SetUserRoles(r.Context(), user.UserID, mergedRoles); err != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to update user roles")
+				return
+			}
+		}
+
+		token, tokenErr := newSessionID()
+		if tokenErr != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
+			return
+		}
+		if _, err := s.store.CreateInvite(r.Context(), Invite{
+			OrgID:           *admin.OrgID,
+			Email:           email,
+			UserID:          user.UserID,
+			RoleSlugs:       selectedRoles,
+			TokenHash:       token,
+			ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
+			CreatedAt:       s.nowUTC(),
+			CreatedByUserID: admin.UserID,
+		}); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
+			return
+		}
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "/invite/"+token, "")
+		return
+	case "set_roles":
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user is required")
+			return
+		}
+		target, err := s.store.GetUserByUserID(r.Context(), userID)
+		if err != nil || target == nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user not found")
+			return
+		}
+		if !accountMatchesOrg(target, *admin.OrgID, admin.OrgSlug) {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user does not belong to your organization")
+			return
+		}
+		selectedRoles := requestedRoleSlugs(r.Form)
+		for _, roleSlug := range selectedRoles {
+			if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+				return
+			}
+		}
+		if target.UserID == admin.UserID && !containsRole(selectedRoles, "org-admin") {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "cannot remove org-admin from your own account")
+			return
+		}
+		if err := s.store.SetUserRoles(r.Context(), target.UserID, selectedRoles); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to update user roles")
+			return
+		}
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+		return
+	case "delete_user":
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user is required")
+			return
+		}
+		if userID == admin.UserID {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "cannot delete yourself")
+			return
+		}
+		target, err := s.store.GetUserByUserID(r.Context(), userID)
+		if err != nil || target == nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user not found")
+			return
+		}
+		if !accountMatchesOrg(target, *admin.OrgID, admin.OrgSlug) {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user does not belong to your organization")
+			return
+		}
+		if err := s.store.DisableUser(r.Context(), userID); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to delete user")
+			return
+		}
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+		return
+	default:
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "unsupported action")
+		return
+	}
+}
+
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {
 	clone := r.Clone(r.Context())
 	if clone.URL != nil {
@@ -808,6 +2109,9 @@ func cloneRequestWithPath(r *http.Request, path string) *http.Request {
 }
 
 func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/w/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
@@ -839,8 +2143,8 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/backoffice" || strings.HasPrefix(rest, "/backoffice/"):
 		s.handleBackoffice(w, cloneRequestWithPath(scopedReq, rest))
 		return
-	case rest == "/impersonate":
-		s.handleImpersonate(w, cloneRequestWithPath(scopedReq, rest))
+	case rest == "/dashboard" || rest == "/dashboard/" || strings.HasPrefix(rest, "/dashboard/"):
+		s.handleDashboard(w, cloneRequestWithPath(scopedReq, rest))
 		return
 	case rest == "/events":
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
@@ -851,6 +2155,10 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -899,7 +2207,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	sortHomeProcessList(history, sortKey)
 
 	view := HomeView{
-		PageBase:        s.pageBase("home_body", workflowKey, cfg.Workflow.Name),
+		PageBase:        s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		LatestProcessID: latestID,
 		Sort:            sortKey,
 		Processes:       processes,
@@ -1003,6 +2311,9 @@ func (s *Server) handleLegacyStartProcess(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleLegacyProcessRoutes(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	processID, parts, ok := legacyProcessPath(r.URL.Path)
 	if !ok {
 		http.NotFound(w, r)
@@ -1024,6 +2335,9 @@ func (s *Server) handleLegacyProcessRoutes(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleLegacyBackoffice(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/backoffice"), "/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 3 && parts[1] == "process" && r.Method == http.MethodGet {
@@ -1040,14 +2354,6 @@ func (s *Server) handleLegacyBackoffice(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.handleBackoffice(w, r)
-}
-
-func (s *Server) handleLegacyImpersonate(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		http.Error(w, "workflow context required", http.StatusBadRequest)
-		return
-	}
-	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
@@ -1098,6 +2404,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1115,7 +2425,25 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 	process = s.ensureProcessCompletionArtifacts(ctx, cfg, workflowKey, process)
 	timeline := buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
-	view := ProcessPageView{PageBase: s.pageBase("process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	view := ProcessPageView{PageBase: s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name), ProcessID: process.ID.Hex(), Timeline: timeline}
+	actor := Actor{
+		UserID:      user.UserID,
+		OrgSlug:     user.OrgSlug,
+		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
+		WorkflowKey: workflowKey,
+	}
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+	}
+	if len(actor.RoleSlugs) > 0 {
+		actor.Role = actor.RoleSlugs[0]
+	}
+	view.ActionList = ActionListView{
+		WorkflowKey: workflowKey,
+		ProcessID:   process.ID.Hex(),
+		CurrentUser: actor,
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, false, s.roleMetaMap(cfg)),
+	}
 	view.Attachments = buildProcessDownloadAttachments(workflowKey, process, collectProcessAttachments(cfg.Workflow, process))
 	if process.DPP != nil {
 		view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
@@ -1482,6 +2810,15 @@ func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
+	if s.enforceAuth {
+		workflowKey, _, err := s.selectedWorkflow(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, workflowPath(workflowKey)+"/dashboard", http.StatusSeeOther)
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1541,19 +2878,9 @@ func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
-		return
-	}
-	userID := r.FormValue("userId")
-	role := r.FormValue("role")
-	if userID == "" || role == "" {
-		http.Error(w, "invalid impersonation", http.StatusBadRequest)
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
 		return
 	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
@@ -1561,28 +2888,43 @@ func (s *Server) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !s.isKnownRole(cfg, role) {
-		http.Error(w, "unknown role", http.StatusBadRequest)
-		return
+	ctx := r.Context()
+	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboardForRoles(ctx, cfg, workflowKey, user.RoleSlugs)
+	view := DashboardView{
+		PageBase:        s.pageBaseForUser(user, "dashboard_body", workflowKey, cfg.Workflow.Name),
+		UserID:          user.UserID,
+		RoleSlugs:       append([]string(nil), user.RoleSlugs...),
+		TodoActions:     todoActions,
+		ActiveProcesses: activeProcesses,
+		DoneProcesses:   doneProcesses,
 	}
-	cookie := &http.Cookie{
-		Name:  "demo_user",
-		Value: fmt.Sprintf("%s|%s|%s", userID, role, workflowKey),
-		Path:  "/",
+	templateName := "dashboard.html"
+	if strings.HasSuffix(strings.TrimSpace(r.URL.Path), "/partial") {
+		templateName = "dashboard_partial.html"
 	}
-	http.SetCookie(w, cookie)
-	http.Redirect(w, r, fmt.Sprintf("%s/backoffice/%s", workflowPath(workflowKey), role), http.StatusSeeOther)
+	if err := s.tmpl.ExecuteTemplate(w, templateName, view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
+	user, _, ok := s.requireAuthenticatedPost(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.UserID == "" {
-		actor = s.actorForRole(cfg, s.defaultRole(cfg), workflowKey)
+	actor := Actor{
+		UserID:      user.UserID,
+		OrgSlug:     user.OrgSlug,
+		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
+		WorkflowKey: workflowKey,
+	}
+	if len(user.RoleSlugs) > 0 {
+		actor.Role = user.RoleSlugs[0]
 	}
 	if actor.WorkflowKey != "" && actor.WorkflowKey != workflowKey {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", nil, actor)
@@ -1605,19 +2947,41 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Substep not found.", process, actor)
 		return
 	}
+	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
+		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
+	}
+	if substep.InputType == "file" {
+		_ = r.ParseMultipartForm(attachmentMaxBytes())
+	} else {
+		_ = r.ParseForm()
+	}
+	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
+	if activeRole == "" && len(actor.RoleSlugs) == 1 {
+		activeRole = actor.RoleSlugs[0]
+	}
+	allowedRoles := substepRoles(substep)
+	if !s.enforceAuth && activeRole == "" && len(allowedRoles) > 0 {
+		activeRole = allowedRoles[0]
+		actor.RoleSlugs = append([]string(nil), allowedRoles...)
+	}
+	if activeRole == "" || !containsRole(actor.RoleSlugs, activeRole) || !containsRole(allowedRoles, activeRole) {
+		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
+		return
+	}
+	actor.Role = activeRole
 
 	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
 	if s.authorizer == nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
 	}
-	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, sequenceOK)
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, step.OrganizationSlug, sequenceOK)
 	if err != nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
 	}
 	if !sequenceOK {
-		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && actor.Role == substep.Role {
+		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && containsRole(allowedRoles, actor.Role) {
 			if isHTMXRequest(r) {
 				s.renderActionList(w, r, process, actor, "")
 				return
@@ -2099,6 +3463,9 @@ func sanitizeAttachmentFilename(filename string) string {
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPost(w, r); !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2153,26 +3520,28 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.Role != role || actor.UserID == "" {
+	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
+	if strings.TrimSpace(actor.UserID) == "" {
 		actor = s.actorForRole(cfg, role, workflowKey)
-		cookie := &http.Cookie{
-			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
 	}
 
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
 	view := DepartmentDashboardView{
-		PageBase:        s.pageBase("dept_dashboard_body", workflowKey, cfg.Workflow.Name),
+		PageBase:        s.pageBaseForUser(user, "dept_dashboard_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser:     actor,
 		RoleLabel:       s.roleLabel(cfg, role),
 		TodoActions:     todoActions,
@@ -2185,20 +3554,22 @@ func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request, role, processID string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.Role != role || actor.UserID == "" {
+	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
+	if strings.TrimSpace(actor.UserID) == "" {
 		actor = s.actorForRole(cfg, role, workflowKey)
-		cookie := &http.Cookie{
-			Name:  "demo_user",
-			Value: fmt.Sprintf("%s|%s|%s", actor.UserID, actor.Role, actor.WorkflowKey),
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
 	}
 
 	ctx := r.Context()
@@ -2213,7 +3584,7 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 	}
 	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg))
 	view := DepartmentProcessView{
-		PageBase:    s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
+		PageBase:    s.pageBaseForUser(user, "dept_process_body", workflowKey, cfg.Workflow.Name),
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, role),
 		ProcessID:   process.ID.Hex(),
@@ -2225,15 +3596,20 @@ func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request,
 }
 
 func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http.Request, role string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actor := readActor(r, workflowKey)
-	if actor.Role != role || actor.UserID == "" {
-		actor = s.actorForRole(cfg, role, workflowKey)
+	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
+	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
 
 	ctx := r.Context()
 	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
@@ -2366,6 +3742,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		if unmarshalErr := yaml.Unmarshal(data, &cfg); unmarshalErr != nil {
 			return nil, fmt.Errorf("parse config %s: %w", path, unmarshalErr)
 		}
+		normalizeWorkflowConfig(&cfg)
 		if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
 			return nil, fmt.Errorf("workflow config is empty in %s", filepath.Base(path))
 		}
@@ -2407,8 +3784,78 @@ func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {
 	return cfg, nil
 }
 
+func normalizeWorkflowConfig(cfg *RuntimeConfig) {
+	if cfg == nil {
+		return
+	}
+	defaultOrg := ""
+	if len(cfg.Organizations) > 0 {
+		defaultOrg = strings.TrimSpace(cfg.Organizations[0].Slug)
+	}
+	if defaultOrg == "" && len(cfg.Departments) > 0 {
+		defaultOrg = "default-org"
+		cfg.Organizations = []WorkflowOrganization{
+			{
+				Slug:   defaultOrg,
+				Name:   "Default organization",
+				Color:  "#f0f3ea",
+				Border: "#d9e0d0",
+			},
+		}
+	}
+
+	if len(cfg.Roles) == 0 && len(cfg.Departments) > 0 {
+		for _, dept := range cfg.Departments {
+			cfg.Roles = append(cfg.Roles, WorkflowRole{
+				OrgSlug: defaultOrg,
+				Slug:    strings.TrimSpace(dept.ID),
+				Name:    strings.TrimSpace(dept.Name),
+				Color:   strings.TrimSpace(dept.Color),
+				Border:  strings.TrimSpace(dept.Border),
+			})
+		}
+	}
+
+	for stepIdx := range cfg.Workflow.Steps {
+		step := &cfg.Workflow.Steps[stepIdx]
+		if strings.TrimSpace(step.OrganizationSlug) == "" {
+			step.OrganizationSlug = defaultOrg
+		}
+		for subIdx := range step.Substep {
+			sub := &step.Substep[subIdx]
+			if len(sub.Roles) == 0 && strings.TrimSpace(sub.Role) != "" {
+				sub.Roles = []string{strings.TrimSpace(sub.Role)}
+			}
+			if strings.TrimSpace(sub.Role) == "" && len(sub.Roles) > 0 {
+				sub.Role = strings.TrimSpace(sub.Roles[0])
+			}
+		}
+	}
+}
+
 func (s *Server) roleMetaMap(cfg RuntimeConfig) map[string]RoleMeta {
 	roles := map[string]RoleMeta{}
+	for _, role := range cfg.Roles {
+		meta := RoleMeta{
+			ID:     role.Slug,
+			Label:  role.Name,
+			Color:  role.Color,
+			Border: role.Border,
+		}
+		if meta.Label == "" {
+			meta.Label = role.Slug
+		}
+		if meta.Color == "" {
+			meta.Color = "#f0f3ea"
+		}
+		if meta.Border == "" {
+			meta.Border = "#d9e0d0"
+		}
+		roles[role.Slug] = meta
+	}
+	if len(roles) > 0 {
+		return roles
+	}
 	for _, dept := range cfg.Departments {
 		meta := RoleMeta{
 			ID:     dept.ID,
@@ -2436,6 +3883,11 @@ func (s *Server) roleLabel(cfg RuntimeConfig, role string) string {
 }
 
 func (s *Server) isKnownRole(cfg RuntimeConfig, role string) bool {
+	for _, item := range cfg.Roles {
+		if item.Slug == role {
+			return true
+		}
+	}
 	for _, dept := range cfg.Departments {
 		if dept.ID == role {
 			return true
@@ -2446,6 +3898,12 @@ func (s *Server) isKnownRole(cfg RuntimeConfig, role string) bool {
 
 func (s *Server) roles(cfg RuntimeConfig) []string {
 	var roles []string
+	for _, item := range cfg.Roles {
+		roles = append(roles, item.Slug)
+	}
+	if len(roles) > 0 {
+		return roles
+	}
 	for _, dept := range cfg.Departments {
 		roles = append(roles, dept.ID)
 	}
@@ -2465,6 +3923,9 @@ func (s *Server) actorForRole(cfg RuntimeConfig, role, workflowKey string) Actor
 }
 
 func (s *Server) defaultRole(cfg RuntimeConfig) string {
+	if len(cfg.Roles) > 0 {
+		return cfg.Roles[0].Slug
+	}
 	if len(cfg.Departments) > 0 {
 		return cfg.Departments[0].ID
 	}
@@ -2513,25 +3974,119 @@ func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, wo
 	return todo, active, done
 }
 
-func readActor(r *http.Request, routeWorkflowKey string) Actor {
-	cookie, err := r.Cookie("demo_user")
+func (s *Server) loadProcessDashboardForRoles(ctx context.Context, cfg RuntimeConfig, workflowKey string, roles []string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
+	processes, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 25)
 	if err != nil {
-		return Actor{}
+		return nil, nil, nil
 	}
-	parts := strings.Split(cookie.Value, "|")
-	if len(parts) != 2 && len(parts) != 3 {
-		return Actor{}
+	roleSet := map[string]struct{}{}
+	for _, role := range roles {
+		trimmed := strings.TrimSpace(role)
+		if trimmed != "" {
+			roleSet[trimmed] = struct{}{}
+		}
 	}
-	actor := Actor{
-		UserID: strings.TrimSpace(parts[0]),
-		Role:   strings.TrimSpace(parts[1]),
+	todoSeen := map[string]struct{}{}
+	activeSeen := map[string]struct{}{}
+	doneSeen := map[string]struct{}{}
+	var todo []ActionTodo
+	var active []ProcessSummary
+	var done []ProcessSummary
+	for _, process := range processes {
+		process.Progress = normalizeProgressKeys(process.Progress)
+		status := deriveProcessStatus(cfg.Workflow, &process)
+		summary := buildProcessSummary(cfg.Workflow, &process, status)
+		if status == "done" {
+			if _, ok := doneSeen[summary.ID]; !ok {
+				doneSeen[summary.ID] = struct{}{}
+				done = append(done, summary)
+			}
+			continue
+		}
+		availMap := computeAvailability(cfg.Workflow, &process)
+		for _, sub := range orderedSubsteps(cfg.Workflow) {
+			allowedRoles := substepRoles(sub)
+			matched := ""
+			for _, role := range allowedRoles {
+				if _, ok := roleSet[role]; ok {
+					matched = role
+					break
+				}
+			}
+			if matched == "" {
+				continue
+			}
+			stepStatus := "locked"
+			if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
+				stepStatus = "done"
+			} else if availMap[sub.SubstepID] {
+				stepStatus = "available"
+			}
+			if stepStatus == "available" {
+				key := summary.ID + "|" + sub.SubstepID
+				if _, ok := todoSeen[key]; !ok {
+					todoSeen[key] = struct{}{}
+					todo = append(todo, ActionTodo{
+						ProcessID: summary.ID,
+						SubstepID: sub.SubstepID,
+						Title:     sub.Title,
+						Role:      matched,
+						Status:    stepStatus,
+					})
+				}
+				if _, ok := activeSeen[summary.ID]; !ok {
+					activeSeen[summary.ID] = struct{}{}
+					active = append(active, summary)
+				}
+			}
+		}
 	}
-	if len(parts) == 3 {
-		actor.WorkflowKey = strings.TrimSpace(parts[2])
-	} else {
-		actor.WorkflowKey = strings.TrimSpace(routeWorkflowKey)
+	return todo, active, done
+}
+
+func containsRole(roles []string, role string) bool {
+	target := strings.TrimSpace(role)
+	for _, item := range roles {
+		if strings.TrimSpace(item) == target {
+			return true
+		}
 	}
-	return actor
+	return false
+}
+
+func substepRoles(sub WorkflowSub) []string {
+	if len(sub.Roles) > 0 {
+		out := make([]string, 0, len(sub.Roles))
+		for _, role := range sub.Roles {
+			trimmed := strings.TrimSpace(role)
+			if trimmed == "" {
+				continue
+			}
+			out = append(out, trimmed)
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	if strings.TrimSpace(sub.Role) != "" {
+		return []string{strings.TrimSpace(sub.Role)}
+	}
+	return nil
+}
+
+func intersectRoles(allowed []string, owned []string) []string {
+	ownedSet := map[string]struct{}{}
+	for _, role := range owned {
+		ownedSet[strings.TrimSpace(role)] = struct{}{}
+	}
+	var matches []string
+	for _, role := range allowed {
+		trimmed := strings.TrimSpace(role)
+		if _, ok := ownedSet[trimmed]; ok {
+			matches = append(matches, trimmed)
+		}
+	}
+	return matches
 }
 
 func sortedSteps(def WorkflowDef) []WorkflowStep {
@@ -2554,11 +4109,27 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 	for _, step := range steps {
 		row := TimelineStep{StepID: step.StepID, Title: step.Title}
 		for _, sub := range sortedSubsteps(step) {
-			meta := roleMetaFor(sub.Role, roleMeta)
+			allowedRoles := substepRoles(sub)
+			primaryRole := sub.Role
+			if strings.TrimSpace(primaryRole) == "" && len(allowedRoles) > 0 {
+				primaryRole = allowedRoles[0]
+			}
+			meta := roleMetaFor(primaryRole, roleMeta)
+			roleBadges := make([]TimelineRoleBadge, 0, len(allowedRoles))
+			for _, role := range allowedRoles {
+				badgeMeta := roleMetaFor(role, roleMeta)
+				roleBadges = append(roleBadges, TimelineRoleBadge{
+					ID:     role,
+					Label:  badgeMeta.Label,
+					Color:  badgeMeta.Color,
+					Border: badgeMeta.Border,
+				})
+			}
 			entry := TimelineSubstep{
 				SubstepID:  sub.SubstepID,
 				Title:      sub.Title,
-				Role:       sub.Role,
+				Role:       strings.Join(allowedRoles, ", "),
+				RoleBadges: roleBadges,
 				RoleLabel:  meta.Label,
 				RoleColor:  meta.Color,
 				RoleBorder: meta.Border,
@@ -2951,10 +4522,30 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
 	for _, sub := range ordered {
-		if onlyRole && sub.Role != actor.Role {
+		allowedRoles := substepRoles(sub)
+		ownedRoles := append([]string(nil), actor.RoleSlugs...)
+		if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
+			ownedRoles = []string{strings.TrimSpace(actor.Role)}
+		}
+		matchingRoles := intersectRoles(allowedRoles, ownedRoles)
+		primaryRole := sub.Role
+		if primaryRole == "" && len(allowedRoles) > 0 {
+			primaryRole = allowedRoles[0]
+		}
+		roleBadges := make([]ActionRoleBadge, 0, len(allowedRoles))
+		for _, role := range allowedRoles {
+			meta := roleMetaFor(role, roleMeta)
+			roleBadges = append(roleBadges, ActionRoleBadge{
+				ID:     role,
+				Label:  meta.Label,
+				Color:  meta.Color,
+				Border: meta.Border,
+			})
+		}
+		if onlyRole && strings.TrimSpace(actor.Role) != "" && !containsRole(allowedRoles, actor.Role) {
 			continue
 		}
-		meta := roleMetaFor(sub.Role, roleMeta)
+		meta := roleMetaFor(primaryRole, roleMeta)
 		status := "locked"
 		if process != nil {
 			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
@@ -2963,14 +4554,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				status = "available"
 			}
 		}
-		disabled := status != "available" || sub.Role != actor.Role
+		disabled := status != "available" || len(matchingRoles) == 0
 		reason := ""
 		if status == "locked" {
 			reason = "Locked by sequence"
 		} else if status == "done" {
 			reason = "Already completed"
-		} else if sub.Role != actor.Role {
-			reason = "Role mismatch"
+		} else if len(matchingRoles) == 0 {
+			reason = "Not authorized"
 		}
 		formSchema := ""
 		formUISchema := ""
@@ -3001,25 +4592,28 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			formUISchema = marshalJSONCompact(sub.UISchema)
 		}
 		actions = append(actions, ActionView{
-			ProcessID:    processIDString(process),
-			SubstepID:    sub.SubstepID,
-			Title:        sub.Title,
-			Role:         sub.Role,
-			RoleLabel:    meta.Label,
-			RoleColor:    meta.Color,
-			RoleBorder:   meta.Border,
-			InputKey:     sub.InputKey,
-			InputType:    sub.InputType,
-			FormSchema:   formSchema,
-			FormUISchema: formUISchema,
-			Status:       status,
-			DoneAt:       doneAt,
-			DoneBy:       doneBy,
-			DoneRole:     doneRole,
-			Values:       values,
-			Attachments:  attachments,
-			Disabled:     disabled,
-			Reason:       reason,
+			ProcessID:     processIDString(process),
+			SubstepID:     sub.SubstepID,
+			Title:         sub.Title,
+			Role:          primaryRole,
+			AllowedRoles:  allowedRoles,
+			RoleBadges:    roleBadges,
+			MatchingRoles: matchingRoles,
+			RoleLabel:     meta.Label,
+			RoleColor:     meta.Color,
+			RoleBorder:    meta.Border,
+			InputKey:      sub.InputKey,
+			InputType:     sub.InputType,
+			FormSchema:    formSchema,
+			FormUISchema:  formUISchema,
+			Status:        status,
+			DoneAt:        doneAt,
+			DoneBy:        doneBy,
+			DoneRole:      doneRole,
+			Values:        values,
+			Attachments:   attachments,
+			Disabled:      disabled,
+			Reason:        reason,
 		})
 	}
 	return actions
@@ -3428,7 +5022,7 @@ func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, proces
 		WorkflowKey: workflowKey,
 		ProcessID:   processIDString(process),
 		CurrentUser: actor,
-		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, false, s.roleMetaMap(cfg)),
 		Error:       message,
 		Timeline:    timeline,
 	}
@@ -3459,7 +5053,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, actor.Role),
 		ProcessID:   processID,
-		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, false, s.roleMetaMap(cfg)),
 		Error:       message,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {

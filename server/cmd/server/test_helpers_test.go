@@ -56,7 +56,11 @@ func testRuntimeConfig() RuntimeConfig {
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}
+  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
   {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
+  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
+  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
   {{else if eq .Body "home_body"}}{{template "home_body" .}}
   {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
@@ -68,7 +72,14 @@ func testTemplates() *template.Template {
 {{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "home_body"}}HOME {{.LatestProcessID}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
-{{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "timeline.html" .Timeline}}{{end}}
+{{define "dashboard_body"}}DASHBOARD_ME {{.UserID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
+{{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
+{{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
+{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
+{{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.RoleColor}} {{.RoleBorder}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
+{{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{template "timeline.html" .Timeline}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
@@ -97,21 +108,26 @@ func writeTwoSubstepWorkflowConfig(t testHelperT, path, name string) {
 		"    - id: \"1\"\n" +
 		"      title: \"Step 1\"\n" +
 		"      order: 1\n" +
+		"      organization: \"org1\"\n" +
 		"      substeps:\n" +
 		"        - id: \"1.1\"\n" +
 		"          title: \"Input 1\"\n" +
 		"          order: 1\n" +
-		"          role: \"dep1\"\n" +
+		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value1\"\n" +
 		"          inputType: \"string\"\n" +
 		"        - id: \"1.2\"\n" +
 		"          title: \"Input 2\"\n" +
 		"          order: 2\n" +
-		"          role: \"dep1\"\n" +
+		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value2\"\n" +
 		"          inputType: \"string\"\n" +
-		"departments:\n" +
-		"  - id: \"dep1\"\n" +
+		"organizations:\n" +
+		"  - slug: \"org1\"\n" +
+		"    name: \"Organization 1\"\n" +
+		"roles:\n" +
+		"  - orgSlug: \"org1\"\n" +
+		"    slug: \"dep1\"\n" +
 		"    name: \"Department 1\"\n" +
 		"users:\n" +
 		"  - id: \"u1\"\n" +

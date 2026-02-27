@@ -12,14 +12,23 @@
             <div class="substep-head">
               <span class="pill">{{.SubstepID}}</span>
               <span class="title">{{.Title}}</span>
-              <span
-                class="dept-badge"
-                style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
-              >{{.RoleLabel}}</span>
+              {{if .RoleBadges}}
+                {{range .RoleBadges}}
+                  <span
+                    class="dept-badge"
+                    style="--dept-color: {{.Color}}; --dept-border: {{.Border}}"
+                  >{{.Label}}</span>
+                {{end}}
+              {{else}}
+                <span
+                  class="dept-badge"
+                  style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+                >{{.RoleLabel}}</span>
+              {{end}}
               <span class="status">{{.Status}}</span>
             </div>
             <div class="substep-meta">
-              <span class="role">role: {{.Role}}</span>
+              <span class="role">roles: {{.Role}}</span>
               {{if eq .Status "done"}}
                 <span class="actor">by {{.DoneBy}} ({{.DoneRole}})</span>
                 <span class="time">{{.DoneAt}}</span>

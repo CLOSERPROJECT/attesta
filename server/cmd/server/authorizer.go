@@ -11,7 +11,7 @@ import (
 )
 
 type Authorizer interface {
-	CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error)
+	CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
 }
 
 type CerbosAuthorizer struct {
@@ -30,13 +30,23 @@ func NewCerbosAuthorizer(url string, client *http.Client, now func() time.Time) 
 	return &CerbosAuthorizer{url: url, client: client, now: now}
 }
 
-func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, sequenceOK bool) (bool, error) {
+func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
+	rolesAllowed := append([]string(nil), sub.Roles...)
+	if len(rolesAllowed) == 0 && strings.TrimSpace(sub.Role) != "" {
+		rolesAllowed = []string{strings.TrimSpace(sub.Role)}
+	}
+	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
+		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
+	}
 	request := map[string]interface{}{
 		"requestId": fmt.Sprintf("req-%d", a.now().UnixNano()),
 		"principal": map[string]interface{}{
 			"id":    actor.UserID,
-			"roles": []string{actor.Role},
+			"roles": []string{"authenticated"},
 			"attr": map[string]interface{}{
+				"orgSlug":     strings.TrimSpace(actor.OrgSlug),
+				"roleSlugs":   actor.RoleSlugs,
+				"activeRole":  strings.TrimSpace(actor.Role),
 				"workflowKey": strings.TrimSpace(actor.WorkflowKey),
 			},
 		},
@@ -45,7 +55,8 @@ func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, process
 			"instances": map[string]interface{}{
 				sub.SubstepID: map[string]interface{}{
 					"attr": map[string]interface{}{
-						"roleRequired": sub.Role,
+						"orgSlug":      strings.TrimSpace(stepOrgSlug),
+						"rolesAllowed": rolesAllowed,
 						"stepOrder":    stepOrder,
 						"substepOrder": sub.Order,
 						"substepId":    sub.SubstepID,

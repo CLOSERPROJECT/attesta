@@ -52,3 +52,76 @@ func TestBuildTimelineFileSubstepDisplay(t *testing.T) {
 		t.Fatalf("expected display value batch-1, got %q", valueEntry.DisplayValue)
 	}
 }
+
+func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
+	cfg := testRuntimeConfig()
+	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)
+	process := &Process{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				// Legacy actor shape: no orgSlug/roleSlugs fields.
+				DoneBy: &Actor{UserID: "legacy-user", Role: "dep1"},
+				Data:   map[string]interface{}{"value": 10.0},
+			},
+		},
+	}
+
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{})
+	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
+		t.Fatalf("unexpected timeline shape: %#v", timeline)
+	}
+	entry := timeline[0].Substeps[0]
+	if entry.DoneBy != "legacy-user" || entry.DoneRole != "dep1" {
+		t.Fatalf("unexpected legacy actor render: doneBy=%q doneRole=%q", entry.DoneBy, entry.DoneRole)
+	}
+}
+
+func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Title:  "Step 1",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Multi Role Substep",
+						Order:     1,
+						Roles:     []string{"dep1", "dep2"},
+						InputKey:  "value",
+						InputType: "string",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID:       primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{},
+	}
+	roleMeta := map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
+		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
+	}
+
+	timeline := buildTimeline(def, process, "workflow", roleMeta)
+	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
+		t.Fatalf("unexpected timeline shape: %#v", timeline)
+	}
+	entry := timeline[0].Substeps[0]
+	if len(entry.RoleBadges) != 2 {
+		t.Fatalf("role badge count = %d, want 2", len(entry.RoleBadges))
+	}
+	if entry.RoleBadges[0].ID != "dep1" || entry.RoleBadges[1].ID != "dep2" {
+		t.Fatalf("unexpected role badges: %#v", entry.RoleBadges)
+	}
+	if entry.Role != "dep1, dep2" {
+		t.Fatalf("role summary = %q, want %q", entry.Role, "dep1, dep2")
+	}
+}

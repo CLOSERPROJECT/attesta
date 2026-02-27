@@ -30,10 +30,44 @@
         <button type="button" class="theme-toggle" id="theme-toggle">
           Dark
         </button>
+        {{if .ShowLogout}}
+          <details class="account-menu">
+            <summary class="account-trigger" aria-label="Open account menu">
+              <svg class="account-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+                <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
+              </svg>
+            </summary>
+            <div class="account-dropdown">
+              <section class="account-menu-section">
+                <p class="account-menu-label">Signed in as</p>
+                <p class="account-menu-email">{{if .UserEmail}}{{.UserEmail}}{{else}}Account{{end}}</p>
+              </section>
+              {{if or .ShowOrgsLink .ShowMyOrgLink}}
+                <section class="account-menu-section">
+                  {{if .ShowOrgsLink}}<a href="/admin/orgs" class="account-menu-item">Orgs</a>{{end}}
+                  {{if .ShowMyOrgLink}}<a href="/org-admin/users" class="account-menu-item">My Org</a>{{end}}
+                </section>
+              {{end}}
+              <section class="account-menu-section">
+                <form method="post" action="/logout">
+                  <button type="submit" class="account-menu-item">Logout</button>
+                </form>
+              </section>
+            </div>
+          </details>
+        {{end}}
       </nav>
     </header>
     <main class="page">
       {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+      {{else if eq .Body "login_body"}}{{template "login_body" .}}
+      {{else if eq .Body "invite_body"}}{{template "invite_body" .}}
+      {{else if eq .Body "reset_request_body"}}{{template "reset_request_body" .}}
+      {{else if eq .Body "reset_set_body"}}{{template "reset_set_body" .}}
+      {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
+      {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
+      {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
       {{else if eq .Body "home_body"}}{{template "home_body" .}}
       {{else if eq .Body "process_body"}}{{template "process_body" .}}
       {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}

@@ -1,0 +1,120 @@
+{{define "org_admin_body"}}
+<section class="panel landing">
+  <h1>Org Admin</h1>
+  <p class="muted">Organization: <strong>{{.Organization.Name}}</strong> (<code>{{.Organization.Slug}}</code>)</p>
+  {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
+  {{if .InviteLink}}
+    <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
+  {{end}}
+</section>
+
+<section class="panel">
+  <h2>Create Role</h2>
+  <form method="post" action="/org-admin/roles" class="input-form">
+    <label for="role-name">Role name</label>
+    <input id="role-name" name="name" type="text" required />
+    <label for="role-color">Role color</label>
+    <input id="role-color" name="color" type="color" value="#000000" />
+    <label for="role-border">Role border color</label>
+    <input id="role-border" name="border" type="color" value="#000000" />
+    <button class="primary" type="submit">Create role</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Invite User</h2>
+  <form method="post" action="/org-admin/users" class="input-form">
+    <input type="hidden" name="intent" value="invite" />
+    <label for="user-email">Email</label>
+    <input id="user-email" name="email" type="email" required />
+    <fieldset class="checkbox-group">
+      <legend>Roles</legend>
+
+      {{range .Roles}}
+        <label class="checkbox-item">
+          <input type="checkbox" name="roles" value="{{.Slug}}" />
+          <span>{{.Name}} ({{.Slug}})</span>
+        </label>
+      {{end}}
+
+      <p class="muted">Select one or more roles (optional).</p>
+    </fieldset>
+    <button class="primary" type="submit">Create invite</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Organization users</h2>
+  {{if .Users}}
+    <ul class="users-list">
+      {{range .Users}}
+        <li class="users-item">
+          <span class="user-email">
+            {{.Email}}
+            {{if .Activated}}
+            <span class="pill" style="--pill-bg: #57c2a6;">Active</span>
+            {{else}}
+            <span class="pill" style="--pill-bg: #f2c64f;">Invited</span>
+            {{end}}
+          </span>
+          <div class="user-tags">
+            {{range .RoleOptions}}
+              {{if .Selected}}
+                <span class="pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}">
+                  {{.Name}}
+                </span>
+              {{end}}
+            {{end}}
+          </div>
+          <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
+            Manage
+          </button>
+          <dialog id="manage-user-{{.UserID}}" class="manage-dialog">
+            <div class="manage-dialog-card">
+              <header class="manage-dialog-head">
+                <div>
+                  <h3 class="manage-dialog-title">Manage User</h3>
+                  <p class="manage-dialog-subtitle">{{.Email}}</p>
+                </div>
+                <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">
+                  X
+                </button>
+              </header>
+
+              <form method="post" action="/org-admin/users" class="input-form">
+                <input type="hidden" name="intent" value="set_roles" />
+                <input type="hidden" name="userId" value="{{.UserID}}" />
+                <fieldset class="checkbox-group">
+                  <legend>Roles</legend>
+                  {{range .RoleOptions}}
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
+                      <span>{{.Name}} ({{.Slug}})</span>
+                    </label>
+                  {{end}}
+                  <div class="manage-dialog-actions">
+                    <button class="primary" type="submit">Save roles</button>
+                  </div>
+                </fieldset>
+              </form>
+
+              <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
+                <input type="hidden" name="intent" value="delete_user" />
+                <input type="hidden" name="userId" value="{{.UserID}}" />
+                <button type="submit" class="danger">Delete account</button>
+              </form>
+            </div>
+          </dialog>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="muted">No organization users yet.</p>
+  {{end}}
+</section>
+
+{{end}}
+
+{{define "org_admin.html"}}
+  {{template "layout.html" .}}
+{{end}}

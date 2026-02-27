@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -34,7 +35,108 @@ type Store interface {
 	SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error)
 	LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error)
 	OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error)
+	CreateOrganization(ctx context.Context, org Organization) (Organization, error)
+	GetOrganizationBySlug(ctx context.Context, slug string) (*Organization, error)
+	ListOrganizations(ctx context.Context) ([]Organization, error)
+	CreateRole(ctx context.Context, role Role) (Role, error)
+	GetRoleBySlug(ctx context.Context, orgSlug, roleSlug string) (*Role, error)
+	ListRolesByOrg(ctx context.Context, orgSlug string) ([]Role, error)
+	CreateUser(ctx context.Context, user AccountUser) (AccountUser, error)
+	GetUserByEmail(ctx context.Context, email string) (*AccountUser, error)
+	GetUserByUserID(ctx context.Context, userID string) (*AccountUser, error)
+	ListUsersByOrgID(ctx context.Context, orgID primitive.ObjectID) ([]AccountUser, error)
+	SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error
+	SetUserRoles(ctx context.Context, userID string, roleSlugs []string) error
+	SetUserLastLogin(ctx context.Context, userID string, lastLoginAt time.Time) error
+	DisableUser(ctx context.Context, userID string) error
+	CreateInvite(ctx context.Context, invite Invite) (Invite, error)
+	ListInvitesByCreator(ctx context.Context, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error)
+	LoadInviteByTokenHash(ctx context.Context, tokenHash string) (*Invite, error)
+	MarkInviteUsed(ctx context.Context, tokenHash string, usedAt time.Time) error
+	CreateSession(ctx context.Context, session Session) (Session, error)
+	LoadSessionByID(ctx context.Context, sessionID string) (*Session, error)
+	DeleteSession(ctx context.Context, sessionID string) error
+	CreatePasswordReset(ctx context.Context, reset PasswordReset) (PasswordReset, error)
+	LoadPasswordResetByTokenHash(ctx context.Context, tokenHash string) (*PasswordReset, error)
+	MarkPasswordResetUsed(ctx context.Context, tokenHash string, usedAt time.Time) error
 }
+
+type Organization struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	Slug      string             `bson:"slug"`
+	Name      string             `bson:"name"`
+	Color     string             `bson:"color,omitempty"`
+	Border    string             `bson:"border,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+}
+
+type Role struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	OrgID     primitive.ObjectID `bson:"orgId"`
+	OrgSlug   string             `bson:"orgSlug"`
+	Slug      string             `bson:"slug"`
+	Name      string             `bson:"name"`
+	Color     string             `bson:"color,omitempty"`
+	Border    string             `bson:"border,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+}
+
+type AccountUser struct {
+	ID              primitive.ObjectID  `bson:"_id,omitempty"`
+	UserID          string              `bson:"userId"`
+	OrgID           *primitive.ObjectID `bson:"orgId,omitempty"`
+	OrgSlug         string              `bson:"orgSlug,omitempty"`
+	Email           string              `bson:"email"`
+	PasswordHash    string              `bson:"passwordHash"`
+	RoleSlugs       []string            `bson:"roleSlugs"`
+	Status          string              `bson:"status"`
+	IsPlatformAdmin bool                `bson:"isPlatformAdmin,omitempty"`
+	CreatedAt       time.Time           `bson:"createdAt"`
+	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
+}
+
+type Invite struct {
+	ID              primitive.ObjectID `bson:"_id,omitempty"`
+	OrgID           primitive.ObjectID `bson:"orgId"`
+	Email           string             `bson:"email"`
+	UserID          string             `bson:"userId"`
+	RoleSlugs       []string           `bson:"roleSlugs"`
+	TokenHash       string             `bson:"tokenHash"`
+	ExpiresAt       time.Time          `bson:"expiresAt"`
+	UsedAt          *time.Time         `bson:"usedAt,omitempty"`
+	CreatedAt       time.Time          `bson:"createdAt"`
+	CreatedByUserID string             `bson:"createdByUserId"`
+}
+
+type Session struct {
+	ID          primitive.ObjectID  `bson:"_id,omitempty"`
+	SessionID   string              `bson:"sessionId"`
+	UserID      string              `bson:"userId"`
+	UserMongoID primitive.ObjectID  `bson:"userMongoId"`
+	OrgID       *primitive.ObjectID `bson:"orgId,omitempty"`
+	CreatedAt   time.Time           `bson:"createdAt"`
+	LastLoginAt time.Time           `bson:"lastLoginAt"`
+	ExpiresAt   time.Time           `bson:"expiresAt"`
+}
+
+type PasswordReset struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	Email     string             `bson:"email"`
+	UserID    string             `bson:"userId"`
+	TokenHash string             `bson:"tokenHash"`
+	ExpiresAt time.Time          `bson:"expiresAt"`
+	UsedAt    *time.Time         `bson:"usedAt,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+}
+
+const (
+	collectionOrganizations = "organizations"
+	collectionRoles         = "roles"
+	collectionUsers         = "users"
+	collectionInvites       = "invites"
+	collectionSessions      = "sessions"
+	collectionPasswordReset = "password_resets"
+)
 
 type MongoStore struct {
 	db     *mongo.Database
@@ -52,6 +154,7 @@ type mongoCollectionPort interface {
 	Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error)
 	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
+	CreateIndexes(ctx context.Context, models []mongo.IndexModel) error
 }
 
 type mongoSingleResultPort interface {
@@ -113,6 +216,11 @@ func (c mongoDriverCollection) UpdateOne(ctx context.Context, filter interface{}
 
 func (c mongoDriverCollection) FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
 	return mongoDriverSingleResult{result: c.collection.FindOneAndUpdate(ctx, filter, update, opts...)}
+}
+
+func (c mongoDriverCollection) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
+	_, err := c.collection.Indexes().CreateMany(ctx, models)
+	return err
 }
 
 type mongoDriverSingleResult struct {
@@ -407,6 +515,13 @@ type MemoryStore struct {
 	processes     map[primitive.ObjectID]Process
 	notarizations []Notarization
 	attachments   map[primitive.ObjectID]memoryAttachment
+	organizations map[string]Organization
+	roles         map[string]Role
+	usersByUserID map[string]AccountUser
+	usersByEmail  map[string]string
+	invites       map[string]Invite
+	sessions      map[string]Session
+	resets        map[string]PasswordReset
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -424,8 +539,15 @@ type memoryAttachment struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		processes:   map[primitive.ObjectID]Process{},
-		attachments: map[primitive.ObjectID]memoryAttachment{},
+		processes:     map[primitive.ObjectID]Process{},
+		attachments:   map[primitive.ObjectID]memoryAttachment{},
+		organizations: map[string]Organization{},
+		roles:         map[string]Role{},
+		usersByUserID: map[string]AccountUser{},
+		usersByEmail:  map[string]string{},
+		invites:       map[string]Invite{},
+		sessions:      map[string]Session{},
+		resets:        map[string]PasswordReset{},
 	}
 }
 
@@ -687,6 +809,409 @@ func (s *MemoryStore) OpenAttachmentDownload(_ context.Context, id primitive.Obj
 	return io.NopCloser(bytes.NewReader(content)), nil
 }
 
+func (s *MemoryStore) CreateOrganization(_ context.Context, org Organization) (Organization, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	if org.CreatedAt.IsZero() {
+		org.CreatedAt = now
+	}
+	org.Name = strings.TrimSpace(org.Name)
+	if org.Name == "" {
+		org.Name = strings.TrimSpace(org.Slug)
+	}
+	org.Slug = canonifySlug(org.Name)
+	if org.Slug == "" {
+		return Organization{}, errors.New("organization slug required")
+	}
+	if _, exists := s.organizations[org.Slug]; exists {
+		return Organization{}, errors.New("organization slug already exists")
+	}
+	if org.ID.IsZero() {
+		org.ID = primitive.NewObjectID()
+	}
+	s.organizations[org.Slug] = org
+	return org, nil
+}
+
+func (s *MemoryStore) GetOrganizationBySlug(_ context.Context, slug string) (*Organization, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	org, ok := s.organizations[canonifySlug(slug)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copy := org
+	return &copy, nil
+}
+
+func (s *MemoryStore) ListOrganizations(_ context.Context) ([]Organization, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	organizations := make([]Organization, 0, len(s.organizations))
+	for _, org := range s.organizations {
+		organizations = append(organizations, org)
+	}
+	sort.Slice(organizations, func(i, j int) bool {
+		return organizations[i].Name < organizations[j].Name
+	})
+	return organizations, nil
+}
+
+func (s *MemoryStore) CreateRole(_ context.Context, role Role) (Role, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	role.OrgSlug = canonifySlug(role.OrgSlug)
+	if _, exists := s.organizations[role.OrgSlug]; !exists {
+		return Role{}, errors.New("organization not found")
+	}
+	role.Name = strings.TrimSpace(role.Name)
+	if role.Name == "" {
+		role.Name = strings.TrimSpace(role.Slug)
+	}
+	role.Slug = canonifySlug(role.Name)
+	if role.Slug == "" {
+		return Role{}, errors.New("role slug required")
+	}
+	if role.CreatedAt.IsZero() {
+		role.CreatedAt = time.Now().UTC()
+	}
+	key := role.OrgSlug + ":" + role.Slug
+	if _, exists := s.roles[key]; exists {
+		return Role{}, errors.New("role already exists")
+	}
+	if role.ID.IsZero() {
+		role.ID = primitive.NewObjectID()
+	}
+	if role.OrgID.IsZero() {
+		org := s.organizations[role.OrgSlug]
+		role.OrgID = org.ID
+	}
+	s.roles[key] = role
+	return role, nil
+}
+
+func (s *MemoryStore) GetRoleBySlug(_ context.Context, orgSlug, roleSlug string) (*Role, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key := canonifySlug(orgSlug) + ":" + canonifySlug(roleSlug)
+	role, ok := s.roles[key]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copy := role
+	return &copy, nil
+}
+
+func (s *MemoryStore) ListRolesByOrg(_ context.Context, orgSlug string) ([]Role, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	canonOrg := canonifySlug(orgSlug)
+	roles := []Role{}
+	for key, role := range s.roles {
+		if strings.HasPrefix(key, canonOrg+":") {
+			roles = append(roles, role)
+		}
+	}
+	sort.Slice(roles, func(i, j int) bool {
+		return roles[i].Name < roles[j].Name
+	})
+	return roles, nil
+}
+
+func (s *MemoryStore) CreateUser(_ context.Context, user AccountUser) (AccountUser, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	user.UserID = strings.TrimSpace(user.UserID)
+	user.Email = strings.ToLower(strings.TrimSpace(user.Email))
+	user.OrgSlug = canonifyOptionalSlug(user.OrgSlug)
+	user.RoleSlugs = canonifyRoleSlugs(user.RoleSlugs)
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = time.Now().UTC()
+	}
+	if user.UserID == "" || user.Email == "" {
+		return AccountUser{}, errors.New("user id and email required")
+	}
+	if _, exists := s.usersByUserID[user.UserID]; exists {
+		return AccountUser{}, errors.New("user id already exists")
+	}
+	if _, exists := s.usersByEmail[user.Email]; exists {
+		return AccountUser{}, errors.New("email already exists")
+	}
+	if user.OrgSlug != "" {
+		org, exists := s.organizations[user.OrgSlug]
+		if !exists {
+			return AccountUser{}, errors.New("organization not found")
+		}
+		if user.OrgID == nil {
+			orgID := org.ID
+			user.OrgID = &orgID
+		}
+		for _, roleSlug := range user.RoleSlugs {
+			if _, exists := s.roles[user.OrgSlug+":"+roleSlug]; !exists {
+				return AccountUser{}, errors.New("role not found in organization")
+			}
+		}
+	}
+	if user.ID.IsZero() {
+		user.ID = primitive.NewObjectID()
+	}
+	s.usersByUserID[user.UserID] = user
+	s.usersByEmail[user.Email] = user.UserID
+	return user, nil
+}
+
+func (s *MemoryStore) GetUserByEmail(_ context.Context, email string) (*AccountUser, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	userID, ok := s.usersByEmail[strings.ToLower(strings.TrimSpace(email))]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	user := s.usersByUserID[userID]
+	copy := user
+	return &copy, nil
+}
+
+func (s *MemoryStore) GetUserByUserID(_ context.Context, userID string) (*AccountUser, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copy := user
+	return &copy, nil
+}
+
+func (s *MemoryStore) ListUsersByOrgID(_ context.Context, orgID primitive.ObjectID) ([]AccountUser, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	users := []AccountUser{}
+	for _, user := range s.usersByUserID {
+		if user.OrgID == nil || *user.OrgID != orgID {
+			continue
+		}
+		users = append(users, user)
+	}
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].Email < users[j].Email
+	})
+	return users, nil
+}
+
+func (s *MemoryStore) SetUserPasswordHash(_ context.Context, userID, passwordHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	user.PasswordHash = strings.TrimSpace(passwordHash)
+	s.usersByUserID[user.UserID] = user
+	return nil
+}
+
+func (s *MemoryStore) SetUserRoles(_ context.Context, userID string, roleSlugs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	canonRoles := canonifyRoleSlugs(roleSlugs)
+	for _, roleSlug := range canonRoles {
+		if _, exists := s.roles[user.OrgSlug+":"+roleSlug]; !exists {
+			return errors.New("role not found in organization")
+		}
+	}
+	user.RoleSlugs = canonRoles
+	s.usersByUserID[user.UserID] = user
+	return nil
+}
+
+func (s *MemoryStore) SetUserLastLogin(_ context.Context, userID string, lastLoginAt time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	timestamp := lastLoginAt.UTC()
+	user.LastLoginAt = &timestamp
+	s.usersByUserID[user.UserID] = user
+	return nil
+}
+
+func (s *MemoryStore) DisableUser(_ context.Context, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	user.Status = "deleted"
+	user.PasswordHash = ""
+	user.RoleSlugs = []string{}
+	s.usersByUserID[user.UserID] = user
+	return nil
+}
+
+func (s *MemoryStore) CreateInvite(_ context.Context, invite Invite) (Invite, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	invite.Email = strings.ToLower(strings.TrimSpace(invite.Email))
+	invite.TokenHash = hashLookupToken(invite.TokenHash)
+	invite.RoleSlugs = canonifyRoleSlugs(invite.RoleSlugs)
+	if invite.CreatedAt.IsZero() {
+		invite.CreatedAt = time.Now().UTC()
+	}
+	if _, exists := s.invites[invite.TokenHash]; exists {
+		return Invite{}, errors.New("invite token already exists")
+	}
+	if invite.ID.IsZero() {
+		invite.ID = primitive.NewObjectID()
+	}
+	s.invites[invite.TokenHash] = invite
+	return invite, nil
+}
+
+func (s *MemoryStore) ListInvitesByCreator(_ context.Context, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	creator := strings.TrimSpace(createdByUserID)
+	invites := []Invite{}
+	for _, invite := range s.invites {
+		if invite.CreatedByUserID != creator || invite.OrgID != orgID {
+			continue
+		}
+		invites = append(invites, invite)
+	}
+	sort.Slice(invites, func(i, j int) bool {
+		return invites[i].CreatedAt.After(invites[j].CreatedAt)
+	})
+	return invites, nil
+}
+
+func (s *MemoryStore) LoadInviteByTokenHash(_ context.Context, tokenHash string) (*Invite, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	invite, ok := s.invites[hashLookupToken(tokenHash)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copy := invite
+	return &copy, nil
+}
+
+func (s *MemoryStore) MarkInviteUsed(_ context.Context, tokenHash string, usedAt time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	hash := hashLookupToken(tokenHash)
+	invite, ok := s.invites[hash]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	if invite.UsedAt != nil {
+		return errors.New("invite already used")
+	}
+	timestamp := usedAt.UTC()
+	invite.UsedAt = &timestamp
+	s.invites[hash] = invite
+	return nil
+}
+
+func (s *MemoryStore) CreateSession(_ context.Context, session Session) (Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session.SessionID = strings.TrimSpace(session.SessionID)
+	if session.SessionID == "" {
+		return Session{}, errors.New("session id required")
+	}
+	if _, exists := s.sessions[session.SessionID]; exists {
+		return Session{}, errors.New("session id already exists")
+	}
+	if session.CreatedAt.IsZero() {
+		session.CreatedAt = time.Now().UTC()
+	}
+	if session.ID.IsZero() {
+		session.ID = primitive.NewObjectID()
+	}
+	s.sessions[session.SessionID] = session
+	return session, nil
+}
+
+func (s *MemoryStore) LoadSessionByID(_ context.Context, sessionID string) (*Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessions[strings.TrimSpace(sessionID)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copy := session
+	return &copy, nil
+}
+
+func (s *MemoryStore) DeleteSession(_ context.Context, sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := strings.TrimSpace(sessionID)
+	if _, ok := s.sessions[key]; !ok {
+		return mongo.ErrNoDocuments
+	}
+	delete(s.sessions, key)
+	return nil
+}
+
+func (s *MemoryStore) CreatePasswordReset(_ context.Context, reset PasswordReset) (PasswordReset, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	reset.Email = strings.ToLower(strings.TrimSpace(reset.Email))
+	reset.TokenHash = hashLookupToken(reset.TokenHash)
+	if reset.CreatedAt.IsZero() {
+		reset.CreatedAt = time.Now().UTC()
+	}
+	if _, exists := s.resets[reset.TokenHash]; exists {
+		return PasswordReset{}, errors.New("reset token already exists")
+	}
+	if reset.ID.IsZero() {
+		reset.ID = primitive.NewObjectID()
+	}
+	s.resets[reset.TokenHash] = reset
+	return reset, nil
+}
+
+func (s *MemoryStore) LoadPasswordResetByTokenHash(_ context.Context, tokenHash string) (*PasswordReset, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	reset, ok := s.resets[hashLookupToken(tokenHash)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copy := reset
+	return &copy, nil
+}
+
+func (s *MemoryStore) MarkPasswordResetUsed(_ context.Context, tokenHash string, usedAt time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	hash := hashLookupToken(tokenHash)
+	reset, ok := s.resets[hash]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	if reset.UsedAt != nil {
+		return errors.New("password reset already used")
+	}
+	timestamp := usedAt.UTC()
+	reset.UsedAt = &timestamp
+	s.resets[hash] = reset
+	return nil
+}
+
 func cloneProcess(process Process) Process {
 	cloned := process
 	if process.DPP != nil {
@@ -767,4 +1292,400 @@ func detectAttachmentContentType(filename string) string {
 		return "application/octet-stream"
 	}
 	return mimeType
+}
+
+var nonSlugPattern = regexp.MustCompile(`[^a-z0-9]+`)
+
+func canonifySlug(input string) string {
+	normalized := strings.ToLower(strings.TrimSpace(input))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = nonSlugPattern.ReplaceAllString(normalized, "-")
+	normalized = strings.Trim(normalized, "-")
+	if normalized == "" {
+		return "item"
+	}
+	return normalized
+}
+
+func canonifyRoleSlugs(roleSlugs []string) []string {
+	canon := make([]string, 0, len(roleSlugs))
+	seen := map[string]struct{}{}
+	for _, roleSlug := range roleSlugs {
+		slug := canonifySlug(roleSlug)
+		if slug == "" {
+			continue
+		}
+		if _, exists := seen[slug]; exists {
+			continue
+		}
+		seen[slug] = struct{}{}
+		canon = append(canon, slug)
+	}
+	return canon
+}
+
+func canonifyOptionalSlug(input string) string {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return ""
+	}
+	return canonifySlug(trimmed)
+}
+
+func hashLookupToken(token string) string {
+	hash := sha256.Sum256([]byte(strings.TrimSpace(token)))
+	return hex.EncodeToString(hash[:])
+}
+
+func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
+	indexes := map[string][]mongo.IndexModel{
+		collectionOrganizations: {
+			{Keys: bson.D{{Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true)},
+		},
+		collectionRoles: {
+			{Keys: bson.D{{Key: "orgId", Value: 1}, {Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true)},
+		},
+		collectionUsers: {
+			{Keys: bson.D{{Key: "email", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "userId", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "orgId", Value: 1}}},
+		},
+		collectionInvites: {
+			{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+			{Keys: bson.D{{Key: "email", Value: 1}}},
+		},
+		collectionSessions: {
+			{Keys: bson.D{{Key: "sessionId", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+			{Keys: bson.D{{Key: "userId", Value: 1}}},
+		},
+		collectionPasswordReset: {
+			{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},
+			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+		},
+	}
+
+	for name, models := range indexes {
+		if err := s.database().Collection(name).CreateIndexes(ctx, models); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *MongoStore) CreateOrganization(ctx context.Context, org Organization) (Organization, error) {
+	now := time.Now().UTC()
+	if org.CreatedAt.IsZero() {
+		org.CreatedAt = now
+	}
+	org.Name = strings.TrimSpace(org.Name)
+	if org.Name == "" {
+		org.Name = strings.TrimSpace(org.Slug)
+	}
+	org.Slug = canonifySlug(org.Name)
+	result, err := s.database().Collection(collectionOrganizations).InsertOne(ctx, org)
+	if err != nil {
+		return Organization{}, err
+	}
+	if insertedID, ok := result.InsertedID.(primitive.ObjectID); ok {
+		org.ID = insertedID
+	}
+	return org, nil
+}
+
+func (s *MongoStore) GetOrganizationBySlug(ctx context.Context, slug string) (*Organization, error) {
+	var org Organization
+	if err := s.database().Collection(collectionOrganizations).FindOne(ctx, bson.M{"slug": canonifySlug(slug)}).Decode(&org); err != nil {
+		return nil, err
+	}
+	return &org, nil
+}
+
+func (s *MongoStore) ListOrganizations(ctx context.Context) ([]Organization, error) {
+	cursor, err := s.database().Collection(collectionOrganizations).Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	organizations := []Organization{}
+	for cursor.Next(ctx) {
+		var org Organization
+		if err := cursor.Decode(&org); err != nil {
+			continue
+		}
+		organizations = append(organizations, org)
+	}
+	return organizations, nil
+}
+
+func (s *MongoStore) CreateRole(ctx context.Context, role Role) (Role, error) {
+	if role.CreatedAt.IsZero() {
+		role.CreatedAt = time.Now().UTC()
+	}
+	role.Name = strings.TrimSpace(role.Name)
+	if role.Name == "" {
+		role.Name = strings.TrimSpace(role.Slug)
+	}
+	role.Slug = canonifySlug(role.Name)
+	role.OrgSlug = canonifySlug(role.OrgSlug)
+	result, err := s.database().Collection(collectionRoles).InsertOne(ctx, role)
+	if err != nil {
+		return Role{}, err
+	}
+	if insertedID, ok := result.InsertedID.(primitive.ObjectID); ok {
+		role.ID = insertedID
+	}
+	return role, nil
+}
+
+func (s *MongoStore) GetRoleBySlug(ctx context.Context, orgSlug, roleSlug string) (*Role, error) {
+	var role Role
+	filter := bson.M{
+		"orgSlug": canonifySlug(orgSlug),
+		"slug":    canonifySlug(roleSlug),
+	}
+	if err := s.database().Collection(collectionRoles).FindOne(ctx, filter).Decode(&role); err != nil {
+		return nil, err
+	}
+	return &role, nil
+}
+
+func (s *MongoStore) ListRolesByOrg(ctx context.Context, orgSlug string) ([]Role, error) {
+	filter := bson.M{"orgSlug": canonifySlug(orgSlug)}
+	cursor, err := s.database().Collection(collectionRoles).Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	roles := []Role{}
+	for cursor.Next(ctx) {
+		var role Role
+		if err := cursor.Decode(&role); err != nil {
+			continue
+		}
+		roles = append(roles, role)
+	}
+	return roles, nil
+}
+
+func (s *MongoStore) CreateUser(ctx context.Context, user AccountUser) (AccountUser, error) {
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = time.Now().UTC()
+	}
+	user.Email = strings.ToLower(strings.TrimSpace(user.Email))
+	user.RoleSlugs = canonifyRoleSlugs(user.RoleSlugs)
+	user.OrgSlug = canonifyOptionalSlug(user.OrgSlug)
+	result, err := s.database().Collection(collectionUsers).InsertOne(ctx, user)
+	if err != nil {
+		return AccountUser{}, err
+	}
+	if insertedID, ok := result.InsertedID.(primitive.ObjectID); ok {
+		user.ID = insertedID
+	}
+	return user, nil
+}
+
+func (s *MongoStore) GetUserByEmail(ctx context.Context, email string) (*AccountUser, error) {
+	var user AccountUser
+	if err := s.database().Collection(collectionUsers).FindOne(ctx, bson.M{"email": strings.ToLower(strings.TrimSpace(email))}).Decode(&user); err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *MongoStore) GetUserByUserID(ctx context.Context, userID string) (*AccountUser, error) {
+	var user AccountUser
+	if err := s.database().Collection(collectionUsers).FindOne(ctx, bson.M{"userId": strings.TrimSpace(userID)}).Decode(&user); err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *MongoStore) ListUsersByOrgID(ctx context.Context, orgID primitive.ObjectID) ([]AccountUser, error) {
+	cursor, err := s.database().Collection(collectionUsers).Find(
+		ctx,
+		bson.M{"orgId": orgID},
+		options.Find().SetSort(bson.D{{Key: "email", Value: 1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	users := []AccountUser{}
+	for cursor.Next(ctx) {
+		var user AccountUser
+		if err := cursor.Decode(&user); err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+func (s *MongoStore) SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error {
+	_, err := s.database().Collection(collectionUsers).UpdateOne(
+		ctx,
+		bson.M{"userId": strings.TrimSpace(userID)},
+		bson.M{"$set": bson.M{"passwordHash": strings.TrimSpace(passwordHash)}},
+	)
+	return err
+}
+
+func (s *MongoStore) SetUserRoles(ctx context.Context, userID string, roleSlugs []string) error {
+	_, err := s.database().Collection(collectionUsers).UpdateOne(
+		ctx,
+		bson.M{"userId": strings.TrimSpace(userID)},
+		bson.M{"$set": bson.M{"roleSlugs": canonifyRoleSlugs(roleSlugs)}},
+	)
+	return err
+}
+
+func (s *MongoStore) SetUserLastLogin(ctx context.Context, userID string, lastLoginAt time.Time) error {
+	_, err := s.database().Collection(collectionUsers).UpdateOne(
+		ctx,
+		bson.M{"userId": strings.TrimSpace(userID)},
+		bson.M{"$set": bson.M{"lastLoginAt": lastLoginAt.UTC()}},
+	)
+	return err
+}
+
+func (s *MongoStore) DisableUser(ctx context.Context, userID string) error {
+	_, err := s.database().Collection(collectionUsers).UpdateOne(
+		ctx,
+		bson.M{"userId": strings.TrimSpace(userID)},
+		bson.M{"$set": bson.M{
+			"status":       "deleted",
+			"passwordHash": "",
+			"roleSlugs":    []string{},
+		}},
+	)
+	return err
+}
+
+func (s *MongoStore) CreateInvite(ctx context.Context, invite Invite) (Invite, error) {
+	if invite.CreatedAt.IsZero() {
+		invite.CreatedAt = time.Now().UTC()
+	}
+	invite.Email = strings.ToLower(strings.TrimSpace(invite.Email))
+	invite.TokenHash = hashLookupToken(invite.TokenHash)
+	invite.RoleSlugs = canonifyRoleSlugs(invite.RoleSlugs)
+	result, err := s.database().Collection(collectionInvites).InsertOne(ctx, invite)
+	if err != nil {
+		return Invite{}, err
+	}
+	if insertedID, ok := result.InsertedID.(primitive.ObjectID); ok {
+		invite.ID = insertedID
+	}
+	return invite, nil
+}
+
+func (s *MongoStore) ListInvitesByCreator(ctx context.Context, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error) {
+	cursor, err := s.database().Collection(collectionInvites).Find(
+		ctx,
+		bson.M{
+			"createdByUserId": strings.TrimSpace(createdByUserID),
+			"orgId":           orgID,
+		},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	invites := []Invite{}
+	for cursor.Next(ctx) {
+		var invite Invite
+		if err := cursor.Decode(&invite); err != nil {
+			continue
+		}
+		invites = append(invites, invite)
+	}
+	return invites, nil
+}
+
+func (s *MongoStore) LoadInviteByTokenHash(ctx context.Context, tokenHash string) (*Invite, error) {
+	var invite Invite
+	if err := s.database().Collection(collectionInvites).FindOne(ctx, bson.M{"tokenHash": hashLookupToken(tokenHash)}).Decode(&invite); err != nil {
+		return nil, err
+	}
+	return &invite, nil
+}
+
+func (s *MongoStore) MarkInviteUsed(ctx context.Context, tokenHash string, usedAt time.Time) error {
+	_, err := s.database().Collection(collectionInvites).UpdateOne(
+		ctx,
+		bson.M{"tokenHash": hashLookupToken(tokenHash), "usedAt": bson.M{"$exists": false}},
+		bson.M{"$set": bson.M{"usedAt": usedAt.UTC()}},
+	)
+	return err
+}
+
+func (s *MongoStore) CreateSession(ctx context.Context, session Session) (Session, error) {
+	if session.CreatedAt.IsZero() {
+		session.CreatedAt = time.Now().UTC()
+	}
+	session.SessionID = strings.TrimSpace(session.SessionID)
+	result, err := s.database().Collection(collectionSessions).InsertOne(ctx, session)
+	if err != nil {
+		return Session{}, err
+	}
+	if insertedID, ok := result.InsertedID.(primitive.ObjectID); ok {
+		session.ID = insertedID
+	}
+	return session, nil
+}
+
+func (s *MongoStore) LoadSessionByID(ctx context.Context, sessionID string) (*Session, error) {
+	var session Session
+	if err := s.database().Collection(collectionSessions).FindOne(ctx, bson.M{"sessionId": strings.TrimSpace(sessionID)}).Decode(&session); err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (s *MongoStore) DeleteSession(ctx context.Context, sessionID string) error {
+	_, err := s.database().Collection(collectionSessions).UpdateOne(
+		ctx,
+		bson.M{"sessionId": strings.TrimSpace(sessionID)},
+		bson.M{"$set": bson.M{"expiresAt": time.Now().UTC()}},
+	)
+	return err
+}
+
+func (s *MongoStore) CreatePasswordReset(ctx context.Context, reset PasswordReset) (PasswordReset, error) {
+	if reset.CreatedAt.IsZero() {
+		reset.CreatedAt = time.Now().UTC()
+	}
+	reset.Email = strings.ToLower(strings.TrimSpace(reset.Email))
+	reset.TokenHash = hashLookupToken(reset.TokenHash)
+	result, err := s.database().Collection(collectionPasswordReset).InsertOne(ctx, reset)
+	if err != nil {
+		return PasswordReset{}, err
+	}
+	if insertedID, ok := result.InsertedID.(primitive.ObjectID); ok {
+		reset.ID = insertedID
+	}
+	return reset, nil
+}
+
+func (s *MongoStore) LoadPasswordResetByTokenHash(ctx context.Context, tokenHash string) (*PasswordReset, error) {
+	var reset PasswordReset
+	if err := s.database().Collection(collectionPasswordReset).FindOne(ctx, bson.M{"tokenHash": hashLookupToken(tokenHash)}).Decode(&reset); err != nil {
+		return nil, err
+	}
+	return &reset, nil
+}
+
+func (s *MongoStore) MarkPasswordResetUsed(ctx context.Context, tokenHash string, usedAt time.Time) error {
+	_, err := s.database().Collection(collectionPasswordReset).UpdateOne(
+		ctx,
+		bson.M{"tokenHash": hashLookupToken(tokenHash), "usedAt": bson.M{"$exists": false}},
+		bson.M{"$set": bson.M{"usedAt": usedAt.UTC()}},
+	)
+	return err
 }

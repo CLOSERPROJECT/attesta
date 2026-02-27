@@ -103,11 +103,6 @@ func TestLegacyMutatingRoutesRequireWorkflowContext(t *testing.T) {
 			path: "/process/" + primitive.NewObjectID().Hex() + "/substep/1.1/complete",
 			call: server.handleLegacyProcessRoutes,
 		},
-		{
-			name: "impersonate",
-			path: "/impersonate",
-			call: server.handleLegacyImpersonate,
-		},
 	}
 
 	for _, tc := range tests {
@@ -135,11 +130,6 @@ func TestLegacyMutatingRoutesRejectWrongMethod(t *testing.T) {
 			path: "/process/start",
 			call: server.handleLegacyStartProcess,
 		},
-		{
-			name: "impersonate get",
-			path: "/impersonate",
-			call: server.handleLegacyImpersonate,
-		},
 	}
 
 	for _, tc := range tests {
@@ -152,4 +142,30 @@ func TestLegacyMutatingRoutesRejectWrongMethod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLegacyProcessRoutesAdditionalGuards(t *testing.T) {
+	t.Run("requires auth when enabled", func(t *testing.T) {
+		server := &Server{
+			store:       NewMemoryStore(),
+			tmpl:        testTemplates(),
+			enforceAuth: true,
+		}
+		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex(), nil)
+		rec := httptest.NewRecorder()
+		server.handleLegacyProcessRoutes(rec, req)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+	})
+
+	t.Run("invalid legacy process path", func(t *testing.T) {
+		server := &Server{store: NewMemoryStore(), configDir: "config"}
+		req := httptest.NewRequest(http.MethodGet, "/process/", nil)
+		rec := httptest.NewRecorder()
+		server.handleLegacyProcessRoutes(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
 }

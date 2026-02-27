@@ -33,6 +33,9 @@ func TestHandleProcessPageAndTimelineSuccess(t *testing.T) {
 	if !strings.Contains(pageRec.Body.String(), "PROCESS "+id.Hex()) {
 		t.Fatalf("expected process marker in page response, got %q", pageRec.Body.String())
 	}
+	if !strings.Contains(pageRec.Body.String(), "ACTION_LIST") {
+		t.Fatalf("expected action list in page response, got %q", pageRec.Body.String())
+	}
 
 	timelineReq := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/timeline", nil)
 	timelineRec := httptest.NewRecorder()

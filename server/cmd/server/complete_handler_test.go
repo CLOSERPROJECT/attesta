@@ -41,7 +41,6 @@ func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
-	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "malformed"})
 	rr := httptest.NewRecorder()
 
 	server.handleCompleteSubstep(rr, req, processID, "1.1")
@@ -51,8 +50,8 @@ func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 	}
 	id, _ := primitive.ObjectIDFromHex(processID)
 	process, _ := store.SnapshotProcess(id)
-	if process.Progress["1_1"].DoneBy == nil || process.Progress["1_1"].DoneBy.UserID != "u1" {
-		t.Fatalf("expected fallback actor u1|dep1, got %#v", process.Progress["1_1"].DoneBy)
+	if process.Progress["1_1"].DoneBy == nil || process.Progress["1_1"].DoneBy.UserID != "legacy-user" {
+		t.Fatalf("expected fallback actor legacy-user|dep1, got %#v", process.Progress["1_1"].DoneBy)
 	}
 }
 
@@ -268,7 +267,7 @@ func TestHandleCompleteSubstepReturns404ForWorkflowMismatch(t *testing.T) {
 	}
 }
 
-func TestHandleCompleteSubstepDeniesCrossWorkflowCookieReuse(t *testing.T) {
+func TestHandleCompleteSubstepDeniesInvalidRoleForWorkflowContext(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 
@@ -280,14 +279,13 @@ func TestHandleCompleteSubstepDeniesCrossWorkflowCookieReuse(t *testing.T) {
 	process.WorkflowKey = "secondary"
 	store.SeedProcess(process)
 
-	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10&activeRole=dep2"))
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "secondary",
 		Cfg: testRuntimeConfig(),
 	}))
 	req.Header.Set("HX-Request", "true")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1|workflow"})
 	rr := httptest.NewRecorder()
 
 	server.handleCompleteSubstep(rr, req, processID, "1.1")

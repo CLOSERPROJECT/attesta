@@ -37,24 +37,8 @@
 <section class="panel landing">
   <h1>Backoffice</h1>
   <p class="muted">Stream: <strong>{{.WorkflowName}}</strong></p>
-  <p class="muted">Choose a department to continue.</p>
-  {{if .Users}}
-    <div class="impersonate">
-      {{range .Users}}
-        <form method="post" action="{{$.WorkflowPath}}/impersonate">
-          <input type="hidden" name="userId" value="{{.ID}}" />
-          <input type="hidden" name="role" value="{{.Role}}" />
-          <button
-            type="submit"
-            class="dept-button"
-            style="--role-color: {{.RoleColor}}; --role-border: {{.RoleBorder}}"
-          >{{.RoleLabel}} ({{.Name}})</button>
-        </form>
-      {{end}}
-    </div>
-  {{else}}
-    <p class="muted">No users configured.</p>
-  {{end}}
+  <p class="muted">Backoffice access is deprecated. Use the dashboard.</p>
+  <p><a href="{{$.WorkflowPath}}/dashboard">Open dashboard</a></p>
 </section>
 {{end}}
 

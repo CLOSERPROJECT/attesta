@@ -1,4 +1,5 @@
 server/gen
+server/tmp
 
 # Docker volumes and runtime data
 *.log

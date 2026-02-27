@@ -1,0 +1,145 @@
+#+TITLE: Org Admin Slugs & User Management
+#+SUBTITLE: Enforce unique org/role slugs with clear errors; add multi-role invites, invite tracking, role editing, and account deletion in Org Admin
+#+DATE: 2026-02-27
+#+KEYWORDS: attesta, go, net/http, mongo, templates, org-admin, invites, roles, slugs
+
+Summary
+- Slugs: keep current uniqueness guarantees, but surface friendly “slug already exists” errors on `/admin/orgs` and `/org-admin/roles`.
+- Org admin: upgrade `/org-admin/users` to (1) invite with 0..N roles via multi-select, (2) show invites sent by the current org admin with accepted/expired status, and (3) allow editing a user’s roles or deleting (disabling) a user account.
+
+* DONE [#A] Make slug-collision failures explicit
+Effort: S
+Goal: Platform admin and org admin see a clear error when a new org/role would reuse an existing slug.
+Notes: Storage already enforces uniqueness (MemoryStore checks; Mongo unique indexes). This task is about UX + error mapping, not changing slug rules.
+
+** DONE [#A] Map duplicate slug errors to user-facing messages
+Why: Current handlers return generic “failed to create …”; requirement asks for a creation-blocking error when slugs collide.
+Change:
+- Update `server/cmd/server/main.go`:
+  - In `handleAdminOrgs` (POST `/admin/orgs`), detect “org slug already exists” and render with an explicit message like `organization slug already exists` (optionally include computed slug).
+  - In `handleOrgAdminRoles` (POST `/org-admin/roles`), detect “role already exists” and render with an explicit message like `role slug already exists`.
+  - Add a small helper for duplicate-key detection that works for both MemoryStore string errors and Mongo driver errors (prefer `mongo.IsDuplicateKeyError(err)` for Mongo).
+- Keep HTTP status behavior consistent with other validation paths (render page with status 200).
+Tests:
+- Add/extend unit tests in `server/cmd/server/admin_handler_test.go`:
+  - Creating org “Acme Org” then “Acme_Org” yields an error string containing `already exists` and does not increase org count.
+  - Creating role “QA Reviewer” then “QA_reviewer” yields an error string containing `already exists` and does not increase role count for the org.
+Done when:
+- Duplicate slug attempts render a specific error message on the same page and no new entity is created.
+
+* DONE [#A] Add store/query support for org-admin management views
+Effort: M
+Goal: `renderOrgAdmin` can show “invites I sent” and “users in my org”, and handlers can disable users without needing Mongo deletes.
+Notes: Prefer minimal Store interface extensions and implementations in both MemoryStore and MongoStore. Avoid hard-delete to prevent widening the Mongo adapter surface (currently no `DeleteOne` in ports).
+
+** DONE [#A] Extend Store with list + disable operations
+Why: Org-admin page needs to render invites/users and perform account deletion.
+Change:
+- Update `server/cmd/server/store.go` `Store` interface:
+  - `ListUsersByOrgID(ctx, orgID primitive.ObjectID) ([]AccountUser, error)`
+  - `ListInvitesByCreator(ctx, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error)`
+  - `DisableUser(ctx, userID string) error` (soft-delete semantics: clear password hash + roles; set status to `deleted`)
+- Implement in `MemoryStore`:
+  - `ListUsersByOrgID`: iterate `usersByUserID`, filter by `OrgID`, sort by `Email`.
+  - `ListInvitesByCreator`: iterate `invites`, filter by `CreatedByUserID` and `OrgID`, sort by `CreatedAt` desc.
+  - `DisableUser`: mutate stored user (set `Status="deleted"`, `PasswordHash=""`, `RoleSlugs=[]`).
+- Implement in `MongoStore`:
+  - `ListUsersByOrgID`: `Find` on `collectionUsers` filter `{orgId: orgID}`, sort by `email`.
+  - `ListInvitesByCreator`: `Find` on `collectionInvites` filter `{createdByUserId: ..., orgId: ...}`, sort by `createdAt` desc.
+  - `DisableUser`: `UpdateOne` on `collectionUsers` filter `{userId: ...}` set `{status:"deleted", passwordHash:"", roleSlugs:[]}`.
+- Optional (if performance matters): extend `EnsureAuthIndexes` to add non-unique indexes on `invites.createdByUserId` and `invites.orgId`.
+Tests:
+- Unit tests in `server/cmd/server/store_test.go` (or a new focused `*_test.go`) for MemoryStore:
+  - List methods return only matching org/creator and are sorted.
+  - DisableUser removes roles and prevents bcrypt login (indirectly via handler tests).
+Done when:
+- Store supports listing invites/users and disabling users for both Memory and Mongo implementations.
+
+* DONE [#A] Implement org-admin UX: multi-role invites, invite list, user role edits, user deletion
+Effort: M
+Goal: `/org-admin/users` page becomes the central org-admin console for invites and account management.
+Notes: Keep routes stable; implement multiple POST operations via a single handler using an `intent` form field to avoid adding new endpoints.
+
+** DONE [#A] Update OrgAdminView and renderOrgAdmin data flow
+Why: Template needs more data (invites, users, role options per user).
+Change:
+- Update `server/cmd/server/main.go`:
+  - Extend `OrgAdminView` with:
+    - `Users []OrgAdminUserRow` (a view model that does not expose `PasswordHash`)
+    - `Invites []OrgAdminInviteRow`
+  - Add view-model structs (in the same file near other view types), e.g.:
+    - `OrgAdminUserRow{UserID, Email, Status, Activated, RoleOptions []OrgAdminRoleOption}`
+    - `OrgAdminInviteRow{Email, RoleSlugs, CreatedAt, ExpiresAt, UsedAt, Status}`
+    - `OrgAdminRoleOption{Slug, Name, Selected}`
+  - Update `renderOrgAdmin` to:
+    - Load `roles` (existing) and also `users` via `ListUsersByOrgID(*user.OrgID)` excluding `status=="deleted"`.
+    - Load `invites` via `ListInvitesByCreator(user.UserID, *user.OrgID)`.
+    - Compute invite `Status`: `accepted` if `UsedAt!=nil`, else `expired` if `ExpiresAt.Before(now)`, else `pending`.
+    - Compute `Activated` for users as `PasswordHash != ""` (boolean only in view model).
+Tests:
+- Update `server/cmd/server/test_helpers_test.go` `testTemplates()` `org_admin_body` definition to include counts for the new collections (so new tests can assert): e.g. `INVITES {{len .Invites}} USERS {{len .Users}}` while keeping existing tokens used by current tests.
+Done when:
+- Rendering `/org-admin/users` shows roles + invite/user sections without leaking secrets.
+
+** DONE [#A] Support inviting with multiple roles (including none)
+Why: Requirement: org admin can invite a user with multiple roles; selection can be empty.
+Change:
+- Update `server/templates/org_admin.html`:
+  - Replace the single-role `<select name="role" required>` with a multi-select:
+    - `name="roles"` + `multiple` + not required.
+  - Add small helper text: “Select one or more roles (optional).”
+  - Add hidden field `intent=invite` in the invite form.
+- Update `server/cmd/server/main.go` `handleOrgAdminUsers` invite path:
+  - Parse roles from `r.Form["roles"]` (and for backward compatibility, also accept `role`).
+  - Allow zero roles.
+  - Validate each role exists in the org via `GetRoleBySlug` before persisting.
+  - If user exists, enforce `user.OrgID`/`OrgSlug` matches the admin’s org; otherwise show an error like `email already belongs to another organization`.
+  - Role update semantics for existing users: union (`existing ∪ selected`) to avoid accidental role removal; use the dedicated “edit roles” action for replacements.
+  - Create the invite with `Invite.RoleSlugs = selectedRoles` (possibly empty).
+Tests:
+- Update `server/cmd/server/admin_handler_test.go`:
+  - Replace `role=...` posts with multi-value `roles=...` posts.
+  - Add a test case for “no roles selected” that still creates an invite link.
+Done when:
+- Org admin can submit invite with multiple roles or none; invite link renders; user roles are updated as designed.
+
+** DONE [#A] Add “Invites I sent” section and user management actions
+Why: Requirement: org admin can see invites they sent, whether accepted, and can modify roles or delete an account.
+Change:
+- Update `server/templates/org_admin.html`:
+  - Add an “Invites I sent” table/list rendering `.Invites` (email, roles, status, created/expires).
+  - Add a “Users” table/list rendering `.Users` with:
+    - Activated indicator (derived, e.g. “Active” vs “Invited”).
+    - Multi-select roles pre-populated per user (`RoleOptions` with `Selected=true/false`).
+    - “Save roles” button posting `intent=set_roles`, `userId=...`, `roles=...`.
+    - “Delete account” button posting `intent=delete_user`, `userId=...`.
+- Update `server/cmd/server/main.go` `handleOrgAdminUsers` POST to support `intent`:
+  - `invite` (default)
+  - `set_roles`: validate target user exists and belongs to org; enforce invariants:
+    - Cannot remove `org-admin` from *your own* account.
+  - `delete_user`: disable user (soft delete); enforce invariants:
+    - Cannot delete yourself.
+    - Target user must belong to your org.
+Tests:
+- Add unit tests in `server/cmd/server/admin_handler_test.go`:
+  - `intent=set_roles` updates a user’s roles to exactly the submitted set.
+  - `intent=delete_user` hides user from subsequent render and prevents login (optional), and rejects self-delete.
+Done when:
+- Org admin page shows invites with accepted status and supports role edits + account deletion safely.
+
+* DONE [#B] Verification, edge cases, and rollout notes
+Effort: S
+Goal: Ensure behavior is robust and doesn’t introduce route/persistence regressions.
+Notes: Keep behavior consistent with existing handlers (render-on-error, redirect-on-success only where it already exists).
+
+** DONE [#B] Define edge-case behavior and document it
+Why: Avoid surprising admin UX and reduce support load.
+Change:
+- Document (in this plan’s implementation notes or as a short addition to `README.md` if desired):
+  - “Delete account” is a soft delete: clears roles and password, sets status `deleted`.
+  - Invite status is derived from `invites.usedAt` and `invites.expiresAt`.
+  - Inviting an existing email in another org is blocked.
+Tests:
+- N/A (doc-only), but ensure unit tests cover cross-org email rejection.
+Done when:
+- Implementer has a clear, written spec for the behaviors above and tests cover the sensitive cases.

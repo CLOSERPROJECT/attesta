@@ -54,6 +54,8 @@ type fakeMongoCollection struct {
 	updateOneUpdates    []interface{}
 	findOneAndUpdFilter []interface{}
 	findOneAndUpdUpdate []interface{}
+	createIndexesFn     func(ctx context.Context, models []mongo.IndexModel) error
+	createIndexesModels [][]mongo.IndexModel
 }
 
 func (c *fakeMongoCollection) InsertOne(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
@@ -100,6 +102,14 @@ func (c *fakeMongoCollection) FindOneAndUpdate(ctx context.Context, filter inter
 	return fakeSingleResult{}
 }
 
+func (c *fakeMongoCollection) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
+	c.createIndexesModels = append(c.createIndexesModels, models)
+	if c.createIndexesFn != nil {
+		return c.createIndexesFn(ctx, models)
+	}
+	return nil
+}
+
 type fakeSingleResult struct {
 	decodeFn func(v interface{}) error
 	err      error
@@ -143,6 +153,70 @@ func (c *fakeCursor) Decode(val interface{}) error {
 }
 
 func (c *fakeCursor) Close(ctx context.Context) error {
+	c.closed = true
+	return c.closeErr
+}
+
+type fakeAnyCursor struct {
+	items       []interface{}
+	decodeErrAt map[int]error
+	index       int
+	closed      bool
+	closeErr    error
+}
+
+func (c *fakeAnyCursor) Next(ctx context.Context) bool {
+	return c.index < len(c.items)
+}
+
+func (c *fakeAnyCursor) Decode(val interface{}) error {
+	if err, ok := c.decodeErrAt[c.index]; ok {
+		c.index++
+		return err
+	}
+	item := c.items[c.index]
+	c.index++
+	switch target := val.(type) {
+	case *Organization:
+		if v, ok := item.(Organization); ok {
+			*target = v
+			return nil
+		}
+	case *Role:
+		if v, ok := item.(Role); ok {
+			*target = v
+			return nil
+		}
+	case *AccountUser:
+		if v, ok := item.(AccountUser); ok {
+			*target = v
+			return nil
+		}
+	case *Session:
+		if v, ok := item.(Session); ok {
+			*target = v
+			return nil
+		}
+	case *Invite:
+		if v, ok := item.(Invite); ok {
+			*target = v
+			return nil
+		}
+	case *PasswordReset:
+		if v, ok := item.(PasswordReset); ok {
+			*target = v
+			return nil
+		}
+	case *Process:
+		if v, ok := item.(Process); ok {
+			*target = v
+			return nil
+		}
+	}
+	return errors.New("unsupported decode target")
+}
+
+func (c *fakeAnyCursor) Close(ctx context.Context) error {
 	c.closed = true
 	return c.closeErr
 }

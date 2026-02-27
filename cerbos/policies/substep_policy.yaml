@@ -5,11 +5,13 @@ resourcePolicy:
   rules:
     - actions: ["complete"]
       effect: EFFECT_ALLOW
-      roles: ["dep1", "dep2", "dep3"]
+      roles: ["authenticated"]
       condition:
         match:
           all:
             of:
               - expr: request.resource.attr.sequenceOk == true
-              - expr: request.resource.attr.roleRequired in request.principal.roles
-              - expr: request.resource.attr.workflowKey == request.principal.attr.workflowKey
+              - expr: request.principal.attr.workflowKey == request.resource.attr.workflowKey
+              - expr: request.principal.attr.orgSlug == request.resource.attr.orgSlug
+              - expr: request.principal.attr.activeRole in request.principal.attr.roleSlugs
+              - expr: request.principal.attr.activeRole in request.resource.attr.rolesAllowed

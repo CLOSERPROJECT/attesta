@@ -1,0 +1,17 @@
+{{define "reset_set_body"}}
+<section class="panel landing" style="max-width: 520px;">
+  <h1>Set New Password</h1>
+  {{if .Error}}
+    <p class="muted" style="color: #a91919;">{{.Error}}</p>
+  {{end}}
+  <form method="post" action="/reset/{{.Token}}" class="stack" style="gap: 12px;">
+    <label class="muted" for="password">New password</label>
+    <input id="password" name="password" type="password" required />
+    <button class="primary" type="submit">Update password</button>
+  </form>
+</section>
+{{end}}
+
+{{define "reset_set.html"}}
+  {{template "layout.html" .}}
+{{end}}

@@ -55,7 +55,7 @@ Your new stream will appear immediately on: http://localhost:3000
 ## What it does
 - Seeds a workflow definition on first run.
 - Starts a process instance with sequential substeps.
-- Backoffice impersonates roles (dep1, dep2, dep3) and completes actions.
+- Uses authenticated users with session cookies.
 - Cerbos enforces role + sequence gating.
 - Mongo stores process progress + notarizations.
 - SSE broadcasts realtime updates to timelines.
@@ -66,24 +66,24 @@ Start a process in a selected workflow (`workflow`):
 curl -X POST http://localhost:3000/w/workflow/process/start -i
 ```
 
-Impersonate dep1:
+Login and capture the session cookie:
 ```bash
-curl -X POST http://localhost:3000/w/workflow/impersonate \
-  -d 'userId=u1' -d 'role=dep1' -i
+curl -X POST http://localhost:3000/login \
+  -d 'email=admin@example.com' -d 'password=change-me' -i
 ```
 
 Complete substep 1.1 (dep1):
 ```bash
 curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/1.1/complete \
-  -H 'Cookie: demo_user=u1|dep1|workflow' \
-  -d 'value=10'
+  -H 'Cookie: attesta_session=SESSION_ID' \
+  -d 'value=10&activeRole=dep1'
 ```
 
 Attempt out-of-sequence (should fail):
 ```bash
 curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/complete \
-  -H 'Cookie: demo_user=u2|dep2|workflow' \
-  -d 'value=5'
+  -H 'Cookie: attesta_session=SESSION_ID' \
+  -d 'value=5&activeRole=dep2'
 ```
 
 ## Notes
@@ -91,6 +91,25 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 - MongoDB is expected at `mongodb://localhost:27017`.
 - Timeline updates pull `/w/:workflow/process/:id/timeline` when SSE events arrive.
 - Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
+
+## Deployment Checklist
+1. Set auth/bootstrap env vars:
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+   - `ANYONE_CAN_CREATE_ACCOUNT` (recommended `false` in production)
+   - `SESSION_TTL_DAYS` and `COOKIE_SECURE=true` behind HTTPS
+2. Start services and verify Mongo + Cerbos health.
+3. Login as platform admin and create organizations.
+4. Create org admin invites, then create org roles/users from org admin pages.
+5. Ensure workflow YAML org/role slugs match Mongo entities.
+6. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
+
+## Org admin edge cases
+- `Delete account` is a soft delete: the backend sets `status=deleted`, clears `passwordHash`, and clears `roleSlugs`.
+- Invite status is derived from invite timestamps:
+  - `accepted` when `usedAt` is present
+  - `expired` when `usedAt` is empty and `expiresAt` is in the past
+  - `pending` otherwise
+- Inviting an email that already belongs to another organization is rejected.
 
 ## DPP Digital Link configuration
 Configure GS1 Digital Link generation per workflow YAML (`server/config/*.yaml`):
