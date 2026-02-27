@@ -196,6 +196,46 @@ func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 	}
 }
 
+func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Multi Role",
+						Order:     1,
+						Roles:     []string{"dep1", "dep2"},
+						InputKey:  "value",
+						InputType: "string",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID:       primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{},
+	}
+	roleMeta := map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
+		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
+	}
+
+	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta)
+	action := findAction(t, actions, "1.1")
+	if len(action.RoleBadges) != 2 {
+		t.Fatalf("role badge count = %d, want 2", len(action.RoleBadges))
+	}
+	if action.RoleBadges[0].ID != "dep1" || action.RoleBadges[1].ID != "dep2" {
+		t.Fatalf("unexpected badge ids: %#v", action.RoleBadges)
+	}
+	if action.RoleBadges[0].Color != "#aaaaaa" || action.RoleBadges[1].Color != "#bbbbbb" {
+		t.Fatalf("unexpected badge colors: %#v", action.RoleBadges)
+	}
+}
+
 func findAction(t *testing.T, actions []ActionView, substepID string) ActionView {
 	t.Helper()
 	for _, action := range actions {

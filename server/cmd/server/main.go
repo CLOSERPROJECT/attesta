@@ -141,6 +141,7 @@ type TimelineSubstep struct {
 	SubstepID    string
 	Title        string
 	Role         string
+	RoleBadges   []TimelineRoleBadge
 	RoleLabel    string
 	RoleColor    string
 	RoleBorder   string
@@ -152,6 +153,13 @@ type TimelineSubstep struct {
 	FileName     string
 	FileSHA256   string
 	FileURL      string
+}
+
+type TimelineRoleBadge struct {
+	ID     string
+	Label  string
+	Color  string
+	Border string
 }
 
 type TimelineStep struct {
@@ -212,6 +220,7 @@ type ActionView struct {
 	Title         string
 	Role          string
 	AllowedRoles  []string
+	RoleBadges    []ActionRoleBadge
 	MatchingRoles []string
 	RoleLabel     string
 	RoleColor     string
@@ -228,6 +237,13 @@ type ActionView struct {
 	Attachments   []ActionAttachmentView
 	Disabled      bool
 	Reason        string
+}
+
+type ActionRoleBadge struct {
+	ID     string
+	Label  string
+	Color  string
+	Border string
 }
 
 type ActionKV struct {
@@ -2955,7 +2971,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	if !sequenceOK {
-		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && actor.Role == substep.Role {
+		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && containsRole(allowedRoles, actor.Role) {
 			if isHTMXRequest(r) {
 				s.renderActionList(w, r, process, actor, "")
 				return
@@ -4083,11 +4099,27 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 	for _, step := range steps {
 		row := TimelineStep{StepID: step.StepID, Title: step.Title}
 		for _, sub := range sortedSubsteps(step) {
-			meta := roleMetaFor(sub.Role, roleMeta)
+			allowedRoles := substepRoles(sub)
+			primaryRole := sub.Role
+			if strings.TrimSpace(primaryRole) == "" && len(allowedRoles) > 0 {
+				primaryRole = allowedRoles[0]
+			}
+			meta := roleMetaFor(primaryRole, roleMeta)
+			roleBadges := make([]TimelineRoleBadge, 0, len(allowedRoles))
+			for _, role := range allowedRoles {
+				badgeMeta := roleMetaFor(role, roleMeta)
+				roleBadges = append(roleBadges, TimelineRoleBadge{
+					ID:     role,
+					Label:  badgeMeta.Label,
+					Color:  badgeMeta.Color,
+					Border: badgeMeta.Border,
+				})
+			}
 			entry := TimelineSubstep{
 				SubstepID:  sub.SubstepID,
 				Title:      sub.Title,
-				Role:       sub.Role,
+				Role:       strings.Join(allowedRoles, ", "),
+				RoleBadges: roleBadges,
 				RoleLabel:  meta.Label,
 				RoleColor:  meta.Color,
 				RoleBorder: meta.Border,
@@ -4490,6 +4522,16 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if primaryRole == "" && len(allowedRoles) > 0 {
 			primaryRole = allowedRoles[0]
 		}
+		roleBadges := make([]ActionRoleBadge, 0, len(allowedRoles))
+		for _, role := range allowedRoles {
+			meta := roleMetaFor(role, roleMeta)
+			roleBadges = append(roleBadges, ActionRoleBadge{
+				ID:     role,
+				Label:  meta.Label,
+				Color:  meta.Color,
+				Border: meta.Border,
+			})
+		}
 		if onlyRole && strings.TrimSpace(actor.Role) != "" && !containsRole(allowedRoles, actor.Role) {
 			continue
 		}
@@ -4545,6 +4587,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			Title:         sub.Title,
 			Role:          primaryRole,
 			AllowedRoles:  allowedRoles,
+			RoleBadges:    roleBadges,
 			MatchingRoles: matchingRoles,
 			RoleLabel:     meta.Label,
 			RoleColor:     meta.Color,
@@ -4969,7 +5012,7 @@ func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, proces
 		WorkflowKey: workflowKey,
 		ProcessID:   processIDString(process),
 		CurrentUser: actor,
-		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, false, s.roleMetaMap(cfg)),
 		Error:       message,
 		Timeline:    timeline,
 	}
@@ -5000,7 +5043,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		CurrentUser: actor,
 		RoleLabel:   s.roleLabel(cfg, actor.Role),
 		ProcessID:   processID,
-		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, true, s.roleMetaMap(cfg)),
+		Actions:     buildActionList(cfg.Workflow, process, workflowKey, actor, false, s.roleMetaMap(cfg)),
 		Error:       message,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {
