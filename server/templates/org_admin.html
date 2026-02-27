@@ -23,13 +23,18 @@
     <input type="hidden" name="intent" value="invite" />
     <label for="user-email">Email</label>
     <input id="user-email" name="email" type="email" required />
-    <label for="roles">Roles</label>
-    <select id="roles" name="roles" multiple>
+    <fieldset class="checkbox-group">
+      <legend>Roles</legend>
+
       {{range .Roles}}
-        <option value="{{.Slug}}">{{.Name}} ({{.Slug}})</option>
+        <label class="checkbox-item">
+          <input type="checkbox" name="roles" value="{{.Slug}}" />
+          <span>{{.Name}} ({{.Slug}})</span>
+        </label>
       {{end}}
-    </select>
-    <p class="muted">Select one or more roles (optional).</p>
+
+      <p class="muted">Select one or more roles (optional).</p>
+    </fieldset>
     <button class="primary" type="submit">Create invite</button>
   </form>
 </section>
