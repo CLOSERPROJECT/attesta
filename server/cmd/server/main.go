@@ -1880,15 +1880,32 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	roleSlug := strings.TrimSpace(r.FormValue("role"))
-	if email == "" || roleSlug == "" {
-		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email and role are required")
+	intent := strings.TrimSpace(r.FormValue("intent"))
+	if intent == "" {
+		intent = "invite"
+	}
+	if intent != "invite" {
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "unsupported action")
 		return
 	}
-	if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
-		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+
+	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+	if email == "" {
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email is required")
 		return
+	}
+
+	selectedRoles := canonifyRoleSlugs(r.Form["roles"])
+	if len(selectedRoles) == 0 {
+		if legacyRole := strings.TrimSpace(r.FormValue("role")); legacyRole != "" {
+			selectedRoles = canonifyRoleSlugs([]string{legacyRole})
+		}
+	}
+	for _, roleSlug := range selectedRoles {
+		if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+			return
+		}
 	}
 
 	user, userErr := s.store.GetUserByEmail(r.Context(), email)
@@ -1899,7 +1916,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			OrgID:     &orgID,
 			OrgSlug:   admin.OrgSlug,
 			Email:     email,
-			RoleSlugs: []string{roleSlug},
+			RoleSlugs: selectedRoles,
 			Status:    "invited",
 			CreatedAt: s.nowUTC(),
 		})
@@ -1909,7 +1926,15 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		user = &created
 	} else {
-		_ = s.store.SetUserRoles(r.Context(), user.UserID, append(user.RoleSlugs, roleSlug))
+		if user.OrgID == nil || admin.OrgID == nil || *user.OrgID != *admin.OrgID || strings.TrimSpace(user.OrgSlug) != strings.TrimSpace(admin.OrgSlug) {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email already belongs to another organization")
+			return
+		}
+		mergedRoles := canonifyRoleSlugs(append(append([]string{}, user.RoleSlugs...), selectedRoles...))
+		if err := s.store.SetUserRoles(r.Context(), user.UserID, mergedRoles); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to update user roles")
+			return
+		}
 	}
 
 	token, tokenErr := newSessionID()
@@ -1921,7 +1946,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		OrgID:           *admin.OrgID,
 		Email:           email,
 		UserID:          user.UserID,
-		RoleSlugs:       []string{roleSlug},
+		RoleSlugs:       selectedRoles,
 		TokenHash:       token,
 		ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
 		CreatedAt:       s.nowUTC(),

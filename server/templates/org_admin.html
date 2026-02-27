@@ -20,15 +20,16 @@
 <section class="panel">
   <h2>Invite User</h2>
   <form method="post" action="/org-admin/users" class="input-form">
+    <input type="hidden" name="intent" value="invite" />
     <label for="user-email">Email</label>
     <input id="user-email" name="email" type="email" required />
-    <label for="role">Role</label>
-    <select id="role" name="role" required>
-      <option value="">Select role</option>
+    <label for="roles">Roles</label>
+    <select id="roles" name="roles" multiple>
       {{range .Roles}}
         <option value="{{.Slug}}">{{.Name}} ({{.Slug}})</option>
       {{end}}
     </select>
+    <p class="muted">Select one or more roles (optional).</p>
     <button class="primary" type="submit">Create invite</button>
   </form>
 </section>
