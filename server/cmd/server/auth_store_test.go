@@ -126,6 +126,43 @@ func TestMongoStoreEnsureAuthIndexesError(t *testing.T) {
 	}
 }
 
+func TestEnsureStoreIndexes(t *testing.T) {
+	t.Run("noop for non-mongo store", func(t *testing.T) {
+		if err := ensureStoreIndexes(t.Context(), NewMemoryStore()); err != nil {
+			t.Fatalf("ensureStoreIndexes returned error: %v", err)
+		}
+	})
+
+	t.Run("runs mongo auth indexes", func(t *testing.T) {
+		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{}}
+		store := &MongoStore{dbPort: db}
+		if err := ensureStoreIndexes(t.Context(), store); err != nil {
+			t.Fatalf("ensureStoreIndexes returned error: %v", err)
+		}
+		if len(db.collections[collectionOrganizations].createIndexesModels) != 1 {
+			t.Fatalf("expected organizations indexes creation call, got %#v", db.collections[collectionOrganizations].createIndexesModels)
+		}
+		if len(db.collections[collectionRoles].createIndexesModels) != 1 {
+			t.Fatalf("expected roles indexes creation call, got %#v", db.collections[collectionRoles].createIndexesModels)
+		}
+	})
+
+	t.Run("returns mongo index error", func(t *testing.T) {
+		indexErr := errors.New("indexes failed")
+		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionOrganizations: {
+				createIndexesFn: func(_ context.Context, _ []mongo.IndexModel) error {
+					return indexErr
+				},
+			},
+		}}
+		store := &MongoStore{dbPort: db}
+		if err := ensureStoreIndexes(t.Context(), store); !errors.Is(err, indexErr) {
+			t.Fatalf("ensureStoreIndexes error = %v, want %v", err, indexErr)
+		}
+	})
+}
+
 func indexOptionBool(opts *options.IndexOptions, name string) bool {
 	if opts == nil {
 		return false

@@ -597,6 +597,9 @@ func main() {
 		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 		enforceAuth:   true,
 	}
+	if err := ensureStoreIndexes(ctx, server.store); err != nil {
+		log.Printf("warning: failed to ensure auth indexes: %v", err)
+	}
 	if err := bootstrapPlatformAdmin(ctx, server.store, server.now); err != nil {
 		log.Fatal(err)
 	}
@@ -1634,6 +1637,14 @@ func accountMatchesOrg(user *AccountUser, orgID primitive.ObjectID, orgSlug stri
 	return strings.TrimSpace(user.OrgSlug) == strings.TrimSpace(orgSlug)
 }
 
+func ensureStoreIndexes(ctx context.Context, store Store) error {
+	mongoStore, ok := store.(*MongoStore)
+	if !ok || mongoStore == nil {
+		return nil
+	}
+	return mongoStore.EnsureAuthIndexes(ctx)
+}
+
 func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
 	user, _, ok := s.requireAuthenticatedPage(w, r)
 	if !ok {
@@ -1690,6 +1701,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			name := strings.TrimSpace(r.FormValue("name"))
 			if name == "" {
 				s.renderPlatformAdmin(w, admin, "", "organization name is required")
+				return
+			}
+			if existing, err := s.store.GetOrganizationBySlug(r.Context(), canonifySlug(name)); err == nil && existing != nil {
+				s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
 				return
 			}
 			if _, err := s.store.CreateOrganization(r.Context(), Organization{Name: name, CreatedAt: s.nowUTC()}); err != nil {
@@ -1866,6 +1881,10 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role name is required")
+			return
+		}
+		if existing, err := s.store.GetRoleBySlug(r.Context(), user.OrgSlug, canonifySlug(name)); err == nil && existing != nil {
+			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role slug already exists")
 			return
 		}
 		_, err := s.store.CreateRole(r.Context(), Role{
