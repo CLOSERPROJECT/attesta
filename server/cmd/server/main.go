@@ -468,9 +468,11 @@ type OrgAdminView struct {
 }
 
 type OrgAdminRoleOption struct {
-	Slug     string
-	Name     string
-	Selected bool
+	Slug       string
+	Name       string
+	RoleColor  string
+	RoleBorder string
+	Selected   bool
 }
 
 type OrgAdminUserRow struct {
@@ -1817,9 +1819,11 @@ func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlu
 		roleOptions := make([]OrgAdminRoleOption, 0, len(roles))
 		for _, role := range roles {
 			roleOptions = append(roleOptions, OrgAdminRoleOption{
-				Slug:     role.Slug,
-				Name:     role.Name,
-				Selected: containsRole(orgUser.RoleSlugs, role.Slug),
+				Slug:       role.Slug,
+				Name:       role.Name,
+				RoleColor:  role.Color,
+				RoleBorder: role.Border,
+				Selected:   containsRole(orgUser.RoleSlugs, role.Slug),
 			})
 		}
 		orgUsers = append(orgUsers, OrgAdminUserRow{
@@ -1879,6 +1883,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		name := strings.TrimSpace(r.FormValue("name"))
+		color := strings.TrimSpace(r.FormValue("color"))
+		border := strings.TrimSpace(r.FormValue("border"))
 		if name == "" {
 			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role name is required")
 			return
@@ -1891,6 +1897,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			OrgID:     *user.OrgID,
 			OrgSlug:   user.OrgSlug,
 			Name:      name,
+			Color:     color,
+			Border:    border,
 			CreatedAt: s.nowUTC(),
 		})
 		if err != nil {

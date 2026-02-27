@@ -13,6 +13,10 @@
   <form method="post" action="/org-admin/roles" class="input-form">
     <label for="role-name">Role name</label>
     <input id="role-name" name="name" type="text" required />
+    <label for="role-color">Role color</label>
+    <input id="role-color" name="color" type="color" value="#000000" />
+    <label for="role-border">Role border color</label>
+    <input id="role-border" name="border" type="color" value="#000000" />
     <button class="primary" type="submit">Create role</button>
   </form>
 </section>
@@ -96,12 +100,15 @@
               <form method="post" action="/org-admin/users" class="input-form">
                 <input type="hidden" name="intent" value="set_roles" />
                 <input type="hidden" name="userId" value="{{.UserID}}" />
-                <select name="roles" multiple>
+                <span>
                   {{range .RoleOptions}}
-                    <option value="{{.Slug}}" {{if .Selected}}selected{{end}}>{{.Name}} ({{.Slug}})</option>
+                    {{if .Selected}}
+                      <span class="dept-badge" style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}">
+                        {{.Name}}
+                      </span>
+                    {{end}}
                   {{end}}
-                </select>
-                <button type="submit">Save roles</button>
+                </span>
               </form>
             </td>
             <td>
