@@ -17,6 +17,8 @@ type adminFailingStore struct {
 	failCreateUser         bool
 	failCreateInvite       bool
 	failCreateRole         bool
+	failSetUserRoles       bool
+	failDisableUser        bool
 }
 
 func (s *adminFailingStore) CreateOrganization(ctx context.Context, org Organization) (Organization, error) {
@@ -45,6 +47,20 @@ func (s *adminFailingStore) CreateInvite(ctx context.Context, invite Invite) (In
 		return Invite{}, errors.New("create invite failed")
 	}
 	return s.MemoryStore.CreateInvite(ctx, invite)
+}
+
+func (s *adminFailingStore) SetUserRoles(ctx context.Context, userID string, roleSlugs []string) error {
+	if s.failSetUserRoles {
+		return errors.New("set user roles failed")
+	}
+	return s.MemoryStore.SetUserRoles(ctx, userID, roleSlugs)
+}
+
+func (s *adminFailingStore) DisableUser(ctx context.Context, userID string) error {
+	if s.failDisableUser {
+		return errors.New("disable user failed")
+	}
+	return s.MemoryStore.DisableUser(ctx, userID)
 }
 
 func createSessionForTestUser(t *testing.T, store *MemoryStore, user AccountUser) string {
@@ -707,6 +723,171 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 	if !strings.Contains(selfRec.Body.String(), "cannot delete yourself") {
 		t.Fatalf("expected self-delete protection message, got %q", selfRec.Body.String())
 	}
+}
+
+func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
+	base := NewMemoryStore()
+	orgA, err := base.CreateOrganization(t.Context(), Organization{Name: "Org A"})
+	if err != nil {
+		t.Fatalf("CreateOrganization orgA error: %v", err)
+	}
+	orgB, err := base.CreateOrganization(t.Context(), Organization{Name: "Org B"})
+	if err != nil {
+		t.Fatalf("CreateOrganization orgB error: %v", err)
+	}
+	_, _ = base.CreateRole(t.Context(), Role{OrgID: orgA.ID, OrgSlug: orgA.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	_, _ = base.CreateRole(t.Context(), Role{OrgID: orgA.ID, OrgSlug: orgA.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
+	_, _ = base.CreateRole(t.Context(), Role{OrgID: orgB.ID, OrgSlug: orgB.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
+
+	orgAID := orgA.ID
+	orgBID := orgB.ID
+	adminUser, err := base.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-errors",
+		OrgID:     &orgAID,
+		OrgSlug:   orgA.Slug,
+		Email:     "org-admin-errors@orga.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser admin error: %v", err)
+	}
+	if _, err := base.CreateUser(t.Context(), AccountUser{
+		UserID:    "same-org-user",
+		OrgID:     &orgAID,
+		OrgSlug:   orgA.Slug,
+		Email:     "same-org-user@orga.org",
+		RoleSlugs: []string{"qa-reviewer"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser same-org error: %v", err)
+	}
+	if _, err := base.CreateUser(t.Context(), AccountUser{
+		UserID:    "other-org-user",
+		OrgID:     &orgBID,
+		OrgSlug:   orgB.Slug,
+		Email:     "other-org-user@orgb.org",
+		RoleSlugs: []string{"qa-reviewer"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser other-org error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, base, adminUser)
+
+	newServer := func(store Store) *Server {
+		return &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+	}
+	newPost := func(payload string) (*http.Request, *httptest.ResponseRecorder) {
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		return req, httptest.NewRecorder()
+	}
+
+	t.Run("unsupported action", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=nope")
+		server.handleOrgAdminUsers(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "unsupported action") {
+			t.Fatalf("expected unsupported action error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("set roles missing user id", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=set_roles")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "user is required") {
+			t.Fatalf("expected user required error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("set roles user not found", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=set_roles&userId=missing&roles=qa-reviewer")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "user not found") {
+			t.Fatalf("expected user not found error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("set roles cross org user", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=set_roles&userId=other-org-user&roles=qa-reviewer")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "user does not belong to your organization") {
+			t.Fatalf("expected cross-org user error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("set roles role not found", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=set_roles&userId=same-org-user&roles=missing-role")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "role not found") {
+			t.Fatalf("expected role not found error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("set roles update failure", func(t *testing.T) {
+		server := newServer(&adminFailingStore{MemoryStore: base, failSetUserRoles: true})
+		req, rec := newPost("intent=set_roles&userId=same-org-user&roles=qa-reviewer")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "failed to update user roles") {
+			t.Fatalf("expected set roles failure message, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("delete user missing id", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=delete_user")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "user is required") {
+			t.Fatalf("expected user required error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("delete user not found", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=delete_user&userId=missing")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "user not found") {
+			t.Fatalf("expected user not found error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("delete user cross org", func(t *testing.T) {
+		server := newServer(base)
+		req, rec := newPost("intent=delete_user&userId=other-org-user")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "user does not belong to your organization") {
+			t.Fatalf("expected cross-org delete error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("delete user failure", func(t *testing.T) {
+		server := newServer(&adminFailingStore{MemoryStore: base, failDisableUser: true})
+		req, rec := newPost("intent=delete_user&userId=same-org-user")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "failed to delete user") {
+			t.Fatalf("expected delete failure error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("invite update roles failure", func(t *testing.T) {
+		server := newServer(&adminFailingStore{MemoryStore: base, failSetUserRoles: true})
+		req, rec := newPost("intent=invite&email=same-org-user%40orga.org&roles=qa-reviewer")
+		server.handleOrgAdminUsers(rec, req)
+		if !strings.Contains(rec.Body.String(), "failed to update user roles") {
+			t.Fatalf("expected invite update roles failure message, got %q", rec.Body.String())
+		}
+	})
 }
 
 func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
