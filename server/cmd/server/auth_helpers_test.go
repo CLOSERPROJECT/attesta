@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -240,4 +243,71 @@ func TestRequireAuthenticatedAndOrgAdminGuards(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec3.Code, http.StatusUnauthorized)
 	}
 
+}
+
+func TestIsDuplicateSlugError(t *testing.T) {
+	if isDuplicateSlugError(nil) {
+		t.Fatal("expected nil error to be non-duplicate")
+	}
+
+	dupErr := mongo.WriteException{
+		WriteErrors: []mongo.WriteError{{Code: 11000, Message: "E11000 duplicate key"}},
+	}
+	if !isDuplicateSlugError(dupErr) {
+		t.Fatal("expected mongo duplicate-key error to be recognized")
+	}
+
+	if !isDuplicateSlugError(errors.New("slug already exists")) {
+		t.Fatal("expected slug conflict message to be recognized")
+	}
+	if !isDuplicateSlugError(errors.New("role already exists")) {
+		t.Fatal("expected role conflict message to be recognized")
+	}
+	if !isDuplicateSlugError(errors.New("duplicate key")) {
+		t.Fatal("expected duplicate key message to be recognized")
+	}
+	if isDuplicateSlugError(errors.New("something else")) {
+		t.Fatal("expected unrelated error to be non-duplicate")
+	}
+}
+
+func TestRequestedRoleSlugs(t *testing.T) {
+	form := url.Values{}
+	form["roles"] = []string{" org-admin ", "org_admin", "dep1", "dep1"}
+	got := requestedRoleSlugs(form)
+	if len(got) != 2 || got[0] != "org-admin" || got[1] != "dep1" {
+		t.Fatalf("requestedRoleSlugs roles = %#v, want [org-admin dep1]", got)
+	}
+
+	legacy := url.Values{}
+	legacy.Set("role", " dep2 ")
+	got = requestedRoleSlugs(legacy)
+	if len(got) != 1 || got[0] != "dep2" {
+		t.Fatalf("requestedRoleSlugs legacy role = %#v, want [dep2]", got)
+	}
+
+	empty := requestedRoleSlugs(url.Values{})
+	if len(empty) != 0 {
+		t.Fatalf("requestedRoleSlugs empty = %#v, want []", empty)
+	}
+}
+
+func TestAccountMatchesOrg(t *testing.T) {
+	orgID := primitive.NewObjectID()
+	otherID := primitive.NewObjectID()
+	if accountMatchesOrg(nil, orgID, "acme") {
+		t.Fatal("expected nil user mismatch")
+	}
+	if accountMatchesOrg(&AccountUser{UserID: "u"}, orgID, "acme") {
+		t.Fatal("expected missing user org mismatch")
+	}
+	if accountMatchesOrg(&AccountUser{UserID: "u", OrgID: &otherID, OrgSlug: "acme"}, orgID, "acme") {
+		t.Fatal("expected different org ID mismatch")
+	}
+	if accountMatchesOrg(&AccountUser{UserID: "u", OrgID: &orgID, OrgSlug: "acme"}, orgID, "other") {
+		t.Fatal("expected different org slug mismatch")
+	}
+	if !accountMatchesOrg(&AccountUser{UserID: "u", OrgID: &orgID, OrgSlug: " acme "}, orgID, "acme") {
+		t.Fatal("expected matching org ID and slug")
+	}
 }

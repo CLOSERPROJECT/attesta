@@ -63,7 +63,7 @@ const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
 const workflowKey = root?.dataset?.workflowKey;
 const timeline = document.getElementById("timeline");
-const processDownloads = document.getElementById("process-downloads");
+const actionArea = document.getElementById("action-area");
 
 const focusNextActionInput = () => {
   const nextInput = document.querySelector(
@@ -79,6 +79,30 @@ const resolveAbsoluteURL = (value) => {
     return new URL(value, window.location.origin).toString();
   } catch (_err) {
     return value;
+  }
+};
+
+const loadProcessActionArea = async (substepId = "") => {
+  if (!processId || !workflowKey || !actionArea) {
+    return;
+  }
+  const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
+  const url = `/w/${workflowKey}/process/${processId}/actions${query}`;
+  if (window.htmx?.ajax) {
+    window.htmx.ajax("GET", url, {
+      target: "#action-area",
+      swap: "innerHTML",
+    });
+    return;
+  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return;
+    }
+    const html = await response.text();
+    actionArea.innerHTML = html;
+  } catch (_err) {
   }
 };
 
@@ -508,32 +532,10 @@ if (processId && workflowKey && timeline) {
   const source = new EventSource(
     `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`
   );
-  source.addEventListener("process-updated", async () => {
-    try {
-      const response = await fetch(`/w/${workflowKey}/process/${processId}/timeline`);
-      if (!response.ok) {
-        return;
-      }
-      const html = await response.text();
-      timeline.innerHTML = html;
-    } catch (err) {
-      // keep UI responsive even if SSE fails
-    }
-    if (processDownloads) {
-      try {
-        const response = await fetch(`/w/${workflowKey}/process/${processId}/downloads`);
-        if (!response.ok) {
-          return;
-        }
-        const html = await response.text();
-        const current = document.getElementById("process-downloads");
-        if (current) {
-          current.outerHTML = html;
-        }
-      } catch (err) {
-        // keep UI responsive even if SSE fails
-      }
-    }
+  source.addEventListener("process-updated", () => {
+    const selected = document.querySelector(".substep-selected.js-substep-nav");
+    const selectedSubstepId = selected instanceof HTMLElement ? selected.dataset.substepId || "" : "";
+    void loadProcessActionArea(selectedSubstepId);
   });
 }
 
@@ -562,10 +564,46 @@ document.body.addEventListener("click", (event) => {
   }
   const shareButton = target.closest(".js-share-link");
   if (!(shareButton instanceof HTMLButtonElement)) {
+    const substepNav = target.closest(".js-substep-nav");
+    if (!(substepNav instanceof HTMLElement) || !processId || !workflowKey) {
+      return;
+    }
+    if (target.closest("a, button, input, select, textarea")) {
+      return;
+    }
+    const substepID = (substepNav.dataset.substepId || "").trim();
+    if (!substepID) {
+      return;
+    }
+    event.preventDefault();
+    void loadProcessActionArea(substepID);
     return;
   }
   event.preventDefault();
   void shareLink(shareButton);
+});
+
+document.body.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const substepNav = target.closest(".js-substep-nav");
+  if (!(substepNav instanceof HTMLElement) || !processId || !workflowKey) {
+    return;
+  }
+  if (target.closest("a, button, input, select, textarea")) {
+    return;
+  }
+  const substepID = (substepNav.dataset.substepId || "").trim();
+  if (!substepID) {
+    return;
+  }
+  event.preventDefault();
+  void loadProcessActionArea(substepID);
 });
 
 const deptRoot = document.querySelector("[data-dept-role]");

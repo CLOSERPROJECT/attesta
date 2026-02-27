@@ -219,7 +219,15 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 		WorkflowKey: "workflow",
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
-		Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done"},
+			"1_2": {State: "done"},
+			"1_3": {State: "done"},
+			"2_1": {State: "done"},
+			"2_2": {State: "done"},
+			"3_1": {State: "done"},
+			"3_2": {State: "done"},
+		},
 		DPP: &ProcessDPP{
 			GTIN:   "09506000134352",
 			Lot:    "LOT-001",

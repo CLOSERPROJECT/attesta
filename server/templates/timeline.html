@@ -1,56 +1,61 @@
 {{define "timeline.html"}}
-<div class="timeline">
-  {{range .}}
-    <div class="timeline-step">
-      <h3>Step {{.StepID}} - {{.Title}}</h3>
-      <ul>
-        {{range .Substeps}}
-          <li
-            class="substep substep-{{.Status}}"
-            style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
-          >
-            <div class="substep-head">
-              <span class="pill">{{.SubstepID}}</span>
-              <span class="title">{{.Title}}</span>
-              {{if .RoleBadges}}
-                {{range .RoleBadges}}
+  <div class="timeline-list">
+    {{range .}}
+      <details class="timeline-step" {{if .Expanded}}open{{end}}>
+        <summary class="timeline-step-summary" aria-label="Open stream step">
+          Step {{.StepID}} - {{.Title}}{{if .OrgName}} - {{.OrgName}}{{end}}
+        </summary>
+        <ul class="timeline-substeps">
+          {{range .Substeps}}
+            <li
+              class="substep js-substep-nav substep-{{.Status}}{{if .Selected}} substep-selected{{end}}"
+              data-substep-id="{{.SubstepID}}"
+              style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+              tabindex="0"
+              role="button"
+            >
+              <div class="substep-head">
+                <span class="pill">{{.SubstepID}}</span>
+                <span class="title">{{.Title}}</span>
+                {{if .RoleBadges}}
+                  {{range .RoleBadges}}
+                    <span
+                      class="dept-badge"
+                      style="--dept-color: {{.Color}}; --dept-border: {{.Border}}"
+                    >{{.Label}}</span>
+                  {{end}}
+                {{else}}
                   <span
                     class="dept-badge"
-                    style="--dept-color: {{.Color}}; --dept-border: {{.Border}}"
-                  >{{.Label}}</span>
+                    style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+                  >{{.RoleLabel}}</span>
                 {{end}}
-              {{else}}
-                <span
-                  class="dept-badge"
-                  style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
-                >{{.RoleLabel}}</span>
-              {{end}}
-              <span class="status">{{.Status}}</span>
-            </div>
-            <div class="substep-meta">
-              <span class="role">roles: {{.Role}}</span>
-              {{if eq .Status "done"}}
-                <span class="actor">by {{.DoneBy}} ({{.DoneRole}})</span>
-                <span class="time">{{.DoneAt}}</span>
-                {{if .FileURL}}
-                  <span class="data">file: {{.FileName}}</span>
-                  <a class="secondary" href="{{.FileURL}}">Download</a>
-                  {{if .FileSHA256}}
-                    <span class="data data-hash">
-                      <span>sha256:</span>
-                      <code class="hash-value" title="{{.FileSHA256}}">{{.FileSHA256}}</code>
-                      <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
-                    </span>
+                <span class="status">{{.Status}}</span>
+              </div>
+              <div class="substep-meta">
+                <span class="role">roles: {{.Role}}</span>
+                {{if eq .Status "done"}}
+                  <span class="actor">by {{.DoneBy}} ({{.DoneRole}})</span>
+                  <span class="time">{{.DoneAt}}</span>
+                  {{if .FileURL}}
+                    <span class="data">file: {{.FileName}}</span>
+                    <a class="secondary" href="{{.FileURL}}">Download</a>
+                    {{if .FileSHA256}}
+                      <span class="data data-hash">
+                        <span>sha256:</span>
+                        <code class="hash-value" title="{{.FileSHA256}}">{{.FileSHA256}}</code>
+                        <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
+                      </span>
+                    {{end}}
+                  {{else if .DisplayValue}}
+                    <span class="data">value: {{.DisplayValue}}</span>
                   {{end}}
-                {{else if .DisplayValue}}
-                  <span class="data">value: {{.DisplayValue}}</span>
                 {{end}}
-              {{end}}
-            </div>
-          </li>
-        {{end}}
-      </ul>
-    </div>
-  {{end}}
-</div>
+              </div>
+            </li>
+          {{end}}
+        </ul>
+      </details>
+    {{end}}
+  </div>
 {{end}}

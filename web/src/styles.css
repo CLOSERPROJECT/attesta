@@ -75,6 +75,30 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Shared inline SVG icon style */
+.icon-svg,
+svg.bi {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: -0.125em;
+  fill: currentColor;
+}
+
+.icon-svg-sm {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-svg-md {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-svg-lg {
+  width: 21px;
+  height: 21px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -241,12 +265,24 @@ a:hover {
 }
 
 .hero {
-  max-width: 640px;
+  width: 100%;
   padding: 32px;
   background: var(--panel);
   border: 1px solid var(--border);
   box-shadow: 0 12px 30px var(--shadow);
   border-radius: 16px;
+
+  position: relative;        /* required */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hero-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
 }
 
 .two-col {
@@ -340,19 +376,36 @@ button.secondary {
   line-height: 1;
 }
 
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.timeline-list {
+  display: grid;
+  gap: 12px;
 }
 
-.timeline-step ul {
+.timeline-step {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.timeline-step-summary {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.timeline-step-summary::marker,
+.timeline-step-summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeline-substeps {
   list-style: none;
-  padding: 0;
-  margin: 12px 0 0;
+  padding: 0 12px 12px;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .substep {
@@ -365,6 +418,22 @@ button.secondary {
     var(--dept-color, var(--dept-fallback)),
     var(--substep-bg) 45%
   );
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.substep:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.substep:hover {
+  transform: translateY(-1px);
+}
+
+.substep.substep-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(30, 111, 92, 0.2);
 }
 
 .substep-available {
@@ -992,7 +1061,6 @@ button.secondary {
   gap: 8px;
   flex-wrap: wrap;
 }
-
 
 .users-item > button{
   justify-self: end;

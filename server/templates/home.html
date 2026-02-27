@@ -36,17 +36,21 @@
 {{define "home_body"}}
 <div class="stack">
   <section class="hero">
-    <div>
-      <h1>Start a stream</h1>
-      <p class="muted">Stream: <strong>{{.WorkflowName}}</strong></p>
-      <p class="muted">Create a new stream instance and follow the sequential steps.</p>
-      <form method="post" action="{{.WorkflowPath}}/process/start">
-        <button class="primary" type="submit">Start a stream</button>
-      </form>
-      {{if .LatestProcessID}}
-        <p class="muted">Latest stream: <a href="{{.WorkflowPath}}/process/{{.LatestProcessID}}">{{.LatestProcessID}}</a></p>
-      {{end}}
-    </div>
+    <button class="secondary" onclick="location.href='/'">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+      </svg>
+      Back
+    </button>
+    <h1 class="hero-title">{{.WorkflowName}}</h1>
+    <form method="post" action="{{.WorkflowPath}}/process/start">
+      <button class="primary" type="submit">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+          <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+        </svg>
+        New stream
+      </button>
+    </form>
   </section>
 
   <section class="panel">
