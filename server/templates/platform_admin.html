@@ -9,8 +9,8 @@
 
 <section class="panel">
   <h2>Create Organization</h2>
-  <form method="post" action="/admin/orgs" class="stack" style="gap: 12px;">
-    <label class="muted" for="org-name">Organization name</label>
+  <form method="post" action="/admin/orgs" class="input-form">
+    <label for="org-name">Organization name</label>
     <input id="org-name" name="name" type="text" required />
     <button class="primary" type="submit">Create organization</button>
   </form>
@@ -26,10 +26,10 @@
             <span>{{.Name}}</span>
             <span class="pill">{{.Slug}}</span>
           </div>
-          <form method="post" action="/admin/orgs/{{.Slug}}" class="stack" style="gap: 8px; margin-top: 8px;">
-            <label class="muted">Org admin email</label>
-            <input name="email" type="email" required />
-            <button type="submit">Create org admin invite</button>
+          <form method="post" action="/admin/orgs/{{.Slug}}" class="input-form">
+            <label for="org-admin-email">Org admin email</label>
+            <input id="org-admin-email" name="email" type="email" required />
+            <button class="primary" type="submit">Create org admin invite</button>
           </form>
         </li>
       {{end}}

@@ -9,8 +9,8 @@
   {{if .Error}}
     <p class="muted" style="color: #a91919;">{{.Error}}</p>
   {{end}}
-  <form method="post" action="/invite/{{.Token}}" class="stack" style="gap: 12px;">
-    <label class="muted" for="password">Set password</label>
+  <form method="post" action="/invite/{{.Token}}" class="input-form">
+    <label for="password">Set password</label>
     <input id="password" name="password" type="password" required />
     <button class="primary" type="submit">Activate account</button>
   </form>
