@@ -1574,6 +1574,19 @@ func randomUserIDFromEmail(email string) string {
 	return canonifySlug(local) + "-" + fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
+func isDuplicateSlugError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if mongo.IsDuplicateKeyError(err) {
+		return true
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(message, "slug already exists") ||
+		strings.Contains(message, "role already exists") ||
+		strings.Contains(message, "duplicate key")
+}
+
 func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
 	user, _, ok := s.requireAuthenticatedPage(w, r)
 	if !ok {
@@ -1633,6 +1646,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if _, err := s.store.CreateOrganization(r.Context(), Organization{Name: name, CreatedAt: s.nowUTC()}); err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
+					return
+				}
 				s.renderPlatformAdmin(w, admin, "", "failed to create organization")
 				return
 			}
@@ -1762,6 +1779,10 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: s.nowUTC(),
 		})
 		if err != nil {
+			if isDuplicateSlugError(err) {
+				s.renderOrgAdmin(w, user, user.OrgSlug, "", "role slug already exists")
+				return
+			}
 			s.renderOrgAdmin(w, user, user.OrgSlug, "", "failed to create role")
 			return
 		}

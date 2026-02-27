@@ -147,6 +147,51 @@ func TestHandleAdminOrgsCreateOrgAndInvite(t *testing.T) {
 	}
 }
 
+func TestHandleAdminOrgsDuplicateSlugRendersExplicitError(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:          "platform-admin-dup-org",
+		Email:           "platform-dup-org@example.com",
+		IsPlatformAdmin: true,
+		Status:          "active",
+		CreatedAt:       time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, admin)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Acme+Org"))
+	firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	firstReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	firstRec := httptest.NewRecorder()
+	server.handleAdminOrgs(firstRec, firstReq)
+	if firstRec.Code != http.StatusSeeOther {
+		t.Fatalf("first create status = %d, want %d", firstRec.Code, http.StatusSeeOther)
+	}
+
+	dupReq := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Acme_Org"))
+	dupReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dupReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	dupRec := httptest.NewRecorder()
+	server.handleAdminOrgs(dupRec, dupReq)
+	if dupRec.Code != http.StatusOK {
+		t.Fatalf("duplicate create status = %d, want %d", dupRec.Code, http.StatusOK)
+	}
+	if !strings.Contains(dupRec.Body.String(), "already exists") {
+		t.Fatalf("expected duplicate slug message, got %q", dupRec.Body.String())
+	}
+
+	orgs, err := store.ListOrganizations(t.Context())
+	if err != nil {
+		t.Fatalf("ListOrganizations error: %v", err)
+	}
+	if len(orgs) != 1 {
+		t.Fatalf("org count = %d, want %d", len(orgs), 1)
+	}
+}
+
 func TestHandleOrgAdminCreateRoleAndUserInvite(t *testing.T) {
 	store := NewMemoryStore()
 	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
@@ -192,6 +237,65 @@ func TestHandleOrgAdminCreateRoleAndUserInvite(t *testing.T) {
 	}
 	if !strings.Contains(userRec.Body.String(), "/invite/") {
 		t.Fatalf("expected invite link in response, got %q", userRec.Body.String())
+	}
+}
+
+func TestHandleOrgAdminRolesDuplicateSlugRendersExplicitError(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-dup-role",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-dup-role@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA+Reviewer"))
+	firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	firstReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	firstRec := httptest.NewRecorder()
+	server.handleOrgAdminRoles(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("first create status = %d, want %d", firstRec.Code, http.StatusOK)
+	}
+
+	dupReq := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA_reviewer"))
+	dupReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dupReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	dupRec := httptest.NewRecorder()
+	server.handleOrgAdminRoles(dupRec, dupReq)
+	if dupRec.Code != http.StatusOK {
+		t.Fatalf("duplicate create status = %d, want %d", dupRec.Code, http.StatusOK)
+	}
+	if !strings.Contains(dupRec.Body.String(), "already exists") {
+		t.Fatalf("expected duplicate role message, got %q", dupRec.Body.String())
+	}
+
+	roles, err := store.ListRolesByOrg(t.Context(), org.Slug)
+	if err != nil {
+		t.Fatalf("ListRolesByOrg error: %v", err)
+	}
+	count := 0
+	for _, role := range roles {
+		if role.Slug == "qa-reviewer" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("qa-reviewer count = %d, want %d", count, 1)
 	}
 }
 
