@@ -33,6 +33,87 @@
     <button class="primary" type="submit">Create invite</button>
   </form>
 </section>
+
+<section class="panel">
+  <h2>Invites I sent</h2>
+  {{if .Invites}}
+    <table class="status-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Roles</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Expires</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Invites}}
+          <tr>
+            <td>{{.Email}}</td>
+            <td>
+              {{if .RoleSlugs}}
+                {{range .RoleSlugs}}<code>{{.}}</code> {{end}}
+              {{else}}
+                <span class="muted">none</span>
+              {{end}}
+            </td>
+            <td>{{.Status}}</td>
+            <td>{{.CreatedAt}}</td>
+            <td>{{.ExpiresAt}}</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p class="muted">No invites sent yet.</p>
+  {{end}}
+</section>
+
+<section class="panel">
+  <h2>Users</h2>
+  {{if .Users}}
+    <table class="status-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Roles</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Users}}
+          <tr>
+            <td>{{.Email}}</td>
+            <td>{{if .Activated}}Active{{else}}Invited{{end}}</td>
+            <td>
+              <form method="post" action="/org-admin/users" class="input-form">
+                <input type="hidden" name="intent" value="set_roles" />
+                <input type="hidden" name="userId" value="{{.UserID}}" />
+                <select name="roles" multiple>
+                  {{range .RoleOptions}}
+                    <option value="{{.Slug}}" {{if .Selected}}selected{{end}}>{{.Name}} ({{.Slug}})</option>
+                  {{end}}
+                </select>
+                <button type="submit">Save roles</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="/org-admin/users">
+                <input type="hidden" name="intent" value="delete_user" />
+                <input type="hidden" name="userId" value="{{.UserID}}" />
+                <button type="submit">Delete account</button>
+              </form>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p class="muted">No users found in this organization.</p>
+  {{end}}
+</section>
 {{end}}
 
 {{define "org_admin.html"}}

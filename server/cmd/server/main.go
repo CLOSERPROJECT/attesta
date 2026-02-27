@@ -1612,6 +1612,28 @@ func isDuplicateSlugError(err error) bool {
 		strings.Contains(message, "duplicate key")
 }
 
+func requestedRoleSlugs(form url.Values) []string {
+	roles := canonifyRoleSlugs(form["roles"])
+	if len(roles) > 0 {
+		return roles
+	}
+	legacyRole := strings.TrimSpace(form.Get("role"))
+	if legacyRole == "" {
+		return []string{}
+	}
+	return canonifyRoleSlugs([]string{legacyRole})
+}
+
+func accountMatchesOrg(user *AccountUser, orgID primitive.ObjectID, orgSlug string) bool {
+	if user == nil || user.OrgID == nil {
+		return false
+	}
+	if *user.OrgID != orgID {
+		return false
+	}
+	return strings.TrimSpace(user.OrgSlug) == strings.TrimSpace(orgSlug)
+}
+
 func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
 	user, _, ok := s.requireAuthenticatedPage(w, r)
 	if !ok {
@@ -1884,78 +1906,133 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 	if intent == "" {
 		intent = "invite"
 	}
-	if intent != "invite" {
-		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "unsupported action")
+
+	switch intent {
+	case "invite":
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		if email == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email is required")
+			return
+		}
+
+		selectedRoles := requestedRoleSlugs(r.Form)
+		for _, roleSlug := range selectedRoles {
+			if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+				return
+			}
+		}
+
+		user, userErr := s.store.GetUserByEmail(r.Context(), email)
+		if userErr != nil || user == nil {
+			orgID := *admin.OrgID
+			created, createErr := s.store.CreateUser(r.Context(), AccountUser{
+				UserID:    randomUserIDFromEmail(email),
+				OrgID:     &orgID,
+				OrgSlug:   admin.OrgSlug,
+				Email:     email,
+				RoleSlugs: selectedRoles,
+				Status:    "invited",
+				CreatedAt: s.nowUTC(),
+			})
+			if createErr != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create user")
+				return
+			}
+			user = &created
+		} else {
+			if !accountMatchesOrg(user, *admin.OrgID, admin.OrgSlug) {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email already belongs to another organization")
+				return
+			}
+			mergedRoles := canonifyRoleSlugs(append(append([]string{}, user.RoleSlugs...), selectedRoles...))
+			if err := s.store.SetUserRoles(r.Context(), user.UserID, mergedRoles); err != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to update user roles")
+				return
+			}
+		}
+
+		token, tokenErr := newSessionID()
+		if tokenErr != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
+			return
+		}
+		if _, err := s.store.CreateInvite(r.Context(), Invite{
+			OrgID:           *admin.OrgID,
+			Email:           email,
+			UserID:          user.UserID,
+			RoleSlugs:       selectedRoles,
+			TokenHash:       token,
+			ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
+			CreatedAt:       s.nowUTC(),
+			CreatedByUserID: admin.UserID,
+		}); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
+			return
+		}
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "/invite/"+token, "")
 		return
-	}
-
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	if email == "" {
-		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email is required")
-		return
-	}
-
-	selectedRoles := canonifyRoleSlugs(r.Form["roles"])
-	if len(selectedRoles) == 0 {
-		if legacyRole := strings.TrimSpace(r.FormValue("role")); legacyRole != "" {
-			selectedRoles = canonifyRoleSlugs([]string{legacyRole})
-		}
-	}
-	for _, roleSlug := range selectedRoles {
-		if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
-			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+	case "set_roles":
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user is required")
 			return
 		}
-	}
-
-	user, userErr := s.store.GetUserByEmail(r.Context(), email)
-	if userErr != nil || user == nil {
-		orgID := *admin.OrgID
-		created, createErr := s.store.CreateUser(r.Context(), AccountUser{
-			UserID:    randomUserIDFromEmail(email),
-			OrgID:     &orgID,
-			OrgSlug:   admin.OrgSlug,
-			Email:     email,
-			RoleSlugs: selectedRoles,
-			Status:    "invited",
-			CreatedAt: s.nowUTC(),
-		})
-		if createErr != nil {
-			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create user")
+		target, err := s.store.GetUserByUserID(r.Context(), userID)
+		if err != nil || target == nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user not found")
 			return
 		}
-		user = &created
-	} else {
-		if user.OrgID == nil || admin.OrgID == nil || *user.OrgID != *admin.OrgID || strings.TrimSpace(user.OrgSlug) != strings.TrimSpace(admin.OrgSlug) {
-			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "email already belongs to another organization")
+		if !accountMatchesOrg(target, *admin.OrgID, admin.OrgSlug) {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user does not belong to your organization")
 			return
 		}
-		mergedRoles := canonifyRoleSlugs(append(append([]string{}, user.RoleSlugs...), selectedRoles...))
-		if err := s.store.SetUserRoles(r.Context(), user.UserID, mergedRoles); err != nil {
+		selectedRoles := requestedRoleSlugs(r.Form)
+		for _, roleSlug := range selectedRoles {
+			if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "role not found")
+				return
+			}
+		}
+		if target.UserID == admin.UserID && !containsRole(selectedRoles, "org-admin") {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "cannot remove org-admin from your own account")
+			return
+		}
+		if err := s.store.SetUserRoles(r.Context(), target.UserID, selectedRoles); err != nil {
 			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to update user roles")
 			return
 		}
-	}
-
-	token, tokenErr := newSessionID()
-	if tokenErr != nil {
-		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+		return
+	case "delete_user":
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user is required")
+			return
+		}
+		if userID == admin.UserID {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "cannot delete yourself")
+			return
+		}
+		target, err := s.store.GetUserByUserID(r.Context(), userID)
+		if err != nil || target == nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user not found")
+			return
+		}
+		if !accountMatchesOrg(target, *admin.OrgID, admin.OrgSlug) {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "user does not belong to your organization")
+			return
+		}
+		if err := s.store.DisableUser(r.Context(), userID); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to delete user")
+			return
+		}
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+		return
+	default:
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "unsupported action")
 		return
 	}
-	if _, err := s.store.CreateInvite(r.Context(), Invite{
-		OrgID:           *admin.OrgID,
-		Email:           email,
-		UserID:          user.UserID,
-		RoleSlugs:       selectedRoles,
-		TokenHash:       token,
-		ExpiresAt:       s.nowUTC().Add(7 * 24 * time.Hour),
-		CreatedAt:       s.nowUTC(),
-		CreatedByUserID: admin.UserID,
-	}); err != nil {
-		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to create invite")
-		return
-	}
-	s.renderOrgAdmin(w, admin, admin.OrgSlug, "/invite/"+token, "")
 }
 
 func cloneRequestWithPath(r *http.Request, path string) *http.Request {

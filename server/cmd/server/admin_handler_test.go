@@ -565,6 +565,150 @@ func TestHandleOrgAdminUsersInviteExistingUserMergesRoles(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Roles Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Approver", Slug: "approver", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-set-roles",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-set-roles@acme.org",
+		RoleSlugs: []string{"org-admin", "qa-reviewer"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser admin error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "target-user",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "target-user@acme.org",
+		RoleSlugs: []string{"qa-reviewer"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser target error: %v", err)
+	}
+
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	updateReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=target-user&roles=approver"))
+	updateReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	updateReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	updateRec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("set_roles status = %d, want %d", updateRec.Code, http.StatusOK)
+	}
+	target, err := store.GetUserByUserID(t.Context(), "target-user")
+	if err != nil {
+		t.Fatalf("GetUserByUserID target error: %v", err)
+	}
+	if len(target.RoleSlugs) != 1 || target.RoleSlugs[0] != "approver" {
+		t.Fatalf("target roles = %#v, want [approver]", target.RoleSlugs)
+	}
+
+	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=org-admin-set-roles&roles=qa-reviewer"))
+	selfReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	selfReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	selfRec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(selfRec, selfReq)
+	if selfRec.Code != http.StatusOK {
+		t.Fatalf("self set_roles status = %d, want %d", selfRec.Code, http.StatusOK)
+	}
+	if !strings.Contains(selfRec.Body.String(), "cannot remove org-admin from your own account") {
+		t.Fatalf("expected self org-admin protection message, got %q", selfRec.Body.String())
+	}
+}
+
+func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Delete Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "org-admin-delete",
+		OrgID:        &orgID,
+		OrgSlug:      org.Slug,
+		Email:        "org-admin-delete@acme.org",
+		PasswordHash: "hash-admin",
+		RoleSlugs:    []string{"org-admin"},
+		Status:       "active",
+		CreatedAt:    time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser admin error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "delete-target",
+		OrgID:        &orgID,
+		OrgSlug:      org.Slug,
+		Email:        "delete-target@acme.org",
+		PasswordHash: "hash-target",
+		RoleSlugs:    []string{"qa-reviewer"},
+		Status:       "active",
+		CreatedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser target error: %v", err)
+	}
+
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	deleteReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=delete-target"))
+	deleteReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	deleteReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	deleteRec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusOK {
+		t.Fatalf("delete_user status = %d, want %d", deleteRec.Code, http.StatusOK)
+	}
+	deleted, err := store.GetUserByUserID(t.Context(), "delete-target")
+	if err != nil {
+		t.Fatalf("GetUserByUserID deleted error: %v", err)
+	}
+	if deleted.Status != "deleted" || deleted.PasswordHash != "" || len(deleted.RoleSlugs) != 0 {
+		t.Fatalf("deleted account not disabled as expected: %#v", deleted)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+	getReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	getRec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want %d", getRec.Code, http.StatusOK)
+	}
+	if !strings.Contains(getRec.Body.String(), "USERS 1") {
+		t.Fatalf("expected deleted user hidden from org admin view, got %q", getRec.Body.String())
+	}
+
+	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=org-admin-delete"))
+	selfReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	selfReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	selfRec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(selfRec, selfReq)
+	if selfRec.Code != http.StatusOK {
+		t.Fatalf("self delete status = %d, want %d", selfRec.Code, http.StatusOK)
+	}
+	if !strings.Contains(selfRec.Body.String(), "cannot delete yourself") {
+		t.Fatalf("expected self-delete protection message, got %q", selfRec.Body.String())
+	}
+}
+
 func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
