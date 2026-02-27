@@ -20,6 +20,11 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`.
   - Platform admin sees `Orgs` (`/admin/orgs`)
   - Org admin with org context sees `My Org` (`/org-admin/users`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
+- Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
+- `/org-admin/users` now supports:
+  - invites with zero-to-many roles (`roles` multi-select, `intent=invite`)
+  - "Invites I sent" with derived statuses (`pending`, `accepted`, `expired`)
+  - user role editing (`intent=set_roles`) and soft-delete (`intent=delete_user`) with self-protection checks.
 
 ## Agent behavior expectations
 
