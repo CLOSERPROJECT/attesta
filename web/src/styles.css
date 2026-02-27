@@ -241,12 +241,24 @@ a:hover {
 }
 
 .hero {
-  max-width: 640px;
+  width: 100%;
   padding: 32px;
   background: var(--panel);
   border: 1px solid var(--border);
   box-shadow: 0 12px 30px var(--shadow);
   border-radius: 16px;
+
+  position: relative;        /* required */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hero-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
 }
 
 .two-col {
@@ -992,7 +1004,6 @@ button.secondary {
   gap: 8px;
   flex-wrap: wrap;
 }
-
 
 .users-item > button{
   justify-self: end;
