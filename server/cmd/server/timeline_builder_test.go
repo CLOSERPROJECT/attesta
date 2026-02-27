@@ -30,7 +30,7 @@ func TestBuildTimelineFileSubstepDisplay(t *testing.T) {
 		},
 	}
 
-	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{})
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{}, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) < 3 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -71,7 +71,7 @@ func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 		},
 	}
 
-	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{})
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{}, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -110,7 +110,7 @@ func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {
 		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
 	}
 
-	timeline := buildTimeline(def, process, "workflow", roleMeta)
+	timeline := buildTimeline(def, process, "workflow", roleMeta, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -123,5 +123,33 @@ func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {
 	}
 	if entry.Role != "dep1, dep2" {
 		t.Fatalf("role summary = %q, want %q", entry.Role, "dep1, dep2")
+	}
+}
+
+func TestBuildTimelineUsesOrganizationNameInStep(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID:           "1",
+				Title:            "Step 1",
+				Order:            1,
+				OrganizationSlug: "org-acme",
+				Substep: []WorkflowSub{
+					{SubstepID: "1.1", Title: "A", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID:       primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{"1.1": {State: "pending"}},
+	}
+
+	timeline := buildTimeline(def, process, "workflow", map[string]RoleMeta{}, map[string]string{"org-acme": "Acme Org"})
+	if len(timeline) != 1 {
+		t.Fatalf("timeline len = %d, want 1", len(timeline))
+	}
+	if timeline[0].OrgName != "Acme Org" {
+		t.Fatalf("timeline org name = %q, want %q", timeline[0].OrgName, "Acme Org")
 	}
 }
