@@ -44,10 +44,13 @@ type Store interface {
 	CreateUser(ctx context.Context, user AccountUser) (AccountUser, error)
 	GetUserByEmail(ctx context.Context, email string) (*AccountUser, error)
 	GetUserByUserID(ctx context.Context, userID string) (*AccountUser, error)
+	ListUsersByOrgID(ctx context.Context, orgID primitive.ObjectID) ([]AccountUser, error)
 	SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error
 	SetUserRoles(ctx context.Context, userID string, roleSlugs []string) error
 	SetUserLastLogin(ctx context.Context, userID string, lastLoginAt time.Time) error
+	DisableUser(ctx context.Context, userID string) error
 	CreateInvite(ctx context.Context, invite Invite) (Invite, error)
+	ListInvitesByCreator(ctx context.Context, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error)
 	LoadInviteByTokenHash(ctx context.Context, tokenHash string) (*Invite, error)
 	MarkInviteUsed(ctx context.Context, tokenHash string, usedAt time.Time) error
 	CreateSession(ctx context.Context, session Session) (Session, error)
@@ -984,6 +987,22 @@ func (s *MemoryStore) GetUserByUserID(_ context.Context, userID string) (*Accoun
 	return &copy, nil
 }
 
+func (s *MemoryStore) ListUsersByOrgID(_ context.Context, orgID primitive.ObjectID) ([]AccountUser, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	users := []AccountUser{}
+	for _, user := range s.usersByUserID {
+		if user.OrgID == nil || *user.OrgID != orgID {
+			continue
+		}
+		users = append(users, user)
+	}
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].Email < users[j].Email
+	})
+	return users, nil
+}
+
 func (s *MemoryStore) SetUserPasswordHash(_ context.Context, userID, passwordHash string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1027,6 +1046,20 @@ func (s *MemoryStore) SetUserLastLogin(_ context.Context, userID string, lastLog
 	return nil
 }
 
+func (s *MemoryStore) DisableUser(_ context.Context, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	user.Status = "deleted"
+	user.PasswordHash = ""
+	user.RoleSlugs = []string{}
+	s.usersByUserID[user.UserID] = user
+	return nil
+}
+
 func (s *MemoryStore) CreateInvite(_ context.Context, invite Invite) (Invite, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1044,6 +1077,23 @@ func (s *MemoryStore) CreateInvite(_ context.Context, invite Invite) (Invite, er
 	}
 	s.invites[invite.TokenHash] = invite
 	return invite, nil
+}
+
+func (s *MemoryStore) ListInvitesByCreator(_ context.Context, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	creator := strings.TrimSpace(createdByUserID)
+	invites := []Invite{}
+	for _, invite := range s.invites {
+		if invite.CreatedByUserID != creator || invite.OrgID != orgID {
+			continue
+		}
+		invites = append(invites, invite)
+	}
+	sort.Slice(invites, func(i, j int) bool {
+		return invites[i].CreatedAt.After(invites[j].CreatedAt)
+	})
+	return invites, nil
 }
 
 func (s *MemoryStore) LoadInviteByTokenHash(_ context.Context, tokenHash string) (*Invite, error) {
@@ -1454,6 +1504,28 @@ func (s *MongoStore) GetUserByUserID(ctx context.Context, userID string) (*Accou
 	return &user, nil
 }
 
+func (s *MongoStore) ListUsersByOrgID(ctx context.Context, orgID primitive.ObjectID) ([]AccountUser, error) {
+	cursor, err := s.database().Collection(collectionUsers).Find(
+		ctx,
+		bson.M{"orgId": orgID},
+		options.Find().SetSort(bson.D{{Key: "email", Value: 1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	users := []AccountUser{}
+	for cursor.Next(ctx) {
+		var user AccountUser
+		if err := cursor.Decode(&user); err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 func (s *MongoStore) SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error {
 	_, err := s.database().Collection(collectionUsers).UpdateOne(
 		ctx,
@@ -1481,6 +1553,19 @@ func (s *MongoStore) SetUserLastLogin(ctx context.Context, userID string, lastLo
 	return err
 }
 
+func (s *MongoStore) DisableUser(ctx context.Context, userID string) error {
+	_, err := s.database().Collection(collectionUsers).UpdateOne(
+		ctx,
+		bson.M{"userId": strings.TrimSpace(userID)},
+		bson.M{"$set": bson.M{
+			"status":       "deleted",
+			"passwordHash": "",
+			"roleSlugs":    []string{},
+		}},
+	)
+	return err
+}
+
 func (s *MongoStore) CreateInvite(ctx context.Context, invite Invite) (Invite, error) {
 	if invite.CreatedAt.IsZero() {
 		invite.CreatedAt = time.Now().UTC()
@@ -1496,6 +1581,31 @@ func (s *MongoStore) CreateInvite(ctx context.Context, invite Invite) (Invite, e
 		invite.ID = insertedID
 	}
 	return invite, nil
+}
+
+func (s *MongoStore) ListInvitesByCreator(ctx context.Context, createdByUserID string, orgID primitive.ObjectID) ([]Invite, error) {
+	cursor, err := s.database().Collection(collectionInvites).Find(
+		ctx,
+		bson.M{
+			"createdByUserId": strings.TrimSpace(createdByUserID),
+			"orgId":           orgID,
+		},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	invites := []Invite{}
+	for cursor.Next(ctx) {
+		var invite Invite
+		if err := cursor.Decode(&invite); err != nil {
+			continue
+		}
+		invites = append(invites, invite)
+	}
+	return invites, nil
 }
 
 func (s *MongoStore) LoadInviteByTokenHash(ctx context.Context, tokenHash string) (*Invite, error) {

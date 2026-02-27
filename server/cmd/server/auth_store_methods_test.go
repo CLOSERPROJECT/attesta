@@ -148,6 +148,151 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreOrgAdminManagementMethods(t *testing.T) {
+	store := NewMemoryStore()
+	orgA, err := store.CreateOrganization(t.Context(), Organization{Name: "Org A"})
+	if err != nil {
+		t.Fatalf("CreateOrganization orgA error: %v", err)
+	}
+	orgB, err := store.CreateOrganization(t.Context(), Organization{Name: "Org B"})
+	if err != nil {
+		t.Fatalf("CreateOrganization orgB error: %v", err)
+	}
+	if _, err := store.CreateRole(t.Context(), Role{OrgSlug: orgA.Slug, Name: "Reviewer"}); err != nil {
+		t.Fatalf("CreateRole orgA error: %v", err)
+	}
+	if _, err := store.CreateRole(t.Context(), Role{OrgSlug: orgB.Slug, Name: "Reviewer"}); err != nil {
+		t.Fatalf("CreateRole orgB error: %v", err)
+	}
+
+	orgAID := orgA.ID
+	orgBID := orgB.ID
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "u-b",
+		OrgID:        &orgAID,
+		OrgSlug:      orgA.Slug,
+		Email:        "b@orga.example",
+		PasswordHash: "hash-b",
+		RoleSlugs:    []string{"reviewer"},
+		Status:       "active",
+	}); err != nil {
+		t.Fatalf("CreateUser u-b error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "u-a",
+		OrgID:        &orgAID,
+		OrgSlug:      orgA.Slug,
+		Email:        "a@orga.example",
+		PasswordHash: "hash-a",
+		RoleSlugs:    []string{"reviewer"},
+		Status:       "active",
+	}); err != nil {
+		t.Fatalf("CreateUser u-a error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "u-z",
+		OrgID:     &orgBID,
+		OrgSlug:   orgB.Slug,
+		Email:     "z@orgb.example",
+		RoleSlugs: []string{"reviewer"},
+		Status:    "active",
+	}); err != nil {
+		t.Fatalf("CreateUser u-z error: %v", err)
+	}
+
+	users, err := store.ListUsersByOrgID(t.Context(), orgA.ID)
+	if err != nil {
+		t.Fatalf("ListUsersByOrgID error: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("user count = %d, want %d", len(users), 2)
+	}
+	if users[0].Email != "a@orga.example" || users[1].Email != "b@orga.example" {
+		t.Fatalf("users not sorted by email: %#v", users)
+	}
+
+	now := time.Now().UTC()
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:           orgA.ID,
+		Email:           "one@orga.example",
+		UserID:          "u-one",
+		RoleSlugs:       []string{"reviewer"},
+		TokenHash:       "token-one",
+		ExpiresAt:       now.Add(24 * time.Hour),
+		CreatedAt:       now.Add(-1 * time.Hour),
+		CreatedByUserID: "admin-1",
+	}); err != nil {
+		t.Fatalf("CreateInvite one error: %v", err)
+	}
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:           orgA.ID,
+		Email:           "two@orga.example",
+		UserID:          "u-two",
+		RoleSlugs:       []string{"reviewer"},
+		TokenHash:       "token-two",
+		ExpiresAt:       now.Add(24 * time.Hour),
+		CreatedAt:       now,
+		CreatedByUserID: "admin-1",
+	}); err != nil {
+		t.Fatalf("CreateInvite two error: %v", err)
+	}
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:           orgA.ID,
+		Email:           "three@orga.example",
+		UserID:          "u-three",
+		RoleSlugs:       []string{"reviewer"},
+		TokenHash:       "token-three",
+		ExpiresAt:       now.Add(24 * time.Hour),
+		CreatedAt:       now.Add(1 * time.Hour),
+		CreatedByUserID: "admin-2",
+	}); err != nil {
+		t.Fatalf("CreateInvite three error: %v", err)
+	}
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:           orgB.ID,
+		Email:           "four@orgb.example",
+		UserID:          "u-four",
+		RoleSlugs:       []string{"reviewer"},
+		TokenHash:       "token-four",
+		ExpiresAt:       now.Add(24 * time.Hour),
+		CreatedAt:       now.Add(2 * time.Hour),
+		CreatedByUserID: "admin-1",
+	}); err != nil {
+		t.Fatalf("CreateInvite four error: %v", err)
+	}
+
+	invites, err := store.ListInvitesByCreator(t.Context(), "admin-1", orgA.ID)
+	if err != nil {
+		t.Fatalf("ListInvitesByCreator error: %v", err)
+	}
+	if len(invites) != 2 {
+		t.Fatalf("invite count = %d, want %d", len(invites), 2)
+	}
+	if invites[0].Email != "two@orga.example" || invites[1].Email != "one@orga.example" {
+		t.Fatalf("invites not sorted by createdAt desc: %#v", invites)
+	}
+
+	if err := store.DisableUser(t.Context(), "u-a"); err != nil {
+		t.Fatalf("DisableUser error: %v", err)
+	}
+	disabled, err := store.GetUserByUserID(t.Context(), "u-a")
+	if err != nil {
+		t.Fatalf("GetUserByUserID disabled error: %v", err)
+	}
+	if disabled.Status != "deleted" {
+		t.Fatalf("disabled user status = %q, want deleted", disabled.Status)
+	}
+	if disabled.PasswordHash != "" {
+		t.Fatalf("disabled user password hash = %q, want empty", disabled.PasswordHash)
+	}
+	if len(disabled.RoleSlugs) != 0 {
+		t.Fatalf("disabled user roles = %#v, want empty", disabled.RoleSlugs)
+	}
+	if err := store.DisableUser(t.Context(), "missing"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("DisableUser missing err = %v, want %v", err, mongo.ErrNoDocuments)
+	}
+}
+
 func TestMongoStoreCreateOrganizationCanonifiesSlug(t *testing.T) {
 	insertedID := primitive.NewObjectID()
 	collection := &fakeMongoCollection{
@@ -205,6 +350,76 @@ func TestMongoStoreAuthFilterShapes(t *testing.T) {
 	wantResetFilter := bson.M{"tokenHash": hashLookupToken("reset-y")}
 	if !reflect.DeepEqual(collection.findOneFilters[1], wantResetFilter) {
 		t.Fatalf("reset filter = %#v, want %#v", collection.findOneFilters[1], wantResetFilter)
+	}
+}
+
+func TestMongoStoreOrgAdminManagementFilterShapes(t *testing.T) {
+	userCollection := &fakeMongoCollection{
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{AccountUser{UserID: "u-1"}}}, nil
+		},
+	}
+	inviteCollection := &fakeMongoCollection{
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{Invite{Email: "invitee@example.com"}}}, nil
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionUsers:   userCollection,
+		collectionInvites: inviteCollection,
+	}}
+	store := &MongoStore{dbPort: db}
+
+	orgID := primitive.NewObjectID()
+	users, err := store.ListUsersByOrgID(t.Context(), orgID)
+	if err != nil {
+		t.Fatalf("ListUsersByOrgID error: %v", err)
+	}
+	if len(users) != 1 || users[0].UserID != "u-1" {
+		t.Fatalf("ListUsersByOrgID result = %#v", users)
+	}
+
+	invites, err := store.ListInvitesByCreator(t.Context(), " admin-1 ", orgID)
+	if err != nil {
+		t.Fatalf("ListInvitesByCreator error: %v", err)
+	}
+	if len(invites) != 1 || invites[0].Email != "invitee@example.com" {
+		t.Fatalf("ListInvitesByCreator result = %#v", invites)
+	}
+
+	if err := store.DisableUser(t.Context(), " u-1 "); err != nil {
+		t.Fatalf("DisableUser error: %v", err)
+	}
+
+	wantUsersFilter := bson.M{"orgId": orgID}
+	if !reflect.DeepEqual(userCollection.findFilters[0], wantUsersFilter) {
+		t.Fatalf("user find filter = %#v, want %#v", userCollection.findFilters[0], wantUsersFilter)
+	}
+	wantUsersSort := bson.D{{Key: "email", Value: 1}}
+	if !reflect.DeepEqual(userCollection.findOptionsCalls[0][0].Sort, wantUsersSort) {
+		t.Fatalf("user sort = %#v, want %#v", userCollection.findOptionsCalls[0][0].Sort, wantUsersSort)
+	}
+
+	wantInvitesFilter := bson.M{"createdByUserId": "admin-1", "orgId": orgID}
+	if !reflect.DeepEqual(inviteCollection.findFilters[0], wantInvitesFilter) {
+		t.Fatalf("invite find filter = %#v, want %#v", inviteCollection.findFilters[0], wantInvitesFilter)
+	}
+	wantInvitesSort := bson.D{{Key: "createdAt", Value: -1}}
+	if !reflect.DeepEqual(inviteCollection.findOptionsCalls[0][0].Sort, wantInvitesSort) {
+		t.Fatalf("invite sort = %#v, want %#v", inviteCollection.findOptionsCalls[0][0].Sort, wantInvitesSort)
+	}
+
+	wantDisableFilter := bson.M{"userId": "u-1"}
+	if !reflect.DeepEqual(userCollection.updateOneFilters[0], wantDisableFilter) {
+		t.Fatalf("disable filter = %#v, want %#v", userCollection.updateOneFilters[0], wantDisableFilter)
+	}
+	wantDisableUpdate := bson.M{"$set": bson.M{
+		"status":       "deleted",
+		"passwordHash": "",
+		"roleSlugs":    []string{},
+	}}
+	if !reflect.DeepEqual(userCollection.updateOneUpdates[0], wantDisableUpdate) {
+		t.Fatalf("disable update = %#v, want %#v", userCollection.updateOneUpdates[0], wantDisableUpdate)
 	}
 }
 
