@@ -44,106 +44,66 @@
 </section>
 
 <section class="panel">
-  <h2>Invites I sent</h2>
-  {{if .Invites}}
-    <table class="status-table">
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Roles</th>
-          <th>Status</th>
-          <th>Created</th>
-          <th>Expires</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Invites}}
-          <tr>
-            <td>{{.Email}}</td>
-            <td>
-              {{if .RoleSlugs}}
-                {{range .RoleSlugs}}<code>{{.}}</code> {{end}}
-              {{else}}
-                <span class="muted">none</span>
+  <h2>Organization users</h2>
+  {{if .Users}}
+    <ul class="users-list">
+      {{range .Users}}
+        <li class="users-item">
+          <span class="user-email">
+            {{.Email}}
+            {{if .Activated}}
+            <span class="pill" style="--pill-bg: #57c2a6;">Active</span>
+            {{else}}
+            <span class="pill" style="--pill-bg: #f2c64f;">Invited</span>
+            {{end}}
+          </span>
+          <div class="user-tags">
+            {{range .RoleOptions}}
+              {{if .Selected}}
+                <span class="pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}">
+                  {{.Name}}
+                </span>
               {{end}}
-            </td>
-            <td>{{.Status}}</td>
-            <td>{{.CreatedAt}}</td>
-            <td>{{.ExpiresAt}}</td>
-          </tr>
-        {{end}}
-      </tbody>
-    </table>
+            {{end}}
+          </div>
+          <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
+            Manage
+          </button>
+          <dialog id="manage-user-{{.UserID}}">
+            <form method="post" action="/org-admin/users" class="input-form">
+              <input type="hidden" name="intent" value="set_roles" />
+              <input type="hidden" name="userId" value="{{.UserID}}" />
+              <fieldset class="checkbox-group">
+                <legend>Edit roles for {{.Email}}</legend>
+                {{range .RoleOptions}}
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
+                    <span>{{.Name}} ({{.Slug}})</span>
+                  </label>
+                {{end}}
+              </fieldset>
+              <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="submit">Save roles</button>
+                <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">Cancel</button>
+              </div>
+            </form>
+            <form method="post" action="/org-admin/users" class="input-form" style="margin-top: 10px;">
+              <input type="hidden" name="intent" value="delete_user" />
+              <input type="hidden" name="userId" value="{{.UserID}}" />
+              <button type="submit">Delete account</button>
+            </form>
+          </dialog>
+        </li>
+      {{end}}
+    </ul>
   {{else}}
-    <p class="muted">No invites sent yet.</p>
+    <p class="muted">No organization users yet.</p>
   {{end}}
 </section>
 
-<section class="panel">
-  <h2>Users</h2>
-  {{if .Users}}
-    <table class="status-table">
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Status</th>
-          <th>Roles</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Users}}
-          <tr>
-            <td>{{.Email}}</td>
-            <td>{{if .Activated}}Active{{else}}Invited{{end}}</td>
-            <td>
-              <span>
-                {{range .RoleOptions}}
-                  {{if .Selected}}
-                    <span class="dept-badge" style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}">
-                      {{.Name}}
-                    </span>
-                  {{end}}
-                {{end}}
-              </span>
-            </td>
-            <td>
-              <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
-                Manage
-              </button>
-              <dialog id="manage-user-{{.UserID}}">
-                <form method="post" action="/org-admin/users" class="input-form">
-                  <input type="hidden" name="intent" value="set_roles" />
-                  <input type="hidden" name="userId" value="{{.UserID}}" />
-                  <fieldset class="checkbox-group">
-                    <legend>Edit roles for {{.Email}}</legend>
-                    {{range .RoleOptions}}
-                      <label class="checkbox-item">
-                        <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
-                        <span>{{.Name}} ({{.Slug}})</span>
-                      </label>
-                    {{end}}
-                  </fieldset>
-                  <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button type="submit">Save roles</button>
-                    <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">Cancel</button>
-                  </div>
-                </form>
-                <form method="post" action="/org-admin/users" class="input-form" style="margin-top: 10px;">
-                  <input type="hidden" name="intent" value="delete_user" />
-                  <input type="hidden" name="userId" value="{{.UserID}}" />
-                  <button type="submit">Delete account</button>
-                </form>
-              </dialog>
-            </td>
-          </tr>
-        {{end}}
-      </tbody>
-    </table>
-  {{else}}
-    <p class="muted">No users found in this organization.</p>
-  {{end}}
-</section>
+
+
+
 {{end}}
 
 {{define "org_admin.html"}}
