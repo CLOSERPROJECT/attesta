@@ -191,6 +191,11 @@ button[disabled] {
   opacity: 0.6;
 }
 
+button.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
 .secondary {
   display: inline-block;
   padding: 10px 16px;
@@ -832,6 +837,61 @@ button.secondary {
 
 .users-item > button{
   justify-self: end;
+}
+
+.manage-dialog {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: min(560px, 92vw);
+  max-width: 92vw;
+}
+
+.manage-dialog::backdrop {
+  background: rgba(16, 26, 20, 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.manage-dialog-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 34px var(--shadow);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.manage-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manage-dialog-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.manage-dialog-subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.manage-dialog-actions {
+  display: flex;
+  width: 100%;
+}
+
+.manage-dialog-actions .primary {
+  width: 100%;
+}
+
+.manage-dialog-danger-zone {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 
 @media (max-width: 720px) {

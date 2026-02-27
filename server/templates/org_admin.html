@@ -69,29 +69,41 @@
           <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
             Manage
           </button>
-          <dialog id="manage-user-{{.UserID}}">
-            <form method="post" action="/org-admin/users" class="input-form">
-              <input type="hidden" name="intent" value="set_roles" />
-              <input type="hidden" name="userId" value="{{.UserID}}" />
-              <fieldset class="checkbox-group">
-                <legend>Edit roles for {{.Email}}</legend>
-                {{range .RoleOptions}}
-                  <label class="checkbox-item">
-                    <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
-                    <span>{{.Name}} ({{.Slug}})</span>
-                  </label>
-                {{end}}
-              </fieldset>
-              <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button type="submit">Save roles</button>
-                <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">Cancel</button>
-              </div>
-            </form>
-            <form method="post" action="/org-admin/users" class="input-form" style="margin-top: 10px;">
-              <input type="hidden" name="intent" value="delete_user" />
-              <input type="hidden" name="userId" value="{{.UserID}}" />
-              <button type="submit">Delete account</button>
-            </form>
+          <dialog id="manage-user-{{.UserID}}" class="manage-dialog">
+            <div class="manage-dialog-card">
+              <header class="manage-dialog-head">
+                <div>
+                  <h3 class="manage-dialog-title">Manage User</h3>
+                  <p class="manage-dialog-subtitle">{{.Email}}</p>
+                </div>
+                <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">
+                  X
+                </button>
+              </header>
+
+              <form method="post" action="/org-admin/users" class="input-form">
+                <input type="hidden" name="intent" value="set_roles" />
+                <input type="hidden" name="userId" value="{{.UserID}}" />
+                <fieldset class="checkbox-group">
+                  <legend>Roles</legend>
+                  {{range .RoleOptions}}
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
+                      <span>{{.Name}} ({{.Slug}})</span>
+                    </label>
+                  {{end}}
+                  <div class="manage-dialog-actions">
+                    <button class="primary" type="submit">Save roles</button>
+                  </div>
+                </fieldset>
+              </form>
+
+              <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
+                <input type="hidden" name="intent" value="delete_user" />
+                <input type="hidden" name="userId" value="{{.UserID}}" />
+                <button type="submit" class="danger">Delete account</button>
+              </form>
+            </div>
           </dialog>
         </li>
       {{end}}
@@ -100,9 +112,6 @@
     <p class="muted">No organization users yet.</p>
   {{end}}
 </section>
-
-
-
 
 {{end}}
 
