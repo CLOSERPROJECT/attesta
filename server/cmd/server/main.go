@@ -461,8 +461,33 @@ type OrgAdminView struct {
 	PageBase
 	Organization Organization
 	Roles        []Role
+	Users        []OrgAdminUserRow
+	Invites      []OrgAdminInviteRow
 	InviteLink   string
 	Error        string
+}
+
+type OrgAdminRoleOption struct {
+	Slug     string
+	Name     string
+	Selected bool
+}
+
+type OrgAdminUserRow struct {
+	UserID      string
+	Email       string
+	Status      string
+	Activated   bool
+	RoleOptions []OrgAdminRoleOption
+}
+
+type OrgAdminInviteRow struct {
+	Email     string
+	RoleSlugs []string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	Status    string
 }
 
 type WorkflowRefValidationError struct {
@@ -1741,10 +1766,59 @@ func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlu
 		return
 	}
 	roles, _ := s.store.ListRolesByOrg(context.Background(), orgSlug)
+	users, _ := s.store.ListUsersByOrgID(context.Background(), org.ID)
+	invites := []Invite{}
+	if user != nil {
+		invites, _ = s.store.ListInvitesByCreator(context.Background(), user.UserID, org.ID)
+	}
+
+	orgUsers := make([]OrgAdminUserRow, 0, len(users))
+	for _, orgUser := range users {
+		if strings.EqualFold(strings.TrimSpace(orgUser.Status), "deleted") {
+			continue
+		}
+		roleOptions := make([]OrgAdminRoleOption, 0, len(roles))
+		for _, role := range roles {
+			roleOptions = append(roleOptions, OrgAdminRoleOption{
+				Slug:     role.Slug,
+				Name:     role.Name,
+				Selected: containsRole(orgUser.RoleSlugs, role.Slug),
+			})
+		}
+		orgUsers = append(orgUsers, OrgAdminUserRow{
+			UserID:      orgUser.UserID,
+			Email:       orgUser.Email,
+			Status:      orgUser.Status,
+			Activated:   strings.TrimSpace(orgUser.PasswordHash) != "",
+			RoleOptions: roleOptions,
+		})
+	}
+
+	now := s.nowUTC()
+	orgInvites := make([]OrgAdminInviteRow, 0, len(invites))
+	for _, invite := range invites {
+		status := "pending"
+		if invite.UsedAt != nil {
+			status = "accepted"
+		} else if invite.ExpiresAt.Before(now) {
+			status = "expired"
+		}
+		orgInvites = append(orgInvites, OrgAdminInviteRow{
+			Email:     invite.Email,
+			RoleSlugs: append([]string(nil), invite.RoleSlugs...),
+			CreatedAt: invite.CreatedAt,
+			ExpiresAt: invite.ExpiresAt,
+			UsedAt:    invite.UsedAt,
+			Status:    status,
+		})
+	}
+
 	view := OrgAdminView{
 		PageBase:     s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Organization: *org,
 		Roles:        roles,
+		Users:        orgUsers,
+		Invites:      orgInvites,
 		InviteLink:   strings.TrimSpace(inviteLink),
 		Error:        strings.TrimSpace(errMsg),
 	}

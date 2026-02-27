@@ -299,6 +299,92 @@ func TestHandleOrgAdminRolesDuplicateSlugRendersExplicitError(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminUsersGetRendersInviteAndUserCollections(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "org-admin-counts",
+		OrgID:        &orgID,
+		OrgSlug:      org.Slug,
+		Email:        "org-admin-counts@acme.org",
+		PasswordHash: "hash-admin",
+		RoleSlugs:    []string{"org-admin"},
+		Status:       "active",
+		CreatedAt:    time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser admin error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:       "active-user",
+		OrgID:        &orgID,
+		OrgSlug:      org.Slug,
+		Email:        "active-user@acme.org",
+		PasswordHash: "hash-active",
+		RoleSlugs:    []string{"qa-reviewer"},
+		Status:       "active",
+		CreatedAt:    time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser active error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "deleted-user",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "deleted-user@acme.org",
+		RoleSlugs: []string{"qa-reviewer"},
+		Status:    "deleted",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser deleted error: %v", err)
+	}
+	now := time.Now().UTC()
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:           org.ID,
+		Email:           "invitee@acme.org",
+		UserID:          "invited-1",
+		RoleSlugs:       []string{"qa-reviewer"},
+		TokenHash:       "token-1",
+		ExpiresAt:       now.Add(24 * time.Hour),
+		CreatedAt:       now,
+		CreatedByUserID: adminUser.UserID,
+	}); err != nil {
+		t.Fatalf("CreateInvite primary error: %v", err)
+	}
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:           org.ID,
+		Email:           "other@acme.org",
+		UserID:          "invited-2",
+		RoleSlugs:       []string{"qa-reviewer"},
+		TokenHash:       "token-2",
+		ExpiresAt:       now.Add(24 * time.Hour),
+		CreatedAt:       now,
+		CreatedByUserID: "someone-else",
+	}); err != nil {
+		t.Fatalf("CreateInvite secondary error: %v", err)
+	}
+
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+	req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "INVITES 1 USERS 2") {
+		t.Fatalf("expected invite/user counts in response, got %q", rec.Body.String())
+	}
+}
+
 func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
