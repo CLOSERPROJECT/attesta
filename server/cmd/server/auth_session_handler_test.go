@@ -166,6 +166,52 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/users"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
 	}
+	if !strings.Contains(body, `class="toggle-password"`) && !strings.Contains(body, `id="password-toggle"`) {
+		t.Fatalf("expected password toggle control in login page, got %q", body)
+	}
+}
+
+func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
+	store := NewMemoryStore()
+	user, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "u-auth-login",
+		Email:     "u-auth-login@example.com",
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	session, err := store.CreateSession(t.Context(), Session{
+		SessionID:   "session-auth-login",
+		UserID:      user.UserID,
+		UserMongoID: user.ID,
+		CreatedAt:   time.Now().UTC(),
+		LastLoginAt: time.Now().UTC(),
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("CreateSession error: %v", err)
+	}
+
+	server := &Server{
+		store:       store,
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         time.Now,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	rec := httptest.NewRecorder()
+
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/" {
+		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	}
 }
 
 func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {

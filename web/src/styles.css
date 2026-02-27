@@ -95,9 +95,122 @@ a:hover {
   color: var(--muted);
 }
 
+.nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .nav a {
   margin-left: 16px;
   font-weight: 600;
+}
+
+.nav .account-menu {
+  margin-left: 16px;
+  position: relative;
+}
+
+.nav .account-trigger {
+  list-style: none;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.nav .account-trigger::marker {
+  content: "";
+}
+
+.nav .account-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.nav .account-trigger:hover,
+.nav .account-menu[open] .account-trigger {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .nav .account-trigger:hover,
+[data-theme="dark"] .nav .account-menu[open] .account-trigger {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nav .account-icon {
+  width: 21px;
+  height: 21px;
+}
+
+.nav .account-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 10px 26px var(--shadow);
+  z-index: 40;
+}
+
+.nav .account-menu-section {
+  padding: 10px;
+}
+
+.nav .account-menu-section + .account-menu-section {
+  border-top: 1px solid var(--border);
+}
+
+.nav .account-menu-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nav .account-menu-email {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.nav .account-menu-section form {
+  margin: 0;
+}
+
+.nav .account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+  margin-left: 0;
+  text-decoration: none;
+}
+
+.nav .account-menu-item + .account-menu-item {
+  margin-top: 8px;
+}
+
+.nav .account-menu-item:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+/* Optional: long emails won’t overflow */
+.nav .account-menu-email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav .theme-toggle {

@@ -345,8 +345,10 @@ type PageBase struct {
 	WorkflowKey   string
 	WorkflowName  string
 	WorkflowPath  string
+	UserEmail     string
 	ShowOrgsLink  bool
 	ShowMyOrgLink bool
+	ShowLogout    bool
 }
 
 type BackofficeLandingView struct {
@@ -875,6 +877,8 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	if user == nil {
 		return base
 	}
+	base.UserEmail = strings.TrimSpace(user.Email)
+	base.ShowLogout = s.enforceAuth
 	base.ShowOrgsLink = user.IsPlatformAdmin
 	base.ShowMyOrgLink = userIsOrgAdmin(user)
 	return base
@@ -1276,6 +1280,12 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, user *Acco
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if s.enforceAuth {
+			if _, _, err := s.currentUser(r); err == nil {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
+		}
 		view := LoginView{
 			PageBase: s.pageBase("login_body", "", ""),
 			Next:     safeNextPath(r, "/"),
