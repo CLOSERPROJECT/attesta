@@ -773,6 +773,11 @@ button.secondary {
   accent-color: var(--ink);
 }
 
+.status-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
 @media (max-width: 720px) {
   .topbar {
     flex-direction: column;
