@@ -70,7 +70,7 @@ func testTemplates() *template.Template {
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
 {{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
-{{define "home_body"}}HOME {{.LatestProcessID}}{{end}}
+{{define "home_body"}}HOME{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_body"}}DASHBOARD_ME {{.UserID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}

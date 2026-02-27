@@ -433,10 +433,9 @@ type ProcessListItem struct {
 
 type HomeView struct {
 	PageBase
-	LatestProcessID string
-	Sort            string
-	Processes       []ProcessListItem
-	History         []ProcessListItem
+	Sort      string
+	Processes []ProcessListItem
+	History   []ProcessListItem
 }
 
 type LoginView struct {
@@ -2165,10 +2164,6 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	latestID := ""
-	if latest, err := s.loadLatestProcess(ctx, workflowKey); err == nil {
-		latestID = latest.ID.Hex()
-	}
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
 	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
@@ -2207,11 +2202,10 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	sortHomeProcessList(history, sortKey)
 
 	view := HomeView{
-		PageBase:        s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
-		LatestProcessID: latestID,
-		Sort:            sortKey,
-		Processes:       processes,
-		History:         history,
+		PageBase:  s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
+		Sort:      sortKey,
+		Processes: processes,
+		History:   history,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -3632,15 +3626,6 @@ func (s *Server) loadProcess(ctx context.Context, id string) (*Process, error) {
 		return nil, err
 	}
 	process, err := s.store.LoadProcessByID(ctx, objectID)
-	if err != nil {
-		return nil, err
-	}
-	process.Progress = normalizeProgressKeys(process.Progress)
-	return process, nil
-}
-
-func (s *Server) loadLatestProcess(ctx context.Context, workflowKey string) (*Process, error) {
-	process, err := s.store.LoadLatestProcessByWorkflow(ctx, workflowKey)
 	if err != nil {
 		return nil, err
 	}
