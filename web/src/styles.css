@@ -159,6 +159,18 @@ a:hover {
   max-width: 520px;
 }
 
+.login-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.panel.login {
+  width: 100%;
+  max-width: 460px;
+}
+
 .landing.landing-wide {
   max-width: none;
   width: 100%;

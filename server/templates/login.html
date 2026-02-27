@@ -1,19 +1,21 @@
 {{define "login_body"}}
-<section class="panel landing" style="max-width: 460px;">
-  <h1>Login</h1>
-  <p class="muted">Use your account credentials to continue.</p>
-  {{if .Error}}
-    <p class="muted" style="color: #a91919;">{{.Error}}</p>
-  {{end}}
-  <form method="post" action="/login" class="input-form">
-    <input type="hidden" name="next" value="{{.Next}}" />
-    <label for="email">Email</label>
-    <input id="email" name="email" type="email" value="{{.Email}}" required />
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" required />
-    <button class="primary" type="submit">Login</button>
-  </form>
-</section>
+<div class="login-wrapper">
+  <section class="panel login">
+    <h1>Login</h1>
+    <p class="muted">Use your account credentials to continue.</p>
+    {{if .Error}}
+      <p class="muted" style="color: #a91919;">{{.Error}}</p>
+    {{end}}
+    <form method="post" action="/login" class="input-form">
+      <input type="hidden" name="next" value="{{.Next}}" />
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" value="{{.Email}}" required />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required />
+      <button class="primary" type="submit">Login</button>
+    </form>
+  </section>
+</div>
 {{end}}
 
 {{define "login.html"}}
