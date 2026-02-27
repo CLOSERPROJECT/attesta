@@ -75,6 +75,30 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Shared inline SVG icon style */
+.icon-svg,
+svg.bi {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: -0.125em;
+  fill: currentColor;
+}
+
+.icon-svg-sm {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-svg-md {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-svg-lg {
+  width: 21px;
+  height: 21px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
