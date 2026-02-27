@@ -97,26 +97,44 @@
             <td>{{.Email}}</td>
             <td>{{if .Activated}}Active{{else}}Invited{{end}}</td>
             <td>
-              <form method="post" action="/org-admin/users" class="input-form">
-                <input type="hidden" name="intent" value="set_roles" />
-                <input type="hidden" name="userId" value="{{.UserID}}" />
-                <span>
-                  {{range .RoleOptions}}
-                    {{if .Selected}}
-                      <span class="dept-badge" style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}">
-                        {{.Name}}
-                      </span>
-                    {{end}}
+              <span>
+                {{range .RoleOptions}}
+                  {{if .Selected}}
+                    <span class="dept-badge" style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}">
+                      {{.Name}}
+                    </span>
                   {{end}}
-                </span>
-              </form>
+                {{end}}
+              </span>
             </td>
             <td>
-              <form method="post" action="/org-admin/users">
-                <input type="hidden" name="intent" value="delete_user" />
-                <input type="hidden" name="userId" value="{{.UserID}}" />
-                <button type="submit">Delete account</button>
-              </form>
+              <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
+                Manage
+              </button>
+              <dialog id="manage-user-{{.UserID}}">
+                <form method="post" action="/org-admin/users" class="input-form">
+                  <input type="hidden" name="intent" value="set_roles" />
+                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <fieldset class="checkbox-group">
+                    <legend>Edit roles for {{.Email}}</legend>
+                    {{range .RoleOptions}}
+                      <label class="checkbox-item">
+                        <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
+                        <span>{{.Name}} ({{.Slug}})</span>
+                      </label>
+                    {{end}}
+                  </fieldset>
+                  <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="submit">Save roles</button>
+                    <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">Cancel</button>
+                  </div>
+                </form>
+                <form method="post" action="/org-admin/users" class="input-form" style="margin-top: 10px;">
+                  <input type="hidden" name="intent" value="delete_user" />
+                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <button type="submit">Delete account</button>
+                </form>
+              </dialog>
             </td>
           </tr>
         {{end}}
