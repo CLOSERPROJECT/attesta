@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +32,14 @@ func TestEnvAndCookieHelpers(t *testing.T) {
 	if got := sessionTTLDays(); got != 14 {
 		t.Fatalf("sessionTTLDays value = %d, want 14", got)
 	}
+	t.Setenv("RESET_TTL_HOURS", "0")
+	if got := resetTTLHrs(); got != 24 {
+		t.Fatalf("resetTTLHrs zero = %d, want 24", got)
+	}
+	t.Setenv("RESET_TTL_HOURS", "48")
+	if got := resetTTLHrs(); got != 48 {
+		t.Fatalf("resetTTLHrs value = %d, want 48", got)
+	}
 
 	t.Setenv("COOKIE_SECURE", "false")
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -45,6 +54,15 @@ func TestEnvAndCookieHelpers(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
 	if !shouldSecureCookie(req2) {
 		t.Fatal("expected secure cookie when COOKIE_SECURE=true")
+	}
+
+	id := randomUserIDFromEmail("  USER.Name+tag@example.com ")
+	if !strings.HasPrefix(id, "user-name-tag-") {
+		t.Fatalf("unexpected randomUserIDFromEmail prefix: %q", id)
+	}
+	idFallback := randomUserIDFromEmail("   @example.com ")
+	if !strings.HasPrefix(idFallback, "user-") {
+		t.Fatalf("unexpected randomUserIDFromEmail fallback prefix: %q", idFallback)
 	}
 }
 

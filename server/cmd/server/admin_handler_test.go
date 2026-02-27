@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -378,4 +379,202 @@ func TestAdminHandlersFailurePaths(t *testing.T) {
 			t.Fatalf("expected create user failure message, got %q", recCreateUserFail.Body.String())
 		}
 	})
+}
+
+func TestAdminHandlersMethodAndParseErrors(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	if _, err := store.CreateRole(t.Context(), Role{
+		OrgID:     org.ID,
+		OrgSlug:   org.Slug,
+		Name:      "Org Admin",
+		Slug:      "org-admin",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateRole org-admin error: %v", err)
+	}
+	orgID := org.ID
+	platformAdmin, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:          "platform-admin-methods",
+		Email:           "platform-methods@example.com",
+		IsPlatformAdmin: true,
+		Status:          "active",
+		CreatedAt:       time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser platform admin error: %v", err)
+	}
+	orgAdmin, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-methods",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-methods@example.com",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser org admin error: %v", err)
+	}
+	platformSession := createSessionForTestUser(t, store, platformAdmin)
+	orgAdminSession := createSessionForTestUser(t, store, orgAdmin)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	t.Run("admin orgs method not allowed and parse errors", func(t *testing.T) {
+		reqMethod := httptest.NewRequest(http.MethodPut, "/admin/orgs", nil)
+		reqMethod.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformSession})
+		recMethod := httptest.NewRecorder()
+		server.handleAdminOrgs(recMethod, reqMethod)
+		if recMethod.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", recMethod.Code, http.StatusMethodNotAllowed)
+		}
+
+		reqParse := httptest.NewRequest(http.MethodPost, "/admin/orgs?bad=%zz", strings.NewReader("name=Acme"))
+		reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		reqParse.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformSession})
+		recParse := httptest.NewRecorder()
+		server.handleAdminOrgs(recParse, reqParse)
+		if recParse.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", recParse.Code, http.StatusBadRequest)
+		}
+
+		reqMissingOrg := httptest.NewRequest(http.MethodPost, "/admin/orgs/missing", strings.NewReader("email=a%40b.c"))
+		reqMissingOrg.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		reqMissingOrg.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformSession})
+		recMissingOrg := httptest.NewRecorder()
+		server.handleAdminOrgs(recMissingOrg, reqMissingOrg)
+		if recMissingOrg.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", recMissingOrg.Code, http.StatusNotFound)
+		}
+
+		reqExistingOrgGet := httptest.NewRequest(http.MethodGet, "/admin/orgs/"+org.Slug, nil)
+		reqExistingOrgGet.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformSession})
+		recExistingOrgGet := httptest.NewRecorder()
+		server.handleAdminOrgs(recExistingOrgGet, reqExistingOrgGet)
+		if recExistingOrgGet.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recExistingOrgGet.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("org admin roles method not allowed and parse error", func(t *testing.T) {
+		reqMethod := httptest.NewRequest(http.MethodDelete, "/org-admin/roles", nil)
+		reqMethod.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
+		recMethod := httptest.NewRecorder()
+		server.handleOrgAdminRoles(recMethod, reqMethod)
+		if recMethod.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", recMethod.Code, http.StatusMethodNotAllowed)
+		}
+
+		reqParse := httptest.NewRequest(http.MethodPost, "/org-admin/roles?bad=%zz", strings.NewReader("name=qa"))
+		reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		reqParse.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
+		recParse := httptest.NewRecorder()
+		server.handleOrgAdminRoles(recParse, reqParse)
+		if recParse.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", recParse.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("org admin users get and parse error", func(t *testing.T) {
+		reqGet := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		reqGet.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
+		recGet := httptest.NewRecorder()
+		server.handleOrgAdminUsers(recGet, reqGet)
+		if recGet.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recGet.Code, http.StatusOK)
+		}
+
+		reqParse := httptest.NewRequest(http.MethodPost, "/org-admin/users?bad=%zz", strings.NewReader("email=a%40b.c&role=org-admin"))
+		reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		reqParse.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
+		recParse := httptest.NewRecorder()
+		server.handleOrgAdminUsers(recParse, reqParse)
+		if recParse.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", recParse.Code, http.StatusBadRequest)
+		}
+	})
+}
+
+func TestOrgAdminRoleCreationFailureRendersError(t *testing.T) {
+	base := NewMemoryStore()
+	org, err := base.CreateOrganization(t.Context(), Organization{Name: "Role Fail Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	if _, err := base.CreateRole(t.Context(), Role{
+		OrgID:     org.ID,
+		OrgSlug:   org.Slug,
+		Name:      "Org Admin",
+		Slug:      "org-admin",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateRole error: %v", err)
+	}
+	orgID := org.ID
+	admin, err := base.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-role-fail",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-role-fail@example.com",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, base, admin)
+	store := &adminFailingStore{MemoryStore: base, failCreateRole: true}
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=qa_reviewer"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminRoles(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "failed to create role") {
+		t.Fatalf("expected failure message, got %q", rec.Body.String())
+	}
+}
+
+func TestRenderAdminTemplatesErrorPaths(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Render Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	orgID := org.ID
+	user := &AccountUser{
+		UserID:          "render-user",
+		OrgID:           &orgID,
+		OrgSlug:         org.Slug,
+		RoleSlugs:       []string{"org-admin"},
+		IsPlatformAdmin: true,
+	}
+	server := &Server{store: store, tmpl: template.Must(template.New("broken").Parse("broken"))}
+
+	recOrg := httptest.NewRecorder()
+	server.renderOrgAdmin(recOrg, user, org.Slug, "", "")
+	if recOrg.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", recOrg.Code, http.StatusInternalServerError)
+	}
+
+	recMissing := httptest.NewRecorder()
+	server.renderOrgAdmin(recMissing, user, "missing-org", "", "")
+	if recMissing.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recMissing.Code, http.StatusNotFound)
+	}
+
+	recPlatform := httptest.NewRecorder()
+	server.renderPlatformAdmin(recPlatform, user, "", "")
+	if recPlatform.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", recPlatform.Code, http.StatusInternalServerError)
+	}
 }

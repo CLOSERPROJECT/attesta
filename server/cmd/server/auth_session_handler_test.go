@@ -212,3 +212,47 @@ func TestHandleLoginMethodNotAllowed(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 }
+
+func TestHandleLoginInvalidFormAndUnknownUser(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), tmpl: testTemplates()}
+
+	reqParse := httptest.NewRequest(http.MethodPost, "/login?bad=%zz", strings.NewReader("email=u%40example.com&password=pw"))
+	reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recParse := httptest.NewRecorder()
+	server.handleLogin(recParse, reqParse)
+	if recParse.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recParse.Code, http.StatusBadRequest)
+	}
+
+	form := url.Values{}
+	form.Set("email", "missing@example.com")
+	form.Set("password", "irrelevant-password")
+	reqMissing := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	reqMissing.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recMissing := httptest.NewRecorder()
+	server.handleLogin(recMissing, reqMissing)
+	if recMissing.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recMissing.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestHandleLogoutMethodAndNoCookie(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), now: time.Now}
+
+	reqMethod := httptest.NewRequest(http.MethodGet, "/logout", nil)
+	recMethod := httptest.NewRecorder()
+	server.handleLogout(recMethod, reqMethod)
+	if recMethod.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", recMethod.Code, http.StatusMethodNotAllowed)
+	}
+
+	reqNoCookie := httptest.NewRequest(http.MethodPost, "/logout", nil)
+	recNoCookie := httptest.NewRecorder()
+	server.handleLogout(recNoCookie, reqNoCookie)
+	if recNoCookie.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", recNoCookie.Code, http.StatusSeeOther)
+	}
+	if recNoCookie.Header().Get("Location") != "/login" {
+		t.Fatalf("location = %q, want /login", recNoCookie.Header().Get("Location"))
+	}
+}

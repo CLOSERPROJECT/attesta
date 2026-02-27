@@ -145,3 +145,61 @@ func TestHandleWorkflowRoutesDispatchAndUnknownWorkflow(t *testing.T) {
 		t.Fatalf("status = %d, want %d", missingRec.Code, http.StatusNotFound)
 	}
 }
+
+func TestHandleWorkflowRoutesAdditionalBranches(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
+
+	server := &Server{
+		store:      NewMemoryStore(),
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		now:        func() time.Time { return time.Date(2026, 2, 4, 11, 0, 0, 0, time.UTC) },
+		configDir:  tempDir,
+	}
+
+	reqMissingWorkflow := httptest.NewRequest(http.MethodGet, "/w/", nil)
+	recMissingWorkflow := httptest.NewRecorder()
+	server.handleWorkflowRoutes(recMissingWorkflow, reqMissingWorkflow)
+	if recMissingWorkflow.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recMissingWorkflow.Code, http.StatusNotFound)
+	}
+
+	reqWorkflowHome := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	recWorkflowHome := httptest.NewRecorder()
+	server.handleWorkflowRoutes(recWorkflowHome, reqWorkflowHome)
+	if recWorkflowHome.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recWorkflowHome.Code, http.StatusOK)
+	}
+
+	reqUnknown := httptest.NewRequest(http.MethodGet, "/w/workflow/unknown", nil)
+	recUnknown := httptest.NewRecorder()
+	server.handleWorkflowRoutes(recUnknown, reqUnknown)
+	if recUnknown.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recUnknown.Code, http.StatusNotFound)
+	}
+
+	reqEvents := httptest.NewRequest(http.MethodGet, "/w/workflow/events?role=qa", nil)
+	recEvents := httptest.NewRecorder()
+	server.handleWorkflowRoutes(recEvents, reqEvents)
+	if recEvents.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recEvents.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWorkflowRoutesRequiresAuthWhenEnabled(t *testing.T) {
+	server := &Server{
+		store:       NewMemoryStore(),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow", nil)
+	rec := httptest.NewRecorder()
+	server.handleWorkflowRoutes(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+}

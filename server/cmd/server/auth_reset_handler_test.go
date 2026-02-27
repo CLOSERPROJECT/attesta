@@ -307,3 +307,49 @@ func TestHandleResetSetValidationAndFailurePaths(t *testing.T) {
 		}
 	})
 }
+
+func TestHandleResetRequestAndSetParseAndMethodErrors(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), tmpl: resetTemplates(), now: time.Now}
+
+	reqBadResetForm := httptest.NewRequest(http.MethodPost, "/reset?bad=%zz", strings.NewReader("email=user%40acme.io"))
+	reqBadResetForm.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recBadResetForm := httptest.NewRecorder()
+	server.handleResetRequest(recBadResetForm, reqBadResetForm)
+	if recBadResetForm.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recBadResetForm.Code, http.StatusBadRequest)
+	}
+
+	recBadPath := httptest.NewRecorder()
+	reqBadPath := httptest.NewRequest(http.MethodGet, "/reset/invalid/path", nil)
+	server.handleResetSet(recBadPath, reqBadPath)
+	if recBadPath.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recBadPath.Code, http.StatusNotFound)
+	}
+
+	store := NewMemoryStore()
+	if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{
+		Email:     "user@acme.io",
+		UserID:    "u1",
+		TokenHash: "method-token",
+		ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreatePasswordReset error: %v", err)
+	}
+	serverWithToken := &Server{store: store, tmpl: resetTemplates(), now: time.Now}
+
+	reqMethod := httptest.NewRequest(http.MethodPut, "/reset/method-token", nil)
+	recMethod := httptest.NewRecorder()
+	serverWithToken.handleResetSet(recMethod, reqMethod)
+	if recMethod.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", recMethod.Code, http.StatusMethodNotAllowed)
+	}
+
+	reqParse := httptest.NewRequest(http.MethodPost, "/reset/method-token?bad=%zz", strings.NewReader("password=this-is-strong-enough"))
+	reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recParse := httptest.NewRecorder()
+	serverWithToken.handleResetSet(recParse, reqParse)
+	if recParse.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recParse.Code, http.StatusBadRequest)
+	}
+}
