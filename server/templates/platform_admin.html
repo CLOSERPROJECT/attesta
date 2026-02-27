@@ -12,6 +12,10 @@
   <form method="post" action="/admin/orgs" class="input-form">
     <label for="org-name">Organization name</label>
     <input id="org-name" name="name" type="text" required />
+    <label for="org-color">Organization color</label>
+    <input id="org-color" name="color" type="color" value="#000000" />
+    <label for="org-border">Organization border color</label>
+    <input id="org-border" name="border" type="color" value="#000000" />
     <button class="primary" type="submit">Create organization</button>
   </form>
 </section>
@@ -24,7 +28,7 @@
         <li class="process-item">
           <div class="process-head">
             <span>{{.Name}}</span>
-            <span class="pill">{{.Slug}}</span>
+            <span class="pill" style="--pill-bg: {{.Color}}; --border: {{.Border}};">{{.Slug}}</span>
           </div>
           <form method="post" action="/admin/orgs/{{.Slug}}" class="input-form">
             <label for="org-admin-email">Org admin email</label>

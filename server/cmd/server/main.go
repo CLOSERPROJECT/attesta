@@ -1701,6 +1701,8 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			name := strings.TrimSpace(r.FormValue("name"))
+			color := strings.TrimSpace(r.FormValue("color"))
+			border := strings.TrimSpace(r.FormValue("border"))
 			if name == "" {
 				s.renderPlatformAdmin(w, admin, "", "organization name is required")
 				return
@@ -1709,7 +1711,12 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
 				return
 			}
-			if _, err := s.store.CreateOrganization(r.Context(), Organization{Name: name, CreatedAt: s.nowUTC()}); err != nil {
+			if _, err := s.store.CreateOrganization(r.Context(), Organization{
+				Name:      name,
+				Color:     color,
+				Border:    border,
+				CreatedAt: s.nowUTC(),
+			}); err != nil {
 				if isDuplicateSlugError(err) {
 					s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
 					return
@@ -1752,6 +1759,8 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			OrgSlug:   org.Slug,
 			Slug:      roleSlug,
 			Name:      "Org Admin",
+			Color:     org.Color,
+			Border:    org.Border,
 			CreatedAt: s.nowUTC(),
 		})
 	}

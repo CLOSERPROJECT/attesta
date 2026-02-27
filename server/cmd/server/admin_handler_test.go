@@ -122,7 +122,7 @@ func TestHandleAdminOrgsCreateOrgAndInvite(t *testing.T) {
 
 	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
 
-	createReq := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Acme+Org"))
+	createReq := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Acme+Org&color=%2300aa88&border=%23112233"))
 	createReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	createReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	createRec := httptest.NewRecorder()
@@ -134,6 +134,12 @@ func TestHandleAdminOrgsCreateOrgAndInvite(t *testing.T) {
 	org, err := store.GetOrganizationBySlug(t.Context(), "acme-org")
 	if err != nil {
 		t.Fatalf("GetOrganizationBySlug error: %v", err)
+	}
+	if org.Color != "#00aa88" {
+		t.Fatalf("organization color = %q, want %q", org.Color, "#00aa88")
+	}
+	if org.Border != "#112233" {
+		t.Fatalf("organization border = %q, want %q", org.Border, "#112233")
 	}
 	inviteReq := httptest.NewRequest(http.MethodPost, "/admin/orgs/acme-org", strings.NewReader("email=org-admin%40acme.org"))
 	inviteReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -152,14 +158,22 @@ func TestHandleAdminOrgsCreateOrgAndInvite(t *testing.T) {
 		t.Fatalf("ListRolesByOrg error: %v", err)
 	}
 	foundOrgAdmin := false
+	var orgAdminRole Role
 	for _, role := range roles {
 		if role.Slug == "org-admin" {
 			foundOrgAdmin = true
+			orgAdminRole = role
 			break
 		}
 	}
 	if !foundOrgAdmin {
 		t.Fatal("expected org-admin role to exist")
+	}
+	if orgAdminRole.Color != "#00aa88" {
+		t.Fatalf("org-admin role color = %q, want %q", orgAdminRole.Color, "#00aa88")
+	}
+	if orgAdminRole.Border != "#112233" {
+		t.Fatalf("org-admin role border = %q, want %q", orgAdminRole.Border, "#112233")
 	}
 }
 
