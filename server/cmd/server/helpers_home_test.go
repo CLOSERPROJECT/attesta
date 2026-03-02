@@ -3,8 +3,6 @@ package main
 import (
 	"testing"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestSortHomeProcessList(t *testing.T) {
@@ -91,37 +89,7 @@ func TestSortHomeProcessList(t *testing.T) {
 	}
 }
 
-func TestBuildProcessSummary(t *testing.T) {
-	def := testRuntimeConfig().Workflow
-	now := time.Date(2026, 2, 4, 11, 30, 0, 0, time.UTC)
-
-	active := processWithDone("1.1")
-	active.ID = primitive.NewObjectID()
-	active.CreatedAt = now
-	summary := buildProcessSummary(def, active, "active")
-	if summary.ID != active.ID.Hex() {
-		t.Fatalf("summary.ID = %q, want %q", summary.ID, active.ID.Hex())
-	}
-	if summary.Status != "active" {
-		t.Fatalf("summary.Status = %q, want active", summary.Status)
-	}
-	if summary.NextSubstep != "1.2" {
-		t.Fatalf("summary.NextSubstep = %q, want 1.2", summary.NextSubstep)
-	}
-	if summary.NextTitle != "B" || summary.NextRole != "dep1" {
-		t.Fatalf("unexpected next summary fields: %#v", summary)
-	}
-
-	done := processWithDone("1.1", "1.2", "1.3", "2.1", "2.2", "3.1", "3.2")
-	done.ID = primitive.NewObjectID()
-	done.CreatedAt = now
-	doneSummary := buildProcessSummary(def, done, "done")
-	if doneSummary.NextSubstep != "" || doneSummary.NextTitle != "" || doneSummary.NextRole != "" {
-		t.Fatalf("expected no next action for done process, got %#v", doneSummary)
-	}
-}
-
-func TestRoleMetaMapAndActorForRole(t *testing.T) {
+func TestRoleMetaMap(t *testing.T) {
 	server := &Server{}
 	cfg := RuntimeConfig{
 		Departments: []Department{
@@ -142,34 +110,5 @@ func TestRoleMetaMapAndActorForRole(t *testing.T) {
 	}
 	if meta["dep2"].Color != "#f0f3ea" || meta["dep2"].Border != "#d9e0d0" {
 		t.Fatalf("dep2 defaults mismatch: %#v", meta["dep2"])
-	}
-
-	known := server.actorForRole(cfg, "dep1", "workflow")
-	if known.UserID != "u1" || known.Role != "dep1" {
-		t.Fatalf("known actor mismatch: %#v", known)
-	}
-
-	unknown := server.actorForRole(cfg, "depX", "workflow")
-	if unknown.UserID != "depX" || unknown.Role != "depX" {
-		t.Fatalf("unknown actor mismatch: %#v", unknown)
-	}
-
-	empty := server.actorForRole(cfg, "", "workflow")
-	if empty.UserID != "unknown" || empty.Role != "unknown" {
-		t.Fatalf("empty role fallback mismatch: %#v", empty)
-	}
-}
-
-func TestDefaultRole(t *testing.T) {
-	server := &Server{}
-	cfg := RuntimeConfig{
-		Departments: []Department{{ID: "dep1"}, {ID: "dep2"}},
-	}
-	if got := server.defaultRole(cfg); got != "dep1" {
-		t.Fatalf("defaultRole = %q, want dep1", got)
-	}
-
-	if got := server.defaultRole(RuntimeConfig{}); got != "" {
-		t.Fatalf("defaultRole for empty config = %q, want empty", got)
 	}
 }

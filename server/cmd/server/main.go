@@ -260,14 +260,6 @@ type ActionAttachmentView struct {
 	SHA256   string
 }
 
-type ActionTodo struct {
-	ProcessID string
-	SubstepID string
-	Title     string
-	Role      string
-	Status    string
-}
-
 type Department struct {
 	ID     string `yaml:"id"`
 	Name   string `yaml:"name"`
@@ -324,24 +316,6 @@ type RoleMeta struct {
 	Border string
 }
 
-type UserView struct {
-	ID         string
-	Name       string
-	Role       string
-	RoleLabel  string
-	RoleColor  string
-	RoleBorder string
-}
-
-type ProcessSummary struct {
-	ID          string
-	Status      string
-	CreatedAt   string
-	NextSubstep string
-	NextTitle   string
-	NextRole    string
-}
-
 type PageBase struct {
 	Body          string
 	ViteDevServer string
@@ -352,11 +326,6 @@ type PageBase struct {
 	ShowOrgsLink  bool
 	ShowMyOrgLink bool
 	ShowLogout    bool
-}
-
-type BackofficeLandingView struct {
-	PageBase
-	Users []UserView
 }
 
 type WorkflowOption struct {
@@ -379,43 +348,6 @@ type WorkflowPickerView struct {
 
 type HomeWorkflowPickerView struct {
 	WorkflowPickerView
-}
-
-type BackofficeWorkflowPickerView struct {
-	WorkflowPickerView
-}
-
-type DepartmentDashboardView struct {
-	PageBase
-	CurrentUser     Actor
-	RoleLabel       string
-	TodoActions     []ActionTodo
-	ActiveProcesses []ProcessSummary
-	DoneProcesses   []ProcessSummary
-}
-
-type DashboardView struct {
-	PageBase
-	UserID          string
-	RoleSlugs       []string
-	TodoActions     []ActionTodo
-	ActiveProcesses []ProcessSummary
-	DoneProcesses   []ProcessSummary
-}
-
-type DepartmentProcessView struct {
-	PageBase
-	CurrentUser       Actor
-	RoleLabel         string
-	ProcessID         string
-	SelectedSubstepID string
-	ProcessDone       bool
-	Actions           []ActionView
-	Error             string
-	Timeline          []TimelineStep
-	DPPURL            string
-	DPPGS1            string
-	Attachments       []ProcessDownloadAttachment
 }
 
 type ActionListView struct {
@@ -648,18 +580,12 @@ func main() {
 	mux.HandleFunc("/invite/", server.handleInvite)
 	mux.HandleFunc("/reset", server.handleResetRequest)
 	mux.HandleFunc("/reset/", server.handleResetSet)
-	mux.HandleFunc("/dashboard", server.handleDashboard)
-	mux.HandleFunc("/dashboard/", server.handleDashboard)
 	mux.HandleFunc("/admin/orgs", server.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", server.handleAdminOrgs)
 	mux.HandleFunc("/org-admin/roles", server.handleOrgAdminRoles)
 	mux.HandleFunc("/org-admin/users", server.handleOrgAdminUsers)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
-	mux.HandleFunc("/process/start", server.handleLegacyStartProcess)
-	mux.HandleFunc("/process/", server.handleLegacyProcessRoutes)
-	mux.HandleFunc("/backoffice", server.handleLegacyBackoffice)
-	mux.HandleFunc("/backoffice/", server.handleLegacyBackoffice)
 	mux.HandleFunc("/events", server.handleEvents)
 
 	addr := ":3000"
@@ -2154,12 +2080,6 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(rest, "/process/"):
 		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, rest))
 		return
-	case rest == "/backoffice" || strings.HasPrefix(rest, "/backoffice/"):
-		s.handleBackoffice(w, cloneRequestWithPath(scopedReq, rest))
-		return
-	case rest == "/dashboard" || rest == "/dashboard/" || strings.HasPrefix(rest, "/dashboard/"):
-		s.handleDashboard(w, cloneRequestWithPath(scopedReq, rest))
-		return
 	case rest == "/events":
 		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -2281,17 +2201,6 @@ func (s *Server) defaultWorkflowKey() string {
 	return strings.TrimSpace(base)
 }
 
-func (s *Server) resolveLegacyProcessWorkflowKey(ctx context.Context, processID string) (string, bool) {
-	process, err := s.loadProcess(ctx, processID)
-	if err != nil {
-		return "", false
-	}
-	if key := strings.TrimSpace(process.WorkflowKey); key != "" {
-		return key, true
-	}
-	return s.defaultWorkflowKey(), true
-}
-
 func (s *Server) processBelongsToWorkflow(process *Process, workflowKey string) bool {
 	if process == nil {
 		return false
@@ -2301,69 +2210,6 @@ func (s *Server) processBelongsToWorkflow(process *Process, workflowKey string) 
 		return true
 	}
 	return current == "" && workflowKey == s.defaultWorkflowKey()
-}
-
-func legacyProcessPath(path string) (processID string, parts []string, ok bool) {
-	raw := strings.TrimPrefix(path, "/process/")
-	parts = strings.Split(raw, "/")
-	if len(parts) == 0 || parts[0] == "" {
-		return "", nil, false
-	}
-	return parts[0], parts, true
-}
-
-func (s *Server) handleLegacyStartProcess(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		http.Error(w, "workflow context required", http.StatusBadRequest)
-		return
-	}
-	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-}
-
-func (s *Server) handleLegacyProcessRoutes(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
-		return
-	}
-	processID, parts, ok := legacyProcessPath(r.URL.Path)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	if len(parts) == 1 && r.Method == http.MethodGet {
-		if key, found := s.resolveLegacyProcessWorkflowKey(r.Context(), processID); found {
-			http.Redirect(w, r, fmt.Sprintf("/w/%s/process/%s", key, processID), http.StatusSeeOther)
-			return
-		}
-		http.NotFound(w, r)
-		return
-	}
-	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "complete" && r.Method == http.MethodPost {
-		http.Error(w, "workflow context required", http.StatusBadRequest)
-		return
-	}
-	s.handleProcessRoutes(w, r)
-}
-
-func (s *Server) handleLegacyBackoffice(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
-		return
-	}
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/backoffice"), "/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 3 && parts[1] == "process" && r.Method == http.MethodGet {
-		processID := strings.TrimSpace(parts[2])
-		if processID == "" {
-			http.NotFound(w, r)
-			return
-		}
-		if key, found := s.resolveLegacyProcessWorkflowKey(r.Context(), processID); found {
-			http.Redirect(w, r, fmt.Sprintf("/w/%s/backoffice/%s/process/%s", key, parts[0], processID), http.StatusSeeOther)
-			return
-		}
-		http.NotFound(w, r)
-		return
-	}
-	s.handleBackoffice(w, r)
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
@@ -2888,104 +2734,6 @@ func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	if _, err := io.Copy(w, download); err != nil {
 		return
-	}
-}
-
-func (s *Server) handleBackoffice(w http.ResponseWriter, r *http.Request) {
-	if s.enforceAuth {
-		workflowKey, _, err := s.selectedWorkflow(r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, workflowPath(workflowKey)+"/dashboard", http.StatusSeeOther)
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	path := strings.TrimPrefix(r.URL.Path, "/backoffice")
-	path = strings.Trim(path, "/")
-	_, scoped := r.Context().Value(workflowContextKey{}).(workflowContextValue)
-	if path == "" {
-		if !scoped {
-			options, listErr := s.workflowOptions(r.Context())
-			if listErr != nil {
-				http.Error(w, listErr.Error(), http.StatusInternalServerError)
-				return
-			}
-			view := BackofficeWorkflowPickerView{
-				WorkflowPickerView: WorkflowPickerView{
-					PageBase:  s.pageBase("backoffice_picker_body", "", ""),
-					Workflows: options,
-				},
-			}
-			if err := s.tmpl.ExecuteTemplate(w, "backoffice.html", view); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-			return
-		}
-		view := BackofficeLandingView{
-			PageBase: s.pageBase("backoffice_landing_body", workflowKey, cfg.Workflow.Name),
-			Users:    s.userViews(cfg),
-		}
-		if err := s.tmpl.ExecuteTemplate(w, "backoffice_landing.html", view); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-
-	parts := strings.Split(path, "/")
-	role := parts[0]
-	if !s.isKnownRole(cfg, role) {
-		http.NotFound(w, r)
-		return
-	}
-
-	if len(parts) == 1 {
-		s.handleDepartmentDashboard(w, r, role)
-		return
-	}
-	if len(parts) == 2 && parts[1] == "partial" {
-		s.handleDepartmentDashboardPartial(w, r, role)
-		return
-	}
-	if len(parts) == 3 && parts[1] == "process" {
-		s.handleDepartmentProcess(w, r, role, parts[2])
-		return
-	}
-
-	http.NotFound(w, r)
-}
-
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ctx := r.Context()
-	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboardForRoles(ctx, cfg, workflowKey, user.RoleSlugs)
-	view := DashboardView{
-		PageBase:        s.pageBaseForUser(user, "dashboard_body", workflowKey, cfg.Workflow.Name),
-		UserID:          user.UserID,
-		RoleSlugs:       append([]string(nil), user.RoleSlugs...),
-		TodoActions:     todoActions,
-		ActiveProcesses: activeProcesses,
-		DoneProcesses:   doneProcesses,
-	}
-	templateName := "dashboard.html"
-	if strings.HasSuffix(strings.TrimSpace(r.URL.Path), "/partial") {
-		templateName = "dashboard_partial.html"
-	}
-	if err := s.tmpl.ExecuteTemplate(w, templateName, view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -3601,121 +3349,6 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleDepartmentDashboard(w http.ResponseWriter, r *http.Request, role string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
-	if strings.TrimSpace(actor.UserID) == "" {
-		actor = s.actorForRole(cfg, role, workflowKey)
-	}
-
-	ctx := r.Context()
-	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
-	view := DepartmentDashboardView{
-		PageBase:        s.pageBaseForUser(user, "dept_dashboard_body", workflowKey, cfg.Workflow.Name),
-		CurrentUser:     actor,
-		RoleLabel:       s.roleLabel(cfg, role),
-		TodoActions:     todoActions,
-		ActiveProcesses: activeProcesses,
-		DoneProcesses:   doneProcesses,
-	}
-	if err := s.tmpl.ExecuteTemplate(w, "backoffice_department.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleDepartmentProcess(w http.ResponseWriter, r *http.Request, role, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
-	if strings.TrimSpace(actor.UserID) == "" {
-		actor = s.actorForRole(cfg, role, workflowKey)
-	}
-
-	ctx := r.Context()
-	process, err := s.loadProcess(ctx, processID)
-	if err != nil {
-		http.Error(w, "process not found", http.StatusNotFound)
-		return
-	}
-	if !s.processBelongsToWorkflow(process, workflowKey) {
-		http.Error(w, "process not found", http.StatusNotFound)
-		return
-	}
-	process = s.ensureProcessCompletionArtifacts(ctx, cfg, workflowKey, process)
-	selectedSubstepID := strings.TrimSpace(r.URL.Query().Get("substep"))
-	actionList := s.buildProcessActionListView(cfg, workflowKey, process, actor, selectedSubstepID, "", true)
-	view := DepartmentProcessView{
-		PageBase:          s.pageBaseForUser(user, "dept_process_body", workflowKey, cfg.Workflow.Name),
-		CurrentUser:       actor,
-		RoleLabel:         s.roleLabel(cfg, role),
-		ProcessID:         process.ID.Hex(),
-		SelectedSubstepID: actionList.SelectedSubstepID,
-		ProcessDone:       actionList.ProcessDone,
-		Actions:           actionList.Actions,
-		Timeline:          actionList.Timeline,
-		DPPURL:            actionList.DPPURL,
-		DPPGS1:            actionList.DPPGS1,
-		Attachments:       actionList.Attachments,
-	}
-	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleDepartmentDashboardPartial(w http.ResponseWriter, r *http.Request, role string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if s.enforceAuth && !containsRole(user.RoleSlugs, role) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	actor := Actor{UserID: user.UserID, Role: role, WorkflowKey: workflowKey}
-
-	ctx := r.Context()
-	todoActions, activeProcesses, doneProcesses := s.loadProcessDashboard(ctx, cfg, workflowKey, role)
-	view := DepartmentDashboardView{
-		PageBase:        s.pageBase("", workflowKey, cfg.Workflow.Name),
-		CurrentUser:     actor,
-		RoleLabel:       s.roleLabel(cfg, role),
-		TodoActions:     todoActions,
-		ActiveProcesses: activeProcesses,
-		DoneProcesses:   doneProcesses,
-	}
-	if err := s.tmpl.ExecuteTemplate(w, "backoffice_department_partial.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
 func (s *Server) loadProcess(ctx context.Context, id string) (*Process, error) {
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -3739,10 +3372,6 @@ func (s *Server) runtimeConfig() (RuntimeConfig, error) {
 		return RuntimeConfig{}, err
 	}
 	return cfg, nil
-}
-
-func (s *Server) getConfig() (RuntimeConfig, error) {
-	return s.runtimeConfig()
 }
 
 func sortedWorkflowKeys(catalog map[string]RuntimeConfig) []string {
@@ -3958,11 +3587,6 @@ func (s *Server) roleMetaMap(cfg RuntimeConfig) map[string]RoleMeta {
 	return roles
 }
 
-func (s *Server) roleLabel(cfg RuntimeConfig, role string) string {
-	meta := roleMetaFor(role, s.roleMetaMap(cfg))
-	return meta.Label
-}
-
 func (s *Server) isKnownRole(cfg RuntimeConfig, role string) bool {
 	for _, item := range cfg.Roles {
 		if item.Slug == role {
@@ -3989,140 +3613,6 @@ func (s *Server) roles(cfg RuntimeConfig) []string {
 		roles = append(roles, dept.ID)
 	}
 	return roles
-}
-
-func (s *Server) actorForRole(cfg RuntimeConfig, role, workflowKey string) Actor {
-	for _, user := range cfg.Users {
-		if user.DepartmentID == role {
-			return Actor{UserID: user.ID, Role: role, WorkflowKey: workflowKey}
-		}
-	}
-	if role == "" {
-		role = "unknown"
-	}
-	return Actor{UserID: role, Role: role, WorkflowKey: workflowKey}
-}
-
-func (s *Server) defaultRole(cfg RuntimeConfig) string {
-	if len(cfg.Roles) > 0 {
-		return cfg.Roles[0].Slug
-	}
-	if len(cfg.Departments) > 0 {
-		return cfg.Departments[0].ID
-	}
-	return ""
-}
-
-func (s *Server) userViews(cfg RuntimeConfig) []UserView {
-	metaMap := s.roleMetaMap(cfg)
-	var views []UserView
-	for _, user := range cfg.Users {
-		meta := roleMetaFor(user.DepartmentID, metaMap)
-		views = append(views, UserView{
-			ID:         user.ID,
-			Name:       user.Name,
-			Role:       user.DepartmentID,
-			RoleLabel:  meta.Label,
-			RoleColor:  meta.Color,
-			RoleBorder: meta.Border,
-		})
-	}
-	return views
-}
-
-func (s *Server) loadProcessDashboard(ctx context.Context, cfg RuntimeConfig, workflowKey, role string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
-	processes, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 25)
-	if err != nil {
-		return nil, nil, nil
-	}
-
-	var todo []ActionTodo
-	var active []ProcessSummary
-	var done []ProcessSummary
-	for _, process := range processes {
-		process.Progress = normalizeProgressKeys(process.Progress)
-		status := deriveProcessStatus(cfg.Workflow, &process)
-		summary := buildProcessSummaryForRole(cfg.Workflow, &process, status, role)
-		if status == "done" {
-			done = append(done, summary)
-		} else {
-			todo = append(todo, buildRoleTodos(cfg.Workflow, &process, role)...)
-			if summary.NextSubstep != "" {
-				active = append(active, summary)
-			}
-		}
-	}
-	return todo, active, done
-}
-
-func (s *Server) loadProcessDashboardForRoles(ctx context.Context, cfg RuntimeConfig, workflowKey string, roles []string) ([]ActionTodo, []ProcessSummary, []ProcessSummary) {
-	processes, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 25)
-	if err != nil {
-		return nil, nil, nil
-	}
-	roleSet := map[string]struct{}{}
-	for _, role := range roles {
-		trimmed := strings.TrimSpace(role)
-		if trimmed != "" {
-			roleSet[trimmed] = struct{}{}
-		}
-	}
-	todoSeen := map[string]struct{}{}
-	activeSeen := map[string]struct{}{}
-	doneSeen := map[string]struct{}{}
-	var todo []ActionTodo
-	var active []ProcessSummary
-	var done []ProcessSummary
-	for _, process := range processes {
-		process.Progress = normalizeProgressKeys(process.Progress)
-		status := deriveProcessStatus(cfg.Workflow, &process)
-		summary := buildProcessSummary(cfg.Workflow, &process, status)
-		if status == "done" {
-			if _, ok := doneSeen[summary.ID]; !ok {
-				doneSeen[summary.ID] = struct{}{}
-				done = append(done, summary)
-			}
-			continue
-		}
-		availMap := computeAvailability(cfg.Workflow, &process)
-		for _, sub := range orderedSubsteps(cfg.Workflow) {
-			allowedRoles := substepRoles(sub)
-			matched := ""
-			for _, role := range allowedRoles {
-				if _, ok := roleSet[role]; ok {
-					matched = role
-					break
-				}
-			}
-			if matched == "" {
-				continue
-			}
-			stepStatus := "locked"
-			if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
-				stepStatus = "done"
-			} else if availMap[sub.SubstepID] {
-				stepStatus = "available"
-			}
-			if stepStatus == "available" {
-				key := summary.ID + "|" + sub.SubstepID
-				if _, ok := todoSeen[key]; !ok {
-					todoSeen[key] = struct{}{}
-					todo = append(todo, ActionTodo{
-						ProcessID: summary.ID,
-						SubstepID: sub.SubstepID,
-						Title:     sub.Title,
-						Role:      matched,
-						Status:    stepStatus,
-					})
-				}
-				if _, ok := activeSeen[summary.ID]; !ok {
-					activeSeen[summary.ID] = struct{}{}
-					active = append(active, summary)
-				}
-			}
-		}
-	}
-	return todo, active, done
 }
 
 func containsRole(roles []string, role string) bool {
@@ -4542,36 +4032,6 @@ func orderedSubsteps(def WorkflowDef) []WorkflowSub {
 	return ordered
 }
 
-func buildProcessSummary(def WorkflowDef, process *Process, status string) ProcessSummary {
-	nextSubstep, ok := nextAvailableSubstep(def, process)
-	summary := ProcessSummary{
-		ID:        process.ID.Hex(),
-		Status:    status,
-		CreatedAt: process.CreatedAt.Format(time.RFC3339),
-	}
-	if ok {
-		summary.NextSubstep = nextSubstep.SubstepID
-		summary.NextTitle = nextSubstep.Title
-		summary.NextRole = nextSubstep.Role
-	}
-	return summary
-}
-
-func buildProcessSummaryForRole(def WorkflowDef, process *Process, status, role string) ProcessSummary {
-	nextSubstep, ok := nextAvailableSubstepForRole(def, process, role)
-	summary := ProcessSummary{
-		ID:        process.ID.Hex(),
-		Status:    status,
-		CreatedAt: process.CreatedAt.Format(time.RFC3339),
-	}
-	if ok {
-		summary.NextSubstep = nextSubstep.SubstepID
-		summary.NextTitle = nextSubstep.Title
-		summary.NextRole = nextSubstep.Role
-	}
-	return summary
-}
-
 func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool) {
 	if process == nil {
 		return WorkflowSub{}, false
@@ -4583,50 +4043,6 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 		}
 	}
 	return WorkflowSub{}, false
-}
-
-func nextAvailableSubstepForRole(def WorkflowDef, process *Process, role string) (WorkflowSub, bool) {
-	if process == nil {
-		return WorkflowSub{}, false
-	}
-	availMap := computeAvailability(def, process)
-	for _, sub := range orderedSubsteps(def) {
-		if sub.Role != role {
-			continue
-		}
-		if availMap[sub.SubstepID] {
-			return sub, true
-		}
-	}
-	return WorkflowSub{}, false
-}
-
-func buildRoleTodos(def WorkflowDef, process *Process, role string) []ActionTodo {
-	if process == nil {
-		return nil
-	}
-	availMap := computeAvailability(def, process)
-	var todos []ActionTodo
-	for _, sub := range orderedSubsteps(def) {
-		if sub.Role != role {
-			continue
-		}
-		status := "locked"
-		if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
-			status = "done"
-		} else if availMap[sub.SubstepID] {
-			status = "available"
-		}
-		if status == "available" {
-			todos = append(todos, ActionTodo{
-				ProcessID: process.ID.Hex(),
-				SubstepID: sub.SubstepID,
-				Title:     sub.Title,
-				Status:    status,
-			})
-		}
-	}
-	return todos
 }
 
 func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleMeta map[string]RoleMeta) []ActionView {
@@ -5151,11 +4567,6 @@ func (s *Server) nowUTC() time.Time {
 	return s.now().UTC()
 }
 
-func (s *Server) renderActionError(w http.ResponseWriter, status int, message string, process *Process, actor Actor) {
-	w.WriteHeader(status)
-	s.renderActionList(w, nil, process, actor, message)
-}
-
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {
 	w.WriteHeader(status)
 	if isHTMXRequest(r) {
@@ -5206,21 +4617,16 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 	if process != nil {
 		processID = process.ID.Hex()
 	}
-	view := DepartmentProcessView{
-		PageBase:          s.pageBase("dept_process_body", workflowKey, cfg.Workflow.Name),
-		CurrentUser:       actor,
-		RoleLabel:         s.roleLabel(cfg, actor.Role),
-		ProcessID:         processID,
-		SelectedSubstepID: actionList.SelectedSubstepID,
-		ProcessDone:       actionList.ProcessDone,
-		Actions:           actionList.Actions,
-		Error:             message,
-		Timeline:          actionList.Timeline,
-		DPPURL:            actionList.DPPURL,
-		DPPGS1:            actionList.DPPGS1,
-		Attachments:       actionList.Attachments,
+	view := ProcessPageView{
+		PageBase:    s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
+		ProcessID:   processID,
+		Timeline:    actionList.Timeline,
+		ActionList:  actionList,
+		DPPURL:      actionList.DPPURL,
+		DPPGS1:      actionList.DPPGS1,
+		Attachments: actionList.Attachments,
 	}
-	if err := s.tmpl.ExecuteTemplate(w, "backoffice_process.html", view); err != nil {
+	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

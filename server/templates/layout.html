@@ -89,16 +89,11 @@
       {{else if eq .Body "invite_body"}}{{template "invite_body" .}}
       {{else if eq .Body "reset_request_body"}}{{template "reset_request_body" .}}
       {{else if eq .Body "reset_set_body"}}{{template "reset_set_body" .}}
-      {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
       {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
       {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
       {{else if eq .Body "home_body"}}{{template "home_body" .}}
       {{else if eq .Body "process_body"}}{{template "process_body" .}}
       {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
-      {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
-      {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
-      {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
-      {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}
       {{end}}
     </main>
     <footer

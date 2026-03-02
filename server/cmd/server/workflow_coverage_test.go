@@ -71,6 +71,7 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 		{name: "events validation", method: http.MethodGet, path: "/w/workflow/events", want: http.StatusBadRequest},
 		{name: "start method guard", method: http.MethodGet, path: "/w/workflow/process/start", want: http.StatusMethodNotAllowed},
 		{name: "backoffice unknown role", method: http.MethodGet, path: "/w/workflow/backoffice/unknown", want: http.StatusNotFound},
+		{name: "dashboard removed", method: http.MethodGet, path: "/w/workflow/dashboard", want: http.StatusNotFound},
 	}
 
 	for _, tc := range tests {
@@ -82,22 +83,6 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 				t.Fatalf("status = %d, want %d", rec.Code, tc.want)
 			}
 		})
-	}
-}
-
-func TestHandleLegacyBackofficePassThrough(t *testing.T) {
-	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
-
-	server := &Server{
-		tmpl:      testTemplates(),
-		configDir: tempDir,
-	}
-	req := httptest.NewRequest(http.MethodGet, "/backoffice", nil)
-	rec := httptest.NewRecorder()
-	server.handleLegacyBackoffice(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
 
@@ -184,37 +169,6 @@ func TestHandleTimelinePartialReturns404OnWorkflowMismatch(t *testing.T) {
 	}
 }
 
-func TestHandleDepartmentProcessReturns404OnWorkflowMismatch(t *testing.T) {
-	store := NewMemoryStore()
-	processID := store.SeedProcess(Process{
-		ID:          primitive.NewObjectID(),
-		WorkflowKey: "secondary",
-		CreatedAt:   time.Now().UTC(),
-		Status:      "active",
-		Progress: map[string]ProcessStep{
-			"1_1": {State: "pending"},
-		},
-	})
-	server := &Server{
-		store: store,
-		tmpl:  testTemplates(),
-		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
-		},
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/backoffice/dep1/process/"+processID.Hex(), nil)
-	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
-		Key: "workflow",
-		Cfg: testRuntimeConfig(),
-	}))
-	rec := httptest.NewRecorder()
-	server.handleBackoffice(rec, req)
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
-	}
-}
-
 func TestHandleEventsReturns400OnWorkflowQueryMismatch(t *testing.T) {
 	server := &Server{
 		sse: newSSEHub(),
@@ -231,22 +185,5 @@ func TestHandleEventsReturns400OnWorkflowQueryMismatch(t *testing.T) {
 	server.handleEvents(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-	}
-}
-
-func TestGetConfigUsesRuntimeProvider(t *testing.T) {
-	server := &Server{
-		configProvider: func() (RuntimeConfig, error) {
-			cfg := testRuntimeConfig()
-			cfg.Workflow.Name = "Provided workflow"
-			return cfg, nil
-		},
-	}
-	cfg, err := server.getConfig()
-	if err != nil {
-		t.Fatalf("getConfig() error: %v", err)
-	}
-	if cfg.Workflow.Name != "Provided workflow" {
-		t.Fatalf("workflow name = %q, want Provided workflow", cfg.Workflow.Name)
 	}
 }
