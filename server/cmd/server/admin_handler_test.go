@@ -564,7 +564,7 @@ func TestHandleOrgAdminRolesDuplicateSlugRendersExplicitError(t *testing.T) {
 	}
 }
 
-func TestHandleOrgAdminRolesStoresColorAndBorder(t *testing.T) {
+func TestHandleOrgAdminRolesStoresPaletteStyle(t *testing.T) {
 	store := NewMemoryStore()
 	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
 	if err != nil {
@@ -587,7 +587,7 @@ func TestHandleOrgAdminRolesStoresColorAndBorder(t *testing.T) {
 	sessionID := createSessionForTestUser(t, store, adminUser)
 	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA+Reviewer&color=%2300ff88&border=%23112233"))
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA+Reviewer&palette=emerald"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
@@ -600,11 +600,55 @@ func TestHandleOrgAdminRolesStoresColorAndBorder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRoleBySlug error: %v", err)
 	}
-	if role.Color != "#00ff88" {
-		t.Fatalf("role color = %q, want %q", role.Color, "#00ff88")
+	if role.Color != "var(--role-emerald-bg)" {
+		t.Fatalf("role color = %q, want %q", role.Color, "var(--role-emerald-bg)")
 	}
-	if role.Border != "#112233" {
-		t.Fatalf("role border = %q, want %q", role.Border, "#112233")
+	if role.Border != "var(--role-emerald-border)" {
+		t.Fatalf("role border = %q, want %q", role.Border, "var(--role-emerald-border)")
+	}
+}
+
+func TestHandleOrgAdminRolesDefaultsToRedPaletteForUnknownValue(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-role-default",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-role-default@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Line+Leader&palette=not-a-palette"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminRoles(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	role, err := store.GetRoleBySlug(t.Context(), org.Slug, "line-leader")
+	if err != nil {
+		t.Fatalf("GetRoleBySlug error: %v", err)
+	}
+	if role.Color != "var(--role-red-bg)" {
+		t.Fatalf("role color = %q, want %q", role.Color, "var(--role-red-bg)")
+	}
+	if role.Border != "var(--role-red-border)" {
+		t.Fatalf("role border = %q, want %q", role.Border, "var(--role-red-border)")
 	}
 }
 
@@ -786,6 +830,59 @@ func TestHandleOrgAdminUsersGetIncludesSelectedRoleStyleData(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "ROLE_STYLE #abcdef #123456") {
 		t.Fatalf("expected role style token in response, got %q", rec.Body.String())
+	}
+}
+
+func TestHandleOrgAdminUsersGetIncludesFallbackRoleStyleData(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{
+		OrgID:     org.ID,
+		OrgSlug:   org.Slug,
+		Name:      "Org Admin",
+		Slug:      "org-admin",
+		CreatedAt: time.Now().UTC(),
+	})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-fallback-style-view",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-fallback-style-view@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser admin error: %v", err)
+	}
+	if _, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "fallback-style-user",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "fallback-style-user@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateUser fallback-style-user error: %v", err)
+	}
+
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+	req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "ROLE_STYLE var(--role-fallback) var(--border)") {
+		t.Fatalf("expected role fallback style token in response, got %q", rec.Body.String())
 	}
 }
 

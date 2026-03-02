@@ -23,8 +23,8 @@ func TestActionListTemplateShowsAllRoleBadges(t *testing.T) {
 				InputType: "string",
 				Status:    "available",
 				RoleBadges: []ActionRoleBadge{
-					{ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
-					{ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
+					{ID: "dep1", Label: "Department 1", Color: template.CSS("#aaaaaa"), Border: template.CSS("#111111")},
+					{ID: "dep2", Label: "Department 2", Color: template.CSS("#bbbbbb"), Border: template.CSS("#222222")},
 				},
 				MatchingRoles: []string{"dep1", "dep2"},
 			},

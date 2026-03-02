@@ -144,8 +144,8 @@ type TimelineSubstep struct {
 	Selected     bool
 	RoleBadges   []TimelineRoleBadge
 	RoleLabel    string
-	RoleColor    string
-	RoleBorder   string
+	RoleColor    template.CSS
+	RoleBorder   template.CSS
 	Status       string
 	DoneBy       string
 	DoneRole     string
@@ -159,8 +159,8 @@ type TimelineSubstep struct {
 type TimelineRoleBadge struct {
 	ID     string
 	Label  string
-	Color  string
-	Border string
+	Color  template.CSS
+	Border template.CSS
 }
 
 type TimelineStep struct {
@@ -226,8 +226,8 @@ type ActionView struct {
 	RoleBadges    []ActionRoleBadge
 	MatchingRoles []string
 	RoleLabel     string
-	RoleColor     string
-	RoleBorder    string
+	RoleColor     template.CSS
+	RoleBorder    template.CSS
 	InputKey      string
 	InputType     string
 	FormSchema    string
@@ -245,8 +245,8 @@ type ActionView struct {
 type ActionRoleBadge struct {
 	ID     string
 	Label  string
-	Color  string
-	Border string
+	Color  template.CSS
+	Border template.CSS
 }
 
 type ActionKV struct {
@@ -434,8 +434,8 @@ type OrgAdminView struct {
 type OrgAdminRoleOption struct {
 	Slug       string
 	Name       string
-	RoleColor  string
-	RoleBorder string
+	RoleColor  template.CSS
+	RoleBorder template.CSS
 	Selected   bool
 }
 
@@ -519,6 +519,54 @@ type DPPTraceabilitySubstep struct {
 type DPPTraceabilityValue struct {
 	Key   string
 	Value string
+}
+
+type rolePaletteStyle struct {
+	Color  string
+	Border string
+}
+
+var rolePaletteStyles = map[string]rolePaletteStyle{
+	"red":     {Color: "var(--role-red-bg)", Border: "var(--role-red-border)"},
+	"orange":  {Color: "var(--role-orange-bg)", Border: "var(--role-orange-border)"},
+	"amber":   {Color: "var(--role-amber-bg)", Border: "var(--role-amber-border)"},
+	"yellow":  {Color: "var(--role-yellow-bg)", Border: "var(--role-yellow-border)"},
+	"lime":    {Color: "var(--role-lime-bg)", Border: "var(--role-lime-border)"},
+	"green":   {Color: "var(--role-green-bg)", Border: "var(--role-green-border)"},
+	"emerald": {Color: "var(--role-emerald-bg)", Border: "var(--role-emerald-border)"},
+	"teal":    {Color: "var(--role-teal-bg)", Border: "var(--role-teal-border)"},
+	"cyan":    {Color: "var(--role-cyan-bg)", Border: "var(--role-cyan-border)"},
+	"sky":     {Color: "var(--role-sky-bg)", Border: "var(--role-sky-border)"},
+	"blue":    {Color: "var(--role-blue-bg)", Border: "var(--role-blue-border)"},
+	"indigo":  {Color: "var(--role-indigo-bg)", Border: "var(--role-indigo-border)"},
+	"violet":  {Color: "var(--role-violet-bg)", Border: "var(--role-violet-border)"},
+	"purple":  {Color: "var(--role-purple-bg)", Border: "var(--role-purple-border)"},
+	"fuchsia": {Color: "var(--role-fuchsia-bg)", Border: "var(--role-fuchsia-border)"},
+	"pink":    {Color: "var(--role-pink-bg)", Border: "var(--role-pink-border)"},
+	"rose":    {Color: "var(--role-rose-bg)", Border: "var(--role-rose-border)"},
+}
+
+func resolveRolePaletteStyle(palette string) rolePaletteStyle {
+	key := canonifySlug(palette)
+	if style, ok := rolePaletteStyles[key]; ok {
+		return style
+	}
+	return rolePaletteStyles["red"]
+}
+
+func resolveRoleBadgeStyle(color, border string) rolePaletteStyle {
+	resolvedColor := strings.TrimSpace(color)
+	if resolvedColor == "" {
+		resolvedColor = "var(--role-fallback)"
+	}
+	resolvedBorder := strings.TrimSpace(border)
+	if resolvedBorder == "" {
+		resolvedBorder = "var(--border)"
+	}
+	return rolePaletteStyle{
+		Color:  resolvedColor,
+		Border: resolvedBorder,
+	}
 }
 
 type workflowContextKey struct{}
@@ -1930,11 +1978,12 @@ func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlu
 		}
 		roleOptions := make([]OrgAdminRoleOption, 0, len(roles))
 		for _, role := range roles {
+			roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
 			roleOptions = append(roleOptions, OrgAdminRoleOption{
 				Slug:       role.Slug,
 				Name:       role.Name,
-				RoleColor:  role.Color,
-				RoleBorder: role.Border,
+				RoleColor:  cssValue(roleStyle.Color, "var(--role-fallback)"),
+				RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
 				Selected:   containsRole(orgUser.RoleSlugs, role.Slug),
 			})
 		}
@@ -1995,8 +2044,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		name := strings.TrimSpace(r.FormValue("name"))
-		color := strings.TrimSpace(r.FormValue("color"))
-		border := strings.TrimSpace(r.FormValue("border"))
+		palette := strings.TrimSpace(r.FormValue("palette"))
+		paletteStyle := resolveRolePaletteStyle(palette)
 		if name == "" {
 			s.renderOrgAdmin(w, user, user.OrgSlug, "", "role name is required")
 			return
@@ -2009,8 +2058,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			OrgID:     *user.OrgID,
 			OrgSlug:   user.OrgSlug,
 			Name:      name,
-			Color:     color,
-			Border:    border,
+			Color:     paletteStyle.Color,
+			Border:    paletteStyle.Border,
 			CreatedAt: s.nowUTC(),
 		})
 		if err != nil {
@@ -3860,8 +3909,8 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 				roleBadges = append(roleBadges, TimelineRoleBadge{
 					ID:     role,
 					Label:  badgeMeta.Label,
-					Color:  badgeMeta.Color,
-					Border: badgeMeta.Border,
+					Color:  cssValue(badgeMeta.Color, "var(--role-fallback)"),
+					Border: cssValue(badgeMeta.Border, "var(--border)"),
 				})
 			}
 			entry := TimelineSubstep{
@@ -3870,8 +3919,8 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 				Role:       strings.Join(allowedRoles, ", "),
 				RoleBadges: roleBadges,
 				RoleLabel:  meta.Label,
-				RoleColor:  meta.Color,
-				RoleBorder: meta.Border,
+				RoleColor:  cssValue(meta.Color, "var(--role-fallback)"),
+				RoleBorder: cssValue(meta.Border, "var(--border)"),
 			}
 			if process != nil {
 				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
@@ -4203,8 +4252,8 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			roleBadges = append(roleBadges, ActionRoleBadge{
 				ID:     role,
 				Label:  meta.Label,
-				Color:  meta.Color,
-				Border: meta.Border,
+				Color:  cssValue(meta.Color, "var(--role-fallback)"),
+				Border: cssValue(meta.Border, "var(--border)"),
 			})
 		}
 		if onlyRole && strings.TrimSpace(actor.Role) != "" && !containsRole(allowedRoles, actor.Role) {
@@ -4265,8 +4314,8 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			RoleBadges:    roleBadges,
 			MatchingRoles: matchingRoles,
 			RoleLabel:     meta.Label,
-			RoleColor:     meta.Color,
-			RoleBorder:    meta.Border,
+			RoleColor:     cssValue(meta.Color, "var(--role-fallback)"),
+			RoleBorder:    cssValue(meta.Border, "var(--border)"),
 			InputKey:      sub.InputKey,
 			InputType:     sub.InputType,
 			FormSchema:    formSchema,
@@ -4481,7 +4530,20 @@ func roleMetaFor(role string, roleMeta map[string]RoleMeta) RoleMeta {
 	if meta, ok := roleMeta[role]; ok {
 		return meta
 	}
-	return RoleMeta{ID: role, Label: role}
+	return RoleMeta{
+		ID:     role,
+		Label:  role,
+		Color:  "var(--role-fallback)",
+		Border: "var(--border)",
+	}
+}
+
+func cssValue(value, fallback string) template.CSS {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		trimmed = strings.TrimSpace(fallback)
+	}
+	return template.CSS(trimmed)
 }
 
 func computeAvailability(def WorkflowDef, process *Process) map[string]bool {

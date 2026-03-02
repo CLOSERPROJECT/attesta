@@ -231,7 +231,7 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 	if action.RoleBadges[0].ID != "dep1" || action.RoleBadges[1].ID != "dep2" {
 		t.Fatalf("unexpected badge ids: %#v", action.RoleBadges)
 	}
-	if action.RoleBadges[0].Color != "#aaaaaa" || action.RoleBadges[1].Color != "#bbbbbb" {
+	if string(action.RoleBadges[0].Color) != "#aaaaaa" || string(action.RoleBadges[1].Color) != "#bbbbbb" {
 		t.Fatalf("unexpected badge colors: %#v", action.RoleBadges)
 	}
 }
