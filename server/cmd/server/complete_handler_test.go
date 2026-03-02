@@ -29,7 +29,7 @@ func TestHandleCompleteSubstepSuccessNonHTMX(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "PROCESS_PAGE") {
+	if !strings.Contains(rr.Body.String(), "PROCESS "+processID) {
 		t.Fatalf("expected non-HTMX process page marker, got %q", rr.Body.String())
 	}
 }
@@ -74,7 +74,7 @@ func TestHandleCompleteSubstepProcessNotFoundPaths(t *testing.T) {
 	if htmxRec.Code != http.StatusNotFound {
 		t.Fatalf("expected HTMX status %d, got %d", http.StatusNotFound, htmxRec.Code)
 	}
-	if strings.Contains(htmxRec.Body.String(), "PROCESS_PAGE") {
+	if strings.Contains(htmxRec.Body.String(), "PROCESS "+missingID) {
 		t.Fatalf("expected HTMX path to render action list only, got %q", htmxRec.Body.String())
 	}
 
@@ -85,7 +85,7 @@ func TestHandleCompleteSubstepProcessNotFoundPaths(t *testing.T) {
 	if fullRec.Code != http.StatusNotFound {
 		t.Fatalf("expected non-HTMX status %d, got %d", http.StatusNotFound, fullRec.Code)
 	}
-	if !strings.Contains(fullRec.Body.String(), "PROCESS_PAGE") {
+	if !strings.Contains(fullRec.Body.String(), "PROCESS ") {
 		t.Fatalf("expected non-HTMX path to render process page, got %q", fullRec.Body.String())
 	}
 }

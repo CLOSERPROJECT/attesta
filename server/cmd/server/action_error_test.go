@@ -85,11 +85,11 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 			}
 			body := rec.Body.String()
 			if tc.htmx {
-				if strings.Contains(body, "PROCESS_PAGE") {
+				if strings.Contains(body, "PROCESS ") {
 					t.Fatalf("expected HTMX partial, got full page body %q", body)
 				}
 			} else {
-				if !strings.Contains(body, "PROCESS_PAGE") {
+				if !strings.Contains(body, "PROCESS ") {
 					t.Fatalf("expected full page render, got %q", body)
 				}
 			}
