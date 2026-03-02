@@ -447,9 +447,10 @@ type ProcessListItem struct {
 
 type HomeView struct {
 	PageBase
-	Sort      string
-	Processes []ProcessListItem
-	History   []ProcessListItem
+	WorkflowDescription string
+	Sort                string
+	Processes           []ProcessListItem
+	History             []ProcessListItem
 }
 
 type LoginView struct {
@@ -2216,10 +2217,11 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	sortHomeProcessList(history, sortKey)
 
 	view := HomeView{
-		PageBase:  s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
-		Sort:      sortKey,
-		Processes: processes,
-		History:   history,
+		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
+		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
+		Sort:                sortKey,
+		Processes:           processes,
+		History:             history,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

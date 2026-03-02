@@ -7,7 +7,10 @@
       </svg>
       Back
     </button>
-    <h1 class="hero-title">{{.WorkflowName}}</h1>
+    <div class="hero-center">
+      <h1 class="hero-title">{{.WorkflowName}}</h1>
+      <p class="hero-description">{{.ProcessID}}</p>
+    </div>
   </section>
   <div class="two-col" data-process-id="{{.ProcessID}}" data-workflow-key="{{.WorkflowKey}}">
     <section class="panel">

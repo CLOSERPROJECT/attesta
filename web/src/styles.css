@@ -286,18 +286,33 @@ svg.bi {
   border: 1px solid var(--border);
   box-shadow: 0 12px 30px var(--shadow);
   border-radius: 16px;
-
-  position: relative;        /* required */
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto; /* left | center | right */
   align-items: center;
-  justify-content: space-between;
+  column-gap: 24px;
+}
+
+.hero button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-center {
+  justify-self: center;
+  text-align: center;
+  max-width: min(70ch, 100%);
+  padding: 0 16px;
 }
 
 .hero-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   margin: 0;
+}
+
+.hero-description {
+  margin: 6px 0 0 0;
+  opacity: 0.7;
+  font-weight: 400;
 }
 
 .two-col {

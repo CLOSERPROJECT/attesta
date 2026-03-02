@@ -42,7 +42,12 @@
       </svg>
       Back
     </button>
-    <h1 class="hero-title">{{.WorkflowName}}</h1>
+    <div class="hero-center">
+      <h1 class="hero-title">{{.WorkflowName}}</h1>
+      {{if .WorkflowDescription}}
+        <p class="hero-description">{{.WorkflowDescription}}</p>
+      {{end}}
+    </div>
     <form method="post" action="{{.WorkflowPath}}/process/start">
       <button class="primary" type="submit">
         <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
