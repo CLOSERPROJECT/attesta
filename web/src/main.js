@@ -38,7 +38,9 @@ const applyTheme = (theme) => {
   document.documentElement.dataset.theme = theme;
   syncFormataDarkMode(theme);
   if (themeToggle) {
-    themeToggle.textContent = theme === "dark" ? "Light" : "Dark";
+    const nextThemeLabel = theme === "dark" ? "light" : "dark";
+    themeToggle.setAttribute("aria-label", `Switch to ${nextThemeLabel} theme`);
+    themeToggle.setAttribute("title", `Switch to ${nextThemeLabel} theme`);
   }
 };
 
