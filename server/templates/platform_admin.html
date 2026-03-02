@@ -17,7 +17,8 @@
   </section>
 
   <section class="panel">
-    <h1>New organization</h1>
+    <h2>New organization</h2>
+    <p class="muted">Add a new organization to the platform</p>
     {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
     <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
       <label for="org-name">Organization name</label>
@@ -30,9 +31,7 @@
 
   <section class="panel">
     <h2>Invite organization admin</h2>
-    {{if .InviteLink}}
-      <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
-    {{end}}
+    <p class="muted">Invite an admin to manage an organization</p>
     {{if .Organizations}}
       <form method="post" action="/admin/orgs" class="input-form">
         <input type="hidden" name="intent" value="invite_org_admin" />
@@ -46,6 +45,9 @@
         <input id="org-admin-email" name="email" type="email" required />
         <button class="primary" type="submit">Create org admin invite</button>
       </form>
+      {{if .InviteLink}}
+        <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
+      {{end}}
     {{else}}
       <p class="muted">No organizations yet.</p>
     {{end}}
