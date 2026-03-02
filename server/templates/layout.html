@@ -4,13 +4,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Closer Demo</title>
+    <title>Attesta</title>
     {{if .ViteDevServer}}
     <script type="module" src="{{.ViteDevServer}}/@vite/client"></script>
     <script type="module" src="{{.ViteDevServer}}/src/main.js"></script>
+    <link rel="icon" type="image/png" href="{{.ViteDevServer}}/favicon.png" />
     {{else}}
     <link rel="stylesheet" href="/static/assets/main.css" />
     <script defer src="/static/assets/app.js"></script>
+    <link rel="icon" type="image/png" href="/static/favicon.png" />
     {{end}}
     <script
       src="https://unpkg.com/htmx.org@1.9.12"
@@ -21,8 +23,14 @@
   <body>
     <header class="topbar">
       <div>
-        <a class="brand" href="/">ATTESTA</a>
-        <span class="tag">Proof-ready streams for traceable compliance</span>
+        <a class="brand" href="/">
+          {{if .ViteDevServer}}
+          <img class="brand-logo" src="{{.ViteDevServer}}/favicon.png" alt="" aria-hidden="true" />
+          {{else}}
+          <img class="brand-logo" src="/static/favicon.png" alt="" aria-hidden="true" />
+          {{end}}
+          <span>ATTESTA</span>
+        </a>
       </div>
       <nav class="nav">
         <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
