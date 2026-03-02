@@ -59,27 +59,10 @@ func TestNextAvailableHelpers(t *testing.T) {
 	if _, ok := nextAvailableSubstep(def, nil); ok {
 		t.Fatal("expected no next substep for nil process")
 	}
-	if _, ok := nextAvailableSubstepForRole(def, nil, "dep1"); ok {
-		t.Fatal("expected no next role substep for nil process")
-	}
 
 	sub, ok := nextAvailableSubstep(def, processWithDone())
 	if !ok || sub.SubstepID != "1.1" {
 		t.Fatalf("expected first available substep 1.1, got %#v (ok=%t)", sub, ok)
-	}
-
-	roleSub, ok := nextAvailableSubstepForRole(def, processWithDone("1.1"), "dep1")
-	if !ok || roleSub.SubstepID != "1.2" {
-		t.Fatalf("expected dep1 next available substep 1.2, got %#v (ok=%t)", roleSub, ok)
-	}
-
-	roleSub, ok = nextAvailableSubstepForRole(def, processWithDone("1.1", "1.2"), "dep1")
-	if !ok || roleSub.SubstepID != "1.3" {
-		t.Fatalf("expected dep1 next available substep 1.3, got %#v (ok=%t)", roleSub, ok)
-	}
-
-	if _, ok := nextAvailableSubstepForRole(def, processWithDone("1.1", "1.2", "1.3"), "dep1"); ok {
-		t.Fatal("expected no dep1 substep available after dep1 work is done")
 	}
 }
 

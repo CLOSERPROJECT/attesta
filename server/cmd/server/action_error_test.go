@@ -11,35 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestRenderActionError(t *testing.T) {
-	server := &Server{
-		tmpl: testTemplates(),
-		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
-		},
-	}
-
-	process := &Process{
-		ID:        primitive.NewObjectID(),
-		CreatedAt: time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC),
-		Progress:  map[string]ProcessStep{},
-	}
-	actor := Actor{UserID: "u1", Role: "dep1"}
-	rec := httptest.NewRecorder()
-	server.renderActionError(rec, http.StatusBadRequest, "bad payload", process, actor)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "ACTION_LIST") {
-		t.Fatalf("expected action list render, got %q", body)
-	}
-	if !strings.Contains(body, "bad payload") {
-		t.Fatalf("expected error message in body, got %q", body)
-	}
-}
-
 func TestRenderActionErrorForRequest(t *testing.T) {
 	server := &Server{
 		tmpl: testTemplates(),

@@ -187,20 +187,3 @@ func TestHandleEventsReturns400OnWorkflowQueryMismatch(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
-
-func TestGetConfigUsesRuntimeProvider(t *testing.T) {
-	server := &Server{
-		configProvider: func() (RuntimeConfig, error) {
-			cfg := testRuntimeConfig()
-			cfg.Workflow.Name = "Provided workflow"
-			return cfg, nil
-		},
-	}
-	cfg, err := server.getConfig()
-	if err != nil {
-		t.Fatalf("getConfig() error: %v", err)
-	}
-	if cfg.Workflow.Name != "Provided workflow" {
-		t.Fatalf("workflow name = %q, want Provided workflow", cfg.Workflow.Name)
-	}
-}

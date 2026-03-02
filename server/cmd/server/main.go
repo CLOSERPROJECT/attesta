@@ -316,15 +316,6 @@ type RoleMeta struct {
 	Border string
 }
 
-type ProcessSummary struct {
-	ID          string
-	Status      string
-	CreatedAt   string
-	NextSubstep string
-	NextTitle   string
-	NextRole    string
-}
-
 type PageBase struct {
 	Body          string
 	ViteDevServer string
@@ -3383,10 +3374,6 @@ func (s *Server) runtimeConfig() (RuntimeConfig, error) {
 	return cfg, nil
 }
 
-func (s *Server) getConfig() (RuntimeConfig, error) {
-	return s.runtimeConfig()
-}
-
 func sortedWorkflowKeys(catalog map[string]RuntimeConfig) []string {
 	keys := make([]string, 0, len(catalog))
 	for key := range catalog {
@@ -3626,28 +3613,6 @@ func (s *Server) roles(cfg RuntimeConfig) []string {
 		roles = append(roles, dept.ID)
 	}
 	return roles
-}
-
-func (s *Server) actorForRole(cfg RuntimeConfig, role, workflowKey string) Actor {
-	for _, user := range cfg.Users {
-		if user.DepartmentID == role {
-			return Actor{UserID: user.ID, Role: role, WorkflowKey: workflowKey}
-		}
-	}
-	if role == "" {
-		role = "unknown"
-	}
-	return Actor{UserID: role, Role: role, WorkflowKey: workflowKey}
-}
-
-func (s *Server) defaultRole(cfg RuntimeConfig) string {
-	if len(cfg.Roles) > 0 {
-		return cfg.Roles[0].Slug
-	}
-	if len(cfg.Departments) > 0 {
-		return cfg.Departments[0].ID
-	}
-	return ""
 }
 
 func containsRole(roles []string, role string) bool {
@@ -4067,43 +4032,12 @@ func orderedSubsteps(def WorkflowDef) []WorkflowSub {
 	return ordered
 }
 
-func buildProcessSummary(def WorkflowDef, process *Process, status string) ProcessSummary {
-	nextSubstep, ok := nextAvailableSubstep(def, process)
-	summary := ProcessSummary{
-		ID:        process.ID.Hex(),
-		Status:    status,
-		CreatedAt: process.CreatedAt.Format(time.RFC3339),
-	}
-	if ok {
-		summary.NextSubstep = nextSubstep.SubstepID
-		summary.NextTitle = nextSubstep.Title
-		summary.NextRole = nextSubstep.Role
-	}
-	return summary
-}
-
 func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool) {
 	if process == nil {
 		return WorkflowSub{}, false
 	}
 	availMap := computeAvailability(def, process)
 	for _, sub := range orderedSubsteps(def) {
-		if availMap[sub.SubstepID] {
-			return sub, true
-		}
-	}
-	return WorkflowSub{}, false
-}
-
-func nextAvailableSubstepForRole(def WorkflowDef, process *Process, role string) (WorkflowSub, bool) {
-	if process == nil {
-		return WorkflowSub{}, false
-	}
-	availMap := computeAvailability(def, process)
-	for _, sub := range orderedSubsteps(def) {
-		if sub.Role != role {
-			continue
-		}
 		if availMap[sub.SubstepID] {
 			return sub, true
 		}
@@ -4631,11 +4565,6 @@ func (s *Server) nowUTC() time.Time {
 		return time.Now().UTC()
 	}
 	return s.now().UTC()
-}
-
-func (s *Server) renderActionError(w http.ResponseWriter, status int, message string, process *Process, actor Actor) {
-	w.WriteHeader(status)
-	s.renderActionList(w, nil, process, actor, message)
 }
 
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {
