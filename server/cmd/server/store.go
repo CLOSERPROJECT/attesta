@@ -62,12 +62,11 @@ type Store interface {
 }
 
 type Organization struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty"`
-	Slug      string             `bson:"slug"`
-	Name      string             `bson:"name"`
-	Color     string             `bson:"color,omitempty"`
-	Border    string             `bson:"border,omitempty"`
-	CreatedAt time.Time          `bson:"createdAt"`
+	ID               primitive.ObjectID `bson:"_id,omitempty"`
+	Slug             string             `bson:"slug"`
+	Name             string             `bson:"name"`
+	LogoAttachmentID string             `bson:"logoAttachmentId,omitempty"`
+	CreatedAt        time.Time          `bson:"createdAt"`
 }
 
 type Role struct {
