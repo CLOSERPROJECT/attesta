@@ -81,7 +81,6 @@ svg.bi {
   display: inline-block;
   flex: 0 0 auto;
   vertical-align: -0.125em;
-  fill: currentColor;
 }
 
 .icon-svg-sm {
@@ -249,11 +248,6 @@ svg.bi {
   border: transparent;
   background: transparent;
   color: var(--ink);
-}
-
-.nav .theme-toggle .theme-icon {
-  width: 16px;
-  height: 16px;
 }
 
 .nav .theme-toggle .theme-icon-sun {
