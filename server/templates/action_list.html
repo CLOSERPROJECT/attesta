@@ -1,115 +1,119 @@
 {{define "action_list.html"}}
   {{template "error_banner.html" .}}
-  {{if .ProcessID}}
+  {{if .ProcessDone}}
+    <div class="stack" style="gap: 16px;">
+      {{template "process_dpp" .}}
+      {{template "process_downloads" .}}
+    </div>
+  {{else if .ProcessID}}
     <div class="actions">
-      {{range .Actions}}
-        <div class="action-card action-{{.Status}}">
-          <div class="action-head">
-            <span class="pill">{{.SubstepID}}</span>
-            <span class="title">{{.Title}}</span>
-            {{if .RoleBadges}}
-              {{range .RoleBadges}}
+      {{if .Actions}}
+        {{range .Actions}}
+          <div class="action-card action-{{.Status}}">
+            <div class="action-head">
+              <span class="pill">{{.SubstepID}}</span>
+              <span class="title">{{.Title}}</span>
+              {{if .RoleBadges}}
+                {{range .RoleBadges}}
+                  <span
+                    class="role role-badge"
+                    style="--role-color: {{.Color}}; --role-border: {{.Border}}"
+                  >{{.Label}}</span>
+                {{end}}
+              {{else}}
                 <span
                   class="role role-badge"
-                  style="--role-color: {{.Color}}; --role-border: {{.Border}}"
-                >{{.Label}}</span>
-              {{end}}
-            {{else}}
-              <span
-                class="role role-badge"
-                style="--role-color: {{.RoleColor}}; --role-border: {{.RoleBorder}}"
-              >{{.RoleLabel}}</span>
-            {{end}}
-          </div>
-          {{if ne .Status "done"}}
-            <form
-              class="action-form"
-              method="post"
-              action="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
-              {{if eq .InputType "formata"}}
-              data-formata-substep="true"
-              data-formata-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
-              {{else}}
-              hx-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
-              hx-target="#action-area"
-              hx-swap="innerHTML"
-              hx-sync="this:drop"
-              {{end}}
-              {{if eq .InputType "file"}}enctype="multipart/form-data" hx-encoding="multipart/form-data"{{end}}
-            >
-              {{if .MatchingRoles}}
-                {{if eq (len .MatchingRoles) 1}}
-                  <input type="hidden" name="activeRole" value="{{index .MatchingRoles 0}}" />
-                {{else}}
-                  <label>
-                    Active role
-                    <select name="activeRole" required {{if .Disabled}}disabled{{end}}>
-                      <option value="">Select role</option>
-                      {{range .MatchingRoles}}
-                        <option value="{{.}}">{{.}}</option>
-                      {{end}}
-                    </select>
-                  </label>
-                {{end}}
-              {{end}}
-              <label {{if eq .InputType "formata"}}class="action-field-formata"{{end}}>
-                {{.InputKey}}
-                {{if eq .InputType "number"}}
-                  <input type="number" name="value" placeholder="Enter number" {{if .Disabled}}disabled{{end}} />
-                {{else if eq .InputType "file"}}
-                  <input type="file" name="{{.InputKey}}" {{if .Disabled}}disabled{{end}} />
-                {{else if eq .InputType "formata"}}
-                  <a href="https://closerproject.github.io/formata-arch/" target="_blank" rel="noopener noreferrer">Open form builder</a>
-                  <div
-                    class="js-formata-host"
-                    data-formata-schema='{{.FormSchema}}'
-                    {{if .FormUISchema}}data-formata-uischema='{{.FormUISchema}}'{{end}}
-                    {{if .Disabled}}data-formata-disabled="true"{{end}}
-                  ></div>
-                  <input class="js-formata-value" type="hidden" name="value" {{if .Disabled}}disabled{{end}} />
-                {{else}}
-                  <input type="text" name="value" placeholder="Enter value" {{if .Disabled}}disabled{{end}} />
-                {{end}}
-              </label>
-              {{if ne .InputType "formata"}}
-                <button type="submit" {{if .Disabled}}disabled{{end}}>Complete</button>
-              {{end}}
-            </form>
-          {{else}}
-            <div class="action-submitted">
-              <strong>Submitted</strong>
-              {{if .Values}}
-                <dl class="action-submitted-values">
-                  {{range .Values}}
-                    <dt>{{.Key}}</dt>
-                    <dd>{{.Value}}</dd>
-                  {{end}}
-                </dl>
-              {{end}}
-              {{if .Attachments}}
-                <ul class="action-submitted-attachments">
-                  {{range .Attachments}}
-                    <li>
-                      <a href="{{.URL}}">{{.Filename}}</a>
-                      {{if .SHA256}}<code>{{.SHA256}}</code>{{end}}
-                    </li>
-                  {{end}}
-                </ul>
-              {{end}}
-              {{if .DoneAt}}
-                <p class="muted">Completed at: {{.DoneAt}}{{if .DoneBy}} by {{.DoneBy}}{{if .DoneRole}} ({{.DoneRole}}){{end}}{{end}}</p>
+                  style="--role-color: {{.RoleColor}}; --role-border: {{.RoleBorder}}"
+                >{{.RoleLabel}}</span>
               {{end}}
             </div>
-          {{end}}
-          <p class="muted">Status: {{.Status}}{{if .Reason}} - {{.Reason}}{{end}}</p>
-        </div>
+            {{if ne .Status "done"}}
+              <form
+                class="action-form"
+                method="post"
+                action="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+                {{if eq .InputType "formata"}}
+                data-formata-substep="true"
+                data-formata-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+                {{else}}
+                hx-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+                hx-target="#action-area"
+                hx-swap="innerHTML"
+                hx-sync="this:drop"
+                {{end}}
+                {{if eq .InputType "file"}}enctype="multipart/form-data" hx-encoding="multipart/form-data"{{end}}
+              >
+                {{if .MatchingRoles}}
+                  {{if eq (len .MatchingRoles) 1}}
+                    <input type="hidden" name="activeRole" value="{{index .MatchingRoles 0}}" />
+                  {{else}}
+                    <label>
+                      Active role
+                      <select name="activeRole" required {{if .Disabled}}disabled{{end}}>
+                        <option value="">Select role</option>
+                        {{range .MatchingRoles}}
+                          <option value="{{.}}">{{.}}</option>
+                        {{end}}
+                      </select>
+                    </label>
+                  {{end}}
+                {{end}}
+                <label {{if eq .InputType "formata"}}class="action-field-formata"{{end}}>
+                  {{.InputKey}}
+                  {{if eq .InputType "number"}}
+                    <input type="number" name="value" placeholder="Enter number" {{if .Disabled}}disabled{{end}} />
+                  {{else if eq .InputType "file"}}
+                    <input type="file" name="{{.InputKey}}" {{if .Disabled}}disabled{{end}} />
+                  {{else if eq .InputType "formata"}}
+                    <a href="https://closerproject.github.io/formata-arch/" target="_blank" rel="noopener noreferrer">Open form builder</a>
+                    <div
+                      class="js-formata-host"
+                      data-formata-schema='{{.FormSchema}}'
+                      {{if .FormUISchema}}data-formata-uischema='{{.FormUISchema}}'{{end}}
+                      {{if .Disabled}}data-formata-disabled="true"{{end}}
+                    ></div>
+                    <input class="js-formata-value" type="hidden" name="value" {{if .Disabled}}disabled{{end}} />
+                  {{else}}
+                    <input type="text" name="value" placeholder="Enter value" {{if .Disabled}}disabled{{end}} />
+                  {{end}}
+                </label>
+                {{if ne .InputType "formata"}}
+                  <button type="submit" {{if .Disabled}}disabled{{end}}>Complete</button>
+                {{end}}
+              </form>
+            {{else}}
+              <div class="action-submitted">
+                <strong>Submitted</strong>
+                {{if .Values}}
+                  <dl class="action-submitted-values">
+                    {{range .Values}}
+                      <dt>{{.Key}}</dt>
+                      <dd>{{.Value}}</dd>
+                    {{end}}
+                  </dl>
+                {{end}}
+                {{if .Attachments}}
+                  <ul class="action-submitted-attachments">
+                    {{range .Attachments}}
+                      <li>
+                        <a href="{{.URL}}">{{.Filename}}</a>
+                        {{if .SHA256}}<code>{{.SHA256}}</code>{{end}}
+                      </li>
+                    {{end}}
+                  </ul>
+                {{end}}
+                {{if .DoneAt}}
+                  <p class="muted">Completed at: {{.DoneAt}}{{if .DoneBy}} by {{.DoneBy}}{{if .DoneRole}} ({{.DoneRole}}){{end}}{{end}}</p>
+                {{end}}
+              </div>
+            {{end}}
+            <p class="muted">Status: {{.Status}}{{if .Reason}} - {{.Reason}}{{end}}</p>
+          </div>
+        {{end}}
+      {{else}}
+        <p class="muted">Select a substep from the timeline to view details.</p>
       {{end}}
     </div>
-    {{if .Timeline}}
-      <div id="timeline" hx-swap-oob="true">
-        {{template "timeline.html" .Timeline}}
-      </div>
-    {{end}}
   {{else}}
     <p class="muted">No actions available for this department yet.</p>
   {{end}}

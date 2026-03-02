@@ -59,14 +59,18 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 		store: store,
 		tmpl:  homeTestTemplates(),
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			cfg := testRuntimeConfig()
+			cfg.Workflow.Description = "Demo workflow description"
+			return cfg, nil
 		},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	cfg := testRuntimeConfig()
+	cfg.Workflow.Description = "Demo workflow description"
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
-		Cfg: testRuntimeConfig(),
+		Cfg: cfg,
 	}))
 	rec := httptest.NewRecorder()
 	server.handleWorkflowHome(rec, req)
@@ -87,6 +91,9 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	}
 	if !strings.Contains(body, "SORT time_desc") {
 		t.Fatalf("expected default sort, got %q", body)
+	}
+	if !strings.Contains(body, "DESC Demo workflow description") {
+		t.Fatalf("expected workflow description, got %q", body)
 	}
 	if !strings.Contains(body, "HISTORY "+doneID.Hex()+":done") {
 		t.Fatalf("expected history to include only done process, got %q", body)
@@ -387,7 +394,7 @@ func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
-PROC {{len .Processes}} HIST {{len .History}} SORT {{.Sort}}
+PROC {{len .Processes}} HIST {{len .History}} SORT {{.Sort}} DESC {{.WorkflowDescription}}
 PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
 HISTORY {{range .History}}{{.ID}}:{{.Status}}|{{end}}
 {{end}}
