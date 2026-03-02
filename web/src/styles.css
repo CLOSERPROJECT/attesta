@@ -124,11 +124,6 @@ svg.bi {
   border-radius: 4px;
 }
 
-.tag {
-  font-size: 14px;
-  color: var(--muted);
-}
-
 .nav {
   display: flex;
   align-items: center;
