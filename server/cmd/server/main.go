@@ -444,6 +444,7 @@ type OrgAdminUserRow struct {
 	Email       string
 	Status      string
 	Activated   bool
+	IsOrgAdmin  bool
 	RoleOptions []OrgAdminRoleOption
 }
 
@@ -1992,6 +1993,7 @@ func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlu
 			Email:       orgUser.Email,
 			Status:      orgUser.Status,
 			Activated:   strings.TrimSpace(orgUser.PasswordHash) != "",
+			IsOrgAdmin:  containsRole(orgUser.RoleSlugs, "org-admin") || containsRole(orgUser.RoleSlugs, "org_admin"),
 			RoleOptions: roleOptions,
 		})
 	}
