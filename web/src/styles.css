@@ -215,12 +215,33 @@ a:hover {
 
 .nav .theme-toggle {
   margin-left: 16px;
-  padding: 8px 12px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: transparent;
   background: transparent;
   color: var(--ink);
-  font-weight: 600;
+}
+
+.nav .theme-toggle .theme-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.nav .theme-toggle .theme-icon-sun {
+  display: none;
+}
+
+[data-theme="dark"] .nav .theme-toggle .theme-icon-sun {
+  display: block;
+}
+
+[data-theme="dark"] .nav .theme-toggle .theme-icon-moon {
+  display: none;
 }
 
 .nav .theme-toggle:hover {
