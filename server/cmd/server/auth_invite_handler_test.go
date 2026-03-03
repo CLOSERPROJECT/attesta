@@ -76,7 +76,7 @@ func TestHandleInviteHappyPath(t *testing.T) {
 	}
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
-	req := httptest.NewRequest(http.MethodPost, "/invite/invite-token", strings.NewReader("password=this-is-strong-enough"))
+	req := httptest.NewRequest(http.MethodPost, "/invite/invite-token", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 
@@ -187,7 +187,7 @@ func TestHandleInviteRejectsMismatchedEmailAndWeakPassword(t *testing.T) {
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
 
-	weakReq := httptest.NewRequest(http.MethodPost, "/invite/mismatch-token", strings.NewReader("password=short"))
+	weakReq := httptest.NewRequest(http.MethodPost, "/invite/mismatch-token", strings.NewReader("password=short&confirm_password=short"))
 	weakReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	weakRec := httptest.NewRecorder()
 	server.handleInvite(weakRec, weakReq)
@@ -195,12 +195,44 @@ func TestHandleInviteRejectsMismatchedEmailAndWeakPassword(t *testing.T) {
 		t.Fatalf("weak password status = %d, want %d", weakRec.Code, http.StatusBadRequest)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/invite/mismatch-token", strings.NewReader("password=this-is-strong-enough"))
+	req := httptest.NewRequest(http.MethodPost, "/invite/mismatch-token", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	server.handleInvite(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("mismatched email status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleInviteRejectsMismatchedConfirmation(t *testing.T) {
+	store := NewMemoryStore()
+	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
+	user, _ := store.CreateUser(t.Context(), AccountUser{
+		UserID:  "u-confirm",
+		OrgSlug: org.Slug,
+		Email:   "confirm@acme.io",
+		Status:  "invited",
+	})
+	_, _ = store.CreateInvite(t.Context(), Invite{
+		OrgID:     org.ID,
+		Email:     "confirm@acme.io",
+		UserID:    user.UserID,
+		TokenHash: "confirm-token",
+		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt: time.Now().UTC(),
+	})
+
+	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/invite/confirm-token", strings.NewReader("password=this-is-strong-enough&confirm_password=totally-different"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.handleInvite(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), "passwords do not match") {
+		t.Fatalf("expected mismatch message, got %q", rec.Body.String())
 	}
 }
 
@@ -262,7 +294,7 @@ func TestHandleInviteInvalidInviteUser(t *testing.T) {
 	})
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
-	req := httptest.NewRequest(http.MethodPost, "/invite/ghost-token", strings.NewReader("password=this-is-strong-enough"))
+	req := httptest.NewRequest(http.MethodPost, "/invite/ghost-token", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	server.handleInvite(rec, req)
@@ -295,7 +327,7 @@ func TestHandleInviteSetPasswordAndSessionFailures(t *testing.T) {
 	t.Run("set password failure", func(t *testing.T) {
 		store := &inviteFailingStore{MemoryStore: base, failSetPassword: true}
 		server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
-		req := httptest.NewRequest(http.MethodPost, "/invite/fail-token", strings.NewReader("password=this-is-strong-enough"))
+		req := httptest.NewRequest(http.MethodPost, "/invite/fail-token", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		server.handleInvite(rec, req)
@@ -307,7 +339,7 @@ func TestHandleInviteSetPasswordAndSessionFailures(t *testing.T) {
 	t.Run("create session failure", func(t *testing.T) {
 		store := &inviteFailingStore{MemoryStore: base, failCreateSession: true}
 		server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
-		req := httptest.NewRequest(http.MethodPost, "/invite/fail-token", strings.NewReader("password=this-is-strong-enough"))
+		req := httptest.NewRequest(http.MethodPost, "/invite/fail-token", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		server.handleInvite(rec, req)
