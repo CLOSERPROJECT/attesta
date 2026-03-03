@@ -246,6 +246,50 @@ func TestMemoryStoreMissingAttachmentDownload(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreLoadLatestProcessByWorkflowBranches(t *testing.T) {
+	t.Run("returns configured error", func(t *testing.T) {
+		store := NewMemoryStore()
+		store.LoadLatestErr = errors.New("load latest failed")
+		if _, err := store.LoadLatestProcessByWorkflow(t.Context(), "workflow"); err == nil || err.Error() != "load latest failed" {
+			t.Fatalf("LoadLatestProcessByWorkflow error = %v, want load latest failed", err)
+		}
+	})
+
+	t.Run("returns not found when store is empty", func(t *testing.T) {
+		store := NewMemoryStore()
+		if _, err := store.LoadLatestProcessByWorkflow(t.Context(), "workflow"); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("LoadLatestProcessByWorkflow error = %v, want %v", err, mongo.ErrNoDocuments)
+		}
+	})
+
+	t.Run("supports workflow fallback and latest-by-created-at", func(t *testing.T) {
+		store := NewMemoryStore()
+		older := time.Now().UTC().Add(-2 * time.Hour)
+		newer := time.Now().UTC().Add(-1 * time.Hour)
+		store.SeedProcess(Process{
+			ID:        primitive.NewObjectID(),
+			CreatedAt: older,
+			Status:    "active",
+			Progress:  map[string]ProcessStep{},
+		})
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "workflow",
+			CreatedAt:   newer,
+			Status:      "active",
+			Progress:    map[string]ProcessStep{},
+		})
+
+		got, err := store.LoadLatestProcessByWorkflow(t.Context(), "workflow")
+		if err != nil {
+			t.Fatalf("LoadLatestProcessByWorkflow returned error: %v", err)
+		}
+		if got.CreatedAt != newer {
+			t.Fatalf("expected latest process createdAt %v, got %v", newer, got.CreatedAt)
+		}
+	})
+}
+
 func TestMemoryStoreDigitalLinkRoundTrip(t *testing.T) {
 	store := NewMemoryStore()
 	processID := store.SeedProcess(Process{
