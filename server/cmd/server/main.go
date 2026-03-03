@@ -1470,6 +1470,20 @@ func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		password := r.FormValue("password")
+		confirmPassword := r.FormValue("confirm_password")
+		if strings.TrimSpace(password) != strings.TrimSpace(confirmPassword) {
+			view := InviteView{
+				PageBase: s.pageBase("invite_body", "", ""),
+				Token:    token,
+				Email:    invite.Email,
+				Org:      orgName,
+				Roles:    invite.RoleSlugs,
+				Error:    "passwords do not match",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "invite.html", view)
+			return
+		}
 		if err := validatePassword(password); err != nil {
 			view := InviteView{
 				PageBase: s.pageBase("invite_body", "", ""),
