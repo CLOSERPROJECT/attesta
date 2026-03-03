@@ -33,6 +33,10 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 	if updatedOrg.LogoAttachmentID != "logo-123" {
 		t.Fatalf("updated logo attachment id = %q, want %q", updatedOrg.LogoAttachmentID, "logo-123")
 	}
+	if updatedOrg.Slug != "acme-foods-europe" {
+		t.Fatalf("updated organization slug = %q, want %q", updatedOrg.Slug, "acme-foods-europe")
+	}
+	org = updatedOrg
 	if _, err := store.UpdateOrganizationProfile(t.Context(), org.Slug, "", ""); err == nil {
 		t.Fatal("expected UpdateOrganizationProfile empty name error")
 	}

@@ -1001,7 +1001,10 @@ func TestHandleOrgAdminUsersUpdateOrgProfile(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	updatedOrg, err := store.GetOrganizationBySlug(t.Context(), org.Slug)
+	if _, err := store.GetOrganizationBySlug(t.Context(), org.Slug); err == nil {
+		t.Fatalf("expected old organization slug %q to be unavailable", org.Slug)
+	}
+	updatedOrg, err := store.GetOrganizationBySlug(t.Context(), "acme-org-updated")
 	if err != nil {
 		t.Fatalf("GetOrganizationBySlug error: %v", err)
 	}
@@ -1010,6 +1013,16 @@ func TestHandleOrgAdminUsersUpdateOrgProfile(t *testing.T) {
 	}
 	if updatedOrg.LogoAttachmentID == "" {
 		t.Fatal("expected organization logo attachment id to be set")
+	}
+	updatedAdmin, err := store.GetUserByUserID(t.Context(), adminUser.UserID)
+	if err != nil {
+		t.Fatalf("GetUserByUserID error: %v", err)
+	}
+	if updatedAdmin.OrgSlug != updatedOrg.Slug {
+		t.Fatalf("admin org slug = %q, want %q", updatedAdmin.OrgSlug, updatedOrg.Slug)
+	}
+	if _, err := store.GetRoleBySlug(t.Context(), updatedOrg.Slug, "org-admin"); err != nil {
+		t.Fatalf("GetRoleBySlug org-admin with updated slug error: %v", err)
 	}
 }
 
@@ -1032,6 +1045,9 @@ func TestHandleOrgAdminUsersUpdateOrgProfileErrors(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("CreateUser error: %v", err)
+	}
+	if _, err := base.CreateOrganization(t.Context(), Organization{Name: "Target Slug Org"}); err != nil {
+		t.Fatalf("CreateOrganization target slug org error: %v", err)
 	}
 	sessionID := createSessionForTestUser(t, base, adminUser)
 
@@ -1068,6 +1084,22 @@ func TestHandleOrgAdminUsersUpdateOrgProfileErrors(t *testing.T) {
 		}
 		if !strings.Contains(rec.Body.String(), "failed to update organization") {
 			t.Fatalf("expected update organization error, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("duplicate organization slug", func(t *testing.T) {
+		server := newServer(base)
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Target+Slug+Org"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "organization slug already exists") {
+			t.Fatalf("expected organization slug already exists error, got %q", rec.Body.String())
 		}
 	})
 }

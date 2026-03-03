@@ -851,17 +851,53 @@ func (s *MemoryStore) UpdateOrganizationProfile(_ context.Context, slug, name, l
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := canonifySlug(slug)
-	org, ok := s.organizations[key]
+	oldSlug := canonifySlug(slug)
+	org, ok := s.organizations[oldSlug]
 	if !ok {
 		return Organization{}, mongo.ErrNoDocuments
 	}
-	org.Name = strings.TrimSpace(name)
-	if org.Name == "" {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
 		return Organization{}, errors.New("organization name required")
 	}
+	newSlug := canonifySlug(trimmedName)
+	if newSlug == "" {
+		return Organization{}, errors.New("organization name required")
+	}
+	if newSlug != oldSlug {
+		if _, exists := s.organizations[newSlug]; exists {
+			return Organization{}, errors.New("organization slug already exists")
+		}
+	}
+
+	org.Name = trimmedName
+	org.Slug = newSlug
 	org.LogoAttachmentID = strings.TrimSpace(logoAttachmentID)
-	s.organizations[key] = org
+
+	if newSlug != oldSlug {
+		delete(s.organizations, oldSlug)
+	}
+	s.organizations[newSlug] = org
+
+	if newSlug != oldSlug {
+		updatedRoles := make(map[string]Role, len(s.roles))
+		for key, role := range s.roles {
+			updatedKey := key
+			if strings.HasPrefix(key, oldSlug+":") && role.OrgID == org.ID {
+				role.OrgSlug = newSlug
+				updatedKey = newSlug + ":" + role.Slug
+			}
+			updatedRoles[updatedKey] = role
+		}
+		s.roles = updatedRoles
+
+		for userID, user := range s.usersByUserID {
+			if user.OrgID != nil && *user.OrgID == org.ID {
+				user.OrgSlug = newSlug
+				s.usersByUserID[userID] = user
+			}
+		}
+	}
 	return org, nil
 }
 
@@ -1450,19 +1486,68 @@ func (s *MongoStore) UpdateOrganizationProfile(ctx context.Context, slug, name, 
 	if trimmedName == "" {
 		return Organization{}, errors.New("organization name required")
 	}
-	filter := bson.M{"slug": canonifySlug(slug)}
-	update := bson.M{
-		"$set": bson.M{
-			"name":             trimmedName,
-			"logoAttachmentId": strings.TrimSpace(logoAttachmentID),
-		},
+	oldSlug := canonifySlug(slug)
+	currentOrg, err := s.GetOrganizationBySlug(ctx, oldSlug)
+	if err != nil || currentOrg == nil {
+		return Organization{}, mongo.ErrNoDocuments
 	}
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-	var org Organization
-	if err := s.database().Collection(collectionOrganizations).FindOneAndUpdate(ctx, filter, update, opts).Decode(&org); err != nil {
+	newSlug := canonifySlug(trimmedName)
+	if newSlug == "" {
+		return Organization{}, errors.New("organization name required")
+	}
+	if newSlug != oldSlug {
+		if existing, lookupErr := s.GetOrganizationBySlug(ctx, newSlug); lookupErr == nil && existing != nil {
+			return Organization{}, errors.New("organization slug already exists")
+		} else if lookupErr != nil && !errors.Is(lookupErr, mongo.ErrNoDocuments) {
+			return Organization{}, lookupErr
+		}
+	}
+
+	filter := bson.M{"_id": currentOrg.ID}
+	update := bson.M{"$set": bson.M{
+		"name":             trimmedName,
+		"slug":             newSlug,
+		"logoAttachmentId": strings.TrimSpace(logoAttachmentID),
+	}}
+	if _, err := s.database().Collection(collectionOrganizations).UpdateOne(ctx, filter, update); err != nil {
 		return Organization{}, err
 	}
-	return org, nil
+
+	if newSlug != oldSlug {
+		roles, rolesErr := s.ListRolesByOrg(ctx, oldSlug)
+		if rolesErr != nil {
+			return Organization{}, rolesErr
+		}
+		for _, role := range roles {
+			if _, updateErr := s.database().Collection(collectionRoles).UpdateOne(
+				ctx,
+				bson.M{"_id": role.ID},
+				bson.M{"$set": bson.M{"orgSlug": newSlug}},
+			); updateErr != nil {
+				return Organization{}, updateErr
+			}
+		}
+
+		users, usersErr := s.ListUsersByOrgID(ctx, currentOrg.ID)
+		if usersErr != nil {
+			return Organization{}, usersErr
+		}
+		for _, user := range users {
+			if _, updateErr := s.database().Collection(collectionUsers).UpdateOne(
+				ctx,
+				bson.M{"userId": strings.TrimSpace(user.UserID)},
+				bson.M{"$set": bson.M{"orgSlug": newSlug}},
+			); updateErr != nil {
+				return Organization{}, updateErr
+			}
+		}
+	}
+
+	updatedOrg, reloadErr := s.GetOrganizationBySlug(ctx, newSlug)
+	if reloadErr != nil || updatedOrg == nil {
+		return Organization{}, mongo.ErrNoDocuments
+	}
+	return *updatedOrg, nil
 }
 
 func (s *MongoStore) ListOrganizations(ctx context.Context) ([]Organization, error) {

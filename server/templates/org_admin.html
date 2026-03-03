@@ -18,7 +18,6 @@
 
   <section class="panel">
     <h2>Organization profile</h2>
-    {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
     {{if .NeedsOrganizationSetup}}
       <p class="muted">Your org admin invite is not assigned to an organization yet. Create one now to continue.</p>
       <form method="post" action="/org-admin/users" class="input-form" enctype="multipart/form-data">
@@ -27,6 +26,7 @@
         <input id="org-name" name="name" type="text" required />
         <label for="org-logo">Organization logo</label>
         <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+        {{if .OrganizationError}}<p class="muted" style="color: #a91919;">{{.OrganizationError}}</p>{{end}}
         <button class="primary" type="submit">Create organization</button>
       </form>
     {{else}}
@@ -49,6 +49,7 @@
         <label for="org-logo">Organization logo</label>
         <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
         <p class="muted">Leave logo empty to keep the current one.</p>
+        {{if .OrganizationError}}<p class="muted" style="color: #a91919;">{{.OrganizationError}}</p>{{end}}
         <button class="primary" type="submit">Save organization</button>
       </form>
     {{end}}
@@ -56,6 +57,7 @@
 
   {{if not .NeedsOrganizationSetup}}
   <section class="panel">
+    {{if .RoleError}}<p class="muted" style="color: #a91919;">{{.RoleError}}</p>{{end}}
     <h2>Create Role</h2>
     <form method="post" action="/org-admin/roles" class="input-form">
       <label for="role-name">Role name</label>
@@ -88,6 +90,7 @@
   </section>
 
   <section class="panel">
+    {{if .InviteError}}<p class="muted" style="color: #a91919;">{{.InviteError}}</p>{{end}}
     <h2>Invite User</h2>
     <form method="post" action="/org-admin/users" class="input-form">
       <input type="hidden" name="intent" value="invite" />
@@ -113,6 +116,7 @@
   </section>
 
   <section class="panel">
+    {{if .UsersError}}<p class="muted" style="color: #a91919;">{{.UsersError}}</p>{{end}}
     <h2>Organization users</h2>
     {{if .Users}}
       <ul class="users-list">
