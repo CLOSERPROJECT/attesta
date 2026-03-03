@@ -1,6 +1,8 @@
 services:
   mongodb:
     image: mongo:7.0
+    volumes:
+      - mongodb_data:/data/db
 
   cerbos:
     build:
@@ -28,3 +30,6 @@ services:
       SERVICE_FQDN_MONGOEXPRESS_8081:
     depends_on:
       - mongodb
+
+volumes:
+  mongodb_data:
