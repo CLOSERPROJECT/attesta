@@ -17,7 +17,45 @@
   </section>
 
   <section class="panel">
+    <h2>Organization profile</h2>
     {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
+    {{if .NeedsOrganizationSetup}}
+      <p class="muted">Your org admin invite is not assigned to an organization yet. Create one now to continue.</p>
+      <form method="post" action="/org-admin/users" class="input-form" enctype="multipart/form-data">
+        <input type="hidden" name="intent" value="create_org" />
+        <label for="org-name">Organization name</label>
+        <input id="org-name" name="name" type="text" required />
+        <label for="org-logo">Organization logo</label>
+        <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+        <button class="primary" type="submit">Create organization</button>
+      </form>
+    {{else}}
+      <p class="muted">Review and update your organization details.</p>
+      <div class="org-profile-summary">
+        {{if .OrganizationLogoURL}}
+          <img src="{{.OrganizationLogoURL}}" alt="{{.Organization.Name}} logo" class="org-profile-logo" />
+        {{else}}
+          <span class="pill">No logo uploaded</span>
+        {{end}}
+        <div class="org-profile-meta">
+          <p class="org-profile-name"><strong>{{.Organization.Name}}</strong></p>
+          <p class="muted org-profile-slug">Slug: {{.Organization.Slug}}</p>
+        </div>
+      </div>
+      <form method="post" action="/org-admin/users" class="input-form" enctype="multipart/form-data">
+        <input type="hidden" name="intent" value="update_org" />
+        <label for="org-name">Organization name</label>
+        <input id="org-name" name="name" type="text" value="{{.Organization.Name}}" required />
+        <label for="org-logo">Organization logo</label>
+        <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+        <p class="muted">Leave logo empty to keep the current one.</p>
+        <button class="primary" type="submit">Save organization</button>
+      </form>
+    {{end}}
+  </section>
+
+  {{if not .NeedsOrganizationSetup}}
+  <section class="panel">
     <h2>Create Role</h2>
     <form method="post" action="/org-admin/roles" class="input-form">
       <label for="role-name">Role name</label>
@@ -150,6 +188,7 @@
       <p class="muted">No organization users yet.</p>
     {{end}}
   </section>
+  {{end}}
 </div>
 
 <script>

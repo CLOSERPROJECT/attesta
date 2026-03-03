@@ -423,12 +423,14 @@ type PlatformAdminView struct {
 
 type OrgAdminView struct {
 	PageBase
-	Organization Organization
-	Roles        []Role
-	Users        []OrgAdminUserRow
-	Invites      []OrgAdminInviteRow
-	InviteLink   string
-	Error        string
+	Organization           Organization
+	OrganizationLogoURL    string
+	NeedsOrganizationSetup bool
+	Roles                  []Role
+	Users                  []OrgAdminUserRow
+	Invites                []OrgAdminInviteRow
+	InviteLink             string
+	Error                  string
 }
 
 type OrgAdminRoleOption struct {
@@ -632,6 +634,7 @@ func main() {
 	mux.HandleFunc("/admin/orgs", server.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", server.handleAdminOrgs)
 	mux.HandleFunc("/org-admin/roles", server.handleOrgAdminRoles)
+	mux.HandleFunc("/org-admin/logo/", server.handleOrgAdminLogo)
 	mux.HandleFunc("/org-admin/users", server.handleOrgAdminUsers)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
@@ -871,7 +874,17 @@ func userIsOrgAdmin(user *AccountUser) bool {
 	if !containsRole(user.RoleSlugs, "org-admin") && !containsRole(user.RoleSlugs, "org_admin") {
 		return false
 	}
-	return strings.TrimSpace(user.OrgSlug) != "" && user.OrgID != nil
+	return true
+}
+
+func userHasOrganizationContext(user *AccountUser) bool {
+	if user == nil {
+		return false
+	}
+	if user.OrgID == nil {
+		return false
+	}
+	return strings.TrimSpace(user.OrgSlug) != ""
 }
 
 func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowName string) PageBase {
@@ -1397,12 +1410,15 @@ func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgName := invite.OrgID.Hex()
-	if org, err := s.store.ListOrganizations(r.Context()); err == nil {
-		for _, item := range org {
-			if item.ID == invite.OrgID {
-				orgName = item.Name
-				break
+	orgName := "Not assigned yet"
+	if !invite.OrgID.IsZero() {
+		orgName = invite.OrgID.Hex()
+		if org, err := s.store.ListOrganizations(r.Context()); err == nil {
+			for _, item := range org {
+				if item.ID == invite.OrgID {
+					orgName = item.Name
+					break
+				}
 			}
 		}
 	}
@@ -1745,21 +1761,21 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			intent := strings.TrimSpace(r.FormValue("intent"))
 			if intent == "invite_org_admin" {
 				orgSlug := strings.TrimSpace(r.FormValue("org_slug"))
-				if orgSlug == "" {
-					s.renderPlatformAdmin(w, admin, "", "organization is required")
-					return
-				}
-				org, orgErr := s.store.GetOrganizationBySlug(r.Context(), orgSlug)
-				if orgErr != nil || org == nil {
-					s.renderPlatformAdmin(w, admin, "", "organization not found")
-					return
-				}
 				email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 				if email == "" {
 					s.renderPlatformAdmin(w, admin, "", "email is required")
 					return
 				}
-				inviteLink, inviteErrMsg := s.createPlatformOrgAdminInvite(r.Context(), admin, *org, email)
+				var org *Organization
+				if orgSlug != "" {
+					loadedOrg, orgErr := s.store.GetOrganizationBySlug(r.Context(), orgSlug)
+					if orgErr != nil || loadedOrg == nil {
+						s.renderPlatformAdmin(w, admin, "", "organization not found")
+						return
+					}
+					org = loadedOrg
+				}
+				inviteLink, inviteErrMsg := s.createPlatformOrgAdminInvite(r.Context(), admin, org, email)
 				if inviteErrMsg != "" {
 					s.renderPlatformAdmin(w, admin, "", inviteErrMsg)
 					return
@@ -1821,7 +1837,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 		s.renderPlatformAdmin(w, admin, "", "email is required")
 		return
 	}
-	inviteLink, inviteErrMsg := s.createPlatformOrgAdminInvite(r.Context(), admin, *org, email)
+	inviteLink, inviteErrMsg := s.createPlatformOrgAdminInvite(r.Context(), admin, org, email)
 	if inviteErrMsg != "" {
 		s.renderPlatformAdmin(w, admin, "", inviteErrMsg)
 		return
@@ -1908,44 +1924,59 @@ func isAllowedOrganizationLogo(contentType, filename string) bool {
 	return false
 }
 
-func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *AccountUser, org Organization, email string) (string, string) {
+func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *AccountUser, org *Organization, email string) (string, string) {
 	roleSlug := "org-admin"
-	if _, roleErr := s.store.GetRoleBySlug(ctx, org.Slug, roleSlug); roleErr != nil {
-		_, _ = s.store.CreateRole(ctx, Role{
-			OrgID:     org.ID,
-			OrgSlug:   org.Slug,
-			Slug:      roleSlug,
-			Name:      "Org Admin",
-			CreatedAt: s.nowUTC(),
-		})
+	if org != nil {
+		if _, roleErr := s.store.GetRoleBySlug(ctx, org.Slug, roleSlug); roleErr != nil {
+			_, _ = s.store.CreateRole(ctx, Role{
+				OrgID:     org.ID,
+				OrgSlug:   org.Slug,
+				Slug:      roleSlug,
+				Name:      "Org Admin",
+				CreatedAt: s.nowUTC(),
+			})
+		}
 	}
 
 	user, userErr := s.store.GetUserByEmail(ctx, email)
 	if userErr != nil || user == nil {
-		orgID := org.ID
-		createdUser, createErr := s.store.CreateUser(ctx, AccountUser{
+		createInput := AccountUser{
 			UserID:    randomUserIDFromEmail(email),
-			OrgID:     &orgID,
-			OrgSlug:   org.Slug,
 			Email:     email,
 			RoleSlugs: []string{roleSlug},
 			Status:    "invited",
 			CreatedAt: s.nowUTC(),
-		})
+		}
+		if org != nil {
+			orgID := org.ID
+			createInput.OrgID = &orgID
+			createInput.OrgSlug = org.Slug
+		}
+		createdUser, createErr := s.store.CreateUser(ctx, createInput)
 		if createErr != nil {
 			return "", "failed to create org admin user"
 		}
 		user = &createdUser
 	} else {
-		_ = s.store.SetUserRoles(ctx, user.UserID, append(user.RoleSlugs, roleSlug))
+		if org != nil && userHasOrganizationContext(user) && !accountMatchesOrg(user, org.ID, org.Slug) {
+			return "", "email already belongs to another organization"
+		}
+		mergedRoles := canonifyRoleSlugs(append(append([]string{}, user.RoleSlugs...), roleSlug))
+		if setErr := s.store.SetUserRoles(ctx, user.UserID, mergedRoles); setErr != nil {
+			return "", "failed to update user roles"
+		}
 	}
 
 	token, tokenErr := newSessionID()
 	if tokenErr != nil {
 		return "", "failed to create invite"
 	}
+	inviteOrgID := primitive.NilObjectID
+	if org != nil {
+		inviteOrgID = org.ID
+	}
 	if _, inviteErr := s.store.CreateInvite(ctx, Invite{
-		OrgID:           org.ID,
+		OrgID:           inviteOrgID,
 		Email:           email,
 		UserID:          user.UserID,
 		RoleSlugs:       []string{roleSlug},
@@ -1960,6 +1991,19 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 }
 
 func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlug, inviteLink, errMsg string) {
+	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
+		view := OrgAdminView{
+			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
+			NeedsOrganizationSetup: true,
+			InviteLink:             strings.TrimSpace(inviteLink),
+			Error:                  strings.TrimSpace(errMsg),
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
 	org, err := s.store.GetOrganizationBySlug(context.Background(), orgSlug)
 	if err != nil || org == nil {
 		http.Error(w, "organization not found", http.StatusNotFound)
@@ -2018,22 +2062,83 @@ func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlu
 	}
 
 	view := OrgAdminView{
-		PageBase:     s.pageBaseForUser(user, "org_admin_body", "", ""),
-		Organization: *org,
-		Roles:        roles,
-		Users:        orgUsers,
-		Invites:      orgInvites,
-		InviteLink:   strings.TrimSpace(inviteLink),
-		Error:        strings.TrimSpace(errMsg),
+		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
+		Organization:           *org,
+		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
+		NeedsOrganizationSetup: false,
+		Roles:                  roles,
+		Users:                  orgUsers,
+		Invites:                orgInvites,
+		InviteLink:             strings.TrimSpace(inviteLink),
+		Error:                  strings.TrimSpace(errMsg),
+	}
+	if strings.TrimSpace(org.LogoAttachmentID) == "" {
+		view.OrganizationLogoURL = ""
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireOrgAdmin(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/org-admin/logo/"), "/")
+	if logoID == "" {
+		http.NotFound(w, r)
+		return
+	}
+	org, err := s.store.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+	if err != nil || org == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.TrimSpace(org.LogoAttachmentID) == "" || strings.TrimSpace(org.LogoAttachmentID) != logoID {
+		http.NotFound(w, r)
+		return
+	}
+	attachmentID, err := primitive.ObjectIDFromHex(logoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	attachment, err := s.store.LoadAttachmentByID(r.Context(), attachmentID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	download, err := s.store.OpenAttachmentDownload(r.Context(), attachmentID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer download.Close()
+
+	contentType := strings.TrimSpace(attachment.ContentType)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	filename := sanitizeAttachmentFilename(attachment.Filename)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
+	if _, err := io.Copy(w, download); err != nil {
+		return
+	}
+}
+
 func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireOrgAdmin(w, r)
 	if !ok {
+		return
+	}
+	if !userHasOrganizationContext(user) {
+		s.renderOrgAdmin(w, user, "", "", "create organization first")
 		return
 	}
 	switch r.Method {
@@ -2088,7 +2193,21 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 		return
 	}
-	if err := r.ParseForm(); err != nil {
+	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		r.Body = http.MaxBytesReader(w, r.Body, organizationLogoMaxBytes())
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			if isRequestTooLarge(err) {
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "logo file too large")
+				return
+			}
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		if r.MultipartForm != nil {
+			defer r.MultipartForm.RemoveAll()
+		}
+	} else if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
@@ -2096,8 +2215,76 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 	if intent == "" {
 		intent = "invite"
 	}
+	if !userHasOrganizationContext(admin) {
+		if intent != "create_org" {
+			s.renderOrgAdmin(w, admin, "", "", "create organization first")
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			s.renderOrgAdmin(w, admin, "", "", "organization name is required")
+			return
+		}
+		orgSlug := canonifySlug(name)
+		if existing, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
+			s.renderOrgAdmin(w, admin, "", "", "organization slug already exists")
+			return
+		}
+		logoAttachmentID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, orgSlug)
+		if logoErrMsg != "" {
+			s.renderOrgAdmin(w, admin, "", "", logoErrMsg)
+			return
+		}
+		createdOrg, err := s.store.CreateOrganization(r.Context(), Organization{
+			Name:             name,
+			LogoAttachmentID: logoAttachmentID,
+			CreatedAt:        s.nowUTC(),
+		})
+		if err != nil {
+			if isDuplicateSlugError(err) {
+				s.renderOrgAdmin(w, admin, "", "", "organization slug already exists")
+				return
+			}
+			s.renderOrgAdmin(w, admin, "", "", "failed to create organization")
+			return
+		}
+		if _, roleErr := s.store.GetRoleBySlug(r.Context(), createdOrg.Slug, "org-admin"); roleErr != nil {
+			if _, createRoleErr := s.store.CreateRole(r.Context(), Role{
+				OrgID:     createdOrg.ID,
+				OrgSlug:   createdOrg.Slug,
+				Slug:      "org-admin",
+				Name:      "Org Admin",
+				CreatedAt: s.nowUTC(),
+			}); createRoleErr != nil && !isDuplicateSlugError(createRoleErr) {
+				s.renderOrgAdmin(w, admin, "", "", "failed to create role")
+				return
+			}
+		}
+		if err := s.store.SetUserOrganization(r.Context(), admin.UserID, createdOrg.ID, createdOrg.Slug); err != nil {
+			s.renderOrgAdmin(w, admin, "", "", "failed to update organization")
+			return
+		}
+		mergedRoles := canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
+		if err := s.store.SetUserRoles(r.Context(), admin.UserID, mergedRoles); err != nil {
+			s.renderOrgAdmin(w, admin, createdOrg.Slug, "", "failed to update user roles")
+			return
+		}
+		updatedAdmin, _ := s.store.GetUserByUserID(r.Context(), admin.UserID)
+		if updatedAdmin == nil {
+			updatedAdmin = admin
+			orgID := createdOrg.ID
+			updatedAdmin.OrgID = &orgID
+			updatedAdmin.OrgSlug = createdOrg.Slug
+			updatedAdmin.RoleSlugs = mergedRoles
+		}
+		s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
+		return
+	}
 
 	switch intent {
+	case "create_org":
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "organization already exists for your account")
+		return
 	case "invite":
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		if email == "" {
@@ -2161,6 +2348,32 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "/invite/"+token, "")
+		return
+	case "update_org":
+		org, err := s.store.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+		if err != nil || org == nil {
+			http.NotFound(w, r)
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "organization name is required")
+			return
+		}
+		logoAttachmentID := strings.TrimSpace(org.LogoAttachmentID)
+		uploadedLogoID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, admin.OrgSlug)
+		if logoErrMsg != "" {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", logoErrMsg)
+			return
+		}
+		if uploadedLogoID != "" {
+			logoAttachmentID = uploadedLogoID
+		}
+		if _, err := s.store.UpdateOrganizationProfile(r.Context(), admin.OrgSlug, name, logoAttachmentID); err != nil {
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "failed to update organization")
+			return
+		}
+		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 		return
 	case "set_roles":
 		userID := strings.TrimSpace(r.FormValue("userId"))

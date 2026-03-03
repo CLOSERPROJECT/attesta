@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type adminFailingStore struct {
@@ -23,6 +25,7 @@ type adminFailingStore struct {
 	failSetUserRoles       bool
 	failDisableUser        bool
 	failSaveAttachment     bool
+	failUpdateOrganization bool
 }
 
 func (s *adminFailingStore) CreateOrganization(ctx context.Context, org Organization) (Organization, error) {
@@ -72,6 +75,13 @@ func (s *adminFailingStore) SaveAttachment(ctx context.Context, upload Attachmen
 		return Attachment{}, errors.New("save attachment failed")
 	}
 	return s.MemoryStore.SaveAttachment(ctx, upload, content)
+}
+
+func (s *adminFailingStore) UpdateOrganizationProfile(ctx context.Context, slug, name, logoAttachmentID string) (Organization, error) {
+	if s.failUpdateOrganization {
+		return Organization{}, errors.New("update organization failed")
+	}
+	return s.MemoryStore.UpdateOrganizationProfile(ctx, slug, name, logoAttachmentID)
 }
 
 func createSessionForTestUser(t *testing.T, store *MemoryStore, user AccountUser) string {
@@ -940,6 +950,240 @@ func TestHandleOrgAdminUsersInviteAllowsNoRoles(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminUsersUpdateOrgProfile(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-update-org",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-update-org@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "update_org"); err != nil {
+		t.Fatalf("WriteField intent error: %v", err)
+	}
+	if err := writer.WriteField("name", "Acme Org Updated"); err != nil {
+		t.Fatalf("WriteField name error: %v", err)
+	}
+	part, err := writer.CreateFormFile("logo", "acme-logo.png")
+	if err != nil {
+		t.Fatalf("CreateFormFile error: %v", err)
+	}
+	if _, err := part.Write([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}); err != nil {
+		t.Fatalf("logo write error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer close error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	updatedOrg, err := store.GetOrganizationBySlug(t.Context(), org.Slug)
+	if err != nil {
+		t.Fatalf("GetOrganizationBySlug error: %v", err)
+	}
+	if updatedOrg.Name != "Acme Org Updated" {
+		t.Fatalf("organization name = %q, want %q", updatedOrg.Name, "Acme Org Updated")
+	}
+	if updatedOrg.LogoAttachmentID == "" {
+		t.Fatal("expected organization logo attachment id to be set")
+	}
+}
+
+func TestHandleOrgAdminUsersUpdateOrgProfileErrors(t *testing.T) {
+	base := NewMemoryStore()
+	org, err := base.CreateOrganization(t.Context(), Organization{Name: "Org Profile Errors"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = base.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := base.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-update-org-errors",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-update-org-errors@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, base, adminUser)
+
+	newServer := func(store Store) *Server {
+		return &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+	}
+
+	t.Run("missing organization name", func(t *testing.T) {
+		server := newServer(base)
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name="))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "organization name is required") {
+			t.Fatalf("expected organization name required message, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("update organization failure", func(t *testing.T) {
+		server := newServer(&adminFailingStore{MemoryStore: base, failUpdateOrganization: true})
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Updated+Name"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "failed to update organization") {
+			t.Fatalf("expected update organization error, got %q", rec.Body.String())
+		}
+	})
+}
+
+func TestHandleOrgAdminLogo(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Logo Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-logo",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-logo@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, adminUser)
+
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   primitive.NilObjectID,
+		SubstepID:   "organization-logo:" + org.Slug,
+		Filename:    "org-logo.png",
+		ContentType: "image/png",
+		MaxBytes:    organizationLogoMaxBytes(),
+		UploadedAt:  time.Now().UTC(),
+	}, bytes.NewReader([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}))
+	if err != nil {
+		t.Fatalf("SaveAttachment error: %v", err)
+	}
+	if _, err := store.UpdateOrganizationProfile(t.Context(), org.Slug, org.Name, attachment.ID.Hex()); err != nil {
+		t.Fatalf("UpdateOrganizationProfile error: %v", err)
+	}
+
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+	req := httptest.NewRequest(http.MethodGet, "/org-admin/logo/"+attachment.ID.Hex(), nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminLogo(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if rec.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("content type = %q, want %q", rec.Header().Get("Content-Type"), "image/png")
+	}
+	if got := rec.Body.Bytes(); len(got) == 0 {
+		t.Fatal("expected logo response body")
+	}
+}
+
+func TestHandleOrgAdminUsersCreateOrgForUnassignedOrgAdmin(t *testing.T) {
+	store := NewMemoryStore()
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-unassigned-create",
+		Email:     "org-admin-unassigned-create@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	reqBlocked := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40acme.org"))
+	reqBlocked.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqBlocked.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	recBlocked := httptest.NewRecorder()
+	server.handleOrgAdminUsers(recBlocked, reqBlocked)
+	if recBlocked.Code != http.StatusOK {
+		t.Fatalf("blocked status = %d, want %d", recBlocked.Code, http.StatusOK)
+	}
+	if !strings.Contains(recBlocked.Body.String(), "create organization first") {
+		t.Fatalf("expected create organization first message, got %q", recBlocked.Body.String())
+	}
+
+	reqCreate := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
+	reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqCreate.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	recCreate := httptest.NewRecorder()
+	server.handleOrgAdminUsers(recCreate, reqCreate)
+	if recCreate.Code != http.StatusOK {
+		t.Fatalf("create status = %d, want %d", recCreate.Code, http.StatusOK)
+	}
+
+	org, err := store.GetOrganizationBySlug(t.Context(), "fresh-org")
+	if err != nil {
+		t.Fatalf("GetOrganizationBySlug error: %v", err)
+	}
+	updatedAdmin, err := store.GetUserByUserID(t.Context(), adminUser.UserID)
+	if err != nil {
+		t.Fatalf("GetUserByUserID error: %v", err)
+	}
+	if updatedAdmin.OrgID == nil || *updatedAdmin.OrgID != org.ID {
+		t.Fatalf("expected admin org id %s, got %+v", org.ID.Hex(), updatedAdmin.OrgID)
+	}
+	if updatedAdmin.OrgSlug != org.Slug {
+		t.Fatalf("expected admin org slug %q, got %q", org.Slug, updatedAdmin.OrgSlug)
+	}
+	if !containsRole(updatedAdmin.RoleSlugs, "org-admin") {
+		t.Fatalf("expected org-admin role, got %#v", updatedAdmin.RoleSlugs)
+	}
+	if _, err := store.GetRoleBySlug(t.Context(), org.Slug, "org-admin"); err != nil {
+		t.Fatalf("GetRoleBySlug org-admin error: %v", err)
+	}
+}
+
 func TestHandleOrgAdminUsersInviteRejectsExistingEmailFromAnotherOrg(t *testing.T) {
 	store := NewMemoryStore()
 	orgA, err := store.CreateOrganization(t.Context(), Organization{Name: "Org A"})
@@ -1453,16 +1697,26 @@ func TestHandleAdminOrgsInviteIntentValidationPaths(t *testing.T) {
 	sessionID := createSessionForTestUser(t, store, admin)
 	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
 
-	reqMissingOrg := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("intent=invite_org_admin&org_slug=&email=org-admin%40acme.org"))
-	reqMissingOrg.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	reqMissingOrg.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-	recMissingOrg := httptest.NewRecorder()
-	server.handleAdminOrgs(recMissingOrg, reqMissingOrg)
-	if recMissingOrg.Code != http.StatusOK {
-		t.Fatalf("missing org status = %d, want %d", recMissingOrg.Code, http.StatusOK)
+	reqNoOrg := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("intent=invite_org_admin&org_slug=&email=org-admin%40acme.org"))
+	reqNoOrg.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqNoOrg.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	recNoOrg := httptest.NewRecorder()
+	server.handleAdminOrgs(recNoOrg, reqNoOrg)
+	if recNoOrg.Code != http.StatusOK {
+		t.Fatalf("no org status = %d, want %d", recNoOrg.Code, http.StatusOK)
 	}
-	if !strings.Contains(recMissingOrg.Body.String(), "organization is required") {
-		t.Fatalf("expected organization required message, got %q", recMissingOrg.Body.String())
+	if !strings.Contains(recNoOrg.Body.String(), "/invite/") {
+		t.Fatalf("expected invite link for unassigned org admin, got %q", recNoOrg.Body.String())
+	}
+	user, userErr := store.GetUserByEmail(t.Context(), "org-admin@acme.org")
+	if userErr != nil {
+		t.Fatalf("GetUserByEmail error: %v", userErr)
+	}
+	if user.OrgID != nil || strings.TrimSpace(user.OrgSlug) != "" {
+		t.Fatalf("expected unassigned org admin user, got orgID=%v orgSlug=%q", user.OrgID, user.OrgSlug)
+	}
+	if !containsRole(user.RoleSlugs, "org-admin") {
+		t.Fatalf("expected org-admin role on unassigned user, got %#v", user.RoleSlugs)
 	}
 
 	reqUnknownOrg := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("intent=invite_org_admin&org_slug=missing-org&email=org-admin%40acme.org"))

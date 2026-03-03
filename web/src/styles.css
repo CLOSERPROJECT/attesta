@@ -1159,6 +1159,34 @@ button.secondary {
   accent-color: var(--ink);
 }
 
+.org-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.org-profile-logo {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+  padding: 4px;
+}
+
+.org-profile-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.org-profile-name,
+.org-profile-slug {
+  margin: 0;
+}
+
 .users-list {
   list-style: none;
   padding: 0;
