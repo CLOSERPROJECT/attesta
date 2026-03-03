@@ -1104,19 +1104,6 @@ button.secondary {
   font: inherit;
 }
 
-.roles-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-}
-
-.roles-header > button {
-  margin-left: auto;
-  padding: 6px 12px;
-  font-size: 10px;
-}
-
 .roles-picker {
   position: relative;
 }
@@ -1303,6 +1290,12 @@ button.secondary {
 .user-tags{
   justify-self: center;    /* <-- true center of the row */
   display: inline-flex;    /* shrink to content so centering is precise */
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.role-tags {
+  display: inline-flex;
   gap: 8px;
   flex-wrap: wrap;
 }

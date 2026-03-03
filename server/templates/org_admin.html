@@ -57,19 +57,56 @@
 
   {{if not .NeedsOrganizationSetup}}
   <section class="panel">
+    <h2>Roles</h2>
+    <form method="post" action="/org-admin/roles" class="input-form">
+      <label for="role-name">Role name</label>
+      <input id="role-name" name="name" type="text" required />
+      <label for="role-palette">Role color palette</label>
+      <div class="role-palette-picker">
+        <select id="role-palette" name="palette" required>
+          <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" selected>Red</option>
+          <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)">Orange</option>
+          <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)">Amber</option>
+          <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)">Yellow</option>
+          <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)">Lime</option>
+          <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)">Green</option>
+          <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)">Emerald</option>
+          <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)">Teal</option>
+          <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)">Cyan</option>
+          <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)">Sky</option>
+          <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)">Blue</option>
+          <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)">Indigo</option>
+          <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)">Violet</option>
+          <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)">Purple</option>
+          <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)">Fuchsia</option>
+          <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)">Pink</option>
+          <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)">Rose</option>
+        </select>
+        <span id="role-palette-preview" class="role-palette-preview" aria-hidden="true"></span>
+      </div>
+      {{if .RoleError}}<p class="error">{{.RoleError}}</p>{{end}}
+      <button class="primary" type="submit">Create role</button>
+    </form>
+    <br>
+    <h3>Existing roles</h3>
+    <div class="role-tags">
+      {{range .RolePills}}
+        {{if not (or (eq .Slug "org-admin") (eq .Slug "org_admin"))}}
+        <span class="pill role-pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}};">
+          {{.Name}}
+        </span>
+        {{end}}
+      {{end}}
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Invite User</h2>
     <form method="post" action="/org-admin/users" class="input-form">
       <input type="hidden" name="intent" value="invite" />
       <label for="user-email">Email</label>
       <input id="user-email" name="email" type="email" required />
-      <div class="roles-header">
-        <label>Roles</label>
-        <button type="button" class="secondary" data-open-role-modal>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 24 24">
-            <path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/>
-          </svg>
-        </button>
-      </div>
+      <label>Roles</label>
       <div class="roles-picker" data-role-picker>
         <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
         <div class="roles-picker-menu" data-role-picker-menu hidden>
@@ -89,54 +126,9 @@
         <div data-role-picker-hidden-inputs></div>
       </div>
       <p class="muted">Select one or more roles (optional).</p>
-      {{if .RoleError}}<p class="error">{{.RoleError}}</p>{{end}}
       {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
       <button class="primary" type="submit">Create invite</button>
     </form>
-    <dialog id="role-modal" class="manage-dialog">
-      <div class="manage-dialog-card">
-        <header class="manage-dialog-head">
-          <div>
-            <h3 class="manage-dialog-title">Create role</h3>
-            <p class="manage-dialog-subtitle">New role for {{.Organization.Name}}</p>
-          </div>
-          <button type="button" class="secondary" onclick="document.getElementById('role-modal').close()">
-            X
-          </button>
-        </header>
-
-        <form method="post" action="/org-admin/roles" class="input-form">
-          <label for="role-name">Role name</label>
-          <input id="role-name" name="name" type="text" required />
-          <label for="role-palette">Role color palette</label>
-          <div class="role-palette-picker">
-            <select id="role-palette" name="palette" required>
-              <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" selected>Red</option>
-              <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)">Orange</option>
-              <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)">Amber</option>
-              <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)">Yellow</option>
-              <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)">Lime</option>
-              <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)">Green</option>
-              <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)">Emerald</option>
-              <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)">Teal</option>
-              <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)">Cyan</option>
-              <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)">Sky</option>
-              <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)">Blue</option>
-              <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)">Indigo</option>
-              <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)">Violet</option>
-              <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)">Purple</option>
-              <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)">Fuchsia</option>
-              <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)">Pink</option>
-              <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)">Rose</option>
-            </select>
-            <span id="role-palette-preview" class="role-palette-preview" aria-hidden="true"></span>
-          </div>
-          <div class="manage-dialog-actions">
-            <button class="primary" type="submit">Create role</button>
-          </div>
-        </form>
-      </div>
-    </dialog>
     {{if .InviteLink}}
       <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
     {{end}}
@@ -237,9 +229,6 @@
     const paletteSelect = document.getElementById("role-palette");
     const roleNameInput = document.getElementById("role-name");
     const palettePreview = document.getElementById("role-palette-preview");
-    const roleModal = document.getElementById("role-modal");
-    const roleModalForm = roleModal ? roleModal.querySelector('form[action="/org-admin/roles"]') : null;
-    const roleModalOpenButtons = Array.from(document.querySelectorAll("[data-open-role-modal]"));
     if (paletteSelect && palettePreview) {
       const paletteKeys = Array.from(paletteSelect.options).map((option) => option.value).filter(Boolean);
       let autoPaletteEnabled = true;
@@ -286,27 +275,6 @@
       }
       applySuggestedPalette();
       updatePalettePreview();
-
-      const resetRoleModalState = () => {
-        if (roleModalForm) {
-          roleModalForm.reset();
-        }
-        autoPaletteEnabled = true;
-        applySuggestedPalette();
-        updatePalettePreview();
-      };
-
-      if (roleModal) {
-        roleModal.addEventListener("close", resetRoleModalState);
-      }
-      roleModalOpenButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          resetRoleModalState();
-          if (roleModal) {
-            roleModal.showModal();
-          }
-        });
-      });
     }
 
     const rolePickers = Array.from(document.querySelectorAll("[data-role-picker]"));
