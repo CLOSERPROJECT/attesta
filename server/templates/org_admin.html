@@ -26,7 +26,7 @@
         <input id="org-name" name="name" type="text" required />
         <label for="org-logo">Organization logo</label>
         <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
-        {{if .OrganizationError}}<p class="muted" style="color: #a91919;">{{.OrganizationError}}</p>{{end}}
+        {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
         <button class="primary" type="submit">Create organization</button>
       </form>
     {{else}}
@@ -49,7 +49,7 @@
         <label for="org-logo">Organization logo</label>
         <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
         <p class="muted">Leave logo empty to keep the current one.</p>
-        {{if .OrganizationError}}<p class="muted" style="color: #a91919;">{{.OrganizationError}}</p>{{end}}
+        {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
         <button class="primary" type="submit">Save organization</button>
       </form>
     {{end}}
@@ -84,7 +84,7 @@
         </select>
         <span id="role-palette-preview" class="role-palette-preview" aria-hidden="true"></span>
       </div>
-      {{if .RoleError}}<p class="muted" style="color: #a91919;">{{.RoleError}}</p>{{end}}
+      {{if .RoleError}}<p class="error">{{.RoleError}}</p>{{end}}
       <button class="primary" type="submit">Create role</button>
     </form>
   </section>
@@ -107,7 +107,7 @@
 
         <p class="muted">Select one or more roles (optional).</p>
       </fieldset>
-      {{if .InviteError}}<p class="muted" style="color: #a91919;">{{.InviteError}}</p>{{end}}
+      {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
       <button class="primary" type="submit">Create invite</button>
     </form>
     {{if .InviteLink}}
@@ -116,7 +116,7 @@
   </section>
 
   <section class="panel">
-    {{if .UsersError}}<p class="muted" style="color: #a91919;">{{.UsersError}}</p>{{end}}
+    {{if .UsersError}}<p class="error">{{.UsersError}}</p>{{end}}
     <h2>Organization users</h2>
     {{if .Users}}
       <ul class="users-list">
