@@ -495,8 +495,8 @@ func TestHandleOrgAdminCreateRoleAndUserInvite(t *testing.T) {
 	roleReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	roleRec := httptest.NewRecorder()
 	server.handleOrgAdminRoles(roleRec, roleReq)
-	if roleRec.Code != http.StatusOK {
-		t.Fatalf("create role status = %d, want %d", roleRec.Code, http.StatusOK)
+	if roleRec.Code != http.StatusSeeOther {
+		t.Fatalf("create role status = %d, want %d", roleRec.Code, http.StatusSeeOther)
 	}
 	if _, err := store.GetRoleBySlug(t.Context(), org.Slug, "qa-reviewer"); err != nil {
 		t.Fatalf("GetRoleBySlug error: %v", err)
@@ -543,8 +543,8 @@ func TestHandleOrgAdminRolesDuplicateSlugRendersExplicitError(t *testing.T) {
 	firstReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	firstRec := httptest.NewRecorder()
 	server.handleOrgAdminRoles(firstRec, firstReq)
-	if firstRec.Code != http.StatusOK {
-		t.Fatalf("first create status = %d, want %d", firstRec.Code, http.StatusOK)
+	if firstRec.Code != http.StatusSeeOther {
+		t.Fatalf("first create status = %d, want %d", firstRec.Code, http.StatusSeeOther)
 	}
 
 	dupReq := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA_reviewer"))
@@ -603,8 +603,8 @@ func TestHandleOrgAdminRolesStoresPaletteStyle(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.handleOrgAdminRoles(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	role, err := store.GetRoleBySlug(t.Context(), org.Slug, "qa-reviewer")
 	if err != nil {
@@ -647,8 +647,8 @@ func TestHandleOrgAdminRolesDefaultsToRedPaletteForUnknownValue(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.handleOrgAdminRoles(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	role, err := store.GetRoleBySlug(t.Context(), org.Slug, "line-leader")
 	if err != nil {

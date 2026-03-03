@@ -1104,6 +1104,126 @@ button.secondary {
   font: inherit;
 }
 
+.roles-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.roles-header > button {
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 10px;
+}
+
+.roles-picker {
+  position: relative;
+}
+
+.roles-picker-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.roles-picker-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.roles-picker-toggle:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+.roles-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.roles-picker-menu[hidden] {
+  display: none;
+}
+
+.roles-picker-search {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+}
+
+.roles-picker-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.roles-picker-option {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.roles-picker-option:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
+.roles-picker-option.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+}
+
+.roles-picker-option-check {
+  display: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.roles-picker-option.is-selected .roles-picker-option-check {
+  display: inline;
+  color: var(--ink);
+}
+
+.roles-picker-empty {
+  margin: 0;
+  padding: 4px 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .role-palette-picker {
   display: flex;
   align-items: center;
@@ -1122,41 +1242,6 @@ button.secondary {
   border: 2px solid var(--swatch-border, var(--border));
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
   flex: 0 0 auto;
-}
-
-.checkbox-group {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
-  padding: 10px;
-  margin: 0;
-}
-
-.checkbox-group legend {
-  font-size: 13px;
-  color: var(--muted);
-  padding: 0 6px;
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  gap: 10px;
-  padding: 8px 6px;
-  border-radius: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.checkbox-item:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.checkbox-item input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--ink);
 }
 
 .org-profile-summary {
@@ -1232,6 +1317,10 @@ button.secondary {
   padding: 0;
   width: min(560px, 92vw);
   max-width: 92vw;
+}
+
+.manage-dialog-overflow {
+  overflow: visible;
 }
 
 .manage-dialog::backdrop {

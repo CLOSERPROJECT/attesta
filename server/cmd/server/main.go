@@ -2231,7 +2231,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to create role"})
 			return
 		}
-		s.renderOrgAdmin(w, user, user.OrgSlug, "", "")
+		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

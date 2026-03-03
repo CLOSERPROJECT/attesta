@@ -57,59 +57,85 @@
 
   {{if not .NeedsOrganizationSetup}}
   <section class="panel">
-    <h2>Create Role</h2>
-    <form method="post" action="/org-admin/roles" class="input-form">
-      <label for="role-name">Role name</label>
-      <input id="role-name" name="name" type="text" required />
-      <label for="role-palette">Role color palette</label>
-      <div class="role-palette-picker">
-        <select id="role-palette" name="palette" required>
-          <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" selected>Red</option>
-          <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)">Orange</option>
-          <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)">Amber</option>
-          <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)">Yellow</option>
-          <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)">Lime</option>
-          <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)">Green</option>
-          <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)">Emerald</option>
-          <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)">Teal</option>
-          <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)">Cyan</option>
-          <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)">Sky</option>
-          <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)">Blue</option>
-          <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)">Indigo</option>
-          <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)">Violet</option>
-          <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)">Purple</option>
-          <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)">Fuchsia</option>
-          <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)">Pink</option>
-          <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)">Rose</option>
-        </select>
-        <span id="role-palette-preview" class="role-palette-preview" aria-hidden="true"></span>
-      </div>
-      {{if .RoleError}}<p class="error">{{.RoleError}}</p>{{end}}
-      <button class="primary" type="submit">Create role</button>
-    </form>
-  </section>
-
-  <section class="panel">
     <h2>Invite User</h2>
     <form method="post" action="/org-admin/users" class="input-form">
       <input type="hidden" name="intent" value="invite" />
       <label for="user-email">Email</label>
       <input id="user-email" name="email" type="email" required />
-      <fieldset class="checkbox-group">
-        <legend>Roles</legend>
-
-        {{range .Roles}}
-          <label class="checkbox-item">
-            <input type="checkbox" name="roles" value="{{.Slug}}" />
-            <span>{{.Name}} ({{.Slug}})</span>
-          </label>
-        {{end}}
-
-        <p class="muted">Select one or more roles (optional).</p>
-      </fieldset>
+      <div class="roles-header">
+        <label>Roles</label>
+        <button type="button" class="secondary" onclick="document.getElementById('role-modal').showModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 24 24">
+            <path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/>
+          </svg>
+        </button>
+      </div>
+      <div class="roles-picker" data-role-picker>
+        <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
+        <div class="roles-picker-menu" data-role-picker-menu hidden>
+          <input type="search" class="roles-picker-search" data-role-picker-search placeholder="Search roles..." />
+          <ul class="roles-picker-options">
+            {{range .Roles}}
+              <li>
+                <button type="button" class="roles-picker-option" data-role-picker-option data-value="{{.Slug}}" data-label="{{.Name}} ({{.Slug}})">
+                  <span>{{.Name}} ({{.Slug}})</span>
+                  <span class="roles-picker-option-check">Selected</span>
+                </button>
+              </li>
+            {{end}}
+          </ul>
+          <p class="roles-picker-empty" data-role-picker-empty hidden>No roles match your search.</p>
+        </div>
+        <div data-role-picker-hidden-inputs></div>
+      </div>
+      <p class="muted">Select one or more roles (optional).</p>
+      {{if .RoleError}}<p class="error">{{.RoleError}}</p>{{end}}
       {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
       <button class="primary" type="submit">Create invite</button>
     </form>
+    <dialog id="role-modal" class="manage-dialog">
+      <div class="manage-dialog-card">
+        <header class="manage-dialog-head">
+          <div>
+            <h3 class="manage-dialog-title">Create role</h3>
+          </div>
+          <button type="button" class="secondary" onclick="document.getElementById('role-modal').close()">
+            X
+          </button>
+        </header>
+
+        <form method="post" action="/org-admin/roles" class="input-form">
+          <label for="role-name">Role name</label>
+          <input id="role-name" name="name" type="text" required />
+          <label for="role-palette">Role color palette</label>
+          <div class="role-palette-picker">
+            <select id="role-palette" name="palette" required>
+              <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" selected>Red</option>
+              <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)">Orange</option>
+              <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)">Amber</option>
+              <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)">Yellow</option>
+              <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)">Lime</option>
+              <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)">Green</option>
+              <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)">Emerald</option>
+              <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)">Teal</option>
+              <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)">Cyan</option>
+              <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)">Sky</option>
+              <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)">Blue</option>
+              <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)">Indigo</option>
+              <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)">Violet</option>
+              <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)">Purple</option>
+              <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)">Fuchsia</option>
+              <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)">Pink</option>
+              <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)">Rose</option>
+            </select>
+            <span id="role-palette-preview" class="role-palette-preview" aria-hidden="true"></span>
+          </div>
+          <div class="manage-dialog-actions">
+            <button class="primary" type="submit">Create role</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
     {{if .InviteLink}}
       <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
     {{end}}
@@ -149,7 +175,7 @@
             <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
               Manage
             </button>
-            <dialog id="manage-user-{{.UserID}}" class="manage-dialog">
+            <dialog id="manage-user-{{.UserID}}" class="manage-dialog manage-dialog-overflow">
               <div class="manage-dialog-card">
                 <header class="manage-dialog-head">
                   <div>
@@ -164,18 +190,28 @@
                 <form method="post" action="/org-admin/users" class="input-form">
                   <input type="hidden" name="intent" value="set_roles" />
                   <input type="hidden" name="userId" value="{{.UserID}}" />
-                  <fieldset class="checkbox-group">
-                    <legend>Roles</legend>
-                    {{range .RoleOptions}}
-                      <label class="checkbox-item">
-                        <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
-                        <span>{{.Name}} ({{.Slug}})</span>
-                      </label>
-                    {{end}}
-                    <div class="manage-dialog-actions">
-                      <button class="primary" type="submit">Save roles</button>
+                  <label>Roles</label>
+                  <div class="roles-picker" data-role-picker>
+                    <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
+                    <div class="roles-picker-menu" data-role-picker-menu hidden>
+                      <input type="search" class="roles-picker-search" data-role-picker-search placeholder="Search roles..." />
+                      <ul class="roles-picker-options">
+                        {{range .RoleOptions}}
+                          <li>
+                            <button type="button" class="roles-picker-option" data-role-picker-option data-value="{{.Slug}}" data-label="{{.Name}} ({{.Slug}})" {{if .Selected}}data-selected="true"{{end}}>
+                              <span>{{.Name}} ({{.Slug}})</span>
+                              <span class="roles-picker-option-check">Selected</span>
+                            </button>
+                          </li>
+                        {{end}}
+                      </ul>
+                      <p class="roles-picker-empty" data-role-picker-empty hidden>No roles match your search.</p>
                     </div>
-                  </fieldset>
+                    <div data-role-picker-hidden-inputs></div>
+                  </div>
+                  <div class="manage-dialog-actions">
+                    <button class="primary" type="submit">Save roles</button>
+                  </div>
                 </form>
 
                 <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
@@ -197,21 +233,175 @@
 
 <script>
   (function () {
-    const select = document.getElementById("role-palette");
-    const preview = document.getElementById("role-palette-preview");
-    if (!select || !preview) {
-      return;
+    const paletteSelect = document.getElementById("role-palette");
+    const palettePreview = document.getElementById("role-palette-preview");
+    if (paletteSelect && palettePreview) {
+      const updatePalettePreview = () => {
+        const option = paletteSelect.options[paletteSelect.selectedIndex];
+        const color = option ? option.getAttribute("data-role-color") : "";
+        const border = option ? option.getAttribute("data-role-border") : "";
+        palettePreview.style.setProperty("--swatch-bg", color || "var(--role-fallback)");
+        palettePreview.style.setProperty("--swatch-border", border || "var(--border)");
+        palettePreview.title = option ? option.text : "";
+      };
+      paletteSelect.addEventListener("change", updatePalettePreview);
+      updatePalettePreview();
     }
-    const updatePalettePreview = () => {
-      const option = select.options[select.selectedIndex];
-      const color = option ? option.getAttribute("data-role-color") : "";
-      const border = option ? option.getAttribute("data-role-border") : "";
-      preview.style.setProperty("--swatch-bg", color || "var(--role-fallback)");
-      preview.style.setProperty("--swatch-border", border || "var(--border)");
-      preview.title = option ? option.text : "";
+
+    const rolePickers = Array.from(document.querySelectorAll("[data-role-picker]"));
+    const closeAllPickers = (except) => {
+      rolePickers.forEach((picker) => {
+        if (picker === except) {
+          return;
+        }
+        const menu = picker.querySelector("[data-role-picker-menu]");
+        const toggle = picker.querySelector("[data-role-picker-toggle]");
+        if (!menu || !toggle) {
+          return;
+        }
+        menu.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+      });
     };
-    select.addEventListener("change", updatePalettePreview);
-    updatePalettePreview();
+
+    rolePickers.forEach((picker) => {
+      const toggle = picker.querySelector("[data-role-picker-toggle]");
+      const menu = picker.querySelector("[data-role-picker-menu]");
+      const search = picker.querySelector("[data-role-picker-search]");
+      const empty = picker.querySelector("[data-role-picker-empty]");
+      const hiddenInputs = picker.querySelector("[data-role-picker-hidden-inputs]");
+      const optionButtons = Array.from(picker.querySelectorAll("[data-role-picker-option]"));
+      if (!toggle || !menu || !hiddenInputs) {
+        return;
+      }
+
+      const selected = new Set();
+      optionButtons.forEach((button) => {
+        if (button.getAttribute("data-selected") === "true") {
+          selected.add(button.getAttribute("data-value"));
+        }
+      });
+
+      const syncHiddenInputs = () => {
+        hiddenInputs.innerHTML = "";
+        optionButtons.forEach((button) => {
+          const value = button.getAttribute("data-value");
+          if (!value || !selected.has(value)) {
+            return;
+          }
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "roles";
+          input.value = value;
+          hiddenInputs.appendChild(input);
+        });
+      };
+
+      const updateToggleLabel = () => {
+        if (selected.size === 0) {
+          toggle.textContent = "Select roles";
+          return;
+        }
+        if (selected.size === 1) {
+          const selectedButton = optionButtons.find((button) => {
+            const value = button.getAttribute("data-value");
+            return value && selected.has(value);
+          });
+          toggle.textContent = selectedButton ? selectedButton.getAttribute("data-label") || "1 role selected" : "1 role selected";
+          return;
+        }
+        toggle.textContent = [...selected].join(", ");
+      };
+
+      const updateOptionState = () => {
+        optionButtons.forEach((button) => {
+          const value = button.getAttribute("data-value");
+          const isSelected = !!value && selected.has(value);
+          button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+          if (isSelected) {
+            button.classList.add("is-selected");
+          } else {
+            button.classList.remove("is-selected");
+          }
+        });
+      };
+
+      const applySearchFilter = () => {
+        const query = search ? search.value.trim().toLowerCase() : "";
+        let visibleCount = 0;
+        optionButtons.forEach((button) => {
+          const item = button.closest("li");
+          const label = (button.getAttribute("data-label") || "").toLowerCase();
+          const match = query === "" || label.includes(query);
+          if (item) {
+            item.hidden = !match;
+          }
+          if (match) {
+            visibleCount++;
+          }
+        });
+        if (empty) {
+          empty.hidden = visibleCount > 0;
+        }
+      };
+
+      if (optionButtons.length === 0) {
+        toggle.textContent = "No roles available";
+        toggle.disabled = true;
+        menu.hidden = true;
+        return;
+      }
+
+      toggle.addEventListener("click", () => {
+        const isOpen = !menu.hidden;
+        closeAllPickers(picker);
+        menu.hidden = isOpen;
+        toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        if (!isOpen && search) {
+          search.focus();
+        }
+      });
+
+      optionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const value = button.getAttribute("data-value");
+          if (!value) {
+            return;
+          }
+          if (selected.has(value)) {
+            selected.delete(value);
+          } else {
+            selected.add(value);
+          }
+          updateOptionState();
+          updateToggleLabel();
+          syncHiddenInputs();
+        });
+      });
+
+      if (search) {
+        search.addEventListener("input", applySearchFilter);
+      }
+
+      updateOptionState();
+      updateToggleLabel();
+      syncHiddenInputs();
+      applySearchFilter();
+    });
+
+    document.addEventListener("click", (event) => {
+      rolePickers.forEach((picker) => {
+        if (!picker.contains(event.target)) {
+          const menu = picker.querySelector("[data-role-picker-menu]");
+          const toggle = picker.querySelector("[data-role-picker-toggle]");
+          if (!menu || !toggle) {
+            return;
+          }
+          menu.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
   })();
 </script>
 {{end}}
