@@ -67,6 +67,9 @@ func TestMongoDriverAdaptersExecuteWrapperMethods(t *testing.T) {
 	runAndRecover(func() {
 		_ = (mongoDriverCollection{}).FindOneAndUpdate(context.Background(), bson.M{}, bson.M{})
 	})
+	runAndRecover(func() {
+		_ = (mongoDriverCollection{}).CreateIndexes(context.Background(), []mongo.IndexModel{})
+	})
 
 	runAndRecover(func() {
 		_ = (mongoDriverSingleResult{}).Decode(&Process{})

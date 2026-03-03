@@ -37,6 +37,7 @@ type Store interface {
 	OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error)
 	CreateOrganization(ctx context.Context, org Organization) (Organization, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*Organization, error)
+	UpdateOrganizationProfile(ctx context.Context, slug, name, logoAttachmentID string) (Organization, error)
 	ListOrganizations(ctx context.Context) ([]Organization, error)
 	CreateRole(ctx context.Context, role Role) (Role, error)
 	GetRoleBySlug(ctx context.Context, orgSlug, roleSlug string) (*Role, error)
@@ -46,6 +47,7 @@ type Store interface {
 	GetUserByUserID(ctx context.Context, userID string) (*AccountUser, error)
 	ListUsersByOrgID(ctx context.Context, orgID primitive.ObjectID) ([]AccountUser, error)
 	SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error
+	SetUserOrganization(ctx context.Context, userID string, orgID primitive.ObjectID, orgSlug string) error
 	SetUserRoles(ctx context.Context, userID string, roleSlugs []string) error
 	SetUserLastLogin(ctx context.Context, userID string, lastLoginAt time.Time) error
 	DisableUser(ctx context.Context, userID string) error
@@ -845,6 +847,60 @@ func (s *MemoryStore) GetOrganizationBySlug(_ context.Context, slug string) (*Or
 	return &copy, nil
 }
 
+func (s *MemoryStore) UpdateOrganizationProfile(_ context.Context, slug, name, logoAttachmentID string) (Organization, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	oldSlug := canonifySlug(slug)
+	org, ok := s.organizations[oldSlug]
+	if !ok {
+		return Organization{}, mongo.ErrNoDocuments
+	}
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return Organization{}, errors.New("organization name required")
+	}
+	newSlug := canonifySlug(trimmedName)
+	if newSlug == "" {
+		return Organization{}, errors.New("organization name required")
+	}
+	if newSlug != oldSlug {
+		if _, exists := s.organizations[newSlug]; exists {
+			return Organization{}, errors.New("organization slug already exists")
+		}
+	}
+
+	org.Name = trimmedName
+	org.Slug = newSlug
+	org.LogoAttachmentID = strings.TrimSpace(logoAttachmentID)
+
+	if newSlug != oldSlug {
+		delete(s.organizations, oldSlug)
+	}
+	s.organizations[newSlug] = org
+
+	if newSlug != oldSlug {
+		updatedRoles := make(map[string]Role, len(s.roles))
+		for key, role := range s.roles {
+			updatedKey := key
+			if strings.HasPrefix(key, oldSlug+":") && role.OrgID == org.ID {
+				role.OrgSlug = newSlug
+				updatedKey = newSlug + ":" + role.Slug
+			}
+			updatedRoles[updatedKey] = role
+		}
+		s.roles = updatedRoles
+
+		for userID, user := range s.usersByUserID {
+			if user.OrgID != nil && *user.OrgID == org.ID {
+				user.OrgSlug = newSlug
+				s.usersByUserID[userID] = user
+			}
+		}
+	}
+	return org, nil
+}
+
 func (s *MemoryStore) ListOrganizations(_ context.Context) ([]Organization, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1014,6 +1070,28 @@ func (s *MemoryStore) SetUserPasswordHash(_ context.Context, userID, passwordHas
 	return nil
 }
 
+func (s *MemoryStore) SetUserOrganization(_ context.Context, userID string, orgID primitive.ObjectID, orgSlug string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.usersByUserID[strings.TrimSpace(userID)]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	canonOrgSlug := canonifySlug(orgSlug)
+	org, exists := s.organizations[canonOrgSlug]
+	if !exists {
+		return errors.New("organization not found")
+	}
+	if !orgID.IsZero() && org.ID != orgID {
+		return errors.New("organization mismatch")
+	}
+	resolvedOrgID := org.ID
+	user.OrgID = &resolvedOrgID
+	user.OrgSlug = canonOrgSlug
+	s.usersByUserID[user.UserID] = user
+	return nil
+}
+
 func (s *MemoryStore) SetUserRoles(_ context.Context, userID string, roleSlugs []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1022,9 +1100,11 @@ func (s *MemoryStore) SetUserRoles(_ context.Context, userID string, roleSlugs [
 		return mongo.ErrNoDocuments
 	}
 	canonRoles := canonifyRoleSlugs(roleSlugs)
-	for _, roleSlug := range canonRoles {
-		if _, exists := s.roles[user.OrgSlug+":"+roleSlug]; !exists {
-			return errors.New("role not found in organization")
+	if strings.TrimSpace(user.OrgSlug) != "" {
+		for _, roleSlug := range canonRoles {
+			if _, exists := s.roles[user.OrgSlug+":"+roleSlug]; !exists {
+				return errors.New("role not found in organization")
+			}
 		}
 	}
 	user.RoleSlugs = canonRoles
@@ -1401,6 +1481,75 @@ func (s *MongoStore) GetOrganizationBySlug(ctx context.Context, slug string) (*O
 	return &org, nil
 }
 
+func (s *MongoStore) UpdateOrganizationProfile(ctx context.Context, slug, name, logoAttachmentID string) (Organization, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return Organization{}, errors.New("organization name required")
+	}
+	oldSlug := canonifySlug(slug)
+	currentOrg, err := s.GetOrganizationBySlug(ctx, oldSlug)
+	if err != nil || currentOrg == nil {
+		return Organization{}, mongo.ErrNoDocuments
+	}
+	newSlug := canonifySlug(trimmedName)
+	if newSlug == "" {
+		return Organization{}, errors.New("organization name required")
+	}
+	if newSlug != oldSlug {
+		if existing, lookupErr := s.GetOrganizationBySlug(ctx, newSlug); lookupErr == nil && existing != nil {
+			return Organization{}, errors.New("organization slug already exists")
+		} else if lookupErr != nil && !errors.Is(lookupErr, mongo.ErrNoDocuments) {
+			return Organization{}, lookupErr
+		}
+	}
+
+	filter := bson.M{"_id": currentOrg.ID}
+	update := bson.M{"$set": bson.M{
+		"name":             trimmedName,
+		"slug":             newSlug,
+		"logoAttachmentId": strings.TrimSpace(logoAttachmentID),
+	}}
+	if _, err := s.database().Collection(collectionOrganizations).UpdateOne(ctx, filter, update); err != nil {
+		return Organization{}, err
+	}
+
+	if newSlug != oldSlug {
+		roles, rolesErr := s.ListRolesByOrg(ctx, oldSlug)
+		if rolesErr != nil {
+			return Organization{}, rolesErr
+		}
+		for _, role := range roles {
+			if _, updateErr := s.database().Collection(collectionRoles).UpdateOne(
+				ctx,
+				bson.M{"_id": role.ID},
+				bson.M{"$set": bson.M{"orgSlug": newSlug}},
+			); updateErr != nil {
+				return Organization{}, updateErr
+			}
+		}
+
+		users, usersErr := s.ListUsersByOrgID(ctx, currentOrg.ID)
+		if usersErr != nil {
+			return Organization{}, usersErr
+		}
+		for _, user := range users {
+			if _, updateErr := s.database().Collection(collectionUsers).UpdateOne(
+				ctx,
+				bson.M{"userId": strings.TrimSpace(user.UserID)},
+				bson.M{"$set": bson.M{"orgSlug": newSlug}},
+			); updateErr != nil {
+				return Organization{}, updateErr
+			}
+		}
+	}
+
+	updatedOrg, reloadErr := s.GetOrganizationBySlug(ctx, newSlug)
+	if reloadErr != nil || updatedOrg == nil {
+		return Organization{}, mongo.ErrNoDocuments
+	}
+	return *updatedOrg, nil
+}
+
 func (s *MongoStore) ListOrganizations(ctx context.Context) ([]Organization, error) {
 	cursor, err := s.database().Collection(collectionOrganizations).Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
 	if err != nil {
@@ -1530,6 +1679,19 @@ func (s *MongoStore) SetUserPasswordHash(ctx context.Context, userID, passwordHa
 		ctx,
 		bson.M{"userId": strings.TrimSpace(userID)},
 		bson.M{"$set": bson.M{"passwordHash": strings.TrimSpace(passwordHash)}},
+	)
+	return err
+}
+
+func (s *MongoStore) SetUserOrganization(ctx context.Context, userID string, orgID primitive.ObjectID, orgSlug string) error {
+	canonOrgSlug := canonifySlug(orgSlug)
+	_, err := s.database().Collection(collectionUsers).UpdateOne(
+		ctx,
+		bson.M{"userId": strings.TrimSpace(userID)},
+		bson.M{"$set": bson.M{
+			"orgId":   orgID,
+			"orgSlug": canonOrgSlug,
+		}},
 	)
 	return err
 }

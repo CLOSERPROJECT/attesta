@@ -23,6 +23,23 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 	if org.Slug != "acme-foods" {
 		t.Fatalf("organization slug = %q, want acme-foods", org.Slug)
 	}
+	updatedOrg, err := store.UpdateOrganizationProfile(t.Context(), org.Slug, "Acme Foods Europe", "logo-123")
+	if err != nil {
+		t.Fatalf("UpdateOrganizationProfile error: %v", err)
+	}
+	if updatedOrg.Name != "Acme Foods Europe" {
+		t.Fatalf("updated organization name = %q, want %q", updatedOrg.Name, "Acme Foods Europe")
+	}
+	if updatedOrg.LogoAttachmentID != "logo-123" {
+		t.Fatalf("updated logo attachment id = %q, want %q", updatedOrg.LogoAttachmentID, "logo-123")
+	}
+	if updatedOrg.Slug != "acme-foods-europe" {
+		t.Fatalf("updated organization slug = %q, want %q", updatedOrg.Slug, "acme-foods-europe")
+	}
+	org = updatedOrg
+	if _, err := store.UpdateOrganizationProfile(t.Context(), org.Slug, "", ""); err == nil {
+		t.Fatal("expected UpdateOrganizationProfile empty name error")
+	}
 
 	role, err := store.CreateRole(t.Context(), Role{OrgSlug: org.Slug, Name: "Org Admin"})
 	if err != nil {
@@ -44,6 +61,31 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 	}
 	if user.Email != "admin@acme.io" {
 		t.Fatalf("normalized email = %q, want admin@acme.io", user.Email)
+	}
+	unassignedOrgAdmin, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "u-bootstrap",
+		Email:     "bootstrap@acme.io",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "invited",
+	})
+	if err != nil {
+		t.Fatalf("CreateUser unassigned org admin error: %v", err)
+	}
+	if err := store.SetUserRoles(t.Context(), unassignedOrgAdmin.UserID, []string{"org-admin"}); err != nil {
+		t.Fatalf("SetUserRoles unassigned org admin error: %v", err)
+	}
+	if err := store.SetUserOrganization(t.Context(), unassignedOrgAdmin.UserID, org.ID, org.Slug); err != nil {
+		t.Fatalf("SetUserOrganization error: %v", err)
+	}
+	assignedUser, err := store.GetUserByUserID(t.Context(), unassignedOrgAdmin.UserID)
+	if err != nil {
+		t.Fatalf("GetUserByUserID assigned user error: %v", err)
+	}
+	if assignedUser.OrgID == nil || *assignedUser.OrgID != org.ID || assignedUser.OrgSlug != org.Slug {
+		t.Fatalf("expected assigned org context, got orgID=%+v orgSlug=%q", assignedUser.OrgID, assignedUser.OrgSlug)
+	}
+	if err := store.SetUserOrganization(t.Context(), unassignedOrgAdmin.UserID, primitive.NewObjectID(), org.Slug); err == nil {
+		t.Fatal("expected SetUserOrganization mismatch error")
 	}
 
 	if _, err := store.CreateUser(t.Context(), AccountUser{

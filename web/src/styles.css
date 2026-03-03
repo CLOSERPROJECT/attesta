@@ -17,6 +17,41 @@
   --pill-bg: #eff4e9;
   --dept-fallback: #f9faf6;
   --role-fallback: #f0f3ea;
+  --role-ink: #ffffff;
+  --role-red-bg: oklch(50.5% 0.213 27.518);
+  --role-red-border: oklch(44.4% 0.177 26.899);
+  --role-orange-bg: oklch(55.3% 0.195 38.402);
+  --role-orange-border: oklch(47% 0.157 37.304);
+  --role-amber-bg: oklch(55.5% 0.163 48.998);
+  --role-amber-border: oklch(47.3% 0.137 46.201);
+  --role-yellow-bg: oklch(55.4% 0.135 66.442);
+  --role-yellow-border: oklch(47.6% 0.114 61.907);
+  --role-lime-bg: oklch(53.2% 0.157 131.589);
+  --role-lime-border: oklch(45.3% 0.124 130.933);
+  --role-green-bg: oklch(52.7% 0.154 150.069);
+  --role-green-border: oklch(44.8% 0.119 151.328);
+  --role-emerald-bg: oklch(50.8% 0.118 165.612);
+  --role-emerald-border: oklch(43.2% 0.095 166.913);
+  --role-teal-bg: oklch(51.1% 0.096 186.391);
+  --role-teal-border: oklch(43.7% 0.078 188.216);
+  --role-cyan-bg: oklch(52% 0.105 223.128);
+  --role-cyan-border: oklch(45% 0.085 224.283);
+  --role-sky-bg: oklch(50% 0.134 242.749);
+  --role-sky-border: oklch(44.3% 0.11 240.79);
+  --role-blue-bg: oklch(48.8% 0.243 264.376);
+  --role-blue-border: oklch(42.4% 0.199 265.638);
+  --role-indigo-bg: oklch(45.7% 0.24 277.023);
+  --role-indigo-border: oklch(39.8% 0.195 277.366);
+  --role-violet-bg: oklch(49.1% 0.27 292.581);
+  --role-violet-border: oklch(43.2% 0.232 292.759);
+  --role-purple-bg: oklch(49.6% 0.265 301.924);
+  --role-purple-border: oklch(43.8% 0.218 303.724);
+  --role-fuchsia-bg: oklch(51.8% 0.253 323.949);
+  --role-fuchsia-border: oklch(45.2% 0.211 324.591);
+  --role-pink-bg: oklch(50.5% 0.213 350.534);
+  --role-pink-border: oklch(44.8% 0.183 354.08);
+  --role-rose-bg: oklch(51.4% 0.222 16.935);
+  --role-rose-border: oklch(45.5% 0.188 13.697);
   --substep-bg: #f9faf6;
   --warning-bg: #fff7da;
   --tag-bg: #eef2e6;
@@ -43,6 +78,41 @@
   --pill-bg: rgba(255, 255, 255, 0.06);
   --dept-fallback: rgba(255, 255, 255, 0.04);
   --role-fallback: rgba(255, 255, 255, 0.06);
+  --role-ink: #000000;
+  --role-red-bg: oklch(88.5% 0.062 18.334);
+  --role-red-border: oklch(80.8% 0.114 19.571);
+  --role-orange-bg: oklch(90.1% 0.076 70.697);
+  --role-orange-border: oklch(83.7% 0.128 66.29);
+  --role-amber-bg: oklch(92.4% 0.12 95.746);
+  --role-amber-border: oklch(87.9% 0.169 91.605);
+  --role-yellow-bg: oklch(94.5% 0.129 101.54);
+  --role-yellow-border: oklch(90.5% 0.182 98.111);
+  --role-lime-bg: oklch(93.8% 0.127 124.321);
+  --role-lime-border: oklch(89.7% 0.196 126.665);
+  --role-green-bg: oklch(92.5% 0.084 155.995);
+  --role-green-border: oklch(87.1% 0.15 154.449);
+  --role-emerald-bg: oklch(90.5% 0.093 164.15);
+  --role-emerald-border: oklch(84.5% 0.143 164.978);
+  --role-teal-bg: oklch(91% 0.096 180.426);
+  --role-teal-border: oklch(85.5% 0.138 181.071);
+  --role-cyan-bg: oklch(91.7% 0.08 205.041);
+  --role-cyan-border: oklch(86.5% 0.127 207.078);
+  --role-sky-bg: oklch(90.1% 0.058 230.902);
+  --role-sky-border: oklch(82.8% 0.111 230.318);
+  --role-blue-bg: oklch(88.2% 0.059 254.128);
+  --role-blue-border: oklch(80.9% 0.105 251.813);
+  --role-indigo-bg: oklch(87% 0.065 274.039);
+  --role-indigo-border: oklch(78.5% 0.115 274.713);
+  --role-violet-bg: oklch(89.4% 0.057 293.283);
+  --role-violet-border: oklch(81.1% 0.111 293.571);
+  --role-purple-bg: oklch(90.2% 0.063 306.703);
+  --role-purple-border: oklch(82.7% 0.119 306.383);
+  --role-fuchsia-bg: oklch(90.3% 0.076 319.62);
+  --role-fuchsia-border: oklch(83.3% 0.145 321.434);
+  --role-pink-bg: oklch(89.9% 0.061 343.231);
+  --role-pink-border: oklch(82.3% 0.12 346.018);
+  --role-rose-bg: oklch(89.2% 0.058 10.001);
+  --role-rose-border: oklch(81% 0.117 11.638);
   --substep-bg: rgba(255, 255, 255, 0.04);
   --warning-bg: rgba(242, 198, 79, 0.12);
   --tag-bg: rgba(255, 255, 255, 0.05);
@@ -500,6 +570,7 @@ button.secondary {
   border-radius: 999px;
   border: 1px solid var(--dept-border, var(--border));
   background: var(--dept-color, var(--role-fallback));
+  color: var(--role-ink);
 }
 
 .substep-head .status {
@@ -588,6 +659,7 @@ button.secondary {
   border-radius: 999px;
   border: 1px solid var(--role-border, var(--border));
   background: var(--role-color, var(--role-fallback));
+  color: var(--role-ink);
 }
 
 .action-form {
@@ -813,7 +885,11 @@ button.secondary {
 .dept-button {
   border: 1px solid var(--role-border, var(--accent));
   background: var(--role-color, var(--accent));
-  color: var(--button-contrast);
+  color: var(--role-ink);
+}
+
+.role-pill {
+  color: var(--role-ink);
 }
 
 .panel-block {
@@ -1028,39 +1104,172 @@ button.secondary {
   font: inherit;
 }
 
-.checkbox-group {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
-  padding: 10px;
-  margin: 0;
-}
-
-.checkbox-group legend {
-  font-size: 13px;
-  color: var(--muted);
-  padding: 0 6px;
-}
-
-.checkbox-item {
+.roles-header {
   display: flex;
   align-items: center;
-  flex-direction: row;
   gap: 10px;
-  padding: 8px 6px;
-  border-radius: 10px;
+  font-size: 13px;
+}
+
+.roles-header > button {
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 10px;
+}
+
+.roles-picker {
+  position: relative;
+}
+
+.roles-picker-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
   cursor: pointer;
-  user-select: none;
 }
 
-.checkbox-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+.roles-picker-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-.checkbox-item input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--ink);
+.roles-picker-toggle:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+.roles-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.roles-picker-menu[hidden] {
+  display: none;
+}
+
+.roles-picker-search {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+}
+
+.roles-picker-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.roles-picker-option {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.roles-picker-option:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
+.roles-picker-option.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+}
+
+.roles-picker-option-check {
+  display: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.roles-picker-option.is-selected .roles-picker-option-check {
+  display: inline;
+  color: var(--ink);
+}
+
+.roles-picker-empty {
+  margin: 0;
+  padding: 4px 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.role-palette-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-palette-picker select {
+  flex: 1 1 auto;
+}
+
+.role-palette-preview {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--swatch-bg, var(--role-fallback));
+  border: 2px solid var(--swatch-border, var(--border));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  flex: 0 0 auto;
+}
+
+.org-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.org-profile-logo {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+  padding: 4px;
+}
+
+.org-profile-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.org-profile-name,
+.org-profile-slug {
+  margin: 0;
 }
 
 .users-list {
@@ -1108,6 +1317,10 @@ button.secondary {
   padding: 0;
   width: min(560px, 92vw);
   max-width: 92vw;
+}
+
+.manage-dialog-overflow {
+  overflow: visible;
 }
 
 .manage-dialog::backdrop {

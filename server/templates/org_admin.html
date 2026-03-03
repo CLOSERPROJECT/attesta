@@ -1,120 +1,470 @@
 {{/* Used on /org-admin/users to render organization administration page */}}
 
 {{define "org_admin_body"}}
-<section class="panel landing">
-  <h1>Org Admin</h1>
-  <p class="muted">Organization: <strong>{{.Organization.Name}}</strong> (<code>{{.Organization.Slug}}</code>)</p>
-  {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
-  {{if .InviteLink}}
-    <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
-  {{end}}
-</section>
 
-<section class="panel">
-  <h2>Create Role</h2>
-  <form method="post" action="/org-admin/roles" class="input-form">
-    <label for="role-name">Role name</label>
-    <input id="role-name" name="name" type="text" required />
-    <label for="role-color">Role color</label>
-    <input id="role-color" name="color" type="color" value="#000000" />
-    <label for="role-border">Role border color</label>
-    <input id="role-border" name="border" type="color" value="#000000" />
-    <button class="primary" type="submit">Create role</button>
-  </form>
-</section>
+<div class="stack">
+  <section class="hero">
+    <button class="secondary" onclick="location.href='/'">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+      </svg>
+      Back
+    </button>
+    <div class="hero-center">
+      <h1 class="hero-title">Organization admin dashboard</h1>
+      <p class="hero-description">Create and manage roles and users</p>
+    </div>
+  </section>
 
-<section class="panel">
-  <h2>Invite User</h2>
-  <form method="post" action="/org-admin/users" class="input-form">
-    <input type="hidden" name="intent" value="invite" />
-    <label for="user-email">Email</label>
-    <input id="user-email" name="email" type="email" required />
-    <fieldset class="checkbox-group">
-      <legend>Roles</legend>
+  <section class="panel">
+    <h2>Organization profile</h2>
+    {{if .NeedsOrganizationSetup}}
+      <p class="muted">Your org admin invite is not assigned to an organization yet. Create one now to continue.</p>
+      <form method="post" action="/org-admin/users" class="input-form" enctype="multipart/form-data">
+        <input type="hidden" name="intent" value="create_org" />
+        <label for="org-name">Organization name</label>
+        <input id="org-name" name="name" type="text" required />
+        <label for="org-logo">Organization logo</label>
+        <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+        {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
+        <button class="primary" type="submit">Create organization</button>
+      </form>
+    {{else}}
+      <p class="muted">Review and update your organization details.</p>
+      <div class="org-profile-summary">
+        {{if .OrganizationLogoURL}}
+          <img src="{{.OrganizationLogoURL}}" alt="{{.Organization.Name}} logo" class="org-profile-logo" />
+        {{else}}
+          <span class="pill">No logo uploaded</span>
+        {{end}}
+        <div class="org-profile-meta">
+          <p class="org-profile-name"><strong>{{.Organization.Name}}</strong></p>
+          <p class="muted org-profile-slug">Slug: {{.Organization.Slug}}</p>
+        </div>
+      </div>
+      <form method="post" action="/org-admin/users" class="input-form" enctype="multipart/form-data">
+        <input type="hidden" name="intent" value="update_org" />
+        <label for="org-name">Organization name</label>
+        <input id="org-name" name="name" type="text" value="{{.Organization.Name}}" required />
+        <label for="org-logo">Organization logo</label>
+        <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+        <p class="muted">Leave logo empty to keep the current one.</p>
+        {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
+        <button class="primary" type="submit">Save organization</button>
+      </form>
+    {{end}}
+  </section>
 
-      {{range .Roles}}
-        <label class="checkbox-item">
-          <input type="checkbox" name="roles" value="{{.Slug}}" />
-          <span>{{.Name}} ({{.Slug}})</span>
-        </label>
-      {{end}}
-
-      <p class="muted">Select one or more roles (optional).</p>
-    </fieldset>
-    <button class="primary" type="submit">Create invite</button>
-  </form>
-</section>
-
-<section class="panel">
-  <h2>Organization users</h2>
-  {{if .Users}}
-    <ul class="users-list">
-      {{range .Users}}
-        <li class="users-item">
-          <span class="user-email">
-            {{.Email}}
-            {{if .Activated}}
-            <span class="pill" style="--pill-bg: #57c2a6;">Active</span>
-            {{else}}
-            <span class="pill" style="--pill-bg: #f2c64f;">Invited</span>
-            {{end}}
-          </span>
-          <div class="user-tags">
-            {{range .RoleOptions}}
-              {{if .Selected}}
-                <span class="pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}">
-                  {{.Name}}
-                </span>
-              {{end}}
-            {{end}}
-          </div>
-          <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
-            Manage
-          </button>
-          <dialog id="manage-user-{{.UserID}}" class="manage-dialog">
-            <div class="manage-dialog-card">
-              <header class="manage-dialog-head">
-                <div>
-                  <h3 class="manage-dialog-title">Manage User</h3>
-                  <p class="manage-dialog-subtitle">{{.Email}}</p>
-                </div>
-                <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">
-                  X
+  {{if not .NeedsOrganizationSetup}}
+  <section class="panel">
+    <h2>Invite User</h2>
+    <form method="post" action="/org-admin/users" class="input-form">
+      <input type="hidden" name="intent" value="invite" />
+      <label for="user-email">Email</label>
+      <input id="user-email" name="email" type="email" required />
+      <div class="roles-header">
+        <label>Roles</label>
+        <button type="button" class="secondary" data-open-role-modal>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 24 24">
+            <path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/>
+          </svg>
+        </button>
+      </div>
+      <div class="roles-picker" data-role-picker>
+        <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
+        <div class="roles-picker-menu" data-role-picker-menu hidden>
+          <input type="search" class="roles-picker-search" data-role-picker-search placeholder="Search roles..." />
+          <ul class="roles-picker-options">
+            {{range .Roles}}
+              <li>
+                <button type="button" class="roles-picker-option" data-role-picker-option data-value="{{.Slug}}" data-label="{{.Name}} ({{.Slug}})">
+                  <span>{{.Name}} ({{.Slug}})</span>
+                  <span class="roles-picker-option-check">Selected</span>
                 </button>
-              </header>
+              </li>
+            {{end}}
+          </ul>
+          <p class="roles-picker-empty" data-role-picker-empty hidden>No roles match your search.</p>
+        </div>
+        <div data-role-picker-hidden-inputs></div>
+      </div>
+      <p class="muted">Select one or more roles (optional).</p>
+      {{if .RoleError}}<p class="error">{{.RoleError}}</p>{{end}}
+      {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
+      <button class="primary" type="submit">Create invite</button>
+    </form>
+    <dialog id="role-modal" class="manage-dialog">
+      <div class="manage-dialog-card">
+        <header class="manage-dialog-head">
+          <div>
+            <h3 class="manage-dialog-title">Create role</h3>
+            <p class="manage-dialog-subtitle">New role for {{.Organization.Name}}</p>
+          </div>
+          <button type="button" class="secondary" onclick="document.getElementById('role-modal').close()">
+            X
+          </button>
+        </header>
 
-              <form method="post" action="/org-admin/users" class="input-form">
-                <input type="hidden" name="intent" value="set_roles" />
-                <input type="hidden" name="userId" value="{{.UserID}}" />
-                <fieldset class="checkbox-group">
-                  <legend>Roles</legend>
-                  {{range .RoleOptions}}
-                    <label class="checkbox-item">
-                      <input type="checkbox" name="roles" value="{{.Slug}}" {{if .Selected}}checked{{end}} />
-                      <span>{{.Name}} ({{.Slug}})</span>
-                    </label>
-                  {{end}}
+        <form method="post" action="/org-admin/roles" class="input-form">
+          <label for="role-name">Role name</label>
+          <input id="role-name" name="name" type="text" required />
+          <label for="role-palette">Role color palette</label>
+          <div class="role-palette-picker">
+            <select id="role-palette" name="palette" required>
+              <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" selected>Red</option>
+              <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)">Orange</option>
+              <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)">Amber</option>
+              <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)">Yellow</option>
+              <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)">Lime</option>
+              <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)">Green</option>
+              <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)">Emerald</option>
+              <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)">Teal</option>
+              <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)">Cyan</option>
+              <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)">Sky</option>
+              <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)">Blue</option>
+              <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)">Indigo</option>
+              <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)">Violet</option>
+              <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)">Purple</option>
+              <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)">Fuchsia</option>
+              <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)">Pink</option>
+              <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)">Rose</option>
+            </select>
+            <span id="role-palette-preview" class="role-palette-preview" aria-hidden="true"></span>
+          </div>
+          <div class="manage-dialog-actions">
+            <button class="primary" type="submit">Create role</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+    {{if .InviteLink}}
+      <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
+    {{end}}
+  </section>
+
+  <section class="panel">
+    {{if .UsersError}}<p class="error">{{.UsersError}}</p>{{end}}
+    <h2>Organization users</h2>
+    {{if .Users}}
+      <ul class="users-list">
+        {{range .Users}}
+          <li class="users-item">
+            <span class="user-email">
+              {{if .IsOrgAdmin}}
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="var(--{{if .Activated}}accent{{else}}accent-2{{end}})" class="icon-svg icon-svg-md" viewBox="0 0 24 24">
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>
+                </svg>
+              {{else}}
+                <svg xmlns="http://www.w3.org/2000/svg" fill="var(--{{if .Activated}}accent{{else}}accent-2{{end}})" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+                  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
+                </svg>
+              {{end}}
+              {{.Email}}
+              {{if not .Activated}}
+              <span class="pill role-pill" style="--pill-bg: var(--accent-2);">Pending invite</span>
+              {{end}}
+            </span>
+            <div class="user-tags">
+              {{range .RoleOptions}}
+                {{if and .Selected (not (or (eq .Slug "org-admin") (eq .Slug "org_admin")))}}
+                  <span class="pill role-pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}">
+                    {{.Name}}
+                  </span>
+                {{end}}
+              {{end}}
+            </div>
+            <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
+              Manage
+            </button>
+            <dialog id="manage-user-{{.UserID}}" class="manage-dialog manage-dialog-overflow">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">Manage User</h3>
+                    <p class="manage-dialog-subtitle">{{.Email}}</p>
+                  </div>
+                  <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">
+                    X
+                  </button>
+                </header>
+
+                <form method="post" action="/org-admin/users" class="input-form">
+                  <input type="hidden" name="intent" value="set_roles" />
+                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <label>Roles</label>
+                  <div class="roles-picker" data-role-picker>
+                    <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
+                    <div class="roles-picker-menu" data-role-picker-menu hidden>
+                      <input type="search" class="roles-picker-search" data-role-picker-search placeholder="Search roles..." />
+                      <ul class="roles-picker-options">
+                        {{range .RoleOptions}}
+                          <li>
+                            <button type="button" class="roles-picker-option" data-role-picker-option data-value="{{.Slug}}" data-label="{{.Name}} ({{.Slug}})" {{if .Selected}}data-selected="true"{{end}}>
+                              <span>{{.Name}} ({{.Slug}})</span>
+                              <span class="roles-picker-option-check">Selected</span>
+                            </button>
+                          </li>
+                        {{end}}
+                      </ul>
+                      <p class="roles-picker-empty" data-role-picker-empty hidden>No roles match your search.</p>
+                    </div>
+                    <div data-role-picker-hidden-inputs></div>
+                  </div>
                   <div class="manage-dialog-actions">
                     <button class="primary" type="submit">Save roles</button>
                   </div>
-                </fieldset>
-              </form>
+                </form>
 
-              <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
-                <input type="hidden" name="intent" value="delete_user" />
-                <input type="hidden" name="userId" value="{{.UserID}}" />
-                <button type="submit" class="danger">Delete account</button>
-              </form>
-            </div>
-          </dialog>
-        </li>
-      {{end}}
-    </ul>
-  {{else}}
-    <p class="muted">No organization users yet.</p>
+                <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
+                  <input type="hidden" name="intent" value="delete_user" />
+                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <button type="submit" class="danger">Delete account</button>
+                </form>
+              </div>
+            </dialog>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted">No organization users yet.</p>
+    {{end}}
+  </section>
   {{end}}
-</section>
+</div>
 
+<script>
+  (function () {
+    const paletteSelect = document.getElementById("role-palette");
+    const roleNameInput = document.getElementById("role-name");
+    const palettePreview = document.getElementById("role-palette-preview");
+    const roleModal = document.getElementById("role-modal");
+    const roleModalForm = roleModal ? roleModal.querySelector('form[action="/org-admin/roles"]') : null;
+    const roleModalOpenButtons = Array.from(document.querySelectorAll("[data-open-role-modal]"));
+    if (paletteSelect && palettePreview) {
+      const paletteKeys = Array.from(paletteSelect.options).map((option) => option.value).filter(Boolean);
+      let autoPaletteEnabled = true;
+      const normalizeRoleName = (value) => value.trim().toLowerCase().replace(/\s+/g, " ");
+      const fnv1a32 = (value) => {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < value.length; i++) {
+          hash ^= value.charCodeAt(i);
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return hash >>> 0;
+      };
+      const suggestedPalette = (value) => {
+        const normalized = normalizeRoleName(value || "");
+        if (!normalized || paletteKeys.length === 0) {
+          return "red";
+        }
+        return paletteKeys[fnv1a32(normalized) % paletteKeys.length];
+      };
+      const updatePalettePreview = () => {
+        const option = paletteSelect.options[paletteSelect.selectedIndex];
+        const color = option ? option.getAttribute("data-role-color") : "";
+        const border = option ? option.getAttribute("data-role-border") : "";
+        palettePreview.style.setProperty("--swatch-bg", color || "var(--role-fallback)");
+        palettePreview.style.setProperty("--swatch-border", border || "var(--border)");
+        palettePreview.title = option ? option.text : "";
+      };
+      const applySuggestedPalette = () => {
+        if (!autoPaletteEnabled || !roleNameInput) {
+          return;
+        }
+        const nextPalette = suggestedPalette(roleNameInput.value);
+        if (nextPalette) {
+          paletteSelect.value = nextPalette;
+        }
+        updatePalettePreview();
+      };
+      paletteSelect.addEventListener("change", () => {
+        autoPaletteEnabled = false;
+        updatePalettePreview();
+      });
+      if (roleNameInput) {
+        roleNameInput.addEventListener("input", applySuggestedPalette);
+      }
+      applySuggestedPalette();
+      updatePalettePreview();
+
+      const resetRoleModalState = () => {
+        if (roleModalForm) {
+          roleModalForm.reset();
+        }
+        autoPaletteEnabled = true;
+        applySuggestedPalette();
+        updatePalettePreview();
+      };
+
+      if (roleModal) {
+        roleModal.addEventListener("close", resetRoleModalState);
+      }
+      roleModalOpenButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          resetRoleModalState();
+          if (roleModal) {
+            roleModal.showModal();
+          }
+        });
+      });
+    }
+
+    const rolePickers = Array.from(document.querySelectorAll("[data-role-picker]"));
+    const closeAllPickers = (except) => {
+      rolePickers.forEach((picker) => {
+        if (picker === except) {
+          return;
+        }
+        const menu = picker.querySelector("[data-role-picker-menu]");
+        const toggle = picker.querySelector("[data-role-picker-toggle]");
+        if (!menu || !toggle) {
+          return;
+        }
+        menu.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+      });
+    };
+
+    rolePickers.forEach((picker) => {
+      const toggle = picker.querySelector("[data-role-picker-toggle]");
+      const menu = picker.querySelector("[data-role-picker-menu]");
+      const search = picker.querySelector("[data-role-picker-search]");
+      const empty = picker.querySelector("[data-role-picker-empty]");
+      const hiddenInputs = picker.querySelector("[data-role-picker-hidden-inputs]");
+      const optionButtons = Array.from(picker.querySelectorAll("[data-role-picker-option]"));
+      if (!toggle || !menu || !hiddenInputs) {
+        return;
+      }
+
+      const selected = new Set();
+      optionButtons.forEach((button) => {
+        if (button.getAttribute("data-selected") === "true") {
+          selected.add(button.getAttribute("data-value"));
+        }
+      });
+
+      const syncHiddenInputs = () => {
+        hiddenInputs.innerHTML = "";
+        optionButtons.forEach((button) => {
+          const value = button.getAttribute("data-value");
+          if (!value || !selected.has(value)) {
+            return;
+          }
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "roles";
+          input.value = value;
+          hiddenInputs.appendChild(input);
+        });
+      };
+
+      const updateToggleLabel = () => {
+        if (selected.size === 0) {
+          toggle.textContent = "Select roles";
+          return;
+        }
+        if (selected.size === 1) {
+          const selectedButton = optionButtons.find((button) => {
+            const value = button.getAttribute("data-value");
+            return value && selected.has(value);
+          });
+          toggle.textContent = selectedButton ? selectedButton.getAttribute("data-label") || "1 role selected" : "1 role selected";
+          return;
+        }
+        toggle.textContent = [...selected].join(", ");
+      };
+
+      const updateOptionState = () => {
+        optionButtons.forEach((button) => {
+          const value = button.getAttribute("data-value");
+          const isSelected = !!value && selected.has(value);
+          button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+          if (isSelected) {
+            button.classList.add("is-selected");
+          } else {
+            button.classList.remove("is-selected");
+          }
+        });
+      };
+
+      const applySearchFilter = () => {
+        const query = search ? search.value.trim().toLowerCase() : "";
+        let visibleCount = 0;
+        optionButtons.forEach((button) => {
+          const item = button.closest("li");
+          const label = (button.getAttribute("data-label") || "").toLowerCase();
+          const match = query === "" || label.includes(query);
+          if (item) {
+            item.hidden = !match;
+          }
+          if (match) {
+            visibleCount++;
+          }
+        });
+        if (empty) {
+          empty.hidden = visibleCount > 0;
+        }
+      };
+
+      if (optionButtons.length === 0) {
+        toggle.textContent = "No roles available";
+        toggle.disabled = true;
+        menu.hidden = true;
+        return;
+      }
+
+      toggle.addEventListener("click", () => {
+        const isOpen = !menu.hidden;
+        closeAllPickers(picker);
+        menu.hidden = isOpen;
+        toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        if (!isOpen && search) {
+          search.focus();
+        }
+      });
+
+      optionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const value = button.getAttribute("data-value");
+          if (!value) {
+            return;
+          }
+          if (selected.has(value)) {
+            selected.delete(value);
+          } else {
+            selected.add(value);
+          }
+          updateOptionState();
+          updateToggleLabel();
+          syncHiddenInputs();
+        });
+      });
+
+      if (search) {
+        search.addEventListener("input", applySearchFilter);
+      }
+
+      updateOptionState();
+      updateToggleLabel();
+      syncHiddenInputs();
+      applySearchFilter();
+    });
+
+    document.addEventListener("click", (event) => {
+      rolePickers.forEach((picker) => {
+        if (!picker.contains(event.target)) {
+          const menu = picker.querySelector("[data-role-picker-menu]");
+          const toggle = picker.querySelector("[data-role-picker-toggle]");
+          if (!menu || !toggle) {
+            return;
+          }
+          menu.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+  })();
+</script>
 {{end}}
 
 {{define "org_admin.html"}}

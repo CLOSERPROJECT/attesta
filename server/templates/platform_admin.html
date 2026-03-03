@@ -31,25 +31,22 @@
 
   <section class="panel">
     <h2>Invite organization admin</h2>
-    <p class="muted">Invite an admin to manage an organization</p>
-    {{if .Organizations}}
-      <form method="post" action="/admin/orgs" class="input-form">
-        <input type="hidden" name="intent" value="invite_org_admin" />
-        <label for="org">Organization</label>
-        <select id="org" name="org_slug" required>
-          {{range .Organizations}}
-            <option value="{{.Slug}}">{{.Name}}</option>
-          {{end}}
-        </select>
-        <label for="org-admin-email">Org admin email</label>
-        <input id="org-admin-email" name="email" type="email" required />
-        <button class="primary" type="submit">Create org admin invite</button>
-      </form>
-      {{if .InviteLink}}
-        <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
-      {{end}}
-    {{else}}
-      <p class="muted">No organizations yet.</p>
+    <p class="muted">Invite an admin with or without assigning an organization.</p>
+    <form method="post" action="/admin/orgs" class="input-form">
+      <input type="hidden" name="intent" value="invite_org_admin" />
+      <label for="org">Organization (optional)</label>
+      <select id="org" name="org_slug">
+        <option value="">Not assigned yet</option>
+        {{range .Organizations}}
+          <option value="{{.Slug}}">{{.Name}}</option>
+        {{end}}
+      </select>
+      <label for="org-admin-email">Org admin email</label>
+      <input id="org-admin-email" name="email" type="email" required />
+      <button class="primary" type="submit">Create org admin invite</button>
+    </form>
+    {{if .InviteLink}}
+      <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
     {{end}}
   </section>
 </div>

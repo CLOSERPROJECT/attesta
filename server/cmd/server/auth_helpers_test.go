@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestEnvAndCookieHelpers(t *testing.T) {
@@ -172,6 +172,18 @@ func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 	page := baseServer.pageBaseForUser(admin, "dashboard_body", "workflow", "Workflow")
 	if !page.ShowOrgsLink || !page.ShowMyOrgLink {
 		t.Fatalf("expected both nav flags true, got %+v", page)
+	}
+
+	unassigned := &AccountUser{
+		UserID:    "org-admin-unassigned",
+		RoleSlugs: []string{"org-admin"},
+	}
+	if !userIsOrgAdmin(unassigned) {
+		t.Fatal("expected unassigned org admin user")
+	}
+	pageUnassigned := baseServer.pageBaseForUser(unassigned, "dashboard_body", "", "")
+	if !pageUnassigned.ShowMyOrgLink {
+		t.Fatalf("expected my-org nav flag for unassigned org admin, got %+v", pageUnassigned)
 	}
 
 	non := &AccountUser{UserID: "non", RoleSlugs: []string{"dep1"}}
