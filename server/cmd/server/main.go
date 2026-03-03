@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"html/template"
 	"io"
 	"log"
@@ -560,12 +561,27 @@ var rolePaletteStyles = map[string]rolePaletteStyle{
 	"rose":    {Color: "var(--role-rose-bg)", Border: "var(--role-rose-border)"},
 }
 
+var rolePaletteKeys = []string{
+	"red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan",
+	"sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
+}
+
 func resolveRolePaletteStyle(palette string) rolePaletteStyle {
 	key := canonifySlug(palette)
 	if style, ok := rolePaletteStyles[key]; ok {
 		return style
 	}
 	return rolePaletteStyles["red"]
+}
+
+func defaultRolePaletteFromInput(raw string) string {
+	normalized := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(raw)), " "))
+	if normalized == "" || len(rolePaletteKeys) == 0 {
+		return "red"
+	}
+	hasher := fnv.New32a()
+	_, _ = hasher.Write([]byte(normalized))
+	return rolePaletteKeys[int(hasher.Sum32()%uint32(len(rolePaletteKeys)))]
 }
 
 func resolveRoleBadgeStyle(color, border string) rolePaletteStyle {
@@ -2206,11 +2222,14 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		}
 		name := strings.TrimSpace(r.FormValue("name"))
 		palette := strings.TrimSpace(r.FormValue("palette"))
-		paletteStyle := resolveRolePaletteStyle(palette)
 		if name == "" {
 			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role name is required"})
 			return
 		}
+		if palette == "" {
+			palette = defaultRolePaletteFromInput(name)
+		}
+		paletteStyle := resolveRolePaletteStyle(palette)
 		if existing, err := s.store.GetRoleBySlug(r.Context(), user.OrgSlug, canonifySlug(name)); err == nil && existing != nil {
 			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
 			return

@@ -98,6 +98,7 @@
         <header class="manage-dialog-head">
           <div>
             <h3 class="manage-dialog-title">Create role</h3>
+            <p class="manage-dialog-subtitle">New role for {{.Organization.Name}}</p>
           </div>
           <button type="button" class="secondary" onclick="document.getElementById('role-modal').close()">
             X
@@ -234,8 +235,27 @@
 <script>
   (function () {
     const paletteSelect = document.getElementById("role-palette");
+    const roleNameInput = document.getElementById("role-name");
     const palettePreview = document.getElementById("role-palette-preview");
     if (paletteSelect && palettePreview) {
+      const paletteKeys = Array.from(paletteSelect.options).map((option) => option.value).filter(Boolean);
+      let autoPaletteEnabled = true;
+      const normalizeRoleName = (value) => value.trim().toLowerCase().replace(/\s+/g, " ");
+      const fnv1a32 = (value) => {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < value.length; i++) {
+          hash ^= value.charCodeAt(i);
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return hash >>> 0;
+      };
+      const suggestedPalette = (value) => {
+        const normalized = normalizeRoleName(value || "");
+        if (!normalized || paletteKeys.length === 0) {
+          return "red";
+        }
+        return paletteKeys[fnv1a32(normalized) % paletteKeys.length];
+      };
       const updatePalettePreview = () => {
         const option = paletteSelect.options[paletteSelect.selectedIndex];
         const color = option ? option.getAttribute("data-role-color") : "";
@@ -244,7 +264,24 @@
         palettePreview.style.setProperty("--swatch-border", border || "var(--border)");
         palettePreview.title = option ? option.text : "";
       };
-      paletteSelect.addEventListener("change", updatePalettePreview);
+      const applySuggestedPalette = () => {
+        if (!autoPaletteEnabled || !roleNameInput) {
+          return;
+        }
+        const nextPalette = suggestedPalette(roleNameInput.value);
+        if (nextPalette) {
+          paletteSelect.value = nextPalette;
+        }
+        updatePalettePreview();
+      };
+      paletteSelect.addEventListener("change", () => {
+        autoPaletteEnabled = false;
+        updatePalettePreview();
+      });
+      if (roleNameInput) {
+        roleNameInput.addEventListener("input", applySuggestedPalette);
+      }
+      applySuggestedPalette();
       updatePalettePreview();
     }
 

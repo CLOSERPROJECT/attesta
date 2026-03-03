@@ -634,6 +634,51 @@ func TestHandleOrgAdminRolesStoresPaletteStyle(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminRolesDerivesPaletteFromRoleNameWhenMissing(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		UserID:    "org-admin-role-derived",
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-role-derived@acme.org",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Line+Leader"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminRoles(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	role, err := store.GetRoleBySlug(t.Context(), org.Slug, "line-leader")
+	if err != nil {
+		t.Fatalf("GetRoleBySlug error: %v", err)
+	}
+	expectedStyle := resolveRolePaletteStyle(defaultRolePaletteFromInput("Line Leader"))
+	if role.Color != expectedStyle.Color {
+		t.Fatalf("role color = %q, want %q", role.Color, expectedStyle.Color)
+	}
+	if role.Border != expectedStyle.Border {
+		t.Fatalf("role border = %q, want %q", role.Border, expectedStyle.Border)
+	}
+}
+
 func TestHandleOrgAdminRolesDefaultsToRedPaletteForUnknownValue(t *testing.T) {
 	store := NewMemoryStore()
 	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
