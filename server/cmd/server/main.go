@@ -432,6 +432,7 @@ type OrgAdminView struct {
 	InviteError            string
 	UsersError             string
 	Roles                  []Role
+	RolePills              []OrgAdminRoleOption
 	Users                  []OrgAdminUserRow
 	Invites                []OrgAdminInviteRow
 	InviteLink             string
@@ -2082,19 +2083,29 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		invites, _ = s.store.ListInvitesByCreator(context.Background(), user.UserID, org.ID)
 	}
 
+	rolePills := make([]OrgAdminRoleOption, 0, len(roles))
+	for _, role := range roles {
+		roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
+		rolePills = append(rolePills, OrgAdminRoleOption{
+			Slug:       role.Slug,
+			Name:       role.Name,
+			RoleColor:  cssValue(roleStyle.Color, "var(--role-fallback)"),
+			RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
+		})
+	}
+
 	orgUsers := make([]OrgAdminUserRow, 0, len(users))
 	for _, orgUser := range users {
 		if strings.EqualFold(strings.TrimSpace(orgUser.Status), "deleted") {
 			continue
 		}
-		roleOptions := make([]OrgAdminRoleOption, 0, len(roles))
-		for _, role := range roles {
-			roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
+		roleOptions := make([]OrgAdminRoleOption, 0, len(rolePills))
+		for _, role := range rolePills {
 			roleOptions = append(roleOptions, OrgAdminRoleOption{
 				Slug:       role.Slug,
 				Name:       role.Name,
-				RoleColor:  cssValue(roleStyle.Color, "var(--role-fallback)"),
-				RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
+				RoleColor:  role.RoleColor,
+				RoleBorder: role.RoleBorder,
 				Selected:   containsRole(orgUser.RoleSlugs, role.Slug),
 			})
 		}
@@ -2137,6 +2148,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		InviteError:            errs.Invite,
 		UsersError:             errs.Users,
 		Roles:                  roles,
+		RolePills:              rolePills,
 		Users:                  orgUsers,
 		Invites:                orgInvites,
 		InviteLink:             strings.TrimSpace(inviteLink),
