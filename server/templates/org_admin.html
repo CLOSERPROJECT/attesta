@@ -64,7 +64,7 @@
       <input id="user-email" name="email" type="email" required />
       <div class="roles-header">
         <label>Roles</label>
-        <button type="button" class="secondary" onclick="document.getElementById('role-modal').showModal()">
+        <button type="button" class="secondary" data-open-role-modal>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 24 24">
             <path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/>
           </svg>
@@ -237,6 +237,9 @@
     const paletteSelect = document.getElementById("role-palette");
     const roleNameInput = document.getElementById("role-name");
     const palettePreview = document.getElementById("role-palette-preview");
+    const roleModal = document.getElementById("role-modal");
+    const roleModalForm = roleModal ? roleModal.querySelector('form[action="/org-admin/roles"]') : null;
+    const roleModalOpenButtons = Array.from(document.querySelectorAll("[data-open-role-modal]"));
     if (paletteSelect && palettePreview) {
       const paletteKeys = Array.from(paletteSelect.options).map((option) => option.value).filter(Boolean);
       let autoPaletteEnabled = true;
@@ -283,6 +286,27 @@
       }
       applySuggestedPalette();
       updatePalettePreview();
+
+      const resetRoleModalState = () => {
+        if (roleModalForm) {
+          roleModalForm.reset();
+        }
+        autoPaletteEnabled = true;
+        applySuggestedPalette();
+        updatePalettePreview();
+      };
+
+      if (roleModal) {
+        roleModal.addEventListener("close", resetRoleModalState);
+      }
+      roleModalOpenButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          resetRoleModalState();
+          if (roleModal) {
+            roleModal.showModal();
+          }
+        });
+      });
     }
 
     const rolePickers = Array.from(document.querySelectorAll("[data-role-picker]"));
