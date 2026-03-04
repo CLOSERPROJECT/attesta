@@ -70,7 +70,7 @@ workflow:
             nonhazardous)
           roles:
             - operator
-          inputType: string
+          inputType: formata
           schema:
             type: object
             properties:
@@ -189,7 +189,7 @@ workflow:
             presence of other valuable chemical elements
           roles:
             - analyst
-          inputType: file
+          inputType: formata
           schema:
             type: object
             required:
@@ -217,7 +217,7 @@ workflow:
           inputKey: Consolidated analysis report on indium recovery outcomes.
           roles:
             - project-manager
-          inputType: string
+          inputType: formata
           schema:
             type: object
             required:
