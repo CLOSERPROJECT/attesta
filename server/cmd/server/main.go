@@ -1029,17 +1029,29 @@ func (s *Server) validateWorkflowRefs(ctx context.Context, cfg RuntimeConfig) er
 		}
 	}
 
-	type roleRef struct {
-		orgSlug string
-	}
-	yamlRoles := map[string]roleRef{}
+	yamlRolesByOrg := map[string]map[string]struct{}{}
+	yamlRoleOrgs := map[string][]string{}
 	for _, role := range cfg.Roles {
 		orgSlug := strings.TrimSpace(role.OrgSlug)
 		roleSlug := strings.TrimSpace(role.Slug)
 		if orgSlug == "" || roleSlug == "" {
 			continue
 		}
-		yamlRoles[roleSlug] = roleRef{orgSlug: orgSlug}
+		if _, ok := yamlRolesByOrg[orgSlug]; !ok {
+			yamlRolesByOrg[orgSlug] = map[string]struct{}{}
+		}
+		yamlRolesByOrg[orgSlug][roleSlug] = struct{}{}
+		orgs := yamlRoleOrgs[roleSlug]
+		foundOrg := false
+		for _, existingOrg := range orgs {
+			if existingOrg == orgSlug {
+				foundOrg = true
+				break
+			}
+		}
+		if !foundOrg {
+			yamlRoleOrgs[roleSlug] = append(orgs, orgSlug)
+		}
 		if _, err := s.store.GetRoleBySlug(ctx, orgSlug, roleSlug); err != nil {
 			messages = append(messages, "missing role slug "+orgSlug+"/"+roleSlug)
 		}
@@ -1063,17 +1075,35 @@ func (s *Server) validateWorkflowRefs(ctx context.Context, cfg RuntimeConfig) er
 			}
 			for _, roleSlug := range roles {
 				trimmedRole := strings.TrimSpace(roleSlug)
-				roleMeta, ok := yamlRoles[trimmedRole]
-				if !ok {
+				if stepOrg != "" {
+					if _, ok := yamlRolesByOrg[stepOrg][trimmedRole]; !ok {
+						if len(yamlRoleOrgs[trimmedRole]) == 0 {
+							messages = append(messages, "substep "+sub.SubstepID+" references role not in yaml: "+trimmedRole)
+						} else {
+							messages = append(messages, "substep "+sub.SubstepID+" role "+trimmedRole+" not in step organization "+stepOrg)
+						}
+						continue
+					}
+					if _, err := s.store.GetRoleBySlug(ctx, stepOrg, trimmedRole); err != nil {
+						messages = append(messages, "missing role slug "+stepOrg+"/"+trimmedRole)
+					}
+					continue
+				}
+
+				roleOrgs := yamlRoleOrgs[trimmedRole]
+				if len(roleOrgs) == 0 {
 					messages = append(messages, "substep "+sub.SubstepID+" references role not in yaml: "+trimmedRole)
 					continue
 				}
-				if stepOrg != "" && roleMeta.orgSlug != stepOrg {
-					messages = append(messages, "substep "+sub.SubstepID+" role "+trimmedRole+" not in step organization "+stepOrg)
-					continue
+				foundRole := false
+				for _, orgSlug := range roleOrgs {
+					if _, err := s.store.GetRoleBySlug(ctx, orgSlug, trimmedRole); err == nil {
+						foundRole = true
+						break
+					}
 				}
-				if _, err := s.store.GetRoleBySlug(ctx, roleMeta.orgSlug, trimmedRole); err != nil {
-					messages = append(messages, "missing role slug "+roleMeta.orgSlug+"/"+trimmedRole)
+				if !foundRole {
+					messages = append(messages, "missing role slug "+roleOrgs[0]+"/"+trimmedRole)
 				}
 			}
 		}

@@ -323,6 +323,69 @@ func TestValidateWorkflowRefsMissingRole(t *testing.T) {
 	}
 }
 
+func TestValidateWorkflowRefsAllowsDuplicateRoleSlugAcrossOrganizations(t *testing.T) {
+	store := NewMemoryStore()
+	closingOrg, err := store.CreateOrganization(t.Context(), Organization{Name: "Closing the loop"})
+	if err != nil {
+		t.Fatalf("CreateOrganization(closing): %v", err)
+	}
+	fivrecOrg, err := store.CreateOrganization(t.Context(), Organization{Name: "Fivrec"})
+	if err != nil {
+		t.Fatalf("CreateOrganization(fivrec): %v", err)
+	}
+	if _, err := store.CreateRole(t.Context(), Role{
+		OrgID:   closingOrg.ID,
+		OrgSlug: closingOrg.Slug,
+		Name:    "Operator",
+	}); err != nil {
+		t.Fatalf("CreateRole(closing/operator): %v", err)
+	}
+	if _, err := store.CreateRole(t.Context(), Role{
+		OrgID:   fivrecOrg.ID,
+		OrgSlug: fivrecOrg.Slug,
+		Name:    "Operator",
+	}); err != nil {
+		t.Fatalf("CreateRole(fivrec/operator): %v", err)
+	}
+
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{
+			{Slug: "closing-the-loop", Name: "Closing the loop"},
+			{Slug: "fivrec", Name: "Fivrec"},
+		},
+		Roles: []WorkflowRole{
+			{OrgSlug: "closing-the-loop", Slug: "operator", Name: "Operator"},
+			{OrgSlug: "fivrec", Slug: "operator", Name: "Operator"},
+		},
+		Workflow: WorkflowDef{
+			Name: "Workflow",
+			Steps: []WorkflowStep{
+				{
+					StepID:           "1",
+					Title:            "Step 1",
+					Order:            1,
+					OrganizationSlug: "closing-the-loop",
+					Substep: []WorkflowSub{
+						{
+							SubstepID: "1.1",
+							Title:     "Sub 1",
+							Order:     1,
+							Roles:     []string{"operator"},
+							InputKey:  "value",
+							InputType: "string",
+						},
+					},
+				},
+			},
+		},
+	}
+	server := &Server{store: store, enforceAuth: true}
+
+	if err := server.validateWorkflowRefs(t.Context(), cfg); err != nil {
+		t.Fatalf("validateWorkflowRefs returned error: %v", err)
+	}
+}
+
 func TestWorkflowCatalogRejectsEnabledDPPWithInvalidGTIN(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"abc123\"\n")

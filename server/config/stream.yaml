@@ -1,0 +1,636 @@
+workflow:
+  name: Indium shipment audit
+  description: Shipment intake, inspection, and approval with traceable checkpoints.
+  steps:
+    - id: "1"
+      title: Collection and dismantling of indium waste
+      order: 1
+      organization: closing-the-loop
+      substeps:
+        - id: "1.1"
+          order: 1
+          roles:
+            - operator
+          title: Waste information record
+          inputKey: Waste document that provides information on the waste (e.g. batch IDs,
+            device type/model, quantities, weight, time of collection, waste
+            code).
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              "Waste information record ":
+                type: string
+                title: "Waste information record "
+              Waste information record:
+                title: Waste information record
+              Group title:
+                type: object
+                properties:
+                  Batch IDs:
+                    type: string
+                    title: Batch IDs
+                  Device model/type:
+                    type: string
+                    title: Device model/type
+                  Quantities:
+                    type: string
+                    title: Quantities
+                  Weight:
+                    type: string
+                    title: Weight
+                  Time of collection:
+                    type: string
+                    title: Time of collection
+                  Waste code:
+                    type: string
+                    title: Waste code
+                required:
+                  - Batch IDs
+                  - Device model/type
+                  - Quantities
+                  - Weight
+                  - Time of collection
+                  - Waste code
+                title: Group title
+            required:
+              - "Waste information record "
+              - Waste information record
+              - Group title
+            title: Waste information
+          uiSchema:
+            Waste information record:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "1.2"
+          order: 2
+          title: Waste shipment documents (for received waste
+          inputKey: Legally required waste transport documents for receiving the
+            indiumcontaining waste. (Basel - hazardous or Annex VII -
+            nonhazardous)
+          roles:
+            - operator
+          inputType: string
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+              Multi choice field:
+                type: array
+                uniqueItems: true
+                items:
+                  enum:
+                    - L1
+                    - L2
+                title: Multi choice field
+            required:
+              - String field
+              - File field
+              - Multi choice field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+            Multi choice field:
+              ui:components:
+                arrayField: multiEnumField
+        - id: "1.3"
+          order: 3
+          title: Dismantling log
+          inputKey: Record of dismantling steps and material categorization
+          roles:
+            - operator
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              Choice field:
+                enum:
+                  - L1
+                  - L2
+                  - L3
+                  - L4
+                title: Choice field
+            required:
+              - String field
+              - Choice field
+            title: Form title
+          uiSchema:
+            Choice field:
+              ui:components:
+                stringField: enumField
+                selectWidget: radioWidget
+              ui:options:
+                useLabel: false
+        - id: "1.4"
+          order: 4
+          title: Indium-containing fraction weights
+          inputKey: Measured weight of LCD glass from dismantled waste.
+          roles:
+            - operator
+          inputType: formata
+          schema:
+            type: object
+            required:
+              - File field
+              - String field
+            title: Form title
+            properties:
+              File field:
+                title: File field
+              String field:
+                type: string
+                title: String field
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "1.5"
+          order: 5
+          title: Waste shipment documentation
+          inputKey: Consolidated batch-level details of waste sent downstream, along with
+            all legally required waste transport documents.
+          roles:
+            - operator
+          inputType: formata
+          schema:
+            type: object
+            required:
+              - String field
+              - File field
+            title: Form title
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+    - id: "2"
+      title: Quantification of indium content in waste sample
+      order: 2
+      organization: due2lab
+      substeps:
+        - id: "2.1"
+          order: 1
+          title: Indium waste analysis results
+          inputKey: Report containing all test results in terms of Indium content and
+            presence of other valuable chemical elements
+          roles:
+            - analyst
+          inputType: file
+          schema:
+            type: object
+            required:
+              - File field
+              - String field
+            title: Form title
+            properties:
+              File field:
+                title: File field
+              String field:
+                type: string
+                title: String field
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+    - id: "3"
+      title: Indium recovery and refinement
+      order: 3
+      organization: critical
+      substeps:
+        - id: "3.1"
+          order: 1
+          title: Indium recovery results report
+          inputKey: Consolidated analysis report on indium recovery outcomes.
+          roles:
+            - project-manager
+          inputType: string
+          schema:
+            type: object
+            required:
+              - File field
+              - String field
+            title: Form title
+            properties:
+              File field:
+                title: File field
+              String field:
+                type: string
+                title: String field
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+            String field:
+              ui:components:
+                textWidget: textareaWidget
+        - id: "3.2"
+          order: 2
+          title: Process information and images
+          inputKey: A report that provides basic information, e.g., steps followed,
+            success or failure of each step, potential advantages and
+            disadvantages, images, etc.
+          roles:
+            - project-manager
+          inputType: formata
+          schema:
+            type: object
+            required:
+              - String field
+              - List title
+            title: Form title
+            properties:
+              String field:
+                type: string
+                title: String field
+              List title:
+                type: array
+                items:
+                  title: File field
+                title: List title
+          uiSchema:
+            List title:
+              items:
+                ui:components:
+                  unknownField: unknownNativeFileField
+    - id: "4"
+      title: TMIn production
+      order: 4
+      organization: dockweiler
+      substeps:
+        - id: "4.1"
+          order: 1
+          title: Transfilling document
+          inputKey: Document outlining canister preparation and usage
+          roles:
+            - head-of-rd
+            - tbs-operator
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field 1:
+                type: string
+                title: String field 1
+              File field:
+                title: File field
+            required:
+              - String field 1
+              - File field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "4.2"
+          order: 2
+          title: Safety Data Sheet
+          inputKey: Information on safe handling, hazards, and regulatory compliance of
+            TMIn
+          roles:
+            - head-of-shipping
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+            required:
+              - String field
+              - File field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "4.3"
+          order: 3
+          title: Certificate of Analysis
+          inputKey: Document that verifies TMIn quality/purity, composition, and
+            compliance. It may also contain other relevant info such as batch
+            ID, safety info, etc
+          roles:
+            - head-of-quality
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+            required:
+              - String field
+              - File field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+    - id: "5"
+      title: Advanced In precursor production
+      order: 5
+      organization: ifw
+      substeps:
+        - id: "5.1"
+          order: 1
+          title: Precursor synthesis conditions report
+          inputKey: Detailed record of synthesis conditions, including solvents,
+            temperatures, parameters and ligand information
+          roles:
+            - analytical-chemist
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+            required:
+              - String field
+              - File field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "5.2"
+          order: 2
+          title: Precursor testing report
+          inputKey: Results of precursor initial screening and testing (e.g. thin-film
+            processing and characterization)
+          roles:
+            - chemical-process-technologist
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+            required:
+              - String field
+              - File field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+        - id: "5.3"
+          order: 3
+          title: Advanced indium precursor data sheet
+          inputKey: Document that summarizes the properties and specifications of the
+            synthesized compound
+          roles:
+            - project-manager
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              String field:
+                type: string
+                title: String field
+              File field:
+                title: File field
+            required:
+              - String field
+              - File field
+            title: Form title
+          uiSchema:
+            File field:
+              ui:components:
+                unknownField: unknownNativeFileField
+    - id: "6"
+      title: Secondary indium deposition for wafer and electronic device fabrication
+      order: 6
+      organization: atlant-3d
+      substeps: []
+
+organizations:
+  - slug: critical
+    name: CRITICAL
+  - slug: leonardo
+    name: Leonardo
+  - slug: dockweiler
+    name: Dockweiler
+  - slug: ifw
+    name: IFW
+  - slug: atlant-3d
+    name: Atlant-3D
+  - slug: due2lab
+    name: Due2Lab
+  - slug: fraunhofer
+    name: Fraunhofer
+  - slug: swegan
+    name: Swegan
+  - slug: closing-the-loop
+    name: Closing the loop
+  - slug: fivrec
+    name: Fivrec
+roles:
+  - name: chemist
+    slug: chemist
+    orgSlug: critical
+    color: "#7da36c"
+    border: "#7da36c"
+  - name: manager
+    slug: manager
+    orgSlug: leonardo
+    color: "#c2945a"
+    border: "#c2945a"
+  - name: Chemist
+    slug: chemist
+    orgSlug: leonardo
+    color: "#c2945a"
+    border: "#c2945a"
+  - name: Mechanic
+    slug: mechanic
+    orgSlug: critical
+    color: "#d7e9f2"
+    border: "#d7e9f2"
+  - name: Inspector
+    slug: inspector
+    orgSlug: leonardo
+    color: "#d7e9f2"
+    border: "#d7e9f2"
+  - name: Project manager
+    slug: project-manager
+    orgSlug: critical
+    color: "#d7e9f2"
+    border: "#d7e9f2"
+  - name: Chemical process technologist
+    slug: chemical-process-technologist
+    orgSlug: critical
+    color: "#d7e9f2"
+    border: "#d7e9f2"
+  - name: Chemist (testing)
+    slug: chemist-testing
+    orgSlug: critical
+    color: "#d7e9f2"
+    border: "#d7e9f2"
+  - name: Metallurgist
+    slug: metallurgist
+    orgSlug: critical
+    color: "#d7e9f2"
+    border: "#d7e9f2"
+  - name: Shipping operator
+    slug: shipping-operator
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Head of shipping
+    slug: head-of-shipping
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Head of R&D
+    slug: head-of-rd
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Chemist
+    slug: chemist
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Manager of T&BS
+    slug: manager-of-tbs
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: T&BS operator
+    slug: tbs-operator
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Analytical chemist
+    slug: analytical-chemist
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Head of Quality
+    slug: head-of-quality
+    orgSlug: dockweiler
+    color: "#5a8cc2"
+    border: "#5a8cc2"
+  - name: Chemist
+    slug: chemist
+    orgSlug: ifw
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Analytical chemist
+    slug: analytical-chemist
+    orgSlug: ifw
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Chemical process technologist
+    slug: chemical-process-technologist
+    orgSlug: ifw
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Project manager
+    slug: project-manager
+    orgSlug: ifw
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Material scientist
+    slug: material-scientist
+    orgSlug: ifw
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Team member
+    slug: team-member
+    orgSlug: atlant-3d
+    color: "#6cc28e"
+    border: "#6cc28e"
+  - name: Risk assessment manager
+    slug: risk-assessment-manager
+    orgSlug: atlant-3d
+    color: "#6cc28e"
+    border: "#6cc28e"
+  - name: Application engineer
+    slug: application-engineer
+    orgSlug: atlant-3d
+    color: "#6cc28e"
+    border: "#6cc28e"
+  - name: Machine operator
+    slug: machine-operator
+    orgSlug: atlant-3d
+    color: "#6cc28e"
+    border: "#6cc28e"
+  - name: Quality manager
+    slug: quality-manager
+    orgSlug: atlant-3d
+    color: "#6cc28e"
+    border: "#6cc28e"
+  - name: analyst
+    slug: analyst
+    orgSlug: due2lab
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Engineer
+    slug: engineer
+    orgSlug: leonardo
+    color: "#6cc28e"
+    border: "#6cc28e"
+  - name: Shipping operator
+    slug: shipping-operator
+    orgSlug: leonardo
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Fraunhofer
+    slug: operator
+    orgSlug: fraunhofer
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Analyst
+    slug: analyst
+    orgSlug: fraunhofer
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Operator
+    slug: operator
+    orgSlug: swegan
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Operator
+    slug: operator
+    orgSlug: closing-the-loop
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+  - name: Operator
+    slug: operator
+    orgSlug: fivrec
+    color: "#8e6cc2"
+    border: "#8e6cc2"
+dpp:
+  enabled: true
+  gtin: "09506000134352"
+  lotInputKey: shipmentRef
+  lotDefault: ""
+  serialInputKey: ""
+  serialStrategy: process_id_hex
+  productName: Gallium shipment audit
+  productDescription: Shipment intake, inspection, and approval with traceable checkpoints.
+  ownerName: Attesta Demo Operator
