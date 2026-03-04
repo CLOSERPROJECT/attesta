@@ -662,6 +662,10 @@ button.secondary {
   color: var(--role-ink);
 }
 
+.sid-pill {
+  margin-right: 50px;
+}
+
 .actions {
   display: grid;
   gap: 14px;
