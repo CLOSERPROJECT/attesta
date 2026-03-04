@@ -108,6 +108,30 @@ const loadProcessActionArea = async (substepId = "") => {
   }
 };
 
+const loadProcessTimeline = async (substepId = "") => {
+  if (!processId || !workflowKey || !timeline) {
+    return;
+  }
+  const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
+  const url = `/w/${workflowKey}/process/${processId}/timeline${query}`;
+  if (window.htmx?.ajax) {
+    window.htmx.ajax("GET", url, {
+      target: "#timeline",
+      swap: "innerHTML",
+    });
+    return;
+  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return;
+    }
+    const html = await response.text();
+    timeline.innerHTML = html;
+  } catch (_err) {
+  }
+};
+
 const shareLink = async (button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -535,9 +559,8 @@ if (processId && workflowKey && timeline) {
     `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`
   );
   source.addEventListener("process-updated", () => {
-    const selected = document.querySelector(".substep-selected.js-substep-nav");
-    const selectedSubstepId = selected instanceof HTMLElement ? selected.dataset.substepId || "" : "";
-    void loadProcessActionArea(selectedSubstepId);
+    void loadProcessTimeline();
+    void loadProcessActionArea();
   });
 }
 
