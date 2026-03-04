@@ -187,3 +187,67 @@ func TestHandleEventsReturns400OnWorkflowQueryMismatch(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
+
+func TestSelectedWorkflowUsesContextValueWhenPresent(t *testing.T) {
+	server := &Server{
+		store:       NewMemoryStore(),
+		enforceAuth: false,
+	}
+	cfg := testRuntimeConfig()
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "from-context",
+		Cfg: cfg,
+	}))
+
+	key, selectedCfg, err := server.selectedWorkflow(req)
+	if err != nil {
+		t.Fatalf("selectedWorkflow(context): %v", err)
+	}
+	if key != "from-context" {
+		t.Fatalf("selectedWorkflow key = %q, want %q", key, "from-context")
+	}
+	if selectedCfg.Workflow.Name != cfg.Workflow.Name {
+		t.Fatalf("selectedWorkflow cfg name = %q, want %q", selectedCfg.Workflow.Name, cfg.Workflow.Name)
+	}
+}
+
+func TestSelectedWorkflowFallsBackToRuntimeConfigAndDefaultKey(t *testing.T) {
+	server := &Server{
+		store:       NewMemoryStore(),
+		enforceAuth: false,
+		configDir:   "/tmp/custom-workflows",
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+
+	key, cfg, err := server.selectedWorkflow(req)
+	if err != nil {
+		t.Fatalf("selectedWorkflow(fallback): %v", err)
+	}
+	if key != "custom-workflows" {
+		t.Fatalf("selectedWorkflow key = %q, want %q", key, "custom-workflows")
+	}
+	if cfg.Workflow.Name == "" {
+		t.Fatal("selectedWorkflow returned empty workflow config")
+	}
+}
+
+func TestProcessBelongsToWorkflow(t *testing.T) {
+	server := &Server{configDir: "/tmp/custom-workflows"}
+
+	if server.processBelongsToWorkflow(nil, "workflow") {
+		t.Fatal("processBelongsToWorkflow(nil) = true, want false")
+	}
+	if !server.processBelongsToWorkflow(&Process{WorkflowKey: "alpha"}, "alpha") {
+		t.Fatal("processBelongsToWorkflow(exact) = false, want true")
+	}
+	if !server.processBelongsToWorkflow(&Process{WorkflowKey: ""}, "custom-workflows") {
+		t.Fatal("processBelongsToWorkflow(default fallback) = false, want true")
+	}
+	if server.processBelongsToWorkflow(&Process{WorkflowKey: ""}, "other-workflow") {
+		t.Fatal("processBelongsToWorkflow(non-default) = true, want false")
+	}
+}
