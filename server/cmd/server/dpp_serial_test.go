@@ -30,3 +30,22 @@ func TestNormalizeDPPSerialStrategyRejectsUnsupportedValue(t *testing.T) {
 		t.Fatal("expected unsupported strategy error")
 	}
 }
+
+func TestNormalizeDPPSerialStrategyDefaultsBlankInput(t *testing.T) {
+	strategy, err := normalizeDPPSerialStrategy("   ")
+	if err != nil {
+		t.Fatalf("normalizeDPPSerialStrategy(blank): %v", err)
+	}
+	if strategy != "process_id_hex" {
+		t.Fatalf("normalizeDPPSerialStrategy(blank) = %q, want %q", strategy, "process_id_hex")
+	}
+}
+
+func TestGS1ElementStringFormatting(t *testing.T) {
+	if got := gs1ElementString(" 09506000134352 ", " LOT-42 ", " SERIAL-9 "); got != "(01)09506000134352(10)LOT-42(21)SERIAL-9" {
+		t.Fatalf("gs1ElementString() = %q", got)
+	}
+	if got := gs1ElementString("09506000134352", "", "SERIAL-9"); got != "" {
+		t.Fatalf("gs1ElementString(missing lot) = %q, want empty", got)
+	}
+}

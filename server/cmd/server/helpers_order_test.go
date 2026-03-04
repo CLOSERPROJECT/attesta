@@ -81,3 +81,56 @@ func TestProgressKeyEncodingAndNormalization(t *testing.T) {
 		t.Fatalf("expected empty map for nil progress, got %#v", nilNormalized)
 	}
 }
+
+func TestSubstepRolesFallbackAndTrimming(t *testing.T) {
+	withRoles := substepRoles(WorkflowSub{
+		Roles: []string{" qa ", "", "ops"},
+		Role:  "legacy",
+	})
+	if got, want := withRoles, []string{"qa", "ops"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("substepRoles(with roles) = %v, want %v", got, want)
+	}
+
+	withLegacyRole := substepRoles(WorkflowSub{
+		Roles: []string{" ", ""},
+		Role:  "  reviewer  ",
+	})
+	if got, want := withLegacyRole, []string{"reviewer"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("substepRoles(legacy role) = %v, want %v", got, want)
+	}
+
+	if got := substepRoles(WorkflowSub{}); got != nil {
+		t.Fatalf("substepRoles(empty) = %v, want nil", got)
+	}
+}
+
+func TestOrganizationNameHelpers(t *testing.T) {
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{
+			{Slug: " org-a ", Name: " Organization A "},
+			{Slug: "org-b", Name: " "},
+			{Slug: " ", Name: "skip"},
+		},
+	}
+
+	orgNames := organizationNameMap(cfg)
+	if len(orgNames) != 2 {
+		t.Fatalf("organizationNameMap length = %d, want 2", len(orgNames))
+	}
+	if got := orgNames["org-a"]; got != "Organization A" {
+		t.Fatalf("organizationNameMap org-a = %q, want %q", got, "Organization A")
+	}
+	if got := orgNames["org-b"]; got != "org-b" {
+		t.Fatalf("organizationNameMap org-b = %q, want %q", got, "org-b")
+	}
+
+	if got := organizationDisplayName("", orgNames); got != "" {
+		t.Fatalf("organizationDisplayName(empty) = %q, want empty", got)
+	}
+	if got := organizationDisplayName("org-a", orgNames); got != "Organization A" {
+		t.Fatalf("organizationDisplayName(org-a) = %q, want %q", got, "Organization A")
+	}
+	if got := organizationDisplayName(" missing-org ", orgNames); got != "missing-org" {
+		t.Fatalf("organizationDisplayName(fallback) = %q, want %q", got, "missing-org")
+	}
+}
