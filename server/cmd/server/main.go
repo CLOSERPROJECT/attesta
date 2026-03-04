@@ -342,6 +342,24 @@ type WorkflowProcessCounts struct {
 	Terminated int
 }
 
+type PublicCatalogResponse struct {
+	Organizations []PublicCatalogOrganization `json:"organizations"`
+	Roles         []PublicCatalogRole         `json:"roles"`
+}
+
+type PublicCatalogOrganization struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type PublicCatalogRole struct {
+	OrgSlug string `json:"orgSlug"`
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	Color   string `json:"color"`
+	Border  string `json:"border"`
+}
+
 type WorkflowPickerView struct {
 	PageBase
 	Workflows []WorkflowOption
@@ -653,6 +671,7 @@ func main() {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
 	mux.HandleFunc("/docs", server.handleDocs)
 	mux.HandleFunc("/docs/", server.handleDocs)
+	mux.HandleFunc("/api/catalog", server.handlePublicCatalog)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", server.handleLogin)
 	mux.HandleFunc("/logout", server.handleLogout)
@@ -1286,6 +1305,74 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s == nil || s.store == nil {
+		http.Error(w, "store not configured", http.StatusInternalServerError)
+		return
+	}
+
+	organizations, err := s.store.ListOrganizations(r.Context())
+	if err != nil {
+		http.Error(w, "failed to list organizations", http.StatusInternalServerError)
+		return
+	}
+
+	response := PublicCatalogResponse{
+		Organizations: make([]PublicCatalogOrganization, 0, len(organizations)),
+		Roles:         []PublicCatalogRole{},
+	}
+	for _, org := range organizations {
+		orgSlug := strings.TrimSpace(org.Slug)
+		if orgSlug == "" {
+			continue
+		}
+		response.Organizations = append(response.Organizations, PublicCatalogOrganization{
+			Name: strings.TrimSpace(org.Name),
+			Slug: orgSlug,
+		})
+
+		roles, roleErr := s.store.ListRolesByOrg(r.Context(), orgSlug)
+		if roleErr != nil {
+			http.Error(w, "failed to list roles", http.StatusInternalServerError)
+			return
+		}
+		for _, role := range roles {
+			if canonifySlug(role.Slug) == "org-admin" {
+				continue
+			}
+			response.Roles = append(response.Roles, PublicCatalogRole{
+				OrgSlug: strings.TrimSpace(role.OrgSlug),
+				Name:    strings.TrimSpace(role.Name),
+				Slug:    strings.TrimSpace(role.Slug),
+				Color:   strings.TrimSpace(role.Color),
+				Border:  strings.TrimSpace(role.Border),
+			})
+		}
+	}
+
+	sort.Slice(response.Organizations, func(i, j int) bool {
+		if response.Organizations[i].Name == response.Organizations[j].Name {
+			return response.Organizations[i].Slug < response.Organizations[j].Slug
+		}
+		return response.Organizations[i].Name < response.Organizations[j].Name
+	})
+	sort.Slice(response.Roles, func(i, j int) bool {
+		if response.Roles[i].OrgSlug != response.Roles[j].OrgSlug {
+			return response.Roles[i].OrgSlug < response.Roles[j].OrgSlug
+		}
+		if response.Roles[i].Name != response.Roles[j].Name {
+			return response.Roles[i].Name < response.Roles[j].Name
+		}
+		return response.Roles[i].Slug < response.Roles[j].Slug
+	})
+
+	writeJSON(w, response)
 }
 
 func openAPIDocCandidates(filename string) []string {
