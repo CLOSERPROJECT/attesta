@@ -658,6 +658,10 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+.role-pill {
+  color: var(--role-ink);
+}
+
 .actions {
   display: grid;
   gap: 14px;
@@ -924,16 +928,6 @@ button.secondary {
 .current-user {
   margin-top: 0;
   font-size: 14px;
-}
-
-.dept-button {
-  border: 1px solid var(--role-border, var(--accent));
-  background: var(--role-color, var(--accent));
-  color: var(--role-ink);
-}
-
-.role-pill {
-  color: var(--role-ink);
 }
 
 .panel-block {
