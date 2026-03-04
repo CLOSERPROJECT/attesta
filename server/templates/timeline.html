@@ -17,43 +17,35 @@
               role="button"
             >
               <div class="substep-head">
-                <span class="pill">{{.SubstepID}}</span>
-                <span class="title">{{.Title}}</span>
+                <span class="pill sid-pill">{{.SubstepID}}</span>
                 {{if .RoleBadges}}
                   {{range .RoleBadges}}
                     <span
-                      class="dept-badge"
-                      style="--dept-color: {{.Color}}; --dept-border: {{.Border}}"
+                      class="pill role-pill"
+                      style="--pill-bg: {{.Color}}; --border: {{.Border}}"
                     >{{.Label}}</span>
                   {{end}}
                 {{else}}
                   <span
-                    class="dept-badge"
-                    style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+                    class="pill role-pill"
+                    style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}"
                   >{{.RoleLabel}}</span>
                 {{end}}
                 <span class="status">{{.Status}}</span>
               </div>
-              <div class="substep-meta">
-                <span class="role">roles: {{.Role}}</span>
-                {{if eq .Status "done"}}
-                  <span class="actor">by {{.DoneBy}} ({{.DoneRole}})</span>
-                  <span class="time">{{.DoneAt}}</span>
-                  {{if .FileURL}}
-                    <span class="data">file: {{.FileName}}</span>
-                    <a class="secondary" href="{{.FileURL}}">Download</a>
-                    {{if .FileSHA256}}
-                      <span class="data data-hash">
-                        <span>sha256:</span>
-                        <code class="hash-value" title="{{.FileSHA256}}">{{.FileSHA256}}</code>
-                        <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
-                      </span>
-                    {{end}}
-                  {{else if .DisplayValue}}
-                    <span class="data">value: {{.DisplayValue}}</span>
+              {{.Title}}
+              {{if eq .Status "done"}}
+                <div class="substep-meta">
+                  {{if .DoneBy}}
+                    <span class="actor">by {{.DoneBy}}</span>
+                  {{else}}
+                    <span class="actor">completed</span>
                   {{end}}
-                {{end}}
-              </div>
+                  {{if .DoneAt}}
+                    <span class="time">{{.DoneAt}}</span>
+                  {{end}}
+                </div>
+              {{end}}
             </li>
           {{end}}
         </ul>

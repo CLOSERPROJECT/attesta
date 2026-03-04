@@ -2810,7 +2810,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		actor.Role = actor.RoleSlugs[0]
 	}
 	selectedSubstepID := strings.TrimSpace(r.URL.Query().Get("substep"))
-	actionList := s.buildProcessActionListView(cfg, workflowKey, process, actor, selectedSubstepID, "", false)
+	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, "", false)
 	view := ProcessPageView{
 		PageBase:    s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
 		ProcessID:   process.ID.Hex(),
@@ -2825,7 +2825,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 }
 
-func (s *Server) buildProcessActionListView(cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ActionListView {
+func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ActionListView {
 	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, onlyRole, s.roleMetaMap(cfg))
 	processDone := process != nil && isProcessDone(cfg.Workflow, process)
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
@@ -2851,7 +2851,120 @@ func (s *Server) buildProcessActionListView(cfg RuntimeConfig, workflowKey strin
 			view.DPPGS1 = gs1ElementString(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
 		}
 	}
+	view.Actions = s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, view.Actions)
+	view.Timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, actor, view.Timeline)
 	return view
+}
+
+func actorFromAccountUser(user *AccountUser, workflowKey string) Actor {
+	actor := Actor{
+		WorkflowKey: workflowKey,
+	}
+	if user == nil {
+		return actor
+	}
+	actor.UserID = strings.TrimSpace(user.UserID)
+	actor.OrgSlug = strings.TrimSpace(user.OrgSlug)
+	actor.RoleSlugs = append([]string(nil), user.RoleSlugs...)
+	if len(actor.RoleSlugs) > 0 {
+		actor.Role = actor.RoleSlugs[0]
+	}
+	return actor
+}
+
+func viewerCanSeeDoneByEmail(def WorkflowDef, viewer Actor) bool {
+	orgSlug := strings.TrimSpace(viewer.OrgSlug)
+	if orgSlug == "" {
+		return false
+	}
+	for _, step := range def.Steps {
+		if strings.TrimSpace(step.OrganizationSlug) == orgSlug {
+			return true
+		}
+	}
+	return false
+}
+
+type userIdentityView struct {
+	email   string
+	mongoID string
+}
+
+func (s *Server) lookupUserIdentityByUserID(ctx context.Context, userID string, cache map[string]userIdentityView) (userIdentityView, bool) {
+	id := strings.TrimSpace(userID)
+	if id == "" {
+		return userIdentityView{}, false
+	}
+	if identity, ok := cache[id]; ok {
+		return identity, strings.TrimSpace(identity.email) != "" || strings.TrimSpace(identity.mongoID) != ""
+	}
+	if s.store == nil {
+		cache[id] = userIdentityView{}
+		return userIdentityView{}, false
+	}
+	user, err := s.store.GetUserByUserID(ctx, id)
+	if err != nil || user == nil {
+		cache[id] = userIdentityView{}
+		return userIdentityView{}, false
+	}
+	identity := userIdentityView{
+		email: strings.TrimSpace(user.Email),
+	}
+	if !user.ID.IsZero() {
+		identity.mongoID = user.ID.Hex()
+	}
+	cache[id] = identity
+	return identity, identity.email != "" || identity.mongoID != ""
+}
+
+func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []ActionView) []ActionView {
+	if len(actions) == 0 {
+		return actions
+	}
+	canSeeEmail := viewerCanSeeDoneByEmail(def, viewer)
+	cache := map[string]userIdentityView{}
+	for idx := range actions {
+		identity, ok := s.lookupUserIdentityByUserID(ctx, actions[idx].DoneBy, cache)
+		if !ok {
+			continue
+		}
+		if canSeeEmail {
+			if strings.TrimSpace(identity.email) != "" {
+				actions[idx].DoneBy = identity.email
+			}
+			continue
+		}
+		if strings.TrimSpace(identity.mongoID) != "" {
+			actions[idx].DoneBy = identity.mongoID
+		}
+	}
+	return actions
+}
+
+func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef, viewer Actor, timeline []TimelineStep) []TimelineStep {
+	if len(timeline) == 0 {
+		return timeline
+	}
+	canSeeEmail := viewerCanSeeDoneByEmail(def, viewer)
+	cache := map[string]userIdentityView{}
+	for stepIdx := range timeline {
+		for subIdx := range timeline[stepIdx].Substeps {
+			identity, ok := s.lookupUserIdentityByUserID(ctx, timeline[stepIdx].Substeps[subIdx].DoneBy, cache)
+			if !ok {
+				continue
+			}
+			if canSeeEmail {
+				if strings.TrimSpace(identity.email) != "" {
+					timeline[stepIdx].Substeps[subIdx].DoneBy = identity.email
+				}
+				continue
+			}
+			if strings.TrimSpace(identity.mongoID) != "" {
+				timeline[stepIdx].Substeps[subIdx].DoneBy = identity.mongoID
+			}
+		}
+	}
+	return timeline
 }
 
 func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
@@ -2933,6 +3046,11 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 	processDone := process != nil && isProcessDone(cfg.Workflow, process)
 	selectedSubstepID := resolveSelectedSubstepID(actions, strings.TrimSpace(r.URL.Query().Get("substep")), processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selectedSubstepID)
+	viewer := Actor{WorkflowKey: workflowKey}
+	if user, _, userErr := s.currentUser(r); userErr == nil && user != nil {
+		viewer = actorFromAccountUser(user, workflowKey)
+	}
+	timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, viewer, timeline)
 	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -2970,7 +3088,7 @@ func (s *Server) handleProcessActionsPartial(w http.ResponseWriter, r *http.Requ
 	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
 		actor.RoleSlugs = s.roles(cfg)
 	}
-	view := s.buildProcessActionListView(cfg, workflowKey, process, actor, strings.TrimSpace(r.URL.Query().Get("substep")), "", false)
+	view := s.buildProcessActionListView(r.Context(), cfg, workflowKey, process, actor, strings.TrimSpace(r.URL.Query().Get("substep")), "", false)
 	if err := s.tmpl.ExecuteTemplate(w, "action_list.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -4255,6 +4373,22 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 					if progress.DoneBy != nil {
 						entry.DoneBy = progress.DoneBy.UserID
 						entry.DoneRole = progress.DoneBy.Role
+						selectedRole := strings.TrimSpace(progress.DoneBy.Role)
+						if selectedRole != "" {
+							selectedMeta := roleMetaFor(selectedRole, roleMeta)
+							entry.Role = selectedRole
+							entry.RoleBadges = []TimelineRoleBadge{
+								{
+									ID:     selectedRole,
+									Label:  selectedMeta.Label,
+									Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
+									Border: cssValue(selectedMeta.Border, "var(--border)"),
+								},
+							}
+							entry.RoleLabel = selectedMeta.Label
+							entry.RoleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
+							entry.RoleBorder = cssValue(selectedMeta.Border, "var(--border)")
+						}
 					}
 					if progress.DoneAt != nil {
 						entry.DoneAt = progress.DoneAt.Format(time.RFC3339)
@@ -4587,6 +4721,10 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			continue
 		}
 		meta := roleMetaFor(primaryRole, roleMeta)
+		role := primaryRole
+		roleLabel := meta.Label
+		roleColor := cssValue(meta.Color, "var(--role-fallback)")
+		roleBorder := cssValue(meta.Border, "var(--border)")
 		status := "locked"
 		if process != nil {
 			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
@@ -4619,6 +4757,21 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				if progress.DoneBy != nil {
 					doneBy = strings.TrimSpace(progress.DoneBy.UserID)
 					doneRole = strings.TrimSpace(progress.DoneBy.Role)
+					if doneRole != "" {
+						selectedMeta := roleMetaFor(doneRole, roleMeta)
+						role = doneRole
+						roleBadges = []ActionRoleBadge{
+							{
+								ID:     doneRole,
+								Label:  selectedMeta.Label,
+								Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
+								Border: cssValue(selectedMeta.Border, "var(--border)"),
+							},
+						}
+						roleLabel = selectedMeta.Label
+						roleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
+						roleBorder = cssValue(selectedMeta.Border, "var(--border)")
+					}
 				}
 				if sub.InputType == "formata" {
 					values = flattenDisplayValues("", progress.Data[sub.InputKey])
@@ -4636,13 +4789,13 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			ProcessID:     processIDString(process),
 			SubstepID:     sub.SubstepID,
 			Title:         sub.Title,
-			Role:          primaryRole,
+			Role:          role,
 			AllowedRoles:  allowedRoles,
 			RoleBadges:    roleBadges,
 			MatchingRoles: matchingRoles,
-			RoleLabel:     meta.Label,
-			RoleColor:     cssValue(meta.Color, "var(--role-fallback)"),
-			RoleBorder:    cssValue(meta.Border, "var(--border)"),
+			RoleLabel:     roleLabel,
+			RoleColor:     roleColor,
+			RoleBorder:    roleBorder,
 			InputKey:      sub.InputKey,
 			InputType:     sub.InputType,
 			FormSchema:    formSchema,
@@ -5117,7 +5270,11 @@ func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, proces
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	view := s.buildProcessActionListView(cfg, workflowKey, process, actor, selectedSubstepID, message, false)
+	ctx := context.Background()
+	if r != nil {
+		ctx = r.Context()
+	}
+	view := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, false)
 	if err := s.tmpl.ExecuteTemplate(w, "action_list.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -5138,7 +5295,11 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	actionList := s.buildProcessActionListView(cfg, workflowKey, process, actor, selectedSubstepID, message, true)
+	ctx := context.Background()
+	if r != nil {
+		ctx = r.Context()
+	}
+	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, true)
 	processID := ""
 	if process != nil {
 		processID = process.ID.Hex()

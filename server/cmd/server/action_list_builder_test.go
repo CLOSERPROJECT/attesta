@@ -236,6 +236,57 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 	}
 }
 
+func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Multi Role",
+						Order:     1,
+						Roles:     []string{"dep1", "dep2"},
+						InputKey:  "value",
+						InputType: "string",
+					},
+				},
+			},
+		},
+	}
+	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				DoneBy: &Actor{UserID: "u2", Role: "dep2"},
+				Data:   map[string]interface{}{"value": "ok"},
+			},
+		},
+	}
+	roleMeta := map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
+		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
+	}
+
+	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta)
+	action := findAction(t, actions, "1.1")
+	if action.Status != "done" {
+		t.Fatalf("status = %q, want done", action.Status)
+	}
+	if action.Role != "dep2" {
+		t.Fatalf("role = %q, want dep2", action.Role)
+	}
+	if len(action.RoleBadges) != 1 {
+		t.Fatalf("role badge count = %d, want 1", len(action.RoleBadges))
+	}
+	if action.RoleBadges[0].ID != "dep2" {
+		t.Fatalf("badge id = %q, want dep2", action.RoleBadges[0].ID)
+	}
+}
+
 func findAction(t *testing.T, actions []ActionView, substepID string) ActionView {
 	t.Helper()
 	for _, action := range actions {

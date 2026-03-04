@@ -75,7 +75,7 @@
   --page-bg: linear-gradient(135deg, #0b0f0d 0%, #121915 100%);
   --chrome-bg: #0f1411;
   --surface-2: rgba(255, 255, 255, 0.04);
-  --pill-bg: rgba(255, 255, 255, 0.06);
+  --pill-bg: #243329;
   --dept-fallback: rgba(255, 255, 255, 0.04);
   --role-fallback: rgba(255, 255, 255, 0.06);
   --role-ink: #000000;
@@ -408,6 +408,7 @@ svg.bi {
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 10px 26px var(--shadow);
+  min-width: 0;
 }
 
 .landing {
@@ -485,12 +486,14 @@ button.secondary {
 .timeline-list {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .timeline-step {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-2);
+  overflow: hidden;
 }
 
 .timeline-step-summary {
@@ -512,6 +515,7 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .substep {
@@ -526,6 +530,10 @@ button.secondary {
   );
   cursor: pointer;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  position: relative;
 }
 
 .substep:focus-visible {
@@ -559,33 +567,69 @@ button.secondary {
 .substep-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.dept-badge {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--dept-border, var(--border));
-  background: var(--dept-color, var(--role-fallback));
-  color: var(--role-ink);
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .substep-head .status {
   margin-left: auto;
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--tag-bg);
+  padding: 2px 8px;
+}
+
+.substep-available .substep-head .status {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--tag-bg-available);
+  color: var(--accent);
+}
+
+.substep-done .substep-head .status {
+  border-color: color-mix(in srgb, var(--accent-2) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent-2) 16%, var(--surface-2));
+  color: color-mix(in srgb, var(--ink) 72%, var(--accent-2));
+}
+
+.substep-locked .substep-head .status {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.substep-available .substep-head,
+.substep-locked .substep-head {
+  padding-right: 82px;
+}
+
+.substep-available .substep-head .status,
+.substep-locked .substep-head .status {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  margin-left: 0;
 }
 
 .substep-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 12px;
   color: var(--muted);
+  min-width: 0;
+  padding-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+}
+
+.substep-meta > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .data-hash {
@@ -612,6 +656,14 @@ button.secondary {
   background: var(--pill-bg);
   border-radius: 999px;
   border: 1px solid var(--border);
+}
+
+.role-pill {
+  color: var(--role-ink);
+}
+
+.sid-pill {
+  margin-right: 50px;
 }
 
 .actions {
@@ -880,16 +932,6 @@ button.secondary {
 .current-user {
   margin-top: 0;
   font-size: 14px;
-}
-
-.dept-button {
-  border: 1px solid var(--role-border, var(--accent));
-  background: var(--role-color, var(--accent));
-  color: var(--role-ink);
-}
-
-.role-pill {
-  color: var(--role-ink);
 }
 
 .panel-block {
