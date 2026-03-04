@@ -126,6 +126,62 @@ func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {
 	}
 }
 
+func TestBuildTimelineDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Title:  "Step 1",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Multi Role Substep",
+						Order:     1,
+						Roles:     []string{"dep1", "dep2"},
+						InputKey:  "value",
+						InputType: "string",
+					},
+				},
+			},
+		},
+	}
+	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				DoneBy: &Actor{UserID: "u2", Role: "dep2"},
+				Data:   map[string]interface{}{"value": "ok"},
+			},
+		},
+	}
+	roleMeta := map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
+		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
+	}
+
+	timeline := buildTimeline(def, process, "workflow", roleMeta, nil)
+	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
+		t.Fatalf("unexpected timeline shape: %#v", timeline)
+	}
+	entry := timeline[0].Substeps[0]
+	if entry.Status != "done" {
+		t.Fatalf("status = %q, want done", entry.Status)
+	}
+	if entry.Role != "dep2" {
+		t.Fatalf("role summary = %q, want dep2", entry.Role)
+	}
+	if len(entry.RoleBadges) != 1 {
+		t.Fatalf("role badge count = %d, want 1", len(entry.RoleBadges))
+	}
+	if entry.RoleBadges[0].ID != "dep2" {
+		t.Fatalf("badge id = %q, want dep2", entry.RoleBadges[0].ID)
+	}
+}
+
 func TestBuildTimelineUsesOrganizationNameInStep(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{

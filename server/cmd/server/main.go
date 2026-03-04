@@ -4255,6 +4255,22 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 					if progress.DoneBy != nil {
 						entry.DoneBy = progress.DoneBy.UserID
 						entry.DoneRole = progress.DoneBy.Role
+						selectedRole := strings.TrimSpace(progress.DoneBy.Role)
+						if selectedRole != "" {
+							selectedMeta := roleMetaFor(selectedRole, roleMeta)
+							entry.Role = selectedRole
+							entry.RoleBadges = []TimelineRoleBadge{
+								{
+									ID:     selectedRole,
+									Label:  selectedMeta.Label,
+									Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
+									Border: cssValue(selectedMeta.Border, "var(--border)"),
+								},
+							}
+							entry.RoleLabel = selectedMeta.Label
+							entry.RoleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
+							entry.RoleBorder = cssValue(selectedMeta.Border, "var(--border)")
+						}
 					}
 					if progress.DoneAt != nil {
 						entry.DoneAt = progress.DoneAt.Format(time.RFC3339)
@@ -4587,6 +4603,10 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			continue
 		}
 		meta := roleMetaFor(primaryRole, roleMeta)
+		role := primaryRole
+		roleLabel := meta.Label
+		roleColor := cssValue(meta.Color, "var(--role-fallback)")
+		roleBorder := cssValue(meta.Border, "var(--border)")
 		status := "locked"
 		if process != nil {
 			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
@@ -4619,6 +4639,21 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				if progress.DoneBy != nil {
 					doneBy = strings.TrimSpace(progress.DoneBy.UserID)
 					doneRole = strings.TrimSpace(progress.DoneBy.Role)
+					if doneRole != "" {
+						selectedMeta := roleMetaFor(doneRole, roleMeta)
+						role = doneRole
+						roleBadges = []ActionRoleBadge{
+							{
+								ID:     doneRole,
+								Label:  selectedMeta.Label,
+								Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
+								Border: cssValue(selectedMeta.Border, "var(--border)"),
+							},
+						}
+						roleLabel = selectedMeta.Label
+						roleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
+						roleBorder = cssValue(selectedMeta.Border, "var(--border)")
+					}
 				}
 				if sub.InputType == "formata" {
 					values = flattenDisplayValues("", progress.Data[sub.InputKey])
@@ -4636,13 +4671,13 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			ProcessID:     processIDString(process),
 			SubstepID:     sub.SubstepID,
 			Title:         sub.Title,
-			Role:          primaryRole,
+			Role:          role,
 			AllowedRoles:  allowedRoles,
 			RoleBadges:    roleBadges,
 			MatchingRoles: matchingRoles,
-			RoleLabel:     meta.Label,
-			RoleColor:     cssValue(meta.Color, "var(--role-fallback)"),
-			RoleBorder:    cssValue(meta.Border, "var(--border)"),
+			RoleLabel:     roleLabel,
+			RoleColor:     roleColor,
+			RoleBorder:    roleBorder,
 			InputKey:      sub.InputKey,
 			InputType:     sub.InputType,
 			FormSchema:    formSchema,
