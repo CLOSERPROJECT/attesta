@@ -1,23 +1,15 @@
-FROM alpine:3.20 AS source
-RUN apk add --no-cache git
-WORKDIR /src
-COPY .gitmodules .gitmodules
-RUN git submodule update --init --recursive
-COPY web/ web/
-COPY server/ server/
-
 FROM node:18-alpine AS web-build
 WORKDIR /app/web
-COPY --from=source /src/web/package*.json ./
+COPY web/package*.json ./
 RUN npm ci
-COPY --from=source /src/web/ ./
+COPY web/ ./
 RUN npm run build
 
 FROM golang:1.25-alpine AS go-build
 WORKDIR /app/server
-COPY --from=source /src/server/go.mod /src/server/go.sum ./
+COPY server/go.mod server/go.sum ./
 RUN go mod download
-COPY --from=source /src/server/ ./
+COPY server/ ./
 ENV CGO_ENABLED=0
 RUN go generate ./design
 RUN go build -trimpath -o /app/bin/attesta ./cmd/server
