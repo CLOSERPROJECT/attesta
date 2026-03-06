@@ -363,7 +363,8 @@ type PublicCatalogRole struct {
 
 type WorkflowPickerView struct {
 	PageBase
-	Workflows []WorkflowOption
+	Workflows            []WorkflowOption
+	ShowCreateStreamCard bool
 }
 
 type HomeWorkflowPickerView struct {
@@ -1338,8 +1339,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := HomeWorkflowPickerView{
 		WorkflowPickerView: WorkflowPickerView{
-			PageBase:  s.pageBaseForUser(user, "home_picker_body", "", ""),
-			Workflows: options,
+			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
+			Workflows:            options,
+			ShowCreateStreamCard: userIsOrgAdmin(user) && !user.IsPlatformAdmin,
 		},
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
