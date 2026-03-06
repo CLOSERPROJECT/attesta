@@ -18,18 +18,6 @@ func TestMongoStoreSaveFormataBuilderStream(t *testing.T) {
 	userID := primitive.NewObjectID()
 
 	streamCollection := &fakeMongoCollection{}
-	streamCollection.findOneFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
-		return fakeSingleResult{decodeFn: func(v interface{}) error {
-			*(v.(*FormataBuilderStream)) = FormataBuilderStream{
-				ID:                   primitive.NewObjectID(),
-				Key:                  formataBuilderStreamKey,
-				Stream:               "stream-v1",
-				UpdatedAt:            updatedAt,
-				UpdatedByUserMongoID: userID,
-			}
-			return nil
-		}}
-	}
 	db := &fakeMongoDatabase{
 		collections: map[string]*fakeMongoCollection{
 			collectionFormataStream: streamCollection,
@@ -48,54 +36,36 @@ func TestMongoStoreSaveFormataBuilderStream(t *testing.T) {
 	if saved.Stream != "stream-v1" {
 		t.Fatalf("saved stream = %q, want %q", saved.Stream, "stream-v1")
 	}
-	if len(streamCollection.updateOneFilters) != 1 {
-		t.Fatalf("expected one update call, got %d", len(streamCollection.updateOneFilters))
+	if len(streamCollection.insertDocuments) != 1 {
+		t.Fatalf("expected one insert call, got %d", len(streamCollection.insertDocuments))
 	}
-	if !reflect.DeepEqual(streamCollection.updateOneFilters[0], bson.M{"key": formataBuilderStreamKey}) {
-		t.Fatalf("update filter = %#v, want default key filter", streamCollection.updateOneFilters[0])
-	}
-	updateDoc, ok := streamCollection.updateOneUpdates[0].(bson.M)
+	inserted, ok := streamCollection.insertDocuments[0].(FormataBuilderStream)
 	if !ok {
-		t.Fatalf("update doc type = %T, want bson.M", streamCollection.updateOneUpdates[0])
+		t.Fatalf("insert document type = %T, want FormataBuilderStream", streamCollection.insertDocuments[0])
 	}
-	setDoc, _ := updateDoc["$set"].(bson.M)
-	if setDoc["stream"] != "stream-v1" {
-		t.Fatalf("set stream = %#v, want %q", setDoc["stream"], "stream-v1")
+	if inserted.ID.IsZero() {
+		t.Fatal("expected non-zero inserted stream id")
 	}
-	if len(streamCollection.updateOneOptions) != 1 || len(streamCollection.updateOneOptions[0]) != 1 {
-		t.Fatalf("expected upsert option call, got %#v", streamCollection.updateOneOptions)
+	if inserted.Stream != "stream-v1" {
+		t.Fatalf("inserted stream = %q, want %q", inserted.Stream, "stream-v1")
 	}
-	if streamCollection.updateOneOptions[0][0].Upsert == nil || !*streamCollection.updateOneOptions[0][0].Upsert {
-		t.Fatalf("expected upsert=true option, got %#v", streamCollection.updateOneOptions[0][0].Upsert)
+	if inserted.UpdatedByUserMongoID != userID {
+		t.Fatalf("inserted updatedByUserMongoID = %s, want %s", inserted.UpdatedByUserMongoID.Hex(), userID.Hex())
 	}
 }
 
 func TestMongoStoreSaveFormataBuilderStreamErrors(t *testing.T) {
 	t.Run("update failure", func(t *testing.T) {
-		updateErr := errors.New("update failed")
+		insertErr := errors.New("insert failed")
 		collection := &fakeMongoCollection{
-			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
-				return nil, updateErr
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, insertErr
 			},
 		}
 		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
 		store := &MongoStore{dbPort: db}
-		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{Stream: "x"}); !errors.Is(err, updateErr) {
-			t.Fatalf("SaveFormataBuilderStream error = %v, want %v", err, updateErr)
-		}
-	})
-
-	t.Run("load after update failure", func(t *testing.T) {
-		loadErr := errors.New("load failed")
-		collection := &fakeMongoCollection{
-			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
-				return fakeSingleResult{err: loadErr}
-			},
-		}
-		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
-		store := &MongoStore{dbPort: db}
-		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{Stream: "x"}); !errors.Is(err, loadErr) {
-			t.Fatalf("SaveFormataBuilderStream error = %v, want %v", err, loadErr)
+		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{Stream: "x"}); !errors.Is(err, insertErr) {
+			t.Fatalf("SaveFormataBuilderStream error = %v, want %v", err, insertErr)
 		}
 	})
 }
@@ -103,7 +73,6 @@ func TestMongoStoreSaveFormataBuilderStreamErrors(t *testing.T) {
 func TestMongoStoreLoadFormataBuilderStream(t *testing.T) {
 	want := FormataBuilderStream{
 		ID:                   primitive.NewObjectID(),
-		Key:                  formataBuilderStreamKey,
 		Stream:               "stream-v2",
 		UpdatedAt:            time.Date(2026, 3, 6, 11, 0, 0, 0, time.UTC),
 		UpdatedByUserMongoID: primitive.NewObjectID(),
@@ -126,8 +95,14 @@ func TestMongoStoreLoadFormataBuilderStream(t *testing.T) {
 	if !reflect.DeepEqual(*got, want) {
 		t.Fatalf("stream = %#v, want %#v", *got, want)
 	}
-	if len(collection.findOneFilters) != 1 || !reflect.DeepEqual(collection.findOneFilters[0], bson.M{"key": formataBuilderStreamKey}) {
-		t.Fatalf("findOne filter = %#v, want default key filter", collection.findOneFilters)
+	if len(collection.findOneFilters) != 1 || !reflect.DeepEqual(collection.findOneFilters[0], bson.M{}) {
+		t.Fatalf("findOne filter = %#v, want empty filter", collection.findOneFilters)
+	}
+	if len(collection.findOneOptionsCalls) != 1 || len(collection.findOneOptionsCalls[0]) != 1 {
+		t.Fatalf("expected one findOne option call, got %#v", collection.findOneOptionsCalls)
+	}
+	if collection.findOneOptionsCalls[0][0].Sort == nil {
+		t.Fatal("expected findOne sort options")
 	}
 }
 
@@ -136,13 +111,11 @@ func TestMongoStoreListFormataBuilderStreams(t *testing.T) {
 	want := []FormataBuilderStream{
 		{
 			ID:        primitive.NewObjectID(),
-			Key:       "workflow",
 			Stream:    "workflow-a",
 			UpdatedAt: now,
 		},
 		{
 			ID:        primitive.NewObjectID(),
-			Key:       "secondary",
 			Stream:    "workflow-b",
 			UpdatedAt: now.Add(-time.Minute),
 		},
@@ -193,7 +166,6 @@ func TestMongoStoreListFormataBuilderStreamsFindError(t *testing.T) {
 func TestMongoStoreListFormataBuilderStreamsSkipsDecodeErrors(t *testing.T) {
 	good := FormataBuilderStream{
 		ID:        primitive.NewObjectID(),
-		Key:       "workflow",
 		Stream:    "workflow-a",
 		UpdatedAt: time.Date(2026, 3, 6, 13, 0, 0, 0, time.UTC),
 	}

@@ -69,7 +69,6 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if _, err := s.store.SaveFormataBuilderStream(r.Context(), FormataBuilderStream{
-			Key:                  formataBuilderStreamKey,
 			Stream:               stream,
 			UpdatedAt:            s.nowUTC(),
 			UpdatedByUserMongoID: user.ID,

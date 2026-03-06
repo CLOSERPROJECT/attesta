@@ -171,7 +171,6 @@ func TestWorkflowCatalogUsesFormataBuilderStreamsWhenAvailable(t *testing.T) {
 
 	store := NewMemoryStore()
 	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-		Key:       "from-db",
 		Stream:    string(streamData),
 		UpdatedAt: time.Now().UTC(),
 	})
@@ -233,7 +232,6 @@ func TestBootstrapFormataBuilderStreamsNoopWhenAlreadySeeded(t *testing.T) {
 
 	store := NewMemoryStore()
 	original, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-		Key:       "existing",
 		Stream:    "workflow:\n  name: \"Existing\"\n  steps:\n    - id: \"1\"\n      title: \"Step\"\n      order: 1\n      organization: \"org1\"\n      substeps:\n        - id: \"1.1\"\n          title: \"Input\"\n          order: 1\n          roles: [\"dep1\"]\n          inputKey: \"value\"\n          inputType: \"string\"\norganizations:\n  - slug: \"org1\"\n    name: \"Org\"\nroles:\n  - orgSlug: \"org1\"\n    slug: \"dep1\"\n    name: \"Dep\"\n",
 		UpdatedAt: time.Now().UTC(),
 	})
@@ -305,21 +303,6 @@ func TestBootstrapFormataBuilderStreamsEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("empty key from filename", func(t *testing.T) {
-		tempDir := t.TempDir()
-		content := "workflow:\n  name: \"Workflow\"\n  steps: []\n"
-		if err := os.WriteFile(filepath.Join(tempDir, ".yaml"), []byte(content), 0o644); err != nil {
-			t.Fatalf("write .yaml: %v", err)
-		}
-		store := NewMemoryStore()
-		err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil)
-		if err == nil {
-			t.Fatal("expected empty key error")
-		}
-		if !strings.Contains(err.Error(), "workflow key is empty") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
 }
 
 func TestWorkflowCatalogReturnsListFormataError(t *testing.T) {
@@ -365,8 +348,7 @@ func TestWorkflowCatalogFallsBackToFilesWhenStoreHasNoStreams(t *testing.T) {
 func TestWorkflowCatalogStreamErrorBranches(t *testing.T) {
 	t.Run("empty stream id", func(t *testing.T) {
 		store := NewMemoryStore()
-		store.formataStreams["broken"] = FormataBuilderStream{
-			Key:    "broken",
+		store.formataStreams[primitive.NewObjectID()] = FormataBuilderStream{
 			Stream: "workflow:\n  name: \"Broken\"\n  steps: []\n",
 		}
 		server := &Server{store: store, configDir: t.TempDir()}
@@ -381,9 +363,9 @@ func TestWorkflowCatalogStreamErrorBranches(t *testing.T) {
 
 	t.Run("invalid stream yaml", func(t *testing.T) {
 		store := NewMemoryStore()
-		store.formataStreams["broken"] = FormataBuilderStream{
+		streamID := primitive.NewObjectID()
+		store.formataStreams[streamID] = FormataBuilderStream{
 			ID:     primitive.NewObjectID(),
-			Key:    "broken",
 			Stream: "workflow: [",
 		}
 		server := &Server{store: store, configDir: t.TempDir()}
@@ -406,7 +388,6 @@ func TestWorkflowCatalogStreamErrorBranches(t *testing.T) {
 		}
 		store := NewMemoryStore()
 		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-			Key:       "cached",
 			Stream:    string(content),
 			UpdatedAt: time.Date(2026, 3, 6, 19, 0, 0, 0, time.UTC),
 		}); err != nil {

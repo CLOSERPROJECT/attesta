@@ -101,7 +101,6 @@ func TestHandlePublicCatalog(t *testing.T) {
 		t.Fatalf("CreateUser(org-admin): %v", err)
 	}
 	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-		Key:                  formataBuilderStreamKey,
 		Stream:               `{"stream":"from-db"}`,
 		UpdatedAt:            time.Now().UTC(),
 		UpdatedByUserMongoID: adminUser.ID,
@@ -303,7 +302,6 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 			t.Fatalf("CreateOrganization: %v", err)
 		}
 		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-			Key:                  formataBuilderStreamKey,
 			Stream:               "stream-v1",
 			UpdatedAt:            time.Now().UTC(),
 			UpdatedByUserMongoID: admin.ID,

@@ -938,12 +938,7 @@ func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir 
 		if readErr != nil {
 			return fmt.Errorf("read config %s: %w", path, readErr)
 		}
-		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
-		if key == "" {
-			return fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
-		}
 		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
-			Key:       key,
 			Stream:    string(data),
 			UpdatedAt: updatedAt,
 		}); saveErr != nil {
