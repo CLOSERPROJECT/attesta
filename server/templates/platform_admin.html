@@ -19,12 +19,12 @@
   <section class="panel">
     <h2>New organization</h2>
     <p class="muted">Add a new organization to the platform</p>
-    {{if .Error}}<p class="muted" style="color: #a91919;">{{.Error}}</p>{{end}}
     <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
       <label for="org-name">Organization name</label>
       <input id="org-name" name="name" type="text" required />
       <label for="org-logo">Organization logo</label>
       <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+      {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
       <button class="primary" type="submit">Create organization</button>
     </form>
   </section>
@@ -43,6 +43,7 @@
           <option value="{{.Slug}}">{{.Name}}</option>
         {{end}}
       </select>
+      {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
       <button class="primary" type="submit">Create org admin invite</button>
       {{if .InviteLink}}
         <button type="button" class="secondary js-invite-copy"  data-copy-invite-link="{{.InviteLink}}">
