@@ -1553,6 +1553,243 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 			t.Fatalf("message = %q, want %q", msg, "failed to update user roles")
 		}
 	})
+
+	t.Run("reuses pending invite for same email org and role", func(t *testing.T) {
+		store := NewMemoryStore()
+		admin, err := store.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-admin-invite-reuse@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser admin error: %v", err)
+		}
+		org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Reuse Org"})
+		if _, err := store.CreateRole(t.Context(), Role{
+			OrgID:     org.ID,
+			OrgSlug:   org.Slug,
+			Slug:      "org-admin",
+			Name:      "Org Admin",
+			CreatedAt: time.Now().UTC(),
+		}); err != nil {
+			t.Fatalf("CreateRole org-admin error: %v", err)
+		}
+		orgID := org.ID
+		invitedUser, err := store.CreateUser(t.Context(), AccountUser{
+			OrgID:     &orgID,
+			OrgSlug:   org.Slug,
+			Email:     "reuse-org-admin@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "invited",
+			CreatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser invited error: %v", err)
+		}
+		existingToken := "existing-platform-token"
+		if _, err := store.CreateInvite(t.Context(), Invite{
+			OrgID:                org.ID,
+			Email:                invitedUser.Email,
+			UserMongoID:          invitedUser.ID,
+			RoleSlugs:            []string{"org-admin"},
+			Token:                existingToken,
+			ExpiresAt:            time.Now().UTC().Add(24 * time.Hour),
+			CreatedAt:            time.Now().UTC(),
+			CreatedByUserMongoID: admin.ID,
+		}); err != nil {
+			t.Fatalf("CreateInvite error: %v", err)
+		}
+		server := &Server{store: store, now: time.Now}
+
+		link, msg := server.createPlatformOrgAdminInvite(t.Context(), &admin, &org, invitedUser.Email)
+		if msg != "" {
+			t.Fatalf("unexpected message: %q", msg)
+		}
+		if link != "/invite/"+existingToken {
+			t.Fatalf("link = %q, want %q", link, "/invite/"+existingToken)
+		}
+		invites, err := store.ListInvitesByCreator(t.Context(), admin.ID, org.ID)
+		if err != nil {
+			t.Fatalf("ListInvitesByCreator error: %v", err)
+		}
+		if len(invites) != 1 {
+			t.Fatalf("invite count = %d, want 1", len(invites))
+		}
+	})
+
+	t.Run("ignores used invite and creates a new one", func(t *testing.T) {
+		store := NewMemoryStore()
+		admin, err := store.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-admin-invite-used@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser admin error: %v", err)
+		}
+		org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Used Invite Org"})
+		if _, err := store.CreateRole(t.Context(), Role{
+			OrgID:     org.ID,
+			OrgSlug:   org.Slug,
+			Slug:      "org-admin",
+			Name:      "Org Admin",
+			CreatedAt: time.Now().UTC(),
+		}); err != nil {
+			t.Fatalf("CreateRole org-admin error: %v", err)
+		}
+		orgID := org.ID
+		invitedUser, err := store.CreateUser(t.Context(), AccountUser{
+			OrgID:     &orgID,
+			OrgSlug:   org.Slug,
+			Email:     "used-invite@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "invited",
+			CreatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser invited error: %v", err)
+		}
+		usedAt := time.Now().UTC().Add(-time.Hour)
+		if _, err := store.CreateInvite(t.Context(), Invite{
+			OrgID:                org.ID,
+			Email:                invitedUser.Email,
+			UserMongoID:          invitedUser.ID,
+			RoleSlugs:            []string{"org-admin"},
+			Token:                "old-used-token",
+			ExpiresAt:            time.Now().UTC().Add(24 * time.Hour),
+			UsedAt:               &usedAt,
+			CreatedAt:            time.Now().UTC().Add(-2 * time.Hour),
+			CreatedByUserMongoID: admin.ID,
+		}); err != nil {
+			t.Fatalf("CreateInvite error: %v", err)
+		}
+		server := &Server{store: store, now: time.Now}
+
+		link, msg := server.createPlatformOrgAdminInvite(t.Context(), &admin, &org, invitedUser.Email)
+		if msg != "" {
+			t.Fatalf("unexpected message: %q", msg)
+		}
+		if link == "" || link == "/invite/old-used-token" {
+			t.Fatalf("expected a new invite link, got %q", link)
+		}
+		invites, err := store.ListInvitesByCreator(t.Context(), admin.ID, org.ID)
+		if err != nil {
+			t.Fatalf("ListInvitesByCreator error: %v", err)
+		}
+		if len(invites) != 2 {
+			t.Fatalf("invite count = %d, want 2", len(invites))
+		}
+	})
+
+	t.Run("fails when existing user lookup errors", func(t *testing.T) {
+		base := NewMemoryStore()
+		admin, _ := base.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-admin-invite-lookup-fail@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		store := &adminInviteStore{
+			MemoryStore:    base,
+			forceLookupErr: errors.New("lookup failed"),
+		}
+		server := &Server{store: store, now: time.Now}
+
+		link, msg := server.createPlatformOrgAdminInvite(t.Context(), &admin, nil, "lookup-fail@example.com")
+		if link != "" {
+			t.Fatalf("expected empty link, got %q", link)
+		}
+		if msg != "failed to load existing user" {
+			t.Fatalf("message = %q, want %q", msg, "failed to load existing user")
+		}
+	})
+
+	t.Run("duplicate user creation reloads existing user", func(t *testing.T) {
+		base := NewMemoryStore()
+		admin, _ := base.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-admin-invite-dup-reload@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		if _, err := base.CreateUser(t.Context(), AccountUser{
+			Email:     "duplicate-reload@example.com",
+			RoleSlugs: []string{},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
+		}); err != nil {
+			t.Fatalf("CreateUser existing error: %v", err)
+		}
+		store := &adminInviteStore{
+			MemoryStore:          base,
+			forceFirstLookupMiss: true,
+			forceCreateUserErr:   errors.New("E11000 duplicate key error collection: users index: email_1 dup key"),
+		}
+		server := &Server{store: store, now: time.Now}
+
+		link, msg := server.createPlatformOrgAdminInvite(t.Context(), &admin, nil, "duplicate-reload@example.com")
+		if msg != "" {
+			t.Fatalf("unexpected message: %q", msg)
+		}
+		if !strings.HasPrefix(link, "/invite/") {
+			t.Fatalf("invite link = %q, want /invite/<token>", link)
+		}
+		invites, err := base.ListInvitesByCreator(t.Context(), admin.ID, primitive.NilObjectID)
+		if err != nil {
+			t.Fatalf("ListInvitesByCreator error: %v", err)
+		}
+		if len(invites) != 1 {
+			t.Fatalf("invite count = %d, want 1", len(invites))
+		}
+	})
+
+	t.Run("duplicate user creation without reload candidate fails", func(t *testing.T) {
+		base := NewMemoryStore()
+		admin, _ := base.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-admin-invite-dup-fail@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		store := &adminInviteStore{
+			MemoryStore:        base,
+			forceCreateUserErr: errors.New("E11000 duplicate key error collection: users index: email_1 dup key"),
+		}
+		server := &Server{store: store, now: time.Now}
+
+		link, msg := server.createPlatformOrgAdminInvite(t.Context(), &admin, nil, "duplicate-fail@example.com")
+		if link != "" {
+			t.Fatalf("expected empty link, got %q", link)
+		}
+		if msg != "failed to load existing user" {
+			t.Fatalf("message = %q, want %q", msg, "failed to load existing user")
+		}
+	})
+
+	t.Run("non duplicate user creation failure returns create error", func(t *testing.T) {
+		base := NewMemoryStore()
+		admin, _ := base.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-admin-invite-create-fail@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		store := &adminInviteStore{
+			MemoryStore:        base,
+			forceCreateUserErr: errors.New("create user failed"),
+		}
+		server := &Server{store: store, now: time.Now}
+
+		link, msg := server.createPlatformOrgAdminInvite(t.Context(), &admin, nil, "create-fail@example.com")
+		if link != "" {
+			t.Fatalf("expected empty link, got %q", link)
+		}
+		if msg != "failed to create org admin user" {
+			t.Fatalf("message = %q, want %q", msg, "failed to create org admin user")
+		}
+	})
 }
 
 func TestHandleOrgAdminRolesAdditionalPaths(t *testing.T) {
@@ -2318,6 +2555,68 @@ func TestHandleAdminOrgsInviteIntentValidationPaths(t *testing.T) {
 	}
 	if !strings.Contains(recUnknownOrg.Body.String(), "organization not found") {
 		t.Fatalf("expected organization not found message, got %q", recUnknownOrg.Body.String())
+	}
+}
+
+func TestHandleAdminOrgsInviteRefreshDoesNotCreateDuplicate(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.CreateUser(t.Context(), AccountUser{
+		Email:           "platform-invite-nodup@example.com",
+		IsPlatformAdmin: true,
+		Status:          "active",
+		CreatedAt:       time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser error: %v", err)
+	}
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Platform No Duplicate Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	sessionID := createSessionForTestUser(t, store, admin)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+
+	postInvite := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("intent=invite_org_admin&org_slug="+org.Slug+"&email=same-platform%40example.com"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleAdminOrgs(rec, req)
+		return rec
+	}
+
+	first := postInvite()
+	if first.Code != http.StatusOK {
+		t.Fatalf("first invite status = %d, want %d", first.Code, http.StatusOK)
+	}
+	invitesAfterFirst, err := store.ListInvitesByCreator(t.Context(), admin.ID, org.ID)
+	if err != nil {
+		t.Fatalf("ListInvitesByCreator after first invite error: %v", err)
+	}
+	if len(invitesAfterFirst) != 1 {
+		t.Fatalf("invite count after first submit = %d, want 1", len(invitesAfterFirst))
+	}
+	firstToken := strings.TrimSpace(invitesAfterFirst[0].Token)
+	if firstToken == "" {
+		t.Fatalf("expected invite token to be persisted")
+	}
+	if !strings.Contains(first.Body.String(), "/invite/"+firstToken) {
+		t.Fatalf("first response should expose the created invite link, got %q", first.Body.String())
+	}
+
+	second := postInvite()
+	if second.Code != http.StatusOK {
+		t.Fatalf("second invite status = %d, want %d", second.Code, http.StatusOK)
+	}
+	if !strings.Contains(second.Body.String(), "/invite/"+firstToken) {
+		t.Fatalf("second response should keep same invite link, got %q", second.Body.String())
+	}
+	invitesAfterSecond, err := store.ListInvitesByCreator(t.Context(), admin.ID, org.ID)
+	if err != nil {
+		t.Fatalf("ListInvitesByCreator after second invite error: %v", err)
+	}
+	if len(invitesAfterSecond) != 1 {
+		t.Fatalf("invite count after repeated submit = %d, want 1", len(invitesAfterSecond))
 	}
 }
 

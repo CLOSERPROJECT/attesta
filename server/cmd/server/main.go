@@ -2032,8 +2032,34 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 		}
 	}
 
+	inviteOrgID := primitive.NilObjectID
+	if org != nil {
+		inviteOrgID = org.ID
+	}
+	now := s.nowUTC()
+	requiredRolesKey := roleSlugsKey([]string{roleSlug})
+	if existingInvites, listErr := s.store.ListInvitesByCreator(ctx, admin.ID, inviteOrgID); listErr == nil {
+		for _, existingInvite := range existingInvites {
+			if !strings.EqualFold(strings.TrimSpace(existingInvite.Email), email) {
+				continue
+			}
+			if existingInvite.UsedAt != nil || (!existingInvite.ExpiresAt.IsZero() && existingInvite.ExpiresAt.Before(now)) {
+				continue
+			}
+			if roleSlugsKey(existingInvite.RoleSlugs) != requiredRolesKey {
+				continue
+			}
+			if token := strings.TrimSpace(existingInvite.Token); token != "" {
+				return "/invite/" + token, ""
+			}
+		}
+	}
+
 	user, userErr := s.store.GetUserByEmail(ctx, email)
-	if userErr != nil || user == nil {
+	if userErr != nil && !errors.Is(userErr, mongo.ErrNoDocuments) {
+		return "", "failed to load existing user"
+	}
+	if user == nil {
 		createInput := AccountUser{
 			Email:     email,
 			RoleSlugs: []string{roleSlug},
@@ -2047,9 +2073,19 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 		}
 		createdUser, createErr := s.store.CreateUser(ctx, createInput)
 		if createErr != nil {
-			return "", "failed to create org admin user"
+			if isDuplicateSlugError(createErr) || strings.Contains(strings.ToLower(createErr.Error()), "email already exists") {
+				existingUser, existingErr := s.store.GetUserByEmail(ctx, email)
+				if existingErr == nil && existingUser != nil {
+					user = existingUser
+				} else {
+					return "", "failed to load existing user"
+				}
+			} else {
+				return "", "failed to create org admin user"
+			}
+		} else {
+			user = &createdUser
 		}
-		user = &createdUser
 	} else {
 		if userHasOrganizationContext(user) {
 			if org == nil || !accountMatchesOrg(user, org.ID, org.Slug) {
@@ -2077,18 +2113,14 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 	if tokenErr != nil {
 		return "", "failed to create invite"
 	}
-	inviteOrgID := primitive.NilObjectID
-	if org != nil {
-		inviteOrgID = org.ID
-	}
 	if _, inviteErr := s.store.CreateInvite(ctx, Invite{
 		OrgID:                inviteOrgID,
 		Email:                email,
 		UserMongoID:          user.ID,
 		RoleSlugs:            []string{roleSlug},
-		TokenHash:            token,
-		ExpiresAt:            s.nowUTC().Add(7 * 24 * time.Hour),
-		CreatedAt:            s.nowUTC(),
+		Token:                token,
+		ExpiresAt:            now.Add(7 * 24 * time.Hour),
+		CreatedAt:            now,
 		CreatedByUserMongoID: admin.ID,
 	}); inviteErr != nil {
 		return "", "failed to create invite"

@@ -109,14 +109,17 @@ func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
 	if !strings.Contains(body, `class="secondary js-invite-copy" data-copy-invite-link="/invite/token-pending"`) {
 		t.Fatalf("expected last invite copy button with invite link, got body: %s", body)
 	}
-	if !strings.Contains(body, "Last invite:") {
-		t.Fatalf("expected last invite text block, got body: %s", body)
+	if strings.Contains(body, "Last invite:") {
+		t.Fatalf("last invite text should be hidden, got body: %s", body)
 	}
 	if !strings.Contains(body, `data-copy-icon-default style="display: inline-block;"`) {
 		t.Fatalf("expected default copy icon visible by default, got body: %s", body)
 	}
 	if !strings.Contains(body, `data-copy-icon-done style="display: none;"`) {
 		t.Fatalf("expected done copy icon hidden by default, got body: %s", body)
+	}
+	if !strings.Contains(body, `<span data-copy-label>`) {
+		t.Fatalf("expected copy label span, got body: %s", body)
 	}
 	if !strings.Contains(body, "data-copy-icon-default") || !strings.Contains(body, "data-copy-icon-done") {
 		t.Fatalf("expected copy state icons in invite copy button, got body: %s", body)
