@@ -1,0 +1,3 @@
+[submodule "server/cmd/server/formata-arch"]
+	path = server/cmd/server/formata-arch
+	url = https://github.com/CLOSERPROJECT/formata-arch.git

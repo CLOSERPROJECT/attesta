@@ -6,6 +6,11 @@ tasks:
     cmds:
       - task: start
 
+  submodule:init:
+    desc: Initialize git submodules required by embedded assets.
+    cmds:
+      - git submodule update --init --recursive
+
   start:
     desc: Bring up infra and show status.
     cmds:
@@ -15,6 +20,7 @@ tasks:
   start:build:
     desc: Bring up infra (build images) and show status.
     cmds:
+      - task: submodule:init
       - docker compose -f deployment/docker-compose.local.yaml up -d --build
       - docker compose -f deployment/docker-compose.local.yaml ps
 
@@ -95,6 +101,7 @@ tasks:
   goa:generate:
     desc: Generate Goa code and OpenAPI spec.
     cmds:
+      - task: submodule:init
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go generate ./design'
 
   goa:generate:all:

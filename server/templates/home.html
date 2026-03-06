@@ -12,9 +12,9 @@
       {{range .Workflows}}
         <a class="workflow-card" href="/w/{{.Key}}/">
           <h2 class="workflow-card-title">{{.Name}}</h2>
-          {{if .Description}}
-            <p class="workflow-card-description">{{.Description}}</p>
-          {{end}}
+          <p class="workflow-card-description{{if not .Description}} is-empty{{end}}">
+            {{if .Description}}{{.Description}}{{else}}&nbsp;{{end}}
+          </p>
           <dl class="workflow-card-stats">
             <div>
               <dt>Not started</dt>
@@ -29,6 +29,19 @@
               <dd>{{.Counts.Terminated}}</dd>
             </div>
           </dl>
+        </a>
+      {{end}}
+      {{if .ShowCreateStreamCard}}
+        <a class="workflow-card workflow-card-create" href="/org-admin/formata-builder">
+          <h2 class="workflow-card-title">Create new stream</h2>
+          <p class="workflow-card-description">Click to create new stream</p>
+          <span class="workflow-card-cta">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+              <path d="M5 12h14"/>
+              <path d="M12 5v14"/>
+            </svg>
+            Create new stream
+          </span>
         </a>
       {{end}}
     </div>

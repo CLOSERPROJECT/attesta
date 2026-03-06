@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: 🔔 Checkout
         uses: actions/checkout@v6
+        with:
+          submodules: true
       - name: 🥢 Set up go@1.25.5 and task@latest
         uses: jdx/mise-action@v3
       - name: 🧪 Run tests
