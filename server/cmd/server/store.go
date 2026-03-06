@@ -101,6 +101,7 @@ type Invite struct {
 	Email                string             `bson:"email"`
 	UserMongoID          primitive.ObjectID `bson:"userMongoId"`
 	RoleSlugs            []string           `bson:"roleSlugs"`
+	Token                string             `bson:"token,omitempty"`
 	TokenHash            string             `bson:"tokenHash"`
 	ExpiresAt            time.Time          `bson:"expiresAt"`
 	UsedAt               *time.Time         `bson:"usedAt,omitempty"`
@@ -154,6 +155,7 @@ type mongoCollectionPort interface {
 	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
 	CreateIndexes(ctx context.Context, models []mongo.IndexModel) error
+	DropIndex(ctx context.Context, name string) error
 }
 
 type mongoSingleResultPort interface {
@@ -219,6 +221,14 @@ func (c mongoDriverCollection) FindOneAndUpdate(ctx context.Context, filter inte
 
 func (c mongoDriverCollection) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
 	_, err := c.collection.Indexes().CreateMany(ctx, models)
+	return err
+}
+
+func (c mongoDriverCollection) DropIndex(ctx context.Context, name string) error {
+	_, err := c.collection.Indexes().DropOne(ctx, name)
+	if err != nil && isMongoIndexNotFoundError(err) {
+		return nil
+	}
 	return err
 }
 
@@ -1143,7 +1153,12 @@ func (s *MemoryStore) CreateInvite(_ context.Context, invite Invite) (Invite, er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	invite.Email = strings.ToLower(strings.TrimSpace(invite.Email))
-	invite.TokenHash = hashLookupToken(invite.TokenHash)
+	rawToken := strings.TrimSpace(invite.Token)
+	if rawToken == "" {
+		rawToken = strings.TrimSpace(invite.TokenHash)
+	}
+	invite.Token = rawToken
+	invite.TokenHash = hashLookupToken(rawToken)
 	invite.RoleSlugs = canonifyRoleSlugs(invite.RoleSlugs)
 	if invite.CreatedAt.IsZero() {
 		invite.CreatedAt = time.Now().UTC()
@@ -1416,6 +1431,23 @@ func hashLookupToken(token string) string {
 }
 
 func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
+	legacyIndexes := map[string][]string{
+		collectionUsers: {
+			"userId_1",
+		},
+		collectionSessions: {
+			"userId_1",
+		},
+	}
+	for collectionName, indexNames := range legacyIndexes {
+		collection := s.database().Collection(collectionName)
+		for _, indexName := range indexNames {
+			if err := collection.DropIndex(ctx, indexName); err != nil {
+				return err
+			}
+		}
+	}
+
 	indexes := map[string][]mongo.IndexModel{
 		collectionOrganizations: {
 			{Keys: bson.D{{Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true)},
@@ -1449,6 +1481,18 @@ func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func isMongoIndexNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var commandErr mongo.CommandError
+	if errors.As(err, &commandErr) {
+		return commandErr.Code == 26 || commandErr.Code == 27
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "index not found") || strings.Contains(msg, "ns not found")
 }
 
 func (s *MongoStore) CreateOrganization(ctx context.Context, org Organization) (Organization, error) {
@@ -1730,7 +1774,12 @@ func (s *MongoStore) CreateInvite(ctx context.Context, invite Invite) (Invite, e
 		invite.CreatedAt = time.Now().UTC()
 	}
 	invite.Email = strings.ToLower(strings.TrimSpace(invite.Email))
-	invite.TokenHash = hashLookupToken(invite.TokenHash)
+	rawToken := strings.TrimSpace(invite.Token)
+	if rawToken == "" {
+		rawToken = strings.TrimSpace(invite.TokenHash)
+	}
+	invite.Token = rawToken
+	invite.TokenHash = hashLookupToken(rawToken)
 	invite.RoleSlugs = canonifyRoleSlugs(invite.RoleSlugs)
 	result, err := s.database().Collection(collectionInvites).InsertOne(ctx, invite)
 	if err != nil {

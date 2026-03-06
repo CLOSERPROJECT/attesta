@@ -464,12 +464,20 @@ type OrgAdminUserRow struct {
 }
 
 type OrgAdminInviteRow struct {
-	Email     string
-	RoleSlugs []string
-	CreatedAt time.Time
-	ExpiresAt time.Time
-	UsedAt    *time.Time
-	Status    string
+	Email      string
+	RoleSlugs  []string
+	InviteLink string
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	UsedAt     *time.Time
+	Status     string
+}
+
+func roleSlugsKey(roleSlugs []string) string {
+	canon := canonifyRoleSlugs(roleSlugs)
+	sorted := append([]string(nil), canon...)
+	sort.Strings(sorted)
+	return strings.Join(sorted, ",")
 }
 
 type WorkflowRefValidationError struct {
@@ -2024,8 +2032,34 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 		}
 	}
 
+	inviteOrgID := primitive.NilObjectID
+	if org != nil {
+		inviteOrgID = org.ID
+	}
+	now := s.nowUTC()
+	requiredRolesKey := roleSlugsKey([]string{roleSlug})
+	if existingInvites, listErr := s.store.ListInvitesByCreator(ctx, admin.ID, inviteOrgID); listErr == nil {
+		for _, existingInvite := range existingInvites {
+			if !strings.EqualFold(strings.TrimSpace(existingInvite.Email), email) {
+				continue
+			}
+			if existingInvite.UsedAt != nil || (!existingInvite.ExpiresAt.IsZero() && existingInvite.ExpiresAt.Before(now)) {
+				continue
+			}
+			if roleSlugsKey(existingInvite.RoleSlugs) != requiredRolesKey {
+				continue
+			}
+			if token := strings.TrimSpace(existingInvite.Token); token != "" {
+				return "/invite/" + token, ""
+			}
+		}
+	}
+
 	user, userErr := s.store.GetUserByEmail(ctx, email)
-	if userErr != nil || user == nil {
+	if userErr != nil && !errors.Is(userErr, mongo.ErrNoDocuments) {
+		return "", "failed to load existing user"
+	}
+	if user == nil {
 		createInput := AccountUser{
 			Email:     email,
 			RoleSlugs: []string{roleSlug},
@@ -2039,9 +2073,19 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 		}
 		createdUser, createErr := s.store.CreateUser(ctx, createInput)
 		if createErr != nil {
-			return "", "failed to create org admin user"
+			if isDuplicateSlugError(createErr) || strings.Contains(strings.ToLower(createErr.Error()), "email already exists") {
+				existingUser, existingErr := s.store.GetUserByEmail(ctx, email)
+				if existingErr == nil && existingUser != nil {
+					user = existingUser
+				} else {
+					return "", "failed to load existing user"
+				}
+			} else {
+				return "", "failed to create org admin user"
+			}
+		} else {
+			user = &createdUser
 		}
-		user = &createdUser
 	} else {
 		if userHasOrganizationContext(user) {
 			if org == nil || !accountMatchesOrg(user, org.ID, org.Slug) {
@@ -2069,18 +2113,14 @@ func (s *Server) createPlatformOrgAdminInvite(ctx context.Context, admin *Accoun
 	if tokenErr != nil {
 		return "", "failed to create invite"
 	}
-	inviteOrgID := primitive.NilObjectID
-	if org != nil {
-		inviteOrgID = org.ID
-	}
 	if _, inviteErr := s.store.CreateInvite(ctx, Invite{
 		OrgID:                inviteOrgID,
 		Email:                email,
 		UserMongoID:          user.ID,
 		RoleSlugs:            []string{roleSlug},
-		TokenHash:            token,
-		ExpiresAt:            s.nowUTC().Add(7 * 24 * time.Hour),
-		CreatedAt:            s.nowUTC(),
+		Token:                token,
+		ExpiresAt:            now.Add(7 * 24 * time.Hour),
+		CreatedAt:            now,
 		CreatedByUserMongoID: admin.ID,
 	}); inviteErr != nil {
 		return "", "failed to create invite"
@@ -2185,13 +2225,18 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		} else if invite.ExpiresAt.Before(now) {
 			status = "expired"
 		}
+		inviteLink := ""
+		if token := strings.TrimSpace(invite.Token); token != "" {
+			inviteLink = "/invite/" + token
+		}
 		orgInvites = append(orgInvites, OrgAdminInviteRow{
-			Email:     invite.Email,
-			RoleSlugs: append([]string(nil), invite.RoleSlugs...),
-			CreatedAt: invite.CreatedAt,
-			ExpiresAt: invite.ExpiresAt,
-			UsedAt:    invite.UsedAt,
-			Status:    status,
+			Email:      invite.Email,
+			RoleSlugs:  append([]string(nil), invite.RoleSlugs...),
+			InviteLink: inviteLink,
+			CreatedAt:  invite.CreatedAt,
+			ExpiresAt:  invite.ExpiresAt,
+			UsedAt:     invite.UsedAt,
+			Status:     status,
 		})
 	}
 
@@ -2441,9 +2486,35 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		selectedRolesKey := roleSlugsKey(selectedRoles)
+		now := s.nowUTC()
+		if existingInvites, listErr := s.store.ListInvitesByCreator(r.Context(), admin.ID, *admin.OrgID); listErr == nil {
+			for _, existingInvite := range existingInvites {
+				if !strings.EqualFold(strings.TrimSpace(existingInvite.Email), email) {
+					continue
+				}
+				if existingInvite.UsedAt != nil || (!existingInvite.ExpiresAt.IsZero() && existingInvite.ExpiresAt.Before(now)) {
+					continue
+				}
+				if roleSlugsKey(existingInvite.RoleSlugs) != selectedRolesKey {
+					continue
+				}
+				inviteLink := ""
+				if token := strings.TrimSpace(existingInvite.Token); token != "" {
+					inviteLink = "/invite/" + token
+				}
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, inviteLink, "")
+				return
+			}
+		}
 
 		user, userErr := s.store.GetUserByEmail(r.Context(), email)
-		if userErr != nil || user == nil {
+		if userErr != nil && !errors.Is(userErr, mongo.ErrNoDocuments) {
+			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"})
+			return
+		}
+		createdNow := false
+		if user == nil {
 			orgID := *admin.OrgID
 			created, createErr := s.store.CreateUser(r.Context(), AccountUser{
 				OrgID:     &orgID,
@@ -2454,11 +2525,24 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				CreatedAt: s.nowUTC(),
 			})
 			if createErr != nil {
-				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create user"})
-				return
+				if isDuplicateSlugError(createErr) || strings.Contains(strings.ToLower(createErr.Error()), "email already exists") {
+					existing, existingErr := s.store.GetUserByEmail(r.Context(), email)
+					if existingErr == nil && existing != nil {
+						user = existing
+					} else {
+						s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"})
+						return
+					}
+				} else {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create user"})
+					return
+				}
+			} else {
+				user = &created
+				createdNow = true
 			}
-			user = &created
-		} else {
+		}
+		if !createdNow {
 			if !accountMatchesOrg(user, *admin.OrgID, admin.OrgSlug) {
 				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
 				return
@@ -2480,9 +2564,9 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			Email:                email,
 			UserMongoID:          user.ID,
 			RoleSlugs:            selectedRoles,
-			TokenHash:            token,
-			ExpiresAt:            s.nowUTC().Add(7 * 24 * time.Hour),
-			CreatedAt:            s.nowUTC(),
+			Token:                token,
+			ExpiresAt:            now.Add(7 * 24 * time.Hour),
+			CreatedAt:            now,
 			CreatedByUserMongoID: admin.ID,
 		}); err != nil {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
