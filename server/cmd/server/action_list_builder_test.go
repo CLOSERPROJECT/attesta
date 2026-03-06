@@ -103,7 +103,7 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 			"1.1": {
 				State:  "done",
 				DoneAt: &doneAt,
-				DoneBy: &Actor{UserID: "u1", Role: "dep1"},
+				DoneBy: &Actor{ID: "u1", Role: "dep1"},
 				Data: map[string]interface{}{
 					"payload": map[string]interface{}{
 						"details": map[string]interface{}{
@@ -261,7 +261,7 @@ func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 			"1.1": {
 				State:  "done",
 				DoneAt: &doneAt,
-				DoneBy: &Actor{UserID: "u2", Role: "dep2"},
+				DoneBy: &Actor{ID: "u2", Role: "dep2"},
 				Data:   map[string]interface{}{"value": "ok"},
 			},
 		},

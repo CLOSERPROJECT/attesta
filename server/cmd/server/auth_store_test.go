@@ -91,7 +91,6 @@ func TestMongoStoreEnsureAuthIndexes(t *testing.T) {
 	})
 	assertIndexes(collectionUsers, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "email", Value: 1}}, Options: options.Index().SetUnique(true)},
-		{Keys: bson.D{{Key: "userId", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "orgId", Value: 1}}},
 	})
 	assertIndexes(collectionInvites, []mongo.IndexModel{
@@ -102,7 +101,7 @@ func TestMongoStoreEnsureAuthIndexes(t *testing.T) {
 	assertIndexes(collectionSessions, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "sessionId", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
-		{Keys: bson.D{{Key: "userId", Value: 1}}},
+		{Keys: bson.D{{Key: "userMongoId", Value: 1}}},
 	})
 	assertIndexes(collectionPasswordReset, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},

@@ -132,7 +132,6 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 func TestHandleWorkflowHomeShowsOrgsLinkForPlatformAdmin(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "workflow-platform-admin",
 		Email:           "workflow-platform-admin@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",

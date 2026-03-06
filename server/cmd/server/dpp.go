@@ -162,7 +162,7 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 					subView.DoneAt = progress.DoneAt.Format(time.RFC3339)
 				}
 				if progress.DoneBy != nil {
-					subView.DoneBy = progress.DoneBy.UserID
+					subView.DoneBy = progress.DoneBy.ID
 				}
 				subView.Digest = digestPayload(progress.Data)
 				subView.Values = dppTraceValues(progress.Data)

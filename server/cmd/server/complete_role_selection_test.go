@@ -15,7 +15,6 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 	now := time.Date(2026, 2, 26, 16, 0, 0, 0, time.UTC)
 
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-session",
 		Email:     "u-session@example.com",
 		RoleSlugs: []string{"dep1", "dep2"},
 		Status:    "active",
@@ -26,7 +25,6 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 	}
 	session, err := store.CreateSession(t.Context(), Session{
 		SessionID:   "session-role",
-		UserID:      user.UserID,
 		UserMongoID: user.ID,
 		CreatedAt:   now,
 		LastLoginAt: now,
@@ -92,7 +90,6 @@ func TestHandleCompleteSubstepRejectsInvalidActiveRole(t *testing.T) {
 	now := time.Date(2026, 2, 26, 16, 0, 0, 0, time.UTC)
 
 	user, _ := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-session",
 		Email:     "u-session@example.com",
 		RoleSlugs: []string{"dep1", "dep2"},
 		Status:    "active",
@@ -100,7 +97,6 @@ func TestHandleCompleteSubstepRejectsInvalidActiveRole(t *testing.T) {
 	})
 	session, _ := store.CreateSession(t.Context(), Session{
 		SessionID:   "session-role",
-		UserID:      user.UserID,
 		UserMongoID: user.ID,
 		CreatedAt:   now,
 		LastLoginAt: now,

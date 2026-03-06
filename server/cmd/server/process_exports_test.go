@@ -26,7 +26,7 @@ func TestHandleNotarizedJSON(t *testing.T) {
 			"1_1": {
 				State:  "done",
 				DoneAt: ptrTime(now.Add(-10 * time.Minute)),
-				DoneBy: &Actor{UserID: "u1", Role: "dep1"},
+				DoneBy: &Actor{ID: "u1", Role: "dep1"},
 				Data:   map[string]interface{}{"value": 42},
 			},
 		},
@@ -107,7 +107,7 @@ func TestHandleMerkleJSON(t *testing.T) {
 			"1_1": {
 				State:  "done",
 				DoneAt: ptrTime(now.Add(-10 * time.Minute)),
-				DoneBy: &Actor{UserID: "u1", Role: "dep1"},
+				DoneBy: &Actor{ID: "u1", Role: "dep1"},
 				Data:   map[string]interface{}{"value": 42},
 			},
 		},

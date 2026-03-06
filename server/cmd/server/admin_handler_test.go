@@ -58,25 +58,25 @@ func (s *adminFailingStore) CreateInvite(ctx context.Context, invite Invite) (In
 	return s.MemoryStore.CreateInvite(ctx, invite)
 }
 
-func (s *adminFailingStore) SetUserRoles(ctx context.Context, userID string, roleSlugs []string) error {
+func (s *adminFailingStore) SetUserRoles(ctx context.Context, userMongoID primitive.ObjectID, roleSlugs []string) error {
 	if s.failSetUserRoles {
 		return errors.New("set user roles failed")
 	}
-	return s.MemoryStore.SetUserRoles(ctx, userID, roleSlugs)
+	return s.MemoryStore.SetUserRoles(ctx, userMongoID, roleSlugs)
 }
 
-func (s *adminFailingStore) SetUserOrganization(ctx context.Context, userID string, orgID primitive.ObjectID, orgSlug string) error {
+func (s *adminFailingStore) SetUserOrganization(ctx context.Context, userMongoID, orgID primitive.ObjectID, orgSlug string) error {
 	if s.failSetUserOrg {
 		return errors.New("set user organization failed")
 	}
-	return s.MemoryStore.SetUserOrganization(ctx, userID, orgID, orgSlug)
+	return s.MemoryStore.SetUserOrganization(ctx, userMongoID, orgID, orgSlug)
 }
 
-func (s *adminFailingStore) DisableUser(ctx context.Context, userID string) error {
+func (s *adminFailingStore) DisableUser(ctx context.Context, userMongoID primitive.ObjectID) error {
 	if s.failDisableUser {
 		return errors.New("disable user failed")
 	}
-	return s.MemoryStore.DisableUser(ctx, userID)
+	return s.MemoryStore.DisableUser(ctx, userMongoID)
 }
 
 func (s *adminFailingStore) SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error) {
@@ -104,8 +104,7 @@ func createSessionForTestUser(t *testing.T, store *MemoryStore, user AccountUser
 	t.Helper()
 	now := time.Now().UTC()
 	session, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "s-" + user.UserID,
-		UserID:      user.UserID,
+		SessionID:   "s-" + user.ID.Hex(),
 		UserMongoID: user.ID,
 		OrgID:       user.OrgID,
 		CreatedAt:   now,
@@ -121,7 +120,6 @@ func createSessionForTestUser(t *testing.T, store *MemoryStore, user AccountUser
 func TestHandleAdminOrgsAccessControl(t *testing.T) {
 	store := NewMemoryStore()
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "user-a",
 		Email:     "user-a@example.com",
 		RoleSlugs: []string{"dep1"},
 		Status:    "active",
@@ -146,7 +144,6 @@ func TestHandleAdminOrgsAccessControl(t *testing.T) {
 func TestHandleAdminOrgsCreateOrgAndInvite(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin",
 		Email:           "platform@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -238,7 +235,6 @@ func TestHandleAdminOrgsCreateOrgAndInvite(t *testing.T) {
 func TestHandleAdminOrgsCreateOrgRejectsInvalidLogo(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-invalid-logo",
 		Email:           "platform-invalid-logo@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -290,7 +286,6 @@ func TestHandleAdminOrgsCreateOrgRejectsInvalidLogo(t *testing.T) {
 func TestHandleAdminOrgsCreateOrgLogoValidationAndStoreErrors(t *testing.T) {
 	base := NewMemoryStore()
 	admin, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-logo-errors",
 		Email:           "platform-logo-errors@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -408,7 +403,6 @@ func TestOrganizationLogoMaxBytes(t *testing.T) {
 func TestHandleAdminOrgsDuplicateSlugRendersExplicitError(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-dup-org",
 		Email:           "platform-dup-org@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -453,7 +447,6 @@ func TestHandleAdminOrgsDuplicateSlugRendersExplicitError(t *testing.T) {
 func TestHandleAdminOrgsDuplicateSlugBlockedAtInputBeforeCreate(t *testing.T) {
 	base := NewMemoryStore()
 	admin, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-input-check",
 		Email:           "platform-input-check@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -492,7 +485,6 @@ func TestHandleOrgAdminCreateRoleAndUserInvite(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin@acme.org",
@@ -540,7 +532,6 @@ func TestHandleOrgAdminRolesDuplicateSlugRendersExplicitError(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-dup-role",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-dup-role@acme.org",
@@ -599,7 +590,6 @@ func TestHandleOrgAdminRolesStoresPaletteStyle(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-role-colors",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-role-colors@acme.org",
@@ -643,7 +633,6 @@ func TestHandleOrgAdminRolesDerivesPaletteFromRoleNameWhenMissing(t *testing.T) 
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-role-derived",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-role-derived@acme.org",
@@ -688,7 +677,6 @@ func TestHandleOrgAdminRolesDefaultsToRedPaletteForUnknownValue(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-role-default",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-role-default@acme.org",
@@ -733,7 +721,6 @@ func TestHandleOrgAdminRolesDuplicateSlugBlockedAtInputBeforeCreate(t *testing.T
 	_, _ = base.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-role-input-check",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-role-input-check@acme.org",
@@ -772,7 +759,6 @@ func TestHandleOrgAdminUsersGetRendersInviteAndUserCollections(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "org-admin-counts",
 		OrgID:        &orgID,
 		OrgSlug:      org.Slug,
 		Email:        "org-admin-counts@acme.org",
@@ -785,7 +771,6 @@ func TestHandleOrgAdminUsersGetRendersInviteAndUserCollections(t *testing.T) {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "active-user",
 		OrgID:        &orgID,
 		OrgSlug:      org.Slug,
 		Email:        "active-user@acme.org",
@@ -797,7 +782,6 @@ func TestHandleOrgAdminUsersGetRendersInviteAndUserCollections(t *testing.T) {
 		t.Fatalf("CreateUser active error: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "deleted-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "deleted-user@acme.org",
@@ -809,26 +793,24 @@ func TestHandleOrgAdminUsersGetRendersInviteAndUserCollections(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:           org.ID,
-		Email:           "invitee@acme.org",
-		UserID:          "invited-1",
-		RoleSlugs:       []string{"qa-reviewer"},
-		TokenHash:       "token-1",
-		ExpiresAt:       now.Add(24 * time.Hour),
-		CreatedAt:       now,
-		CreatedByUserID: adminUser.UserID,
+		OrgID:                org.ID,
+		Email:                "invitee@acme.org",
+		RoleSlugs:            []string{"qa-reviewer"},
+		TokenHash:            "token-1",
+		ExpiresAt:            now.Add(24 * time.Hour),
+		CreatedAt:            now,
+		CreatedByUserMongoID: adminUser.ID,
 	}); err != nil {
 		t.Fatalf("CreateInvite primary error: %v", err)
 	}
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:           org.ID,
-		Email:           "other@acme.org",
-		UserID:          "invited-2",
-		RoleSlugs:       []string{"qa-reviewer"},
-		TokenHash:       "token-2",
-		ExpiresAt:       now.Add(24 * time.Hour),
-		CreatedAt:       now,
-		CreatedByUserID: "someone-else",
+		OrgID:                org.ID,
+		Email:                "other@acme.org",
+		RoleSlugs:            []string{"qa-reviewer"},
+		TokenHash:            "token-2",
+		ExpiresAt:            now.Add(24 * time.Hour),
+		CreatedAt:            now,
+		CreatedByUserMongoID: primitive.NewObjectID(),
 	}); err != nil {
 		t.Fatalf("CreateInvite secondary error: %v", err)
 	}
@@ -866,7 +848,6 @@ func TestHandleOrgAdminUsersGetIncludesSelectedRoleStyleData(t *testing.T) {
 	})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-style-view",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-style-view@acme.org",
@@ -878,7 +859,6 @@ func TestHandleOrgAdminUsersGetIncludesSelectedRoleStyleData(t *testing.T) {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "style-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "style-user@acme.org",
@@ -919,7 +899,6 @@ func TestHandleOrgAdminUsersGetIncludesFallbackRoleStyleData(t *testing.T) {
 	})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-fallback-style-view",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-fallback-style-view@acme.org",
@@ -931,7 +910,6 @@ func TestHandleOrgAdminUsersGetIncludesFallbackRoleStyleData(t *testing.T) {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "fallback-style-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "fallback-style-user@acme.org",
@@ -966,7 +944,6 @@ func TestHandleOrgAdminUsersInviteAllowsNoRoles(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-no-roles",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-no-roles@acme.org",
@@ -999,7 +976,7 @@ func TestHandleOrgAdminUsersInviteAllowsNoRoles(t *testing.T) {
 	if len(user.RoleSlugs) != 0 {
 		t.Fatalf("expected invited user to have no roles, got %#v", user.RoleSlugs)
 	}
-	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.UserID, org.ID)
+	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.ID, org.ID)
 	if err != nil {
 		t.Fatalf("ListInvitesByCreator error: %v", err)
 	}
@@ -1020,7 +997,6 @@ func TestHandleOrgAdminUsersUpdateOrgProfile(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-update-org",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-update-org@acme.org",
@@ -1075,9 +1051,9 @@ func TestHandleOrgAdminUsersUpdateOrgProfile(t *testing.T) {
 	if updatedOrg.LogoAttachmentID == "" {
 		t.Fatal("expected organization logo attachment id to be set")
 	}
-	updatedAdmin, err := store.GetUserByUserID(t.Context(), adminUser.UserID)
+	updatedAdmin, err := store.GetUserByMongoID(t.Context(), adminUser.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID error: %v", err)
+		t.Fatalf("GetUserByMongoID error: %v", err)
 	}
 	if updatedAdmin.OrgSlug != updatedOrg.Slug {
 		t.Fatalf("admin org slug = %q, want %q", updatedAdmin.OrgSlug, updatedOrg.Slug)
@@ -1096,7 +1072,6 @@ func TestHandleOrgAdminUsersUpdateOrgProfileErrors(t *testing.T) {
 	_, _ = base.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-update-org-errors",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-update-org-errors@acme.org",
@@ -1174,7 +1149,6 @@ func TestHandleOrgAdminLogo(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-logo",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-logo@acme.org",
@@ -1226,7 +1200,6 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 		_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 		orgID := org.ID
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-method",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-logo-method@acme.org",
@@ -1251,7 +1224,6 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 		_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 		orgID := org.ID
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-empty-id",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-logo-empty-id@acme.org",
@@ -1279,7 +1251,6 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 		}
 		orgID := org.ID
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-invalid-id",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-logo-invalid-id@acme.org",
@@ -1308,7 +1279,6 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 		}
 		orgID := org.ID
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-missing-attachment",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-logo-missing-attachment@acme.org",
@@ -1330,16 +1300,15 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 	t.Run("organization missing returns not found", func(t *testing.T) {
 		store := NewMemoryStore()
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-org-missing",
 			Email:     "org-admin-logo-org-missing@acme.org",
 			RoleSlugs: []string{"org-admin"},
 			Status:    "active",
 			CreatedAt: time.Now().UTC(),
 		})
 		store.mu.Lock()
-		updated := store.usersByUserID[adminUser.UserID]
+		updated := store.usersByID[adminUser.ID]
 		updated.OrgSlug = "missing-org"
-		store.usersByUserID[adminUser.UserID] = updated
+		store.usersByID[adminUser.ID] = updated
 		store.mu.Unlock()
 		adminUser.OrgSlug = "missing-org"
 		sessionID := createSessionForTestUser(t, store, adminUser)
@@ -1369,7 +1338,6 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 		}
 		orgID := org.ID
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-mismatch",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-logo-mismatch@acme.org",
@@ -1404,7 +1372,6 @@ func TestHandleOrgAdminLogoValidationPaths(t *testing.T) {
 		}
 		orgID := org.ID
 		adminUser, _ := base.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-logo-open-fail",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-logo-open-fail@acme.org",
@@ -1429,7 +1396,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 	t.Run("creates unassigned org admin invite when org is nil", func(t *testing.T) {
 		store := NewMemoryStore()
 		admin, err := store.CreateUser(t.Context(), AccountUser{
-			UserID:          "platform-admin-invite-direct",
 			Email:           "platform-admin-invite-direct@example.com",
 			IsPlatformAdmin: true,
 			Status:          "active",
@@ -1457,7 +1423,7 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 		if !containsRole(invited.RoleSlugs, "org-admin") {
 			t.Fatalf("expected org-admin role, got %#v", invited.RoleSlugs)
 		}
-		invites, err := store.ListInvitesByCreator(t.Context(), admin.UserID, primitive.NilObjectID)
+		invites, err := store.ListInvitesByCreator(t.Context(), admin.ID, primitive.NilObjectID)
 		if err != nil {
 			t.Fatalf("ListInvitesByCreator error: %v", err)
 		}
@@ -1469,7 +1435,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 	t.Run("fails when assigning existing unassigned user org fails", func(t *testing.T) {
 		base := NewMemoryStore()
 		admin, err := base.CreateUser(t.Context(), AccountUser{
-			UserID:          "platform-admin-invite-assign-fail",
 			Email:           "platform-admin-invite-assign-fail@example.com",
 			IsPlatformAdmin: true,
 			Status:          "active",
@@ -1483,7 +1448,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 			t.Fatalf("CreateOrganization error: %v", err)
 		}
 		if _, err := base.CreateUser(t.Context(), AccountUser{
-			UserID:    "existing-unassigned",
 			Email:     "existing-unassigned@example.com",
 			RoleSlugs: []string{"viewer"},
 			Status:    "active",
@@ -1506,7 +1470,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 	t.Run("fails when existing user belongs to another org", func(t *testing.T) {
 		store := NewMemoryStore()
 		admin, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:          "platform-admin-invite-other-org",
 			Email:           "platform-admin-invite-other-org@example.com",
 			IsPlatformAdmin: true,
 			Status:          "active",
@@ -1516,7 +1479,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 		orgB, _ := store.CreateOrganization(t.Context(), Organization{Name: "Org B"})
 		orgBID := orgB.ID
 		_, _ = store.CreateUser(t.Context(), AccountUser{
-			UserID:    "existing-other-org",
 			OrgID:     &orgBID,
 			OrgSlug:   orgB.Slug,
 			Email:     "existing-other-org@example.com",
@@ -1538,7 +1500,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 	t.Run("fails when updating existing user roles fails", func(t *testing.T) {
 		base := NewMemoryStore()
 		admin, _ := base.CreateUser(t.Context(), AccountUser{
-			UserID:          "platform-admin-invite-role-update-fail",
 			Email:           "platform-admin-invite-role-update-fail@example.com",
 			IsPlatformAdmin: true,
 			Status:          "active",
@@ -1547,7 +1508,6 @@ func TestCreatePlatformOrgAdminInvitePaths(t *testing.T) {
 		org, _ := base.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
 		orgID := org.ID
 		_, _ = base.CreateUser(t.Context(), AccountUser{
-			UserID:    "existing-same-org",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "existing-same-org@example.com",
@@ -1572,7 +1532,6 @@ func TestHandleOrgAdminRolesAdditionalPaths(t *testing.T) {
 	t.Run("unassigned org admin must create org first", func(t *testing.T) {
 		store := NewMemoryStore()
 		adminUser, err := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-roles-unassigned",
 			Email:     "org-admin-roles-unassigned@acme.org",
 			RoleSlugs: []string{"org-admin"},
 			Status:    "active",
@@ -1601,7 +1560,6 @@ func TestHandleOrgAdminRolesAdditionalPaths(t *testing.T) {
 		_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 		orgID := org.ID
 		adminUser, _ := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-roles-get",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-roles-get@acme.org",
@@ -1627,7 +1585,6 @@ func TestHandleOrgAdminRolesAdditionalPaths(t *testing.T) {
 func TestHandleOrgAdminUsersCreateOrgForUnassignedOrgAdmin(t *testing.T) {
 	store := NewMemoryStore()
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-unassigned-create",
 		Email:     "org-admin-unassigned-create@acme.org",
 		RoleSlugs: []string{"org-admin"},
 		Status:    "active",
@@ -1664,9 +1621,9 @@ func TestHandleOrgAdminUsersCreateOrgForUnassignedOrgAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetOrganizationBySlug error: %v", err)
 	}
-	updatedAdmin, err := store.GetUserByUserID(t.Context(), adminUser.UserID)
+	updatedAdmin, err := store.GetUserByMongoID(t.Context(), adminUser.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID error: %v", err)
+		t.Fatalf("GetUserByMongoID error: %v", err)
 	}
 	if updatedAdmin.OrgID == nil || *updatedAdmin.OrgID != org.ID {
 		t.Fatalf("expected admin org id %s, got %+v", org.ID.Hex(), updatedAdmin.OrgID)
@@ -1687,7 +1644,6 @@ func TestHandleOrgAdminUsersCreateOrgValidationAndFailurePaths(t *testing.T) {
 		t.Helper()
 		store := NewMemoryStore()
 		adminUser, err := store.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-unassigned-errors-" + strings.ReplaceAll(strings.ToLower(t.Name()), "/", "-"),
 			Email:     "org-admin-unassigned-errors+" + strings.ReplaceAll(strings.ToLower(t.Name()), "/", "-") + "@acme.org",
 			RoleSlugs: []string{"org-admin"},
 			Status:    "active",
@@ -1816,7 +1772,6 @@ func TestHandleOrgAdminUsersInviteRejectsExistingEmailFromAnotherOrg(t *testing.
 	orgAID := orgA.ID
 	orgBID := orgB.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-cross-org",
 		OrgID:     &orgAID,
 		OrgSlug:   orgA.Slug,
 		Email:     "org-admin-cross-org@orga.org",
@@ -1828,7 +1783,6 @@ func TestHandleOrgAdminUsersInviteRejectsExistingEmailFromAnotherOrg(t *testing.
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "existing-user",
 		OrgID:     &orgBID,
 		OrgSlug:   orgB.Slug,
 		Email:     "existing@shared.org",
@@ -1853,7 +1807,7 @@ func TestHandleOrgAdminUsersInviteRejectsExistingEmailFromAnotherOrg(t *testing.
 	if !strings.Contains(rec.Body.String(), "email already belongs to another organization") {
 		t.Fatalf("expected cross-org email error, got %q", rec.Body.String())
 	}
-	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.UserID, orgA.ID)
+	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.ID, orgA.ID)
 	if err != nil {
 		t.Fatalf("ListInvitesByCreator error: %v", err)
 	}
@@ -1873,7 +1827,6 @@ func TestHandleOrgAdminUsersInviteExistingUserMergesRoles(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Approver", Slug: "approver", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-merge",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-merge@acme.org",
@@ -1885,7 +1838,6 @@ func TestHandleOrgAdminUsersInviteExistingUserMergesRoles(t *testing.T) {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "existing-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "existing-user@acme.org",
@@ -1914,7 +1866,7 @@ func TestHandleOrgAdminUsersInviteExistingUserMergesRoles(t *testing.T) {
 	if !containsRole(user.RoleSlugs, "qa-reviewer") || !containsRole(user.RoleSlugs, "approver") {
 		t.Fatalf("expected merged role slugs, got %#v", user.RoleSlugs)
 	}
-	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.UserID, org.ID)
+	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.ID, org.ID)
 	if err != nil {
 		t.Fatalf("ListInvitesByCreator error: %v", err)
 	}
@@ -1937,7 +1889,6 @@ func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Approver", Slug: "approver", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-set-roles",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-set-roles@acme.org",
@@ -1949,7 +1900,6 @@ func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	targetUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "target-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "target-user@acme.org",
@@ -1972,9 +1922,9 @@ func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.
 	if updateRec.Code != http.StatusOK {
 		t.Fatalf("set_roles status = %d, want %d", updateRec.Code, http.StatusOK)
 	}
-	target, err := store.GetUserByUserID(t.Context(), "target-user")
+	target, err := store.GetUserByMongoID(t.Context(), targetUser.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID target error: %v", err)
+		t.Fatalf("GetUserByMongoID target error: %v", err)
 	}
 	if len(target.RoleSlugs) != 1 || target.RoleSlugs[0] != "approver" {
 		t.Fatalf("target roles = %#v, want [approver]", target.RoleSlugs)
@@ -2003,7 +1953,6 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "org-admin-delete",
 		OrgID:        &orgID,
 		OrgSlug:      org.Slug,
 		Email:        "org-admin-delete@acme.org",
@@ -2016,7 +1965,6 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	targetUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "delete-target",
 		OrgID:        &orgID,
 		OrgSlug:      org.Slug,
 		Email:        "delete-target@acme.org",
@@ -2040,9 +1988,9 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 	if deleteRec.Code != http.StatusOK {
 		t.Fatalf("delete_user status = %d, want %d", deleteRec.Code, http.StatusOK)
 	}
-	deleted, err := store.GetUserByUserID(t.Context(), "delete-target")
+	deleted, err := store.GetUserByMongoID(t.Context(), targetUser.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID deleted error: %v", err)
+		t.Fatalf("GetUserByMongoID deleted error: %v", err)
 	}
 	if deleted.Status != "deleted" || deleted.PasswordHash != "" || len(deleted.RoleSlugs) != 0 {
 		t.Fatalf("deleted account not disabled as expected: %#v", deleted)
@@ -2089,7 +2037,6 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 	orgAID := orgA.ID
 	orgBID := orgB.ID
 	adminUser, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-errors",
 		OrgID:     &orgAID,
 		OrgSlug:   orgA.Slug,
 		Email:     "org-admin-errors@orga.org",
@@ -2101,7 +2048,6 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
 	sameOrgUser, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "same-org-user",
 		OrgID:     &orgAID,
 		OrgSlug:   orgA.Slug,
 		Email:     "same-org-user@orga.org",
@@ -2113,7 +2059,6 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 		t.Fatalf("CreateUser same-org error: %v", err)
 	}
 	otherOrgUser, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "other-org-user",
 		OrgID:     &orgBID,
 		OrgSlug:   orgB.Slug,
 		Email:     "other-org-user@orgb.org",
@@ -2242,7 +2187,6 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-nav",
 		Email:           "platform-nav@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -2270,7 +2214,6 @@ func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
 func TestHandleAdminOrgsInviteValidationError(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-invite",
 		Email:           "platform-invite@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -2302,7 +2245,6 @@ func TestHandleAdminOrgsInviteValidationError(t *testing.T) {
 func TestHandleAdminOrgsInviteIntentValidationPaths(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-invite-validation",
 		Email:           "platform-invite-validation@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -2355,7 +2297,6 @@ func TestHandleAdminOrgsInviteIntentValidationPaths(t *testing.T) {
 func TestHandleAdminOrgsInviteIntentExistingUserAndFailurePaths(t *testing.T) {
 	base := NewMemoryStore()
 	admin, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-existing-user",
 		Email:           "platform-existing-user@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -2379,7 +2320,6 @@ func TestHandleAdminOrgsInviteIntentExistingUserAndFailurePaths(t *testing.T) {
 	}
 	orgID := org.ID
 	if _, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "existing-org-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "existing-org-user@acme.org",
@@ -2450,7 +2390,6 @@ func TestHandleOrgAdminRolesAndUsersValidationPaths(t *testing.T) {
 	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 	orgID := org.ID
 	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-validation",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-validation@acme.org",
@@ -2493,7 +2432,6 @@ func TestAdminHandlersFailurePaths(t *testing.T) {
 	t.Run("platform admin create organization failure", func(t *testing.T) {
 		base := NewMemoryStore()
 		admin, err := base.CreateUser(t.Context(), AccountUser{
-			UserID:          "platform-admin-failure",
 			Email:           "platform-failure@example.com",
 			IsPlatformAdmin: true,
 			Status:          "active",
@@ -2524,7 +2462,6 @@ func TestAdminHandlersFailurePaths(t *testing.T) {
 		_, _ = base.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
 		orgID := org.ID
 		admin, err := base.CreateUser(t.Context(), AccountUser{
-			UserID:    "org-admin-failure",
 			OrgID:     &orgID,
 			OrgSlug:   org.Slug,
 			Email:     "org-admin-failure@example.com",
@@ -2584,7 +2521,6 @@ func TestAdminHandlersMethodAndParseErrors(t *testing.T) {
 	}
 	orgID := org.ID
 	platformAdmin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:          "platform-admin-methods",
 		Email:           "platform-methods@example.com",
 		IsPlatformAdmin: true,
 		Status:          "active",
@@ -2594,7 +2530,6 @@ func TestAdminHandlersMethodAndParseErrors(t *testing.T) {
 		t.Fatalf("CreateUser platform admin error: %v", err)
 	}
 	orgAdmin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-methods",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-methods@example.com",
@@ -2701,7 +2636,6 @@ func TestOrgAdminRoleCreationFailureRendersError(t *testing.T) {
 	}
 	orgID := org.ID
 	admin, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "org-admin-role-fail",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
 		Email:     "org-admin-role-fail@example.com",
@@ -2738,7 +2672,6 @@ func TestRenderAdminTemplatesErrorPaths(t *testing.T) {
 	}
 	orgID := org.ID
 	user := &AccountUser{
-		UserID:          "render-user",
 		OrgID:           &orgID,
 		OrgSlug:         org.Slug,
 		RoleSlugs:       []string{"org-admin"},

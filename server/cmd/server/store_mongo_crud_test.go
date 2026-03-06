@@ -269,8 +269,8 @@ func TestMongoStoreUpdateOrganizationProfile(t *testing.T) {
 		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
 			return &fakeAnyCursor{
 				items: []interface{}{
-					AccountUser{UserID: "u-1", OrgID: &currentOrgID, OrgSlug: oldSlug, Email: "u1@acme.org"},
-					AccountUser{UserID: "u-2", OrgID: &currentOrgID, OrgSlug: oldSlug, Email: "u2@acme.org"},
+					AccountUser{OrgID: &currentOrgID, OrgSlug: oldSlug, Email: "u1@acme.org"},
+					AccountUser{OrgID: &currentOrgID, OrgSlug: oldSlug, Email: "u2@acme.org"},
 				},
 			}, nil
 		},
@@ -361,15 +361,16 @@ func TestMongoStoreSetUserOrganization(t *testing.T) {
 		collectionUsers: usersCollection,
 	}}}
 	orgID := primitive.NewObjectID()
+	userMongoID := primitive.NewObjectID()
 
-	if err := store.SetUserOrganization(t.Context(), " user-1 ", orgID, "Fresh Org"); err != nil {
+	if err := store.SetUserOrganization(t.Context(), userMongoID, orgID, "Fresh Org"); err != nil {
 		t.Fatalf("SetUserOrganization returned error: %v", err)
 	}
 	if len(usersCollection.updateOneFilters) != 1 || len(usersCollection.updateOneUpdates) != 1 {
 		t.Fatalf("expected one UpdateOne call, got filters=%d updates=%d", len(usersCollection.updateOneFilters), len(usersCollection.updateOneUpdates))
 	}
-	if !reflect.DeepEqual(usersCollection.updateOneFilters[0], bson.M{"userId": "user-1"}) {
-		t.Fatalf("filter = %#v, want trimmed user id", usersCollection.updateOneFilters[0])
+	if !reflect.DeepEqual(usersCollection.updateOneFilters[0], bson.M{"_id": userMongoID}) {
+		t.Fatalf("filter = %#v, want user mongo id", usersCollection.updateOneFilters[0])
 	}
 	wantUpdate := bson.M{"$set": bson.M{"orgId": orgID, "orgSlug": "fresh-org"}}
 	if !reflect.DeepEqual(usersCollection.updateOneUpdates[0], wantUpdate) {
@@ -380,7 +381,7 @@ func TestMongoStoreSetUserOrganization(t *testing.T) {
 	usersCollection.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
 		return nil, updateErr
 	}
-	if err := store.SetUserOrganization(t.Context(), "user-1", orgID, "Fresh Org"); !errors.Is(err, updateErr) {
+	if err := store.SetUserOrganization(t.Context(), userMongoID, orgID, "Fresh Org"); !errors.Is(err, updateErr) {
 		t.Fatalf("SetUserOrganization error = %v, want %v", err, updateErr)
 	}
 }

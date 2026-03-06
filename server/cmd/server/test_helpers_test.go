@@ -72,7 +72,7 @@ func testTemplates() *template.Template {
 {{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "home_body"}}HOME{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
-{{define "dashboard_body"}}DASHBOARD_ME {{.UserID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
+{{define "dashboard_body"}}DASHBOARD_ME {{.ID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
 {{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}

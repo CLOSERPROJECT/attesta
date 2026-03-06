@@ -23,7 +23,7 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 		CreatedAt: time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC),
 		Progress:  map[string]ProcessStep{},
 	}
-	actor := Actor{UserID: "u1", Role: "dep1"}
+	actor := Actor{ID: "u1", Role: "dep1"}
 
 	tests := []struct {
 		name   string
@@ -79,7 +79,7 @@ func TestRenderActionViewsReturn500WhenConfigFails(t *testing.T) {
 		},
 	}
 	process := &Process{ID: primitive.NewObjectID(), Progress: map[string]ProcessStep{}}
-	actor := Actor{UserID: "u1", Role: "dep1"}
+	actor := Actor{ID: "u1", Role: "dep1"}
 
 	listRec := httptest.NewRecorder()
 	server.renderActionList(listRec, nil, process, actor, "error")

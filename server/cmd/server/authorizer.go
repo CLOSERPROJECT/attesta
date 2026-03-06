@@ -41,7 +41,7 @@ func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, process
 	request := map[string]interface{}{
 		"requestId": fmt.Sprintf("req-%d", a.now().UnixNano()),
 		"principal": map[string]interface{}{
-			"id":    actor.UserID,
+			"id":    actor.ID,
 			"roles": []string{"authenticated"},
 			"attr": map[string]interface{}{
 				"orgSlug":     strings.TrimSpace(actor.OrgSlug),
