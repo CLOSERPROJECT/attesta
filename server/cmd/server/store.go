@@ -61,6 +61,9 @@ type Store interface {
 	CreatePasswordReset(ctx context.Context, reset PasswordReset) (PasswordReset, error)
 	LoadPasswordResetByTokenHash(ctx context.Context, tokenHash string) (*PasswordReset, error)
 	MarkPasswordResetUsed(ctx context.Context, tokenHash string, usedAt time.Time) error
+	SaveFormataBuilderStream(ctx context.Context, stream FormataBuilderStream) (FormataBuilderStream, error)
+	LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error)
+	ListFormataBuilderStreams(ctx context.Context) ([]FormataBuilderStream, error)
 }
 
 type Organization struct {
@@ -129,6 +132,14 @@ type PasswordReset struct {
 	CreatedAt   time.Time          `bson:"createdAt"`
 }
 
+type FormataBuilderStream struct {
+	ID                   primitive.ObjectID `bson:"_id,omitempty"`
+	Key                  string             `bson:"key"`
+	Stream               string             `bson:"stream"`
+	UpdatedAt            time.Time          `bson:"updatedAt"`
+	UpdatedByUserMongoID primitive.ObjectID `bson:"updatedByUserMongoId"`
+}
+
 const (
 	collectionOrganizations = "organizations"
 	collectionRoles         = "roles"
@@ -136,6 +147,8 @@ const (
 	collectionInvites       = "invites"
 	collectionSessions      = "sessions"
 	collectionPasswordReset = "password_resets"
+	collectionFormataStream = "formata_builder_streams"
+	formataBuilderStreamKey = "default"
 )
 
 type MongoStore struct {
@@ -520,17 +533,18 @@ func (s *MongoStore) attachmentsBucket() (gridFSBucketPort, error) {
 }
 
 type MemoryStore struct {
-	mu            sync.RWMutex
-	processes     map[primitive.ObjectID]Process
-	notarizations []Notarization
-	attachments   map[primitive.ObjectID]memoryAttachment
-	organizations map[string]Organization
-	roles         map[string]Role
-	usersByID     map[primitive.ObjectID]AccountUser
-	usersByEmail  map[string]primitive.ObjectID
-	invites       map[string]Invite
-	sessions      map[string]Session
-	resets        map[string]PasswordReset
+	mu             sync.RWMutex
+	processes      map[primitive.ObjectID]Process
+	notarizations  []Notarization
+	attachments    map[primitive.ObjectID]memoryAttachment
+	organizations  map[string]Organization
+	roles          map[string]Role
+	usersByID      map[primitive.ObjectID]AccountUser
+	usersByEmail   map[string]primitive.ObjectID
+	invites        map[string]Invite
+	sessions       map[string]Session
+	resets         map[string]PasswordReset
+	formataStreams map[string]FormataBuilderStream
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -548,15 +562,16 @@ type memoryAttachment struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		processes:     map[primitive.ObjectID]Process{},
-		attachments:   map[primitive.ObjectID]memoryAttachment{},
-		organizations: map[string]Organization{},
-		roles:         map[string]Role{},
-		usersByID:     map[primitive.ObjectID]AccountUser{},
-		usersByEmail:  map[string]primitive.ObjectID{},
-		invites:       map[string]Invite{},
-		sessions:      map[string]Session{},
-		resets:        map[string]PasswordReset{},
+		processes:      map[primitive.ObjectID]Process{},
+		attachments:    map[primitive.ObjectID]memoryAttachment{},
+		organizations:  map[string]Organization{},
+		roles:          map[string]Role{},
+		usersByID:      map[primitive.ObjectID]AccountUser{},
+		usersByEmail:   map[string]primitive.ObjectID{},
+		invites:        map[string]Invite{},
+		sessions:       map[string]Session{},
+		resets:         map[string]PasswordReset{},
+		formataStreams: map[string]FormataBuilderStream{},
 	}
 }
 
@@ -1305,6 +1320,60 @@ func (s *MemoryStore) MarkPasswordResetUsed(_ context.Context, tokenHash string,
 	return nil
 }
 
+func (s *MemoryStore) SaveFormataBuilderStream(_ context.Context, stream FormataBuilderStream) (FormataBuilderStream, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stream.Key = strings.TrimSpace(stream.Key)
+	if stream.Key == "" {
+		stream.Key = formataBuilderStreamKey
+	}
+	if stream.UpdatedAt.IsZero() {
+		stream.UpdatedAt = time.Now().UTC()
+	}
+	if stream.ID.IsZero() {
+		if existing, ok := s.formataStreams[stream.Key]; ok && !existing.ID.IsZero() {
+			stream.ID = existing.ID
+		} else {
+			stream.ID = primitive.NewObjectID()
+		}
+	}
+	s.formataStreams[stream.Key] = stream
+	return stream, nil
+}
+
+func (s *MemoryStore) LoadFormataBuilderStream(_ context.Context) (*FormataBuilderStream, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	stream, ok := s.formataStreams[formataBuilderStreamKey]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copied := stream
+	return &copied, nil
+}
+
+func (s *MemoryStore) ListFormataBuilderStreams(_ context.Context) ([]FormataBuilderStream, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.formataStreams) == 0 {
+		return nil, nil
+	}
+	items := make([]FormataBuilderStream, 0, len(s.formataStreams))
+	for _, stream := range s.formataStreams {
+		items = append(items, stream)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].UpdatedAt.Equal(items[j].UpdatedAt) {
+			if items[i].Key == items[j].Key {
+				return items[i].ID.Hex() < items[j].ID.Hex()
+			}
+			return items[i].Key < items[j].Key
+		}
+		return items[i].UpdatedAt.After(items[j].UpdatedAt)
+	})
+	return items, nil
+}
+
 func cloneProcess(process Process) Process {
 	cloned := process
 	if process.DPP != nil {
@@ -1472,6 +1541,9 @@ func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
 		collectionPasswordReset: {
 			{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},
 			{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
+		},
+		collectionFormataStream: {
+			{Keys: bson.D{{Key: "key", Value: 1}}, Options: options.Index().SetUnique(true)},
 		},
 	}
 
@@ -1896,4 +1968,67 @@ func (s *MongoStore) MarkPasswordResetUsed(ctx context.Context, tokenHash string
 		bson.M{"$set": bson.M{"usedAt": usedAt.UTC()}},
 	)
 	return err
+}
+
+func (s *MongoStore) SaveFormataBuilderStream(ctx context.Context, stream FormataBuilderStream) (FormataBuilderStream, error) {
+	stream.Key = strings.TrimSpace(stream.Key)
+	if stream.Key == "" {
+		stream.Key = formataBuilderStreamKey
+	}
+	if stream.UpdatedAt.IsZero() {
+		stream.UpdatedAt = time.Now().UTC()
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"stream":               stream.Stream,
+			"updatedAt":            stream.UpdatedAt,
+			"updatedByUserMongoId": stream.UpdatedByUserMongoID,
+		},
+		"$setOnInsert": bson.M{
+			"key": stream.Key,
+		},
+	}
+	_, err := s.database().Collection(collectionFormataStream).UpdateOne(
+		ctx,
+		bson.M{"key": stream.Key},
+		update,
+		options.Update().SetUpsert(true),
+	)
+	if err != nil {
+		return FormataBuilderStream{}, err
+	}
+	loaded, err := s.LoadFormataBuilderStream(ctx)
+	if err != nil {
+		return FormataBuilderStream{}, err
+	}
+	return *loaded, nil
+}
+
+func (s *MongoStore) LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error) {
+	var stream FormataBuilderStream
+	if err := s.database().Collection(collectionFormataStream).FindOne(ctx, bson.M{"key": formataBuilderStreamKey}).Decode(&stream); err != nil {
+		return nil, err
+	}
+	return &stream, nil
+}
+
+func (s *MongoStore) ListFormataBuilderStreams(ctx context.Context) ([]FormataBuilderStream, error) {
+	cursor, err := s.database().Collection(collectionFormataStream).Find(
+		ctx,
+		bson.M{},
+		options.Find().SetSort(bson.D{{Key: "updatedAt", Value: -1}, {Key: "_id", Value: 1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	items := []FormataBuilderStream{}
+	for cursor.Next(ctx) {
+		var stream FormataBuilderStream
+		if err := cursor.Decode(&stream); err != nil {
+			continue
+		}
+		items = append(items, stream)
+	}
+	return items, nil
 }

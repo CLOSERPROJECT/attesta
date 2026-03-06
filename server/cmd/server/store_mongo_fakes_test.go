@@ -52,6 +52,7 @@ type fakeMongoCollection struct {
 	findOptionsCalls    [][]*options.FindOptions
 	updateOneFilters    []interface{}
 	updateOneUpdates    []interface{}
+	updateOneOptions    [][]*options.UpdateOptions
 	findOneAndUpdFilter []interface{}
 	findOneAndUpdUpdate []interface{}
 	createIndexesFn     func(ctx context.Context, models []mongo.IndexModel) error
@@ -89,6 +90,7 @@ func (c *fakeMongoCollection) Find(ctx context.Context, filter interface{}, opts
 func (c *fakeMongoCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
 	c.updateOneFilters = append(c.updateOneFilters, filter)
 	c.updateOneUpdates = append(c.updateOneUpdates, update)
+	c.updateOneOptions = append(c.updateOneOptions, opts)
 	if c.updateOneFn != nil {
 		return c.updateOneFn(ctx, filter, update, opts...)
 	}
@@ -219,6 +221,11 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 		}
 	case *Process:
 		if v, ok := item.(Process); ok {
+			*target = v
+			return nil
+		}
+	case *FormataBuilderStream:
+		if v, ok := item.(FormataBuilderStream); ok {
 			*target = v
 			return nil
 		}

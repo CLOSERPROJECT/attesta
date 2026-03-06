@@ -345,6 +345,7 @@ type WorkflowProcessCounts struct {
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
+	Stream        string                      `json:"stream,omitempty"`
 }
 
 type PublicCatalogOrganization struct {
@@ -692,12 +693,15 @@ func main() {
 	if err := bootstrapPlatformAdmin(ctx, server.store, server.now); err != nil {
 		log.Fatal(err)
 	}
+	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
+		log.Fatal(err)
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
 	mux.HandleFunc("/docs", server.handleDocs)
 	mux.HandleFunc("/docs/", server.handleDocs)
-	mux.HandleFunc("/api/catalog", server.handlePublicCatalog)
+	mux.HandleFunc("/api/organizations", server.handlePublicCatalog)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", server.handleLogin)
 	mux.HandleFunc("/logout", server.handleLogout)
@@ -709,6 +713,8 @@ func main() {
 	mux.HandleFunc("/org-admin/roles", server.handleOrgAdminRoles)
 	mux.HandleFunc("/org-admin/logo/", server.handleOrgAdminLogo)
 	mux.HandleFunc("/org-admin/users", server.handleOrgAdminUsers)
+	mux.HandleFunc("/org-admin/formata-builder", server.handleOrgAdminFormataBuilder)
+	mux.HandleFunc("/org-admin/formata-builder/", server.handleOrgAdminFormataBuilder)
 	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
 	mux.HandleFunc("/", server.handleHome)
 	mux.HandleFunc("/events", server.handleEvents)
@@ -885,6 +891,66 @@ func bootstrapPlatformAdmin(ctx context.Context, store Store, now func() time.Ti
 		CreatedAt:       now().UTC(),
 	})
 	return err
+}
+
+func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
+	if store == nil {
+		return nil
+	}
+	existing, err := store.ListFormataBuilderStreams(ctx)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
+	}
+
+	dir := strings.TrimSpace(configDir)
+	if dir == "" {
+		dir = "config"
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("config dir not found: %w", err)
+	}
+	paths := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+			continue
+		}
+		paths = append(paths, filepath.Join(dir, name))
+	}
+	sort.Strings(paths)
+	if len(paths) == 0 {
+		return errors.New("workflow config catalog is empty")
+	}
+
+	updatedAt := time.Now().UTC()
+	if now != nil {
+		updatedAt = now().UTC()
+	}
+	for _, path := range paths {
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return fmt.Errorf("read config %s: %w", path, readErr)
+		}
+		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+		if key == "" {
+			return fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
+		}
+		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
+			Key:       key,
+			Stream:    string(data),
+			UpdatedAt: updatedAt,
+		}); saveErr != nil {
+			return fmt.Errorf("seed formata stream %s: %w", filepath.Base(path), saveErr)
+		}
+	}
+	return nil
 }
 
 func attachmentMaxBytes() int64 {
@@ -1336,6 +1402,9 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if _, ok := s.requireOrgOrPlatformAdminAPI(w, r); !ok {
+		return
+	}
 	if s == nil || s.store == nil {
 		http.Error(w, "store not configured", http.StatusInternalServerError)
 		return
@@ -1379,6 +1448,15 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+	stream, streamErr := s.store.LoadFormataBuilderStream(r.Context())
+	switch {
+	case streamErr == nil && stream != nil:
+		response.Stream = stream.Stream
+	case streamErr == nil || errors.Is(streamErr, mongo.ErrNoDocuments):
+	default:
+		http.Error(w, "failed to load stream", http.StatusInternalServerError)
+		return
+	}
 
 	sort.Slice(response.Organizations, func(i, j int) bool {
 		if response.Organizations[i].Name == response.Organizations[j].Name {
@@ -1397,6 +1475,18 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, response)
+}
+
+func (s *Server) requireOrgOrPlatformAdminAPI(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+	user, _, ok := s.requireAuthenticatedPost(w, r)
+	if !ok {
+		return nil, false
+	}
+	if user != nil && (user.IsPlatformAdmin || userIsOrgAdmin(user)) {
+		return user, true
+	}
+	http.Error(w, "forbidden", http.StatusForbidden)
+	return nil, false
 }
 
 func openAPIDocCandidates(filename string) []string {
@@ -4287,9 +4377,81 @@ func sameCatalogModTimes(a, b map[string]time.Time) bool {
 	return true
 }
 
+func cloneWorkflowCatalog(catalog map[string]RuntimeConfig) map[string]RuntimeConfig {
+	cloned := make(map[string]RuntimeConfig, len(catalog))
+	for key, cfg := range catalog {
+		cloned[key] = cfg
+	}
+	return cloned
+}
+
+func parseRuntimeConfigData(source string, data []byte) (RuntimeConfig, error) {
+	var cfg RuntimeConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("parse config %s: %w", source, err)
+	}
+	normalizeWorkflowConfig(&cfg)
+	if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
+		return RuntimeConfig{}, fmt.Errorf("workflow config is empty in %s", source)
+	}
+	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
+	}
+	if err := normalizeDPPConfig(&cfg.DPP); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
+	}
+	return cfg, nil
+}
+
+func workflowCatalogModTime(stream FormataBuilderStream) time.Time {
+	if !stream.UpdatedAt.IsZero() {
+		return stream.UpdatedAt
+	}
+	if !stream.ID.IsZero() {
+		return stream.ID.Timestamp()
+	}
+	return time.Time{}
+}
+
 func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
+
+	if s.store != nil {
+		streams, err := s.store.ListFormataBuilderStreams(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("list formata streams: %w", err)
+		}
+		if len(streams) > 0 {
+			modTimes := make(map[string]time.Time, len(streams))
+			for _, stream := range streams {
+				if stream.ID.IsZero() {
+					return nil, errors.New("formata stream id is empty")
+				}
+				key := stream.ID.Hex()
+				modTimes[key] = workflowCatalogModTime(stream)
+			}
+			if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
+				return cloneWorkflowCatalog(s.catalog), nil
+			}
+
+			catalog := make(map[string]RuntimeConfig, len(streams))
+			for _, stream := range streams {
+				if stream.ID.IsZero() {
+					return nil, errors.New("formata stream id is empty")
+				}
+				key := stream.ID.Hex()
+				cfg, parseErr := parseRuntimeConfigData("stream "+key, []byte(stream.Stream))
+				if parseErr != nil {
+					return nil, parseErr
+				}
+				catalog[key] = cfg
+			}
+			s.catalog = catalog
+			s.catalogModTime = modTimes
+			return cloneWorkflowCatalog(catalog), nil
+		}
+	}
 
 	dir := strings.TrimSpace(s.configDir)
 	if dir == "" {
@@ -4326,11 +4488,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		modTimes[path] = info.ModTime()
 	}
 	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
-		cached := make(map[string]RuntimeConfig, len(s.catalog))
-		for key, cfg := range s.catalog {
-			cached[key] = cfg
-		}
-		return cached, nil
+		return cloneWorkflowCatalog(s.catalog), nil
 	}
 
 	catalog := make(map[string]RuntimeConfig, len(paths))
@@ -4339,19 +4497,9 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		if readErr != nil {
 			return nil, fmt.Errorf("read config %s: %w", path, readErr)
 		}
-		var cfg RuntimeConfig
-		if unmarshalErr := yaml.Unmarshal(data, &cfg); unmarshalErr != nil {
-			return nil, fmt.Errorf("parse config %s: %w", path, unmarshalErr)
-		}
-		normalizeWorkflowConfig(&cfg)
-		if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
-			return nil, fmt.Errorf("workflow config is empty in %s", filepath.Base(path))
-		}
-		if normalizeErr := normalizeInputTypes(&cfg.Workflow); normalizeErr != nil {
-			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
-		}
-		if normalizeErr := normalizeDPPConfig(&cfg.DPP); normalizeErr != nil {
-			return nil, fmt.Errorf("%s: %w", filepath.Base(path), normalizeErr)
+		cfg, parseErr := parseRuntimeConfigData(filepath.Base(path), data)
+		if parseErr != nil {
+			return nil, parseErr
 		}
 		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 		if key == "" {
@@ -4366,11 +4514,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.catalog = catalog
 	s.catalogModTime = modTimes
 
-	cloned := make(map[string]RuntimeConfig, len(catalog))
-	for key, cfg := range catalog {
-		cloned[key] = cfg
-	}
-	return cloned, nil
+	return cloneWorkflowCatalog(catalog), nil
 }
 
 func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {
