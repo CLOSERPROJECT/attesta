@@ -2,7 +2,7 @@
 
 {{define "dpp_body"}}
 <div class="stack">
-  <section class="panel stack">
+  <section class="panel">
     <h2>Digital Product Passport</h2>
     <p class="muted">GS1 Digital Link landing page for product and stream traceability.</p>
     <div class="stack" style="gap: 8px;">
@@ -14,7 +14,7 @@
     </div>
   </section>
 
-  <section class="panel stack">
+  <section class="panel">
     <h2>Overview</h2>
     <div class="stack" style="gap: 8px;">
       <div><strong>Stream:</strong> {{.Workflow.Name}}</div>
@@ -24,7 +24,7 @@
     </div>
   </section>
 
-  <section class="panel stack">
+  <section class="panel">
     <h2>Traceability</h2>
     <div class="timeline-list">
       {{range .Traceability}}
@@ -90,7 +90,7 @@
     </div>
   </section>
 
-  <section class="panel stack">
+  <section class="panel">
     <h2>Integrity</h2>
     <div><strong>Merkle root:</strong> <code>{{.Export.Merkle.Root}}</code></div>
     <ul>
