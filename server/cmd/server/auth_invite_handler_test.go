@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,11 +20,11 @@ type inviteFailingStore struct {
 	failCreateSession bool
 }
 
-func (s *inviteFailingStore) SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error {
+func (s *inviteFailingStore) SetUserPasswordHash(ctx context.Context, userMongoID primitive.ObjectID, passwordHash string) error {
 	if s.failSetPassword {
 		return errors.New("set password failed")
 	}
-	return s.MemoryStore.SetUserPasswordHash(ctx, userID, passwordHash)
+	return s.MemoryStore.SetUserPasswordHash(ctx, userMongoID, passwordHash)
 }
 
 func (s *inviteFailingStore) CreateSession(ctx context.Context, session Session) (Session, error) {
@@ -54,7 +55,6 @@ func TestHandleInviteHappyPath(t *testing.T) {
 		t.Fatalf("CreateRole error: %v", err)
 	}
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u1",
 		OrgSlug:   org.Slug,
 		Email:     "new@acme.io",
 		RoleSlugs: []string{role.Slug},
@@ -64,13 +64,13 @@ func TestHandleInviteHappyPath(t *testing.T) {
 		t.Fatalf("CreateUser error: %v", err)
 	}
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "new@acme.io",
-		UserID:    user.UserID,
-		RoleSlugs: []string{role.Slug},
-		TokenHash: "invite-token",
-		ExpiresAt: time.Now().UTC().Add(48 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "new@acme.io",
+		UserMongoID: user.ID,
+		RoleSlugs:   []string{role.Slug},
+		TokenHash:   "invite-token",
+		ExpiresAt:   time.Now().UTC().Add(48 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("CreateInvite error: %v", err)
 	}
@@ -93,9 +93,9 @@ func TestHandleInviteHappyPath(t *testing.T) {
 		t.Fatalf("expected attesta_session cookie, got %#v", cookies)
 	}
 
-	updatedUser, err := store.GetUserByUserID(t.Context(), user.UserID)
+	updatedUser, err := store.GetUserByMongoID(t.Context(), user.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID error: %v", err)
+		t.Fatalf("GetUserByMongoID error: %v", err)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(updatedUser.PasswordHash), []byte("this-is-strong-enough")); err != nil {
 		t.Fatalf("password hash verification failed: %v", err)
@@ -114,18 +114,17 @@ func TestHandleInviteExpiredToken(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	user, _ := store.CreateUser(t.Context(), AccountUser{
-		UserID:  "u1",
 		OrgSlug: org.Slug,
 		Email:   "expired@acme.io",
 		Status:  "invited",
 	})
 	_, _ = store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "expired@acme.io",
-		UserID:    user.UserID,
-		TokenHash: "expired-token",
-		ExpiresAt: time.Now().UTC().Add(-1 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "expired@acme.io",
+		UserMongoID: user.ID,
+		TokenHash:   "expired-token",
+		ExpiresAt:   time.Now().UTC().Add(-1 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
@@ -142,18 +141,17 @@ func TestHandleInviteReusedToken(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	user, _ := store.CreateUser(t.Context(), AccountUser{
-		UserID:  "u1",
 		OrgSlug: org.Slug,
 		Email:   "used@acme.io",
 		Status:  "invited",
 	})
 	_, _ = store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "used@acme.io",
-		UserID:    user.UserID,
-		TokenHash: "used-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "used@acme.io",
+		UserMongoID: user.ID,
+		TokenHash:   "used-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 	_ = store.MarkInviteUsed(t.Context(), "used-token", time.Now().UTC())
 
@@ -171,18 +169,17 @@ func TestHandleInviteRejectsMismatchedEmailAndWeakPassword(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	user, _ := store.CreateUser(t.Context(), AccountUser{
-		UserID:  "u1",
 		OrgSlug: org.Slug,
 		Email:   "user@acme.io",
 		Status:  "invited",
 	})
 	_, _ = store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "different@acme.io",
-		UserID:    user.UserID,
-		TokenHash: "mismatch-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "different@acme.io",
+		UserMongoID: user.ID,
+		TokenHash:   "mismatch-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
@@ -208,18 +205,17 @@ func TestHandleInviteRejectsMismatchedConfirmation(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	user, _ := store.CreateUser(t.Context(), AccountUser{
-		UserID:  "u-confirm",
 		OrgSlug: org.Slug,
 		Email:   "confirm@acme.io",
 		Status:  "invited",
 	})
 	_, _ = store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "confirm@acme.io",
-		UserID:    user.UserID,
-		TokenHash: "confirm-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "confirm@acme.io",
+		UserMongoID: user.ID,
+		TokenHash:   "confirm-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
@@ -258,18 +254,17 @@ func TestHandleInviteMethodNotAllowed(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	user, _ := store.CreateUser(t.Context(), AccountUser{
-		UserID:  "u-method",
 		OrgSlug: org.Slug,
 		Email:   "method@acme.io",
 		Status:  "invited",
 	})
 	_, _ = store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "method@acme.io",
-		UserID:    user.UserID,
-		TokenHash: "method-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "method@acme.io",
+		UserMongoID: user.ID,
+		TokenHash:   "method-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
@@ -285,12 +280,12 @@ func TestHandleInviteInvalidInviteUser(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	_, _ = store.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "ghost@acme.io",
-		UserID:    "missing-user",
-		TokenHash: "ghost-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "ghost@acme.io",
+		UserMongoID: primitive.NewObjectID(),
+		TokenHash:   "ghost-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 
 	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
@@ -308,20 +303,19 @@ func TestHandleInviteSetPasswordAndSessionFailures(t *testing.T) {
 	org, _ := base.CreateOrganization(t.Context(), Organization{Name: "Acme"})
 	role, _ := base.CreateRole(t.Context(), Role{OrgSlug: org.Slug, Name: "org_admin"})
 	user, _ := base.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-fail",
 		OrgSlug:   org.Slug,
 		Email:     "fail@acme.io",
 		RoleSlugs: []string{role.Slug},
 		Status:    "invited",
 	})
 	_, _ = base.CreateInvite(t.Context(), Invite{
-		OrgID:     org.ID,
-		Email:     "fail@acme.io",
-		UserID:    user.UserID,
-		RoleSlugs: []string{role.Slug},
-		TokenHash: "fail-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		OrgID:       org.ID,
+		Email:       "fail@acme.io",
+		UserMongoID: user.ID,
+		RoleSlugs:   []string{role.Slug},
+		TokenHash:   "fail-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	})
 
 	t.Run("set password failure", func(t *testing.T) {

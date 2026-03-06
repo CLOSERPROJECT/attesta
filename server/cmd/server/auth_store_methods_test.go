@@ -50,7 +50,6 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 	}
 
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-1",
 		OrgSlug:   org.Slug,
 		Email:     "Admin@Acme.io",
 		RoleSlugs: []string{"org-admin"},
@@ -63,7 +62,6 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 		t.Fatalf("normalized email = %q, want admin@acme.io", user.Email)
 	}
 	unassignedOrgAdmin, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-bootstrap",
 		Email:     "bootstrap@acme.io",
 		RoleSlugs: []string{"org-admin"},
 		Status:    "invited",
@@ -71,25 +69,24 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser unassigned org admin error: %v", err)
 	}
-	if err := store.SetUserRoles(t.Context(), unassignedOrgAdmin.UserID, []string{"org-admin"}); err != nil {
+	if err := store.SetUserRoles(t.Context(), unassignedOrgAdmin.ID, []string{"org-admin"}); err != nil {
 		t.Fatalf("SetUserRoles unassigned org admin error: %v", err)
 	}
-	if err := store.SetUserOrganization(t.Context(), unassignedOrgAdmin.UserID, org.ID, org.Slug); err != nil {
+	if err := store.SetUserOrganization(t.Context(), unassignedOrgAdmin.ID, org.ID, org.Slug); err != nil {
 		t.Fatalf("SetUserOrganization error: %v", err)
 	}
-	assignedUser, err := store.GetUserByUserID(t.Context(), unassignedOrgAdmin.UserID)
+	assignedUser, err := store.GetUserByMongoID(t.Context(), unassignedOrgAdmin.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID assigned user error: %v", err)
+		t.Fatalf("GetUserByMongoID assigned user error: %v", err)
 	}
 	if assignedUser.OrgID == nil || *assignedUser.OrgID != org.ID || assignedUser.OrgSlug != org.Slug {
 		t.Fatalf("expected assigned org context, got orgID=%+v orgSlug=%q", assignedUser.OrgID, assignedUser.OrgSlug)
 	}
-	if err := store.SetUserOrganization(t.Context(), unassignedOrgAdmin.UserID, primitive.NewObjectID(), org.Slug); err == nil {
+	if err := store.SetUserOrganization(t.Context(), unassignedOrgAdmin.ID, primitive.NewObjectID(), org.Slug); err == nil {
 		t.Fatal("expected SetUserOrganization mismatch error")
 	}
 
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-2",
 		OrgSlug:   org.Slug,
 		Email:     "admin@acme.io",
 		RoleSlugs: []string{"org-admin"},
@@ -97,23 +94,22 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 		t.Fatal("expected duplicate email error")
 	}
 
-	if err := store.SetUserPasswordHash(t.Context(), "u-1", "hash-1"); err != nil {
+	if err := store.SetUserPasswordHash(t.Context(), user.ID, "hash-1"); err != nil {
 		t.Fatalf("SetUserPasswordHash error: %v", err)
 	}
-	if err := store.SetUserRoles(t.Context(), "u-1", []string{"org-admin"}); err != nil {
+	if err := store.SetUserRoles(t.Context(), user.ID, []string{"org-admin"}); err != nil {
 		t.Fatalf("SetUserRoles error: %v", err)
 	}
-	if err := store.SetUserRoles(t.Context(), "u-1", []string{"missing-role"}); err == nil {
+	if err := store.SetUserRoles(t.Context(), user.ID, []string{"missing-role"}); err == nil {
 		t.Fatal("expected SetUserRoles missing role error")
 	}
-	if err := store.SetUserLastLogin(t.Context(), "u-1", time.Now().UTC()); err != nil {
+	if err := store.SetUserLastLogin(t.Context(), user.ID, time.Now().UTC()); err != nil {
 		t.Fatalf("SetUserLastLogin error: %v", err)
 	}
 
 	invite, err := store.CreateInvite(t.Context(), Invite{
 		OrgID:     org.ID,
 		Email:     "new.user@acme.io",
-		UserID:    "u-3",
 		RoleSlugs: []string{"org-admin"},
 		TokenHash: "invite-token",
 		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
@@ -140,7 +136,6 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 
 	session, err := store.CreateSession(t.Context(), Session{
 		SessionID:   "s-1",
-		UserID:      "u-1",
 		UserMongoID: user.ID,
 		CreatedAt:   time.Now().UTC(),
 		LastLoginAt: time.Now().UTC(),
@@ -165,7 +160,6 @@ func TestMemoryStoreAuthPrimitives(t *testing.T) {
 
 	reset, err := store.CreatePasswordReset(t.Context(), PasswordReset{
 		Email:     "admin@acme.io",
-		UserID:    "u-1",
 		TokenHash: "reset-token",
 		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
 	})
@@ -209,37 +203,40 @@ func TestMemoryStoreOrgAdminManagementMethods(t *testing.T) {
 
 	orgAID := orgA.ID
 	orgBID := orgB.ID
-	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "u-b",
+	userB, err := store.CreateUser(t.Context(), AccountUser{
 		OrgID:        &orgAID,
 		OrgSlug:      orgA.Slug,
 		Email:        "b@orga.example",
 		PasswordHash: "hash-b",
 		RoleSlugs:    []string{"reviewer"},
 		Status:       "active",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser u-b error: %v", err)
 	}
-	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "u-a",
+	userA, err := store.CreateUser(t.Context(), AccountUser{
 		OrgID:        &orgAID,
 		OrgSlug:      orgA.Slug,
 		Email:        "a@orga.example",
 		PasswordHash: "hash-a",
 		RoleSlugs:    []string{"reviewer"},
 		Status:       "active",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser u-a error: %v", err)
 	}
-	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-z",
+	userZ, err := store.CreateUser(t.Context(), AccountUser{
 		OrgID:     &orgBID,
 		OrgSlug:   orgB.Slug,
 		Email:     "z@orgb.example",
 		RoleSlugs: []string{"reviewer"},
 		Status:    "active",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser u-z error: %v", err)
+	}
+	if userB.ID.IsZero() || userA.ID.IsZero() || userZ.ID.IsZero() {
+		t.Fatal("expected created users to have mongo IDs")
 	}
 
 	users, err := store.ListUsersByOrgID(t.Context(), orgA.ID)
@@ -253,57 +250,55 @@ func TestMemoryStoreOrgAdminManagementMethods(t *testing.T) {
 		t.Fatalf("users not sorted by email: %#v", users)
 	}
 
+	creatorOne := primitive.NewObjectID()
+	creatorTwo := primitive.NewObjectID()
 	now := time.Now().UTC()
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:           orgA.ID,
-		Email:           "one@orga.example",
-		UserID:          "u-one",
-		RoleSlugs:       []string{"reviewer"},
-		TokenHash:       "token-one",
-		ExpiresAt:       now.Add(24 * time.Hour),
-		CreatedAt:       now.Add(-1 * time.Hour),
-		CreatedByUserID: "admin-1",
+		OrgID:                orgA.ID,
+		Email:                "one@orga.example",
+		RoleSlugs:            []string{"reviewer"},
+		TokenHash:            "token-one",
+		ExpiresAt:            now.Add(24 * time.Hour),
+		CreatedAt:            now.Add(-1 * time.Hour),
+		CreatedByUserMongoID: creatorOne,
 	}); err != nil {
 		t.Fatalf("CreateInvite one error: %v", err)
 	}
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:           orgA.ID,
-		Email:           "two@orga.example",
-		UserID:          "u-two",
-		RoleSlugs:       []string{"reviewer"},
-		TokenHash:       "token-two",
-		ExpiresAt:       now.Add(24 * time.Hour),
-		CreatedAt:       now,
-		CreatedByUserID: "admin-1",
+		OrgID:                orgA.ID,
+		Email:                "two@orga.example",
+		RoleSlugs:            []string{"reviewer"},
+		TokenHash:            "token-two",
+		ExpiresAt:            now.Add(24 * time.Hour),
+		CreatedAt:            now,
+		CreatedByUserMongoID: creatorOne,
 	}); err != nil {
 		t.Fatalf("CreateInvite two error: %v", err)
 	}
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:           orgA.ID,
-		Email:           "three@orga.example",
-		UserID:          "u-three",
-		RoleSlugs:       []string{"reviewer"},
-		TokenHash:       "token-three",
-		ExpiresAt:       now.Add(24 * time.Hour),
-		CreatedAt:       now.Add(1 * time.Hour),
-		CreatedByUserID: "admin-2",
+		OrgID:                orgA.ID,
+		Email:                "three@orga.example",
+		RoleSlugs:            []string{"reviewer"},
+		TokenHash:            "token-three",
+		ExpiresAt:            now.Add(24 * time.Hour),
+		CreatedAt:            now.Add(1 * time.Hour),
+		CreatedByUserMongoID: creatorTwo,
 	}); err != nil {
 		t.Fatalf("CreateInvite three error: %v", err)
 	}
 	if _, err := store.CreateInvite(t.Context(), Invite{
-		OrgID:           orgB.ID,
-		Email:           "four@orgb.example",
-		UserID:          "u-four",
-		RoleSlugs:       []string{"reviewer"},
-		TokenHash:       "token-four",
-		ExpiresAt:       now.Add(24 * time.Hour),
-		CreatedAt:       now.Add(2 * time.Hour),
-		CreatedByUserID: "admin-1",
+		OrgID:                orgB.ID,
+		Email:                "four@orgb.example",
+		RoleSlugs:            []string{"reviewer"},
+		TokenHash:            "token-four",
+		ExpiresAt:            now.Add(24 * time.Hour),
+		CreatedAt:            now.Add(2 * time.Hour),
+		CreatedByUserMongoID: creatorOne,
 	}); err != nil {
 		t.Fatalf("CreateInvite four error: %v", err)
 	}
 
-	invites, err := store.ListInvitesByCreator(t.Context(), "admin-1", orgA.ID)
+	invites, err := store.ListInvitesByCreator(t.Context(), creatorOne, orgA.ID)
 	if err != nil {
 		t.Fatalf("ListInvitesByCreator error: %v", err)
 	}
@@ -314,12 +309,12 @@ func TestMemoryStoreOrgAdminManagementMethods(t *testing.T) {
 		t.Fatalf("invites not sorted by createdAt desc: %#v", invites)
 	}
 
-	if err := store.DisableUser(t.Context(), "u-a"); err != nil {
+	if err := store.DisableUser(t.Context(), userA.ID); err != nil {
 		t.Fatalf("DisableUser error: %v", err)
 	}
-	disabled, err := store.GetUserByUserID(t.Context(), "u-a")
+	disabled, err := store.GetUserByMongoID(t.Context(), userA.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID disabled error: %v", err)
+		t.Fatalf("GetUserByMongoID disabled error: %v", err)
 	}
 	if disabled.Status != "deleted" {
 		t.Fatalf("disabled user status = %q, want deleted", disabled.Status)
@@ -330,7 +325,7 @@ func TestMemoryStoreOrgAdminManagementMethods(t *testing.T) {
 	if len(disabled.RoleSlugs) != 0 {
 		t.Fatalf("disabled user roles = %#v, want empty", disabled.RoleSlugs)
 	}
-	if err := store.DisableUser(t.Context(), "missing"); !errors.Is(err, mongo.ErrNoDocuments) {
+	if err := store.DisableUser(t.Context(), primitive.NewObjectID()); !errors.Is(err, mongo.ErrNoDocuments) {
 		t.Fatalf("DisableUser missing err = %v, want %v", err, mongo.ErrNoDocuments)
 	}
 }
@@ -370,7 +365,8 @@ func TestMongoStoreAuthFilterShapes(t *testing.T) {
 	}}
 	store := &MongoStore{dbPort: db}
 
-	if err := store.SetUserRoles(t.Context(), "u-1", []string{"Org Admin", "org_admin"}); err != nil {
+	userMongoID := primitive.NewObjectID()
+	if err := store.SetUserRoles(t.Context(), userMongoID, []string{"Org Admin", "org_admin"}); err != nil {
 		t.Fatalf("SetUserRoles error: %v", err)
 	}
 	wantRolesUpdate := bson.M{"$set": bson.M{"roleSlugs": []string{"org-admin"}}}
@@ -398,7 +394,7 @@ func TestMongoStoreAuthFilterShapes(t *testing.T) {
 func TestMongoStoreOrgAdminManagementFilterShapes(t *testing.T) {
 	userCollection := &fakeMongoCollection{
 		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
-			return &fakeAnyCursor{items: []interface{}{AccountUser{UserID: "u-1"}}}, nil
+			return &fakeAnyCursor{items: []interface{}{AccountUser{ID: primitive.NewObjectID()}}}, nil
 		},
 	}
 	inviteCollection := &fakeMongoCollection{
@@ -417,11 +413,12 @@ func TestMongoStoreOrgAdminManagementFilterShapes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListUsersByOrgID error: %v", err)
 	}
-	if len(users) != 1 || users[0].UserID != "u-1" {
+	if len(users) != 1 || users[0].ID.IsZero() {
 		t.Fatalf("ListUsersByOrgID result = %#v", users)
 	}
 
-	invites, err := store.ListInvitesByCreator(t.Context(), " admin-1 ", orgID)
+	creatorID := primitive.NewObjectID()
+	invites, err := store.ListInvitesByCreator(t.Context(), creatorID, orgID)
 	if err != nil {
 		t.Fatalf("ListInvitesByCreator error: %v", err)
 	}
@@ -429,7 +426,8 @@ func TestMongoStoreOrgAdminManagementFilterShapes(t *testing.T) {
 		t.Fatalf("ListInvitesByCreator result = %#v", invites)
 	}
 
-	if err := store.DisableUser(t.Context(), " u-1 "); err != nil {
+	disabledID := primitive.NewObjectID()
+	if err := store.DisableUser(t.Context(), disabledID); err != nil {
 		t.Fatalf("DisableUser error: %v", err)
 	}
 
@@ -442,7 +440,7 @@ func TestMongoStoreOrgAdminManagementFilterShapes(t *testing.T) {
 		t.Fatalf("user sort = %#v, want %#v", userCollection.findOptionsCalls[0][0].Sort, wantUsersSort)
 	}
 
-	wantInvitesFilter := bson.M{"createdByUserId": "admin-1", "orgId": orgID}
+	wantInvitesFilter := bson.M{"createdByUserMongoId": creatorID, "orgId": orgID}
 	if !reflect.DeepEqual(inviteCollection.findFilters[0], wantInvitesFilter) {
 		t.Fatalf("invite find filter = %#v, want %#v", inviteCollection.findFilters[0], wantInvitesFilter)
 	}
@@ -451,7 +449,7 @@ func TestMongoStoreOrgAdminManagementFilterShapes(t *testing.T) {
 		t.Fatalf("invite sort = %#v, want %#v", inviteCollection.findOptionsCalls[0][0].Sort, wantInvitesSort)
 	}
 
-	wantDisableFilter := bson.M{"userId": "u-1"}
+	wantDisableFilter := bson.M{"_id": disabledID}
 	if !reflect.DeepEqual(userCollection.updateOneFilters[0], wantDisableFilter) {
 		t.Fatalf("disable filter = %#v, want %#v", userCollection.updateOneFilters[0], wantDisableFilter)
 	}
@@ -469,7 +467,7 @@ func TestMongoStoreAuthMethodsCovered(t *testing.T) {
 	now := time.Date(2026, 2, 26, 18, 0, 0, 0, time.UTC)
 	orgID := primitive.NewObjectID()
 	roleID := primitive.NewObjectID()
-	userID := primitive.NewObjectID()
+	userMongoID := primitive.NewObjectID()
 	inviteID := primitive.NewObjectID()
 	sessionID := primitive.NewObjectID()
 	resetID := primitive.NewObjectID()
@@ -508,11 +506,11 @@ func TestMongoStoreAuthMethodsCovered(t *testing.T) {
 	}
 	userCollection := &fakeMongoCollection{
 		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
-			return &mongo.InsertOneResult{InsertedID: userID}, nil
+			return &mongo.InsertOneResult{InsertedID: userMongoID}, nil
 		},
 		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
 			return fakeSingleResult{decodeFn: func(v interface{}) error {
-				*(v.(*AccountUser)) = AccountUser{ID: userID, UserID: "u-1", Email: "admin@acme.org"}
+				*(v.(*AccountUser)) = AccountUser{ID: userMongoID, Email: "admin@acme.org"}
 				return nil
 			}}
 		},
@@ -528,7 +526,7 @@ func TestMongoStoreAuthMethodsCovered(t *testing.T) {
 		},
 		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
 			return fakeSingleResult{decodeFn: func(v interface{}) error {
-				*(v.(*Session)) = Session{ID: sessionID, SessionID: "session-1", UserID: "u-1"}
+				*(v.(*Session)) = Session{ID: sessionID, SessionID: "session-1", UserMongoID: primitive.NewObjectID()}
 				return nil
 			}}
 		},
@@ -571,27 +569,26 @@ func TestMongoStoreAuthMethodsCovered(t *testing.T) {
 		t.Fatalf("ListRolesByOrg error: %v", err)
 	}
 
-	user, err := store.CreateUser(t.Context(), AccountUser{UserID: "u-1", Email: "Admin@Acme.Org", CreatedAt: now})
-	if err != nil || user.ID != userID {
+	user, err := store.CreateUser(t.Context(), AccountUser{Email: "Admin@Acme.Org", CreatedAt: now})
+	if err != nil || user.ID != userMongoID {
 		t.Fatalf("CreateUser result error=%v user=%+v", err, user)
 	}
 	if _, err := store.GetUserByEmail(t.Context(), "admin@acme.org"); err != nil {
 		t.Fatalf("GetUserByEmail error: %v", err)
 	}
-	if _, err := store.GetUserByUserID(t.Context(), "u-1"); err != nil {
-		t.Fatalf("GetUserByUserID error: %v", err)
+	if _, err := store.GetUserByMongoID(t.Context(), userMongoID); err != nil {
+		t.Fatalf("GetUserByMongoID error: %v", err)
 	}
-	if err := store.SetUserPasswordHash(t.Context(), "u-1", "hash-1"); err != nil {
+	if err := store.SetUserPasswordHash(t.Context(), userMongoID, "hash-1"); err != nil {
 		t.Fatalf("SetUserPasswordHash error: %v", err)
 	}
-	if err := store.SetUserLastLogin(t.Context(), "u-1", now); err != nil {
+	if err := store.SetUserLastLogin(t.Context(), userMongoID, now); err != nil {
 		t.Fatalf("SetUserLastLogin error: %v", err)
 	}
 
 	invite, err := store.CreateInvite(t.Context(), Invite{
 		OrgID:     orgID,
 		Email:     "invitee@acme.org",
-		UserID:    "u-2",
 		RoleSlugs: []string{"org-admin"},
 		TokenHash: "invite-token",
 		ExpiresAt: now.Add(24 * time.Hour),
@@ -606,8 +603,7 @@ func TestMongoStoreAuthMethodsCovered(t *testing.T) {
 
 	session, err := store.CreateSession(t.Context(), Session{
 		SessionID:   "session-1",
-		UserID:      "u-1",
-		UserMongoID: userID,
+		UserMongoID: userMongoID,
 		CreatedAt:   now,
 		LastLoginAt: now,
 		ExpiresAt:   now.Add(30 * 24 * time.Hour),
@@ -624,7 +620,6 @@ func TestMongoStoreAuthMethodsCovered(t *testing.T) {
 
 	reset, err := store.CreatePasswordReset(t.Context(), PasswordReset{
 		Email:     "admin@acme.org",
-		UserID:    "u-1",
 		TokenHash: "reset-token",
 		ExpiresAt: now.Add(24 * time.Hour),
 		CreatedAt: now,
@@ -713,16 +708,16 @@ func TestMongoStoreAuthMethodsErrors(t *testing.T) {
 		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
 			collectionUsers: userCollection,
 		}}}
-		if _, err := store.CreateUser(t.Context(), AccountUser{UserID: "u1", Email: "u1@example.com"}); err == nil {
+		if _, err := store.CreateUser(t.Context(), AccountUser{Email: "u1@example.com"}); err == nil {
 			t.Fatal("expected CreateUser error")
 		}
 		if _, err := store.GetUserByEmail(t.Context(), "u1@example.com"); err == nil {
 			t.Fatal("expected GetUserByEmail error")
 		}
-		if _, err := store.GetUserByUserID(t.Context(), "u1"); err == nil {
-			t.Fatal("expected GetUserByUserID error")
+		if _, err := store.GetUserByMongoID(t.Context(), primitive.NewObjectID()); err == nil {
+			t.Fatal("expected GetUserByMongoID error")
 		}
-		if err := store.SetUserPasswordHash(t.Context(), "u1", "hash"); err == nil {
+		if err := store.SetUserPasswordHash(t.Context(), primitive.NewObjectID(), "hash"); err == nil {
 			t.Fatal("expected SetUserPasswordHash error")
 		}
 	})

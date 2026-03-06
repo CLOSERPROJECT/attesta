@@ -58,7 +58,6 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 		t.Fatalf("hash password: %v", err)
 	}
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "u1",
 		Email:        "u1@example.com",
 		PasswordHash: string(hash),
 		Status:       "active",
@@ -103,9 +102,9 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 		t.Fatalf("LoadSessionByID error: %v", err)
 	}
 
-	updated, err := store.GetUserByUserID(t.Context(), user.UserID)
+	updated, err := store.GetUserByMongoID(t.Context(), user.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID error: %v", err)
+		t.Fatalf("GetUserByMongoID error: %v", err)
 	}
 	if updated.LastLoginAt == nil {
 		t.Fatal("expected user lastLoginAt to be updated")
@@ -116,7 +115,6 @@ func TestHandleLogoutClearsSession(t *testing.T) {
 	store := NewMemoryStore()
 	session, err := store.CreateSession(t.Context(), Session{
 		SessionID:   "session-1",
-		UserID:      "u1",
 		UserMongoID: primitive.NewObjectID(),
 		CreatedAt:   time.Now().UTC(),
 		LastLoginAt: time.Now().UTC(),
@@ -174,7 +172,6 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 	store := NewMemoryStore()
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-auth-login",
 		Email:     "u-auth-login@example.com",
 		Status:    "active",
 		CreatedAt: time.Now().UTC(),
@@ -184,7 +181,6 @@ func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 	}
 	session, err := store.CreateSession(t.Context(), Session{
 		SessionID:   "session-auth-login",
-		UserID:      user.UserID,
 		UserMongoID: user.ID,
 		CreatedAt:   time.Now().UTC(),
 		LastLoginAt: time.Now().UTC(),
@@ -221,7 +217,6 @@ func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
 		t.Fatalf("hash password: %v", err)
 	}
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "u-invalid-login",
 		Email:        "u-invalid-login@example.com",
 		PasswordHash: string(hash),
 		Status:       "active",

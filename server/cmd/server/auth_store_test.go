@@ -91,7 +91,6 @@ func TestMongoStoreEnsureAuthIndexes(t *testing.T) {
 	})
 	assertIndexes(collectionUsers, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "email", Value: 1}}, Options: options.Index().SetUnique(true)},
-		{Keys: bson.D{{Key: "userId", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "orgId", Value: 1}}},
 	})
 	assertIndexes(collectionInvites, []mongo.IndexModel{
@@ -102,12 +101,28 @@ func TestMongoStoreEnsureAuthIndexes(t *testing.T) {
 	assertIndexes(collectionSessions, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "sessionId", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
-		{Keys: bson.D{{Key: "userId", Value: 1}}},
+		{Keys: bson.D{{Key: "userMongoId", Value: 1}}},
 	})
 	assertIndexes(collectionPasswordReset, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "tokenHash", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
 	})
+
+	usersCollection := db.collections[collectionUsers]
+	if usersCollection == nil {
+		t.Fatalf("missing collection %q", collectionUsers)
+	}
+	if len(usersCollection.dropIndexNames) != 1 || usersCollection.dropIndexNames[0] != "userId_1" {
+		t.Fatalf("users dropped indexes = %#v, want [userId_1]", usersCollection.dropIndexNames)
+	}
+
+	sessionsCollection := db.collections[collectionSessions]
+	if sessionsCollection == nil {
+		t.Fatalf("missing collection %q", collectionSessions)
+	}
+	if len(sessionsCollection.dropIndexNames) != 1 || sessionsCollection.dropIndexNames[0] != "userId_1" {
+		t.Fatalf("sessions dropped indexes = %#v, want [userId_1]", sessionsCollection.dropIndexNames)
+	}
 }
 
 func TestMongoStoreEnsureAuthIndexesError(t *testing.T) {
@@ -123,6 +138,22 @@ func TestMongoStoreEnsureAuthIndexesError(t *testing.T) {
 
 	if err := store.EnsureAuthIndexes(t.Context()); !errors.Is(err, indexErr) {
 		t.Fatalf("EnsureAuthIndexes error = %v, want %v", err, indexErr)
+	}
+}
+
+func TestMongoStoreEnsureAuthIndexesDropLegacyIndexError(t *testing.T) {
+	dropErr := errors.New("drop legacy index failed")
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionUsers: {
+			dropIndexFn: func(_ context.Context, _ string) error {
+				return dropErr
+			},
+		},
+	}}
+	store := &MongoStore{dbPort: db}
+
+	if err := store.EnsureAuthIndexes(t.Context()); !errors.Is(err, dropErr) {
+		t.Fatalf("EnsureAuthIndexes error = %v, want %v", err, dropErr)
 	}
 }
 
@@ -190,5 +221,23 @@ func indexOptionInt(opts *options.IndexOptions, name string) int32 {
 		return *opts.ExpireAfterSeconds
 	default:
 		return -1
+	}
+}
+
+func TestIsMongoIndexNotFoundError(t *testing.T) {
+	if isMongoIndexNotFoundError(nil) {
+		t.Fatal("nil error should not be index-not-found")
+	}
+	if !isMongoIndexNotFoundError(mongo.CommandError{Code: 27}) {
+		t.Fatal("expected command code 27 to be index-not-found")
+	}
+	if !isMongoIndexNotFoundError(mongo.CommandError{Code: 26}) {
+		t.Fatal("expected command code 26 to be index-not-found")
+	}
+	if !isMongoIndexNotFoundError(errors.New("Index not found: userId_1")) {
+		t.Fatal("expected string index-not-found match")
+	}
+	if isMongoIndexNotFoundError(errors.New("permission denied")) {
+		t.Fatal("unexpected index-not-found match for unrelated error")
 	}
 }

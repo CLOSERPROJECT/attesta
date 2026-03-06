@@ -56,6 +56,8 @@ type fakeMongoCollection struct {
 	findOneAndUpdUpdate []interface{}
 	createIndexesFn     func(ctx context.Context, models []mongo.IndexModel) error
 	createIndexesModels [][]mongo.IndexModel
+	dropIndexFn         func(ctx context.Context, name string) error
+	dropIndexNames      []string
 }
 
 func (c *fakeMongoCollection) InsertOne(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
@@ -106,6 +108,14 @@ func (c *fakeMongoCollection) CreateIndexes(ctx context.Context, models []mongo.
 	c.createIndexesModels = append(c.createIndexesModels, models)
 	if c.createIndexesFn != nil {
 		return c.createIndexesFn(ctx, models)
+	}
+	return nil
+}
+
+func (c *fakeMongoCollection) DropIndex(ctx context.Context, name string) error {
+	c.dropIndexNames = append(c.dropIndexNames, name)
+	if c.dropIndexFn != nil {
+		return c.dropIndexFn(ctx, name)
 	}
 	return nil
 }

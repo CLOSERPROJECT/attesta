@@ -128,10 +128,21 @@
       <p class="muted">Select one or more roles (optional).</p>
       {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
       <button class="primary" type="submit">Create invite</button>
-    </form>
-    {{if .InviteLink}}
-      <p class="muted">Invite link: <a href="{{.InviteLink}}">{{.InviteLink}}</a></p>
+      {{if .InviteLink}}
+      <button type="button" class="secondary js-invite-copy" data-copy-invite-link="{{.InviteLink}}">
+        <svg data-copy-icon-default style="display: inline-block;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+          <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+        </svg>
+        <svg data-copy-icon-done style="display: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+          <path d="m12 15 2 2 4-4"/>
+          <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+        </svg>
+        <span data-copy-label>Copy invite link</span>
+      </button>
     {{end}}
+    </form>
   </section>
 
   <section class="panel">
@@ -143,12 +154,15 @@
           <li class="users-item">
             <span class="user-email">
               {{if .IsOrgAdmin}}
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="var(--{{if .Activated}}accent{{else}}accent-2{{end}})" class="icon-svg icon-svg-md" viewBox="0 0 24 24">
-                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--{{if .Activated}}accent{{else}}accent-2{{end}})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                  <path d="M6.376 18.91a6 6 0 0 1 11.249.003"/>
+                  <circle cx="12" cy="11" r="4"/>
                 </svg>
               {{else}}
-                <svg xmlns="http://www.w3.org/2000/svg" fill="var(--{{if .Activated}}accent{{else}}accent-2{{end}})" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-                  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--{{if .Activated}}accent{{else}}accent-2{{end}})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                  <circle cx="12" cy="8" r="5"/>
+                  <path d="M20 21a8 8 0 0 0-16 0"/>
                 </svg>
               {{end}}
               {{.Email}}
@@ -165,24 +179,24 @@
                 {{end}}
               {{end}}
             </div>
-            <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
+            <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserMongoID}}').showModal()">
               Manage
             </button>
-            <dialog id="manage-user-{{.UserID}}" class="manage-dialog manage-dialog-overflow">
+            <dialog id="manage-user-{{.UserMongoID}}" class="manage-dialog manage-dialog-overflow">
               <div class="manage-dialog-card">
                 <header class="manage-dialog-head">
                   <div>
                     <h3 class="manage-dialog-title">Manage User</h3>
                     <p class="manage-dialog-subtitle">{{.Email}}</p>
                   </div>
-                  <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">
+                  <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserMongoID}}').close()">
                     X
                   </button>
                 </header>
 
                 <form method="post" action="/org-admin/users" class="input-form">
                   <input type="hidden" name="intent" value="set_roles" />
-                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <input type="hidden" name="userMongoId" value="{{.UserMongoID}}" />
                   <label>Roles</label>
                   <div class="roles-picker" data-role-picker>
                     <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
@@ -209,7 +223,7 @@
 
                 <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
                   <input type="hidden" name="intent" value="delete_user" />
-                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <input type="hidden" name="userMongoId" value="{{.UserMongoID}}" />
                   <button type="submit" class="danger">Delete account</button>
                 </form>
               </div>
@@ -416,6 +430,60 @@
       updateToggleLabel();
       syncHiddenInputs();
       applySearchFilter();
+    });
+
+    const inviteCopyButtons = Array.from(document.querySelectorAll(".js-invite-copy"));
+    inviteCopyButtons.forEach((button) => {
+      let resetTimer = null;
+      const label = button.querySelector("[data-copy-label]");
+      const defaultLabel = label ? (label.textContent || "").trim() : "";
+      button.addEventListener("click", async () => {
+        const rawLink = (button.getAttribute("data-copy-invite-link") || "").trim();
+        if (!rawLink) {
+          return;
+        }
+        let inviteLink = rawLink;
+        try {
+          inviteLink = new URL(rawLink, window.location.origin).toString();
+        } catch (error) {
+          inviteLink = rawLink;
+        }
+
+        let copied = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(inviteLink);
+            copied = true;
+          } catch (error) {
+            copied = false;
+          }
+        }
+        if (!copied) {
+          window.prompt("Copy invite link:", inviteLink);
+          return;
+        }
+
+        const defaultIcon = button.querySelector("[data-copy-icon-default]");
+        const doneIcon = button.querySelector("[data-copy-icon-done]");
+        if (defaultIcon && doneIcon) {
+          defaultIcon.style.display = "none";
+          doneIcon.style.display = "inline-block";
+          if (label) {
+            label.textContent = "Copied";
+          }
+          if (resetTimer) {
+            window.clearTimeout(resetTimer);
+          }
+          resetTimer = window.setTimeout(() => {
+            defaultIcon.style.display = "inline-block";
+            doneIcon.style.display = "none";
+            if (label) {
+              label.textContent = defaultLabel || "Copy invite link";
+            }
+            resetTimer = null;
+          }, 1800);
+        }
+      });
     });
 
     document.addEventListener("click", (event) => {

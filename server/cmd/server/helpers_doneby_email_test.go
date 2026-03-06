@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestViewerCanSeeDoneByEmail(t *testing.T) {
@@ -29,17 +31,17 @@ func TestActorFromAccountUser(t *testing.T) {
 	if empty.WorkflowKey != "wf-x" {
 		t.Fatalf("workflow key = %q, want wf-x", empty.WorkflowKey)
 	}
-	if empty.UserID != "" || empty.OrgSlug != "" || len(empty.RoleSlugs) != 0 || empty.Role != "" {
+	if empty.ID != "" || empty.OrgSlug != "" || len(empty.RoleSlugs) != 0 || empty.Role != "" {
 		t.Fatalf("unexpected empty actor: %#v", empty)
 	}
 
 	user := &AccountUser{
-		UserID:    "u-1",
+		ID:        primitive.NewObjectID(),
 		OrgSlug:   "org-a",
 		RoleSlugs: []string{"dep2", "dep1"},
 	}
 	actor := actorFromAccountUser(user, "wf-y")
-	if actor.WorkflowKey != "wf-y" || actor.UserID != "u-1" || actor.OrgSlug != "org-a" {
+	if actor.WorkflowKey != "wf-y" || actor.ID != user.ID.Hex() || actor.OrgSlug != "org-a" {
 		t.Fatalf("unexpected actor identity: %#v", actor)
 	}
 	if actor.Role != "dep2" {
@@ -55,20 +57,20 @@ func TestActorFromAccountUser(t *testing.T) {
 	}
 }
 
-func TestLookupUserIdentityByUserIDBranches(t *testing.T) {
+func TestLookupUserIdentityByActorIDBranches(t *testing.T) {
 	server := &Server{}
 	cache := map[string]userIdentityView{}
-	if _, ok := server.lookupUserIdentityByUserID(context.Background(), "", cache); ok {
-		t.Fatal("empty userID should be unresolved")
+	if _, ok := server.lookupUserIdentityByActorID(context.Background(), "", cache); ok {
+		t.Fatal("empty userMongoID should be unresolved")
 	}
-	if _, ok := server.lookupUserIdentityByUserID(context.Background(), "u-1", cache); ok {
+	if _, ok := server.lookupUserIdentityByActorID(context.Background(), "u-1", cache); ok {
 		t.Fatal("missing store should be unresolved")
 	}
 	if _, exists := cache["u-1"]; !exists {
 		t.Fatal("expected missing-store lookup to prime cache")
 	}
 	cache["u-2"] = userIdentityView{email: "cached@example.com"}
-	identity, ok := server.lookupUserIdentityByUserID(context.Background(), "u-2", cache)
+	identity, ok := server.lookupUserIdentityByActorID(context.Background(), "u-2", cache)
 	if !ok || identity.email != "cached@example.com" {
 		t.Fatalf("cache hit mismatch: ok=%v identity=%#v", ok, identity)
 	}
@@ -78,7 +80,6 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 	store := NewMemoryStore()
 	server := &Server{store: store}
 	created, err := store.CreateUser(context.Background(), AccountUser{
-		UserID:    "u-done",
 		Email:     "done@example.com",
 		Status:    "active",
 		RoleSlugs: []string{"dep1"},
@@ -94,14 +95,14 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		},
 	}
 	actions := []ActionView{
-		{SubstepID: "1.1", DoneBy: "u-done"},
+		{SubstepID: "1.1", DoneBy: created.ID.Hex()},
 		{SubstepID: "1.2", DoneBy: "legacy-user"},
 	}
 	timeline := []TimelineStep{
 		{
 			StepID: "1",
 			Substeps: []TimelineSubstep{
-				{SubstepID: "1.1", DoneBy: "u-done"},
+				{SubstepID: "1.1", DoneBy: created.ID.Hex()},
 				{SubstepID: "1.2", DoneBy: "legacy-user"},
 			},
 		},
@@ -121,14 +122,45 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		t.Fatalf("allowed action doneBy = %q, want email", allowedActions[0].DoneBy)
 	}
 	if allowedActions[1].DoneBy != "legacy-user" {
-		t.Fatalf("legacy action doneBy = %q, want unchanged userID", allowedActions[1].DoneBy)
+		t.Fatalf("legacy action doneBy = %q, want unchanged userMongoID", allowedActions[1].DoneBy)
 	}
 	allowedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-a"}, cloneTimelineSteps(timeline))
 	if allowedTimeline[0].Substeps[0].DoneBy != "done@example.com" {
 		t.Fatalf("allowed timeline doneBy = %q, want email", allowedTimeline[0].Substeps[0].DoneBy)
 	}
 	if allowedTimeline[0].Substeps[1].DoneBy != "legacy-user" {
-		t.Fatalf("legacy timeline doneBy = %q, want unchanged userID", allowedTimeline[0].Substeps[1].DoneBy)
+		t.Fatalf("legacy timeline doneBy = %q, want unchanged userMongoID", allowedTimeline[0].Substeps[1].DoneBy)
+	}
+}
+
+func TestApplyDoneByMongoIDToDPPTraceability(t *testing.T) {
+	store := NewMemoryStore()
+	server := &Server{store: store}
+	created, err := store.CreateUser(context.Background(), AccountUser{
+		Email:     "dpp@example.com",
+		Status:    "active",
+		RoleSlugs: []string{"dep1"},
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	traceability := []DPPTraceabilityStep{
+		{
+			StepID: "1",
+			Substeps: []DPPTraceabilitySubstep{
+				{SubstepID: "1.1", DoneBy: created.ID.Hex()},
+				{SubstepID: "1.2", DoneBy: "legacy-user"},
+			},
+		},
+	}
+	mapped := server.applyDoneByMongoIDToDPPTraceability(context.Background(), traceability)
+	if mapped[0].Substeps[0].DoneBy != created.ID.Hex() {
+		t.Fatalf("mapped dpp doneBy = %q, want mongoID %q", mapped[0].Substeps[0].DoneBy, created.ID.Hex())
+	}
+	if mapped[0].Substeps[1].DoneBy != "legacy-user" {
+		t.Fatalf("legacy dpp doneBy = %q, want unchanged userMongoID", mapped[0].Substeps[1].DoneBy)
 	}
 }
 

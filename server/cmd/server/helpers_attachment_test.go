@@ -32,10 +32,10 @@ func TestSanitizeAttachmentFilename(t *testing.T) {
 
 func TestDetectAttachmentContentType(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		want    string
-		prefix  string
+		name   string
+		input  string
+		want   string
+		prefix string
 	}{
 		{name: "known text extension", input: "notes.txt", prefix: "text/plain"},
 		{name: "known uppercase extension", input: "REPORT.PDF", want: "application/pdf"},

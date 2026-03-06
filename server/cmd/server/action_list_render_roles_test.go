@@ -29,7 +29,6 @@ func TestRenderActionListDoesNotFilterByCurrentActiveRole(t *testing.T) {
 		},
 	}
 	actor := Actor{
-		UserID:    "u-session",
 		Role:      "dep2",
 		RoleSlugs: []string{"dep1", "dep2"},
 	}

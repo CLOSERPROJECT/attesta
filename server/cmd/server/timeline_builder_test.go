@@ -65,7 +65,7 @@ func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 				State:  "done",
 				DoneAt: &doneAt,
 				// Legacy actor shape: no orgSlug/roleSlugs fields.
-				DoneBy: &Actor{UserID: "legacy-user", Role: "dep1"},
+				DoneBy: &Actor{ID: "legacy-user", Role: "dep1"},
 				Data:   map[string]interface{}{"value": 10.0},
 			},
 		},
@@ -153,7 +153,7 @@ func TestBuildTimelineDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 			"1.1": {
 				State:  "done",
 				DoneAt: &doneAt,
-				DoneBy: &Actor{UserID: "u2", Role: "dep2"},
+				DoneBy: &Actor{ID: "u2", Role: "dep2"},
 				Data:   map[string]interface{}{"value": "ok"},
 			},
 		},
