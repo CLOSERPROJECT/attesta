@@ -45,6 +45,7 @@ type Store interface {
 	CreateUser(ctx context.Context, user AccountUser) (AccountUser, error)
 	GetUserByEmail(ctx context.Context, email string) (*AccountUser, error)
 	GetUserByUserID(ctx context.Context, userID string) (*AccountUser, error)
+	GetUserByMongoID(ctx context.Context, userMongoID primitive.ObjectID) (*AccountUser, error)
 	ListUsersByOrgID(ctx context.Context, orgID primitive.ObjectID) ([]AccountUser, error)
 	SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error
 	SetUserOrganization(ctx context.Context, userID string, orgID primitive.ObjectID, orgSlug string) error
@@ -1042,6 +1043,18 @@ func (s *MemoryStore) GetUserByUserID(_ context.Context, userID string) (*Accoun
 	return &copy, nil
 }
 
+func (s *MemoryStore) GetUserByMongoID(_ context.Context, userMongoID primitive.ObjectID) (*AccountUser, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, user := range s.usersByUserID {
+		if user.ID == userMongoID {
+			copy := user
+			return &copy, nil
+		}
+	}
+	return nil, mongo.ErrNoDocuments
+}
+
 func (s *MemoryStore) ListUsersByOrgID(_ context.Context, orgID primitive.ObjectID) ([]AccountUser, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1647,6 +1660,14 @@ func (s *MongoStore) GetUserByEmail(ctx context.Context, email string) (*Account
 func (s *MongoStore) GetUserByUserID(ctx context.Context, userID string) (*AccountUser, error) {
 	var user AccountUser
 	if err := s.database().Collection(collectionUsers).FindOne(ctx, bson.M{"userId": strings.TrimSpace(userID)}).Decode(&user); err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *MongoStore) GetUserByMongoID(ctx context.Context, userMongoID primitive.ObjectID) (*AccountUser, error) {
+	var user AccountUser
+	if err := s.database().Collection(collectionUsers).FindOne(ctx, bson.M{"_id": userMongoID}).Decode(&user); err != nil {
 		return nil, err
 	}
 	return &user, nil

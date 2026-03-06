@@ -132,6 +132,38 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 	}
 }
 
+func TestApplyDoneByMongoIDToDPPTraceability(t *testing.T) {
+	store := NewMemoryStore()
+	server := &Server{store: store}
+	created, err := store.CreateUser(context.Background(), AccountUser{
+		UserID:    "u-dpp",
+		Email:     "dpp@example.com",
+		Status:    "active",
+		RoleSlugs: []string{"dep1"},
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	traceability := []DPPTraceabilityStep{
+		{
+			StepID: "1",
+			Substeps: []DPPTraceabilitySubstep{
+				{SubstepID: "1.1", DoneBy: "u-dpp"},
+				{SubstepID: "1.2", DoneBy: "legacy-user"},
+			},
+		},
+	}
+	mapped := server.applyDoneByMongoIDToDPPTraceability(context.Background(), traceability)
+	if mapped[0].Substeps[0].DoneBy != created.ID.Hex() {
+		t.Fatalf("mapped dpp doneBy = %q, want mongoID %q", mapped[0].Substeps[0].DoneBy, created.ID.Hex())
+	}
+	if mapped[0].Substeps[1].DoneBy != "legacy-user" {
+		t.Fatalf("legacy dpp doneBy = %q, want unchanged userID", mapped[0].Substeps[1].DoneBy)
+	}
+}
+
 func cloneTimelineSteps(src []TimelineStep) []TimelineStep {
 	out := append([]TimelineStep(nil), src...)
 	for i := range out {

@@ -165,24 +165,24 @@
                 {{end}}
               {{end}}
             </div>
-            <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').showModal()">
+            <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserMongoID}}').showModal()">
               Manage
             </button>
-            <dialog id="manage-user-{{.UserID}}" class="manage-dialog manage-dialog-overflow">
+            <dialog id="manage-user-{{.UserMongoID}}" class="manage-dialog manage-dialog-overflow">
               <div class="manage-dialog-card">
                 <header class="manage-dialog-head">
                   <div>
                     <h3 class="manage-dialog-title">Manage User</h3>
                     <p class="manage-dialog-subtitle">{{.Email}}</p>
                   </div>
-                  <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserID}}').close()">
+                  <button type="button" class="secondary" onclick="document.getElementById('manage-user-{{.UserMongoID}}').close()">
                     X
                   </button>
                 </header>
 
                 <form method="post" action="/org-admin/users" class="input-form">
                   <input type="hidden" name="intent" value="set_roles" />
-                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <input type="hidden" name="userMongoId" value="{{.UserMongoID}}" />
                   <label>Roles</label>
                   <div class="roles-picker" data-role-picker>
                     <button type="button" class="roles-picker-toggle" data-role-picker-toggle aria-expanded="false">Select roles</button>
@@ -209,7 +209,7 @@
 
                 <form method="post" action="/org-admin/users" class="input-form manage-dialog-danger-zone">
                   <input type="hidden" name="intent" value="delete_user" />
-                  <input type="hidden" name="userId" value="{{.UserID}}" />
+                  <input type="hidden" name="userMongoId" value="{{.UserMongoID}}" />
                   <button type="submit" class="danger">Delete account</button>
                 </form>
               </div>

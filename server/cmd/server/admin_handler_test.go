@@ -1948,7 +1948,7 @@ func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.
 	if err != nil {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
-	if _, err := store.CreateUser(t.Context(), AccountUser{
+	targetUser, err := store.CreateUser(t.Context(), AccountUser{
 		UserID:    "target-user",
 		OrgID:     &orgID,
 		OrgSlug:   org.Slug,
@@ -1956,14 +1956,15 @@ func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.
 		RoleSlugs: []string{"qa-reviewer"},
 		Status:    "active",
 		CreatedAt: time.Now().UTC(),
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser target error: %v", err)
 	}
 
 	sessionID := createSessionForTestUser(t, store, adminUser)
 	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
 
-	updateReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=target-user&roles=approver"))
+	updateReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+targetUser.ID.Hex()+"&roles=approver"))
 	updateReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	updateReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	updateRec := httptest.NewRecorder()
@@ -1979,7 +1980,7 @@ func TestHandleOrgAdminUsersSetRolesIntentUpdatesUserAndProtectsSelf(t *testing.
 		t.Fatalf("target roles = %#v, want [approver]", target.RoleSlugs)
 	}
 
-	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=org-admin-set-roles&roles=qa-reviewer"))
+	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+adminUser.ID.Hex()+"&roles=qa-reviewer"))
 	selfReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	selfReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	selfRec := httptest.NewRecorder()
@@ -2014,7 +2015,7 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 	if err != nil {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
-	if _, err := store.CreateUser(t.Context(), AccountUser{
+	targetUser, err := store.CreateUser(t.Context(), AccountUser{
 		UserID:       "delete-target",
 		OrgID:        &orgID,
 		OrgSlug:      org.Slug,
@@ -2023,14 +2024,15 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 		RoleSlugs:    []string{"qa-reviewer"},
 		Status:       "active",
 		CreatedAt:    time.Now().UTC(),
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser target error: %v", err)
 	}
 
 	sessionID := createSessionForTestUser(t, store, adminUser)
 	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
 
-	deleteReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=delete-target"))
+	deleteReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+targetUser.ID.Hex()))
 	deleteReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	deleteReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	deleteRec := httptest.NewRecorder()
@@ -2057,7 +2059,7 @@ func TestHandleOrgAdminUsersDeleteUserIntentDisablesUserAndRejectsSelf(t *testin
 		t.Fatalf("expected deleted user hidden from org admin view, got %q", getRec.Body.String())
 	}
 
-	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=org-admin-delete"))
+	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+adminUser.ID.Hex()))
 	selfReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	selfReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	selfRec := httptest.NewRecorder()
@@ -2098,7 +2100,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser admin error: %v", err)
 	}
-	if _, err := base.CreateUser(t.Context(), AccountUser{
+	sameOrgUser, err := base.CreateUser(t.Context(), AccountUser{
 		UserID:    "same-org-user",
 		OrgID:     &orgAID,
 		OrgSlug:   orgA.Slug,
@@ -2106,10 +2108,11 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 		RoleSlugs: []string{"qa-reviewer"},
 		Status:    "active",
 		CreatedAt: time.Now().UTC(),
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser same-org error: %v", err)
 	}
-	if _, err := base.CreateUser(t.Context(), AccountUser{
+	otherOrgUser, err := base.CreateUser(t.Context(), AccountUser{
 		UserID:    "other-org-user",
 		OrgID:     &orgBID,
 		OrgSlug:   orgB.Slug,
@@ -2117,7 +2120,8 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 		RoleSlugs: []string{"qa-reviewer"},
 		Status:    "active",
 		CreatedAt: time.Now().UTC(),
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("CreateUser other-org error: %v", err)
 	}
 	sessionID := createSessionForTestUser(t, base, adminUser)
@@ -2155,7 +2159,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("set roles user not found", func(t *testing.T) {
 		server := newServer(base)
-		req, rec := newPost("intent=set_roles&userId=missing&roles=qa-reviewer")
+		req, rec := newPost("intent=set_roles&userMongoId=507f1f77bcf86cd799439099&roles=qa-reviewer")
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "user not found") {
 			t.Fatalf("expected user not found error, got %q", rec.Body.String())
@@ -2164,7 +2168,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("set roles cross org user", func(t *testing.T) {
 		server := newServer(base)
-		req, rec := newPost("intent=set_roles&userId=other-org-user&roles=qa-reviewer")
+		req, rec := newPost("intent=set_roles&userMongoId=" + otherOrgUser.ID.Hex() + "&roles=qa-reviewer")
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "user does not belong to your organization") {
 			t.Fatalf("expected cross-org user error, got %q", rec.Body.String())
@@ -2173,7 +2177,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("set roles role not found", func(t *testing.T) {
 		server := newServer(base)
-		req, rec := newPost("intent=set_roles&userId=same-org-user&roles=missing-role")
+		req, rec := newPost("intent=set_roles&userMongoId=" + sameOrgUser.ID.Hex() + "&roles=missing-role")
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "role not found") {
 			t.Fatalf("expected role not found error, got %q", rec.Body.String())
@@ -2182,7 +2186,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("set roles update failure", func(t *testing.T) {
 		server := newServer(&adminFailingStore{MemoryStore: base, failSetUserRoles: true})
-		req, rec := newPost("intent=set_roles&userId=same-org-user&roles=qa-reviewer")
+		req, rec := newPost("intent=set_roles&userMongoId=" + sameOrgUser.ID.Hex() + "&roles=qa-reviewer")
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "failed to update user roles") {
 			t.Fatalf("expected set roles failure message, got %q", rec.Body.String())
@@ -2200,7 +2204,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("delete user not found", func(t *testing.T) {
 		server := newServer(base)
-		req, rec := newPost("intent=delete_user&userId=missing")
+		req, rec := newPost("intent=delete_user&userMongoId=507f1f77bcf86cd799439098")
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "user not found") {
 			t.Fatalf("expected user not found error, got %q", rec.Body.String())
@@ -2209,7 +2213,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("delete user cross org", func(t *testing.T) {
 		server := newServer(base)
-		req, rec := newPost("intent=delete_user&userId=other-org-user")
+		req, rec := newPost("intent=delete_user&userMongoId=" + otherOrgUser.ID.Hex())
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "user does not belong to your organization") {
 			t.Fatalf("expected cross-org delete error, got %q", rec.Body.String())
@@ -2218,7 +2222,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 
 	t.Run("delete user failure", func(t *testing.T) {
 		server := newServer(&adminFailingStore{MemoryStore: base, failDisableUser: true})
-		req, rec := newPost("intent=delete_user&userId=same-org-user")
+		req, rec := newPost("intent=delete_user&userMongoId=" + sameOrgUser.ID.Hex())
 		server.handleOrgAdminUsers(rec, req)
 		if !strings.Contains(rec.Body.String(), "failed to delete user") {
 			t.Fatalf("expected delete failure error, got %q", rec.Body.String())

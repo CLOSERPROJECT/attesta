@@ -455,7 +455,7 @@ type OrgAdminRoleOption struct {
 }
 
 type OrgAdminUserRow struct {
-	UserID      string
+	UserMongoID string
 	Email       string
 	Status      string
 	Activated   bool
@@ -1755,6 +1755,16 @@ func accountMatchesOrg(user *AccountUser, orgID primitive.ObjectID, orgSlug stri
 	return strings.TrimSpace(user.OrgSlug) == strings.TrimSpace(orgSlug)
 }
 
+func isSameAccount(a, b *AccountUser) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if !a.ID.IsZero() && !b.ID.IsZero() {
+		return a.ID == b.ID
+	}
+	return strings.TrimSpace(a.UserID) != "" && strings.TrimSpace(a.UserID) == strings.TrimSpace(b.UserID)
+}
+
 func ensureStoreIndexes(ctx context.Context, store Store) error {
 	mongoStore, ok := store.(*MongoStore)
 	if !ok || mongoStore == nil {
@@ -2154,7 +2164,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 			})
 		}
 		orgUsers = append(orgUsers, OrgAdminUserRow{
-			UserID:      orgUser.UserID,
+			UserMongoID: orgUser.ID.Hex(),
 			Email:       orgUser.Email,
 			Status:      orgUser.Status,
 			Activated:   strings.TrimSpace(orgUser.PasswordHash) != "",
@@ -2518,12 +2528,17 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		s.renderOrgAdmin(w, updatedAdmin, updatedOrg.Slug, "", "")
 		return
 	case "set_roles":
-		userID := strings.TrimSpace(r.FormValue("userId"))
-		if userID == "" {
+		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
+		if userMongoID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
 			return
 		}
-		target, err := s.store.GetUserByUserID(r.Context(), userID)
+		userMongoObjectID, err := primitive.ObjectIDFromHex(userMongoID)
+		if err != nil {
+			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+			return
+		}
+		target, err := s.store.GetUserByMongoID(r.Context(), userMongoObjectID)
 		if err != nil || target == nil {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
@@ -2539,7 +2554,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if target.UserID == admin.UserID && !containsRole(selectedRoles, "org-admin") {
+		if isSameAccount(target, admin) && !containsRole(selectedRoles, "org-admin") {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove org-admin from your own account"})
 			return
 		}
@@ -2550,16 +2565,17 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 		return
 	case "delete_user":
-		userID := strings.TrimSpace(r.FormValue("userId"))
-		if userID == "" {
+		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
+		if userMongoID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
 			return
 		}
-		if userID == admin.UserID {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot delete yourself"})
+		userMongoObjectID, err := primitive.ObjectIDFromHex(userMongoID)
+		if err != nil {
+			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
 		}
-		target, err := s.store.GetUserByUserID(r.Context(), userID)
+		target, err := s.store.GetUserByMongoID(r.Context(), userMongoObjectID)
 		if err != nil || target == nil {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
@@ -2568,7 +2584,11 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user does not belong to your organization"})
 			return
 		}
-		if err := s.store.DisableUser(r.Context(), userID); err != nil {
+		if isSameAccount(target, admin) {
+			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot delete yourself"})
+			return
+		}
+		if err := s.store.DisableUser(r.Context(), target.UserID); err != nil {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
 			return
 		}
@@ -2997,6 +3017,25 @@ func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef
 	return timeline
 }
 
+func (s *Server) applyDoneByMongoIDToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
+	if len(traceability) == 0 {
+		return traceability
+	}
+	cache := map[string]userIdentityView{}
+	for stepIdx := range traceability {
+		for subIdx := range traceability[stepIdx].Substeps {
+			identity, ok := s.lookupUserIdentityByUserID(ctx, traceability[stepIdx].Substeps[subIdx].DoneBy, cache)
+			if !ok {
+				continue
+			}
+			if strings.TrimSpace(identity.mongoID) != "" {
+				traceability[stepIdx].Substeps[subIdx].DoneBy = identity.mongoID
+			}
+		}
+	}
+	return traceability
+}
+
 func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
 	if err != nil {
@@ -3039,6 +3078,8 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	if process.DPP != nil && !process.DPP.GeneratedAt.IsZero() {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
+	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey)
+	traceability = s.applyDoneByMongoIDToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		ProcessID:    process.ID.Hex(),
@@ -3048,7 +3089,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		Serial:       serial,
 		IssuedAt:     issuedAt,
 		Workflow:     cfg.Workflow,
-		Traceability: buildDPPTraceabilityView(cfg.Workflow, process, workflowKey),
+		Traceability: traceability,
 		Export:       export,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
