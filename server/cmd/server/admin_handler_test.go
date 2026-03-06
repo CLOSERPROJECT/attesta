@@ -2852,3 +2852,53 @@ func TestHandleOrgAdminUsersInviteDuplicateCreateReloadsExistingUser(t *testing.
 		t.Fatalf("invite count = %d, want 1", len(invites))
 	}
 }
+
+func TestHandleOrgAdminUsersInviteRefreshDoesNotCreateDuplicate(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "No Duplicate Org"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "Org Admin", Slug: "org-admin", CreatedAt: time.Now().UTC()})
+	_, _ = store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Slug: "qa-reviewer", CreatedAt: time.Now().UTC()})
+	orgID := org.ID
+	adminUser, err := store.CreateUser(t.Context(), AccountUser{
+		OrgID:     &orgID,
+		OrgSlug:   org.Slug,
+		Email:     "org-admin-nodup@example.com",
+		RoleSlugs: []string{"org-admin"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("CreateUser admin error: %v", err)
+	}
+
+	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := &Server{store: store, tmpl: testTemplates(), enforceAuth: true, now: time.Now}
+	postInvite := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=same%40example.com&roles=qa-reviewer"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+		return rec
+	}
+
+	first := postInvite()
+	if first.Code != http.StatusOK {
+		t.Fatalf("first invite status = %d, want %d", first.Code, http.StatusOK)
+	}
+	second := postInvite()
+	if second.Code != http.StatusOK {
+		t.Fatalf("second invite status = %d, want %d", second.Code, http.StatusOK)
+	}
+
+	invites, err := store.ListInvitesByCreator(t.Context(), adminUser.ID, org.ID)
+	if err != nil {
+		t.Fatalf("ListInvitesByCreator error: %v", err)
+	}
+	if len(invites) != 1 {
+		t.Fatalf("invite count after repeated submit = %d, want 1", len(invites))
+	}
+}

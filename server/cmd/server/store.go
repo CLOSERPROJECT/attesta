@@ -101,6 +101,7 @@ type Invite struct {
 	Email                string             `bson:"email"`
 	UserMongoID          primitive.ObjectID `bson:"userMongoId"`
 	RoleSlugs            []string           `bson:"roleSlugs"`
+	Token                string             `bson:"token,omitempty"`
 	TokenHash            string             `bson:"tokenHash"`
 	ExpiresAt            time.Time          `bson:"expiresAt"`
 	UsedAt               *time.Time         `bson:"usedAt,omitempty"`
@@ -1152,7 +1153,12 @@ func (s *MemoryStore) CreateInvite(_ context.Context, invite Invite) (Invite, er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	invite.Email = strings.ToLower(strings.TrimSpace(invite.Email))
-	invite.TokenHash = hashLookupToken(invite.TokenHash)
+	rawToken := strings.TrimSpace(invite.Token)
+	if rawToken == "" {
+		rawToken = strings.TrimSpace(invite.TokenHash)
+	}
+	invite.Token = rawToken
+	invite.TokenHash = hashLookupToken(rawToken)
 	invite.RoleSlugs = canonifyRoleSlugs(invite.RoleSlugs)
 	if invite.CreatedAt.IsZero() {
 		invite.CreatedAt = time.Now().UTC()
@@ -1768,7 +1774,12 @@ func (s *MongoStore) CreateInvite(ctx context.Context, invite Invite) (Invite, e
 		invite.CreatedAt = time.Now().UTC()
 	}
 	invite.Email = strings.ToLower(strings.TrimSpace(invite.Email))
-	invite.TokenHash = hashLookupToken(invite.TokenHash)
+	rawToken := strings.TrimSpace(invite.Token)
+	if rawToken == "" {
+		rawToken = strings.TrimSpace(invite.TokenHash)
+	}
+	invite.Token = rawToken
+	invite.TokenHash = hashLookupToken(rawToken)
 	invite.RoleSlugs = canonifyRoleSlugs(invite.RoleSlugs)
 	result, err := s.database().Collection(collectionInvites).InsertOne(ctx, invite)
 	if err != nil {
