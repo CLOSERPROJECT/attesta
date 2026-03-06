@@ -204,10 +204,11 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				}
 				subView.Digest = digestPayload(progress.Data)
 				subView.Values = dppTraceValues(sub, progress.Data)
-				if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
-					subView.FileName = attachment.Filename
-					subView.FileSHA256 = attachment.SHA256
-					subView.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
+				subView.Attachments = buildActionAttachments(workflowKey, process, progress.Data)
+				if len(subView.Attachments) > 0 {
+					subView.FileName = subView.Attachments[0].Filename
+					subView.FileSHA256 = subView.Attachments[0].SHA256
+					subView.FileURL = subView.Attachments[0].URL
 				}
 			} else if availableMap[sub.SubstepID] {
 				subView.Status = "available"

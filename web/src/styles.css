@@ -833,7 +833,6 @@ button.secondary {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--panel);
   display: grid;
   gap: 6px;
 }

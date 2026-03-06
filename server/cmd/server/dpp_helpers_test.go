@@ -259,6 +259,65 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 	}
 }
 
+func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Title:  "Step 1",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Formata",
+						Order:     1,
+						Role:      "qa",
+						InputKey:  "payload",
+						InputType: "formata",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"payload": map[string]interface{}{
+						"docs": []interface{}{
+							map[string]interface{}{
+								"attachmentId": primitive.NewObjectID().Hex(),
+								"filename":     "proof.pdf",
+								"sha256":       "hash-proof",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{})
+	if len(view) != 1 || len(view[0].Substeps) != 1 {
+		t.Fatalf("unexpected traceability shape: %#v", view)
+	}
+	substep := view[0].Substeps[0]
+	if len(substep.Attachments) != 1 {
+		t.Fatalf("expected one nested attachment, got %#v", substep.Attachments)
+	}
+	if substep.Attachments[0].Filename != "proof.pdf" {
+		t.Fatalf("attachment filename = %q, want proof.pdf", substep.Attachments[0].Filename)
+	}
+	if substep.Attachments[0].URL == "" {
+		t.Fatalf("expected attachment URL, got %#v", substep.Attachments[0])
+	}
+	if substep.FileURL == "" || substep.FileName != "proof.pdf" {
+		t.Fatalf("expected backward-compatible single file fields, got file=%q url=%q", substep.FileName, substep.FileURL)
+	}
+}
+
 func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{

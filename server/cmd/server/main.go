@@ -519,20 +519,21 @@ type DPPTraceabilityStep struct {
 }
 
 type DPPTraceabilitySubstep struct {
-	SubstepID  string
-	Title      string
-	Role       string
-	RoleBadges []DPPTraceabilityRoleBadge
-	RoleColor  template.CSS
-	RoleBorder template.CSS
-	Status     string
-	DoneAt     string
-	DoneBy     string
-	Digest     string
-	Values     []DPPTraceabilityValue
-	FileName   string
-	FileSHA256 string
-	FileURL    string
+	SubstepID   string
+	Title       string
+	Role        string
+	RoleBadges  []DPPTraceabilityRoleBadge
+	RoleColor   template.CSS
+	RoleBorder  template.CSS
+	Status      string
+	DoneAt      string
+	DoneBy      string
+	Digest      string
+	Values      []DPPTraceabilityValue
+	Attachments []ActionAttachmentView
+	FileName    string
+	FileSHA256  string
+	FileURL     string
 }
 
 type DPPTraceabilityRoleBadge struct {

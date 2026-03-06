@@ -32,7 +32,7 @@
           <summary class="timeline-step-summary" aria-label="Open stream step">
             Step {{.StepID}} - {{.Title}}
           </summary>
-          <ul>
+          <ul class="actions">
             {{range .Substeps}}
               <details class="substep substep-{{.Status}}">
                 <summary class="substep-head">
@@ -43,34 +43,48 @@
                     style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}; margin-left: auto;"
                   >{{.Role}}</span>
                 </summary>
-                {{if .Values}}
-                  <dl class="action-submitted-values">
-                    {{range .Values}}
-                      <dt>{{.Key}}</dt>
-                      <dd>{{.Value}}</dd>
-                    {{end}}
-                  </dl>
-                {{end}}
-                {{if .FileURL}}
-                  <ul class="action-submitted-attachments">
-                    <li>
-                      <a href="{{.FileURL}}">{{.FileName}}</a>
-                      <a class="secondary" href="{{.FileURL}}">Download</a>
-                      {{if .FileSHA256}}
-                        <code>{{.FileSHA256}}</code>
-                        <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
+                <div class="action-submitted">
+                  {{if .Values}}
+                    <dl class="action-submitted-values">
+                      {{range .Values}}
+                        <dt>{{.Key}}</dt>
+                        <dd>{{.Value}}</dd>
                       {{end}}
-                    </li>
-                  </ul>
-                {{end}}
-                <div class="substep-meta">
-                  {{if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
-                  {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
-                  {{if .Digest}}<span class="data">digest: <code>{{.Digest}}</code></span>{{end}}
+                    </dl>
+                  {{end}}
+                  {{if .Attachments}}
+                    <ul class="action-submitted-attachments">
+                      {{range .Attachments}}
+                        <li>
+                          <a href="{{.URL}}">{{.Filename}}</a>
+                          {{if .SHA256}}
+                            <code>{{.SHA256}}</code>
+                            <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.SHA256}}" data-copy-label="sha256">Copy</button>
+                          {{end}}
+                        </li>
+                      {{end}}
+                    </ul>
+                  {{else if .FileURL}}
+                    <ul class="action-submitted-attachments">
+                      <li>
+                        <a href="{{.FileURL}}">{{.FileName}}</a>
+                        <a class="secondary" href="{{.FileURL}}">Download</a>
+                        {{if .FileSHA256}}
+                          <code>{{.FileSHA256}}</code>
+                          <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
+                        {{end}}
+                      </li>
+                    </ul>
+                  {{end}}
+                  <div class="substep-meta">
+                    {{if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
+                    {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
+                    {{if .Digest}}<span class="data">digest: <code>{{.Digest}}</code></span>{{end}}
+                  </div>
                 </div>
               </details>
             {{end}}
-          </ul>
+            </ul>
         </details>
       {{end}}
     </div>
