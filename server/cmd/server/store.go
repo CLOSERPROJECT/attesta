@@ -154,6 +154,7 @@ type mongoCollectionPort interface {
 	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
 	CreateIndexes(ctx context.Context, models []mongo.IndexModel) error
+	DropIndex(ctx context.Context, name string) error
 }
 
 type mongoSingleResultPort interface {
@@ -219,6 +220,14 @@ func (c mongoDriverCollection) FindOneAndUpdate(ctx context.Context, filter inte
 
 func (c mongoDriverCollection) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
 	_, err := c.collection.Indexes().CreateMany(ctx, models)
+	return err
+}
+
+func (c mongoDriverCollection) DropIndex(ctx context.Context, name string) error {
+	_, err := c.collection.Indexes().DropOne(ctx, name)
+	if err != nil && isMongoIndexNotFoundError(err) {
+		return nil
+	}
 	return err
 }
 
@@ -1416,6 +1425,23 @@ func hashLookupToken(token string) string {
 }
 
 func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
+	legacyIndexes := map[string][]string{
+		collectionUsers: {
+			"userId_1",
+		},
+		collectionSessions: {
+			"userId_1",
+		},
+	}
+	for collectionName, indexNames := range legacyIndexes {
+		collection := s.database().Collection(collectionName)
+		for _, indexName := range indexNames {
+			if err := collection.DropIndex(ctx, indexName); err != nil {
+				return err
+			}
+		}
+	}
+
 	indexes := map[string][]mongo.IndexModel{
 		collectionOrganizations: {
 			{Keys: bson.D{{Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true)},
@@ -1449,6 +1475,18 @@ func (s *MongoStore) EnsureAuthIndexes(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func isMongoIndexNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var commandErr mongo.CommandError
+	if errors.As(err, &commandErr) {
+		return commandErr.Code == 26 || commandErr.Code == 27
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "index not found") || strings.Contains(msg, "ns not found")
 }
 
 func (s *MongoStore) CreateOrganization(ctx context.Context, org Organization) (Organization, error) {
