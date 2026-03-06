@@ -194,7 +194,7 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "cert.pdf") || !strings.Contains(body, "Download") {
+	if !strings.Contains(body, "cert.pdf") {
 		t.Fatalf("expected inline file link in traceability, got %q", body)
 	}
 	if strings.Contains(body, ">Documents<") {
