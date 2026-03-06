@@ -417,9 +417,11 @@ type ResetSetView struct {
 
 type PlatformAdminView struct {
 	PageBase
-	Organizations []Organization
-	InviteLink    string
-	Error         string
+	Organizations     []Organization
+	InviteLink        string
+	OrganizationError string
+	InviteError       string
+	Error             string
 }
 
 type OrgAdminView struct {
@@ -444,6 +446,11 @@ type OrgAdminErrors struct {
 	Role         string
 	Invite       string
 	Users        string
+}
+
+type PlatformAdminErrors struct {
+	Organization string
+	Invite       string
 }
 
 type OrgAdminRoleOption struct {
@@ -1809,13 +1816,17 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 	return user, true
 }
 
-func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, inviteLink, errMsg string) {
+func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, inviteLink string, errs PlatformAdminErrors) {
+	errs.Organization = strings.TrimSpace(errs.Organization)
+	errs.Invite = strings.TrimSpace(errs.Invite)
 	orgs, _ := s.store.ListOrganizations(context.Background())
 	view := PlatformAdminView{
-		PageBase:      s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		Organizations: orgs,
-		InviteLink:    strings.TrimSpace(inviteLink),
-		Error:         strings.TrimSpace(errMsg),
+		PageBase:          s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		Organizations:     orgs,
+		InviteLink:        strings.TrimSpace(inviteLink),
+		OrganizationError: errs.Organization,
+		InviteError:       errs.Invite,
+		Error:             firstNonEmpty(errs.Organization, errs.Invite),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1831,7 +1842,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	if path == "" || path == "/" {
 		switch r.Method {
 		case http.MethodGet:
-			s.renderPlatformAdmin(w, admin, "", "")
+			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{})
 			return
 		case http.MethodPost:
 			contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
@@ -1839,7 +1850,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				r.Body = http.MaxBytesReader(w, r.Body, organizationLogoMaxBytes())
 				if err := r.ParseMultipartForm(1 << 20); err != nil {
 					if isRequestTooLarge(err) {
-						s.renderPlatformAdmin(w, admin, "", "logo file too large")
+						s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "logo file too large"})
 						return
 					}
 					http.Error(w, "invalid form", http.StatusBadRequest)
@@ -1857,39 +1868,39 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				orgSlug := strings.TrimSpace(r.FormValue("org_slug"))
 				email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 				if email == "" {
-					s.renderPlatformAdmin(w, admin, "", "email is required")
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "email is required"})
 					return
 				}
 				var org *Organization
 				if orgSlug != "" {
 					loadedOrg, orgErr := s.store.GetOrganizationBySlug(r.Context(), orgSlug)
 					if orgErr != nil || loadedOrg == nil {
-						s.renderPlatformAdmin(w, admin, "", "organization not found")
+						s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "organization not found"})
 						return
 					}
 					org = loadedOrg
 				}
 				inviteLink, inviteErrMsg := s.createPlatformOrgAdminInvite(r.Context(), admin, org, email)
 				if inviteErrMsg != "" {
-					s.renderPlatformAdmin(w, admin, "", inviteErrMsg)
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: inviteErrMsg})
 					return
 				}
-				s.renderPlatformAdmin(w, admin, inviteLink, "")
+				s.renderPlatformAdmin(w, admin, inviteLink, PlatformAdminErrors{})
 				return
 			}
 			name := strings.TrimSpace(r.FormValue("name"))
 			if name == "" {
-				s.renderPlatformAdmin(w, admin, "", "organization name is required")
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization name is required"})
 				return
 			}
 			orgSlug := canonifySlug(name)
 			if existing, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
-				s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists"})
 				return
 			}
 			logoAttachmentID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, orgSlug)
 			if logoErrMsg != "" {
-				s.renderPlatformAdmin(w, admin, "", logoErrMsg)
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: logoErrMsg})
 				return
 			}
 			if _, err := s.store.CreateOrganization(r.Context(), Organization{
@@ -1898,10 +1909,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				CreatedAt:        s.nowUTC(),
 			}); err != nil {
 				if isDuplicateSlugError(err) {
-					s.renderPlatformAdmin(w, admin, "", "organization slug already exists")
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists"})
 					return
 				}
-				s.renderPlatformAdmin(w, admin, "", "failed to create organization")
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to create organization"})
 				return
 			}
 			http.Redirect(w, r, "/admin/orgs", http.StatusSeeOther)
@@ -1919,7 +1930,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		s.renderPlatformAdmin(w, admin, "", "")
+		s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{})
 		return
 	}
 	if err := r.ParseForm(); err != nil {
@@ -1928,15 +1939,15 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 	if email == "" {
-		s.renderPlatformAdmin(w, admin, "", "email is required")
+		s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "email is required"})
 		return
 	}
 	inviteLink, inviteErrMsg := s.createPlatformOrgAdminInvite(r.Context(), admin, org, email)
 	if inviteErrMsg != "" {
-		s.renderPlatformAdmin(w, admin, "", inviteErrMsg)
+		s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: inviteErrMsg})
 		return
 	}
-	s.renderPlatformAdmin(w, admin, inviteLink, "")
+	s.renderPlatformAdmin(w, admin, inviteLink, PlatformAdminErrors{})
 }
 
 func (s *Server) parseOrganizationLogoUpload(ctx context.Context, r *http.Request, orgSlug string) (string, string) {

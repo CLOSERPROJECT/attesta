@@ -3018,7 +3018,7 @@ func TestRenderAdminTemplatesErrorPaths(t *testing.T) {
 	}
 
 	recPlatform := httptest.NewRecorder()
-	server.renderPlatformAdmin(recPlatform, user, "", "")
+	server.renderPlatformAdmin(recPlatform, user, "", PlatformAdminErrors{})
 	if recPlatform.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", recPlatform.Code, http.StatusInternalServerError)
 	}
