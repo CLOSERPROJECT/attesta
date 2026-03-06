@@ -1,7 +1,6 @@
 FROM alpine:3.20 AS source
 RUN apk add --no-cache git
 WORKDIR /src
-COPY .git .git
 COPY .gitmodules .gitmodules
 RUN git submodule update --init --recursive
 COPY web/ web/
