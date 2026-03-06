@@ -248,7 +248,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		if !strings.Contains(body, "Click to create new stream") {
 			t.Fatalf("expected create stream card copy for org admin, got %q", body)
 		}
-		if !strings.Contains(body, "Create stream") {
+		if !strings.Contains(body, "workflow-card-cta") || !strings.Contains(body, "Create new stream") {
 			t.Fatalf("expected create stream card cta for org admin, got %q", body)
 		}
 	})
