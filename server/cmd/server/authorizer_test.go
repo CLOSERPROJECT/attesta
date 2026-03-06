@@ -43,7 +43,7 @@ func TestCerbosAuthorizerCanCompleteBuildsRequestAndMapsAllow(t *testing.T) {
 	fixed := time.Unix(1700000000, 123)
 	authorizer := NewCerbosAuthorizer(pdp.URL+"/", pdp.Client(), func() time.Time { return fixed })
 
-	allowed, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1", "dep2"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+	allowed, err := authorizer.CanComplete(context.Background(), Actor{ID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1", "dep2"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 		SubstepID: "1.1",
 		Order:     2,
 		Roles:     []string{"dep1"},
@@ -145,7 +145,7 @@ func TestCerbosAuthorizerCanCompleteMapsDenyAndUnknownToFalse(t *testing.T) {
 			authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), func() time.Time {
 				return time.Unix(1700000000, 0)
 			})
-			allowed, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+			allowed, err := authorizer.CanComplete(context.Background(), Actor{ID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 				SubstepID: "1.1",
 				Order:     1,
 				Roles:     []string{"dep1"},
@@ -167,7 +167,7 @@ func TestCerbosAuthorizerCanCompleteReturnsErrorForBadStatusAndBadJSON(t *testin
 	defer badStatus.Close()
 
 	authorizer := NewCerbosAuthorizer(badStatus.URL, badStatus.Client(), time.Now)
-	_, err := authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+	_, err := authorizer.CanComplete(context.Background(), Actor{ID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 		SubstepID: "1.1",
 		Order:     1,
 		Roles:     []string{"dep1"},
@@ -182,7 +182,7 @@ func TestCerbosAuthorizerCanCompleteReturnsErrorForBadStatusAndBadJSON(t *testin
 	defer badJSON.Close()
 
 	authorizer = NewCerbosAuthorizer(badJSON.URL, badJSON.Client(), time.Now)
-	_, err = authorizer.CanComplete(context.Background(), Actor{UserID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+	_, err = authorizer.CanComplete(context.Background(), Actor{ID: "u1", Role: "dep1", OrgSlug: "org1", RoleSlugs: []string{"dep1"}, WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
 		SubstepID: "1.1",
 		Order:     1,
 		Roles:     []string{"dep1"},

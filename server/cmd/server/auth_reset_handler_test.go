@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,11 +21,11 @@ type resetFailingStore struct {
 	failMarkUsed    bool
 }
 
-func (s *resetFailingStore) SetUserPasswordHash(ctx context.Context, userID, passwordHash string) error {
+func (s *resetFailingStore) SetUserPasswordHash(ctx context.Context, userMongoID primitive.ObjectID, passwordHash string) error {
 	if s.failSetPassword {
 		return errors.New("set password failed")
 	}
-	return s.MemoryStore.SetUserPasswordHash(ctx, userID, passwordHash)
+	return s.MemoryStore.SetUserPasswordHash(ctx, userMongoID, passwordHash)
 }
 
 func (s *resetFailingStore) MarkPasswordResetUsed(ctx context.Context, tokenHash string, usedAt time.Time) error {
@@ -48,7 +49,6 @@ func TestHandleResetRequestGenericConfirmation(t *testing.T) {
 	store := NewMemoryStore()
 	hash, _ := bcrypt.GenerateFromPassword([]byte("old-password-value"), bcrypt.DefaultCost)
 	if _, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "u1",
 		Email:        "user@acme.io",
 		PasswordHash: string(hash),
 		Status:       "active",
@@ -85,7 +85,6 @@ func TestHandleResetSetFlow(t *testing.T) {
 	store := NewMemoryStore()
 	oldHash, _ := bcrypt.GenerateFromPassword([]byte("old-password-value"), bcrypt.DefaultCost)
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:       "u1",
 		Email:        "user@acme.io",
 		PasswordHash: string(oldHash),
 		Status:       "active",
@@ -95,11 +94,11 @@ func TestHandleResetSetFlow(t *testing.T) {
 		t.Fatalf("CreateUser error: %v", err)
 	}
 	if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{
-		Email:     "user@acme.io",
-		UserID:    user.UserID,
-		TokenHash: "reset-token",
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		Email:       "user@acme.io",
+		UserMongoID: user.ID,
+		TokenHash:   "reset-token",
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("CreatePasswordReset error: %v", err)
 	}
@@ -121,9 +120,9 @@ func TestHandleResetSetFlow(t *testing.T) {
 		t.Fatalf("expected attesta_session cookie, got %#v", cookies)
 	}
 
-	updated, err := store.GetUserByUserID(t.Context(), user.UserID)
+	updated, err := store.GetUserByMongoID(t.Context(), user.ID)
 	if err != nil {
-		t.Fatalf("GetUserByUserID error: %v", err)
+		t.Fatalf("GetUserByMongoID error: %v", err)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(updated.PasswordHash), []byte("new-password-123")); err != nil {
 		t.Fatalf("password hash mismatch: %v", err)
@@ -140,11 +139,11 @@ func TestHandleResetSetFlow(t *testing.T) {
 func TestHandleResetSetRejectsExpiredToken(t *testing.T) {
 	store := NewMemoryStore()
 	if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{
-		Email:     "user@acme.io",
-		UserID:    "u1",
-		TokenHash: "expired-reset-token",
-		ExpiresAt: time.Now().UTC().Add(-1 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		Email:       "user@acme.io",
+		UserMongoID: primitive.NewObjectID(),
+		TokenHash:   "expired-reset-token",
+		ExpiresAt:   time.Now().UTC().Add(-1 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("CreatePasswordReset error: %v", err)
 	}
@@ -182,11 +181,11 @@ func TestHandleResetPageHidesAdminTopbarLinks(t *testing.T) {
 func TestHandleResetSetGetValidTokenRendersForm(t *testing.T) {
 	store := NewMemoryStore()
 	if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{
-		Email:     "user@acme.io",
-		UserID:    "u1",
-		TokenHash: "valid-reset-token",
-		ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		Email:       "user@acme.io",
+		UserMongoID: primitive.NewObjectID(),
+		TokenHash:   "valid-reset-token",
+		ExpiresAt:   time.Now().UTC().Add(2 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("CreatePasswordReset error: %v", err)
 	}
@@ -219,7 +218,6 @@ func TestHandleResetSetValidationAndFailurePaths(t *testing.T) {
 	base := NewMemoryStore()
 	oldHash, _ := bcrypt.GenerateFromPassword([]byte("old-password-value"), bcrypt.DefaultCost)
 	user, err := base.CreateUser(t.Context(), AccountUser{
-		UserID:       "u-reset-extra",
 		Email:        "user-reset-extra@acme.io",
 		PasswordHash: string(oldHash),
 		Status:       "active",
@@ -232,11 +230,11 @@ func TestHandleResetSetValidationAndFailurePaths(t *testing.T) {
 	t.Run("short password", func(t *testing.T) {
 		token := "reset-short-password"
 		_, _ = base.CreatePasswordReset(t.Context(), PasswordReset{
-			Email:     user.Email,
-			UserID:    user.UserID,
-			TokenHash: token,
-			ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
-			CreatedAt: time.Now().UTC(),
+			Email:       user.Email,
+			UserMongoID: user.ID,
+			TokenHash:   token,
+			ExpiresAt:   time.Now().UTC().Add(2 * time.Hour),
+			CreatedAt:   time.Now().UTC(),
 		})
 		server := &Server{store: base, tmpl: resetTemplates(), now: time.Now}
 		req := httptest.NewRequest(http.MethodPost, "/reset/"+token, strings.NewReader("password=short"))
@@ -251,11 +249,11 @@ func TestHandleResetSetValidationAndFailurePaths(t *testing.T) {
 	t.Run("invalid reset user", func(t *testing.T) {
 		token := "reset-missing-user"
 		_, _ = base.CreatePasswordReset(t.Context(), PasswordReset{
-			Email:     "missing@acme.io",
-			UserID:    "missing-user",
-			TokenHash: token,
-			ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
-			CreatedAt: time.Now().UTC(),
+			Email:       "missing@acme.io",
+			UserMongoID: primitive.NewObjectID(),
+			TokenHash:   token,
+			ExpiresAt:   time.Now().UTC().Add(2 * time.Hour),
+			CreatedAt:   time.Now().UTC(),
 		})
 		server := &Server{store: base, tmpl: resetTemplates(), now: time.Now}
 		req := httptest.NewRequest(http.MethodPost, "/reset/"+token, strings.NewReader("password=this-is-strong-enough"))
@@ -270,11 +268,11 @@ func TestHandleResetSetValidationAndFailurePaths(t *testing.T) {
 	t.Run("set password failure", func(t *testing.T) {
 		token := "reset-set-password-failure"
 		_, _ = base.CreatePasswordReset(t.Context(), PasswordReset{
-			Email:     user.Email,
-			UserID:    user.UserID,
-			TokenHash: token,
-			ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
-			CreatedAt: time.Now().UTC(),
+			Email:       user.Email,
+			UserMongoID: user.ID,
+			TokenHash:   token,
+			ExpiresAt:   time.Now().UTC().Add(2 * time.Hour),
+			CreatedAt:   time.Now().UTC(),
 		})
 		store := &resetFailingStore{MemoryStore: base, failSetPassword: true}
 		server := &Server{store: store, tmpl: resetTemplates(), now: time.Now}
@@ -290,11 +288,11 @@ func TestHandleResetSetValidationAndFailurePaths(t *testing.T) {
 	t.Run("mark used failure", func(t *testing.T) {
 		token := "reset-mark-used-failure"
 		_, _ = base.CreatePasswordReset(t.Context(), PasswordReset{
-			Email:     user.Email,
-			UserID:    user.UserID,
-			TokenHash: token,
-			ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
-			CreatedAt: time.Now().UTC(),
+			Email:       user.Email,
+			UserMongoID: user.ID,
+			TokenHash:   token,
+			ExpiresAt:   time.Now().UTC().Add(2 * time.Hour),
+			CreatedAt:   time.Now().UTC(),
 		})
 		store := &resetFailingStore{MemoryStore: base, failMarkUsed: true}
 		server := &Server{store: store, tmpl: resetTemplates(), now: time.Now}
@@ -328,11 +326,11 @@ func TestHandleResetRequestAndSetParseAndMethodErrors(t *testing.T) {
 
 	store := NewMemoryStore()
 	if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{
-		Email:     "user@acme.io",
-		UserID:    "u1",
-		TokenHash: "method-token",
-		ExpiresAt: time.Now().UTC().Add(2 * time.Hour),
-		CreatedAt: time.Now().UTC(),
+		Email:       "user@acme.io",
+		UserMongoID: primitive.NewObjectID(),
+		TokenHash:   "method-token",
+		ExpiresAt:   time.Now().UTC().Add(2 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("CreatePasswordReset error: %v", err)
 	}

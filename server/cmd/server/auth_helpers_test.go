@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -59,21 +58,12 @@ func TestEnvAndCookieHelpers(t *testing.T) {
 		t.Fatal("expected secure cookie when COOKIE_SECURE=true")
 	}
 
-	id := randomUserIDFromEmail("  USER.Name+tag@example.com ")
-	if !strings.HasPrefix(id, "user-name-tag-") {
-		t.Fatalf("unexpected randomUserIDFromEmail prefix: %q", id)
-	}
-	idFallback := randomUserIDFromEmail("   @example.com ")
-	if !strings.HasPrefix(idFallback, "user-") {
-		t.Fatalf("unexpected randomUserIDFromEmail fallback prefix: %q", idFallback)
-	}
 }
 
 func TestReadSessionAndCurrentUser(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 26, 20, 0, 0, 0, time.UTC)
 	user, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "u-session",
 		Email:     "u-session@example.com",
 		Status:    "active",
 		CreatedAt: now,
@@ -83,7 +73,6 @@ func TestReadSessionAndCurrentUser(t *testing.T) {
 	}
 	_, err = store.CreateSession(t.Context(), Session{
 		SessionID:   "session-valid",
-		UserID:      user.UserID,
 		UserMongoID: user.ID,
 		CreatedAt:   now,
 		LastLoginAt: now,
@@ -94,7 +83,6 @@ func TestReadSessionAndCurrentUser(t *testing.T) {
 	}
 	_, err = store.CreateSession(t.Context(), Session{
 		SessionID:   "session-expired",
-		UserID:      user.UserID,
 		UserMongoID: user.ID,
 		CreatedAt:   now.Add(-4 * time.Hour),
 		LastLoginAt: now.Add(-4 * time.Hour),
@@ -142,7 +130,7 @@ func TestReadSessionAndCurrentUser(t *testing.T) {
 		if err != nil {
 			t.Fatalf("currentUser error: %v", err)
 		}
-		if gotUser.UserID != "u-session" || gotSession.SessionID != "session-valid" {
+		if gotUser.ID != user.ID || gotSession.SessionID != "session-valid" {
 			t.Fatalf("unexpected currentUser result user=%+v session=%+v", gotUser, gotSession)
 		}
 
@@ -158,7 +146,6 @@ func TestReadSessionAndCurrentUser(t *testing.T) {
 func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 	orgID := primitive.NewObjectID()
 	admin := &AccountUser{
-		UserID:          "admin",
 		IsPlatformAdmin: true,
 		RoleSlugs:       []string{"org-admin"},
 		OrgSlug:         "acme",
@@ -175,7 +162,6 @@ func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 	}
 
 	unassigned := &AccountUser{
-		UserID:    "org-admin-unassigned",
 		RoleSlugs: []string{"org-admin"},
 	}
 	if !userIsOrgAdmin(unassigned) {
@@ -186,7 +172,7 @@ func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 		t.Fatalf("expected my-org nav flag for unassigned org admin, got %+v", pageUnassigned)
 	}
 
-	non := &AccountUser{UserID: "non", RoleSlugs: []string{"dep1"}}
+	non := &AccountUser{RoleSlugs: []string{"dep1"}}
 	if userIsOrgAdmin(non) {
 		t.Fatal("expected non org admin user")
 	}
@@ -204,14 +190,13 @@ func TestRequireAuthenticatedAndOrgAdminGuards(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
 	user, _, ok := server.requireAuthenticatedPage(rec, req)
-	if !ok || user.UserID != "legacy-user" {
+	if !ok || !user.ID.IsZero() {
 		t.Fatalf("expected legacy auth user, got ok=%v user=%+v", ok, user)
 	}
 
 	store := NewMemoryStore()
 	now := time.Now().UTC()
 	plainUser, err := store.CreateUser(t.Context(), AccountUser{
-		UserID:    "plain-user",
 		Email:     "plain@example.com",
 		Status:    "active",
 		CreatedAt: now,
@@ -221,7 +206,6 @@ func TestRequireAuthenticatedAndOrgAdminGuards(t *testing.T) {
 	}
 	session, err := store.CreateSession(t.Context(), Session{
 		SessionID:   "plain-session",
-		UserID:      plainUser.UserID,
 		UserMongoID: plainUser.ID,
 		CreatedAt:   now,
 		LastLoginAt: now,
@@ -310,16 +294,16 @@ func TestAccountMatchesOrg(t *testing.T) {
 	if accountMatchesOrg(nil, orgID, "acme") {
 		t.Fatal("expected nil user mismatch")
 	}
-	if accountMatchesOrg(&AccountUser{UserID: "u"}, orgID, "acme") {
+	if accountMatchesOrg(&AccountUser{}, orgID, "acme") {
 		t.Fatal("expected missing user org mismatch")
 	}
-	if accountMatchesOrg(&AccountUser{UserID: "u", OrgID: &otherID, OrgSlug: "acme"}, orgID, "acme") {
+	if accountMatchesOrg(&AccountUser{OrgID: &otherID, OrgSlug: "acme"}, orgID, "acme") {
 		t.Fatal("expected different org ID mismatch")
 	}
-	if accountMatchesOrg(&AccountUser{UserID: "u", OrgID: &orgID, OrgSlug: "acme"}, orgID, "other") {
+	if accountMatchesOrg(&AccountUser{OrgID: &orgID, OrgSlug: "acme"}, orgID, "other") {
 		t.Fatal("expected different org slug mismatch")
 	}
-	if !accountMatchesOrg(&AccountUser{UserID: "u", OrgID: &orgID, OrgSlug: " acme "}, orgID, "acme") {
+	if !accountMatchesOrg(&AccountUser{OrgID: &orgID, OrgSlug: " acme "}, orgID, "acme") {
 		t.Fatal("expected matching org ID and slug")
 	}
 }

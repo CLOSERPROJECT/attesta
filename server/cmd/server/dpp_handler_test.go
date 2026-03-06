@@ -138,7 +138,7 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if !strings.Contains(body, "Merkle root:") {
 		t.Fatalf("expected merkle marker in body, got %q", body)
 	}
-	if !strings.Contains(body, "value: 1") {
+	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(body, "<dd>1</dd>") {
 		t.Fatalf("expected inline traceability value in body, got %q", body)
 	}
 	if strings.Contains(body, ">Documents<") {
@@ -194,7 +194,7 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "cert.pdf") || !strings.Contains(body, "Download") {
+	if !strings.Contains(body, "cert.pdf") {
 		t.Fatalf("expected inline file link in traceability, got %q", body)
 	}
 	if strings.Contains(body, ">Documents<") {

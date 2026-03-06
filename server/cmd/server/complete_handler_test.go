@@ -50,7 +50,7 @@ func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 	}
 	id, _ := primitive.ObjectIDFromHex(processID)
 	process, _ := store.SnapshotProcess(id)
-	if process.Progress["1_1"].DoneBy == nil || process.Progress["1_1"].DoneBy.UserID != "legacy-user" {
+	if process.Progress["1_1"].DoneBy == nil || process.Progress["1_1"].DoneBy.ID != "legacy-user" {
 		t.Fatalf("expected fallback actor legacy-user|dep1, got %#v", process.Progress["1_1"].DoneBy)
 	}
 }
