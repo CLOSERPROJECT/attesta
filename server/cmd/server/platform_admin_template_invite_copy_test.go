@@ -23,7 +23,10 @@ func TestPlatformAdminTemplateInviteCopyButton(t *testing.T) {
 	if strings.Contains(body, "Invite link:") {
 		t.Fatalf("raw invite link text should be hidden, got body: %s", body)
 	}
-	if !strings.Contains(body, `class="secondary js-invite-copy" data-copy-invite-link="/invite/platform-token-pending"`) {
+	if !strings.Contains(body, `class="secondary js-invite-copy"`) {
+		t.Fatalf("expected invite copy button class, got body: %s", body)
+	}
+	if !strings.Contains(body, `data-copy-invite-link="/invite/platform-token-pending"`) {
 		t.Fatalf("expected invite copy button, got body: %s", body)
 	}
 	if !strings.Contains(body, `data-copy-icon-default style="display: inline-block;"`) {
