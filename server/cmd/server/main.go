@@ -701,7 +701,7 @@ func main() {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
 	mux.HandleFunc("/docs", server.handleDocs)
 	mux.HandleFunc("/docs/", server.handleDocs)
-	mux.HandleFunc("/api/organizations", server.handlePublicCatalog)
+	mux.HandleFunc("/api/catalog", server.handlePublicCatalog)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", server.handleLogin)
 	mux.HandleFunc("/logout", server.handleLogout)
