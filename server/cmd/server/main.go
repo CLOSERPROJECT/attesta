@@ -522,6 +522,9 @@ type DPPTraceabilitySubstep struct {
 	SubstepID  string
 	Title      string
 	Role       string
+	RoleBadges []DPPTraceabilityRoleBadge
+	RoleColor  template.CSS
+	RoleBorder template.CSS
 	Status     string
 	DoneAt     string
 	DoneBy     string
@@ -530,6 +533,13 @@ type DPPTraceabilitySubstep struct {
 	FileName   string
 	FileSHA256 string
 	FileURL    string
+}
+
+type DPPTraceabilityRoleBadge struct {
+	ID     string
+	Label  string
+	Color  template.CSS
+	Border template.CSS
 }
 
 type DPPTraceabilityValue struct {
@@ -3074,7 +3084,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	if process.DPP != nil && !process.DPP.GeneratedAt.IsZero() {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
-	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey)
+	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
 	traceability = s.applyDoneByMongoIDToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),

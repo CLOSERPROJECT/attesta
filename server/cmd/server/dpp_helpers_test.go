@@ -167,7 +167,7 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow")
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{})
 	if len(view) == 0 {
 		t.Fatal("expected non-empty traceability view")
 	}
@@ -195,5 +195,172 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 	}
 	if !foundFile {
 		t.Fatal("expected inline file metadata for substep 1.3")
+	}
+}
+
+func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Title:  "Step 1",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Formata",
+						Order:     1,
+						Role:      "qa",
+						InputKey:  "payload",
+						InputType: "formata",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"payload": map[string]interface{}{
+						"details": map[string]interface{}{
+							"status": "ok",
+							"weight": 42.0,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{
+		"qa": {ID: "qa", Label: "Quality", Color: "#111111", Border: "#222222"},
+	})
+	if len(view) != 1 || len(view[0].Substeps) != 1 {
+		t.Fatalf("unexpected traceability shape: %#v", view)
+	}
+	substep := view[0].Substeps[0]
+	if substep.Role != "Quality" {
+		t.Fatalf("role label = %q, want Quality", substep.Role)
+	}
+	if substep.RoleColor == "" || substep.RoleBorder == "" {
+		t.Fatalf("expected role color and border, got color=%q border=%q", substep.RoleColor, substep.RoleBorder)
+	}
+	if len(substep.Values) != 2 {
+		t.Fatalf("expected flattened formata values, got %#v", substep.Values)
+	}
+	if substep.Values[0].Key != "details.status" || substep.Values[0].Value != "ok" {
+		t.Fatalf("unexpected first flattened value: %#v", substep.Values[0])
+	}
+	if substep.Values[1].Key != "details.weight" || substep.Values[1].Value != "42" {
+		t.Fatalf("unexpected second flattened value: %#v", substep.Values[1])
+	}
+}
+
+func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Title:  "Step 1",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Approve",
+						Order:     1,
+						Roles:     []string{"qa", "manager"},
+						InputKey:  "value",
+						InputType: "string",
+					},
+					{
+						SubstepID: "1.2",
+						Title:     "Release",
+						Order:     2,
+						Role:      "qa",
+						InputKey:  "value",
+						InputType: "string",
+					},
+					{
+						SubstepID: "1.3",
+						Title:     "Archive",
+						Order:     3,
+						Role:      "qa",
+						InputKey:  "value",
+						InputType: "string",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State:  "done",
+				DoneBy: &Actor{ID: primitive.NewObjectID().Hex(), Role: "manager"},
+				Data:   map[string]interface{}{"value": "ok"},
+			},
+		},
+	}
+	roleMeta := map[string]RoleMeta{
+		"qa":      {ID: "qa", Label: "", Color: "#111111", Border: "#222222"},
+		"manager": {ID: "manager", Label: "Manager", Color: "#333333", Border: "#444444"},
+	}
+
+	view := buildDPPTraceabilityView(def, process, "workflow", roleMeta)
+	if len(view) != 1 || len(view[0].Substeps) != 3 {
+		t.Fatalf("unexpected traceability shape: %#v", view)
+	}
+	doneSub := view[0].Substeps[0]
+	if doneSub.Role != "Manager" {
+		t.Fatalf("done role label = %q, want Manager", doneSub.Role)
+	}
+	if len(doneSub.RoleBadges) != 1 || doneSub.RoleBadges[0].Label != "Manager" {
+		t.Fatalf("expected selected done role badge, got %#v", doneSub.RoleBadges)
+	}
+	if doneSub.RoleColor == "" || doneSub.RoleBorder == "" {
+		t.Fatalf("expected selected role style values, got color=%q border=%q", doneSub.RoleColor, doneSub.RoleBorder)
+	}
+	if doneSub.Status != "done" {
+		t.Fatalf("done substep status = %q, want done", doneSub.Status)
+	}
+
+	availableSub := view[0].Substeps[1]
+	if availableSub.Status != "available" {
+		t.Fatalf("available substep status = %q, want available", availableSub.Status)
+	}
+	if availableSub.Role != "qa" {
+		t.Fatalf("available role label fallback = %q, want qa", availableSub.Role)
+	}
+
+	lockedSub := view[0].Substeps[2]
+	if lockedSub.Status != "locked" {
+		t.Fatalf("locked substep status = %q, want locked", lockedSub.Status)
+	}
+}
+
+func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
+	sub := WorkflowSub{
+		SubstepID: "1.1",
+		InputKey:  "value",
+		InputType: "string",
+	}
+	values := dppTraceValues(sub, map[string]interface{}{
+		"other": map[string]interface{}{
+			"nested": "ok",
+		},
+		"attachment": map[string]interface{}{
+			"attachmentId": primitive.NewObjectID().Hex(),
+			"filename":     "proof.pdf",
+		},
+	})
+	if len(values) != 1 {
+		t.Fatalf("expected one fallback flattened value, got %#v", values)
+	}
+	if values[0].Key != "other.nested" || values[0].Value != "ok" {
+		t.Fatalf("unexpected fallback flattened value: %#v", values[0])
 	}
 }

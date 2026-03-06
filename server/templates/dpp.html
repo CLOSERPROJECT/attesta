@@ -1,79 +1,91 @@
 {{/* Used on /01/09506000134352/10/defaultProduct/21/.StreamID to render Digital Product Passport */}}
 
 {{define "dpp_body"}}
-<section class="panel stack">
-  <h2>Digital Product Passport</h2>
-  <p class="muted">GS1 Digital Link landing page for product and stream traceability.</p>
-  <div class="stack" style="gap: 8px;">
-    <div><strong>GTIN:</strong> {{.GTIN}}</div>
-    <div><strong>LOT:</strong> {{.Lot}}</div>
-    <div><strong>SERIAL:</strong> {{.Serial}}</div>
-    {{if .IssuedAt}}<div><strong>Issued at:</strong> {{.IssuedAt}}</div>{{end}}
-    <div><strong>Canonical link:</strong> <code>{{.DigitalLink}}</code></div>
-  </div>
-</section>
+<div class="stack">
+  <section class="panel stack">
+    <h2>Digital Product Passport</h2>
+    <p class="muted">GS1 Digital Link landing page for product and stream traceability.</p>
+    <div class="stack" style="gap: 8px;">
+      <div><strong>GTIN:</strong> {{.GTIN}}</div>
+      <div><strong>LOT:</strong> {{.Lot}}</div>
+      <div><strong>SERIAL:</strong> {{.Serial}}</div>
+      {{if .IssuedAt}}<div><strong>Issued at:</strong> {{.IssuedAt}}</div>{{end}}
+      <div><strong>Canonical link:</strong> <code>{{.DigitalLink}}</code></div>
+    </div>
+  </section>
 
-<section class="panel stack">
-  <h2>Overview</h2>
-  <div class="stack" style="gap: 8px;">
-    <div><strong>Stream:</strong> {{.Workflow.Name}}</div>
-    {{if .Workflow.Description}}<div class="muted">{{.Workflow.Description}}</div>{{end}}
-    <div><strong>Stream ID:</strong> {{.ProcessID}}</div>
-    <div><strong>Status:</strong> {{.Export.Status}}</div>
-  </div>
-</section>
+  <section class="panel stack">
+    <h2>Overview</h2>
+    <div class="stack" style="gap: 8px;">
+      <div><strong>Stream:</strong> {{.Workflow.Name}}</div>
+      {{if .Workflow.Description}}<div class="muted">{{.Workflow.Description}}</div>{{end}}
+      <div><strong>Stream ID:</strong> {{.ProcessID}}</div>
+      <div><strong>Status:</strong> {{.Export.Status}}</div>
+    </div>
+  </section>
 
-<section class="panel stack">
-  <h2>Traceability</h2>
-  <div class="timeline">
-    {{range .Traceability}}
-      <div class="timeline-step">
-        <h3>Step {{.StepID}} - {{.Title}}</h3>
-        <ul>
-          {{range .Substeps}}
-            <li class="substep substep-{{.Status}}">
-              <div class="substep-head">
-                <span class="pill">{{.SubstepID}}</span>
-                <span class="title">{{.Title}}</span>
-                <span class="status">{{.Status}}</span>
-              </div>
-              <div class="substep-meta">
-                <span class="role">role: {{.Role}}</span>
-                {{if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
-                {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
-                {{range .Values}}
-                  <span class="data">{{.Key}}: {{.Value}}</span>
+  <section class="panel stack">
+    <h2>Traceability</h2>
+    <div class="timeline-list">
+      {{range .Traceability}}
+        <details class="timeline-step">
+          <summary class="timeline-step-summary" aria-label="Open stream step">
+            Step {{.StepID}} - {{.Title}}
+          </summary>
+          <ul>
+            {{range .Substeps}}
+              <details class="substep substep-{{.Status}}">
+                <summary class="substep-head">
+                  <span class="pill">{{.SubstepID}}</span>
+                  <span class="title">{{.Title}}</span>
+                  <span
+                    class="pill role-pill"
+                    style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}; margin-left: auto;"
+                  >{{.Role}}</span>
+                </summary>
+                {{if .Values}}
+                  <dl class="action-submitted-values">
+                    {{range .Values}}
+                      <dt>{{.Key}}</dt>
+                      <dd>{{.Value}}</dd>
+                    {{end}}
+                  </dl>
                 {{end}}
                 {{if .FileURL}}
-                  <span class="data">file: {{.FileName}}</span>
-                  <a class="secondary" href="{{.FileURL}}">Download</a>
-                  {{if .FileSHA256}}
-                    <span class="data data-hash">
-                      <span>sha256:</span>
-                      <code class="hash-value" title="{{.FileSHA256}}">{{.FileSHA256}}</code>
-                      <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
-                    </span>
-                  {{end}}
+                  <ul class="action-submitted-attachments">
+                    <li>
+                      <a href="{{.FileURL}}">{{.FileName}}</a>
+                      <a class="secondary" href="{{.FileURL}}">Download</a>
+                      {{if .FileSHA256}}
+                        <code>{{.FileSHA256}}</code>
+                        <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
+                      {{end}}
+                    </li>
+                  </ul>
                 {{end}}
-                {{if .Digest}}<span class="data">digest: {{.Digest}}</span>{{end}}
-              </div>
-            </li>
-          {{end}}
-        </ul>
-      </div>
-    {{end}}
-  </div>
-</section>
+                <div class="substep-meta">
+                  {{if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
+                  {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
+                  {{if .Digest}}<span class="data">digest: <code>{{.Digest}}</code></span>{{end}}
+                </div>
+              </details>
+            {{end}}
+          </ul>
+        </details>
+      {{end}}
+    </div>
+  </section>
 
-<section class="panel stack">
-  <h2>Integrity</h2>
-  <div><strong>Merkle root:</strong> <code>{{.Export.Merkle.Root}}</code></div>
-  <ul>
-    {{range .Export.Merkle.Leaves}}
-      <li><code>{{.SubstepID}}</code> <code>{{.Hash}}</code></li>
-    {{end}}
-  </ul>
-</section>
+  <section class="panel stack">
+    <h2>Integrity</h2>
+    <div><strong>Merkle root:</strong> <code>{{.Export.Merkle.Root}}</code></div>
+    <ul>
+      {{range .Export.Merkle.Leaves}}
+        <li><code>{{.SubstepID}}</code> <code>{{.Hash}}</code></li>
+      {{end}}
+    </ul>
+  </section>
+</div>
 {{end}}
 
 {{define "dpp.html"}}

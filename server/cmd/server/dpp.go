@@ -137,7 +137,7 @@ func gs1ElementString(gtin, lot, serial string) string {
 	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
 }
 
-func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string) []DPPTraceabilityStep {
+func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta) []DPPTraceabilityStep {
 	steps := make([]DPPTraceabilityStep, 0, len(def.Steps))
 	if process == nil {
 		return steps
@@ -149,11 +149,34 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 			Title:  step.Title,
 		}
 		for _, sub := range sortedSubsteps(step) {
+			allowedRoles := substepRoles(sub)
+			primaryRole := strings.TrimSpace(sub.Role)
+			if primaryRole == "" && len(allowedRoles) > 0 {
+				primaryRole = strings.TrimSpace(allowedRoles[0])
+			}
+			meta := roleMetaFor(primaryRole, roleMeta)
+			roleLabel := strings.TrimSpace(meta.Label)
+			if roleLabel == "" {
+				roleLabel = primaryRole
+			}
+			roleBadges := make([]DPPTraceabilityRoleBadge, 0, len(allowedRoles))
+			for _, role := range allowedRoles {
+				roleStyle := roleMetaFor(role, roleMeta)
+				roleBadges = append(roleBadges, DPPTraceabilityRoleBadge{
+					ID:     role,
+					Label:  roleStyle.Label,
+					Color:  cssValue(roleStyle.Color, "var(--role-fallback)"),
+					Border: cssValue(roleStyle.Border, "var(--border)"),
+				})
+			}
 			subView := DPPTraceabilitySubstep{
-				SubstepID: sub.SubstepID,
-				Title:     sub.Title,
-				Role:      sub.Role,
-				Status:    "locked",
+				SubstepID:  sub.SubstepID,
+				Title:      sub.Title,
+				Role:       roleLabel,
+				RoleBadges: roleBadges,
+				RoleColor:  cssValue(meta.Color, "var(--role-fallback)"),
+				RoleBorder: cssValue(meta.Border, "var(--border)"),
+				Status:     "locked",
 			}
 			progress, done := process.Progress[sub.SubstepID]
 			if done && progress.State == "done" {
@@ -163,9 +186,24 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				}
 				if progress.DoneBy != nil {
 					subView.DoneBy = progress.DoneBy.ID
+					doneRole := strings.TrimSpace(progress.DoneBy.Role)
+					if doneRole != "" {
+						selectedMeta := roleMetaFor(doneRole, roleMeta)
+						subView.Role = selectedMeta.Label
+						subView.RoleBadges = []DPPTraceabilityRoleBadge{
+							{
+								ID:     doneRole,
+								Label:  selectedMeta.Label,
+								Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
+								Border: cssValue(selectedMeta.Border, "var(--border)"),
+							},
+						}
+						subView.RoleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
+						subView.RoleBorder = cssValue(selectedMeta.Border, "var(--border)")
+					}
 				}
 				subView.Digest = digestPayload(progress.Data)
-				subView.Values = dppTraceValues(progress.Data)
+				subView.Values = dppTraceValues(sub, progress.Data)
 				if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
 					subView.FileName = attachment.Filename
 					subView.FileSHA256 = attachment.SHA256
@@ -181,28 +219,40 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 	return steps
 }
 
-func dppTraceValues(data map[string]interface{}) []DPPTraceabilityValue {
+func dppTraceValues(sub WorkflowSub, data map[string]interface{}) []DPPTraceabilityValue {
 	if len(data) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(data))
-	for key := range data {
-		keys = append(keys, key)
+
+	flattened := make([]ActionKV, 0)
+	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") {
+		if raw, ok := data[sub.InputKey]; ok {
+			flattened = append(flattened, flattenDisplayValues("", raw)...)
+		}
+	} else if raw, ok := data[sub.InputKey]; ok && !isAttachmentMetaValue(raw) {
+		flattened = append(flattened, flattenDisplayValues(sub.InputKey, raw)...)
 	}
-	sort.Strings(keys)
-	values := make([]DPPTraceabilityValue, 0, len(keys))
-	for _, key := range keys {
-		raw := data[key]
-		if nested, ok := raw.(map[string]interface{}); ok {
-			if _, hasAttachment := nested["attachmentId"]; hasAttachment {
+	if len(flattened) == 0 {
+		keys := make([]string, 0, len(data))
+		for key := range data {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			raw := data[key]
+			if isAttachmentMetaValue(raw) {
 				continue
 			}
+			flattened = append(flattened, flattenDisplayValues(key, raw)...)
 		}
-		text := strings.TrimSpace(fmt.Sprintf("%v", raw))
-		if text == "" {
+	}
+
+	values := make([]DPPTraceabilityValue, 0, len(flattened))
+	for _, item := range flattened {
+		if strings.TrimSpace(item.Value) == "" {
 			continue
 		}
-		values = append(values, DPPTraceabilityValue{Key: key, Value: text})
+		values = append(values, DPPTraceabilityValue{Key: item.Key, Value: item.Value})
 	}
 	return values
 }
