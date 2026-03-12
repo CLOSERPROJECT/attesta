@@ -1,12 +1,34 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type failingListFormataStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingListFormataStore) ListFormataBuilderStreams(_ context.Context) ([]FormataBuilderStream, error) {
+	return nil, s.err
+}
+
+type failingSaveFormataStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingSaveFormataStore) SaveFormataBuilderStream(_ context.Context, stream FormataBuilderStream) (FormataBuilderStream, error) {
+	return FormataBuilderStream{}, s.err
+}
 
 func TestNormalizeInputType(t *testing.T) {
 	tests := []struct {
@@ -133,6 +155,309 @@ func TestWorkflowCatalogLoadsMultipleFiles(t *testing.T) {
 	}
 	if catalog["secondary"].Workflow.Description != "" {
 		t.Fatalf("secondary workflow description = %q, want empty", catalog["secondary"].Workflow.Description)
+	}
+}
+
+func TestWorkflowCatalogUsesFormataBuilderStreamsWhenAvailable(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "From file", "string")
+
+	streamPath := filepath.Join(tempDir, "db-seed.yaml")
+	writeWorkflowConfig(t, streamPath, "From DB", "string")
+	streamData, err := os.ReadFile(streamPath)
+	if err != nil {
+		t.Fatalf("read stream config: %v", err)
+	}
+
+	store := NewMemoryStore()
+	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream:    string(streamData),
+		UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	server := &Server{store: store, configDir: tempDir}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	if len(catalog) != 1 {
+		t.Fatalf("catalog size = %d, want 1", len(catalog))
+	}
+	cfg, ok := catalog[saved.ID.Hex()]
+	if !ok {
+		t.Fatalf("expected workflow key %q in catalog", saved.ID.Hex())
+	}
+	if cfg.Workflow.Name != "From DB" {
+		t.Fatalf("workflow name = %q, want %q", cfg.Workflow.Name, "From DB")
+	}
+}
+
+func TestBootstrapFormataBuilderStreamsSeedsFromConfigWhenEmpty(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "string")
+
+	store := NewMemoryStore()
+	err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, func() time.Time {
+		return time.Date(2026, 3, 6, 17, 0, 0, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatalf("bootstrapFormataBuilderStreams: %v", err)
+	}
+
+	streams, err := store.ListFormataBuilderStreams(t.Context())
+	if err != nil {
+		t.Fatalf("ListFormataBuilderStreams: %v", err)
+	}
+	if len(streams) != 2 {
+		t.Fatalf("stream count = %d, want 2", len(streams))
+	}
+
+	server := &Server{store: store}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	if len(catalog) != 2 {
+		t.Fatalf("catalog size = %d, want 2", len(catalog))
+	}
+}
+
+func TestBootstrapFormataBuilderStreamsNoopWhenAlreadySeeded(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+
+	store := NewMemoryStore()
+	original, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream:    "workflow:\n  name: \"Existing\"\n  steps:\n    - id: \"1\"\n      title: \"Step\"\n      order: 1\n      organization: \"org1\"\n      substeps:\n        - id: \"1.1\"\n          title: \"Input\"\n          order: 1\n          roles: [\"dep1\"]\n          inputKey: \"value\"\n          inputType: \"string\"\norganizations:\n  - slug: \"org1\"\n    name: \"Org\"\nroles:\n  - orgSlug: \"org1\"\n    slug: \"dep1\"\n    name: \"Dep\"\n",
+		UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	if err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, time.Now); err != nil {
+		t.Fatalf("bootstrapFormataBuilderStreams: %v", err)
+	}
+	streams, err := store.ListFormataBuilderStreams(t.Context())
+	if err != nil {
+		t.Fatalf("ListFormataBuilderStreams: %v", err)
+	}
+	if len(streams) != 1 {
+		t.Fatalf("stream count = %d, want 1", len(streams))
+	}
+	if streams[0].ID != original.ID {
+		t.Fatalf("stream ID changed: got %s want %s", streams[0].ID.Hex(), original.ID.Hex())
+	}
+}
+
+func TestBootstrapFormataBuilderStreamsEdgeCases(t *testing.T) {
+	t.Run("nil store", func(t *testing.T) {
+		if err := bootstrapFormataBuilderStreams(t.Context(), nil, t.TempDir(), nil); err != nil {
+			t.Fatalf("bootstrapFormataBuilderStreams nil store: %v", err)
+		}
+	})
+
+	t.Run("missing config dir", func(t *testing.T) {
+		store := NewMemoryStore()
+		err := bootstrapFormataBuilderStreams(t.Context(), store, filepath.Join(t.TempDir(), "missing"), nil)
+		if err == nil {
+			t.Fatal("expected missing config dir error")
+		}
+		if !strings.Contains(err.Error(), "config dir not found") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("no yaml files", func(t *testing.T) {
+		tempDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(tempDir, "note.txt"), []byte("hello"), 0o644); err != nil {
+			t.Fatalf("write note.txt: %v", err)
+		}
+		store := NewMemoryStore()
+		err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil)
+		if err == nil {
+			t.Fatal("expected empty workflow catalog error")
+		}
+		if !strings.Contains(err.Error(), "workflow config catalog is empty") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("save error", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+		store := &failingSaveFormataStore{
+			MemoryStore: NewMemoryStore(),
+			err:         errors.New("save failed"),
+		}
+		err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil)
+		if err == nil {
+			t.Fatal("expected save error")
+		}
+		if !strings.Contains(err.Error(), "seed formata stream") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+}
+
+func TestWorkflowCatalogReturnsListFormataError(t *testing.T) {
+	server := &Server{
+		store: &failingListFormataStore{
+			MemoryStore: NewMemoryStore(),
+			err:         errors.New("boom"),
+		},
+		configDir: t.TempDir(),
+	}
+	_, err := server.workflowCatalog()
+	if err == nil {
+		t.Fatal("expected workflowCatalog error")
+	}
+	if !strings.Contains(err.Error(), "list formata streams") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWorkflowCatalogFallsBackToFilesWhenStoreHasNoStreams(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "From file fallback", "string")
+	server := &Server{
+		store:     NewMemoryStore(),
+		configDir: tempDir,
+	}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	if len(catalog) != 1 {
+		t.Fatalf("catalog size = %d, want 1", len(catalog))
+	}
+	cfg, ok := catalog["workflow"]
+	if !ok {
+		t.Fatal("expected workflow key from filesystem fallback")
+	}
+	if cfg.Workflow.Name != "From file fallback" {
+		t.Fatalf("workflow name = %q, want %q", cfg.Workflow.Name, "From file fallback")
+	}
+}
+
+func TestWorkflowCatalogStreamErrorBranches(t *testing.T) {
+	t.Run("empty stream id", func(t *testing.T) {
+		store := NewMemoryStore()
+		store.formataStreams[primitive.NewObjectID()] = FormataBuilderStream{
+			Stream: "workflow:\n  name: \"Broken\"\n  steps: []\n",
+		}
+		server := &Server{store: store, configDir: t.TempDir()}
+		_, err := server.workflowCatalog()
+		if err == nil {
+			t.Fatal("expected empty stream id error")
+		}
+		if !strings.Contains(err.Error(), "formata stream id is empty") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("invalid stream yaml", func(t *testing.T) {
+		store := NewMemoryStore()
+		streamID := primitive.NewObjectID()
+		store.formataStreams[streamID] = FormataBuilderStream{
+			ID:     primitive.NewObjectID(),
+			Stream: "workflow: [",
+		}
+		server := &Server{store: store, configDir: t.TempDir()}
+		_, err := server.workflowCatalog()
+		if err == nil {
+			t.Fatal("expected invalid stream parse error")
+		}
+		if !strings.Contains(err.Error(), "parse config stream") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("uses cached db catalog", func(t *testing.T) {
+		tempDir := t.TempDir()
+		streamPath := filepath.Join(tempDir, "stream.yaml")
+		writeWorkflowConfig(t, streamPath, "DB Cached", "string")
+		content, err := os.ReadFile(streamPath)
+		if err != nil {
+			t.Fatalf("read stream: %v", err)
+		}
+		store := NewMemoryStore()
+		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:    string(content),
+			UpdatedAt: time.Date(2026, 3, 6, 19, 0, 0, 0, time.UTC),
+		}); err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		server := &Server{store: store, configDir: tempDir}
+		first, err := server.workflowCatalog()
+		if err != nil {
+			t.Fatalf("workflowCatalog(first): %v", err)
+		}
+		second, err := server.workflowCatalog()
+		if err != nil {
+			t.Fatalf("workflowCatalog(second): %v", err)
+		}
+		if len(first) != len(second) || len(second) != 1 {
+			t.Fatalf("unexpected catalog sizes: first=%d second=%d", len(first), len(second))
+		}
+	})
+}
+
+func TestWorkflowCatalogModTimeFallbacks(t *testing.T) {
+	now := time.Date(2026, 3, 6, 18, 0, 0, 0, time.UTC)
+	if got := workflowCatalogModTime(FormataBuilderStream{UpdatedAt: now}); !got.Equal(now) {
+		t.Fatalf("mod time = %s, want %s", got, now)
+	}
+	id := primitive.NewObjectID()
+	if got := workflowCatalogModTime(FormataBuilderStream{ID: id}); !got.Equal(id.Timestamp()) {
+		t.Fatalf("mod time = %s, want id timestamp %s", got, id.Timestamp())
+	}
+	if got := workflowCatalogModTime(FormataBuilderStream{}); !got.IsZero() {
+		t.Fatalf("mod time = %s, want zero", got)
+	}
+}
+
+func TestParseRuntimeConfigDataErrors(t *testing.T) {
+	invalidYAML := []byte("workflow: [")
+	if _, err := parseRuntimeConfigData("invalid.yaml", invalidYAML); err == nil {
+		t.Fatal("expected yaml parse error")
+	}
+
+	emptyWorkflow := []byte("workflow:\n  name: \"\"\n  steps: []\n")
+	if _, err := parseRuntimeConfigData("empty.yaml", emptyWorkflow); err == nil {
+		t.Fatal("expected empty workflow error")
+	}
+
+	invalidInputType := []byte(`
+workflow:
+  name: "Workflow"
+  steps:
+    - id: "1"
+      title: "Step 1"
+      order: 1
+      organization: "org1"
+      substeps:
+        - id: "1.1"
+          title: "Input"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "value"
+          inputType: "unsupported"
+organizations:
+  - slug: "org1"
+    name: "Organization 1"
+roles:
+  - orgSlug: "org1"
+    slug: "dep1"
+    name: "Department 1"
+`)
+	if _, err := parseRuntimeConfigData("bad-input.yaml", invalidInputType); err == nil {
+		t.Fatal("expected invalid input type error")
 	}
 }
 

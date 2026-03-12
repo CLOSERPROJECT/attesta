@@ -207,6 +207,119 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	}
 }
 
+func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
+
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+
+	t.Run("visible for org admin", func(t *testing.T) {
+		store := NewMemoryStore()
+		user, err := store.CreateUser(t.Context(), AccountUser{
+			Email:     "org-admin-picker@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser error: %v", err)
+		}
+		sessionID := createSessionForTestUser(t, store, user)
+
+		server := &Server{
+			store:       store,
+			tmpl:        tmpl,
+			configDir:   tempDir,
+			enforceAuth: true,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, `href="/org-admin/formata-builder"`) {
+			t.Fatalf("expected create stream card for org admin, got %q", body)
+		}
+		if !strings.Contains(body, "Click to create new stream") {
+			t.Fatalf("expected create stream card copy for org admin, got %q", body)
+		}
+		if !strings.Contains(body, "workflow-card-cta") || !strings.Contains(body, "Create new stream") {
+			t.Fatalf("expected create stream card cta for org admin, got %q", body)
+		}
+	})
+
+	t.Run("hidden for non org admin", func(t *testing.T) {
+		store := NewMemoryStore()
+		user, err := store.CreateUser(t.Context(), AccountUser{
+			Email:     "member-picker@example.com",
+			RoleSlugs: []string{"operator"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser error: %v", err)
+		}
+		sessionID := createSessionForTestUser(t, store, user)
+
+		server := &Server{
+			store:       store,
+			tmpl:        tmpl,
+			configDir:   tempDir,
+			enforceAuth: true,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder"`) {
+			t.Fatalf("did not expect create stream card for non org admin, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("hidden for platform admin", func(t *testing.T) {
+		store := NewMemoryStore()
+		user, err := store.CreateUser(t.Context(), AccountUser{
+			Email:           "platform-picker@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+			CreatedAt:       time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser error: %v", err)
+		}
+		sessionID := createSessionForTestUser(t, store, user)
+
+		server := &Server{
+			store:       store,
+			tmpl:        tmpl,
+			configDir:   tempDir,
+			enforceAuth: true,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder"`) {
+			t.Fatalf("did not expect create stream card for platform admin, got %q", rec.Body.String())
+		}
+	})
+}
+
 func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTwoSubstepWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow")
