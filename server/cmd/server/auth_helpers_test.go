@@ -205,6 +205,31 @@ func TestIsSameAccount(t *testing.T) {
 	}
 }
 
+func TestAppwriteActorHelpers(t *testing.T) {
+	if got := accountActorID(nil); got != "legacy-user" {
+		t.Fatalf("accountActorID(nil) = %q", got)
+	}
+	if got := accountActorID(&AccountUser{}); got != "legacy-user" {
+		t.Fatalf("accountActorID(empty) = %q", got)
+	}
+	userID := primitive.NewObjectID()
+	if got := accountActorID(&AccountUser{ID: userID}); got != userID.Hex() {
+		t.Fatalf("accountActorID(legacy) = %q, want %q", got, userID.Hex())
+	}
+	if got := accountActorID(&AccountUser{ID: userID, IdentityUserID: "user-1"}); got != "appwrite:user-1" {
+		t.Fatalf("accountActorID(appwrite) = %q", got)
+	}
+	if got := appwriteActorID(" user-2 "); got != "appwrite:user-2" {
+		t.Fatalf("appwriteActorID = %q", got)
+	}
+	if _, ok := parseAppwriteActorID("legacy-user"); ok {
+		t.Fatal("legacy actor id should not parse as appwrite")
+	}
+	if parsed, ok := parseAppwriteActorID("appwrite:user-2"); !ok || parsed != "user-2" {
+		t.Fatalf("parseAppwriteActorID = %q, %v", parsed, ok)
+	}
+}
+
 func TestRequireOrgAdmin(t *testing.T) {
 	now := time.Now().UTC()
 	orgID := stableOrgObjectID("acme")

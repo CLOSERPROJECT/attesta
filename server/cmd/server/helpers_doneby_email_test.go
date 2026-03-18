@@ -258,6 +258,36 @@ func TestApplyDoneByMongoIDToDPPTraceability(t *testing.T) {
 	}
 }
 
+func TestApplyDoneByEmailFallsBackToOpaqueActorIDWhenEmailUnavailable(t *testing.T) {
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Status: "active"}, nil
+			},
+		},
+	}
+	def := WorkflowDef{
+		Steps: []WorkflowStep{{StepID: "1", OrganizationSlug: "org-a"}},
+	}
+	actions := []ActionView{{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"}}
+	timeline := []TimelineStep{{
+		StepID: "1",
+		Substeps: []TimelineSubstep{
+			{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"},
+		},
+	}}
+
+	mappedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, actions)
+	if mappedActions[0].DoneBy != "appwrite:user-no-email" {
+		t.Fatalf("mapped action doneBy = %q, want opaque appwrite actor id", mappedActions[0].DoneBy)
+	}
+
+	mappedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-a"}, timeline)
+	if mappedTimeline[0].Substeps[0].DoneBy != "appwrite:user-no-email" {
+		t.Fatalf("mapped timeline doneBy = %q, want opaque appwrite actor id", mappedTimeline[0].Substeps[0].DoneBy)
+	}
+}
+
 func cloneTimelineSteps(src []TimelineStep) []TimelineStep {
 	out := append([]TimelineStep(nil), src...)
 	for i := range out {
