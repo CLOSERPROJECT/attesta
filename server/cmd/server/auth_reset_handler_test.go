@@ -299,6 +299,16 @@ func TestHandleResetConfirmBranches(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
 	})
+
+	t.Run("invalid legacy reset path", func(t *testing.T) {
+		server := &Server{store: NewMemoryStore(), tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodGet, "/reset/with/slash", nil)
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
 }
 
 func TestHandleResetPageHidesAdminTopbarLinks(t *testing.T) {

@@ -110,6 +110,38 @@ func TestHandleInviteHappyPath(t *testing.T) {
 	}
 }
 
+func TestHandleInviteGetRendersInvite(t *testing.T) {
+	store := NewMemoryStore()
+	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	if _, err := store.CreateInvite(t.Context(), Invite{
+		OrgID:       org.ID,
+		Email:       "new@acme.io",
+		UserMongoID: primitive.NewObjectID(),
+		RoleSlugs:   []string{"approver"},
+		TokenHash:   "invite-token",
+		ExpiresAt:   time.Now().UTC().Add(48 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateInvite error: %v", err)
+	}
+
+	server := &Server{store: store, tmpl: inviteTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodGet, "/invite/invite-token", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleInvite(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "INVITE") {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestHandleInviteExpiredToken(t *testing.T) {
 	store := NewMemoryStore()
 	org, _ := store.CreateOrganization(t.Context(), Organization{Name: "Acme"})
@@ -426,6 +458,23 @@ func TestHandleInviteAcceptBranches(t *testing.T) {
 		server.handleInvite(rec, req)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("write session cookie failure", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				acceptInviteFunc: func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
+					return IdentitySession{UserID: userID}, nil
+				},
+			},
+			now: time.Now,
+		}
+		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
+		rec := httptest.NewRecorder()
+		server.handleInvite(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
 	})
 }

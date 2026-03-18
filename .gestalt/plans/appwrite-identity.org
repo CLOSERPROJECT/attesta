@@ -127,7 +127,7 @@ Tests:
 Done when:
 - Auth, signup, invite acceptance, and password reset all use Appwrite flows and no Mongo token/session documents remain in use.
 
-* WIP [#A] Keep org-admin in Attesta but move its state and mutations to Appwrite
+* DONE [#A] Keep org-admin in Attesta but move its state and mutations to Appwrite
 Effort: L
 Goal: `/org-admin/users`, `/org-admin/roles`, `/org-admin/logo/*`, and org creation/update remain Attesta pages, but every org/user/role change persists in Appwrite instead of Mongo.
 Notes: This retains the existing UX surface for org admins, which is what the user asked for, while removing platform-admin behavior.
@@ -211,12 +211,12 @@ Tests:
 Done when:
 - Org admins can invite and manage users from Attesta while Appwrite remains the source of truth and mail sender.
 
-* TODO [#A] Remove platform admin behavior and Mongo auth/org persistence from Attesta
+* WIP [#A] Remove platform admin behavior and Mongo auth/org persistence from Attesta
 Effort: M
 Goal: The app no longer exposes platform-admin features or stores auth/org state in Mongo, but it still works for normal users and org admins.
 Notes: The person with Appwrite Console access becomes the bootstrap operator outside Attesta. This is a deliberate product change, not an implementation detail.
 
-** TODO [#A] Delete the platform-admin route/UI path and simplify topbar behavior
+** WIP [#A] Delete the platform-admin route/UI path and simplify topbar behavior
 Why: The user explicitly said platform admin is no longer needed inside Attesta.
 Change:
 - Remove route registration for `/admin/orgs` from `server/cmd/server/main.go`.
