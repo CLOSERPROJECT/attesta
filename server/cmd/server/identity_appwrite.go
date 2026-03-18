@@ -309,8 +309,13 @@ func normalizeIdentityError(err error) error {
 		return nil
 	}
 	var appwriteErr *appwriteclient.AppwriteError
-	if errors.As(err, &appwriteErr) && appwriteErr.GetStatusCode() == http.StatusNotFound {
-		return ErrIdentityNotFound
+	if errors.As(err, &appwriteErr) {
+		switch appwriteErr.GetStatusCode() {
+		case http.StatusNotFound:
+			return ErrIdentityNotFound
+		case http.StatusUnauthorized:
+			return ErrIdentityUnauthorized
+		}
 	}
 	return err
 }

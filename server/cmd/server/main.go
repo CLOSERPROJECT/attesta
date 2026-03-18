@@ -119,6 +119,7 @@ type AttachmentPayload struct {
 type Server struct {
 	mongo          *mongo.Client
 	store          Store
+	identity       IdentityStore
 	tmpl           *template.Template
 	authorizer     Authorizer
 	sse            *SSEHub
@@ -679,6 +680,7 @@ func main() {
 	server := &Server{
 		mongo:         client,
 		store:         &MongoStore{db: db},
+		identity:      NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
 		tmpl:          tmpl,
 		authorizer:    NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:           newSSEHub(),
@@ -801,14 +803,25 @@ func newSessionID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
-func (s *Server) readSession(r *http.Request) (*Session, error) {
+func (s *Server) readSession(r *http.Request) (*IdentitySession, error) {
 	cookie, err := r.Cookie("attesta_session")
 	if err != nil {
 		return nil, err
 	}
 	sessionID := strings.TrimSpace(cookie.Value)
 	if sessionID == "" {
-		return nil, mongo.ErrNoDocuments
+		return nil, ErrIdentityUnauthorized
+	}
+	if s.identity != nil {
+		session, err := s.identity.GetSession(r.Context(), sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if session.ExpiresAt.Before(s.nowUTC()) {
+			_ = s.identity.DeleteSession(r.Context(), sessionID)
+			return nil, ErrIdentityUnauthorized
+		}
+		return &session, nil
 	}
 	session, err := s.store.LoadSessionByID(r.Context(), sessionID)
 	if err != nil {
@@ -818,22 +831,37 @@ func (s *Server) readSession(r *http.Request) (*Session, error) {
 		_ = s.store.DeleteSession(r.Context(), sessionID)
 		return nil, mongo.ErrNoDocuments
 	}
-	return session, nil
+	return &IdentitySession{
+		Secret:    session.SessionID,
+		ExpiresAt: session.ExpiresAt,
+		UserID:    session.UserMongoID.Hex(),
+	}, nil
 }
 
-func (s *Server) currentUser(r *http.Request) (*AccountUser, *Session, error) {
+func (s *Server) currentUser(r *http.Request) (*AccountUser, *IdentitySession, error) {
 	session, err := s.readSession(r)
 	if err != nil {
 		return nil, nil, err
 	}
-	user, err := s.store.GetUserByMongoID(r.Context(), session.UserMongoID)
+	if s.identity != nil {
+		identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret)
+		if err != nil {
+			return nil, nil, err
+		}
+		return s.accountUserFromIdentity(r.Context(), identityUser), session, nil
+	}
+	userMongoID, err := primitive.ObjectIDFromHex(strings.TrimSpace(session.UserID))
+	if err != nil {
+		return nil, nil, mongo.ErrNoDocuments
+	}
+	user, err := s.store.GetUserByMongoID(r.Context(), userMongoID)
 	if err != nil {
 		return nil, nil, err
 	}
 	return user, session, nil
 }
 
-func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
 	if !s.enforceAuth {
 		return &AccountUser{}, nil, true
 	}
@@ -846,7 +874,7 @@ func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request
 	return nil, nil, false
 }
 
-func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *Session, bool) {
+func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
 	if !s.enforceAuth {
 		return &AccountUser{}, nil, true
 	}
@@ -892,6 +920,37 @@ func bootstrapPlatformAdmin(ctx context.Context, store Store, now func() time.Ti
 		CreatedAt:       now().UTC(),
 	})
 	return err
+}
+
+func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser IdentityUser) *AccountUser {
+	roleSlugs := decodeIdentityRoleLabels(identityUser.Labels)
+	if identityUser.IsOrgAdmin {
+		roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
+	}
+	user := &AccountUser{
+		Email:     strings.TrimSpace(identityUser.Email),
+		OrgSlug:   strings.TrimSpace(identityUser.OrgSlug),
+		RoleSlugs: roleSlugs,
+		Status:    strings.TrimSpace(identityUser.Status),
+	}
+	if user.Status == "" {
+		user.Status = "active"
+	}
+	if s.store == nil || strings.TrimSpace(identityUser.Email) == "" {
+		return user
+	}
+	legacyUser, err := s.store.GetUserByEmail(ctx, identityUser.Email)
+	if err != nil || legacyUser == nil {
+		return user
+	}
+	legacy := *legacyUser
+	legacy.Email = user.Email
+	if user.OrgSlug != "" {
+		legacy.OrgSlug = user.OrgSlug
+	}
+	legacy.RoleSlugs = append([]string(nil), user.RoleSlugs...)
+	legacy.Status = user.Status
+	return &legacy
 }
 
 func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
@@ -1510,7 +1569,23 @@ func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filena
 	http.ServeFile(w, r, foundPath)
 }
 
-func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, user *AccountUser) error {
+func (s *Server) writeSessionCookie(w http.ResponseWriter, r *http.Request, session IdentitySession) error {
+	if strings.TrimSpace(session.Secret) == "" {
+		return errors.New("session secret required")
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "attesta_session",
+		Value:    session.Secret,
+		Path:     "/",
+		Expires:  session.ExpiresAt,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   shouldSecureCookie(r),
+	})
+	return nil
+}
+
+func (s *Server) issueLegacySession(w http.ResponseWriter, r *http.Request, user *AccountUser) error {
 	if user == nil {
 		return errors.New("user required")
 	}
@@ -1534,17 +1609,11 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, user *Acco
 	if _, err := s.store.CreateSession(r.Context(), session); err != nil {
 		return err
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "attesta_session",
-		Value:    sessionID,
-		Path:     "/",
-		Expires:  expiresAt,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   shouldSecureCookie(r),
+	return s.writeSessionCookie(w, r, IdentitySession{
+		Secret:    session.SessionID,
+		ExpiresAt: session.ExpiresAt,
+		UserID:    session.UserMongoID.Hex(),
 	})
-	return nil
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -1573,31 +1642,56 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		password := strings.TrimSpace(r.FormValue("password"))
 		next := safeNextPath(r, "/")
 
-		user, err := s.store.GetUserByEmail(r.Context(), email)
-		if err != nil || user == nil {
-			view := LoginView{
-				PageBase: s.pageBase("login_body", "", ""),
-				Email:    email,
-				Next:     next,
-				Error:    "Invalid email or password.",
+		if s.identity == nil {
+			user, err := s.store.GetUserByEmail(r.Context(), email)
+			if err != nil || user == nil {
+				view := LoginView{
+					PageBase: s.pageBase("login_body", "", ""),
+					Email:    email,
+					Next:     next,
+					Error:    "Invalid email or password.",
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+				return
 			}
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
-			return
-		}
-		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-			view := LoginView{
-				PageBase: s.pageBase("login_body", "", ""),
-				Email:    email,
-				Next:     next,
-				Error:    "Invalid email or password.",
+			if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+				view := LoginView{
+					PageBase: s.pageBase("login_body", "", ""),
+					Email:    email,
+					Next:     next,
+					Error:    "Invalid email or password.",
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+				return
 			}
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+
+			if err := s.issueLegacySession(w, r, user); err != nil {
+				http.Error(w, "login failed", http.StatusInternalServerError)
+				return
+			}
+			http.Redirect(w, r, next, http.StatusSeeOther)
 			return
 		}
 
-		if err := s.issueSession(w, r, user); err != nil {
+		session, err := s.identity.CreateEmailPasswordSession(r.Context(), email, password)
+		if errors.Is(err, ErrIdentityUnauthorized) || errors.Is(err, ErrIdentityNotFound) {
+			view := LoginView{
+				PageBase: s.pageBase("login_body", "", ""),
+				Email:    email,
+				Next:     next,
+				Error:    "Invalid email or password.",
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+			return
+		}
+		if err != nil {
+			http.Error(w, "login failed", http.StatusInternalServerError)
+			return
+		}
+		if err := s.writeSessionCookie(w, r, session); err != nil {
 			http.Error(w, "login failed", http.StatusInternalServerError)
 			return
 		}
@@ -1614,7 +1708,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cookie, err := r.Cookie("attesta_session"); err == nil && strings.TrimSpace(cookie.Value) != "" {
-		_ = s.store.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
+		if s.identity != nil {
+			_ = s.identity.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
+		} else {
+			_ = s.store.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
+		}
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "attesta_session",
@@ -1753,7 +1851,7 @@ func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to load user", http.StatusInternalServerError)
 			return
 		}
-		if err := s.issueSession(w, r, updated); err != nil {
+		if err := s.issueLegacySession(w, r, updated); err != nil {
 			http.Error(w, "failed to login", http.StatusInternalServerError)
 			return
 		}
@@ -1898,7 +1996,7 @@ func (s *Server) handleResetSet(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to load user", http.StatusInternalServerError)
 			return
 		}
-		if err := s.issueSession(w, r, updated); err != nil {
+		if err := s.issueLegacySession(w, r, updated); err != nil {
 			http.Error(w, "failed to login", http.StatusInternalServerError)
 			return
 		}

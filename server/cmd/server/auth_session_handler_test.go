@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
@@ -52,26 +52,20 @@ func TestHandleCompleteSubstepUnauthenticatedReturnsUnauthorized(t *testing.T) {
 }
 
 func TestHandleLoginCreatesSessionCookie(t *testing.T) {
-	store := NewMemoryStore()
-	hash, err := bcrypt.GenerateFromPassword([]byte("secure-password"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hash password: %v", err)
-	}
-	user, err := store.CreateUser(t.Context(), AccountUser{
-		Email:        "u1@example.com",
-		PasswordHash: string(hash),
-		Status:       "active",
-		CreatedAt:    time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
+	var loginEmail string
+	var loginPassword string
 	server := &Server{
-		store: store,
-		tmpl:  testTemplates(),
+		identity: &fakeIdentityStore{
+			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+				loginEmail = email
+				loginPassword = password
+				return fakeIdentitySession("session-secret", "user-1", now.Add(24*time.Hour)), nil
+			},
+		},
+		tmpl: testTemplates(),
 		now: func() time.Time {
-			return time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
+			return now
 		},
 	}
 
@@ -98,35 +92,30 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	if cookies[0].HttpOnly != true {
 		t.Fatal("expected HttpOnly session cookie")
 	}
-	if _, err := store.LoadSessionByID(t.Context(), cookies[0].Value); err != nil {
-		t.Fatalf("LoadSessionByID error: %v", err)
+	if cookies[0].Value != "session-secret" {
+		t.Fatalf("session cookie value = %q, want session-secret", cookies[0].Value)
 	}
-
-	updated, err := store.GetUserByMongoID(t.Context(), user.ID)
-	if err != nil {
-		t.Fatalf("GetUserByMongoID error: %v", err)
+	if !cookies[0].Expires.Equal(now.Add(24 * time.Hour)) {
+		t.Fatalf("session cookie expiry = %s, want %s", cookies[0].Expires, now.Add(24*time.Hour))
 	}
-	if updated.LastLoginAt == nil {
-		t.Fatal("expected user lastLoginAt to be updated")
+	if loginEmail != "u1@example.com" || loginPassword != "secure-password" {
+		t.Fatalf("login credentials = %q/%q", loginEmail, loginPassword)
 	}
 }
 
 func TestHandleLogoutClearsSession(t *testing.T) {
-	store := NewMemoryStore()
-	session, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "session-1",
-		UserMongoID: primitive.NewObjectID(),
-		CreatedAt:   time.Now().UTC(),
-		LastLoginAt: time.Now().UTC(),
-		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("create session: %v", err)
+	var deletedSecret string
+	server := &Server{
+		identity: &fakeIdentityStore{
+			deleteSessionFunc: func(ctx context.Context, sessionSecret string) error {
+				deletedSecret = sessionSecret
+				return nil
+			},
+		},
+		now: time.Now,
 	}
-
-	server := &Server{store: store, now: time.Now}
 	req := httptest.NewRequest(http.MethodPost, "/logout", nil)
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
 
 	server.handleLogout(rec, req)
@@ -141,8 +130,8 @@ func TestHandleLogoutClearsSession(t *testing.T) {
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" || cookies[0].Value != "" {
 		t.Fatalf("expected cleared attesta_session cookie, got %#v", cookies)
 	}
-	if _, err := store.LoadSessionByID(t.Context(), session.SessionID); err == nil {
-		t.Fatal("expected session to be deleted")
+	if deletedSecret != "session-1" {
+		t.Fatalf("deleted secret = %q, want session-1", deletedSecret)
 	}
 }
 
@@ -170,34 +159,25 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 }
 
 func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
-	store := NewMemoryStore()
-	user, err := store.CreateUser(t.Context(), AccountUser{
-		Email:     "u-auth-login@example.com",
-		Status:    "active",
-		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-	session, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "session-auth-login",
-		UserMongoID: user.ID,
-		CreatedAt:   time.Now().UTC(),
-		LastLoginAt: time.Now().UTC(),
-		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("CreateSession error: %v", err)
-	}
-
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 	server := &Server{
-		store:       store,
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				if sessionSecret != "session-auth-login" {
+					return IdentitySession{}, ErrIdentityUnauthorized
+				}
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "u-auth-login@example.com", Status: "active"}, nil
+			},
+		},
 		tmpl:        testTemplates(),
 		enforceAuth: true,
-		now:         time.Now,
+		now:         func() time.Time { return now },
 	}
 	req := httptest.NewRequest(http.MethodGet, "/login", nil)
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-auth-login"})
 	rec := httptest.NewRecorder()
 
 	server.handleLogin(rec, req)
@@ -211,22 +191,15 @@ func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 }
 
 func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
-	store := NewMemoryStore()
-	hash, err := bcrypt.GenerateFromPassword([]byte("valid-password-value"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hash password: %v", err)
-	}
-	if _, err := store.CreateUser(t.Context(), AccountUser{
-		Email:        "u-invalid-login@example.com",
-		PasswordHash: string(hash),
-		Status:       "active",
-		CreatedAt:    time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-
 	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
-	server := &Server{store: store, tmpl: tmpl}
+	server := &Server{
+		identity: &fakeIdentityStore{
+			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+				return IdentitySession{}, ErrIdentityUnauthorized
+			},
+		},
+		tmpl: tmpl,
+	}
 	form := url.Values{}
 	form.Set("email", "u-invalid-login@example.com")
 	form.Set("password", "wrong-password")
@@ -244,7 +217,7 @@ func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
 }
 
 func TestHandleLoginMethodNotAllowed(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), tmpl: testTemplates()}
+	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
 	req := httptest.NewRequest(http.MethodPut, "/login", nil)
 	rec := httptest.NewRecorder()
 	server.handleLogin(rec, req)
@@ -255,7 +228,14 @@ func TestHandleLoginMethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleLoginInvalidFormAndUnknownUser(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), tmpl: testTemplates()}
+	server := &Server{
+		identity: &fakeIdentityStore{
+			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+				return IdentitySession{}, ErrIdentityUnauthorized
+			},
+		},
+		tmpl: testTemplates(),
+	}
 
 	reqParse := httptest.NewRequest(http.MethodPost, "/login?bad=%zz", strings.NewReader("email=u%40example.com&password=pw"))
 	reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -278,7 +258,7 @@ func TestHandleLoginInvalidFormAndUnknownUser(t *testing.T) {
 }
 
 func TestHandleLogoutMethodAndNoCookie(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), now: time.Now}
+	server := &Server{identity: &fakeIdentityStore{}, now: time.Now}
 
 	reqMethod := httptest.NewRequest(http.MethodGet, "/logout", nil)
 	recMethod := httptest.NewRecorder()

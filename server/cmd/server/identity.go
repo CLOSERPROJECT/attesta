@@ -7,6 +7,7 @@ import (
 )
 
 var ErrIdentityNotFound = errors.New("identity not found")
+var ErrIdentityUnauthorized = errors.New("identity unauthorized")
 
 // IdentityStore isolates auth and organization data from the Mongo workflow store.
 type IdentityStore interface {

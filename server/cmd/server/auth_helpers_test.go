@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -61,40 +62,39 @@ func TestEnvAndCookieHelpers(t *testing.T) {
 }
 
 func TestReadSessionAndCurrentUser(t *testing.T) {
-	store := NewMemoryStore()
 	now := time.Date(2026, 2, 26, 20, 0, 0, 0, time.UTC)
-	user, err := store.CreateUser(t.Context(), AccountUser{
-		Email:     "u-session@example.com",
-		Status:    "active",
-		CreatedAt: now,
-	})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-	_, err = store.CreateSession(t.Context(), Session{
-		SessionID:   "session-valid",
-		UserMongoID: user.ID,
-		CreatedAt:   now,
-		LastLoginAt: now,
-		ExpiresAt:   now.Add(2 * time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("CreateSession valid error: %v", err)
-	}
-	_, err = store.CreateSession(t.Context(), Session{
-		SessionID:   "session-expired",
-		UserMongoID: user.ID,
-		CreatedAt:   now.Add(-4 * time.Hour),
-		LastLoginAt: now.Add(-4 * time.Hour),
-		ExpiresAt:   now.Add(-1 * time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("CreateSession expired error: %v", err)
-	}
-
+	var deletedSecrets []string
 	server := &Server{
-		store: store,
-		now:   func() time.Time { return now },
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				switch sessionSecret {
+				case "session-valid":
+					return fakeIdentitySession(sessionSecret, "user-1", now.Add(2*time.Hour)), nil
+				case "session-expired":
+					return fakeIdentitySession(sessionSecret, "user-1", now.Add(-1*time.Hour)), nil
+				default:
+					return IdentitySession{}, ErrIdentityUnauthorized
+				}
+			},
+			deleteSessionFunc: func(ctx context.Context, sessionSecret string) error {
+				deletedSecrets = append(deletedSecrets, sessionSecret)
+				return nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				if sessionSecret != "session-valid" {
+					return IdentityUser{}, ErrIdentityUnauthorized
+				}
+				return IdentityUser{
+					ID:         "user-1",
+					Email:      "u-session@example.com",
+					OrgSlug:    "acme",
+					Labels:     []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")},
+					IsOrgAdmin: true,
+					Status:     "active",
+				}, nil
+			},
+		},
+		now: func() time.Time { return now },
 	}
 
 	t.Run("missing cookie", func(t *testing.T) {
@@ -118,8 +118,8 @@ func TestReadSessionAndCurrentUser(t *testing.T) {
 		if _, err := server.readSession(req); err == nil {
 			t.Fatal("expected expired session error")
 		}
-		if _, err := store.LoadSessionByID(t.Context(), "session-expired"); err == nil {
-			t.Fatal("expected expired session to be deleted")
+		if len(deletedSecrets) != 1 || deletedSecrets[0] != "session-expired" {
+			t.Fatalf("deleted secrets = %#v, want [session-expired]", deletedSecrets)
 		}
 	})
 
@@ -130,15 +130,14 @@ func TestReadSessionAndCurrentUser(t *testing.T) {
 		if err != nil {
 			t.Fatalf("currentUser error: %v", err)
 		}
-		if gotUser.ID != user.ID || gotSession.SessionID != "session-valid" {
+		if gotUser.Email != "u-session@example.com" || gotUser.OrgSlug != "acme" || !containsRole(gotUser.RoleSlugs, "org-admin") || gotSession.Secret != "session-valid" {
 			t.Fatalf("unexpected currentUser result user=%+v session=%+v", gotUser, gotSession)
 		}
 
-		_ = store.DeleteSession(t.Context(), "session-valid")
 		req2 := httptest.NewRequest(http.MethodGet, "/", nil)
-		req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-valid"})
+		req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-missing"})
 		if _, _, err := server.currentUser(req2); err == nil {
-			t.Fatal("expected currentUser error after deleting session")
+			t.Fatal("expected currentUser error for invalid session")
 		}
 	})
 }
@@ -194,35 +193,32 @@ func TestRequireAuthenticatedAndOrgAdminGuards(t *testing.T) {
 		t.Fatalf("expected legacy auth user, got ok=%v user=%+v", ok, user)
 	}
 
-	store := NewMemoryStore()
 	now := time.Now().UTC()
-	plainUser, err := store.CreateUser(t.Context(), AccountUser{
-		Email:     "plain@example.com",
-		Status:    "active",
-		CreatedAt: now,
-	})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-	session, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "plain-session",
-		UserMongoID: plainUser.ID,
-		CreatedAt:   now,
-		LastLoginAt: now,
-		ExpiresAt:   now.Add(24 * time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("CreateSession error: %v", err)
-	}
 	authServer := &Server{
-		store:       store,
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				if sessionSecret != "plain-session" {
+					return IdentitySession{}, ErrIdentityUnauthorized
+				}
+				return fakeIdentitySession(sessionSecret, "user-plain", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{
+					ID:      "user-plain",
+					Email:   "plain@example.com",
+					OrgSlug: "acme",
+					Labels:  []string{encodeIdentityRoleLabel("dep1")},
+					Status:  "active",
+				}, nil
+			},
+		},
 		enforceAuth: true,
 		now:         func() time.Time { return now },
 	}
 
 	rec2 := httptest.NewRecorder()
 	req2 := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
-	req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: "plain-session"})
 	if _, ok := authServer.requireOrgAdmin(rec2, req2); ok {
 		t.Fatal("expected requireOrgAdmin to reject non-org-admin")
 	}
