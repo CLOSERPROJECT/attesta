@@ -66,7 +66,7 @@ Tests:
 Done when:
 - There is one documented mapping from Appwrite objects to Attesta concepts, including pending-invite role transport.
 
-* WIP [#A] Migrate request authentication, sessions, signup, and recovery to Appwrite
+* DONE [#A] Migrate request authentication, sessions, signup, and recovery to Appwrite
 Effort: L
 Goal: The `attesta_session` cookie becomes an Appwrite session secret, login/signup/reset stop touching Mongo, and the auth routes keep the existing server-rendered UX where practical.
 Notes: Keep `attesta_session` as the cookie name for minimal template and middleware churn, but its value must be an Appwrite-managed session secret.
@@ -94,7 +94,7 @@ Tests:
 Done when:
 - No authenticated route depends on Mongo sessions, and the same `attesta_session` cookie drives Appwrite-backed auth.
 
-** WIP [#A] Add signup and reset flows with Appwrite-compatible callbacks
+** DONE [#A] Add signup and reset flows with Appwrite-compatible callbacks
 Why: The user wants `ANYONE_CAN_CREATE_ACCOUNT=false` to keep invite-only behavior, but `true` must expose signup; password reset must move off Mongo reset tokens too.
 Change:
 - Add `GET/POST /signup` only when `ANYONE_CAN_CREATE_ACCOUNT=true`.

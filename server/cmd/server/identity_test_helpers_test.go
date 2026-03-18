@@ -7,7 +7,11 @@ import (
 )
 
 type fakeIdentityStore struct {
+	createAccountFunc              func(ctx context.Context, email, password, name string) (IdentityUser, error)
+	acceptInviteFunc               func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	createEmailPasswordSessionFunc func(ctx context.Context, email, password string) (IdentitySession, error)
+	createRecoveryFunc             func(ctx context.Context, email, redirectURL string) error
+	completeRecoveryFunc           func(ctx context.Context, userID, secret, password string) error
 	getSessionFunc                 func(ctx context.Context, sessionSecret string) (IdentitySession, error)
 	deleteSessionFunc              func(ctx context.Context, sessionSecret string) error
 	getCurrentUserFunc             func(ctx context.Context, sessionSecret string) (IdentityUser, error)
@@ -16,11 +20,39 @@ type fakeIdentityStore struct {
 	getOrganizationBySlugFunc      func(ctx context.Context, slug string) (*IdentityOrg, error)
 }
 
+func (f *fakeIdentityStore) CreateAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
+	if f.createAccountFunc != nil {
+		return f.createAccountFunc(ctx, email, password, name)
+	}
+	return IdentityUser{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
+	if f.acceptInviteFunc != nil {
+		return f.acceptInviteFunc(ctx, teamID, membershipID, userID, secret)
+	}
+	return IdentitySession{}, ErrIdentityUnauthorized
+}
+
 func (f *fakeIdentityStore) CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error) {
 	if f.createEmailPasswordSessionFunc != nil {
 		return f.createEmailPasswordSessionFunc(ctx, email, password)
 	}
 	return IdentitySession{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) CreateRecovery(ctx context.Context, email, redirectURL string) error {
+	if f.createRecoveryFunc != nil {
+		return f.createRecoveryFunc(ctx, email, redirectURL)
+	}
+	return nil
+}
+
+func (f *fakeIdentityStore) CompleteRecovery(ctx context.Context, userID, secret, password string) error {
+	if f.completeRecoveryFunc != nil {
+		return f.completeRecoveryFunc(ctx, userID, secret, password)
+	}
+	return nil
 }
 
 func (f *fakeIdentityStore) GetSession(ctx context.Context, sessionSecret string) (IdentitySession, error) {

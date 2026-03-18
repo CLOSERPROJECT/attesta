@@ -74,6 +74,69 @@ func TestAppwriteIdentityCreateEmailPasswordSession(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityCreateAccountAndRecovery(t *testing.T) {
+	var createPath string
+	var createBody map[string]interface{}
+	var recoveryPath string
+	var recoveryBody map[string]interface{}
+	var completePath string
+	var completeBody map[string]interface{}
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/account":
+			createPath = r.URL.Path
+			if err := json.NewDecoder(r.Body).Decode(&createBody); err != nil {
+				t.Fatalf("decode create account body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"new@example.com","status":true,"labels":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/account/recovery":
+			recoveryPath = r.URL.Path
+			if err := json.NewDecoder(r.Body).Decode(&recoveryBody); err != nil {
+				t.Fatalf("decode recovery body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"userId":"user-1","secret":"secret-1"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/account/recovery":
+			completePath = r.URL.Path
+			if err := json.NewDecoder(r.Body).Decode(&completeBody); err != nil {
+				t.Fatalf("decode complete body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"userId":"user-1","secret":"secret-1"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	user, err := identity.CreateAccount(context.Background(), "new@example.com", "very-secure-password", "")
+	if err != nil {
+		t.Fatalf("CreateAccount error: %v", err)
+	}
+	if createPath != "/v1/account" || createBody["email"] != "new@example.com" || createBody["password"] != "very-secure-password" {
+		t.Fatalf("create account request = %q %#v", createPath, createBody)
+	}
+	if user.Email != "new@example.com" || user.ID != "user-1" {
+		t.Fatalf("user = %#v", user)
+	}
+
+	if err := identity.CreateRecovery(context.Background(), "new@example.com", "http://attesta.local/reset/confirm"); err != nil {
+		t.Fatalf("CreateRecovery error: %v", err)
+	}
+	if recoveryPath != "/v1/account/recovery" || recoveryBody["email"] != "new@example.com" || recoveryBody["url"] != "http://attesta.local/reset/confirm" {
+		t.Fatalf("recovery request = %q %#v", recoveryPath, recoveryBody)
+	}
+
+	if err := identity.CompleteRecovery(context.Background(), "user-1", "secret-1", "updated-password"); err != nil {
+		t.Fatalf("CompleteRecovery error: %v", err)
+	}
+	if completePath != "/v1/account/recovery" || completeBody["userId"] != "user-1" || completeBody["secret"] != "secret-1" || completeBody["password"] != "updated-password" {
+		t.Fatalf("complete recovery request = %q %#v", completePath, completeBody)
+	}
+}
+
 func TestAppwriteIdentityGetCurrentUserHydratesMembership(t *testing.T) {
 	var accountSessionHeader string
 	var membershipsKeyHeader string
@@ -253,6 +316,56 @@ func TestAppwriteIdentityGetSessionAndDeleteSession(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityAcceptInvite(t *testing.T) {
+	var membershipPath string
+	var sessionPath string
+	var membershipBody map[string]interface{}
+	var sessionBody map[string]interface{}
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/teams/acme/memberships/membership-1/status":
+			membershipPath = r.URL.Path
+			if err := json.NewDecoder(r.Body).Decode(&membershipBody); err != nil {
+				t.Fatalf("decode membership body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"membership-1","teamId":"acme","userId":"user-1","confirm":true,"roles":["member"]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/account/sessions/token":
+			sessionPath = r.URL.Path
+			if err := json.NewDecoder(r.Body).Decode(&sessionBody); err != nil {
+				t.Fatalf("decode session body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"session-1","userId":"user-1","expire":"2026-03-18T10:11:12Z","secret":"session-secret"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	session, err := identity.AcceptInvite(context.Background(), "acme", "membership-1", "user-1", "secret-1")
+	if err != nil {
+		t.Fatalf("AcceptInvite error: %v", err)
+	}
+	if membershipPath != "/v1/teams/acme/memberships/membership-1/status" {
+		t.Fatalf("membership path = %q", membershipPath)
+	}
+	if membershipBody["userId"] != "user-1" || membershipBody["secret"] != "secret-1" {
+		t.Fatalf("membership body = %#v", membershipBody)
+	}
+	if sessionPath != "/v1/account/sessions/token" {
+		t.Fatalf("session path = %q", sessionPath)
+	}
+	if sessionBody["userId"] != "user-1" || sessionBody["secret"] != "secret-1" {
+		t.Fatalf("session body = %#v", sessionBody)
+	}
+	if session.Secret != "session-secret" {
+		t.Fatalf("session secret = %q, want session-secret", session.Secret)
+	}
+}
+
 func TestAppwriteIdentityGetUserByIDAndGetOrganizationBySlug(t *testing.T) {
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -407,6 +520,47 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 				t.Fatalf("error = %v, want %v", err, context.Canceled)
 			}
 		})
+	}
+}
+
+func TestAppwriteIdentityNormalizesUnauthorizedErrors(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"unauthorized"}`, http.StatusUnauthorized)
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	if _, err := identity.CreateAccount(context.Background(), "user@example.com", "password", ""); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("CreateAccount error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if err := identity.CreateRecovery(context.Background(), "user@example.com", "http://attesta.local/reset/confirm"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("CreateRecovery error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if err := identity.CompleteRecovery(context.Background(), "user-1", "secret-1", "password"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("CompleteRecovery error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+}
+
+func TestAppwriteIdentityAdditionalUnauthorizedPaths(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"unauthorized"}`, http.StatusUnauthorized)
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	if _, err := identity.CreateEmailPasswordSession(context.Background(), "user@example.com", "password"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("CreateEmailPasswordSession error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if _, err := identity.GetSession(context.Background(), "session-secret"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("GetSession error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if _, err := identity.GetCurrentUser(context.Background(), "session-secret"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("GetCurrentUser error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if _, err := identity.ListOrganizations(context.Background()); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("ListOrganizations error = %v, want %v", err, ErrIdentityUnauthorized)
 	}
 }
 

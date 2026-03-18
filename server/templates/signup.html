@@ -1,0 +1,23 @@
+{{define "signup_body"}}
+<div class="login-wrapper">
+  <section class="panel login">
+    <h1>Sign Up</h1>
+    <p class="muted">Create an account to continue.</p>
+    {{if .Error}}
+      <p class="muted" style="color: #a91919;">{{.Error}}</p>
+    {{end}}
+    <form method="post" action="/signup" class="input-form">
+      <label for="signup-email">Email</label>
+      <input id="signup-email" name="email" type="email" value="{{.Email}}" required />
+      <label for="signup-password">Password</label>
+      <input id="signup-password" name="password" type="password" required />
+      <button class="primary" type="submit">Create account</button>
+    </form>
+    <p class="muted">Already have an account? <a href="/login">Log in</a></p>
+  </section>
+</div>
+{{end}}
+
+{{define "signup.html"}}
+  {{template "layout.html" .}}
+{{end}}

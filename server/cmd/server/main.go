@@ -409,7 +409,14 @@ type HomeView struct {
 
 type LoginView struct {
 	PageBase
-	Next  string
+	Next       string
+	Email      string
+	Error      string
+	ShowSignup bool
+}
+
+type SignupView struct {
+	PageBase
 	Email string
 	Error string
 }
@@ -707,6 +714,7 @@ func main() {
 	mux.HandleFunc("/api/catalog", server.handlePublicCatalog)
 	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", server.handleLogin)
+	mux.HandleFunc("/signup", server.handleSignup)
 	mux.HandleFunc("/logout", server.handleLogout)
 	mux.HandleFunc("/invite/", server.handleInvite)
 	mux.HandleFunc("/reset", server.handleResetRequest)
@@ -793,6 +801,10 @@ func shouldSecureCookie(r *http.Request) bool {
 		return true
 	}
 	return r.TLS != nil
+}
+
+func anyoneCanCreateAccount() bool {
+	return boolEnvOr("ANYONE_CAN_CREATE_ACCOUNT", true)
 }
 
 func newSessionID() (string, error) {
@@ -887,39 +899,10 @@ func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request
 }
 
 func bootstrapPlatformAdmin(ctx context.Context, store Store, now func() time.Time) error {
-	if store == nil {
-		return nil
-	}
-	anyoneCanCreate := boolEnvOr("ANYONE_CAN_CREATE_ACCOUNT", true)
-	adminEmail := strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
-	adminPassword := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
-	if !anyoneCanCreate && (adminEmail == "" || adminPassword == "") {
-		return errors.New("ADMIN_EMAIL and ADMIN_PASSWORD are required when ANYONE_CAN_CREATE_ACCOUNT=false")
-	}
-	if adminEmail == "" || adminPassword == "" {
-		return nil
-	}
-
-	if _, err := store.GetUserByEmail(ctx, adminEmail); err == nil {
-		return nil
-	} else if !errors.Is(err, mongo.ErrNoDocuments) {
-		return err
-	}
-
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-
-	_, err = store.CreateUser(ctx, AccountUser{
-		Email:           adminEmail,
-		PasswordHash:    string(passwordHash),
-		RoleSlugs:       []string{},
-		Status:          "active",
-		IsPlatformAdmin: true,
-		CreatedAt:       now().UTC(),
-	})
-	return err
+	_ = ctx
+	_ = store
+	_ = now
+	return nil
 }
 
 func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser IdentityUser) *AccountUser {
@@ -1626,8 +1609,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		view := LoginView{
-			PageBase: s.pageBase("login_body", "", ""),
-			Next:     safeNextPath(r, "/"),
+			PageBase:   s.pageBase("login_body", "", ""),
+			Next:       safeNextPath(r, "/"),
+			ShowSignup: anyoneCanCreateAccount(),
 		}
 		if err := s.tmpl.ExecuteTemplate(w, "login.html", view); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1646,10 +1630,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			user, err := s.store.GetUserByEmail(r.Context(), email)
 			if err != nil || user == nil {
 				view := LoginView{
-					PageBase: s.pageBase("login_body", "", ""),
-					Email:    email,
-					Next:     next,
-					Error:    "Invalid email or password.",
+					PageBase:   s.pageBase("login_body", "", ""),
+					Email:      email,
+					Next:       next,
+					Error:      "Invalid email or password.",
+					ShowSignup: anyoneCanCreateAccount(),
 				}
 				w.WriteHeader(http.StatusUnauthorized)
 				_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
@@ -1657,10 +1642,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 				view := LoginView{
-					PageBase: s.pageBase("login_body", "", ""),
-					Email:    email,
-					Next:     next,
-					Error:    "Invalid email or password.",
+					PageBase:   s.pageBase("login_body", "", ""),
+					Email:      email,
+					Next:       next,
+					Error:      "Invalid email or password.",
+					ShowSignup: anyoneCanCreateAccount(),
 				}
 				w.WriteHeader(http.StatusUnauthorized)
 				_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
@@ -1678,10 +1664,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		session, err := s.identity.CreateEmailPasswordSession(r.Context(), email, password)
 		if errors.Is(err, ErrIdentityUnauthorized) || errors.Is(err, ErrIdentityNotFound) {
 			view := LoginView{
-				PageBase: s.pageBase("login_body", "", ""),
-				Email:    email,
-				Next:     next,
-				Error:    "Invalid email or password.",
+				PageBase:   s.pageBase("login_body", "", ""),
+				Email:      email,
+				Next:       next,
+				Error:      "Invalid email or password.",
+				ShowSignup: anyoneCanCreateAccount(),
 			}
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
@@ -1696,6 +1683,73 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Redirect(w, r, next, http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
+	if !anyoneCanCreateAccount() {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		if s.enforceAuth {
+			if _, _, err := s.currentUser(r); err == nil {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
+		}
+		view := SignupView{PageBase: s.pageBase("signup_body", "", "")}
+		if err := s.tmpl.ExecuteTemplate(w, "signup.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		if s.identity == nil {
+			http.Error(w, "signup unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		password := strings.TrimSpace(r.FormValue("password"))
+		if err := validatePassword(password); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
+				PageBase: s.pageBase("signup_body", "", ""),
+				Email:    email,
+				Error:    err.Error(),
+			})
+			return
+		}
+		if _, err := s.identity.CreateAccount(r.Context(), email, password, ""); err != nil && !errors.Is(err, ErrIdentityUnauthorized) {
+			http.Error(w, "signup failed", http.StatusInternalServerError)
+			return
+		}
+		session, err := s.identity.CreateEmailPasswordSession(r.Context(), email, password)
+		if err != nil {
+			http.Error(w, "signup failed", http.StatusInternalServerError)
+			return
+		}
+		if err := s.writeSessionCookie(w, r, session); err != nil {
+			http.Error(w, "signup failed", http.StatusInternalServerError)
+			return
+		}
+		identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret)
+		if err != nil {
+			http.Error(w, "signup failed", http.StatusInternalServerError)
+			return
+		}
+		redirectTarget := "/"
+		if strings.TrimSpace(identityUser.OrgSlug) == "" {
+			redirectTarget = "/org-admin/users"
+		}
+		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1751,6 +1805,10 @@ func (s *Server) loadActiveInvite(ctx context.Context, token string) (*Invite, e
 }
 
 func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/invite/accept") {
+		s.handleInviteAccept(w, r)
+		return
+	}
 	token := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/invite/"))
 	if token == "" || strings.Contains(token, "/") {
 		http.NotFound(w, r)
@@ -1862,12 +1920,70 @@ func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func inviteAcceptParams(r *http.Request) (string, string, string, string) {
+	query := r.URL.Query()
+	return strings.TrimSpace(query.Get("teamId")),
+		strings.TrimSpace(query.Get("membershipId")),
+		strings.TrimSpace(query.Get("userId")),
+		strings.TrimSpace(query.Get("secret"))
+}
+
+func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
+	if s.identity == nil {
+		http.NotFound(w, r)
+		return
+	}
+	teamID, membershipID, userID, secret := inviteAcceptParams(r)
+	if teamID == "" || membershipID == "" || userID == "" || secret == "" {
+		http.Error(w, "invalid invite link", http.StatusBadRequest)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, err := s.identity.AcceptInvite(r.Context(), teamID, membershipID, userID, secret)
+	if err != nil {
+		http.Error(w, "failed to accept invite", http.StatusBadRequest)
+		return
+	}
+	if err := s.writeSessionCookie(w, r, session); err != nil {
+		http.Error(w, "failed to login", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func resetTTLHrs() int {
 	hours := intEnvOr("RESET_TTL_HOURS", 24)
 	if hours <= 0 {
 		return 24
 	}
 	return hours
+}
+
+func requestBaseURL(r *http.Request) string {
+	scheme := "http"
+	if shouldSecureCookie(r) {
+		scheme = "https"
+	}
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		host = "localhost:3000"
+	}
+	return scheme + "://" + host
+}
+
+func resetRedirectURL(r *http.Request) string {
+	if configured := strings.TrimSpace(os.Getenv("APPWRITE_RESET_REDIRECT_URL")); configured != "" {
+		return configured
+	}
+	return requestBaseURL(r) + "/reset/confirm"
+}
+
+func resetConfirmParams(r *http.Request) (string, string) {
+	query := r.URL.Query()
+	return strings.TrimSpace(query.Get("userId")), strings.TrimSpace(query.Get("secret"))
 }
 
 func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
@@ -1891,22 +2007,26 @@ func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
 			ResetLink:    "",
 		}
 
-		user, err := s.store.GetUserByEmail(r.Context(), email)
-		if err == nil && user != nil {
-			token, tokenErr := newSessionID()
-			if tokenErr != nil {
-				http.Error(w, "failed to create reset token", http.StatusInternalServerError)
-				return
-			}
-			_, createErr := s.store.CreatePasswordReset(r.Context(), PasswordReset{
-				Email:       email,
-				UserMongoID: user.ID,
-				TokenHash:   token,
-				ExpiresAt:   s.nowUTC().Add(time.Duration(resetTTLHrs()) * time.Hour),
-				CreatedAt:   s.nowUTC(),
-			})
-			if createErr == nil {
-				view.ResetLink = "/reset/" + token
+		if s.identity != nil {
+			_ = s.identity.CreateRecovery(r.Context(), email, resetRedirectURL(r))
+		} else {
+			user, err := s.store.GetUserByEmail(r.Context(), email)
+			if err == nil && user != nil {
+				token, tokenErr := newSessionID()
+				if tokenErr != nil {
+					http.Error(w, "failed to create reset token", http.StatusInternalServerError)
+					return
+				}
+				_, createErr := s.store.CreatePasswordReset(r.Context(), PasswordReset{
+					Email:       email,
+					UserMongoID: user.ID,
+					TokenHash:   token,
+					ExpiresAt:   s.nowUTC().Add(time.Duration(resetTTLHrs()) * time.Hour),
+					CreatedAt:   s.nowUTC(),
+				})
+				if createErr == nil {
+					view.ResetLink = "/reset/" + token
+				}
 			}
 		}
 
@@ -1935,6 +2055,10 @@ func (s *Server) loadActivePasswordReset(ctx context.Context, token string) (*Pa
 }
 
 func (s *Server) handleResetSet(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/reset/confirm" {
+		s.handleResetConfirm(w, r)
+		return
+	}
 	token := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/reset/"))
 	if token == "" || strings.Contains(token, "/") {
 		http.NotFound(w, r)
@@ -2001,6 +2125,52 @@ func (s *Server) handleResetSet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
+	if s.identity == nil {
+		http.NotFound(w, r)
+		return
+	}
+	userID, secret := resetConfirmParams(r)
+	if userID == "" || secret == "" {
+		http.Error(w, "invalid or expired reset link", http.StatusBadRequest)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		view := ResetSetView{
+			PageBase: s.pageBase("reset_set_body", "", ""),
+			Token:    "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "reset_set.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		password := strings.TrimSpace(r.FormValue("password"))
+		if err := validatePassword(password); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "reset_set.html", ResetSetView{
+				PageBase: s.pageBase("reset_set_body", "", ""),
+				Token:    "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
+				Error:    err.Error(),
+			})
+			return
+		}
+		if err := s.identity.CompleteRecovery(r.Context(), userID, secret, password); err != nil {
+			http.Error(w, "failed to reset password", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

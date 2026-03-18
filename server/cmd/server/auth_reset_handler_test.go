@@ -81,6 +81,41 @@ func TestHandleResetRequestGenericConfirmation(t *testing.T) {
 	}
 }
 
+func TestHandleResetRequestTriggersIdentityRecovery(t *testing.T) {
+	var recoveryEmail string
+	var recoveryURL string
+	server := &Server{
+		identity: &fakeIdentityStore{
+			createRecoveryFunc: func(ctx context.Context, email, redirectURL string) error {
+				recoveryEmail = email
+				recoveryURL = redirectURL
+				return nil
+			},
+		},
+		tmpl: resetTemplates(),
+		now:  time.Now,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/reset", strings.NewReader("email=user%40acme.io"))
+	req.Host = "attesta.local"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.handleResetRequest(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if recoveryEmail != "user@acme.io" {
+		t.Fatalf("recovery email = %q, want user@acme.io", recoveryEmail)
+	}
+	if recoveryURL != "http://attesta.local/reset/confirm" {
+		t.Fatalf("recovery url = %q, want http://attesta.local/reset/confirm", recoveryURL)
+	}
+	if strings.Contains(rec.Body.String(), "/reset/") {
+		t.Fatalf("unexpected local reset link in appwrite mode: %q", rec.Body.String())
+	}
+}
+
 func TestHandleResetSetFlow(t *testing.T) {
 	store := NewMemoryStore()
 	oldHash, _ := bcrypt.GenerateFromPassword([]byte("old-password-value"), bcrypt.DefaultCost)
@@ -156,6 +191,114 @@ func TestHandleResetSetRejectsExpiredToken(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
+}
+
+func TestHandleResetConfirmCompletesIdentityRecovery(t *testing.T) {
+	var completedUserID string
+	var completedSecret string
+	var completedPassword string
+	server := &Server{
+		identity: &fakeIdentityStore{
+			completeRecoveryFunc: func(ctx context.Context, userID, secret, password string) error {
+				completedUserID = userID
+				completedSecret = secret
+				completedPassword = password
+				return nil
+			},
+		},
+		tmpl: resetTemplates(),
+		now:  time.Now,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.handleResetSet(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/login" {
+		t.Fatalf("location = %q, want /login", rec.Header().Get("Location"))
+	}
+	if completedUserID != "user-1" || completedSecret != "secret-1" || completedPassword != "this-is-strong-enough" {
+		t.Fatalf("completed recovery = %q/%q/%q", completedUserID, completedSecret, completedPassword)
+	}
+}
+
+func TestHandleResetConfirmBranches(t *testing.T) {
+	t.Run("get renders form", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodGet, "/reset/confirm?userId=user-1&secret=secret-1", nil)
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "RESET_SET") {
+			t.Fatalf("body = %q", rec.Body.String())
+		}
+	})
+
+	t.Run("identity missing", func(t *testing.T) {
+		server := &Server{tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodGet, "/reset/confirm?userId=user-1&secret=secret-1", nil)
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("invalid params", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodGet, "/reset/confirm?userId=user-1", nil)
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("short password", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=short"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodPut, "/reset/confirm?userId=user-1&secret=secret-1", nil)
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		}
+	})
+
+	t.Run("completion failure", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				completeRecoveryFunc: func(ctx context.Context, userID, secret, password string) error {
+					return errors.New("boom")
+				},
+			},
+			tmpl: resetTemplates(),
+			now:  time.Now,
+		}
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
 }
 
 func TestHandleResetPageHidesAdminTopbarLinks(t *testing.T) {

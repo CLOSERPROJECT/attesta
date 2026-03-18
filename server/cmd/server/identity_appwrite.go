@@ -10,6 +10,7 @@ import (
 	"github.com/appwrite/sdk-for-go/account"
 	"github.com/appwrite/sdk-for-go/appwrite"
 	appwriteclient "github.com/appwrite/sdk-for-go/client"
+	"github.com/appwrite/sdk-for-go/id"
 	"github.com/appwrite/sdk-for-go/models"
 	"github.com/appwrite/sdk-for-go/teams"
 	"github.com/appwrite/sdk-for-go/users"
@@ -59,6 +60,58 @@ func (a *appwriteIdentity) CreateEmailPasswordSession(ctx context.Context, email
 		return IdentitySession{}, err
 	}
 	return toIdentitySession(session, "")
+}
+
+func (a *appwriteIdentity) CreateAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityUser{}, err
+	}
+	user, err := account.New(a.sessionClient).Create(
+		id.Unique(),
+		strings.TrimSpace(email),
+		password,
+		account.New(a.sessionClient).WithCreateName(strings.TrimSpace(name)),
+	)
+	if err != nil {
+		return IdentityUser{}, normalizeIdentityError(err)
+	}
+	return toIdentityUser(user, nil), nil
+}
+
+func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentitySession{}, err
+	}
+	_, err := teams.New(a.sessionClient).UpdateMembershipStatus(
+		strings.TrimSpace(teamID),
+		strings.TrimSpace(membershipID),
+		strings.TrimSpace(userID),
+		strings.TrimSpace(secret),
+	)
+	if err != nil {
+		return IdentitySession{}, normalizeIdentityError(err)
+	}
+	session, err := account.New(a.sessionClient).CreateSession(strings.TrimSpace(userID), strings.TrimSpace(secret))
+	if err != nil {
+		return IdentitySession{}, normalizeIdentityError(err)
+	}
+	return toIdentitySession(session, "")
+}
+
+func (a *appwriteIdentity) CreateRecovery(ctx context.Context, email, redirectURL string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := account.New(a.sessionClient).CreateRecovery(strings.TrimSpace(email), strings.TrimSpace(redirectURL))
+	return normalizeIdentityError(err)
+}
+
+func (a *appwriteIdentity) CompleteRecovery(ctx context.Context, userID, secret, password string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := account.New(a.sessionClient).UpdateRecovery(strings.TrimSpace(userID), strings.TrimSpace(secret), password)
+	return normalizeIdentityError(err)
 }
 
 func (a *appwriteIdentity) GetSession(ctx context.Context, sessionSecret string) (IdentitySession, error) {

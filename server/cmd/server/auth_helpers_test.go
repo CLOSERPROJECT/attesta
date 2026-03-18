@@ -303,3 +303,61 @@ func TestAccountMatchesOrg(t *testing.T) {
 		t.Fatal("expected matching org ID and slug")
 	}
 }
+
+func TestAccountUserFromIdentity(t *testing.T) {
+	t.Run("without store fallback", func(t *testing.T) {
+		server := &Server{}
+		user := server.accountUserFromIdentity(t.Context(), IdentityUser{
+			Email:      "user@example.com",
+			OrgSlug:    "acme",
+			Labels:     []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")},
+			IsOrgAdmin: true,
+			Status:     "active",
+		})
+		if user.Email != "user@example.com" || user.OrgSlug != "acme" || !containsRole(user.RoleSlugs, "org-admin") || !containsRole(user.RoleSlugs, "qa-reviewer") {
+			t.Fatalf("user = %#v", user)
+		}
+	})
+
+	t.Run("merges onto legacy user", func(t *testing.T) {
+		store := NewMemoryStore()
+		legacy, err := store.CreateUser(t.Context(), AccountUser{
+			Email:     "legacy@example.com",
+			RoleSlugs: []string{"dep1"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("CreateUser error: %v", err)
+		}
+		server := &Server{store: store}
+		user := server.accountUserFromIdentity(t.Context(), IdentityUser{
+			Email:   "legacy@example.com",
+			OrgSlug: "acme",
+			Labels:  []string{encodeIdentityRoleLabel("qa-reviewer")},
+			Status:  "pending",
+		})
+		if user.ID != legacy.ID || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
+			t.Fatalf("user = %#v legacy=%#v", user, legacy)
+		}
+	})
+}
+
+func TestResetURLHelpers(t *testing.T) {
+	t.Run("base URL prefers forwarded https", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/reset", nil)
+		req.Host = "attesta.local"
+		req.Header.Set("X-Forwarded-Proto", "https")
+		if got := requestBaseURL(req); got != "https://attesta.local" {
+			t.Fatalf("requestBaseURL = %q, want https://attesta.local", got)
+		}
+	})
+
+	t.Run("configured redirect overrides request", func(t *testing.T) {
+		t.Setenv("APPWRITE_RESET_REDIRECT_URL", "https://app.example/reset/confirm")
+		req := httptest.NewRequest(http.MethodGet, "/reset", nil)
+		if got := resetRedirectURL(req); got != "https://app.example/reset/confirm" {
+			t.Fatalf("resetRedirectURL = %q", got)
+		}
+	})
+}

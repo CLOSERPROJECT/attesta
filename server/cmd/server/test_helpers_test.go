@@ -55,23 +55,26 @@ func testRuntimeConfig() RuntimeConfig {
 
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
-{{define "layout.html"}}
-  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
-  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
-  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
-  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
-  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
-  {{else if eq .Body "home_body"}}{{template "home_body" .}}
-  {{else if eq .Body "process_body"}}{{template "process_body" .}}
+	{{define "layout.html"}}
+	  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
+	  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+	  {{else if eq .Body "signup_body"}}{{template "signup_body" .}}
+	  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
+	  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
+	  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
+	  {{else if eq .Body "home_body"}}{{template "home_body" .}}
+	  {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
   {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
   {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
-{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
-{{define "home_body"}}HOME{{end}}
-{{define "home.html"}}{{template "layout.html" .}}{{end}}
+	{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
+	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}
+	{{define "signup.html"}}{{template "layout.html" .}}{{end}}
+	{{define "home_body"}}HOME{{end}}
+	{{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_body"}}DASHBOARD_ME {{.ID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}

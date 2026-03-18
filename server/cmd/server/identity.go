@@ -11,7 +11,11 @@ var ErrIdentityUnauthorized = errors.New("identity unauthorized")
 
 // IdentityStore isolates auth and organization data from the Mongo workflow store.
 type IdentityStore interface {
+	CreateAccount(ctx context.Context, email, password, name string) (IdentityUser, error)
+	AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error)
+	CreateRecovery(ctx context.Context, email, redirectURL string) error
+	CompleteRecovery(ctx context.Context, userID, secret, password string) error
 	GetSession(ctx context.Context, sessionSecret string) (IdentitySession, error)
 	DeleteSession(ctx context.Context, sessionSecret string) error
 	GetCurrentUser(ctx context.Context, sessionSecret string) (IdentityUser, error)
