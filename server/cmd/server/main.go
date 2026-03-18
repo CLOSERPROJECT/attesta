@@ -2295,6 +2295,9 @@ func rolesFromIdentityOrg(org IdentityOrg) []Role {
 func identityRolesFromStoreRoles(roles []Role) []IdentityRole {
 	out := make([]IdentityRole, 0, len(roles))
 	for _, role := range roles {
+		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+			continue
+		}
 		out = append(out, IdentityRole{
 			Slug:   strings.TrimSpace(role.Slug),
 			Name:   strings.TrimSpace(role.Name),
@@ -2303,6 +2306,18 @@ func identityRolesFromStoreRoles(roles []Role) []IdentityRole {
 		})
 	}
 	return out
+}
+
+func ensureOrgAdminRoleOption(roles []Role) []Role {
+	for _, role := range roles {
+		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+			return roles
+		}
+	}
+	withAdmin := make([]Role, 0, len(roles)+1)
+	withAdmin = append(withAdmin, Role{Slug: "org-admin", Name: "Org Admin"})
+	withAdmin = append(withAdmin, roles...)
+	return withAdmin
 }
 
 func ensureStoreIndexes(ctx context.Context, store Store) error {
@@ -2734,6 +2749,40 @@ func buildOrgAdminUserRows(rolePills []OrgAdminRoleOption, users []AccountUser) 
 	return orgUsers
 }
 
+func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []IdentityUser) []OrgAdminUserRow {
+	orgUsers := make([]OrgAdminUserRow, 0, len(users))
+	for _, orgUser := range users {
+		roleSlugs := decodeIdentityRoleLabels(orgUser.Labels)
+		roleOptions := make([]OrgAdminRoleOption, 0, len(rolePills))
+		for _, role := range rolePills {
+			selected := containsRole(roleSlugs, role.Slug)
+			if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+				selected = orgUser.IsOrgAdmin
+			}
+			roleOptions = append(roleOptions, OrgAdminRoleOption{
+				Slug:       role.Slug,
+				Name:       role.Name,
+				RoleColor:  role.RoleColor,
+				RoleBorder: role.RoleBorder,
+				Selected:   selected,
+			})
+		}
+		userID := strings.TrimSpace(orgUser.ID)
+		if userID == "" {
+			userID = strings.TrimSpace(orgUser.Email)
+		}
+		orgUsers = append(orgUsers, OrgAdminUserRow{
+			UserMongoID: stableIdentityUserObjectID(userID).Hex(),
+			Email:       orgUser.Email,
+			Status:      orgUser.Status,
+			Activated:   !strings.EqualFold(strings.TrimSpace(orgUser.Status), "pending") && !strings.EqualFold(strings.TrimSpace(orgUser.Status), "invited"),
+			IsOrgAdmin:  orgUser.IsOrgAdmin,
+			RoleOptions: roleOptions,
+		})
+	}
+	return orgUsers
+}
+
 func buildOrgAdminInviteRows(invites []Invite, now time.Time) []OrgAdminInviteRow {
 	orgInvites := make([]OrgAdminInviteRow, 0, len(invites))
 	for _, invite := range invites {
@@ -2784,52 +2833,24 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 	roles := rolesFromIdentityOrg(*orgIdentity)
 	if s.store != nil {
 		if storeRoles, storeErr := s.store.ListRolesByOrg(ctx, strings.TrimSpace(org.Slug)); storeErr == nil && len(storeRoles) > 0 {
-			roles = storeRoles
+			roles = ensureOrgAdminRoleOption(storeRoles)
 		}
 	}
+	roles = ensureOrgAdminRoleOption(roles)
 	rolePills := buildOrgAdminRolePills(roles)
 
+	identityUsers, identityUsersErr := s.identity.ListOrganizationUsers(ctx, org.Slug)
+	if identityUsersErr != nil {
+		return Organization{}, nil, nil, nil, identityUsersErr
+	}
+	orgUsers := buildOrgAdminUserRowsFromIdentity(rolePills, identityUsers)
+
+	invites := []Invite{}
 	lookupOrgID := org.ID
 	if user != nil && user.OrgID != nil && strings.EqualFold(strings.TrimSpace(user.OrgSlug), strings.TrimSpace(org.Slug)) {
 		lookupOrgID = *user.OrgID
 	}
-	storeUsers := []AccountUser{}
-	if s.store != nil {
-		storeUsers, _ = s.store.ListUsersByOrgID(ctx, lookupOrgID)
-	}
-	orgUsers := buildOrgAdminUserRows(rolePills, storeUsers)
-	if user != nil {
-		foundCurrent := false
-		for _, row := range orgUsers {
-			if strings.EqualFold(strings.TrimSpace(row.Email), strings.TrimSpace(user.Email)) {
-				foundCurrent = true
-				break
-			}
-		}
-		if !foundCurrent && strings.EqualFold(strings.TrimSpace(user.OrgSlug), strings.TrimSpace(org.Slug)) {
-			roleOptions := make([]OrgAdminRoleOption, 0, len(rolePills))
-			for _, role := range rolePills {
-				roleOptions = append(roleOptions, OrgAdminRoleOption{
-					Slug:       role.Slug,
-					Name:       role.Name,
-					RoleColor:  role.RoleColor,
-					RoleBorder: role.RoleBorder,
-					Selected:   containsRole(user.RoleSlugs, role.Slug),
-				})
-			}
-			orgUsers = append(orgUsers, OrgAdminUserRow{
-				UserMongoID: user.ID.Hex(),
-				Email:       user.Email,
-				Status:      user.Status,
-				Activated:   !strings.EqualFold(strings.TrimSpace(user.Status), "invited") && !strings.EqualFold(strings.TrimSpace(user.Status), "pending"),
-				IsOrgAdmin:  userIsOrgAdmin(user),
-				RoleOptions: roleOptions,
-			})
-		}
-	}
-
-	invites := []Invite{}
-	if s.store != nil && user != nil {
+	if s.store != nil && user != nil && user.OrgID != nil {
 		invites, _ = s.store.ListInvitesByCreator(ctx, user.ID, lookupOrgID)
 	}
 	return org, roles, orgUsers, buildOrgAdminInviteRows(invites, s.nowUTC()), nil
@@ -2994,6 +3015,41 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			palette = defaultRolePaletteFromInput(name)
 		}
 		paletteStyle := resolveRolePaletteStyle(palette)
+		if s.identity != nil {
+			org, err := s.identity.GetOrganizationBySlug(r.Context(), user.OrgSlug)
+			if err != nil || org == nil {
+				http.NotFound(w, r)
+				return
+			}
+			roleSlug := canonifySlug(name)
+			for _, existingRole := range ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org)) {
+				if strings.EqualFold(strings.TrimSpace(existingRole.Slug), roleSlug) {
+					s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
+					return
+				}
+			}
+			sessionSecret, err := sessionSecretFromRequest(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			updatedRoles := append(append([]IdentityRole(nil), org.Roles...), IdentityRole{
+				Slug:   roleSlug,
+				Name:   name,
+				Color:  paletteStyle.Color,
+				Border: paletteStyle.Border,
+			})
+			if _, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, user.OrgSlug, org.Name, org.LogoFileID, updatedRoles); err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
+					return
+				}
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to create role"})
+				return
+			}
+			http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
+			return
+		}
 		if existing, err := s.store.GetRoleBySlug(r.Context(), user.OrgSlug, canonifySlug(name)); err == nil && existing != nil {
 			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
 			return
@@ -3381,6 +3437,73 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
 		if userMongoID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
+			return
+		}
+		if s.identity != nil {
+			org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+			if err != nil || org == nil {
+				http.NotFound(w, r)
+				return
+			}
+			targetUsers, err := s.identity.ListOrganizationUsers(r.Context(), admin.OrgSlug)
+			if err != nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+				return
+			}
+			var target *IdentityUser
+			for idx := range targetUsers {
+				targetKey := strings.TrimSpace(targetUsers[idx].ID)
+				if targetKey == "" {
+					targetKey = strings.TrimSpace(targetUsers[idx].Email)
+				}
+				if stableIdentityUserObjectID(targetKey).Hex() == userMongoID {
+					target = &targetUsers[idx]
+					break
+				}
+			}
+			if target == nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+				return
+			}
+			selectedRoles := requestedRoleSlugs(r.Form)
+			allowedRoles := ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org))
+			allowed := make(map[string]struct{}, len(allowedRoles))
+			for _, role := range allowedRoles {
+				allowed[strings.TrimSpace(role.Slug)] = struct{}{}
+			}
+			for _, roleSlug := range selectedRoles {
+				if _, ok := allowed[strings.TrimSpace(roleSlug)]; !ok {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "role not found"})
+					return
+				}
+			}
+			if stableIdentityUserObjectID(strings.TrimSpace(target.ID)).Hex() == admin.ID.Hex() && !containsRole(selectedRoles, "org-admin") {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove org-admin from your own account"})
+				return
+			}
+			labels := make([]string, 0, len(target.Labels)+len(selectedRoles)+1)
+			for _, label := range target.Labels {
+				if strings.HasPrefix(strings.TrimSpace(label), identityRoleLabelPrefix) || strings.EqualFold(strings.TrimSpace(label), identityOrgAdminLabel) {
+					continue
+				}
+				labels = append(labels, strings.TrimSpace(label))
+			}
+			isOrgAdmin := containsRole(selectedRoles, "org-admin")
+			for _, roleSlug := range selectedRoles {
+				if containsRole([]string{roleSlug}, "org-admin") || containsRole([]string{roleSlug}, "org_admin") {
+					isOrgAdmin = true
+					continue
+				}
+				labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+			}
+			if isOrgAdmin {
+				labels = append(labels, identityOrgAdminLabel)
+			}
+			if _, err := s.identity.UpdateUserLabels(r.Context(), target.ID, labels); err != nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to update user roles"})
+				return
+			}
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 			return
 		}
 		userMongoObjectID, err := primitive.ObjectIDFromHex(userMongoID)

@@ -86,6 +86,7 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	var createFileCalled bool
 	var createFileContentType string
 	var createFileBody []byte
+	var updateLabelsBody map[string]interface{}
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -104,6 +105,12 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attesta:org-admin"]}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/users/member-1/labels":
+			if err := json.NewDecoder(r.Body).Decode(&updateLabelsBody); err != nil {
+				t.Fatalf("decode update labels: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:qa-reviewer","attesta:org-admin"]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/fresh-org/prefs":
 			var body map[string]interface{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -115,12 +122,21 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/fresh-org":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"$id":"fresh-org","name":"Fresh Org","prefs":{"schemaVersion":1,"slug":"fresh-org","roles":[{"slug":"qa-reviewer","name":"QA Reviewer"}]}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/fresh-org/memberships":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"fresh-org","teamName":"Fresh Org","confirm":true,"roles":["member"]}]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/fresh-org":
 			if err := json.NewDecoder(r.Body).Decode(&updateNameBody); err != nil {
 				t.Fatalf("decode update team: %v", err)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"$id":"fresh-org","name":"Updated Org"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/member-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:qa-reviewer"]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/member-1/memberships":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"fresh-org","teamName":"Fresh Org","confirm":true,"roles":["owner"]}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/storage/buckets/org-assets/files/logo-1":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"$id":"logo-1","name":"logo.png","mimeType":"image/png"}`))
@@ -204,6 +220,26 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	}
 	if logo.Filename != "logo.png" || logo.ContentType != "image/png" || string(logo.Data) != "PNG" {
 		t.Fatalf("logo = %#v", logo)
+	}
+
+	orgUsers, err := identity.ListOrganizationUsers(context.Background(), "fresh-org")
+	if err != nil {
+		t.Fatalf("ListOrganizationUsers error: %v", err)
+	}
+	if len(orgUsers) != 1 || orgUsers[0].Email != "member@example.com" || !containsRole(decodeIdentityRoleLabels(orgUsers[0].Labels), "qa-reviewer") {
+		t.Fatalf("org users = %#v", orgUsers)
+	}
+
+	updatedUser, err := identity.UpdateUserLabels(context.Background(), "member-1", []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")})
+	if err != nil {
+		t.Fatalf("UpdateUserLabels error: %v", err)
+	}
+	if updatedUser.Email != "member@example.com" || !updatedUser.IsOrgAdmin || updatedUser.OrgSlug != "fresh-org" {
+		t.Fatalf("updated user = %#v", updatedUser)
+	}
+	updatedUserLabels, _ := updateLabelsBody["labels"].([]interface{})
+	if len(updatedUserLabels) != 2 {
+		t.Fatalf("update labels body = %#v", updateLabelsBody)
 	}
 }
 

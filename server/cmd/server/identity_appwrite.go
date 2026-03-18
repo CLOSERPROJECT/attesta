@@ -255,6 +255,47 @@ func (a *appwriteIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg
 	return decodeIdentityOrgs(teamList), nil
 }
 
+func (a *appwriteIdentity) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	membershipList, err := teams.New(a.adminClient).ListMemberships(strings.TrimSpace(org.ID))
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	usersForOrg := make([]IdentityUser, 0, len(membershipList.Memberships))
+	for _, membership := range membershipList.Memberships {
+		identity := IdentityUser{
+			ID:              strings.TrimSpace(membership.UserId),
+			Email:           strings.TrimSpace(membership.UserEmail),
+			OrgSlug:         strings.TrimSpace(org.Slug),
+			OrgName:         strings.TrimSpace(org.Name),
+			MembershipID:    strings.TrimSpace(membership.Id),
+			MembershipRoles: append([]string(nil), membership.Roles...),
+			Status:          "active",
+		}
+		if !membership.Confirm {
+			identity.Status = "pending"
+		}
+		if identity.ID != "" {
+			user, userErr := users.New(a.adminClient).Get(identity.ID)
+			if userErr != nil {
+				return nil, normalizeIdentityError(userErr)
+			}
+			accountIdentity := toIdentityUser(user, []models.Membership{membership})
+			accountIdentity.OrgSlug = strings.TrimSpace(org.Slug)
+			accountIdentity.OrgName = strings.TrimSpace(org.Name)
+			identity = accountIdentity
+		}
+		usersForOrg = append(usersForOrg, identity)
+	}
+	return usersForOrg, nil
+}
+
 func (a *appwriteIdentity) GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -313,6 +354,28 @@ func (a *appwriteIdentity) UpdateOrganization(ctx context.Context, sessionSecret
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}
 	return updatedOrg, nil
+}
+
+func (a *appwriteIdentity) UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityUser{}, err
+	}
+	user, err := users.New(a.adminClient).UpdateLabels(strings.TrimSpace(userID), uniqueIdentityStrings(labels))
+	if err != nil {
+		return IdentityUser{}, normalizeIdentityError(err)
+	}
+	memberships, err := users.New(a.adminClient).ListMemberships(strings.TrimSpace(userID))
+	if err != nil {
+		return IdentityUser{}, normalizeIdentityError(err)
+	}
+	identity := toIdentityUser(user, memberships.Memberships)
+	if identity.OrgSlug != "" {
+		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
+			identity.OrgSlug = org.Slug
+			identity.OrgName = org.Name
+		}
+	}
+	return identity, nil
 }
 
 func (a *appwriteIdentity) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {

@@ -22,8 +22,10 @@ type IdentityStore interface {
 	GetCurrentUser(ctx context.Context, sessionSecret string) (IdentityUser, error)
 	GetUserByID(ctx context.Context, userID string) (IdentityUser, error)
 	ListOrganizations(ctx context.Context) ([]IdentityOrg, error)
+	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error)
 }

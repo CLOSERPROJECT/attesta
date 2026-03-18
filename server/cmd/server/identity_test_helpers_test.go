@@ -18,8 +18,10 @@ type fakeIdentityStore struct {
 	getCurrentUserFunc             func(ctx context.Context, sessionSecret string) (IdentityUser, error)
 	getUserByIDFunc                func(ctx context.Context, userID string) (IdentityUser, error)
 	listOrganizationsFunc          func(ctx context.Context) ([]IdentityOrg, error)
+	listOrganizationUsersFunc      func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	getOrganizationBySlugFunc      func(ctx context.Context, slug string) (*IdentityOrg, error)
 	updateOrganizationFunc         func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	updateUserLabelsFunc           func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	uploadOrganizationLogoFunc     func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	getOrganizationLogoFunc        func(ctx context.Context, fileID string) (IdentityFile, error)
 }
@@ -101,6 +103,13 @@ func (f *fakeIdentityStore) ListOrganizations(ctx context.Context) ([]IdentityOr
 	return nil, nil
 }
 
+func (f *fakeIdentityStore) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+	if f.listOrganizationUsersFunc != nil {
+		return f.listOrganizationUsersFunc(ctx, orgSlug)
+	}
+	return nil, nil
+}
+
 func (f *fakeIdentityStore) GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error) {
 	if f.getOrganizationBySlugFunc != nil {
 		return f.getOrganizationBySlugFunc(ctx, slug)
@@ -113,6 +122,13 @@ func (f *fakeIdentityStore) UpdateOrganization(ctx context.Context, sessionSecre
 		return f.updateOrganizationFunc(ctx, sessionSecret, currentSlug, name, logoFileID, roles)
 	}
 	return IdentityOrg{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+	if f.updateUserLabelsFunc != nil {
+		return f.updateUserLabelsFunc(ctx, userID, labels)
+	}
+	return IdentityUser{}, ErrIdentityUnauthorized
 }
 
 func (f *fakeIdentityStore) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {
