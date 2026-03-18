@@ -61,6 +61,7 @@ type Role struct {
 
 type AccountUser struct {
 	ID              primitive.ObjectID  `bson:"_id,omitempty"`
+	IdentityUserID  string              `bson:"identityUserId,omitempty"`
 	OrgID           *primitive.ObjectID `bson:"orgId,omitempty"`
 	OrgSlug         string              `bson:"orgSlug,omitempty"`
 	Email           string              `bson:"email"`

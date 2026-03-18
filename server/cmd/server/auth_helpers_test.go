@@ -39,7 +39,7 @@ func TestAccountUserFromIdentity(t *testing.T) {
 		IsOrgAdmin: false,
 		Status:     "pending",
 	})
-	if user.Email != "legacy@example.com" || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
+	if user.IdentityUserID != "user-1" || user.Email != "legacy@example.com" || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
 		t.Fatalf("user = %#v", user)
 	}
 }

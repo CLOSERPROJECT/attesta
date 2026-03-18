@@ -15,11 +15,12 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 	now := time.Date(2026, 2, 26, 16, 0, 0, 0, time.UTC)
 
 	user := AccountUser{
-		ID:        primitive.NewObjectID(),
-		Email:     "u-session@example.com",
-		RoleSlugs: []string{"dep1", "dep2"},
-		Status:    "active",
-		CreatedAt: now,
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-session-role",
+		Email:          "u-session@example.com",
+		RoleSlugs:      []string{"dep1", "dep2"},
+		Status:         "active",
+		CreatedAt:      now,
 	}
 	sessionID := "session-role"
 
@@ -72,6 +73,9 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 	step := updated.Progress["2_1"]
 	if step.DoneBy == nil || step.DoneBy.Role != "dep2" {
 		t.Fatalf("doneBy role = %#v, want dep2", step.DoneBy)
+	}
+	if step.DoneBy.ID != "appwrite:user-session-role" {
+		t.Fatalf("doneBy id = %q, want appwrite:user-session-role", step.DoneBy.ID)
 	}
 }
 

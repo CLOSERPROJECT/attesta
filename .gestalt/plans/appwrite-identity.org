@@ -344,12 +344,12 @@ Tests:
 Done when:
 - The repo’s Coolify compose can launch a functional Appwrite-backed Attesta stack without relying on out-of-band Appwrite services.
 
-* TODO [#A] Migrate actor identity, catalogs, docs, and rollout safely
+* WIP [#A] Migrate actor identity, catalogs, docs, and rollout safely
 Effort: M
 Goal: Existing process history remains readable, workflow validation keeps working, and deployment has a clear cutover sequence.
 Notes: This is the step that avoids silent regressions in timelines, DPP traceability, and operational setup.
 
-** TODO [#A] Make actor IDs opaque and backward-compatible
+** DONE [#A] Make actor IDs opaque and backward-compatible
 Why: Process history currently stores `DoneBy.ID` as a Mongo hex string and later resolves it through `lookupUserIdentityByActorID`. New Appwrite users cannot fit that assumption.
 Change:
 - Change `accountActorID` in `server/cmd/server/main.go` to emit `appwrite:<userId>` for Appwrite-backed users.

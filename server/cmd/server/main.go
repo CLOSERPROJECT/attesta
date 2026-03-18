@@ -861,11 +861,12 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
 	}
 	user := &AccountUser{
-		ID:        stableIdentityUserObjectID(identityUser.ID),
-		Email:     strings.TrimSpace(identityUser.Email),
-		OrgSlug:   strings.TrimSpace(identityUser.OrgSlug),
-		RoleSlugs: roleSlugs,
-		Status:    strings.TrimSpace(identityUser.Status),
+		ID:             stableIdentityUserObjectID(identityUser.ID),
+		IdentityUserID: strings.TrimSpace(identityUser.ID),
+		Email:          strings.TrimSpace(identityUser.Email),
+		OrgSlug:        strings.TrimSpace(identityUser.OrgSlug),
+		RoleSlugs:      roleSlugs,
+		Status:         strings.TrimSpace(identityUser.Status),
 	}
 	if user.OrgSlug != "" {
 		orgID := stableOrgObjectID(user.OrgSlug)
@@ -1905,7 +1906,13 @@ func isSameAccount(a, b *AccountUser) bool {
 }
 
 func accountActorID(user *AccountUser) string {
-	if user == nil || user.ID.IsZero() {
+	if user == nil {
+		return "legacy-user"
+	}
+	if actorID := appwriteActorID(user.IdentityUserID); actorID != "" {
+		return actorID
+	}
+	if user.ID.IsZero() {
 		return "legacy-user"
 	}
 	return user.ID.Hex()
@@ -1924,6 +1931,28 @@ func stableOrgObjectID(slug string) primitive.ObjectID {
 
 func stableIdentityUserObjectID(userID string) primitive.ObjectID {
 	return stableObjectID("identity-user:" + strings.TrimSpace(userID))
+}
+
+const appwriteActorPrefix = "appwrite:"
+
+func appwriteActorID(userID string) string {
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" {
+		return ""
+	}
+	return appwriteActorPrefix + trimmed
+}
+
+func parseAppwriteActorID(actorID string) (string, bool) {
+	trimmed := strings.TrimSpace(actorID)
+	if !strings.HasPrefix(trimmed, appwriteActorPrefix) {
+		return "", false
+	}
+	userID := strings.TrimSpace(strings.TrimPrefix(trimmed, appwriteActorPrefix))
+	if userID == "" {
+		return "", false
+	}
+	return userID, true
 }
 
 func organizationFromIdentityOrg(org IdentityOrg) Organization {
@@ -3110,8 +3139,8 @@ func viewerCanSeeDoneByEmail(def WorkflowDef, viewer Actor) bool {
 }
 
 type userIdentityView struct {
-	email   string
-	mongoID string
+	email      string
+	fallbackID string
 }
 
 func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string, cache map[string]userIdentityView) (userIdentityView, bool) {
@@ -3120,7 +3149,24 @@ func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string
 		return userIdentityView{}, false
 	}
 	if identity, ok := cache[id]; ok {
-		return identity, strings.TrimSpace(identity.email) != "" || strings.TrimSpace(identity.mongoID) != ""
+		return identity, strings.TrimSpace(identity.email) != "" || strings.TrimSpace(identity.fallbackID) != ""
+	}
+	if appwriteUserID, ok := parseAppwriteActorID(id); ok {
+		if s.identity == nil {
+			cache[id] = userIdentityView{}
+			return userIdentityView{}, false
+		}
+		user, err := s.identity.GetUserByID(ctx, appwriteUserID)
+		if err != nil {
+			cache[id] = userIdentityView{}
+			return userIdentityView{}, false
+		}
+		identity := userIdentityView{
+			email:      strings.TrimSpace(user.Email),
+			fallbackID: appwriteActorID(firstNonEmpty(user.ID, appwriteUserID)),
+		}
+		cache[id] = identity
+		return identity, identity.email != "" || identity.fallbackID != ""
 	}
 	lookup, ok := any(s.store).(interface {
 		GetUserByMongoID(context.Context, primitive.ObjectID) (*AccountUser, error)
@@ -3143,10 +3189,10 @@ func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string
 		email: strings.TrimSpace(user.Email),
 	}
 	if !user.ID.IsZero() {
-		identity.mongoID = user.ID.Hex()
+		identity.fallbackID = user.ID.Hex()
 	}
 	cache[id] = identity
-	return identity, identity.email != "" || identity.mongoID != ""
+	return identity, identity.email != "" || identity.fallbackID != ""
 }
 
 func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []ActionView) []ActionView {
@@ -3163,11 +3209,13 @@ func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef,
 		if canSeeEmail {
 			if strings.TrimSpace(identity.email) != "" {
 				actions[idx].DoneBy = identity.email
+			} else if strings.TrimSpace(identity.fallbackID) != "" {
+				actions[idx].DoneBy = identity.fallbackID
 			}
 			continue
 		}
-		if strings.TrimSpace(identity.mongoID) != "" {
-			actions[idx].DoneBy = identity.mongoID
+		if strings.TrimSpace(identity.fallbackID) != "" {
+			actions[idx].DoneBy = identity.fallbackID
 		}
 	}
 	return actions
@@ -3188,11 +3236,13 @@ func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef
 			if canSeeEmail {
 				if strings.TrimSpace(identity.email) != "" {
 					timeline[stepIdx].Substeps[subIdx].DoneBy = identity.email
+				} else if strings.TrimSpace(identity.fallbackID) != "" {
+					timeline[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
 				}
 				continue
 			}
-			if strings.TrimSpace(identity.mongoID) != "" {
-				timeline[stepIdx].Substeps[subIdx].DoneBy = identity.mongoID
+			if strings.TrimSpace(identity.fallbackID) != "" {
+				timeline[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
 			}
 		}
 	}
@@ -3210,8 +3260,8 @@ func (s *Server) applyDoneByMongoIDToDPPTraceability(ctx context.Context, tracea
 			if !ok {
 				continue
 			}
-			if strings.TrimSpace(identity.mongoID) != "" {
-				traceability[stepIdx].Substeps[subIdx].DoneBy = identity.mongoID
+			if strings.TrimSpace(identity.fallbackID) != "" {
+				traceability[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
 			}
 		}
 	}

@@ -148,6 +148,10 @@ type testHelperT interface {
 
 func identityUserFromAccountUser(user AccountUser) IdentityUser {
 	orgSlug := strings.TrimSpace(user.OrgSlug)
+	identityUserID := strings.TrimSpace(user.IdentityUserID)
+	if identityUserID == "" && !user.ID.IsZero() {
+		identityUserID = user.ID.Hex()
+	}
 	labels := make([]string, 0, len(user.RoleSlugs))
 	isOrgAdmin := false
 	for _, roleSlug := range canonifyRoleSlugs(user.RoleSlugs) {
@@ -161,7 +165,7 @@ func identityUserFromAccountUser(user AccountUser) IdentityUser {
 		labels = append(labels, identityOrgAdminLabel)
 	}
 	return IdentityUser{
-		ID:         user.ID.Hex(),
+		ID:         identityUserID,
 		Email:      strings.TrimSpace(user.Email),
 		OrgSlug:    orgSlug,
 		Labels:     labels,
