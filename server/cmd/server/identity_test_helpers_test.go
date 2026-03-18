@@ -17,11 +17,16 @@ type fakeIdentityStore struct {
 	deleteSessionFunc              func(ctx context.Context, sessionSecret string) error
 	getCurrentUserFunc             func(ctx context.Context, sessionSecret string) (IdentityUser, error)
 	getUserByIDFunc                func(ctx context.Context, userID string) (IdentityUser, error)
+	getUserByEmailFunc             func(ctx context.Context, email string) (IdentityUser, error)
+	inviteOrganizationUserFunc     func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	listOrganizationsFunc          func(ctx context.Context) ([]IdentityOrg, error)
+	listOrganizationMembershipsFunc func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	listOrganizationUsersFunc      func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	getOrganizationBySlugFunc      func(ctx context.Context, slug string) (*IdentityOrg, error)
 	updateOrganizationFunc         func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	updateOrganizationMembershipFunc func(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	updateUserLabelsFunc           func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
+	deleteOrganizationMembershipFunc func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
 	uploadOrganizationLogoFunc     func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	getOrganizationLogoFunc        func(ctx context.Context, fileID string) (IdentityFile, error)
 }
@@ -96,9 +101,30 @@ func (f *fakeIdentityStore) GetUserByID(ctx context.Context, userID string) (Ide
 	return IdentityUser{}, ErrIdentityNotFound
 }
 
+func (f *fakeIdentityStore) GetUserByEmail(ctx context.Context, email string) (IdentityUser, error) {
+	if f.getUserByEmailFunc != nil {
+		return f.getUserByEmailFunc(ctx, email)
+	}
+	return IdentityUser{}, ErrIdentityNotFound
+}
+
+func (f *fakeIdentityStore) InviteOrganizationUser(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+	if f.inviteOrganizationUserFunc != nil {
+		return f.inviteOrganizationUserFunc(ctx, sessionSecret, orgSlug, email, redirectURL, roleSlugs, isOrgAdmin)
+	}
+	return IdentityMembership{}, ErrIdentityUnauthorized
+}
+
 func (f *fakeIdentityStore) ListOrganizations(ctx context.Context) ([]IdentityOrg, error) {
 	if f.listOrganizationsFunc != nil {
 		return f.listOrganizationsFunc(ctx)
+	}
+	return nil, nil
+}
+
+func (f *fakeIdentityStore) ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+	if f.listOrganizationMembershipsFunc != nil {
+		return f.listOrganizationMembershipsFunc(ctx, orgSlug)
 	}
 	return nil, nil
 }
@@ -124,11 +150,25 @@ func (f *fakeIdentityStore) UpdateOrganization(ctx context.Context, sessionSecre
 	return IdentityOrg{}, ErrIdentityUnauthorized
 }
 
+func (f *fakeIdentityStore) UpdateOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+	if f.updateOrganizationMembershipFunc != nil {
+		return f.updateOrganizationMembershipFunc(ctx, sessionSecret, orgSlug, membershipID, roleSlugs, isOrgAdmin)
+	}
+	return IdentityMembership{}, ErrIdentityUnauthorized
+}
+
 func (f *fakeIdentityStore) UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
 	if f.updateUserLabelsFunc != nil {
 		return f.updateUserLabelsFunc(ctx, userID, labels)
 	}
 	return IdentityUser{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
+	if f.deleteOrganizationMembershipFunc != nil {
+		return f.deleteOrganizationMembershipFunc(ctx, sessionSecret, orgSlug, membershipID)
+	}
+	return nil
 }
 
 func (f *fakeIdentityStore) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {

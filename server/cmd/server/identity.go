@@ -21,11 +21,16 @@ type IdentityStore interface {
 	DeleteSession(ctx context.Context, sessionSecret string) error
 	GetCurrentUser(ctx context.Context, sessionSecret string) (IdentityUser, error)
 	GetUserByID(ctx context.Context, userID string) (IdentityUser, error)
+	GetUserByEmail(ctx context.Context, email string) (IdentityUser, error)
+	InviteOrganizationUser(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	ListOrganizations(ctx context.Context) ([]IdentityOrg, error)
+	ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	UpdateOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error)
+	DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
 	UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error)
 }
@@ -68,4 +73,17 @@ type IdentityFile struct {
 	Filename    string
 	ContentType string
 	Data        []byte
+}
+
+type IdentityMembership struct {
+	ID              string
+	TeamID          string
+	UserID          string
+	Email           string
+	MembershipRoles []string
+	RoleSlugs       []string
+	IsOrgAdmin      bool
+	Confirmed       bool
+	InvitedAt       time.Time
+	JoinedAt        time.Time
 }

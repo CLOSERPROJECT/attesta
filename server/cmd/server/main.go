@@ -2007,6 +2007,13 @@ func resetRedirectURL(r *http.Request) string {
 	return requestBaseURL(r) + "/reset/confirm"
 }
 
+func inviteRedirectURL(r *http.Request) string {
+	if configured := strings.TrimSpace(os.Getenv("APPWRITE_INVITE_REDIRECT_URL")); configured != "" {
+		return configured
+	}
+	return requestBaseURL(r) + "/invite/accept"
+}
+
 func resetConfirmParams(r *http.Request) (string, string) {
 	query := r.URL.Query()
 	return strings.TrimSpace(query.Get("userId")), strings.TrimSpace(query.Get("secret"))
@@ -2809,6 +2816,41 @@ func buildOrgAdminInviteRows(invites []Invite, now time.Time) []OrgAdminInviteRo
 	return orgInvites
 }
 
+func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, now time.Time) []OrgAdminInviteRow {
+	orgInvites := make([]OrgAdminInviteRow, 0, len(memberships))
+	for _, membership := range memberships {
+		status := "accepted"
+		if !membership.Confirmed {
+			status = "pending"
+			if !membership.InvitedAt.IsZero() && membership.InvitedAt.Add(7*24*time.Hour).Before(now) {
+				status = "expired"
+			}
+		}
+		roleSlugs := append([]string(nil), membership.RoleSlugs...)
+		if membership.IsOrgAdmin {
+			roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
+		}
+		expiresAt := time.Time{}
+		if !membership.InvitedAt.IsZero() {
+			expiresAt = membership.InvitedAt.Add(7 * 24 * time.Hour)
+		}
+		var usedAt *time.Time
+		if !membership.JoinedAt.IsZero() {
+			joinedAt := membership.JoinedAt
+			usedAt = &joinedAt
+		}
+		orgInvites = append(orgInvites, OrgAdminInviteRow{
+			Email:      membership.Email,
+			RoleSlugs:  roleSlugs,
+			CreatedAt:  membership.InvitedAt,
+			ExpiresAt:  expiresAt,
+			UsedAt:     usedAt,
+			Status:     status,
+		})
+	}
+	return orgInvites
+}
+
 func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSlug string) (Organization, []Role, []OrgAdminUserRow, []OrgAdminInviteRow, error) {
 	if s.identity == nil {
 		org, err := s.store.GetOrganizationBySlug(ctx, orgSlug)
@@ -2846,6 +2888,9 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 	orgUsers := buildOrgAdminUserRowsFromIdentity(rolePills, identityUsers)
 
 	invites := []Invite{}
+	if memberships, membershipsErr := s.identity.ListOrganizationMemberships(ctx, org.Slug); membershipsErr == nil {
+		return org, roles, orgUsers, buildOrgAdminInviteRowsFromMemberships(memberships, s.nowUTC()), nil
+	}
 	lookupOrgID := org.ID
 	if user != nil && user.OrgID != nil && strings.EqualFold(strings.TrimSpace(user.OrgSlug), strings.TrimSpace(org.Slug)) {
 		lookupOrgID = *user.OrgID
@@ -3238,6 +3283,115 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 
 		selectedRoles := requestedRoleSlugs(r.Form)
+		if s.identity != nil {
+			org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+			if err != nil || org == nil {
+				http.NotFound(w, r)
+				return
+			}
+			allowedRoles := ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org))
+			allowed := make(map[string]struct{}, len(allowedRoles))
+			for _, role := range allowedRoles {
+				allowed[strings.TrimSpace(role.Slug)] = struct{}{}
+			}
+			for _, roleSlug := range selectedRoles {
+				if _, ok := allowed[strings.TrimSpace(roleSlug)]; !ok {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "role not found"})
+					return
+				}
+			}
+			isOrgAdmin := containsRole(selectedRoles, "org-admin")
+			businessRoles := make([]string, 0, len(selectedRoles))
+			for _, roleSlug := range selectedRoles {
+				if containsRole([]string{roleSlug}, "org-admin") || containsRole([]string{roleSlug}, "org_admin") {
+					isOrgAdmin = true
+					continue
+				}
+				businessRoles = append(businessRoles, roleSlug)
+			}
+
+			memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
+			if err != nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
+				return
+			}
+			for _, membership := range memberships {
+				if !strings.EqualFold(strings.TrimSpace(membership.Email), email) {
+					continue
+				}
+				if membership.Confirmed {
+					labels := make([]string, 0, len(businessRoles)+1)
+					for _, roleSlug := range businessRoles {
+						labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+					}
+					if isOrgAdmin {
+						labels = append(labels, identityOrgAdminLabel)
+					}
+					if _, err := s.identity.UpdateUserLabels(r.Context(), membership.UserID, labels); err != nil {
+						s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"})
+						return
+					}
+					s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+					return
+				}
+				if roleSlugsKey(append(append([]string{}, membership.RoleSlugs...), func() []string {
+					if membership.IsOrgAdmin {
+						return []string{"org-admin"}
+					}
+					return nil
+				}()...)) == roleSlugsKey(selectedRoles) {
+					s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+					return
+				}
+				sessionSecret, err := sessionSecretFromRequest(r)
+				if err != nil {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+				if _, err := s.identity.UpdateOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, membership.ID, businessRoles, isOrgAdmin); err != nil {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
+					return
+				}
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+				return
+			}
+
+			existingUser, err := s.identity.GetUserByEmail(r.Context(), email)
+			switch {
+			case err == nil && existingUser.OrgSlug != "" && !strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(admin.OrgSlug)):
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
+				return
+			case err == nil && strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(admin.OrgSlug)):
+				labels := make([]string, 0, len(businessRoles)+1)
+				for _, roleSlug := range businessRoles {
+					labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+				}
+				if isOrgAdmin {
+					labels = append(labels, identityOrgAdminLabel)
+				}
+				if _, err := s.identity.UpdateUserLabels(r.Context(), existingUser.ID, labels); err != nil {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"})
+					return
+				}
+				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+				return
+			case err != nil && !errors.Is(err, ErrIdentityNotFound):
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"})
+				return
+			}
+
+			sessionSecret, err := sessionSecretFromRequest(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if _, err := s.identity.InviteOrganizationUser(r.Context(), sessionSecret, admin.OrgSlug, email, inviteRedirectURL(r), businessRoles, isOrgAdmin); err != nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
+				return
+			}
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
+			return
+		}
 		for _, roleSlug := range selectedRoles {
 			if _, err := s.store.GetRoleBySlug(r.Context(), admin.OrgSlug, roleSlug); err != nil {
 				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "role not found"})
@@ -3541,6 +3695,61 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
 		if userMongoID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
+			return
+		}
+		if s.identity != nil {
+			memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
+			if err != nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+				return
+			}
+			var target *IdentityMembership
+			for idx := range memberships {
+				targetKey := strings.TrimSpace(memberships[idx].UserID)
+				if targetKey == "" {
+					targetKey = strings.TrimSpace(memberships[idx].Email)
+				}
+				if stableIdentityUserObjectID(targetKey).Hex() == userMongoID {
+					target = &memberships[idx]
+					break
+				}
+			}
+			if target == nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+				return
+			}
+			if stableIdentityUserObjectID(strings.TrimSpace(target.UserID)).Hex() == admin.ID.Hex() {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot delete yourself"})
+				return
+			}
+			sessionSecret, err := sessionSecretFromRequest(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if err := s.identity.DeleteOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, target.ID); err != nil {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
+				return
+			}
+			if strings.TrimSpace(target.UserID) != "" {
+				targetUser, getErr := s.identity.GetUserByID(r.Context(), target.UserID)
+				if getErr != nil && !errors.Is(getErr, ErrIdentityNotFound) {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
+					return
+				}
+				labels := make([]string, 0, len(targetUser.Labels))
+				for _, label := range targetUser.Labels {
+					if strings.HasPrefix(strings.TrimSpace(label), identityRoleLabelPrefix) || strings.EqualFold(strings.TrimSpace(label), identityOrgAdminLabel) {
+						continue
+					}
+					labels = append(labels, strings.TrimSpace(label))
+				}
+				if _, err := s.identity.UpdateUserLabels(r.Context(), target.UserID, labels); err != nil {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
+					return
+				}
+			}
+			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 			return
 		}
 		userMongoObjectID, err := primitive.ObjectIDFromHex(userMongoID)

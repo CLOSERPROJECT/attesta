@@ -241,6 +241,48 @@ func (a *appwriteIdentity) GetUserByID(ctx context.Context, userID string) (Iden
 	return identity, nil
 }
 
+func (a *appwriteIdentity) GetUserByEmail(ctx context.Context, email string) (IdentityUser, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityUser{}, err
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	userList, err := users.New(a.adminClient).List(users.New(a.adminClient).WithListSearch(email))
+	if err != nil {
+		return IdentityUser{}, normalizeIdentityError(err)
+	}
+	for _, user := range userList.Users {
+		if !strings.EqualFold(strings.TrimSpace(user.Email), email) {
+			continue
+		}
+		return a.GetUserByID(ctx, user.Id)
+	}
+	return IdentityUser{}, ErrIdentityNotFound
+}
+
+func (a *appwriteIdentity) InviteOrganizationUser(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityMembership{}, err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return IdentityMembership{}, err
+	}
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return IdentityMembership{}, err
+	}
+	membership, err := teams.New(sessionClient).CreateMembership(
+		strings.TrimSpace(org.ID),
+		encodeInviteMembershipRoles(roleSlugs, isOrgAdmin),
+		teams.New(sessionClient).WithCreateMembershipEmail(strings.ToLower(strings.TrimSpace(email))),
+		teams.New(sessionClient).WithCreateMembershipUrl(strings.TrimSpace(redirectURL)),
+	)
+	if err != nil {
+		return IdentityMembership{}, normalizeIdentityError(err)
+	}
+	return a.toIdentityMembership(ctx, membership, org), nil
+}
+
 func (a *appwriteIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -269,6 +311,9 @@ func (a *appwriteIdentity) ListOrganizationUsers(ctx context.Context, orgSlug st
 	}
 	usersForOrg := make([]IdentityUser, 0, len(membershipList.Memberships))
 	for _, membership := range membershipList.Memberships {
+		if !membership.Confirm {
+			continue
+		}
 		identity := IdentityUser{
 			ID:              strings.TrimSpace(membership.UserId),
 			Email:           strings.TrimSpace(membership.UserEmail),
@@ -294,6 +339,25 @@ func (a *appwriteIdentity) ListOrganizationUsers(ctx context.Context, orgSlug st
 		usersForOrg = append(usersForOrg, identity)
 	}
 	return usersForOrg, nil
+}
+
+func (a *appwriteIdentity) ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	membershipList, err := teams.New(a.adminClient).ListMemberships(strings.TrimSpace(org.ID))
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	memberships := make([]IdentityMembership, 0, len(membershipList.Memberships))
+	for _, membership := range membershipList.Memberships {
+		memberships = append(memberships, a.toIdentityMembership(ctx, &membership, org))
+	}
+	return memberships, nil
 }
 
 func (a *appwriteIdentity) GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error) {
@@ -356,6 +420,25 @@ func (a *appwriteIdentity) UpdateOrganization(ctx context.Context, sessionSecret
 	return updatedOrg, nil
 }
 
+func (a *appwriteIdentity) UpdateOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityMembership{}, err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return IdentityMembership{}, err
+	}
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return IdentityMembership{}, err
+	}
+	membership, err := teams.New(sessionClient).UpdateMembership(strings.TrimSpace(org.ID), strings.TrimSpace(membershipID), encodeInviteMembershipRoles(roleSlugs, isOrgAdmin))
+	if err != nil {
+		return IdentityMembership{}, normalizeIdentityError(err)
+	}
+	return a.toIdentityMembership(ctx, membership, org), nil
+}
+
 func (a *appwriteIdentity) UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
 	if err := ctx.Err(); err != nil {
 		return IdentityUser{}, err
@@ -376,6 +459,22 @@ func (a *appwriteIdentity) UpdateUserLabels(ctx context.Context, userID string, 
 		}
 	}
 	return identity, nil
+}
+
+func (a *appwriteIdentity) DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return err
+	}
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return err
+	}
+	_, err = teams.New(sessionClient).DeleteMembership(strings.TrimSpace(org.ID), strings.TrimSpace(membershipID))
+	return normalizeIdentityError(err)
 }
 
 func (a *appwriteIdentity) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {
@@ -564,6 +663,40 @@ func (a *appwriteIdentity) getOrganizationByTeamID(ctx context.Context, teamID s
 	}
 	org := decodeIdentityOrg(team)
 	return &org, nil
+}
+
+func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
+	if membership == nil {
+		return IdentityMembership{}
+	}
+	decodedRoles := decodeInviteMembershipRoles(membership.Roles)
+	identity := IdentityMembership{
+		ID:              strings.TrimSpace(membership.Id),
+		TeamID:          strings.TrimSpace(membership.TeamId),
+		UserID:          strings.TrimSpace(membership.UserId),
+		Email:           strings.TrimSpace(membership.UserEmail),
+		MembershipRoles: append([]string(nil), membership.Roles...),
+		RoleSlugs:       append([]string(nil), decodedRoles.BusinessRoles...),
+		IsOrgAdmin:      decodedRoles.IsOrgAdmin || hasMembershipRole(membership.Roles, identityMembershipOwnerRole),
+		Confirmed:       membership.Confirm,
+	}
+	if org != nil {
+		identity.TeamID = strings.TrimSpace(org.ID)
+	}
+	if invitedAt, err := parseAppwriteTime(membership.Invited); err == nil {
+		identity.InvitedAt = invitedAt
+	}
+	if joinedAt, err := parseAppwriteTime(membership.Joined); err == nil {
+		identity.JoinedAt = joinedAt
+	}
+	if identity.UserID != "" {
+		if user, err := a.GetUserByID(ctx, identity.UserID); err == nil {
+			identity.Email = user.Email
+			identity.RoleSlugs = decodeIdentityRoleLabels(user.Labels)
+			identity.IsOrgAdmin = user.IsOrgAdmin
+		}
+	}
+	return identity
 }
 
 func hasIdentityLabel(labels []string, want string) bool {

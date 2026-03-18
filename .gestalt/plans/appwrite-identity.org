@@ -182,7 +182,7 @@ Tests:
 Done when:
 - Roles live in Appwrite team prefs and user labels, and the org-admin screens still behave as they do today.
 
-** WIP [#A] Replace user invites and user lifecycle operations with Appwrite membership flows
+** DONE [#A] Replace user invites and user lifecycle operations with Appwrite membership flows
 Why: The user explicitly wants real invitation emails sent by Appwrite, triggered from Attesta UI, while user/org/role state must no longer live in Mongo.
 Change:
 - Remove `CreateInvite`, `LoadInviteByTokenHash`, `ListInvitesByCreator`, and `DisableUser` from the Mongo store path.
