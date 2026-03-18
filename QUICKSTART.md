@@ -27,6 +27,11 @@ After the compose stack is up:
 docker compose -f deployment/docker-compose.local.yaml up -d attesta
 ```
 
+## Migration Notes
+- Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
+- Existing Mongo invite and password-reset tokens are not migrated. Re-issue any still-needed invite or reset from the Appwrite-backed Attesta flows.
+- If you are cutting over an existing demo dataset, migrate organizations, roles, and active users into Appwrite before relying on `/org-admin/*`.
+
 ## Build frontend assets
 ```bash
 cd web

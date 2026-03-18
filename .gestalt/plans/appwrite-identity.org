@@ -344,7 +344,7 @@ Tests:
 Done when:
 - The repo’s Coolify compose can launch a functional Appwrite-backed Attesta stack without relying on out-of-band Appwrite services.
 
-* WIP [#A] Migrate actor identity, catalogs, docs, and rollout safely
+* DONE [#A] Migrate actor identity, catalogs, docs, and rollout safely
 Effort: M
 Goal: Existing process history remains readable, workflow validation keeps working, and deployment has a clear cutover sequence.
 Notes: This is the step that avoids silent regressions in timelines, DPP traceability, and operational setup.
@@ -370,7 +370,7 @@ Tests:
 Done when:
 - Historical process data still renders and newly completed substeps store non-Mongo actor IDs safely.
 
-** TODO [#B] Keep workflow validation and public catalog behavior aligned with Appwrite
+** DONE [#B] Keep workflow validation and public catalog behavior aligned with Appwrite
 Why: Workflow YAML remains validation-only, so Attesta must compare configured org/role slugs with Appwrite state instead of Mongo state.
 Change:
 - Update config validation paths in `server/cmd/server/main.go` to query Appwrite orgs/role catalogs when checking that configured org/role slugs exist.
@@ -382,7 +382,7 @@ Tests:
 Done when:
 - YAML remains authoritative for allowed references, but live org/role existence is checked against Appwrite instead of Mongo.
 
-** TODO [#B] Define rollout, migration, and operational prerequisites
+** DONE [#B] Define rollout, migration, and operational prerequisites
 Why: This is a breaking auth migration. Without an explicit cutover plan, existing users, invites, and orgs will drift or fail.
 Change:
 - Add deployment/env docs in:

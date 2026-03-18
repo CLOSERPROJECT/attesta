@@ -114,6 +114,26 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 6. Ensure workflow YAML org/role slugs match Appwrite teams and role catalogs.
 7. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
 
+## Appwrite Cutover
+Migration prerequisites:
+1. Provision the Appwrite project, platform entries, email templates, and the `org-assets` storage bucket.
+2. Export Mongo organizations, roles, and active users into Appwrite teams, team prefs, memberships, and labels.
+3. Manually bootstrap the first org-admin owner for each Appwrite team from the Appwrite Console.
+4. Deploy Attesta with `APPWRITE_*` env vars configured and the internal `/admin/orgs` flow removed.
+5. Invalidate old Mongo-backed sessions so users authenticate again through Appwrite.
+6. Expire old pending invite and password-reset tokens and re-issue them through Appwrite.
+
+Rollback note:
+- Rollback is only application-safe before Attesta starts writing auth and org mutations into Appwrite.
+- After cutover, rolling back Attesta code does not restore Mongo as the source of truth for users, invites, or memberships.
+
+Staging rehearsal:
+1. invited user acceptance
+2. self-signup when enabled
+3. org creation by an unassigned user
+4. org-admin invite from Attesta
+5. role edit and user removal
+
 ## Org admin edge cases
 - `Delete user` removes the Appwrite team membership and clears Attesta role labels, but does not delete the global Appwrite account.
 - Invite status is derived from Appwrite memberships:
