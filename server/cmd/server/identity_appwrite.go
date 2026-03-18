@@ -208,7 +208,7 @@ func toIdentityUser(user *models.User, memberships []models.Membership) Identity
 			identity.Status = "pending"
 		}
 	}
-	identity.IsOrgAdmin = hasIdentityLabel(identity.Labels, "attesta:org-admin") || hasMembershipRole(identity.MembershipRoles, "owner")
+	identity.IsOrgAdmin = hasIdentityLabel(identity.Labels, identityOrgAdminLabel) || hasMembershipRole(identity.MembershipRoles, identityMembershipOwnerRole)
 	return identity
 }
 
@@ -239,13 +239,7 @@ func decodeIdentityOrgs(teamList *models.TeamList) []IdentityOrg {
 	if err := teamList.Decode(&payload); err == nil {
 		orgs := make([]IdentityOrg, 0, len(payload.Teams))
 		for _, team := range payload.Teams {
-			orgs = append(orgs, IdentityOrg{
-				ID:         strings.TrimSpace(team.ID),
-				Slug:       strings.TrimSpace(team.ID),
-				Name:       strings.TrimSpace(team.Name),
-				LogoFileID: strings.TrimSpace(team.Prefs.LogoFileID),
-				Roles:      append([]IdentityRole(nil), team.Prefs.Roles...),
-			})
+			orgs = append(orgs, decodeIdentityOrgFromTeam(team.ID, team.Name, team.Prefs))
 		}
 		return orgs
 	}
@@ -269,13 +263,7 @@ func decodeIdentityOrg(team *models.Team) IdentityOrg {
 	}
 	var payload rawTeam
 	if err := team.Decode(&payload); err == nil {
-		return IdentityOrg{
-			ID:         strings.TrimSpace(team.Id),
-			Slug:       strings.TrimSpace(team.Id),
-			Name:       strings.TrimSpace(team.Name),
-			LogoFileID: strings.TrimSpace(payload.Prefs.LogoFileID),
-			Roles:      append([]IdentityRole(nil), payload.Prefs.Roles...),
-		}
+		return decodeIdentityOrgFromTeam(team.Id, team.Name, payload.Prefs)
 	}
 	return IdentityOrg{
 		ID:   strings.TrimSpace(team.Id),
