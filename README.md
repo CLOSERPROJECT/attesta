@@ -93,21 +93,32 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 - Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
 
 ## Deployment Checklist
-1. Set auth/bootstrap env vars:
-   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+1. Set Attesta auth env vars:
    - `ANYONE_CAN_CREATE_ACCOUNT` (recommended `false` in production)
-   - `SESSION_TTL_DAYS` and `COOKIE_SECURE=true` behind HTTPS
-2. Start services and verify Mongo + Cerbos health.
-3. Login as platform admin and create organizations.
-4. Create org admin invites, then create org roles/users from org admin pages.
-5. Ensure workflow YAML org/role slugs match Mongo entities.
-6. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
+   - `SESSION_TTL_DAYS`
+   - `COOKIE_SECURE=true` behind HTTPS
+2. Set Attesta Appwrite env vars:
+   - `APPWRITE_ENDPOINT`
+   - `APPWRITE_PROJECT_ID`
+   - `APPWRITE_API_KEY`
+   - `APPWRITE_INVITE_REDIRECT_URL`
+   - `APPWRITE_RESET_REDIRECT_URL`
+   - `APPWRITE_ORG_ASSETS_BUCKET`
+3. Start services and verify Mongo + Cerbos health.
+4. Bootstrap Appwrite from the Console:
+   - create the first console account
+   - create the Attesta project
+   - create the Attesta API key
+   - create the org assets storage bucket
+5. Create organizations and first org-admin memberships in Appwrite, then manage roles and users from Attesta `/org-admin/*`.
+6. Ensure workflow YAML org/role slugs match Appwrite teams and role catalogs.
+7. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
 
 ## Org admin edge cases
-- `Delete account` is a soft delete: the backend sets `status=deleted`, clears `passwordHash`, and clears `roleSlugs`.
-- Invite status is derived from invite timestamps:
-  - `accepted` when `usedAt` is present
-  - `expired` when `usedAt` is empty and `expiresAt` is in the past
+- `Delete user` removes the Appwrite team membership and clears Attesta role labels, but does not delete the global Appwrite account.
+- Invite status is derived from Appwrite memberships:
+  - `accepted` when the membership is active
+  - `expired` when the membership is no longer usable before acceptance
   - `pending` otherwise
 - Inviting an email that already belongs to another organization is rejected.
 

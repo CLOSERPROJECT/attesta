@@ -1,3 +1,8 @@
+include:
+  - path: ./appwrite/docker-compose.appwrite.yaml
+    env_file:
+      - ./appwrite/.env.appwrite.example
+
 services:
   mongodb:
     image: mongo:7.0
@@ -38,11 +43,21 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017
       CERBOS_URL: http://cerbos:3592
+      APPWRITE_ENDPOINT: http://appwrite/v1
+      APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-local-dev-project}
+      APPWRITE_API_KEY: ${APPWRITE_API_KEY:-replace-me-after-appwrite-bootstrap}
+      APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3030/invite/accept}
+      APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3030/reset/confirm}
+      APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
     ports:
       - "3030:3000"
+    networks:
+      - default
+      - appwrite
     depends_on:
       - mongodb
       - cerbos
+      - appwrite
 
 volumes:
   mongodb_data:

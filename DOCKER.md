@@ -1,6 +1,6 @@
 # Docker Compose Setup
 
-This demo uses Docker Compose to run MongoDB and Cerbos (plus an optional Mongo Express UI).
+This demo uses Docker Compose to run MongoDB, Cerbos, Appwrite, and Attesta.
 All Docker-related files live under `deployment/`.
 
 ## Services
@@ -11,10 +11,16 @@ All Docker-related files live under `deployment/`.
 - **Auth**: Disabled for local demo simplicity
 
 ### Cerbos Policy Engine
-- **Image**: `ghcr.io/cerbos/cerbos:0.39.0`
+- **Image**: `ghcr.io/cerbos/cerbos:0.50.0`
 - **HTTP Port**: 3592
 - **Config**: `cerbos/config/config.yaml`
 - **Policies**: `cerbos/policies/*.yaml`
+
+### Appwrite
+- **Baseline**: `deployment/appwrite/docker-compose.appwrite.yaml`
+- **Env template**: `deployment/appwrite/.env.appwrite.example`
+- **HTTP entrypoint**: `http://localhost`
+- **Purpose**: identity, teams, memberships, labels, and org asset storage
 
 ### Mongo Express (optional)
 - **Image**: `mongo-express:1.0.2`
@@ -32,7 +38,15 @@ docker compose -f deployment/docker-compose.local.yaml up -d
 ```
 
 Open:
+- Appwrite Console: http://localhost
 - App: http://localhost:3030
+
+After first boot:
+1. Create the first Appwrite console account.
+2. Create the Attesta Appwrite project.
+3. Create an API key for Attesta.
+4. Create the `org-assets` bucket.
+5. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then restart Attesta.
 
 ## Verifying the Setup
 ```bash
@@ -50,7 +64,8 @@ docker compose -f deployment/docker-compose.local.yaml down -v
 
 ## Coolify
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
-`deployment/docker-compose.coolify.yaml`).
+`deployment/docker-compose.coolify.yaml`). The Coolify stack will include the
+vendored Appwrite module instead of assuming an external identity deployment.
 
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed

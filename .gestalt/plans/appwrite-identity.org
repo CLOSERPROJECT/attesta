@@ -288,7 +288,7 @@ Tests:
 Done when:
 - The repo contains a pinned, reviewable Appwrite deployment module instead of an underspecified single-container placeholder.
 
-** TODO [#A] Update local compose to start Attesta and Appwrite together
+** DONE [#A] Update local compose to start Attesta and Appwrite together
 Why: `deployment/docker-compose.local.yaml` currently starts Mongo, Cerbos, Mongo Express, and Attesta only. Local Appwrite development should be one repo command, not a manual second stack.
 Change:
 - Update `deployment/docker-compose.local.yaml` to include or merge the vendored Appwrite deployment module rather than inlining the full Appwrite service graph by hand.
