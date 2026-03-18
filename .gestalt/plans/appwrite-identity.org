@@ -264,12 +264,12 @@ Tests:
 Done when:
 - Mongo storage is no longer responsible for identity concerns and test helpers reflect that split.
 
-* TODO [#A] Package Appwrite for local and Coolify deployments
+* WIP [#A] Package Appwrite for local and Coolify deployments
 Effort: M
 Goal: The repository-managed Docker Compose definitions can start Attesta together with a supported Appwrite stack and the dependencies Appwrite requires.
 Notes: Do not hand-author a partial Appwrite topology inside the existing compose files. Vendor the official Appwrite self-hosting stack under `deployment/` and keep Attesta-specific wiring as a thin wrapper so upgrades remain explicit and diffable.
 
-** TODO [#A] Vendor the Appwrite stack as a pinned deployment module
+** DONE [#A] Vendor the Appwrite stack as a pinned deployment module
 Why: Appwrite self-hosting is a multi-service system. Adding only an `appwrite` container to Attesta’s compose files would produce a broken deployment plan and hide upgrade risk.
 Change:
 - Add a dedicated deployment module, for example:
