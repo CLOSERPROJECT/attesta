@@ -221,10 +221,9 @@ func TestReadSessionAndCurrentUserLegacy(t *testing.T) {
 func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 	orgID := primitive.NewObjectID()
 	admin := &AccountUser{
-		IsPlatformAdmin: true,
-		RoleSlugs:       []string{"org-admin"},
-		OrgSlug:         "acme",
-		OrgID:           &orgID,
+		RoleSlugs: []string{"org-admin"},
+		OrgSlug:   "acme",
+		OrgID:     &orgID,
 	}
 	if !userIsOrgAdmin(admin) {
 		t.Fatal("expected org admin user")
@@ -232,8 +231,8 @@ func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 
 	baseServer := &Server{}
 	page := baseServer.pageBaseForUser(admin, "dashboard_body", "workflow", "Workflow")
-	if !page.ShowOrgsLink || !page.ShowMyOrgLink {
-		t.Fatalf("expected both nav flags true, got %+v", page)
+	if !page.ShowMyOrgLink {
+		t.Fatalf("expected my-org nav flag, got %+v", page)
 	}
 
 	unassigned := &AccountUser{
@@ -252,7 +251,7 @@ func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
 		t.Fatal("expected non org admin user")
 	}
 	page2 := baseServer.pageBaseForUser(non, "dashboard_body", "", "")
-	if page2.ShowOrgsLink || page2.ShowMyOrgLink {
+	if page2.ShowMyOrgLink {
 		t.Fatalf("expected nav flags false, got %+v", page2)
 	}
 

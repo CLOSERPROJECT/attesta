@@ -707,35 +707,11 @@ func main() {
 	if err := ensureStoreIndexes(ctx, server.store); err != nil {
 		log.Printf("warning: failed to ensure auth indexes: %v", err)
 	}
-	if err := bootstrapPlatformAdmin(ctx, server.store, server.now); err != nil {
-		log.Fatal(err)
-	}
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
-	mux.HandleFunc("/docs", server.handleDocs)
-	mux.HandleFunc("/docs/", server.handleDocs)
-	mux.HandleFunc("/api/catalog", server.handlePublicCatalog)
-	mux.HandleFunc("/01/", server.handleDigitalLinkDPP)
-	mux.HandleFunc("/login", server.handleLogin)
-	mux.HandleFunc("/signup", server.handleSignup)
-	mux.HandleFunc("/logout", server.handleLogout)
-	mux.HandleFunc("/invite/", server.handleInvite)
-	mux.HandleFunc("/reset", server.handleResetRequest)
-	mux.HandleFunc("/reset/", server.handleResetSet)
-	mux.HandleFunc("/admin/orgs", server.handleAdminOrgs)
-	mux.HandleFunc("/admin/orgs/", server.handleAdminOrgs)
-	mux.HandleFunc("/org-admin/roles", server.handleOrgAdminRoles)
-	mux.HandleFunc("/org-admin/logo/", server.handleOrgAdminLogo)
-	mux.HandleFunc("/org-admin/users", server.handleOrgAdminUsers)
-	mux.HandleFunc("/org-admin/formata-builder", server.handleOrgAdminFormataBuilder)
-	mux.HandleFunc("/org-admin/formata-builder/", server.handleOrgAdminFormataBuilder)
-	mux.HandleFunc("/w/", server.handleWorkflowRoutes)
-	mux.HandleFunc("/", server.handleHome)
-	mux.HandleFunc("/events", server.handleEvents)
+	mux := server.newMux()
 
 	addr := ":3000"
 	log.Printf("server listening on %s", addr)
@@ -1095,7 +1071,6 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	}
 	base.UserEmail = strings.TrimSpace(user.Email)
 	base.ShowLogout = s.enforceAuth
-	base.ShowOrgsLink = user.IsPlatformAdmin
 	base.ShowMyOrgLink = userIsOrgAdmin(user)
 	return base
 }
@@ -1409,7 +1384,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		WorkflowPickerView: WorkflowPickerView{
 			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows:            options,
-			ShowCreateStreamCard: userIsOrgAdmin(user) && !user.IsPlatformAdmin,
+			ShowCreateStreamCard: userIsOrgAdmin(user),
 		},
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
@@ -1547,11 +1522,35 @@ func (s *Server) requireOrgOrPlatformAdminAPI(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return nil, false
 	}
-	if user != nil && (user.IsPlatformAdmin || userIsOrgAdmin(user)) {
+	if user != nil && userIsOrgAdmin(user) {
 		return user, true
 	}
 	http.Error(w, "forbidden", http.StatusForbidden)
 	return nil, false
+}
+
+func (s *Server) newMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
+	mux.HandleFunc("/docs", s.handleDocs)
+	mux.HandleFunc("/docs/", s.handleDocs)
+	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
+	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
+	mux.HandleFunc("/login", s.handleLogin)
+	mux.HandleFunc("/signup", s.handleSignup)
+	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/invite/", s.handleInvite)
+	mux.HandleFunc("/reset", s.handleResetRequest)
+	mux.HandleFunc("/reset/", s.handleResetSet)
+	mux.HandleFunc("/org-admin/roles", s.handleOrgAdminRoles)
+	mux.HandleFunc("/org-admin/logo/", s.handleOrgAdminLogo)
+	mux.HandleFunc("/org-admin/users", s.handleOrgAdminUsers)
+	mux.HandleFunc("/org-admin/formata-builder", s.handleOrgAdminFormataBuilder)
+	mux.HandleFunc("/org-admin/formata-builder/", s.handleOrgAdminFormataBuilder)
+	mux.HandleFunc("/w/", s.handleWorkflowRoutes)
+	mux.HandleFunc("/", s.handleHome)
+	mux.HandleFunc("/events", s.handleEvents)
+	return mux
 }
 
 func openAPIDocCandidates(filename string) []string {
@@ -2840,12 +2839,12 @@ func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, no
 			usedAt = &joinedAt
 		}
 		orgInvites = append(orgInvites, OrgAdminInviteRow{
-			Email:      membership.Email,
-			RoleSlugs:  roleSlugs,
-			CreatedAt:  membership.InvitedAt,
-			ExpiresAt:  expiresAt,
-			UsedAt:     usedAt,
-			Status:     status,
+			Email:     membership.Email,
+			RoleSlugs: roleSlugs,
+			CreatedAt: membership.InvitedAt,
+			ExpiresAt: expiresAt,
+			UsedAt:    usedAt,
+			Status:    status,
 		})
 	}
 	return orgInvites
@@ -3153,83 +3152,33 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 	if intent == "" {
 		intent = "invite"
 	}
-		if !userHasOrganizationContext(admin) {
-			if intent != "create_org" {
-				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "create organization first"})
-				return
-			}
+	if !userHasOrganizationContext(admin) {
+		if intent != "create_org" {
+			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "create organization first"})
+			return
+		}
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization name is required"})
 			return
-			}
-			orgSlug := canonifySlug(name)
-			if s.identity != nil {
-				if existing, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
-					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
-					return
-				}
-				logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
-				if logoErrMsg != "" {
-					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
-					return
-				}
-				sessionSecret, err := sessionSecretFromRequest(r)
-				if err != nil {
-					http.Error(w, "unauthorized", http.StatusUnauthorized)
-					return
-				}
-				createdOrg, err := s.identity.CreateOrganization(r.Context(), sessionSecret, name)
-				if err != nil {
-					if isDuplicateSlugError(err) {
-						s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
-						return
-					}
-					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
-					return
-				}
-				if logoUpload != nil {
-					logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), createdOrg.Slug, IdentityFile{
-						Filename:    logoUpload.Filename,
-						ContentType: logoUpload.ContentType,
-						Data:        logoUpload.Data,
-					})
-					if err != nil {
-						s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to upload logo"})
-						return
-					}
-					createdOrg, err = s.identity.UpdateOrganization(r.Context(), sessionSecret, createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles)
-					if err != nil {
-						s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update organization"})
-						return
-					}
-				}
-				if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
-					s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
-					return
-				}
-				updatedAdmin := *admin
-				orgID := stableOrgObjectID(createdOrg.Slug)
-				updatedAdmin.OrgID = &orgID
-				updatedAdmin.OrgSlug = createdOrg.Slug
-				updatedAdmin.RoleSlugs = canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
-				s.renderOrgAdmin(w, &updatedAdmin, createdOrg.Slug, "", "")
-				return
-			}
-			if existing, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
+		}
+		orgSlug := canonifySlug(name)
+		if s.identity != nil {
+			if existing, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
 				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
 				return
 			}
-			logoAttachmentID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, orgSlug)
+			logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
 			if logoErrMsg != "" {
 				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
 				return
 			}
-			createdOrg, err := s.store.CreateOrganization(r.Context(), Organization{
-				Name:             name,
-				LogoAttachmentID: logoAttachmentID,
-				CreatedAt:        s.nowUTC(),
-			})
+			sessionSecret, err := sessionSecretFromRequest(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			createdOrg, err := s.identity.CreateOrganization(r.Context(), sessionSecret, name)
 			if err != nil {
 				if isDuplicateSlugError(err) {
 					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
@@ -3238,38 +3187,88 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
 				return
 			}
-			if _, roleErr := s.store.GetRoleBySlug(r.Context(), createdOrg.Slug, "org-admin"); roleErr != nil {
-				if _, createRoleErr := s.store.CreateRole(r.Context(), Role{
-					OrgID:     createdOrg.ID,
-					OrgSlug:   createdOrg.Slug,
-					Slug:      "org-admin",
-					Name:      "Org Admin",
-					CreatedAt: s.nowUTC(),
-				}); createRoleErr != nil && !isDuplicateSlugError(createRoleErr) {
-					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create role"})
+			if logoUpload != nil {
+				logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), createdOrg.Slug, IdentityFile{
+					Filename:    logoUpload.Filename,
+					ContentType: logoUpload.ContentType,
+					Data:        logoUpload.Data,
+				})
+				if err != nil {
+					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to upload logo"})
+					return
+				}
+				createdOrg, err = s.identity.UpdateOrganization(r.Context(), sessionSecret, createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles)
+				if err != nil {
+					s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update organization"})
 					return
 				}
 			}
-			if err := s.store.SetUserOrganization(r.Context(), admin.ID, createdOrg.ID, createdOrg.Slug); err != nil {
-				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to update organization"})
+			if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
+				s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
 				return
 			}
-			mergedRoles := canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
-			if err := s.store.SetUserRoles(r.Context(), admin.ID, mergedRoles); err != nil {
-				s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update user roles"})
-				return
-			}
-			updatedAdmin, _ := s.store.GetUserByMongoID(r.Context(), admin.ID)
-			if updatedAdmin == nil {
-				updatedAdmin = admin
-				orgID := createdOrg.ID
-				updatedAdmin.OrgID = &orgID
-				updatedAdmin.OrgSlug = createdOrg.Slug
-				updatedAdmin.RoleSlugs = mergedRoles
-			}
-			s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
+			updatedAdmin := *admin
+			orgID := stableOrgObjectID(createdOrg.Slug)
+			updatedAdmin.OrgID = &orgID
+			updatedAdmin.OrgSlug = createdOrg.Slug
+			updatedAdmin.RoleSlugs = canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
+			s.renderOrgAdmin(w, &updatedAdmin, createdOrg.Slug, "", "")
 			return
 		}
+		if existing, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
+			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
+			return
+		}
+		logoAttachmentID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, orgSlug)
+		if logoErrMsg != "" {
+			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
+			return
+		}
+		createdOrg, err := s.store.CreateOrganization(r.Context(), Organization{
+			Name:             name,
+			LogoAttachmentID: logoAttachmentID,
+			CreatedAt:        s.nowUTC(),
+		})
+		if err != nil {
+			if isDuplicateSlugError(err) {
+				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
+				return
+			}
+			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
+			return
+		}
+		if _, roleErr := s.store.GetRoleBySlug(r.Context(), createdOrg.Slug, "org-admin"); roleErr != nil {
+			if _, createRoleErr := s.store.CreateRole(r.Context(), Role{
+				OrgID:     createdOrg.ID,
+				OrgSlug:   createdOrg.Slug,
+				Slug:      "org-admin",
+				Name:      "Org Admin",
+				CreatedAt: s.nowUTC(),
+			}); createRoleErr != nil && !isDuplicateSlugError(createRoleErr) {
+				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create role"})
+				return
+			}
+		}
+		if err := s.store.SetUserOrganization(r.Context(), admin.ID, createdOrg.ID, createdOrg.Slug); err != nil {
+			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to update organization"})
+			return
+		}
+		mergedRoles := canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
+		if err := s.store.SetUserRoles(r.Context(), admin.ID, mergedRoles); err != nil {
+			s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update user roles"})
+			return
+		}
+		updatedAdmin, _ := s.store.GetUserByMongoID(r.Context(), admin.ID)
+		if updatedAdmin == nil {
+			updatedAdmin = admin
+			orgID := createdOrg.ID
+			updatedAdmin.OrgID = &orgID
+			updatedAdmin.OrgSlug = createdOrg.Slug
+			updatedAdmin.RoleSlugs = mergedRoles
+		}
+		s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
+		return
+	}
 
 	switch intent {
 	case "create_org":

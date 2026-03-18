@@ -162,26 +162,6 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		}
 	})
 
-	t.Run("platform admin get is forbidden", func(t *testing.T) {
-		platformAdmin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-builder-get@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser platform admin error: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store, platformAdmin)
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-		rec := httptest.NewRecorder()
-		server.handleOrgAdminFormataBuilder(rec, req)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-		}
-	})
-
 	t.Run("method not allowed", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/org-admin/formata-builder", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
@@ -223,17 +203,6 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		t.Fatalf("CreateUser org-admin error: %v", err)
 	}
 	orgAdminSession := createSessionForTestUser(t, store, orgAdmin)
-
-	platformAdmin, err := store.CreateUser(t.Context(), AccountUser{
-		Email:           "platform-builder-post@example.com",
-		IsPlatformAdmin: true,
-		Status:          "active",
-		CreatedAt:       time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser platform admin error: %v", err)
-	}
-	platformSession := createSessionForTestUser(t, store, platformAdmin)
 
 	t.Run("unauthenticated is unauthorized", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("stream"))
@@ -291,26 +260,6 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
-		}
-	})
-
-	t.Run("platform admin can save stream", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader(`{"nodes":[1]}`))
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformSession})
-		rec := httptest.NewRecorder()
-		server.handleOrgAdminFormataBuilder(rec, req)
-		if rec.Code != http.StatusNoContent {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
-		}
-		stream, err := store.LoadFormataBuilderStream(t.Context())
-		if err != nil {
-			t.Fatalf("LoadFormataBuilderStream error: %v", err)
-		}
-		if stream.Stream != `{"nodes":[1]}` {
-			t.Fatalf("stream = %q, want %q", stream.Stream, `{"nodes":[1]}`)
-		}
-		if stream.UpdatedByUserMongoID != platformAdmin.ID {
-			t.Fatalf("updatedByUserMongoID = %s, want %s", stream.UpdatedByUserMongoID.Hex(), platformAdmin.ID.Hex())
 		}
 	})
 

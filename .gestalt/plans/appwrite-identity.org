@@ -216,7 +216,7 @@ Effort: M
 Goal: The app no longer exposes platform-admin features or stores auth/org state in Mongo, but it still works for normal users and org admins.
 Notes: The person with Appwrite Console access becomes the bootstrap operator outside Attesta. This is a deliberate product change, not an implementation detail.
 
-** WIP [#A] Delete the platform-admin route/UI path and simplify topbar behavior
+** DONE [#A] Delete the platform-admin route/UI path and simplify topbar behavior
 Why: The user explicitly said platform admin is no longer needed inside Attesta.
 Change:
 - Remove route registration for `/admin/orgs` from `server/cmd/server/main.go`.
@@ -243,7 +243,7 @@ Tests:
 Done when:
 - There is no Attesta platform-admin path, UI link, or bootstrap env dependency left.
 
-** TODO [#A] Strip auth/org persistence out of the Mongo store and test helpers
+** WIP [#A] Strip auth/org persistence out of the Mongo store and test helpers
 Why: Leaving dead auth/org persistence in `store.go` would mislead future work and make the server look half-migrated.
 Change:
 - Reduce `server/cmd/server/store.go` to workflow/process/attachment/formata responsibilities.

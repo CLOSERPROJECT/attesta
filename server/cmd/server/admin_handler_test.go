@@ -2448,7 +2448,7 @@ func TestHandleOrgAdminUsersIntentErrorPaths(t *testing.T) {
 	})
 }
 
-func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
+func TestHandleAdminOrgsGetDoesNotShowOrgsNav(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.CreateUser(t.Context(), AccountUser{
 		Email:           "platform-nav@example.com",
@@ -2470,8 +2470,8 @@ func TestHandleAdminOrgsGetShowsOrgsNav(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if !strings.Contains(rec.Body.String(), "NAV Home Backoffice Orgs |") {
-		t.Fatalf("expected Orgs nav marker, got %q", rec.Body.String())
+	if strings.Contains(rec.Body.String(), "NAV Home Backoffice Orgs |") {
+		t.Fatalf("did not expect Orgs nav marker, got %q", rec.Body.String())
 	}
 }
 

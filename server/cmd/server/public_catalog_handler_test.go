@@ -206,12 +206,12 @@ func TestHandlePublicCatalogAuthz(t *testing.T) {
 		}
 	})
 
-	t.Run("platform admin allowed", func(t *testing.T) {
+	t.Run("org admin allowed", func(t *testing.T) {
 		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-catalog@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
+			Email:     "org-admin-catalog@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatalf("CreateUser error: %v", err)
@@ -235,10 +235,10 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 			failListRolesByOrg:    false,
 		}
 		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-list-orgs-catalog@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
+			Email:     "org-admin-list-orgs-catalog@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatalf("CreateUser: %v", err)
@@ -265,10 +265,10 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 			t.Fatalf("CreateOrganization: %v", err)
 		}
 		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-list-roles-catalog@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
+			Email:     "org-admin-list-roles-catalog@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatalf("CreateUser: %v", err)
@@ -290,10 +290,10 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 		base := NewMemoryStore()
 		store := &publicCatalogFailingStore{MemoryStore: base}
 		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-stream-catalog@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
+			Email:     "org-admin-stream-catalog@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatalf("CreateUser: %v", err)
@@ -343,10 +343,10 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 		base := NewMemoryStore()
 		store := &publicCatalogFailingStore{MemoryStore: base, failLoadStream: true}
 		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-stream-error-catalog@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
+			Email:     "org-admin-stream-error-catalog@example.com",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatalf("CreateUser: %v", err)
