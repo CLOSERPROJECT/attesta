@@ -3,6 +3,7 @@ module github.com/CLOSERPROJECT/attesta/server
 go 1.25
 
 require (
+	github.com/appwrite/sdk-for-go v1.0.0
 	go.mongodb.org/mongo-driver v1.17.1
 	goa.design/goa/v3 v3.24.3
 	golang.org/x/crypto v0.26.0
