@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,6 +73,137 @@ func TestAppwriteIdentityCreateEmailPasswordSession(t *testing.T) {
 	}
 	if !session.ExpiresAt.Equal(time.Date(2026, time.March, 18, 10, 11, 12, 0, time.UTC)) {
 		t.Fatalf("expires at = %s", session.ExpiresAt)
+	}
+}
+
+func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
+	t.Setenv("APPWRITE_ORG_ASSETS_BUCKET", "org-assets")
+
+	var createTeamBody map[string]interface{}
+	var updateNameBody map[string]interface{}
+	var updatePrefsBodies []map[string]interface{}
+	var updatedLabelsBody map[string]interface{}
+	var createFileCalled bool
+	var createFileContentType string
+	var createFileBody []byte
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams":
+			if err := json.NewDecoder(r.Body).Decode(&createTeamBody); err != nil {
+				t.Fatalf("decode create team: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"fresh-org","name":"Fresh Org","prefs":{"schemaVersion":1,"slug":"fresh-org"}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/account":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":[]}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/users/user-1/labels":
+			if err := json.NewDecoder(r.Body).Decode(&updatedLabelsBody); err != nil {
+				t.Fatalf("decode labels: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attesta:org-admin"]}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/fresh-org/prefs":
+			var body map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode prefs: %v", err)
+			}
+			updatePrefsBodies = append(updatePrefsBodies, body)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"schemaVersion":1,"slug":"fresh-org"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/fresh-org":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"fresh-org","name":"Fresh Org","prefs":{"schemaVersion":1,"slug":"fresh-org","roles":[{"slug":"qa-reviewer","name":"QA Reviewer"}]}}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/fresh-org":
+			if err := json.NewDecoder(r.Body).Decode(&updateNameBody); err != nil {
+				t.Fatalf("decode update team: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"fresh-org","name":"Updated Org"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/storage/buckets/org-assets/files/logo-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"logo-1","name":"logo.png","mimeType":"image/png"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/storage/buckets/org-assets/files/logo-1/view":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write([]byte("PNG"))
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/storage/buckets/org-assets/files/"):
+			http.NotFound(w, r)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/storage/buckets/org-assets/files":
+			createFileCalled = true
+			createFileContentType = r.Header.Get("Content-Type")
+			var err error
+			createFileBody, err = io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("read upload body: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$id":"logo-1","name":"logo.png","mimeType":"image/png"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	createdOrg, err := identity.CreateOrganization(context.Background(), "session-secret", "Fresh Org")
+	if err != nil {
+		t.Fatalf("CreateOrganization error: %v", err)
+	}
+	if createdOrg.Slug != "fresh-org" || createdOrg.Name != "Fresh Org" {
+		t.Fatalf("created org = %#v", createdOrg)
+	}
+	if createTeamBody["teamId"] != "fresh-org" || createTeamBody["name"] != "Fresh Org" {
+		t.Fatalf("create team body = %#v", createTeamBody)
+	}
+	labels, _ := updatedLabelsBody["labels"].([]interface{})
+	if len(labels) != 1 || labels[0] != identityOrgAdminLabel {
+		t.Fatalf("labels body = %#v", updatedLabelsBody)
+	}
+
+	uploadedLogo, err := identity.UploadOrganizationLogo(context.Background(), "fresh-org", IdentityFile{
+		Filename:    "logo.png",
+		ContentType: "image/png",
+		Data:        []byte("PNG"),
+	})
+	if err != nil {
+		t.Fatalf("UploadOrganizationLogo error: %v", err)
+	}
+	if !createFileCalled || uploadedLogo.ID != "logo-1" {
+		t.Fatalf("upload result = %#v called=%v", uploadedLogo, createFileCalled)
+	}
+	if createFileContentType == "" || !strings.HasPrefix(createFileContentType, "multipart/form-data") {
+		t.Fatalf("upload content type = %q", createFileContentType)
+	}
+	if !strings.Contains(string(createFileBody), "logo.png") {
+		t.Fatalf("upload body = %q", string(createFileBody))
+	}
+
+	updatedOrg, err := identity.UpdateOrganization(context.Background(), "session-secret", "fresh-org", "Updated Org", uploadedLogo.ID, []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer"}})
+	if err != nil {
+		t.Fatalf("UpdateOrganization error: %v", err)
+	}
+	if updatedOrg.Slug != "updated-org" || updatedOrg.LogoFileID != "logo-1" {
+		t.Fatalf("updated org = %#v", updatedOrg)
+	}
+	if updateNameBody["name"] != "Updated Org" {
+		t.Fatalf("update name body = %#v", updateNameBody)
+	}
+	if len(updatePrefsBodies) != 2 {
+		t.Fatalf("prefs calls = %d, want 2", len(updatePrefsBodies))
+	}
+	prefs, _ := updatePrefsBodies[1]["prefs"].(map[string]interface{})
+	if prefs["slug"] != "updated-org" || prefs["logoFileId"] != "logo-1" {
+		t.Fatalf("update prefs body = %#v", updatePrefsBodies[1])
+	}
+
+	logo, err := identity.GetOrganizationLogo(context.Background(), "logo-1")
+	if err != nil {
+		t.Fatalf("GetOrganizationLogo error: %v", err)
+	}
+	if logo.Filename != "logo.png" || logo.ContentType != "image/png" || string(logo.Data) != "PNG" {
+		t.Fatalf("logo = %#v", logo)
 	}
 }
 
@@ -165,7 +298,13 @@ func TestAppwriteIdentityGetCurrentUserHydratesMembership(t *testing.T) {
 						"confirm":true,
 						"roles":["owner","member"]
 					}
-				]
+					]
+				}`))
+		case "/v1/teams/acme":
+			_, _ = w.Write([]byte(`{
+				"$id":"acme",
+				"name":"Acme Org",
+				"prefs":{"schemaVersion":1,"slug":"acme"}
 			}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)

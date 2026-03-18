@@ -44,15 +44,20 @@ func decodeIdentityRoleLabels(labels []string) []string {
 func encodeIdentityOrgPrefs(org IdentityOrg) appwriteTeamPrefs {
 	return appwriteTeamPrefs{
 		SchemaVersion: identityTeamPrefsSchemaVersion,
+		Slug:          strings.TrimSpace(org.Slug),
 		LogoFileID:    strings.TrimSpace(org.LogoFileID),
 		Roles:         append([]IdentityRole(nil), org.Roles...),
 	}
 }
 
 func decodeIdentityOrgFromTeam(id, name string, prefs appwriteTeamPrefs) IdentityOrg {
+	slug := strings.TrimSpace(prefs.Slug)
+	if slug == "" {
+		slug = strings.TrimSpace(id)
+	}
 	return IdentityOrg{
 		ID:         strings.TrimSpace(id),
-		Slug:       strings.TrimSpace(id),
+		Slug:       slug,
 		Name:       strings.TrimSpace(name),
 		LogoFileID: strings.TrimSpace(prefs.LogoFileID),
 		Roles:      append([]IdentityRole(nil), prefs.Roles...),

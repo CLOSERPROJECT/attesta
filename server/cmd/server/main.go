@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -508,6 +509,12 @@ type OrgAdminInviteRow struct {
 	Status     string
 }
 
+type organizationLogoUpload struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
 func roleSlugsKey(roleSlugs []string) string {
 	canon := canonifyRoleSlugs(roleSlugs)
 	sorted := append([]string(nil), canon...)
@@ -850,6 +857,18 @@ func (s *Server) readSession(r *http.Request) (*IdentitySession, error) {
 	}, nil
 }
 
+func sessionSecretFromRequest(r *http.Request) (string, error) {
+	cookie, err := r.Cookie("attesta_session")
+	if err != nil {
+		return "", err
+	}
+	secret := strings.TrimSpace(cookie.Value)
+	if secret == "" {
+		return "", ErrIdentityUnauthorized
+	}
+	return secret, nil
+}
+
 func (s *Server) currentUser(r *http.Request) (*AccountUser, *IdentitySession, error) {
 	session, err := s.readSession(r)
 	if err != nil {
@@ -911,10 +930,15 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
 	}
 	user := &AccountUser{
+		ID:        stableIdentityUserObjectID(identityUser.ID),
 		Email:     strings.TrimSpace(identityUser.Email),
 		OrgSlug:   strings.TrimSpace(identityUser.OrgSlug),
 		RoleSlugs: roleSlugs,
 		Status:    strings.TrimSpace(identityUser.Status),
+	}
+	if user.OrgSlug != "" {
+		orgID := stableOrgObjectID(user.OrgSlug)
+		user.OrgID = &orgID
 	}
 	if user.Status == "" {
 		user.Status = "active"
@@ -929,6 +953,8 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 	legacy := *legacyUser
 	legacy.Email = user.Email
 	if user.OrgSlug != "" {
+		orgID := stableOrgObjectID(user.OrgSlug)
+		legacy.OrgID = &orgID
 		legacy.OrgSlug = user.OrgSlug
 	}
 	legacy.RoleSlugs = append([]string(nil), user.RoleSlugs...)
@@ -2226,6 +2252,59 @@ func accountActorID(user *AccountUser) string {
 	return user.ID.Hex()
 }
 
+func stableObjectID(seed string) primitive.ObjectID {
+	sum := sha1.Sum([]byte(strings.TrimSpace(seed)))
+	var id primitive.ObjectID
+	copy(id[:], sum[:len(id)])
+	return id
+}
+
+func stableOrgObjectID(slug string) primitive.ObjectID {
+	return stableObjectID("org:" + canonifySlug(slug))
+}
+
+func stableIdentityUserObjectID(userID string) primitive.ObjectID {
+	return stableObjectID("identity-user:" + strings.TrimSpace(userID))
+}
+
+func organizationFromIdentityOrg(org IdentityOrg) Organization {
+	return Organization{
+		ID:               stableOrgObjectID(org.Slug),
+		Slug:             strings.TrimSpace(org.Slug),
+		Name:             strings.TrimSpace(org.Name),
+		LogoAttachmentID: strings.TrimSpace(org.LogoFileID),
+	}
+}
+
+func rolesFromIdentityOrg(org IdentityOrg) []Role {
+	orgID := stableOrgObjectID(org.Slug)
+	roles := make([]Role, 0, len(org.Roles))
+	for _, role := range org.Roles {
+		roles = append(roles, Role{
+			OrgID:   orgID,
+			OrgSlug: strings.TrimSpace(org.Slug),
+			Slug:    strings.TrimSpace(role.Slug),
+			Name:    strings.TrimSpace(role.Name),
+			Color:   strings.TrimSpace(role.Color),
+			Border:  strings.TrimSpace(role.Border),
+		})
+	}
+	return roles
+}
+
+func identityRolesFromStoreRoles(roles []Role) []IdentityRole {
+	out := make([]IdentityRole, 0, len(roles))
+	for _, role := range roles {
+		out = append(out, IdentityRole{
+			Slug:   strings.TrimSpace(role.Slug),
+			Name:   strings.TrimSpace(role.Name),
+			Color:  strings.TrimSpace(role.Color),
+			Border: strings.TrimSpace(role.Border),
+		})
+	}
+	return out
+}
+
 func ensureStoreIndexes(ctx context.Context, store Store) error {
 	mongoStore, ok := store.(*MongoStore)
 	if !ok || mongoStore == nil {
@@ -2392,24 +2471,24 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	s.renderPlatformAdmin(w, admin, inviteLink, PlatformAdminErrors{})
 }
 
-func (s *Server) parseOrganizationLogoUpload(ctx context.Context, r *http.Request, orgSlug string) (string, string) {
+func (s *Server) readOrganizationLogoUpload(r *http.Request) (*organizationLogoUpload, string) {
 	if r.MultipartForm == nil {
-		return "", ""
+		return nil, ""
 	}
 	files := r.MultipartForm.File["logo"]
 	if len(files) == 0 {
-		return "", ""
+		return nil, ""
 	}
 	if len(files) != 1 {
-		return "", "upload a single logo file"
+		return nil, "upload a single logo file"
 	}
 	part := files[0]
 	if part.Size <= 0 {
-		return "", "logo file is empty"
+		return nil, "logo file is empty"
 	}
 	file, err := part.Open()
 	if err != nil {
-		return "", "invalid logo upload"
+		return nil, "invalid logo upload"
 	}
 	defer file.Close()
 
@@ -2420,7 +2499,7 @@ func (s *Server) parseOrganizationLogoUpload(ctx context.Context, r *http.Reques
 	case readErr == nil:
 	case errors.Is(readErr, io.EOF), errors.Is(readErr, io.ErrUnexpectedEOF):
 	default:
-		return "", "invalid logo upload"
+		return nil, "invalid logo upload"
 	}
 	sniffed := bytes.TrimSpace(header[:count])
 	if len(sniffed) > 0 {
@@ -2433,17 +2512,32 @@ func (s *Server) parseOrganizationLogoUpload(ctx context.Context, r *http.Reques
 		contentType = detectAttachmentContentType(part.Filename)
 	}
 	if !isAllowedOrganizationLogo(contentType, part.Filename) {
-		return "", "logo must be a PNG, JPG, WEBP, or SVG image"
+		return nil, "logo must be a PNG, JPG, WEBP, or SVG image"
 	}
+	data, err := io.ReadAll(io.MultiReader(bytes.NewReader(header[:count]), file))
+	if err != nil {
+		return nil, "invalid logo upload"
+	}
+	return &organizationLogoUpload{
+		Filename:    strings.TrimSpace(part.Filename),
+		ContentType: contentType,
+		Data:        data,
+	}, ""
+}
 
+func (s *Server) parseOrganizationLogoUpload(ctx context.Context, r *http.Request, orgSlug string) (string, string) {
+	upload, errMsg := s.readOrganizationLogoUpload(r)
+	if errMsg != "" || upload == nil {
+		return "", errMsg
+	}
 	attachment, saveErr := s.store.SaveAttachment(ctx, AttachmentUpload{
 		ProcessID:   primitive.NilObjectID,
 		SubstepID:   "organization-logo:" + canonifySlug(orgSlug),
-		Filename:    part.Filename,
-		ContentType: contentType,
+		Filename:    upload.Filename,
+		ContentType: upload.ContentType,
 		MaxBytes:    organizationLogoMaxBytes(),
 		UploadedAt:  s.nowUTC(),
-	}, io.MultiReader(bytes.NewReader(header[:count]), file))
+	}, bytes.NewReader(upload.Data))
 	if saveErr != nil {
 		switch {
 		case errors.Is(saveErr, ErrAttachmentTooLarge):
@@ -2598,41 +2692,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUser, orgSlug, inviteLink string, errs OrgAdminErrors) {
-	errs.Organization = strings.TrimSpace(errs.Organization)
-	errs.Role = strings.TrimSpace(errs.Role)
-	errs.Invite = strings.TrimSpace(errs.Invite)
-	errs.Users = strings.TrimSpace(errs.Users)
-
-	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
-		view := OrgAdminView{
-			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
-			NeedsOrganizationSetup: true,
-			OrganizationError:      errs.Organization,
-			RoleError:              errs.Role,
-			InviteError:            errs.Invite,
-			UsersError:             errs.Users,
-			InviteLink:             strings.TrimSpace(inviteLink),
-			Error:                  firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
-		}
-		if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-
-	org, err := s.store.GetOrganizationBySlug(context.Background(), orgSlug)
-	if err != nil || org == nil {
-		http.Error(w, "organization not found", http.StatusNotFound)
-		return
-	}
-	roles, _ := s.store.ListRolesByOrg(context.Background(), orgSlug)
-	users, _ := s.store.ListUsersByOrgID(context.Background(), org.ID)
-	invites := []Invite{}
-	if user != nil {
-		invites, _ = s.store.ListInvitesByCreator(context.Background(), user.ID, org.ID)
-	}
-
+func buildOrgAdminRolePills(roles []Role) []OrgAdminRoleOption {
 	rolePills := make([]OrgAdminRoleOption, 0, len(roles))
 	for _, role := range roles {
 		roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
@@ -2643,7 +2703,10 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 			RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
 		})
 	}
+	return rolePills
+}
 
+func buildOrgAdminUserRows(rolePills []OrgAdminRoleOption, users []AccountUser) []OrgAdminUserRow {
 	orgUsers := make([]OrgAdminUserRow, 0, len(users))
 	for _, orgUser := range users {
 		if strings.EqualFold(strings.TrimSpace(orgUser.Status), "deleted") {
@@ -2668,8 +2731,10 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 			RoleOptions: roleOptions,
 		})
 	}
+	return orgUsers
+}
 
-	now := s.nowUTC()
+func buildOrgAdminInviteRows(invites []Invite, now time.Time) []OrgAdminInviteRow {
 	orgInvites := make([]OrgAdminInviteRow, 0, len(invites))
 	for _, invite := range invites {
 		status := "pending"
@@ -2692,10 +2757,117 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 			Status:     status,
 		})
 	}
+	return orgInvites
+}
+
+func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSlug string) (Organization, []Role, []OrgAdminUserRow, []OrgAdminInviteRow, error) {
+	if s.identity == nil {
+		org, err := s.store.GetOrganizationBySlug(ctx, orgSlug)
+		if err != nil || org == nil {
+			return Organization{}, nil, nil, nil, ErrIdentityNotFound
+		}
+		roles, _ := s.store.ListRolesByOrg(ctx, orgSlug)
+		users, _ := s.store.ListUsersByOrgID(ctx, org.ID)
+		invites := []Invite{}
+		if user != nil {
+			invites, _ = s.store.ListInvitesByCreator(ctx, user.ID, org.ID)
+		}
+		rolePills := buildOrgAdminRolePills(roles)
+		return *org, roles, buildOrgAdminUserRows(rolePills, users), buildOrgAdminInviteRows(invites, s.nowUTC()), nil
+	}
+
+	orgIdentity, err := s.identity.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil || orgIdentity == nil {
+		return Organization{}, nil, nil, nil, ErrIdentityNotFound
+	}
+	org := organizationFromIdentityOrg(*orgIdentity)
+	roles := rolesFromIdentityOrg(*orgIdentity)
+	if s.store != nil {
+		if storeRoles, storeErr := s.store.ListRolesByOrg(ctx, strings.TrimSpace(org.Slug)); storeErr == nil && len(storeRoles) > 0 {
+			roles = storeRoles
+		}
+	}
+	rolePills := buildOrgAdminRolePills(roles)
+
+	lookupOrgID := org.ID
+	if user != nil && user.OrgID != nil && strings.EqualFold(strings.TrimSpace(user.OrgSlug), strings.TrimSpace(org.Slug)) {
+		lookupOrgID = *user.OrgID
+	}
+	storeUsers := []AccountUser{}
+	if s.store != nil {
+		storeUsers, _ = s.store.ListUsersByOrgID(ctx, lookupOrgID)
+	}
+	orgUsers := buildOrgAdminUserRows(rolePills, storeUsers)
+	if user != nil {
+		foundCurrent := false
+		for _, row := range orgUsers {
+			if strings.EqualFold(strings.TrimSpace(row.Email), strings.TrimSpace(user.Email)) {
+				foundCurrent = true
+				break
+			}
+		}
+		if !foundCurrent && strings.EqualFold(strings.TrimSpace(user.OrgSlug), strings.TrimSpace(org.Slug)) {
+			roleOptions := make([]OrgAdminRoleOption, 0, len(rolePills))
+			for _, role := range rolePills {
+				roleOptions = append(roleOptions, OrgAdminRoleOption{
+					Slug:       role.Slug,
+					Name:       role.Name,
+					RoleColor:  role.RoleColor,
+					RoleBorder: role.RoleBorder,
+					Selected:   containsRole(user.RoleSlugs, role.Slug),
+				})
+			}
+			orgUsers = append(orgUsers, OrgAdminUserRow{
+				UserMongoID: user.ID.Hex(),
+				Email:       user.Email,
+				Status:      user.Status,
+				Activated:   !strings.EqualFold(strings.TrimSpace(user.Status), "invited") && !strings.EqualFold(strings.TrimSpace(user.Status), "pending"),
+				IsOrgAdmin:  userIsOrgAdmin(user),
+				RoleOptions: roleOptions,
+			})
+		}
+	}
+
+	invites := []Invite{}
+	if s.store != nil && user != nil {
+		invites, _ = s.store.ListInvitesByCreator(ctx, user.ID, lookupOrgID)
+	}
+	return org, roles, orgUsers, buildOrgAdminInviteRows(invites, s.nowUTC()), nil
+}
+
+func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUser, orgSlug, inviteLink string, errs OrgAdminErrors) {
+	errs.Organization = strings.TrimSpace(errs.Organization)
+	errs.Role = strings.TrimSpace(errs.Role)
+	errs.Invite = strings.TrimSpace(errs.Invite)
+	errs.Users = strings.TrimSpace(errs.Users)
+
+	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
+		view := OrgAdminView{
+			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
+			NeedsOrganizationSetup: true,
+			OrganizationError:      errs.Organization,
+			RoleError:              errs.Role,
+			InviteError:            errs.Invite,
+			UsersError:             errs.Users,
+			InviteLink:             strings.TrimSpace(inviteLink),
+			Error:                  firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	org, roles, orgUsers, orgInvites, err := s.loadOrgAdminState(context.Background(), user, orgSlug)
+	if err != nil {
+		http.Error(w, "organization not found", http.StatusNotFound)
+		return
+	}
+	rolePills := buildOrgAdminRolePills(roles)
 
 	view := OrgAdminView{
 		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
-		Organization:           *org,
+		Organization:           org,
 		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
 		NeedsOrganizationSetup: false,
 		OrganizationError:      errs.Organization,
@@ -2729,6 +2901,31 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/org-admin/logo/"), "/")
 	if logoID == "" {
 		http.NotFound(w, r)
+		return
+	}
+	if s.identity != nil {
+		org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+		if err != nil || org == nil {
+			http.NotFound(w, r)
+			return
+		}
+		if strings.TrimSpace(org.LogoFileID) == "" || strings.TrimSpace(org.LogoFileID) != logoID {
+			http.NotFound(w, r)
+			return
+		}
+		logo, err := s.identity.GetOrganizationLogo(r.Context(), logoID)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		contentType := strings.TrimSpace(logo.ContentType)
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		filename := sanitizeAttachmentFilename(logo.Filename)
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
+		_, _ = w.Write(logo.Data)
 		return
 	}
 	org, err := s.store.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
@@ -2855,71 +3052,123 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 	if intent == "" {
 		intent = "invite"
 	}
-	if !userHasOrganizationContext(admin) {
-		if intent != "create_org" {
-			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "create organization first"})
-			return
-		}
+		if !userHasOrganizationContext(admin) {
+			if intent != "create_org" {
+				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "create organization first"})
+				return
+			}
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization name is required"})
 			return
-		}
-		orgSlug := canonifySlug(name)
-		if existing, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
-			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
-			return
-		}
-		logoAttachmentID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, orgSlug)
-		if logoErrMsg != "" {
-			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
-			return
-		}
-		createdOrg, err := s.store.CreateOrganization(r.Context(), Organization{
-			Name:             name,
-			LogoAttachmentID: logoAttachmentID,
-			CreatedAt:        s.nowUTC(),
-		})
-		if err != nil {
-			if isDuplicateSlugError(err) {
+			}
+			orgSlug := canonifySlug(name)
+			if s.identity != nil {
+				if existing, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
+					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
+					return
+				}
+				logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
+				if logoErrMsg != "" {
+					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
+					return
+				}
+				sessionSecret, err := sessionSecretFromRequest(r)
+				if err != nil {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+				createdOrg, err := s.identity.CreateOrganization(r.Context(), sessionSecret, name)
+				if err != nil {
+					if isDuplicateSlugError(err) {
+						s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
+						return
+					}
+					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
+					return
+				}
+				if logoUpload != nil {
+					logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), createdOrg.Slug, IdentityFile{
+						Filename:    logoUpload.Filename,
+						ContentType: logoUpload.ContentType,
+						Data:        logoUpload.Data,
+					})
+					if err != nil {
+						s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to upload logo"})
+						return
+					}
+					createdOrg, err = s.identity.UpdateOrganization(r.Context(), sessionSecret, createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles)
+					if err != nil {
+						s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update organization"})
+						return
+					}
+				}
+				if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
+					s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
+					return
+				}
+				updatedAdmin := *admin
+				orgID := stableOrgObjectID(createdOrg.Slug)
+				updatedAdmin.OrgID = &orgID
+				updatedAdmin.OrgSlug = createdOrg.Slug
+				updatedAdmin.RoleSlugs = canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
+				s.renderOrgAdmin(w, &updatedAdmin, createdOrg.Slug, "", "")
+				return
+			}
+			if existing, err := s.store.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
 				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
 				return
 			}
-			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
-			return
-		}
-		if _, roleErr := s.store.GetRoleBySlug(r.Context(), createdOrg.Slug, "org-admin"); roleErr != nil {
-			if _, createRoleErr := s.store.CreateRole(r.Context(), Role{
-				OrgID:     createdOrg.ID,
-				OrgSlug:   createdOrg.Slug,
-				Slug:      "org-admin",
-				Name:      "Org Admin",
-				CreatedAt: s.nowUTC(),
-			}); createRoleErr != nil && !isDuplicateSlugError(createRoleErr) {
-				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create role"})
+			logoAttachmentID, logoErrMsg := s.parseOrganizationLogoUpload(r.Context(), r, orgSlug)
+			if logoErrMsg != "" {
+				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
 				return
 			}
-		}
-		if err := s.store.SetUserOrganization(r.Context(), admin.ID, createdOrg.ID, createdOrg.Slug); err != nil {
-			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to update organization"})
+			createdOrg, err := s.store.CreateOrganization(r.Context(), Organization{
+				Name:             name,
+				LogoAttachmentID: logoAttachmentID,
+				CreatedAt:        s.nowUTC(),
+			})
+			if err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
+					return
+				}
+				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
+				return
+			}
+			if _, roleErr := s.store.GetRoleBySlug(r.Context(), createdOrg.Slug, "org-admin"); roleErr != nil {
+				if _, createRoleErr := s.store.CreateRole(r.Context(), Role{
+					OrgID:     createdOrg.ID,
+					OrgSlug:   createdOrg.Slug,
+					Slug:      "org-admin",
+					Name:      "Org Admin",
+					CreatedAt: s.nowUTC(),
+				}); createRoleErr != nil && !isDuplicateSlugError(createRoleErr) {
+					s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create role"})
+					return
+				}
+			}
+			if err := s.store.SetUserOrganization(r.Context(), admin.ID, createdOrg.ID, createdOrg.Slug); err != nil {
+				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to update organization"})
+				return
+			}
+			mergedRoles := canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
+			if err := s.store.SetUserRoles(r.Context(), admin.ID, mergedRoles); err != nil {
+				s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update user roles"})
+				return
+			}
+			updatedAdmin, _ := s.store.GetUserByMongoID(r.Context(), admin.ID)
+			if updatedAdmin == nil {
+				updatedAdmin = admin
+				orgID := createdOrg.ID
+				updatedAdmin.OrgID = &orgID
+				updatedAdmin.OrgSlug = createdOrg.Slug
+				updatedAdmin.RoleSlugs = mergedRoles
+			}
+			s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
 			return
 		}
-		mergedRoles := canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
-		if err := s.store.SetUserRoles(r.Context(), admin.ID, mergedRoles); err != nil {
-			s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update user roles"})
-			return
-		}
-		updatedAdmin, _ := s.store.GetUserByMongoID(r.Context(), admin.ID)
-		if updatedAdmin == nil {
-			updatedAdmin = admin
-			orgID := createdOrg.ID
-			updatedAdmin.OrgID = &orgID
-			updatedAdmin.OrgSlug = createdOrg.Slug
-			updatedAdmin.RoleSlugs = mergedRoles
-		}
-		s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
-		return
-	}
 
 	switch intent {
 	case "create_org":
@@ -3028,14 +3277,76 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "/invite/"+token, "")
 		return
 	case "update_org":
-		org, err := s.store.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
-		if err != nil || org == nil {
-			http.NotFound(w, r)
-			return
-		}
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "organization name is required"})
+			return
+		}
+		if s.identity != nil {
+			org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+			if err != nil || org == nil {
+				http.NotFound(w, r)
+				return
+			}
+			targetOrgSlug := canonifySlug(name)
+			if targetOrgSlug != strings.TrimSpace(org.Slug) {
+				if existing, err := s.identity.GetOrganizationBySlug(r.Context(), targetOrgSlug); err == nil && existing != nil && strings.TrimSpace(existing.ID) != strings.TrimSpace(org.ID) {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "organization slug already exists"})
+					return
+				}
+			}
+			logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
+			if logoErrMsg != "" {
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: logoErrMsg})
+				return
+			}
+			roleCatalog := append([]IdentityRole(nil), org.Roles...)
+			if len(roleCatalog) == 0 && s.store != nil {
+				if storeRoles, storeErr := s.store.ListRolesByOrg(r.Context(), admin.OrgSlug); storeErr == nil {
+					roleCatalog = identityRolesFromStoreRoles(storeRoles)
+				}
+			}
+			logoFileID := strings.TrimSpace(org.LogoFileID)
+			if logoUpload != nil {
+				logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), targetOrgSlug, IdentityFile{
+					Filename:    logoUpload.Filename,
+					ContentType: logoUpload.ContentType,
+					Data:        logoUpload.Data,
+				})
+				if err != nil {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to upload logo"})
+					return
+				}
+				logoFileID = logoFile.ID
+			}
+			sessionSecret, err := sessionSecretFromRequest(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			updatedOrg, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, admin.OrgSlug, name, logoFileID, roleCatalog)
+			if err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "organization slug already exists"})
+					return
+				}
+				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to update organization"})
+				return
+			}
+			if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
+				s.renderOrgAdmin(w, updatedAdmin, updatedOrg.Slug, "", "")
+				return
+			}
+			updatedAdmin := *admin
+			orgID := stableOrgObjectID(updatedOrg.Slug)
+			updatedAdmin.OrgID = &orgID
+			updatedAdmin.OrgSlug = updatedOrg.Slug
+			s.renderOrgAdmin(w, &updatedAdmin, updatedOrg.Slug, "", "")
+			return
+		}
+		org, err := s.store.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
+		if err != nil || org == nil {
+			http.NotFound(w, r)
 			return
 		}
 		targetOrgSlug := canonifySlug(name)

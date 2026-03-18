@@ -8,6 +8,7 @@ import (
 
 type fakeIdentityStore struct {
 	createAccountFunc              func(ctx context.Context, email, password, name string) (IdentityUser, error)
+	createOrganizationFunc         func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	acceptInviteFunc               func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	createEmailPasswordSessionFunc func(ctx context.Context, email, password string) (IdentitySession, error)
 	createRecoveryFunc             func(ctx context.Context, email, redirectURL string) error
@@ -18,6 +19,9 @@ type fakeIdentityStore struct {
 	getUserByIDFunc                func(ctx context.Context, userID string) (IdentityUser, error)
 	listOrganizationsFunc          func(ctx context.Context) ([]IdentityOrg, error)
 	getOrganizationBySlugFunc      func(ctx context.Context, slug string) (*IdentityOrg, error)
+	updateOrganizationFunc         func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	uploadOrganizationLogoFunc     func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
+	getOrganizationLogoFunc        func(ctx context.Context, fileID string) (IdentityFile, error)
 }
 
 func (f *fakeIdentityStore) CreateAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
@@ -25,6 +29,13 @@ func (f *fakeIdentityStore) CreateAccount(ctx context.Context, email, password, 
 		return f.createAccountFunc(ctx, email, password, name)
 	}
 	return IdentityUser{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) CreateOrganization(ctx context.Context, sessionSecret, name string) (IdentityOrg, error) {
+	if f.createOrganizationFunc != nil {
+		return f.createOrganizationFunc(ctx, sessionSecret, name)
+	}
+	return IdentityOrg{}, ErrIdentityUnauthorized
 }
 
 func (f *fakeIdentityStore) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
@@ -95,6 +106,27 @@ func (f *fakeIdentityStore) GetOrganizationBySlug(ctx context.Context, slug stri
 		return f.getOrganizationBySlugFunc(ctx, slug)
 	}
 	return nil, ErrIdentityNotFound
+}
+
+func (f *fakeIdentityStore) UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error) {
+	if f.updateOrganizationFunc != nil {
+		return f.updateOrganizationFunc(ctx, sessionSecret, currentSlug, name, logoFileID, roles)
+	}
+	return IdentityOrg{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {
+	if f.uploadOrganizationLogoFunc != nil {
+		return f.uploadOrganizationLogoFunc(ctx, orgSlug, upload)
+	}
+	return IdentityFile{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error) {
+	if f.getOrganizationLogoFunc != nil {
+		return f.getOrganizationLogoFunc(ctx, fileID)
+	}
+	return IdentityFile{}, ErrIdentityNotFound
 }
 
 func fakeIdentitySession(secret, userID string, expiresAt time.Time) IdentitySession {

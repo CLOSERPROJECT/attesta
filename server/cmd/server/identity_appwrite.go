@@ -4,20 +4,24 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/appwrite/sdk-for-go/account"
 	"github.com/appwrite/sdk-for-go/appwrite"
 	appwriteclient "github.com/appwrite/sdk-for-go/client"
+	appwritefile "github.com/appwrite/sdk-for-go/file"
 	"github.com/appwrite/sdk-for-go/id"
 	"github.com/appwrite/sdk-for-go/models"
+	"github.com/appwrite/sdk-for-go/storage"
 	"github.com/appwrite/sdk-for-go/teams"
 	"github.com/appwrite/sdk-for-go/users"
 )
 
 type appwriteTeamPrefs struct {
 	SchemaVersion int            `json:"schemaVersion,omitempty"`
+	Slug          string         `json:"slug,omitempty"`
 	LogoFileID    string         `json:"logoFileId,omitempty"`
 	Roles         []IdentityRole `json:"roles,omitempty"`
 }
@@ -25,6 +29,7 @@ type appwriteTeamPrefs struct {
 type appwriteIdentity struct {
 	adminClient   appwriteclient.Client
 	sessionClient appwriteclient.Client
+	orgAssetsBucket string
 }
 
 // NewAppwriteIdentity builds the Appwrite-backed identity adapter used by later auth work.
@@ -43,9 +48,18 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 		sessionClient.Client = httpClient
 	}
 	return &appwriteIdentity{
-		adminClient:   adminClient,
-		sessionClient: sessionClient,
+		adminClient:     adminClient,
+		sessionClient:   sessionClient,
+		orgAssetsBucket: appwriteOrgAssetsBucket(),
 	}
+}
+
+func appwriteOrgAssetsBucket() string {
+	bucket := strings.TrimSpace(strings.ToLower(strings.TrimSpace(envOr("APPWRITE_ORG_ASSETS_BUCKET", "org-assets"))))
+	if bucket == "" {
+		return "org-assets"
+	}
+	return bucket
 }
 
 func (a *appwriteIdentity) CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error) {
@@ -76,6 +90,40 @@ func (a *appwriteIdentity) CreateAccount(ctx context.Context, email, password, n
 		return IdentityUser{}, normalizeIdentityError(err)
 	}
 	return toIdentityUser(user, nil), nil
+}
+
+func (a *appwriteIdentity) CreateOrganization(ctx context.Context, sessionSecret, name string) (IdentityOrg, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityOrg{}, err
+	}
+	name = strings.TrimSpace(name)
+	slug := canonifySlug(name)
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return IdentityOrg{}, err
+	}
+	team, err := teams.New(sessionClient).Create(slug, name)
+	if err != nil {
+		return IdentityOrg{}, normalizeIdentityError(err)
+	}
+	org := decodeIdentityOrg(team)
+	org.Slug = slug
+	if _, err := teams.New(a.adminClient).UpdatePrefs(team.Id, encodeIdentityOrgPrefs(org)); err != nil {
+		return IdentityOrg{}, normalizeIdentityError(err)
+	}
+	accountUser, err := account.New(sessionClient).Get()
+	if err != nil {
+		return IdentityOrg{}, normalizeIdentityError(err)
+	}
+	labels := append([]string(nil), accountUser.Labels...)
+	if !hasIdentityLabel(labels, identityOrgAdminLabel) {
+		labels = append(labels, identityOrgAdminLabel)
+	}
+	if _, err := users.New(a.adminClient).UpdateLabels(accountUser.Id, uniqueIdentityStrings(labels)); err != nil {
+		return IdentityOrg{}, normalizeIdentityError(err)
+	}
+	org = decodeIdentityOrgFromTeam(team.Id, team.Name, encodeIdentityOrgPrefs(org))
+	return org, nil
 }
 
 func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
@@ -160,7 +208,14 @@ func (a *appwriteIdentity) GetCurrentUser(ctx context.Context, sessionSecret str
 	if err != nil {
 		return IdentityUser{}, normalizeIdentityError(err)
 	}
-	return toIdentityUser(accountUser, memberships.Memberships), nil
+	identity := toIdentityUser(accountUser, memberships.Memberships)
+	if identity.OrgSlug != "" {
+		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
+			identity.OrgSlug = org.Slug
+			identity.OrgName = org.Name
+		}
+	}
+	return identity, nil
 }
 
 func (a *appwriteIdentity) GetUserByID(ctx context.Context, userID string) (IdentityUser, error) {
@@ -176,7 +231,14 @@ func (a *appwriteIdentity) GetUserByID(ctx context.Context, userID string) (Iden
 	if err != nil {
 		return IdentityUser{}, normalizeIdentityError(err)
 	}
-	return toIdentityUser(user, memberships.Memberships), nil
+	identity := toIdentityUser(user, memberships.Memberships)
+	if identity.OrgSlug != "" {
+		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
+			identity.OrgSlug = org.Slug
+			identity.OrgName = org.Name
+		}
+	}
+	return identity, nil
 }
 
 func (a *appwriteIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg, error) {
@@ -197,12 +259,116 @@ func (a *appwriteIdentity) GetOrganizationBySlug(ctx context.Context, slug strin
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	team, err := teams.New(a.adminClient).Get(strings.TrimSpace(slug))
-	if err != nil {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return nil, ErrIdentityNotFound
+	}
+	team, err := teams.New(a.adminClient).Get(slug)
+	if err == nil {
+		org := decodeIdentityOrg(team)
+		return &org, nil
+	}
+	if !errors.Is(normalizeIdentityError(err), ErrIdentityNotFound) {
 		return nil, normalizeIdentityError(err)
 	}
-	org := decodeIdentityOrg(team)
-	return &org, nil
+	orgs, listErr := a.ListOrganizations(ctx)
+	if listErr != nil {
+		return nil, listErr
+	}
+	for _, org := range orgs {
+		if strings.EqualFold(strings.TrimSpace(org.Slug), slug) {
+			found := org
+			return &found, nil
+		}
+	}
+	return nil, ErrIdentityNotFound
+}
+
+func (a *appwriteIdentity) UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityOrg{}, err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, currentSlug)
+	if err != nil {
+		return IdentityOrg{}, err
+	}
+	name = strings.TrimSpace(name)
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return IdentityOrg{}, err
+	}
+	teamID := strings.TrimSpace(org.ID)
+	updatedTeam, err := teams.New(sessionClient).UpdateName(teamID, name)
+	if err != nil {
+		return IdentityOrg{}, normalizeIdentityError(err)
+	}
+	updatedOrg := IdentityOrg{
+		ID:         teamID,
+		Slug:       canonifySlug(name),
+		Name:       strings.TrimSpace(updatedTeam.Name),
+		LogoFileID: strings.TrimSpace(logoFileID),
+		Roles:      append([]IdentityRole(nil), roles...),
+	}
+	if _, err := teams.New(a.adminClient).UpdatePrefs(teamID, encodeIdentityOrgPrefs(updatedOrg)); err != nil {
+		return IdentityOrg{}, normalizeIdentityError(err)
+	}
+	return updatedOrg, nil
+}
+
+func (a *appwriteIdentity) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityFile{}, err
+	}
+	tempFile, err := os.CreateTemp("", "attesta-org-logo-*")
+	if err != nil {
+		return IdentityFile{}, err
+	}
+	defer os.Remove(tempFile.Name())
+	if _, err := tempFile.Write(upload.Data); err != nil {
+		_ = tempFile.Close()
+		return IdentityFile{}, err
+	}
+	if err := tempFile.Close(); err != nil {
+		return IdentityFile{}, err
+	}
+	fileID := id.Unique()
+	created, err := storage.New(a.adminClient).CreateFile(
+		a.orgAssetsBucket,
+		fileID,
+		appwritefile.NewInputFile(tempFile.Name(), strings.TrimSpace(upload.Filename)),
+	)
+	if err != nil {
+		return IdentityFile{}, normalizeIdentityError(err)
+	}
+	contentType := strings.TrimSpace(upload.ContentType)
+	if contentType == "" {
+		contentType = strings.TrimSpace(created.MimeType)
+	}
+	return IdentityFile{
+		ID:          strings.TrimSpace(created.Id),
+		Filename:    strings.TrimSpace(created.Name),
+		ContentType: contentType,
+	}, nil
+}
+
+func (a *appwriteIdentity) GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityFile{}, err
+	}
+	meta, err := storage.New(a.adminClient).GetFile(a.orgAssetsBucket, strings.TrimSpace(fileID))
+	if err != nil {
+		return IdentityFile{}, normalizeIdentityError(err)
+	}
+	body, err := storage.New(a.adminClient).GetFileView(a.orgAssetsBucket, strings.TrimSpace(fileID))
+	if err != nil {
+		return IdentityFile{}, normalizeIdentityError(err)
+	}
+	return IdentityFile{
+		ID:          strings.TrimSpace(meta.Id),
+		Filename:    strings.TrimSpace(meta.Name),
+		ContentType: strings.TrimSpace(meta.MimeType),
+		Data:        append([]byte(nil), (*body)...),
+	}, nil
 }
 
 func cloneAppwriteClient(base appwriteclient.Client, setters ...appwriteclient.ClientOption) (appwriteclient.Client, error) {
@@ -323,6 +489,18 @@ func decodeIdentityOrg(team *models.Team) IdentityOrg {
 		Slug: strings.TrimSpace(team.Id),
 		Name: strings.TrimSpace(team.Name),
 	}
+}
+
+func (a *appwriteIdentity) getOrganizationByTeamID(ctx context.Context, teamID string) (*IdentityOrg, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	team, err := teams.New(a.adminClient).Get(strings.TrimSpace(teamID))
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	org := decodeIdentityOrg(team)
+	return &org, nil
 }
 
 func hasIdentityLabel(labels []string, want string) bool {

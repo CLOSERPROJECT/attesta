@@ -127,12 +127,12 @@ Tests:
 Done when:
 - Auth, signup, invite acceptance, and password reset all use Appwrite flows and no Mongo token/session documents remain in use.
 
-* TODO [#A] Keep org-admin in Attesta but move its state and mutations to Appwrite
+* WIP [#A] Keep org-admin in Attesta but move its state and mutations to Appwrite
 Effort: L
 Goal: `/org-admin/users`, `/org-admin/roles`, `/org-admin/logo/*`, and org creation/update remain Attesta pages, but every org/user/role change persists in Appwrite instead of Mongo.
 Notes: This retains the existing UX surface for org admins, which is what the user asked for, while removing platform-admin behavior.
 
-** TODO [#A] Replace org creation and org profile updates with Appwrite team operations
+** DONE [#A] Replace org creation and org profile updates with Appwrite team operations
 Why: Current org creation/update in `handleOrgAdminUsers` and logo loading in `handleOrgAdminLogo` persist organizations in Mongo and files in GridFS.
 Change:
 - For self-serve org creation when `ANYONE_CAN_CREATE_ACCOUNT=true` and the signed-in user has no org:
@@ -156,7 +156,7 @@ Tests:
 Done when:
 - Org admins can create and edit their org from Attesta without touching Mongo org records.
 
-** TODO [#A] Replace role catalog CRUD and role assignment with Appwrite team prefs plus labels
+** WIP [#A] Replace role catalog CRUD and role assignment with Appwrite team prefs plus labels
 Why: Current role creation and role assignment are backed by Mongo `roles` plus user `roleSlugs`. Appwrite labels are the new role store for accepted users, but the org still needs a role catalog.
 Change:
 - `POST /org-admin/roles`:
