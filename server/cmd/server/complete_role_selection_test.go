@@ -14,25 +14,14 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 26, 16, 0, 0, 0, time.UTC)
 
-	user, err := store.CreateUser(t.Context(), AccountUser{
+	user := AccountUser{
+		ID:        primitive.NewObjectID(),
 		Email:     "u-session@example.com",
 		RoleSlugs: []string{"dep1", "dep2"},
 		Status:    "active",
 		CreatedAt: now,
-	})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
 	}
-	session, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "session-role",
-		UserMongoID: user.ID,
-		CreatedAt:   now,
-		LastLoginAt: now,
-		ExpiresAt:   now.Add(24 * time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("CreateSession error: %v", err)
-	}
+	sessionID := "session-role"
 
 	process := Process{
 		ID:        primitive.NewObjectID(),
@@ -52,6 +41,7 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 
 	server := &Server{
 		store:       store,
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
 		tmpl:        testTemplates(),
 		sse:         newSSEHub(),
 		enforceAuth: true,
@@ -67,7 +57,7 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/"+process.ID.Hex()+"/substep/2.1/complete", strings.NewReader("value=42&activeRole=dep2"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 
 	server.handleCompleteSubstep(rec, req, process.ID.Hex(), "2.1")
@@ -89,19 +79,14 @@ func TestHandleCompleteSubstepRejectsInvalidActiveRole(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 26, 16, 0, 0, 0, time.UTC)
 
-	user, _ := store.CreateUser(t.Context(), AccountUser{
+	user := AccountUser{
+		ID:        primitive.NewObjectID(),
 		Email:     "u-session@example.com",
 		RoleSlugs: []string{"dep1", "dep2"},
 		Status:    "active",
 		CreatedAt: now,
-	})
-	session, _ := store.CreateSession(t.Context(), Session{
-		SessionID:   "session-role",
-		UserMongoID: user.ID,
-		CreatedAt:   now,
-		LastLoginAt: now,
-		ExpiresAt:   now.Add(24 * time.Hour),
-	})
+	}
+	sessionID := "session-role"
 	process := Process{
 		ID:        primitive.NewObjectID(),
 		CreatedAt: now,
@@ -117,6 +102,7 @@ func TestHandleCompleteSubstepRejectsInvalidActiveRole(t *testing.T) {
 
 	server := &Server{
 		store:       store,
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
 		tmpl:        testTemplates(),
 		sse:         newSSEHub(),
 		enforceAuth: true,
@@ -130,7 +116,7 @@ func TestHandleCompleteSubstepRejectsInvalidActiveRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/"+process.ID.Hex()+"/substep/2.1/complete", strings.NewReader("value=42&activeRole=dep3"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: session.SessionID})
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 
 	server.handleCompleteSubstep(rec, req, process.ID.Hex(), "2.1")

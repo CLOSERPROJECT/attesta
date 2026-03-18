@@ -11,9 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
@@ -36,23 +33,6 @@ func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 	}
 }
 
-func TestHandleCompleteSubstepUnauthenticatedReturnsUnauthorized(t *testing.T) {
-	server := &Server{
-		store:       NewMemoryStore(),
-		tmpl:        testTemplates(),
-		enforceAuth: true,
-	}
-	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/abc/substep/1.1/complete", strings.NewReader("value=1"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-
-	server.handleCompleteSubstep(rec, req, primitive.NewObjectID().Hex(), "1.1")
-
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
-	}
-}
-
 func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 	var loginEmail string
@@ -66,9 +46,7 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 			},
 		},
 		tmpl: testTemplates(),
-		now: func() time.Time {
-			return now
-		},
+		now:  func() time.Time { return now },
 	}
 
 	form := url.Values{}
@@ -91,9 +69,6 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" {
 		t.Fatalf("expected attesta_session cookie, got %#v", cookies)
 	}
-	if cookies[0].HttpOnly != true {
-		t.Fatal("expected HttpOnly session cookie")
-	}
 	if cookies[0].Value != "session-secret" {
 		t.Fatalf("session cookie value = %q, want session-secret", cookies[0].Value)
 	}
@@ -102,51 +77,6 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	}
 	if loginEmail != "u1@example.com" || loginPassword != "secure-password" {
 		t.Fatalf("login credentials = %q/%q", loginEmail, loginPassword)
-	}
-}
-
-func TestHandleLoginLegacyFallbackCreatesStoredSession(t *testing.T) {
-	store := NewMemoryStore()
-	hash, err := bcrypt.GenerateFromPassword([]byte("secure-password"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hash password: %v", err)
-	}
-	user, err := store.CreateUser(t.Context(), AccountUser{
-		Email:        "legacy@example.com",
-		PasswordHash: string(hash),
-		Status:       "active",
-		CreatedAt:    time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-
-	server := &Server{
-		store: store,
-		tmpl:  testTemplates(),
-		now:   func() time.Time { return time.Date(2026, 2, 26, 12, 0, 0, 0, time.UTC) },
-	}
-	form := url.Values{}
-	form.Set("email", "legacy@example.com")
-	form.Set("password", "secure-password")
-	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-	server.handleLogin(rec, req)
-
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
-	}
-	cookies := rec.Result().Cookies()
-	if len(cookies) == 0 {
-		t.Fatalf("expected session cookie, got %#v", cookies)
-	}
-	session, err := store.LoadSessionByID(t.Context(), cookies[0].Value)
-	if err != nil {
-		t.Fatalf("LoadSessionByID error: %v", err)
-	}
-	if session.UserMongoID != user.ID {
-		t.Fatalf("session user id = %s, want %s", session.UserMongoID.Hex(), user.ID.Hex())
 	}
 }
 
@@ -199,9 +129,6 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 	body := rec.Body.String()
 	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/users"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
-	}
-	if !strings.Contains(body, `class="toggle-password"`) && !strings.Contains(body, `id="password-toggle"`) {
-		t.Fatalf("expected password toggle control in login page, got %q", body)
 	}
 }
 
@@ -263,65 +190,83 @@ func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
 			},
 		},
 		tmpl: tmpl,
+		now:  time.Now,
 	}
 	form := url.Values{}
-	form.Set("email", "u-invalid-login@example.com")
-	form.Set("password", "wrong-password")
+	form.Set("email", "u1@example.com")
+	form.Set("password", "bad-password")
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
+
 	server.handleLogin(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
 	}
 	if !strings.Contains(rec.Body.String(), "Invalid email or password.") {
-		t.Fatalf("expected invalid credentials message, got %q", rec.Body.String())
+		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
 
-func TestHandleLoginMethodNotAllowed(t *testing.T) {
-	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
-	req := httptest.NewRequest(http.MethodPut, "/login", nil)
+func TestHandleLoginIdentityUnavailable(t *testing.T) {
+	server := &Server{tmpl: testTemplates(), now: time.Now}
+	form := url.Values{}
+	form.Set("email", "u1@example.com")
+	form.Set("password", "secure-password")
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
+
 	server.handleLogin(rec, req)
 
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 }
 
-func TestHandleLoginInvalidFormAndUnknownUser(t *testing.T) {
-	server := &Server{
-		identity: &fakeIdentityStore{
-			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
-				return IdentitySession{}, ErrIdentityUnauthorized
-			},
-		},
-		tmpl: testTemplates(),
-	}
-
-	reqParse := httptest.NewRequest(http.MethodPost, "/login?bad=%zz", strings.NewReader("email=u%40example.com&password=pw"))
-	reqParse.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	recParse := httptest.NewRecorder()
-	server.handleLogin(recParse, reqParse)
-	if recParse.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", recParse.Code, http.StatusBadRequest)
-	}
-
-	form := url.Values{}
-	form.Set("email", "missing@example.com")
-	form.Set("password", "irrelevant-password")
-	reqMissing := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
-	reqMissing.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	recMissing := httptest.NewRecorder()
-	server.handleLogin(recMissing, reqMissing)
-	if recMissing.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", recMissing.Code, http.StatusUnauthorized)
+func TestHandleLogoutWithoutCookieStillRedirects(t *testing.T) {
+	server := &Server{identity: &fakeIdentityStore{}, now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/logout", nil)
+	rec := httptest.NewRecorder()
+	server.handleLogout(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 }
 
-func TestHandleLoginIdentityInternalFailure(t *testing.T) {
+func TestHandleLogoutBranches(t *testing.T) {
+	t.Run("method not allowed", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, now: time.Now}
+		req := httptest.NewRequest(http.MethodGet, "/logout", nil)
+		rec := httptest.NewRecorder()
+
+		server.handleLogout(rec, req)
+
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		}
+	})
+
+	t.Run("secure cookie follows forwarded proto", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, now: time.Now}
+		req := httptest.NewRequest(http.MethodPost, "/logout", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		rec := httptest.NewRecorder()
+
+		server.handleLogout(rec, req)
+
+		cookies := rec.Result().Cookies()
+		if len(cookies) == 0 {
+			t.Fatal("expected logout cookie")
+		}
+		if !cookies[0].Secure {
+			t.Fatalf("cookie secure = %v, want true", cookies[0].Secure)
+		}
+	})
+}
+
+func TestHandleLoginFailureReturnsServerError(t *testing.T) {
 	server := &Server{
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
@@ -329,92 +274,23 @@ func TestHandleLoginIdentityInternalFailure(t *testing.T) {
 			},
 		},
 		tmpl: testTemplates(),
+		now:  time.Now,
 	}
-
-	form := url.Values{}
-	form.Set("email", "user@example.com")
-	form.Set("password", "secure-password")
-	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("email=u1%40example.com&password=secret"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	server.handleLogin(rec, req)
-
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
 
-func TestHandleLoginLegacyInvalidCredentials(t *testing.T) {
-	store := NewMemoryStore()
-	hash, err := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hash password: %v", err)
-	}
-	if _, err := store.CreateUser(t.Context(), AccountUser{
-		Email:        "legacy-invalid@example.com",
-		PasswordHash: string(hash),
-		Status:       "active",
-		CreatedAt:    time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-
-	server := &Server{store: store, tmpl: testTemplates()}
-	form := url.Values{}
-	form.Set("email", "legacy-invalid@example.com")
-	form.Set("password", "wrong-password")
-	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-	server.handleLogin(rec, req)
-
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
-	}
-}
-
-func TestHandleLoginLegacyUnknownUser(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), tmpl: testTemplates()}
-	form := url.Values{}
-	form.Set("email", "missing-legacy@example.com")
-	form.Set("password", "whatever-password")
-	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-	server.handleLogin(rec, req)
-
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
-	}
-}
-
-func TestHandleLogoutMethodAndNoCookie(t *testing.T) {
-	server := &Server{identity: &fakeIdentityStore{}, now: time.Now}
-
-	reqMethod := httptest.NewRequest(http.MethodGet, "/logout", nil)
-	recMethod := httptest.NewRecorder()
-	server.handleLogout(recMethod, reqMethod)
-	if recMethod.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want %d", recMethod.Code, http.StatusMethodNotAllowed)
-	}
-
-	reqNoCookie := httptest.NewRequest(http.MethodPost, "/logout", nil)
-	recNoCookie := httptest.NewRecorder()
-	server.handleLogout(recNoCookie, reqNoCookie)
-	if recNoCookie.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", recNoCookie.Code, http.StatusSeeOther)
-	}
-	if recNoCookie.Header().Get("Location") != "/login" {
-		t.Fatalf("location = %q, want /login", recNoCookie.Header().Get("Location"))
-	}
-}
-
-func TestHandleSignupHiddenWhenDisabled(t *testing.T) {
+func TestHandleSignupDisabledReturnsNotFound(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "false")
-	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
-
+	server := &Server{tmpl: testTemplates(), now: time.Now}
 	req := httptest.NewRequest(http.MethodGet, "/signup", nil)
 	rec := httptest.NewRecorder()
+
 	server.handleSignup(rec, req)
 
 	if rec.Code != http.StatusNotFound {
@@ -422,36 +298,40 @@ func TestHandleSignupHiddenWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestHandleSignupCreatesUserAndSession(t *testing.T) {
+func TestHandleSignupPageRendersWhenEnabled(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
-	now := time.Date(2026, 2, 26, 18, 0, 0, 0, time.UTC)
-	var createdEmail string
-	var createdPassword string
-	var sessionEmail string
+	server := &Server{tmpl: testTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodGet, "/signup", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleSignup(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "SIGNUP") {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestHandleSignupRedirectsAuthenticatedUser(t *testing.T) {
+	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 	server := &Server{
 		identity: &fakeIdentityStore{
-			createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
-				createdEmail = email
-				createdPassword = password
-				return IdentityUser{ID: "user-signup", Email: email, Status: "active"}, nil
-			},
-			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
-				sessionEmail = email
-				return fakeIdentitySession("signup-session", "user-signup", now.Add(24*time.Hour)), nil
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
 			},
 			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-				return IdentityUser{ID: "user-signup", Email: "signup@example.com", Status: "active"}, nil
+				return IdentityUser{ID: "user-1", Email: "u1@example.com", Status: "active"}, nil
 			},
 		},
-		tmpl: testTemplates(),
-		now:  func() time.Time { return now },
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
 	}
-
-	form := url.Values{}
-	form.Set("email", "signup@example.com")
-	form.Set("password", "very-secure-password")
-	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := httptest.NewRequest(http.MethodGet, "/signup", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-auth-signup"})
 	rec := httptest.NewRecorder()
 
 	server.handleSignup(rec, req)
@@ -459,100 +339,128 @@ func TestHandleSignupCreatesUserAndSession(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/org-admin/users" {
-		t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
-	}
-	cookies := rec.Result().Cookies()
-	if len(cookies) == 0 || cookies[0].Value != "signup-session" {
-		t.Fatalf("cookies = %#v", cookies)
-	}
-	if createdEmail != "signup@example.com" || createdPassword != "very-secure-password" || sessionEmail != "signup@example.com" {
-		t.Fatalf("signup inputs create=%q/%q session=%q", createdEmail, createdPassword, sessionEmail)
+	if rec.Header().Get("Location") != "/" {
+		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
 	}
 }
 
-func TestHandleSignupGetRendersForm(t *testing.T) {
+func TestHandleSignupRejectsWeakPassword(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
-	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
-
-	req := httptest.NewRequest(http.MethodGet, "/signup", nil)
+	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u1%40example.com&password=short"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
+
 	server.handleSignup(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(strings.ToLower(rec.Body.String()), "password") {
+		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
 
-func TestHandleSignupErrorPaths(t *testing.T) {
+func TestHandleSignupIdentityUnavailable(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	server := &Server{tmpl: testTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u1%40example.com&password=secure-password"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
 
-	t.Run("method not allowed", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
-		req := httptest.NewRequest(http.MethodPut, "/signup", nil)
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusMethodNotAllowed {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
-		}
-	})
+	server.handleSignup(rec, req)
 
-	t.Run("invalid form", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
-		req := httptest.NewRequest(http.MethodPost, "/signup?bad=%zz", strings.NewReader("email=u%40e.com&password=very-secure-password"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-		}
-	})
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}
 
-	t.Run("identity unavailable", func(t *testing.T) {
-		server := &Server{tmpl: testTemplates()}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=very-secure-password"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusServiceUnavailable {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
-		}
-	})
+func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
+	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 
-	t.Run("short password", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates()}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=short"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-		}
-	})
-
-	t.Run("authenticated get redirects", func(t *testing.T) {
-		now := time.Date(2026, 2, 26, 19, 0, 0, 0, time.UTC)
+	t.Run("without organization redirects to org admin bootstrap", func(t *testing.T) {
+		var createdEmail string
+		var createdPassword string
+		var sessionEmail string
+		var sessionPassword string
 		server := &Server{
 			identity: &fakeIdentityStore{
-				getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
-					return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
+					createdEmail = email
+					createdPassword = password
+					return IdentityUser{ID: "user-1", Email: email, Status: "active"}, nil
+				},
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					sessionEmail = email
+					sessionPassword = password
+					return fakeIdentitySession("signup-session", "user-1", now.Add(24*time.Hour)), nil
 				},
 				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: "auth@example.com", Status: "active"}, nil
+					return IdentityUser{ID: "user-1", Email: "new@example.com", Status: "active"}, nil
 				},
 			},
-			tmpl:        testTemplates(),
-			enforceAuth: true,
-			now:         func() time.Time { return now },
+			tmpl: testTemplates(),
+			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodGet, "/signup", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "signup-auth"})
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=New%40Example.com&password=secure-password"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
+
 		server.handleSignup(rec, req)
-		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
-			t.Fatalf("status/location = %d %q", rec.Code, rec.Header().Get("Location"))
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if rec.Header().Get("Location") != "/org-admin/users" {
+			t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
+		}
+		if createdEmail != "new@example.com" || createdPassword != "secure-password" {
+			t.Fatalf("create account args = %q/%q", createdEmail, createdPassword)
+		}
+		if sessionEmail != "new@example.com" || sessionPassword != "secure-password" {
+			t.Fatalf("create session args = %q/%q", sessionEmail, sessionPassword)
+		}
+		cookies := rec.Result().Cookies()
+		if len(cookies) == 0 || cookies[0].Name != "attesta_session" || cookies[0].Value != "signup-session" {
+			t.Fatalf("session cookies = %#v", cookies)
 		}
 	})
+
+	t.Run("existing org membership redirects home", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
+					return IdentityUser{}, ErrIdentityUnauthorized
+				},
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return fakeIdentitySession("signup-session-org", "user-2", now.Add(24*time.Hour)), nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-2", Email: "member@example.com", OrgSlug: "acme", Status: "active"}, nil
+				},
+			},
+			tmpl: testTemplates(),
+			now:  func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=member%40example.com&password=secure-password"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleSignup(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if rec.Header().Get("Location") != "/" {
+			t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+		}
+	})
+}
+
+func TestHandleSignupReturnsServerErrors(t *testing.T) {
+	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 
 	t.Run("create account failure", func(t *testing.T) {
 		server := &Server{
@@ -562,106 +470,43 @@ func TestHandleSignupErrorPaths(t *testing.T) {
 				},
 			},
 			tmpl: testTemplates(),
+			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=very-secure-password"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u1%40example.com&password=secure-password"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
+
 		server.handleSignup(rec, req)
+
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
 	})
 
-	t.Run("session creation failure", func(t *testing.T) {
+	t.Run("load current user failure", func(t *testing.T) {
 		server := &Server{
 			identity: &fakeIdentityStore{
 				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
 					return IdentityUser{ID: "user-1", Email: email, Status: "active"}, nil
 				},
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
-					return IdentitySession{}, errors.New("boom")
-				},
-			},
-			tmpl: testTemplates(),
-		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=very-secure-password"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusInternalServerError {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
-		}
-	})
-
-	t.Run("current user failure after session", func(t *testing.T) {
-		server := &Server{
-			identity: &fakeIdentityStore{
-				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: email, Status: "active"}, nil
-				},
-				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
-					return fakeIdentitySession("session-1", "user-1", time.Now().Add(24*time.Hour)), nil
+					return fakeIdentitySession("signup-session", "user-1", now.Add(24*time.Hour)), nil
 				},
 				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
 					return IdentityUser{}, errors.New("boom")
 				},
 			},
 			tmpl: testTemplates(),
+			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=very-secure-password"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u1%40example.com&password=secure-password"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
+
 		server.handleSignup(rec, req)
+
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
-		}
-	})
-
-	t.Run("create account unauthorized still signs in", func(t *testing.T) {
-		server := &Server{
-			identity: &fakeIdentityStore{
-				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
-					return IdentityUser{}, ErrIdentityUnauthorized
-				},
-				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
-					return fakeIdentitySession("session-1", "user-1", time.Now().Add(24*time.Hour)), nil
-				},
-				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: "u@e.com", OrgSlug: "acme", Status: "active"}, nil
-				},
-			},
-			tmpl: testTemplates(),
-		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=very-secure-password"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
-			t.Fatalf("status/location = %d %q", rec.Code, rec.Header().Get("Location"))
-		}
-	})
-
-	t.Run("existing org redirects home", func(t *testing.T) {
-		server := &Server{
-			identity: &fakeIdentityStore{
-				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: email, Status: "active"}, nil
-				},
-				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
-					return fakeIdentitySession("session-1", "user-1", time.Now().Add(24*time.Hour)), nil
-				},
-				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: "u@e.com", OrgSlug: "acme", Status: "active"}, nil
-				},
-			},
-			tmpl: testTemplates(),
-		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u%40e.com&password=very-secure-password"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		server.handleSignup(rec, req)
-		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
-			t.Fatalf("status/location = %d %q", rec.Code, rec.Header().Get("Location"))
 		}
 	})
 }

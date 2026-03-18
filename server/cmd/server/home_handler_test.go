@@ -176,19 +176,18 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 
 	t.Run("visible for org admin", func(t *testing.T) {
 		store := NewMemoryStore()
-		user, err := store.CreateUser(t.Context(), AccountUser{
+		user := AccountUser{
+			ID:        primitive.NewObjectID(),
 			Email:     "org-admin-picker@example.com",
 			RoleSlugs: []string{"org-admin"},
 			Status:    "active",
 			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser error: %v", err)
 		}
-		sessionID := createSessionForTestUser(t, store, user)
+		sessionID := "session-org-admin"
 
 		server := &Server{
 			store:       store,
+			identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
 			tmpl:        tmpl,
 			configDir:   tempDir,
 			enforceAuth: true,
@@ -216,19 +215,18 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 
 	t.Run("hidden for non org admin", func(t *testing.T) {
 		store := NewMemoryStore()
-		user, err := store.CreateUser(t.Context(), AccountUser{
+		user := AccountUser{
+			ID:        primitive.NewObjectID(),
 			Email:     "member-picker@example.com",
 			RoleSlugs: []string{"operator"},
 			Status:    "active",
 			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser error: %v", err)
 		}
-		sessionID := createSessionForTestUser(t, store, user)
+		sessionID := "session-member"
 
 		server := &Server{
 			store:       store,
+			identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
 			tmpl:        tmpl,
 			configDir:   tempDir,
 			enforceAuth: true,

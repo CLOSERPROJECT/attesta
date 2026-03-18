@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"os"
+	"strings"
+	"time"
 )
 
 func testRuntimeConfig() RuntimeConfig {
@@ -60,7 +63,6 @@ func testTemplates() *template.Template {
 	  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
 	  {{else if eq .Body "signup_body"}}{{template "signup_body" .}}
 	  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
-	  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
 	  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
 	  {{else if eq .Body "home_body"}}{{template "home_body" .}}
 	  {{else if eq .Body "process_body"}}{{template "process_body" .}}
@@ -78,8 +80,6 @@ func testTemplates() *template.Template {
 {{define "dashboard_body"}}DASHBOARD_ME {{.ID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
-{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
-{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.RoleColor}} {{.RoleBorder}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{template "timeline.html" .Timeline}}{{end}}
@@ -144,4 +144,47 @@ func writeTwoSubstepWorkflowConfig(t testHelperT, path, name string) {
 type testHelperT interface {
 	Helper()
 	Fatalf(format string, args ...interface{})
+}
+
+func identityUserFromAccountUser(user AccountUser) IdentityUser {
+	orgSlug := strings.TrimSpace(user.OrgSlug)
+	labels := make([]string, 0, len(user.RoleSlugs))
+	isOrgAdmin := false
+	for _, roleSlug := range canonifyRoleSlugs(user.RoleSlugs) {
+		if containsRole([]string{roleSlug}, "org-admin") || containsRole([]string{roleSlug}, "org_admin") {
+			isOrgAdmin = true
+			continue
+		}
+		labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+	}
+	if isOrgAdmin {
+		labels = append(labels, identityOrgAdminLabel)
+	}
+	return IdentityUser{
+		ID:         user.ID.Hex(),
+		Email:      strings.TrimSpace(user.Email),
+		OrgSlug:    orgSlug,
+		Labels:     labels,
+		IsOrgAdmin: isOrgAdmin,
+		Status:     strings.TrimSpace(user.Status),
+	}
+}
+
+func testIdentityForSessions(now time.Time, sessions map[string]AccountUser) *fakeIdentityStore {
+	return &fakeIdentityStore{
+		getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+			user, ok := sessions[strings.TrimSpace(sessionSecret)]
+			if !ok {
+				return IdentitySession{}, ErrIdentityUnauthorized
+			}
+			return fakeIdentitySession(sessionSecret, user.ID.Hex(), now.Add(24*time.Hour)), nil
+		},
+		getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+			user, ok := sessions[strings.TrimSpace(sessionSecret)]
+			if !ok {
+				return IdentityUser{}, ErrIdentityUnauthorized
+			}
+			return identityUserFromAccountUser(user), nil
+		},
+	}
 }

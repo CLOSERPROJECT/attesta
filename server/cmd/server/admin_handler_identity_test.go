@@ -726,14 +726,6 @@ func TestIdentityOrgAdminHelpers(t *testing.T) {
 		t.Fatalf("empty cookie error = %v", err)
 	}
 
-	roles := identityRolesFromStoreRoles([]Role{
-		{Slug: "org-admin", Name: "Org Admin"},
-		{Slug: "qa-reviewer", Name: "QA Reviewer"},
-	})
-	if len(roles) != 1 || roles[0].Slug != "qa-reviewer" {
-		t.Fatalf("identity roles = %#v", roles)
-	}
-
 	withAdmin := ensureOrgAdminRoleOption([]Role{{Slug: "qa-reviewer", Name: "QA Reviewer"}})
 	if len(withAdmin) != 2 || withAdmin[0].Slug != "org-admin" {
 		t.Fatalf("with admin = %#v", withAdmin)
@@ -1194,29 +1186,18 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 
 func TestLoadOrgAdminStateIdentityFallbacks(t *testing.T) {
 	now := time.Now().UTC()
-	store := NewMemoryStore()
-	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme Org"})
-	if err != nil {
-		t.Fatalf("CreateOrganization error: %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{OrgID: org.ID, OrgSlug: org.Slug, Name: "QA Reviewer", Color: "#123", Border: "#456"}); err != nil {
-		t.Fatalf("CreateRole error: %v", err)
-	}
-	adminUser, err := store.CreateUser(t.Context(), AccountUser{Email: "owner@example.com", RoleSlugs: []string{"org-admin"}, Status: "active", CreatedAt: now})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-	if err := store.SetUserOrganization(t.Context(), adminUser.ID, org.ID, org.Slug); err != nil {
-		t.Fatalf("SetUserOrganization error: %v", err)
-	}
-	if _, err := store.CreateInvite(t.Context(), Invite{OrgID: org.ID, Email: "pending@example.com", UserMongoID: adminUser.ID, RoleSlugs: []string{"qa-reviewer"}, Token: "tok", ExpiresAt: now.Add(24 * time.Hour), CreatedAt: now, CreatedByUserMongoID: adminUser.ID}); err != nil {
-		t.Fatalf("CreateInvite error: %v", err)
-	}
 	server := &Server{
-		store: store,
+		store: NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
-				return &IdentityOrg{ID: "team-1", Slug: "acme-org", Name: "Acme Org"}, nil
+				return &IdentityOrg{
+					ID:   "team-1",
+					Slug: "acme-org",
+					Name: "Acme Org",
+					Roles: []IdentityRole{
+						{Slug: "qa-reviewer", Name: "QA Reviewer", Color: "#123", Border: "#456"},
+					},
+				}, nil
 			},
 			listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
 				return []IdentityUser{{ID: "user-1", Email: "member@example.com", OrgSlug: "acme-org", Labels: []string{encodeIdentityRoleLabel("qa-reviewer")}, Status: "active"}}, nil
@@ -1227,13 +1208,13 @@ func TestLoadOrgAdminStateIdentityFallbacks(t *testing.T) {
 		},
 		now: func() time.Time { return now },
 	}
-	adminOrgID := org.ID
-	admin := &AccountUser{ID: adminUser.ID, Email: adminUser.Email, OrgID: &adminOrgID, OrgSlug: "acme-org", RoleSlugs: []string{"org-admin"}, Status: "active"}
+	adminOrgID := stableOrgObjectID("acme-org")
+	admin := &AccountUser{ID: stableIdentityUserObjectID("owner"), Email: "owner@example.com", OrgID: &adminOrgID, OrgSlug: "acme-org", RoleSlugs: []string{"org-admin"}, Status: "active"}
 	gotOrg, roles, users, invites, err := server.loadOrgAdminState(t.Context(), admin, "acme-org")
 	if err != nil {
 		t.Fatalf("loadOrgAdminState error: %v", err)
 	}
-	if gotOrg.Slug != "acme-org" || len(roles) != 2 || len(users) != 1 || len(invites) != 1 {
+	if gotOrg.Slug != "acme-org" || len(roles) != 2 || len(users) != 1 || invites != nil {
 		t.Fatalf("state = %#v %#v %#v %#v", gotOrg, roles, users, invites)
 	}
 }

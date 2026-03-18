@@ -2,11 +2,26 @@ package main
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type fakeLegacyLookupStore struct {
+	*MemoryStore
+	users map[primitive.ObjectID]AccountUser
+}
+
+func (s *fakeLegacyLookupStore) GetUserByMongoID(_ context.Context, userMongoID primitive.ObjectID) (*AccountUser, error) {
+	user, ok := s.users[userMongoID]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	copy := user
+	return &copy, nil
+}
 
 func TestViewerCanSeeDoneByEmail(t *testing.T) {
 	def := WorkflowDef{
@@ -77,17 +92,18 @@ func TestLookupUserIdentityByActorIDBranches(t *testing.T) {
 }
 
 func TestApplyDoneByEmailVisibility(t *testing.T) {
-	store := NewMemoryStore()
-	server := &Server{store: store}
-	created, err := store.CreateUser(context.Background(), AccountUser{
+	created := AccountUser{
+		ID:        primitive.NewObjectID(),
 		Email:     "done@example.com",
 		Status:    "active",
 		RoleSlugs: []string{"dep1"},
 		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
 	}
+	store := &fakeLegacyLookupStore{
+		MemoryStore: NewMemoryStore(),
+		users:       map[primitive.ObjectID]AccountUser{created.ID: created},
+	}
+	server := &Server{store: store}
 
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
@@ -134,17 +150,18 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 }
 
 func TestApplyDoneByMongoIDToDPPTraceability(t *testing.T) {
-	store := NewMemoryStore()
-	server := &Server{store: store}
-	created, err := store.CreateUser(context.Background(), AccountUser{
+	created := AccountUser{
+		ID:        primitive.NewObjectID(),
 		Email:     "dpp@example.com",
 		Status:    "active",
 		RoleSlugs: []string{"dep1"},
 		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
 	}
+	store := &fakeLegacyLookupStore{
+		MemoryStore: NewMemoryStore(),
+		users:       map[primitive.ObjectID]AccountUser{created.ID: created},
+	}
+	server := &Server{store: store}
 
 	traceability := []DPPTraceabilityStep{
 		{

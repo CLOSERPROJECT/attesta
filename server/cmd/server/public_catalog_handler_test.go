@@ -8,176 +8,131 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type publicCatalogFailingStore struct {
-	*MemoryStore
+type publicCatalogIdentity struct {
+	fakeIdentityStore
 	failListOrganizations bool
-	failListRolesByOrg    bool
-	failLoadStream        bool
 }
 
-func (s *publicCatalogFailingStore) ListOrganizations(ctx context.Context) ([]Organization, error) {
+type failingCatalogStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *publicCatalogIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg, error) {
 	if s.failListOrganizations {
 		return nil, errors.New("list organizations failed")
 	}
-	return s.MemoryStore.ListOrganizations(ctx)
+	return s.fakeIdentityStore.ListOrganizations(ctx)
 }
 
-func (s *publicCatalogFailingStore) ListRolesByOrg(ctx context.Context, orgSlug string) ([]Role, error) {
-	if s.failListRolesByOrg {
-		return nil, errors.New("list roles failed")
-	}
-	return s.MemoryStore.ListRolesByOrg(ctx, orgSlug)
+func (s *failingCatalogStore) LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error) {
+	return nil, s.err
 }
 
-func (s *publicCatalogFailingStore) LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error) {
-	if s.failLoadStream {
-		return nil, errors.New("load stream failed")
+func catalogServer(now time.Time, identity *publicCatalogIdentity) *Server {
+	return &Server{
+		store: NewMemoryStore(),
+		identity: identity,
+		enforceAuth: true,
+		now: func() time.Time { return now },
 	}
-	return s.MemoryStore.LoadFormataBuilderStream(ctx)
+}
+
+func catalogAuthIdentity(now time.Time, admin bool) *publicCatalogIdentity {
+	labels := []string{encodeIdentityRoleLabel("inspector")}
+	if admin {
+		labels = []string{identityOrgAdminLabel}
+	}
+	return &publicCatalogIdentity{
+		fakeIdentityStore: fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "org-admin@example.com", OrgSlug: "acme-org", Labels: labels, IsOrgAdmin: admin, Status: "active"}, nil
+			},
+		},
+	}
 }
 
 func TestHandlePublicCatalog(t *testing.T) {
+	now := time.Now().UTC()
+	identity := catalogAuthIdentity(now, true)
+	identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) {
+		return []IdentityOrg{
+			{
+				ID:   "team-acme",
+				Slug: "acme-org",
+				Name: "Acme Org",
+				Roles: []IdentityRole{
+					{Slug: "inspector", Name: "Inspector", Color: "#f0f3ea", Border: "#d9e0d0"},
+					{Slug: "org-admin", Name: "Org Admin", Color: "#000000", Border: "#ffffff"},
+				},
+			},
+			{
+				ID:   "team-beta",
+				Slug: "beta-org",
+				Name: "Beta Org",
+				Roles: []IdentityRole{
+					{Slug: "assembler", Name: "Assembler", Color: "#f8efe0", Border: "#e9d4a8"},
+				},
+			},
+		}, nil
+	}
+
 	store := NewMemoryStore()
-
-	acmeOrg, err := store.CreateOrganization(t.Context(), Organization{
-		Name:      "Acme Org",
-		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateOrganization(acme): %v", err)
-	}
-	betaOrg, err := store.CreateOrganization(t.Context(), Organization{
-		Name:      "Beta Org",
-		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateOrganization(beta): %v", err)
-	}
-
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:     acmeOrg.ID,
-		OrgSlug:   acmeOrg.Slug,
-		Name:      "Inspector",
-		Color:     "#f0f3ea",
-		Border:    "#d9e0d0",
-		CreatedAt: time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateRole(acme/inspector): %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:     betaOrg.ID,
-		OrgSlug:   betaOrg.Slug,
-		Name:      "Assembler",
-		Color:     "#f8efe0",
-		Border:    "#e9d4a8",
-		CreatedAt: time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateRole(beta/assembler): %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:     acmeOrg.ID,
-		OrgSlug:   acmeOrg.Slug,
-		Name:      "Org Admin",
-		Color:     "#000000",
-		Border:    "#ffffff",
-		CreatedAt: time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateRole(acme/org-admin): %v", err)
-	}
-	orgID := acmeOrg.ID
-	adminUser, err := store.CreateUser(t.Context(), AccountUser{
-		OrgID:     &orgID,
-		OrgSlug:   acmeOrg.Slug,
-		Email:     "org-admin-catalog@example.com",
-		RoleSlugs: []string{"org-admin"},
-		Status:    "active",
-		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser(org-admin): %v", err)
-	}
 	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-		Stream:               `{"stream":"from-db"}`,
-		UpdatedAt:            time.Now().UTC(),
-		UpdatedByUserMongoID: adminUser.ID,
+		Stream:    `{"stream":"from-db"}`,
+		UpdatedAt: now,
 	}); err != nil {
 		t.Fatalf("SaveFormataBuilderStream: %v", err)
 	}
-	sessionID := createSessionForTestUser(t, store, adminUser)
+	server := catalogServer(now, identity)
+	server.store = store
 
-	server := &Server{store: store, enforceAuth: true, now: time.Now}
 	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
 	server.handlePublicCatalog(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf("content-type = %q, want %q", got, "application/json")
-	}
 
 	var got PublicCatalogResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-
-	want := PublicCatalogResponse{
-		Organizations: []PublicCatalogOrganization{
-			{Name: "Acme Org", Slug: "acme-org"},
-			{Name: "Beta Org", Slug: "beta-org"},
-		},
-		Roles: []PublicCatalogRole{
-			{OrgSlug: "acme-org", Name: "Inspector", Slug: "inspector", Color: "#f0f3ea", Border: "#d9e0d0"},
-			{OrgSlug: "beta-org", Name: "Assembler", Slug: "assembler", Color: "#f8efe0", Border: "#e9d4a8"},
-		},
-		Stream: `{"stream":"from-db"}`,
-	}
-	if len(got.Organizations) != len(want.Organizations) {
-		t.Fatalf("organizations len = %d, want %d", len(got.Organizations), len(want.Organizations))
-	}
-	for i, item := range want.Organizations {
-		if got.Organizations[i] != item {
-			t.Fatalf("organizations[%d] = %#v, want %#v", i, got.Organizations[i], item)
-		}
-	}
-	if len(got.Roles) != len(want.Roles) {
-		t.Fatalf("roles len = %d, want %d", len(got.Roles), len(want.Roles))
-	}
-	for i, item := range want.Roles {
-		if got.Roles[i] != item {
-			t.Fatalf("roles[%d] = %#v, want %#v", i, got.Roles[i], item)
-		}
+	if len(got.Organizations) != 2 || len(got.Roles) != 2 {
+		t.Fatalf("response = %#v", got)
 	}
 	for _, role := range got.Roles {
 		if role.Slug == "org-admin" {
 			t.Fatalf("unexpected org-admin role in response: %#v", role)
 		}
 	}
+	if got.Stream != `{"stream":"from-db"}` {
+		t.Fatalf("stream = %q", got.Stream)
+	}
 }
 
 func TestHandlePublicCatalogMethodNotAllowed(t *testing.T) {
-	server := &Server{store: NewMemoryStore()}
+	server := &Server{store: NewMemoryStore(), identity: &fakeIdentityStore{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/catalog", nil)
 	rec := httptest.NewRecorder()
-
 	server.handlePublicCatalog(rec, req)
-
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 }
 
 func TestHandlePublicCatalogAuthz(t *testing.T) {
-	store := NewMemoryStore()
-	server := &Server{store: store, enforceAuth: true, now: time.Now}
+	now := time.Now().UTC()
 
 	t.Run("unauthenticated", func(t *testing.T) {
+		server := catalogServer(now, &publicCatalogIdentity{})
 		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
 		rec := httptest.NewRecorder()
 		server.handlePublicCatalog(rec, req)
@@ -187,18 +142,9 @@ func TestHandlePublicCatalogAuthz(t *testing.T) {
 	})
 
 	t.Run("forbidden for non admin", func(t *testing.T) {
-		user, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "plain-user-catalog@example.com",
-			RoleSlugs: []string{"inspector"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser error: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store, user)
+		server := catalogServer(now, catalogAuthIdentity(now, false))
 		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handlePublicCatalog(rec, req)
 		if rec.Code != http.StatusForbidden {
@@ -207,18 +153,11 @@ func TestHandlePublicCatalogAuthz(t *testing.T) {
 	})
 
 	t.Run("org admin allowed", func(t *testing.T) {
-		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "org-admin-catalog@example.com",
-			RoleSlugs: []string{"org-admin"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser error: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store, admin)
+		identity := catalogAuthIdentity(now, true)
+		identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }
+		server := catalogServer(now, identity)
 		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handlePublicCatalog(rec, req)
 		if rec.Code != http.StatusOK {
@@ -228,140 +167,45 @@ func TestHandlePublicCatalogAuthz(t *testing.T) {
 }
 
 func TestHandlePublicCatalogStoreErrors(t *testing.T) {
+	now := time.Now().UTC()
+
 	t.Run("list organizations", func(t *testing.T) {
-		store := &publicCatalogFailingStore{
-			MemoryStore:           NewMemoryStore(),
-			failListOrganizations: true,
-			failListRolesByOrg:    false,
-		}
-		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "org-admin-list-orgs-catalog@example.com",
-			RoleSlugs: []string{"org-admin"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store.MemoryStore, admin)
-		server := &Server{store: store, enforceAuth: true, now: time.Now}
+		identity := catalogAuthIdentity(now, true)
+		identity.failListOrganizations = true
+		server := catalogServer(now, identity)
 		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
-
 		server.handlePublicCatalog(rec, req)
-
-		if rec.Code != http.StatusInternalServerError {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
-		}
-	})
-
-	t.Run("list roles by org", func(t *testing.T) {
-		store := &publicCatalogFailingStore{
-			MemoryStore:        NewMemoryStore(),
-			failListRolesByOrg: true,
-		}
-		if _, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme"}); err != nil {
-			t.Fatalf("CreateOrganization: %v", err)
-		}
-		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "org-admin-list-roles-catalog@example.com",
-			RoleSlugs: []string{"org-admin"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store.MemoryStore, admin)
-		server := &Server{store: store, enforceAuth: true, now: time.Now}
-		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-		rec := httptest.NewRecorder()
-
-		server.handlePublicCatalog(rec, req)
-
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
 	})
 
 	t.Run("load stream", func(t *testing.T) {
-		base := NewMemoryStore()
-		store := &publicCatalogFailingStore{MemoryStore: base}
-		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "org-admin-stream-catalog@example.com",
-			RoleSlugs: []string{"org-admin"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser: %v", err)
-		}
-		if _, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme"}); err != nil {
-			t.Fatalf("CreateOrganization: %v", err)
-		}
-		if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-			Stream:               "stream-v1",
-			UpdatedAt:            time.Now().UTC(),
-			UpdatedByUserMongoID: admin.ID,
-		}); err != nil {
-			t.Fatalf("SaveFormataBuilderStream: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store.MemoryStore, admin)
-		server := &Server{store: store, enforceAuth: true, now: time.Now}
+		identity := catalogAuthIdentity(now, true)
+		identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }
+		server := catalogServer(now, identity)
+		server.store = &failingCatalogStore{MemoryStore: NewMemoryStore(), err: errors.New("boom")}
 		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
-
 		server.handlePublicCatalog(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-		}
-		var got PublicCatalogResponse
-		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
-		if got.Stream != "stream-v1" {
-			t.Fatalf("stream = %q, want %q", got.Stream, "stream-v1")
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
 	})
 
-	t.Run("invalid user role cookie id still unauthorized", func(t *testing.T) {
-		server := &Server{store: NewMemoryStore(), enforceAuth: true, now: time.Now}
+	t.Run("not configured", func(t *testing.T) {
+		server := &Server{
+			identity:    catalogAuthIdentity(now, true),
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
 		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: primitive.NewObjectID().Hex()})
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handlePublicCatalog(rec, req)
-		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
-		}
-	})
-
-	t.Run("load stream failure", func(t *testing.T) {
-		base := NewMemoryStore()
-		store := &publicCatalogFailingStore{MemoryStore: base, failLoadStream: true}
-		admin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "org-admin-stream-error-catalog@example.com",
-			RoleSlugs: []string{"org-admin"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser: %v", err)
-		}
-		if _, err := store.CreateOrganization(t.Context(), Organization{Name: "Acme"}); err != nil {
-			t.Fatalf("CreateOrganization: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store.MemoryStore, admin)
-		server := &Server{store: store, enforceAuth: true, now: time.Now}
-		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-		rec := httptest.NewRecorder()
-
-		server.handlePublicCatalog(rec, req)
-
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}

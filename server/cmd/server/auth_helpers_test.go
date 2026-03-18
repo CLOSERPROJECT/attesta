@@ -6,352 +6,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
-
-type authFailingStore struct {
-	*MemoryStore
-	failSetLastLogin  bool
-	failCreateSession bool
-}
-
-func (s *authFailingStore) SetUserLastLogin(ctx context.Context, userMongoID primitive.ObjectID, lastLoginAt time.Time) error {
-	if s.failSetLastLogin {
-		return errors.New("set last login failed")
-	}
-	return s.MemoryStore.SetUserLastLogin(ctx, userMongoID, lastLoginAt)
-}
-
-func (s *authFailingStore) CreateSession(ctx context.Context, session Session) (Session, error) {
-	if s.failCreateSession {
-		return Session{}, errors.New("create session failed")
-	}
-	return s.MemoryStore.CreateSession(ctx, session)
-}
-
-func TestEnvAndCookieHelpers(t *testing.T) {
-	t.Setenv("INT_TEST_VALUE", "")
-	if got := intEnvOr("INT_TEST_VALUE", 42); got != 42 {
-		t.Fatalf("intEnvOr fallback = %d, want 42", got)
-	}
-	t.Setenv("INT_TEST_VALUE", "bad")
-	if got := intEnvOr("INT_TEST_VALUE", 42); got != 42 {
-		t.Fatalf("intEnvOr bad parse fallback = %d, want 42", got)
-	}
-	t.Setenv("INT_TEST_VALUE", "7")
-	if got := intEnvOr("INT_TEST_VALUE", 42); got != 7 {
-		t.Fatalf("intEnvOr parsed = %d, want 7", got)
-	}
-
-	t.Setenv("SESSION_TTL_DAYS", "0")
-	if got := sessionTTLDays(); got != 30 {
-		t.Fatalf("sessionTTLDays zero = %d, want 30", got)
-	}
-	t.Setenv("SESSION_TTL_DAYS", "14")
-	if got := sessionTTLDays(); got != 14 {
-		t.Fatalf("sessionTTLDays value = %d, want 14", got)
-	}
-	t.Setenv("RESET_TTL_HOURS", "0")
-	if got := resetTTLHrs(); got != 24 {
-		t.Fatalf("resetTTLHrs zero = %d, want 24", got)
-	}
-	t.Setenv("RESET_TTL_HOURS", "48")
-	if got := resetTTLHrs(); got != 48 {
-		t.Fatalf("resetTTLHrs value = %d, want 48", got)
-	}
-
-	t.Setenv("COOKIE_SECURE", "false")
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	if shouldSecureCookie(req) {
-		t.Fatal("expected insecure cookie by default")
-	}
-	req.Header.Set("X-Forwarded-Proto", "https")
-	if !shouldSecureCookie(req) {
-		t.Fatal("expected secure cookie for forwarded https")
-	}
-	t.Setenv("COOKIE_SECURE", "true")
-	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
-	if !shouldSecureCookie(req2) {
-		t.Fatal("expected secure cookie when COOKIE_SECURE=true")
-	}
-
-}
-
-func TestReadSessionAndCurrentUser(t *testing.T) {
-	now := time.Date(2026, 2, 26, 20, 0, 0, 0, time.UTC)
-	var deletedSecrets []string
-	server := &Server{
-		identity: &fakeIdentityStore{
-			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
-				switch sessionSecret {
-				case "session-valid":
-					return fakeIdentitySession(sessionSecret, "user-1", now.Add(2*time.Hour)), nil
-				case "session-expired":
-					return fakeIdentitySession(sessionSecret, "user-1", now.Add(-1*time.Hour)), nil
-				default:
-					return IdentitySession{}, ErrIdentityUnauthorized
-				}
-			},
-			deleteSessionFunc: func(ctx context.Context, sessionSecret string) error {
-				deletedSecrets = append(deletedSecrets, sessionSecret)
-				return nil
-			},
-			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-				if sessionSecret != "session-valid" {
-					return IdentityUser{}, ErrIdentityUnauthorized
-				}
-				return IdentityUser{
-					ID:         "user-1",
-					Email:      "u-session@example.com",
-					OrgSlug:    "acme",
-					Labels:     []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")},
-					IsOrgAdmin: true,
-					Status:     "active",
-				}, nil
-			},
-		},
-		now: func() time.Time { return now },
-	}
-
-	t.Run("missing cookie", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		if _, err := server.readSession(req); err == nil {
-			t.Fatal("expected missing cookie error")
-		}
-	})
-
-	t.Run("blank cookie", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "  "})
-		if _, err := server.readSession(req); err == nil {
-			t.Fatal("expected blank cookie to fail")
-		}
-	})
-
-	t.Run("expired cookie", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-expired"})
-		if _, err := server.readSession(req); err == nil {
-			t.Fatal("expected expired session error")
-		}
-		if len(deletedSecrets) != 1 || deletedSecrets[0] != "session-expired" {
-			t.Fatalf("deleted secrets = %#v, want [session-expired]", deletedSecrets)
-		}
-	})
-
-	t.Run("current user success and failure", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-valid"})
-		gotUser, gotSession, err := server.currentUser(req)
-		if err != nil {
-			t.Fatalf("currentUser error: %v", err)
-		}
-		if gotUser.Email != "u-session@example.com" || gotUser.OrgSlug != "acme" || !containsRole(gotUser.RoleSlugs, "org-admin") || gotSession.Secret != "session-valid" {
-			t.Fatalf("unexpected currentUser result user=%+v session=%+v", gotUser, gotSession)
-		}
-
-		req2 := httptest.NewRequest(http.MethodGet, "/", nil)
-		req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-missing"})
-		if _, _, err := server.currentUser(req2); err == nil {
-			t.Fatal("expected currentUser error for invalid session")
-		}
-	})
-}
-
-func TestReadSessionAndCurrentUserLegacy(t *testing.T) {
-	now := time.Date(2026, 2, 26, 20, 0, 0, 0, time.UTC)
-	store := NewMemoryStore()
-	user, err := store.CreateUser(t.Context(), AccountUser{
-		Email:     "legacy@example.com",
-		Status:    "active",
-		CreatedAt: now,
-	})
-	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
-	}
-	validSession, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "legacy-valid",
-		UserMongoID: user.ID,
-		CreatedAt:   now,
-		LastLoginAt: now,
-		ExpiresAt:   now.Add(time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("CreateSession error: %v", err)
-	}
-	if _, err := store.CreateSession(t.Context(), Session{
-		SessionID:   "legacy-expired",
-		UserMongoID: user.ID,
-		CreatedAt:   now,
-		LastLoginAt: now,
-		ExpiresAt:   now.Add(-time.Hour),
-	}); err != nil {
-		t.Fatalf("CreateSession expired error: %v", err)
-	}
-
-	server := &Server{
-		store: store,
-		now:   func() time.Time { return now },
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: validSession.SessionID})
-	gotUser, gotSession, err := server.currentUser(req)
-	if err != nil {
-		t.Fatalf("currentUser error: %v", err)
-	}
-	if gotUser.ID != user.ID || gotSession.Secret != validSession.SessionID {
-		t.Fatalf("user/session = %#v %#v", gotUser, gotSession)
-	}
-
-	expiredReq := httptest.NewRequest(http.MethodGet, "/", nil)
-	expiredReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "legacy-expired"})
-	if _, err := server.readSession(expiredReq); !errors.Is(err, mongo.ErrNoDocuments) {
-		t.Fatalf("readSession error = %v, want %v", err, mongo.ErrNoDocuments)
-	}
-	if _, err := store.LoadSessionByID(t.Context(), "legacy-expired"); !errors.Is(err, mongo.ErrNoDocuments) {
-		t.Fatalf("expired session still exists: %v", err)
-	}
-}
-
-func TestUserOrgAdminAndPageBaseFlags(t *testing.T) {
-	orgID := primitive.NewObjectID()
-	admin := &AccountUser{
-		RoleSlugs: []string{"org-admin"},
-		OrgSlug:   "acme",
-		OrgID:     &orgID,
-	}
-	if !userIsOrgAdmin(admin) {
-		t.Fatal("expected org admin user")
-	}
-
-	baseServer := &Server{}
-	page := baseServer.pageBaseForUser(admin, "dashboard_body", "workflow", "Workflow")
-	if !page.ShowMyOrgLink {
-		t.Fatalf("expected my-org nav flag, got %+v", page)
-	}
-
-	unassigned := &AccountUser{
-		RoleSlugs: []string{"org-admin"},
-	}
-	if !userIsOrgAdmin(unassigned) {
-		t.Fatal("expected unassigned org admin user")
-	}
-	pageUnassigned := baseServer.pageBaseForUser(unassigned, "dashboard_body", "", "")
-	if !pageUnassigned.ShowMyOrgLink {
-		t.Fatalf("expected my-org nav flag for unassigned org admin, got %+v", pageUnassigned)
-	}
-
-	non := &AccountUser{RoleSlugs: []string{"dep1"}}
-	if userIsOrgAdmin(non) {
-		t.Fatal("expected non org admin user")
-	}
-	page2 := baseServer.pageBaseForUser(non, "dashboard_body", "", "")
-	if page2.ShowMyOrgLink {
-		t.Fatalf("expected nav flags false, got %+v", page2)
-	}
-
-	underscore := &AccountUser{RoleSlugs: []string{"org_admin"}}
-	if !userIsOrgAdmin(underscore) {
-		t.Fatal("expected underscore org admin role to count")
-	}
-	if userHasOrganizationContext(&AccountUser{OrgID: &orgID, OrgSlug: "   "}) {
-		t.Fatal("expected blank org slug to fail organization context")
-	}
-}
-
-func TestRequireAuthenticatedAndOrgAdminGuards(t *testing.T) {
-	server := &Server{
-		store:       NewMemoryStore(),
-		enforceAuth: false,
-	}
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
-	user, _, ok := server.requireAuthenticatedPage(rec, req)
-	if !ok || !user.ID.IsZero() {
-		t.Fatalf("expected legacy auth user, got ok=%v user=%+v", ok, user)
-	}
-
-	now := time.Now().UTC()
-	authServer := &Server{
-		identity: &fakeIdentityStore{
-			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
-				if sessionSecret != "plain-session" {
-					return IdentitySession{}, ErrIdentityUnauthorized
-				}
-				return fakeIdentitySession(sessionSecret, "user-plain", now.Add(24*time.Hour)), nil
-			},
-			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-				return IdentityUser{
-					ID:      "user-plain",
-					Email:   "plain@example.com",
-					OrgSlug: "acme",
-					Labels:  []string{encodeIdentityRoleLabel("dep1")},
-					Status:  "active",
-				}, nil
-			},
-		},
-		enforceAuth: true,
-		now:         func() time.Time { return now },
-	}
-
-	rec2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
-	req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: "plain-session"})
-	if _, ok := authServer.requireOrgAdmin(rec2, req2); ok {
-		t.Fatal("expected requireOrgAdmin to reject non-org-admin")
-	}
-	if rec2.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", rec2.Code, http.StatusForbidden)
-	}
-
-	rec3 := httptest.NewRecorder()
-	req3 := httptest.NewRequest(http.MethodPost, "/process/start", nil)
-	if _, _, ok := authServer.requireAuthenticatedPost(rec3, req3); ok {
-		t.Fatal("expected requireAuthenticatedPost to fail without cookie")
-	}
-	if rec3.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", rec3.Code, http.StatusUnauthorized)
-	}
-
-}
-
-func TestIsDuplicateSlugError(t *testing.T) {
-	if isDuplicateSlugError(nil) {
-		t.Fatal("expected nil error to be non-duplicate")
-	}
-
-	dupErr := mongo.WriteException{
-		WriteErrors: []mongo.WriteError{{Code: 11000, Message: "E11000 duplicate key"}},
-	}
-	if !isDuplicateSlugError(dupErr) {
-		t.Fatal("expected mongo duplicate-key error to be recognized")
-	}
-
-	if !isDuplicateSlugError(errors.New("slug already exists")) {
-		t.Fatal("expected slug conflict message to be recognized")
-	}
-	if !isDuplicateSlugError(errors.New("role already exists")) {
-		t.Fatal("expected role conflict message to be recognized")
-	}
-	if !isDuplicateSlugError(errors.New("duplicate key")) {
-		t.Fatal("expected duplicate key message to be recognized")
-	}
-	if isDuplicateSlugError(errors.New("something else")) {
-		t.Fatal("expected unrelated error to be non-duplicate")
-	}
-}
 
 func TestRequestedRoleSlugs(t *testing.T) {
 	form := url.Values{}
-	form["roles"] = []string{" org-admin ", "org_admin", "dep1", "dep1"}
+	form["roles"] = []string{" qa-reviewer ", "org-admin"}
 	got := requestedRoleSlugs(form)
-	if len(got) != 2 || got[0] != "org-admin" || got[1] != "dep1" {
-		t.Fatalf("requestedRoleSlugs roles = %#v, want [org-admin dep1]", got)
+	if len(got) != 2 || got[0] != "qa-reviewer" || got[1] != "org-admin" {
+		t.Fatalf("requestedRoleSlugs = %#v", got)
 	}
 
 	legacy := url.Values{}
@@ -360,182 +27,284 @@ func TestRequestedRoleSlugs(t *testing.T) {
 	if len(got) != 1 || got[0] != "dep2" {
 		t.Fatalf("requestedRoleSlugs legacy role = %#v, want [dep2]", got)
 	}
+}
 
-	empty := requestedRoleSlugs(url.Values{})
-	if len(empty) != 0 {
-		t.Fatalf("requestedRoleSlugs empty = %#v, want []", empty)
+func TestAccountUserFromIdentity(t *testing.T) {
+	server := &Server{}
+	user := server.accountUserFromIdentity(context.Background(), IdentityUser{
+		ID:         "user-1",
+		Email:      "legacy@example.com",
+		OrgSlug:    "acme",
+		Labels:     []string{encodeIdentityRoleLabel("qa-reviewer")},
+		IsOrgAdmin: false,
+		Status:     "pending",
+	})
+	if user.Email != "legacy@example.com" || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
+		t.Fatalf("user = %#v", user)
+	}
+}
+
+func TestReadSessionAndCurrentUserIdentityOnly(t *testing.T) {
+	now := time.Now().UTC()
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				if sessionSecret == "expired" {
+					return fakeIdentitySession(sessionSecret, "user-1", now.Add(-time.Hour)), nil
+				}
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "user@example.com", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("qa-reviewer")}, Status: "active"}, nil
+			},
+		},
+		now: func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "ok"})
+	user, session, err := server.currentUser(req)
+	if err != nil {
+		t.Fatalf("currentUser error: %v", err)
+	}
+	if session.Secret != "ok" || user.Email != "user@example.com" || user.OrgSlug != "acme" {
+		t.Fatalf("user/session = %#v %#v", user, session)
+	}
+
+	expiredReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	expiredReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "expired"})
+	if _, err := server.readSession(expiredReq); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("expired readSession error = %v", err)
+	}
+}
+
+func TestReadSessionRequiresIdentity(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	if _, err := server.readSession(req); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("readSession error = %v", err)
+	}
+}
+
+func TestCurrentUserPropagatesIdentityLookupError(t *testing.T) {
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", time.Now().Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{}, errors.New("boom")
+			},
+		},
+		now: time.Now,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+
+	_, _, err := server.currentUser(req)
+
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("currentUser error = %v, want boom", err)
+	}
+}
+
+func TestRequestURLsAndCookieHelpers(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://attesta.local/", nil)
+	if got := requestBaseURL(req); got != "http://attesta.local" {
+		t.Fatalf("requestBaseURL = %q", got)
+	}
+	if got := resetRedirectURL(req); got != "http://attesta.local/reset/confirm" {
+		t.Fatalf("resetRedirectURL = %q", got)
+	}
+	if got := inviteRedirectURL(req); got != "http://attesta.local/invite/accept" {
+		t.Fatalf("inviteRedirectURL = %q", got)
+	}
+
+	t.Setenv("APPWRITE_RESET_REDIRECT_URL", "https://app.example/reset/confirm")
+	if got := resetRedirectURL(req); got != "https://app.example/reset/confirm" {
+		t.Fatalf("configured reset redirect = %q", got)
+	}
+	t.Setenv("APPWRITE_INVITE_REDIRECT_URL", "https://app.example/invite/accept")
+	if got := inviteRedirectURL(req); got != "https://app.example/invite/accept" {
+		t.Fatalf("configured invite redirect = %q", got)
+	}
+
+	secureReq := httptest.NewRequest(http.MethodGet, "http://attesta.local/", nil)
+	secureReq.Header.Set("X-Forwarded-Proto", "https")
+	if got := requestBaseURL(secureReq); got != "https://attesta.local" {
+		t.Fatalf("secure requestBaseURL = %q", got)
+	}
+
+	hostlessReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	hostlessReq.Host = ""
+	if got := requestBaseURL(hostlessReq); got != "http://localhost:3000" {
+		t.Fatalf("hostless requestBaseURL = %q", got)
+	}
+}
+
+func TestSessionSecretFromRequest(t *testing.T) {
+	if _, err := sessionSecretFromRequest(httptest.NewRequest(http.MethodGet, "/", nil)); err == nil {
+		t.Fatal("expected missing cookie error")
+	}
+	reqEmpty := httptest.NewRequest(http.MethodGet, "/", nil)
+	reqEmpty.AddCookie(&http.Cookie{Name: "attesta_session", Value: "   "})
+	if _, err := sessionSecretFromRequest(reqEmpty); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("empty cookie error = %v", err)
+	}
+}
+
+func TestStableIdentityHelpers(t *testing.T) {
+	orgID := stableOrgObjectID("Acme")
+	userID := stableIdentityUserObjectID("user-1")
+	if orgID == primitive.NilObjectID || userID == primitive.NilObjectID {
+		t.Fatal("stable object ids should not be nil")
+	}
+}
+
+func TestResetTTLHrsDefaultsInvalidValues(t *testing.T) {
+	t.Setenv("RESET_TTL_HOURS", "48")
+	if got := resetTTLHrs(); got != 48 {
+		t.Fatalf("resetTTLHrs = %d, want 48", got)
+	}
+
+	t.Setenv("RESET_TTL_HOURS", "0")
+	if got := resetTTLHrs(); got != 24 {
+		t.Fatalf("resetTTLHrs zero = %d, want 24", got)
 	}
 }
 
 func TestAccountMatchesOrg(t *testing.T) {
-	orgID := primitive.NewObjectID()
-	otherID := primitive.NewObjectID()
+	orgID := stableOrgObjectID("acme")
+	user := &AccountUser{OrgID: &orgID, OrgSlug: "acme"}
+	if !accountMatchesOrg(user, orgID, " acme ") {
+		t.Fatal("expected account to match org")
+	}
 	if accountMatchesOrg(nil, orgID, "acme") {
-		t.Fatal("expected nil user mismatch")
+		t.Fatal("nil account should not match")
 	}
-	if accountMatchesOrg(&AccountUser{}, orgID, "acme") {
-		t.Fatal("expected missing user org mismatch")
+	otherOrgID := stableOrgObjectID("other")
+	if accountMatchesOrg(user, otherOrgID, "acme") {
+		t.Fatal("different org id should not match")
 	}
-	if accountMatchesOrg(&AccountUser{OrgID: &otherID, OrgSlug: "acme"}, orgID, "acme") {
-		t.Fatal("expected different org ID mismatch")
-	}
-	if accountMatchesOrg(&AccountUser{OrgID: &orgID, OrgSlug: "acme"}, orgID, "other") {
-		t.Fatal("expected different org slug mismatch")
-	}
-	if !accountMatchesOrg(&AccountUser{OrgID: &orgID, OrgSlug: " acme "}, orgID, "acme") {
-		t.Fatal("expected matching org ID and slug")
+	if accountMatchesOrg(user, orgID, "other") {
+		t.Fatal("different org slug should not match")
 	}
 }
 
-func TestAccountUserFromIdentity(t *testing.T) {
-	t.Run("without store fallback", func(t *testing.T) {
-		server := &Server{}
-		user := server.accountUserFromIdentity(t.Context(), IdentityUser{
-			Email:      "user@example.com",
-			OrgSlug:    "acme",
-			Labels:     []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")},
-			IsOrgAdmin: true,
-			Status:     "active",
-		})
-		if user.Email != "user@example.com" || user.OrgSlug != "acme" || !containsRole(user.RoleSlugs, "org-admin") || !containsRole(user.RoleSlugs, "qa-reviewer") {
+func TestIsSameAccount(t *testing.T) {
+	accountID := stableIdentityUserObjectID("user-1")
+	if !isSameAccount(&AccountUser{ID: accountID}, &AccountUser{ID: accountID}) {
+		t.Fatal("expected same account ids to match")
+	}
+	if isSameAccount(nil, &AccountUser{ID: accountID}) {
+		t.Fatal("nil account should not match")
+	}
+	if isSameAccount(&AccountUser{}, &AccountUser{ID: accountID}) {
+		t.Fatal("zero account id should not match")
+	}
+}
+
+func TestRequireOrgAdmin(t *testing.T) {
+	now := time.Now().UTC()
+	orgID := stableOrgObjectID("acme")
+	admin := AccountUser{ID: primitive.NewObjectID(), OrgID: &orgID, OrgSlug: "acme", Email: "admin@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+	member := AccountUser{ID: primitive.NewObjectID(), OrgID: &orgID, OrgSlug: "acme", Email: "member@example.com", RoleSlugs: []string{"qa-reviewer"}, Status: "active"}
+	server := &Server{
+		identity:    testIdentityForSessions(now, map[string]AccountUser{"session-admin": admin, "session-member": member}),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	t.Run("unauthenticated redirects", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		rec := httptest.NewRecorder()
+		if _, ok := server.requireOrgAdmin(rec, req); ok {
+			t.Fatal("expected requireOrgAdmin to fail")
+		}
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+	})
+
+	t.Run("non admin forbidden", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-member"})
+		rec := httptest.NewRecorder()
+		if _, ok := server.requireOrgAdmin(rec, req); ok {
+			t.Fatal("expected requireOrgAdmin to reject non-admin")
+		}
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("admin allowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-admin"})
+		rec := httptest.NewRecorder()
+		user, ok := server.requireOrgAdmin(rec, req)
+		if !ok {
+			t.Fatal("expected requireOrgAdmin to allow admin")
+		}
+		if user == nil || user.Email != "admin@example.com" {
 			t.Fatalf("user = %#v", user)
 		}
 	})
-
-	t.Run("merges onto legacy user", func(t *testing.T) {
-		store := NewMemoryStore()
-		legacy, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "legacy@example.com",
-			RoleSlugs: []string{"dep1"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser error: %v", err)
-		}
-		server := &Server{store: store}
-		user := server.accountUserFromIdentity(t.Context(), IdentityUser{
-			Email:   "legacy@example.com",
-			OrgSlug: "acme",
-			Labels:  []string{encodeIdentityRoleLabel("qa-reviewer")},
-			Status:  "pending",
-		})
-		if user.ID != legacy.ID || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
-			t.Fatalf("user = %#v legacy=%#v", user, legacy)
-		}
-	})
 }
 
-func TestResetURLHelpers(t *testing.T) {
-	t.Run("base URL prefers forwarded https", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/reset", nil)
-		req.Host = "attesta.local"
-		req.Header.Set("X-Forwarded-Proto", "https")
-		if got := requestBaseURL(req); got != "https://attesta.local" {
-			t.Fatalf("requestBaseURL = %q, want https://attesta.local", got)
-		}
-	})
-
-	t.Run("configured redirect overrides request", func(t *testing.T) {
-		t.Setenv("APPWRITE_RESET_REDIRECT_URL", "https://app.example/reset/confirm")
-		req := httptest.NewRequest(http.MethodGet, "/reset", nil)
-		if got := resetRedirectURL(req); got != "https://app.example/reset/confirm" {
-			t.Fatalf("resetRedirectURL = %q", got)
-		}
-	})
-
-	t.Run("base URL falls back to localhost", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/reset", nil)
-		req.Host = ""
-		if got := requestBaseURL(req); got != "http://localhost:3000" {
-			t.Fatalf("requestBaseURL = %q, want http://localhost:3000", got)
-		}
-	})
-}
-
-func TestWriteSessionCookieAndLegacySessionErrors(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), now: time.Now}
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	if err := server.writeSessionCookie(rec, req, IdentitySession{}); err == nil {
-		t.Fatal("expected writeSessionCookie error for missing secret")
+func TestSessionTTLDaysAndNewSessionID(t *testing.T) {
+	t.Setenv("SESSION_TTL_DAYS", "45")
+	if got := sessionTTLDays(); got != 45 {
+		t.Fatalf("sessionTTLDays = %d, want 45", got)
 	}
 
-	secureReq := httptest.NewRequest(http.MethodGet, "/", nil)
-	secureReq.Header.Set("X-Forwarded-Proto", "https")
-	secureRec := httptest.NewRecorder()
-	expiresAt := time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC)
-	if err := server.writeSessionCookie(secureRec, secureReq, IdentitySession{Secret: "session-1", ExpiresAt: expiresAt}); err != nil {
-		t.Fatalf("writeSessionCookie error: %v", err)
-	}
-	cookies := secureRec.Result().Cookies()
-	if len(cookies) != 1 || !cookies[0].Secure {
-		t.Fatalf("cookies = %#v", cookies)
+	t.Setenv("SESSION_TTL_DAYS", "0")
+	if got := sessionTTLDays(); got != 30 {
+		t.Fatalf("sessionTTLDays zero = %d, want 30", got)
 	}
 
-	if err := server.issueLegacySession(httptest.NewRecorder(), req, nil); err == nil {
-		t.Fatal("expected issueLegacySession nil user error")
-	}
-
-	user := &AccountUser{ID: primitive.NewObjectID()}
-	failLogin := &Server{
-		store: &authFailingStore{MemoryStore: NewMemoryStore(), failSetLastLogin: true},
-		now:   time.Now,
-	}
-	if err := failLogin.issueLegacySession(httptest.NewRecorder(), req, user); err == nil || err.Error() != "set last login failed" {
-		t.Fatalf("issueLegacySession set last login error = %v", err)
-	}
-
-	createSessionStore := NewMemoryStore()
-	storedUser, err := createSessionStore.CreateUser(t.Context(), AccountUser{
-		Email:     "legacy@example.com",
-		Status:    "active",
-		CreatedAt: time.Now().UTC(),
-	})
+	first, err := newSessionID()
 	if err != nil {
-		t.Fatalf("CreateUser error: %v", err)
+		t.Fatalf("newSessionID error: %v", err)
 	}
-	failCreate := &Server{
-		store: &authFailingStore{MemoryStore: createSessionStore, failCreateSession: true},
-		now:   time.Now,
+	second, err := newSessionID()
+	if err != nil {
+		t.Fatalf("newSessionID second error: %v", err)
 	}
-	if err := failCreate.issueLegacySession(httptest.NewRecorder(), req, &storedUser); err == nil || err.Error() != "create session failed" {
-		t.Fatalf("issueLegacySession create session error = %v", err)
+	if first == "" || second == "" || first == second {
+		t.Fatalf("session ids = %q %q", first, second)
 	}
 }
 
-func TestLoadActivePasswordResetAndIsSameAccount(t *testing.T) {
-	now := time.Date(2026, 3, 20, 12, 0, 0, 0, time.UTC)
-	store := NewMemoryStore()
-	server := &Server{
-		store: store,
-		now:   func() time.Time { return now },
+func TestWorkflowValidationAndRoleStyleHelpers(t *testing.T) {
+	if got := (&WorkflowRefValidationError{}).Error(); got != "workflow references are invalid" {
+		t.Fatalf("empty workflow validation error = %q", got)
+	}
+	errText := (&WorkflowRefValidationError{Messages: []string{"missing org", "missing role"}}).Error()
+	if errText != "workflow references are invalid: missing org; missing role" {
+		t.Fatalf("workflow validation error = %q", errText)
 	}
 
-	if _, err := store.CreatePasswordReset(t.Context(), PasswordReset{
-		Email:       "used@example.com",
-		UserMongoID: primitive.NewObjectID(),
-		TokenHash:   "used-token",
-		ExpiresAt:   now.Add(time.Hour),
-		CreatedAt:   now,
-		UsedAt:      ptrTime(now),
-	}); err != nil {
-		t.Fatalf("CreatePasswordReset error: %v", err)
+	if got := resolveRolePaletteStyle("sky"); got.Color == "" || got.Border == "" {
+		t.Fatalf("expected known palette style, got %#v", got)
 	}
+	if got := resolveRolePaletteStyle("unknown"); got != rolePaletteStyles["red"] {
+		t.Fatalf("fallback palette style = %#v, want %#v", got, rolePaletteStyles["red"])
+	}
+}
 
-	if _, err := server.loadActivePasswordReset(t.Context(), "used-token"); err == nil || err.Error() != "reset token already used" {
-		t.Fatalf("loadActivePasswordReset error = %v", err)
+func TestIsDuplicateSlugError(t *testing.T) {
+	if isDuplicateSlugError(nil) {
+		t.Fatal("nil error should not be duplicate slug")
 	}
-
-	if isSameAccount(nil, nil) {
-		t.Fatal("expected nil accounts to differ")
+	if !isDuplicateSlugError(errors.New("slug already exists")) {
+		t.Fatal("expected slug already exists to match")
 	}
-	if isSameAccount(&AccountUser{}, &AccountUser{}) {
-		t.Fatal("expected zero-value accounts to differ")
+	if !isDuplicateSlugError(errors.New("duplicate key")) {
+		t.Fatal("expected duplicate key to match")
 	}
-	id := primitive.NewObjectID()
-	if !isSameAccount(&AccountUser{ID: id}, &AccountUser{ID: id}) {
-		t.Fatal("expected matching IDs to compare equal")
+	if isDuplicateSlugError(errors.New("boom")) {
+		t.Fatal("unexpected duplicate slug match")
 	}
 }
