@@ -10,7 +10,7 @@ Summary
 - Migrate process actor identity from Mongo ObjectIDs to opaque IDs so existing history remains readable and new Appwrite users can appear in action lists, timelines, and DPP traces.
 - Vendor a pinned Appwrite self-hosting stack under `deployment/` and update both `deployment/docker-compose.local.yaml` and `deployment/docker-compose.coolify.yaml` so they start Attesta with the required Appwrite services, volumes, and env wiring.
 
-* WIP [#A] Freeze the new identity boundary and data model
+* DONE [#A] Freeze the new identity boundary and data model
 Effort: M
 Goal: Replace the current Mongo-shaped auth model with an Appwrite-shaped identity boundary before any handler rewrites begin.
 Notes: This is the root-cause step. Do not bolt Appwrite onto the existing `primitive.ObjectID` auth model; that would leak Mongo assumptions everywhere and make the migration brittle.
@@ -38,7 +38,7 @@ Tests:
 Done when:
 - The server has a dedicated identity port with string IDs and Appwrite-shaped DTOs, and no new auth code depends on `primitive.ObjectID`.
 
-** WIP [#A] Decide and encode the Appwrite data mapping
+** DONE [#A] Decide and encode the Appwrite data mapping
 Why: The user requested `org -> team`, `roles -> user labels`, `user -> user`, while Attesta still needs an org-scoped role catalog and org-admin behavior.
 Change:
 - Use Appwrite team ID = Attesta org slug when possible; team name = org display name.
