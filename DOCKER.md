@@ -67,6 +67,12 @@ Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
 `deployment/docker-compose.coolify.yaml`). The Coolify stack will include the
 vendored Appwrite module instead of assuming an external identity deployment.
 
+Coolify-specific notes:
+- `traefik` from the vendored Appwrite stack is still included, but only as an internal router for `/`, `/console`, and `/v1/realtime`.
+- Set `SERVICE_FQDN_APPWRITE_80` on the `traefik` service if you want a public Appwrite hostname in Coolify.
+- Set `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`, `APPWRITE_INVITE_REDIRECT_URL`, and `APPWRITE_RESET_REDIRECT_URL` on the `attesta` service before testing auth flows.
+- Attesta reaches Appwrite internally through `http://${SERVICE_NAME_APPWRITE:-appwrite}:80/v1`.
+
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed
 script if provided via `EPHEMERAL_SEED_SCRIPT` (path inside the container) or

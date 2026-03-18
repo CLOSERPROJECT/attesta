@@ -264,7 +264,7 @@ Tests:
 Done when:
 - Mongo storage is no longer responsible for identity concerns and test helpers reflect that split.
 
-* WIP [#A] Package Appwrite for local and Coolify deployments
+* DONE [#A] Package Appwrite for local and Coolify deployments
 Effort: M
 Goal: The repository-managed Docker Compose definitions can start Attesta together with a supported Appwrite stack and the dependencies Appwrite requires.
 Notes: Do not hand-author a partial Appwrite topology inside the existing compose files. Vendor the official Appwrite self-hosting stack under `deployment/` and keep Attesta-specific wiring as a thin wrapper so upgrades remain explicit and diffable.
@@ -318,7 +318,7 @@ Tests:
 Done when:
 - A developer can start Mongo, Cerbos, Attesta, and Appwrite from the repo’s local compose file without undocumented sidecars.
 
-** TODO [#A] Update Coolify compose to start Attesta and Appwrite together
+** DONE [#A] Update Coolify compose to start Attesta and Appwrite together
 Why: `deployment/docker-compose.coolify.yaml` currently assumes identity remains outside the stack. The Appwrite migration is incomplete if Coolify still depends on a separately managed Appwrite deployment.
 Change:
 - Update `deployment/docker-compose.coolify.yaml` to include the vendored Appwrite deployment module and wire Attesta to the resulting internal Appwrite service URL.
