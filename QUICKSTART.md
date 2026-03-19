@@ -18,11 +18,12 @@ After the compose stack is up:
 2. Create the first Appwrite console account.
 3. Create the Attesta Appwrite project.
 4. Create an API key for Attesta.
-5. Create the `org-assets` storage bucket.
-6. Export or set:
+5. Open Mailpit on `http://localhost:8025` if you want to inspect invite and recovery emails locally.
+6. Create the `org-assets` storage bucket.
+7. Export or set:
    - `APPWRITE_PROJECT_ID`
    - `APPWRITE_API_KEY`
-7. Restart Attesta if those values changed after first boot:
+8. Restart Attesta if those values changed after first boot:
 ```bash
 docker compose -f deployment/docker-compose.local.yaml up -d attesta
 ```
@@ -50,6 +51,7 @@ go run ./cmd/server
 - Appwrite Console: http://localhost
 - Home: http://localhost:3030
 - Backoffice: http://localhost:3030/backoffice
+- Mailpit: http://localhost:8025
 
 The entry pages are workflow pickers. Business routes are workflow-scoped under `/w/{workflowKey}/...`.
 

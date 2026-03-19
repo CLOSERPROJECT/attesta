@@ -68,8 +68,18 @@ tasks:
       - |
           sh -c '
           export ANYONE_CAN_CREATE_ACCOUNT=false
-          export ADMIN_EMAIL=admin@example.com
-          export ADMIN_PASSWORD=adminadmin
+          export APPWRITE_ENDPOINT="${APPWRITE_ENDPOINT:-http://localhost/v1}"
+          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}"
+          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}"
+          if [ -z "${APPWRITE_PROJECT_ID:-}" ]; then
+            APPWRITE_PROJECT_ID="$(docker compose -f deployment/docker-compose.local.yaml exec -T attesta env | sed -n "s/^APPWRITE_PROJECT_ID=//p" | tail -n 1)"
+            export APPWRITE_PROJECT_ID
+          fi
+          if [ -z "${APPWRITE_API_KEY:-}" ]; then
+            APPWRITE_API_KEY="$(docker compose -f deployment/docker-compose.local.yaml exec -T attesta env | sed -n "s/^APPWRITE_API_KEY=//p" | tail -n 1)"
+            export APPWRITE_API_KEY
+          fi
+          docker compose -f deployment/docker-compose.local.yaml stop attesta
           task dev:server &
           server_pid=$!
           task dev:web &
@@ -96,7 +106,14 @@ tasks:
     cmds:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
-      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server'
+      - |
+          sh -c '
+          export APPWRITE_ENDPOINT="${APPWRITE_ENDPOINT:-http://localhost/v1}"
+          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}"
+          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}"
+          cd server
+          GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server
+          '
 
   goa:generate:
     desc: Generate Goa code and OpenAPI spec.

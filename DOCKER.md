@@ -40,13 +40,15 @@ docker compose -f deployment/docker-compose.local.yaml up -d
 Open:
 - Appwrite Console: http://localhost
 - App: http://localhost:3030
+- Mailpit: http://localhost:8025
 
 After first boot:
 1. Create the first Appwrite console account.
 2. Create the Attesta Appwrite project.
 3. Create an API key for Attesta.
-4. Create the `org-assets` bucket.
-5. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then restart Attesta.
+4. Open Mailpit on `http://localhost:8025` to inspect invite and recovery emails.
+5. Create the `org-assets` bucket.
+6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then restart Attesta.
 
 ## Verifying the Setup
 ```bash
