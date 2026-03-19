@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -44,8 +46,8 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 		appwrite.WithProject(strings.TrimSpace(projectID)),
 	)
 	if httpClient != nil {
-		adminClient.Client = httpClient
-		sessionClient.Client = httpClient
+		adminClient.Client = cloneHTTPClient(httpClient, false)
+		sessionClient.Client = cloneHTTPClient(httpClient, true)
 	}
 	return &appwriteIdentity{
 		adminClient:     adminClient,
@@ -130,7 +132,11 @@ func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipI
 	if err := ctx.Err(); err != nil {
 		return IdentitySession{}, err
 	}
-	_, err := teams.New(a.sessionClient).UpdateMembershipStatus(
+	sessionClient, err := cloneAppwriteClient(a.sessionClient)
+	if err != nil {
+		return IdentitySession{}, err
+	}
+	_, err = teams.New(sessionClient).UpdateMembershipStatus(
 		strings.TrimSpace(teamID),
 		strings.TrimSpace(membershipID),
 		strings.TrimSpace(userID),
@@ -139,11 +145,11 @@ func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipI
 	if err != nil {
 		return IdentitySession{}, normalizeIdentityError(err)
 	}
-	session, err := account.New(a.sessionClient).CreateSession(strings.TrimSpace(userID), strings.TrimSpace(secret))
+	session, err := account.New(sessionClient).GetSession("current")
 	if err != nil {
 		return IdentitySession{}, normalizeIdentityError(err)
 	}
-	return toIdentitySession(session, "")
+	return toIdentitySession(session, appwriteSessionSecretFromJar(sessionClient))
 }
 
 func (a *appwriteIdentity) CreateRecovery(ctx context.Context, email, redirectURL string) error {
@@ -539,12 +545,51 @@ func cloneAppwriteClient(base appwriteclient.Client, setters ...appwriteclient.C
 	for key, value := range base.Headers {
 		cloned.Headers[key] = value
 	}
+	if base.Client != nil {
+		cloned.Client = cloneHTTPClient(base.Client, true)
+	}
 	for _, setter := range setters {
 		if err := setter(&cloned); err != nil {
 			return appwriteclient.Client{}, err
 		}
 	}
 	return cloned, nil
+}
+
+func cloneHTTPClient(base *http.Client, withJar bool) *http.Client {
+	if base == nil {
+		return nil
+	}
+	cloned := *base
+	if withJar {
+		if base.Jar != nil {
+			cloned.Jar = base.Jar
+		} else if jar, err := cookiejar.New(nil); err == nil {
+			cloned.Jar = jar
+		}
+	}
+	return &cloned
+}
+
+func appwriteSessionSecretFromJar(client appwriteclient.Client) string {
+	if client.Client == nil || client.Client.Jar == nil {
+		return ""
+	}
+	endpoint := strings.TrimSpace(client.Endpoint)
+	if endpoint == "" {
+		return ""
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return ""
+	}
+	for _, cookie := range client.Client.Jar.Cookies(parsed) {
+		name := strings.TrimSpace(cookie.Name)
+		if strings.HasPrefix(name, "a_session_legacy_") || strings.HasPrefix(name, "a_session_") {
+			return strings.TrimSpace(cookie.Value)
+		}
+	}
+	return ""
 }
 
 func toIdentitySession(session *models.Session, fallbackSecret string) (IdentitySession, error) {

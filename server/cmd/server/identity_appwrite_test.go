@@ -672,7 +672,6 @@ func TestAppwriteIdentityAcceptInvite(t *testing.T) {
 	var membershipPath string
 	var sessionPath string
 	var membershipBody map[string]interface{}
-	var sessionBody map[string]interface{}
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -682,12 +681,10 @@ func TestAppwriteIdentityAcceptInvite(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&membershipBody); err != nil {
 				t.Fatalf("decode membership body: %v", err)
 			}
+			http.SetCookie(w, &http.Cookie{Name: "a_session_project-1", Value: "session-secret", Path: "/"})
 			_, _ = w.Write([]byte(`{"$id":"membership-1","teamId":"acme","userId":"user-1","confirm":true,"roles":["member"]}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/account/sessions/token":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/account/sessions/current":
 			sessionPath = r.URL.Path
-			if err := json.NewDecoder(r.Body).Decode(&sessionBody); err != nil {
-				t.Fatalf("decode session body: %v", err)
-			}
 			_, _ = w.Write([]byte(`{"$id":"session-1","userId":"user-1","expire":"2026-03-18T10:11:12Z","secret":"session-secret"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
@@ -707,11 +704,8 @@ func TestAppwriteIdentityAcceptInvite(t *testing.T) {
 	if membershipBody["userId"] != "user-1" || membershipBody["secret"] != "secret-1" {
 		t.Fatalf("membership body = %#v", membershipBody)
 	}
-	if sessionPath != "/v1/account/sessions/token" {
+	if sessionPath != "/v1/account/sessions/current" {
 		t.Fatalf("session path = %q", sessionPath)
-	}
-	if sessionBody["userId"] != "user-1" || sessionBody["secret"] != "secret-1" {
-		t.Fatalf("session body = %#v", sessionBody)
 	}
 	if session.Secret != "session-secret" {
 		t.Fatalf("session secret = %q, want session-secret", session.Secret)
@@ -959,8 +953,9 @@ func TestAppwriteIdentityAcceptInviteSessionFailure(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/v1/teams/acme/memberships/membership-1/status":
+			http.SetCookie(w, &http.Cookie{Name: "a_session_project-1", Value: "session-secret", Path: "/"})
 			_, _ = w.Write([]byte(`{"$id":"membership-1","teamId":"acme","userId":"user-1","confirm":true,"roles":["member"]}`))
-		case "/v1/account/sessions/token":
+		case "/v1/account/sessions/current":
 			http.Error(w, `{"message":"session failed"}`, http.StatusInternalServerError)
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -972,6 +967,26 @@ func TestAppwriteIdentityAcceptInviteSessionFailure(t *testing.T) {
 
 	if _, err := identity.AcceptInvite(context.Background(), "acme", "membership-1", "user-1", "secret-1"); err == nil {
 		t.Fatal("expected AcceptInvite error")
+	}
+}
+
+func TestNewAppwriteIdentitySessionClientHasCookieJar(t *testing.T) {
+	identityStore := NewAppwriteIdentity("http://example.invalid/v1", "project-1", "api-key-1", http.DefaultClient)
+	identity, ok := identityStore.(*appwriteIdentity)
+	if !ok {
+		t.Fatalf("identity type = %T", identityStore)
+	}
+	if identity.sessionClient.Client == nil {
+		t.Fatal("session client http client is nil")
+	}
+	if identity.sessionClient.Client.Jar == nil {
+		t.Fatal("session client cookie jar is nil")
+	}
+	if identity.adminClient.Client == nil {
+		t.Fatal("admin client http client is nil")
+	}
+	if identity.adminClient.Client.Jar != nil {
+		t.Fatal("admin client cookie jar should be nil")
 	}
 }
 
