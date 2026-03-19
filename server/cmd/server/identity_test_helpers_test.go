@@ -7,28 +7,29 @@ import (
 )
 
 type fakeIdentityStore struct {
-	createAccountFunc              func(ctx context.Context, email, password, name string) (IdentityUser, error)
-	createOrganizationFunc         func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
-	acceptInviteFunc               func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
-	createEmailPasswordSessionFunc func(ctx context.Context, email, password string) (IdentitySession, error)
-	createRecoveryFunc             func(ctx context.Context, email, redirectURL string) error
-	completeRecoveryFunc           func(ctx context.Context, userID, secret, password string) error
-	getSessionFunc                 func(ctx context.Context, sessionSecret string) (IdentitySession, error)
-	deleteSessionFunc              func(ctx context.Context, sessionSecret string) error
-	getCurrentUserFunc             func(ctx context.Context, sessionSecret string) (IdentityUser, error)
-	getUserByIDFunc                func(ctx context.Context, userID string) (IdentityUser, error)
-	getUserByEmailFunc             func(ctx context.Context, email string) (IdentityUser, error)
-	inviteOrganizationUserFunc     func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
-	listOrganizationsFunc          func(ctx context.Context) ([]IdentityOrg, error)
-	listOrganizationMembershipsFunc func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
-	listOrganizationUsersFunc      func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
-	getOrganizationBySlugFunc      func(ctx context.Context, slug string) (*IdentityOrg, error)
-	updateOrganizationFunc         func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	createAccountFunc                func(ctx context.Context, email, password, name string) (IdentityUser, error)
+	createOrganizationFunc           func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
+	acceptInviteFunc                 func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
+	createEmailPasswordSessionFunc   func(ctx context.Context, email, password string) (IdentitySession, error)
+	createRecoveryFunc               func(ctx context.Context, email, redirectURL string) error
+	completeRecoveryFunc             func(ctx context.Context, userID, secret, password string) error
+	updateCurrentPasswordFunc        func(ctx context.Context, sessionSecret, password string) error
+	getSessionFunc                   func(ctx context.Context, sessionSecret string) (IdentitySession, error)
+	deleteSessionFunc                func(ctx context.Context, sessionSecret string) error
+	getCurrentUserFunc               func(ctx context.Context, sessionSecret string) (IdentityUser, error)
+	getUserByIDFunc                  func(ctx context.Context, userID string) (IdentityUser, error)
+	getUserByEmailFunc               func(ctx context.Context, email string) (IdentityUser, error)
+	inviteOrganizationUserFunc       func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
+	listOrganizationsFunc            func(ctx context.Context) ([]IdentityOrg, error)
+	listOrganizationMembershipsFunc  func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	listOrganizationUsersFunc        func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
+	getOrganizationBySlugFunc        func(ctx context.Context, slug string) (*IdentityOrg, error)
+	updateOrganizationFunc           func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
 	updateOrganizationMembershipFunc func(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
-	updateUserLabelsFunc           func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
+	updateUserLabelsFunc             func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	deleteOrganizationMembershipFunc func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
-	uploadOrganizationLogoFunc     func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
-	getOrganizationLogoFunc        func(ctx context.Context, fileID string) (IdentityFile, error)
+	uploadOrganizationLogoFunc       func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
+	getOrganizationLogoFunc          func(ctx context.Context, fileID string) (IdentityFile, error)
 }
 
 func (f *fakeIdentityStore) CreateAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
@@ -69,6 +70,13 @@ func (f *fakeIdentityStore) CreateRecovery(ctx context.Context, email, redirectU
 func (f *fakeIdentityStore) CompleteRecovery(ctx context.Context, userID, secret, password string) error {
 	if f.completeRecoveryFunc != nil {
 		return f.completeRecoveryFunc(ctx, userID, secret, password)
+	}
+	return nil
+}
+
+func (f *fakeIdentityStore) UpdateCurrentPassword(ctx context.Context, sessionSecret, password string) error {
+	if f.updateCurrentPasswordFunc != nil {
+		return f.updateCurrentPasswordFunc(ctx, sessionSecret, password)
 	}
 	return nil
 }

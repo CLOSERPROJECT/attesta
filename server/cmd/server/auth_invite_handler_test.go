@@ -24,6 +24,9 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 				acceptedSecret = secret
 				return fakeIdentitySession("invite-session", userID, now.Add(24*time.Hour)), nil
 			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: true}, nil
+			},
 		},
 		now: time.Now,
 	}
@@ -44,6 +47,32 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 	}
 	if acceptedTeamID != "acme" || acceptedMembershipID != "membership-1" || acceptedUserID != "user-1" || acceptedSecret != "secret-1" {
 		t.Fatalf("accepted params = %q/%q/%q/%q", acceptedTeamID, acceptedMembershipID, acceptedUserID, acceptedSecret)
+	}
+}
+
+func TestHandleInviteAcceptRedirectsToInvitePasswordWhenUnset(t *testing.T) {
+	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
+	server := &Server{
+		identity: &fakeIdentityStore{
+			acceptInviteFunc: func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
+				return fakeIdentitySession("invite-session", userID, now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: false}, nil
+			},
+		},
+		now: time.Now,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
+	rec := httptest.NewRecorder()
+	server.handleInvite(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/invite/password" {
+		t.Fatalf("location = %q, want /invite/password", rec.Header().Get("Location"))
 	}
 }
 

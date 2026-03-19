@@ -17,8 +17,16 @@ func resetTemplates() *template.Template {
 {{define "layout.html"}}{{if eq .Body "reset_request_body"}}{{template "reset_request_body" .}}{{else if eq .Body "reset_set_body"}}{{template "reset_set_body" .}}{{end}}{{end}}
 {{define "reset_request_body"}}RESET_REQUEST{{if .Confirmation}} {{.Confirmation}}{{end}}{{end}}
 {{define "reset_request.html"}}{{template "layout.html" .}}{{end}}
-{{define "reset_set_body"}}RESET_SET{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "reset_set_body"}}RESET_SET{{if .Title}} {{.Title}}{{end}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "reset_set.html"}}{{template "layout.html" .}}{{end}}
+`))
+}
+
+func invitePasswordTemplates() *template.Template {
+	return template.Must(template.New("invite-test").Parse(`
+{{define "layout.html"}}{{if eq .Body "invite_body"}}{{template "invite_body" .}}{{end}}{{end}}
+{{define "invite_body"}}INVITE_PASSWORD{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "invite.html"}}{{template "layout.html" .}}{{end}}
 `))
 }
 
@@ -54,6 +62,46 @@ func TestHandleResetRequestTriggersRecovery(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "If the account exists") {
 		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestHandleInvitePasswordUpdatesCurrentPassword(t *testing.T) {
+	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
+	var updatedSecret string
+	var updatedPassword string
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", OrgSlug: "acme", PasswordSet: false}, nil
+			},
+			updateCurrentPasswordFunc: func(ctx context.Context, sessionSecret, password string) error {
+				updatedSecret = sessionSecret
+				updatedPassword = password
+				return nil
+			},
+		},
+		tmpl:        invitePasswordTemplates(),
+		now:         func() time.Time { return now },
+		enforceAuth: true,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/invite/password", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "invite-session"})
+	rec := httptest.NewRecorder()
+	server.handleInvite(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/" {
+		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	}
+	if updatedSecret != "invite-session" || updatedPassword != "this-is-strong-enough" {
+		t.Fatalf("updated = %q/%q", updatedSecret, updatedPassword)
 	}
 }
 

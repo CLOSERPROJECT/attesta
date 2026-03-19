@@ -29,8 +29,8 @@ type appwriteTeamPrefs struct {
 }
 
 type appwriteIdentity struct {
-	adminClient   appwriteclient.Client
-	sessionClient appwriteclient.Client
+	adminClient     appwriteclient.Client
+	sessionClient   appwriteclient.Client
 	orgAssetsBucket string
 }
 
@@ -165,6 +165,18 @@ func (a *appwriteIdentity) CompleteRecovery(ctx context.Context, userID, secret,
 		return err
 	}
 	_, err := account.New(a.sessionClient).UpdateRecovery(strings.TrimSpace(userID), strings.TrimSpace(secret), password)
+	return normalizeIdentityError(err)
+}
+
+func (a *appwriteIdentity) UpdateCurrentPassword(ctx context.Context, sessionSecret, password string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return err
+	}
+	_, err = account.New(sessionClient).UpdatePassword(password)
 	return normalizeIdentityError(err)
 }
 
@@ -622,6 +634,7 @@ func toIdentityUser(user *models.User, memberships []models.Membership) Identity
 		Labels: append([]string(nil), user.Labels...),
 		Status: "active",
 	}
+	identity.PasswordSet = strings.TrimSpace(user.PasswordUpdate) != ""
 	if !user.Status {
 		identity.Status = "disabled"
 	}

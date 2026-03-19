@@ -438,8 +438,11 @@ type ResetRequestView struct {
 
 type ResetSetView struct {
 	PageBase
-	Token string
-	Error string
+	Token       string
+	Error       string
+	ActionPath  string
+	Title       string
+	SubmitLabel string
 }
 
 type OrgAdminView struct {
@@ -1699,6 +1702,10 @@ func (s *Server) handleInvite(w http.ResponseWriter, r *http.Request) {
 		s.handleInviteAccept(w, r)
 		return
 	}
+	if strings.HasPrefix(r.URL.Path, "/invite/password") {
+		s.handleInvitePassword(w, r)
+		return
+	}
 	http.NotFound(w, r)
 }
 
@@ -1733,7 +1740,75 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to login", http.StatusInternalServerError)
 		return
 	}
+	if identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret); err == nil && !identityUser.PasswordSet {
+		http.Redirect(w, r, "/invite/password", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
+	if s.identity == nil {
+		http.NotFound(w, r)
+		return
+	}
+	user, session, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		view := InviteView{
+			PageBase: s.pageBaseForUser(user, "invite_body", "", ""),
+			Token:    "password",
+			Email:    strings.TrimSpace(user.Email),
+			Org:      strings.TrimSpace(user.OrgSlug),
+			Roles:    append([]string(nil), user.RoleSlugs...),
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "invite.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		password := strings.TrimSpace(r.FormValue("password"))
+		confirmPassword := strings.TrimSpace(r.FormValue("confirm_password"))
+		if password != confirmPassword {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "invite.html", InviteView{
+				PageBase: s.pageBaseForUser(user, "invite_body", "", ""),
+				Token:    "password",
+				Email:    strings.TrimSpace(user.Email),
+				Org:      strings.TrimSpace(user.OrgSlug),
+				Roles:    append([]string(nil), user.RoleSlugs...),
+				Error:    "passwords do not match",
+			})
+			return
+		}
+		if err := validatePassword(password); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "invite.html", InviteView{
+				PageBase: s.pageBaseForUser(user, "invite_body", "", ""),
+				Token:    "password",
+				Email:    strings.TrimSpace(user.Email),
+				Org:      strings.TrimSpace(user.OrgSlug),
+				Roles:    append([]string(nil), user.RoleSlugs...),
+				Error:    err.Error(),
+			})
+			return
+		}
+		if err := s.identity.UpdateCurrentPassword(r.Context(), session.Secret, password); err != nil {
+			http.Error(w, "failed to update password", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func resetTTLHrs() int {
@@ -1830,8 +1905,10 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		view := ResetSetView{
-			PageBase: s.pageBase("reset_set_body", "", ""),
-			Token:    "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
+			PageBase:    s.pageBase("reset_set_body", "", ""),
+			Token:       "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
+			Title:       "Set New Password",
+			SubmitLabel: "Update password",
 		}
 		if err := s.tmpl.ExecuteTemplate(w, "reset_set.html", view); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1846,9 +1923,11 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 		if err := validatePassword(password); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = s.tmpl.ExecuteTemplate(w, "reset_set.html", ResetSetView{
-				PageBase: s.pageBase("reset_set_body", "", ""),
-				Token:    "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
-				Error:    err.Error(),
+				PageBase:    s.pageBase("reset_set_body", "", ""),
+				Token:       "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
+				Error:       err.Error(),
+				Title:       "Set New Password",
+				SubmitLabel: "Update password",
 			})
 			return
 		}
