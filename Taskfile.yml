@@ -67,9 +67,7 @@ tasks:
       - task: start
       - |
           sh -c '
-          export ANYONE_CAN_CREATE_ACCOUNT=false
-          export ADMIN_EMAIL=admin@example.com
-          export ADMIN_PASSWORD=adminadmin
+          docker compose -f deployment/docker-compose.local.yaml stop attesta
           task dev:server &
           server_pid=$!
           task dev:web &
@@ -83,7 +81,7 @@ tasks:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
-      - sh -c 'cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
+      - sh -c 'export $(grep -v "^#" .env | xargs) && cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
 
   dev:web:
     desc: Vite dev server (HMR).
@@ -96,7 +94,14 @@ tasks:
     cmds:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
-      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server'
+      - |
+          sh -c '
+          export APPWRITE_ENDPOINT="${APPWRITE_ENDPOINT:-http://localhost/v1}"
+          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}"
+          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}"
+          cd server
+          GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server
+          '
 
   goa:generate:
     desc: Generate Goa code and OpenAPI spec.

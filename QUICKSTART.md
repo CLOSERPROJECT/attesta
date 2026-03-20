@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-This demo runs MongoDB + Cerbos with Docker Compose, a Go server, and a Vite-built asset bundle.
+This demo runs MongoDB + Cerbos + Appwrite with Docker Compose, a Go server, and a Vite-built asset bundle.
 
 ## Prerequisites
 - Docker + Docker Compose
@@ -11,6 +11,27 @@ This demo runs MongoDB + Cerbos with Docker Compose, a Go server, and a Vite-bui
 ```bash
 docker compose -f deployment/docker-compose.local.yaml up -d
 ```
+
+## Bootstrap Appwrite
+After the compose stack is up:
+1. Open the Appwrite console on `http://localhost`.
+2. Create the first Appwrite console account.
+3. Create the Attesta Appwrite project.
+4. Create an API key for Attesta.
+5. Open Mailpit on `http://localhost:8025` if you want to inspect invite and recovery emails locally.
+6. Create the `org-assets` storage bucket.
+7. Export or set:
+   - `APPWRITE_PROJECT_ID`
+   - `APPWRITE_API_KEY`
+8. Restart Attesta if those values changed after first boot:
+```bash
+docker compose -f deployment/docker-compose.local.yaml up -d attesta
+```
+
+## Migration Notes
+- Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
+- Existing Mongo invite and password-reset tokens are not migrated. Re-issue any still-needed invite or reset from the Appwrite-backed Attesta flows.
+- If you are cutting over an existing demo dataset, migrate organizations, roles, and active users into Appwrite before relying on `/org-admin/*`.
 
 ## Build frontend assets
 ```bash
@@ -27,8 +48,10 @@ go run ./cmd/server
 ```
 
 ## Open the demo
-- Home: http://localhost:3000
-- Backoffice: http://localhost:3000/backoffice
+- Appwrite Console: http://localhost
+- Home: http://localhost:3030
+- Backoffice: http://localhost:3030/backoffice
+- Mailpit: http://localhost:8025
 
 The entry pages are workflow pickers. Business routes are workflow-scoped under `/w/{workflowKey}/...`.
 

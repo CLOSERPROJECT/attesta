@@ -9,15 +9,20 @@ This repo is a small end-to-end demo:
 
 See: `README.md`, `QUICKSTART.md`, `DOCKER.md`.
 
-## Current auth/org status (2026-02)
+## Current auth/org status (2026-03)
 - Demo impersonation has been removed from production code paths.
-- Session auth is active (`attesta_session` cookie) with login/logout/invite/reset flows.
+- Session auth is active (`attesta_session` cookie) and now stores an Appwrite session secret.
 - Dashboard route is `/dashboard` (workflow-scoped variant: `/w/:workflow/dashboard`).
 - Admin consoles:
-  - Platform admin: `/admin/orgs`
   - Org admin: `/org-admin/roles`, `/org-admin/users`
+- Platform admin behavior has been removed from Attesta. Bootstrap orgs and first org-admins in Appwrite instead.
+- Auth/org state now lives in Appwrite:
+  - orgs -> teams
+  - role catalog -> team prefs
+  - accepted roles -> user labels
+  - invites -> memberships
+  - signup/login/reset -> Appwrite account/session/recovery flows
 - Global topbar now renders role-aware admin links on authenticated pages:
-  - Platform admin sees `Orgs` (`/admin/orgs`)
   - Org admin with org context sees `My Org` (`/org-admin/users`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 - Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
@@ -102,9 +107,15 @@ task start
 Backend environment variables (observed):
 - `MONGODB_URI` (default `mongodb://localhost:27017`) — used in `server/cmd/server/main.go:248`
 - `CERBOS_URL` (default `http://localhost:3592`) — used in `server/cmd/server/main.go:267`
+- `APPWRITE_ENDPOINT` (default `http://appwrite/v1`)
+- `APPWRITE_PROJECT_ID`
+- `APPWRITE_API_KEY`
+- `APPWRITE_INVITE_REDIRECT_URL`
+- `APPWRITE_RESET_REDIRECT_URL`
+- `APPWRITE_ORG_ASSETS_BUCKET` (default `org-assets`)
 - `WORKFLOW_CONFIG` (default `config/workflow.yaml`) — used in `server/cmd/server/main.go:271`
 - `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size; used in `server/cmd/server/main.go:298-309`
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ANYONE_CAN_CREATE_ACCOUNT`
+- `ANYONE_CAN_CREATE_ACCOUNT`
 - `SESSION_TTL_DAYS`, `COOKIE_SECURE`
 
 Example env file: `.env.example`.
@@ -121,10 +132,9 @@ Key endpoints:
 - `POST /process/:id/substep/:substepId/complete`
 - `GET /process/:id/substep/:substepId/file` (download)
 - `GET /dashboard`
-- `GET/POST /login`, `POST /logout`
-- `GET/POST /invite/:token`
-- `GET/POST /reset`, `GET/POST /reset/:token`
-- `GET/POST /admin/orgs`, `GET/POST /admin/orgs/:slug`
+- `GET/POST /login`, `GET/POST /signup`, `POST /logout`
+- `GET /invite/accept`
+- `GET/POST /reset`, `GET/POST /reset/confirm`
 - `GET/POST /org-admin/roles`, `GET/POST /org-admin/users`
 - `GET /events` (SSE)
 
