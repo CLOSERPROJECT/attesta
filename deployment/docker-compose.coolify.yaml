@@ -1,7 +1,7 @@
 include:
   - path: ./appwrite/docker-compose.appwrite.yaml
     env_file:
-      - ./appwrite/.env.appwrite.example
+      - ./appwrite/.env.appwrite.coolify
 
 services:
   traefik:
