@@ -67,18 +67,6 @@ tasks:
       - task: start
       - |
           sh -c '
-          export ANYONE_CAN_CREATE_ACCOUNT=false
-          export APPWRITE_ENDPOINT="${APPWRITE_ENDPOINT:-http://localhost/v1}"
-          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}"
-          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}"
-          if [ -z "${APPWRITE_PROJECT_ID:-}" ]; then
-            APPWRITE_PROJECT_ID="$(docker compose -f deployment/docker-compose.local.yaml exec -T attesta env | sed -n "s/^APPWRITE_PROJECT_ID=//p" | tail -n 1)"
-            export APPWRITE_PROJECT_ID
-          fi
-          if [ -z "${APPWRITE_API_KEY:-}" ]; then
-            APPWRITE_API_KEY="$(docker compose -f deployment/docker-compose.local.yaml exec -T attesta env | sed -n "s/^APPWRITE_API_KEY=//p" | tail -n 1)"
-            export APPWRITE_API_KEY
-          fi
           docker compose -f deployment/docker-compose.local.yaml stop attesta
           task dev:server &
           server_pid=$!
@@ -93,7 +81,7 @@ tasks:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
-      - sh -c 'cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
+      - sh -c 'export $(grep -v "^#" .env | xargs) && cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
 
   dev:web:
     desc: Vite dev server (HMR).
