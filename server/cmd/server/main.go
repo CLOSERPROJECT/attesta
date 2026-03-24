@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -325,6 +326,7 @@ type PageBase struct {
 	WorkflowName  string
 	WorkflowPath  string
 	UserEmail     string
+	ShowOrgsLink  bool
 	ShowMyOrgLink bool
 	ShowLogout    bool
 }
@@ -443,6 +445,21 @@ type ResetSetView struct {
 	ActionPath  string
 	Title       string
 	SubmitLabel string
+}
+
+type PlatformAdminView struct {
+	PageBase
+	Organizations     []Organization
+	InviteLink        string
+	Confirmation      string
+	OrganizationError string
+	InviteError       string
+	Error             string
+}
+
+type PlatformAdminErrors struct {
+	Organization string
+	Invite       string
 }
 
 type OrgAdminView struct {
@@ -782,16 +799,148 @@ func newSessionID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
-func (s *Server) readSession(r *http.Request) (*IdentitySession, error) {
+const platformAdminSessionPrefix = "platform-admin:"
+
+func platformAdminCredentials() (string, string, bool) {
+	email := strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
+	password := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+	if email == "" || password == "" {
+		return "", "", false
+	}
+	return email, password, true
+}
+
+func platformAdminSessionValue() string {
+	email, password, ok := platformAdminCredentials()
+	if !ok {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(email + "\n" + password))
+	return platformAdminSessionPrefix + hex.EncodeToString(sum[:])
+}
+
+func isPlatformAdminSessionValue(value string) bool {
+	expected := platformAdminSessionValue()
+	actual := strings.TrimSpace(value)
+	if expected == "" || actual == "" || len(expected) != len(actual) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(actual)) == 1
+}
+
+func platformAdminAccountUser() *AccountUser {
+	email, _, ok := platformAdminCredentials()
+	if !ok {
+		return nil
+	}
+	return &AccountUser{
+		ID:              stableObjectID("platform-admin:" + email),
+		Email:           email,
+		IsPlatformAdmin: true,
+		Status:          "active",
+	}
+}
+
+func (s *Server) platformAdminSession() (*IdentitySession, *AccountUser, bool) {
+	user := platformAdminAccountUser()
+	if user == nil {
+		return nil, nil, false
+	}
+	session := &IdentitySession{
+		Secret:    platformAdminSessionValue(),
+		UserID:    user.ID.Hex(),
+		ExpiresAt: s.nowUTC().Add(time.Duration(sessionTTLDays()) * 24 * time.Hour),
+	}
+	return session, user, true
+}
+
+func (s *Server) platformAdminIdentitySession(ctx context.Context) (*IdentitySession, error) {
 	if s.identity == nil {
 		return nil, ErrIdentityUnauthorized
 	}
+	email, password, ok := platformAdminCredentials()
+	if !ok {
+		return nil, ErrIdentityUnauthorized
+	}
+	session, err := s.identity.CreateEmailPasswordSession(ctx, email, password)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (s *Server) ensurePlatformAdminOwnsOrganization(ctx context.Context, orgSlug, redirectURL string) (*IdentitySession, error) {
+	session, err := s.platformAdminIdentitySession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	currentUser, err := s.identity.GetCurrentUser(ctx, session.Secret)
+	if err != nil {
+		_ = s.identity.DeleteSession(ctx, session.Secret)
+		return nil, err
+	}
+	memberships, err := s.identity.ListOrganizationMemberships(ctx, orgSlug)
+	if err != nil {
+		_ = s.identity.DeleteSession(ctx, session.Secret)
+		return nil, err
+	}
+	for _, membership := range memberships {
+		if currentUser.ID != "" && strings.TrimSpace(membership.UserID) == strings.TrimSpace(currentUser.ID) {
+			if membership.IsOrgAdmin {
+				return session, nil
+			}
+			if _, err := s.identity.UpdateOrganizationMembershipAsAdmin(ctx, orgSlug, membership.ID, membership.RoleSlugs, true); err != nil {
+				_ = s.identity.DeleteSession(ctx, session.Secret)
+				return nil, err
+			}
+			return session, nil
+		}
+		if strings.EqualFold(strings.TrimSpace(membership.Email), strings.TrimSpace(currentUser.Email)) {
+			if membership.IsOrgAdmin {
+				return session, nil
+			}
+			if _, err := s.identity.UpdateOrganizationMembershipAsAdmin(ctx, orgSlug, membership.ID, membership.RoleSlugs, true); err != nil {
+				_ = s.identity.DeleteSession(ctx, session.Secret)
+				return nil, err
+			}
+			return session, nil
+		}
+	}
+	switch {
+	case strings.TrimSpace(currentUser.ID) != "":
+		if _, err := s.identity.AddOrganizationUserByIDAsAdmin(ctx, orgSlug, currentUser.ID, nil, true); err != nil {
+			_ = s.identity.DeleteSession(ctx, session.Secret)
+			return nil, err
+		}
+	case strings.TrimSpace(currentUser.Email) != "":
+		if _, err := s.identity.InviteOrganizationUserAsAdmin(ctx, orgSlug, currentUser.Email, redirectURL, nil, true); err != nil {
+			_ = s.identity.DeleteSession(ctx, session.Secret)
+			return nil, err
+		}
+	default:
+		_ = s.identity.DeleteSession(ctx, session.Secret)
+		return nil, ErrIdentityUnauthorized
+	}
+	return session, nil
+}
+
+func (s *Server) readSession(r *http.Request) (*IdentitySession, error) {
 	cookie, err := r.Cookie("attesta_session")
 	if err != nil {
 		return nil, err
 	}
 	sessionID := strings.TrimSpace(cookie.Value)
 	if sessionID == "" {
+		return nil, ErrIdentityUnauthorized
+	}
+	if isPlatformAdminSessionValue(sessionID) {
+		session, _, ok := s.platformAdminSession()
+		if ok {
+			return session, nil
+		}
+		return nil, ErrIdentityUnauthorized
+	}
+	if s.identity == nil {
 		return nil, ErrIdentityUnauthorized
 	}
 	session, err := s.identity.GetSession(r.Context(), sessionID)
@@ -821,6 +970,12 @@ func (s *Server) currentUser(r *http.Request) (*AccountUser, *IdentitySession, e
 	session, err := s.readSession(r)
 	if err != nil {
 		return nil, nil, err
+	}
+	if isPlatformAdminSessionValue(session.Secret) {
+		if _, user, ok := s.platformAdminSession(); ok {
+			return user, session, nil
+		}
+		return nil, nil, ErrIdentityUnauthorized
 	}
 	if s.identity == nil {
 		return nil, nil, ErrIdentityUnauthorized
@@ -1014,6 +1169,7 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	}
 	base.UserEmail = strings.TrimSpace(user.Email)
 	base.ShowLogout = s.enforceAuth
+	base.ShowOrgsLink = user.IsPlatformAdmin
 	base.ShowMyOrgLink = userIsOrgAdmin(user)
 	return base
 }
@@ -1469,7 +1625,7 @@ func (s *Server) requireOrgOrPlatformAdminAPI(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return nil, false
 	}
-	if user != nil && userIsOrgAdmin(user) {
+	if user != nil && (user.IsPlatformAdmin || userIsOrgAdmin(user)) {
 		return user, true
 	}
 	http.Error(w, "forbidden", http.StatusForbidden)
@@ -1486,6 +1642,8 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
 	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
+	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
@@ -1566,6 +1724,32 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		password := strings.TrimSpace(r.FormValue("password"))
 		next := safeNextPath(r, "/")
+
+		if adminEmail, adminPassword, ok := platformAdminCredentials(); ok && strings.EqualFold(email, adminEmail) {
+			if subtle.ConstantTimeCompare([]byte(password), []byte(adminPassword)) != 1 {
+				view := LoginView{
+					PageBase:   s.pageBase("login_body", "", ""),
+					Email:      email,
+					Next:       next,
+					Error:      "Invalid email or password.",
+					ShowSignup: anyoneCanCreateAccount(),
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+				return
+			}
+			session, _, ok := s.platformAdminSession()
+			if !ok {
+				http.Error(w, "login failed", http.StatusInternalServerError)
+				return
+			}
+			if err := s.writeSessionCookie(w, r, *session); err != nil {
+				http.Error(w, "login failed", http.StatusInternalServerError)
+				return
+			}
+			http.Redirect(w, r, next, http.StatusSeeOther)
+			return
+		}
 
 		if s.identity == nil {
 			http.Error(w, "login unavailable", http.StatusServiceUnavailable)
@@ -1672,7 +1856,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cookie, err := r.Cookie("attesta_session"); err == nil && strings.TrimSpace(cookie.Value) != "" {
-		if s.identity != nil {
+		if s.identity != nil && !isPlatformAdminSessionValue(cookie.Value) {
 			_ = s.identity.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
 		}
 	}
@@ -2093,6 +2277,18 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 	return user, true
 }
 
+func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !user.IsPlatformAdmin {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return user, true
+}
+
 func (s *Server) readOrganizationLogoUpload(r *http.Request) (*organizationLogoUpload, string) {
 	if r.MultipartForm == nil {
 		return nil, ""
@@ -2185,6 +2381,205 @@ func isAllowedOrganizationLogo(contentType, filename string) bool {
 		return true
 	}
 	return false
+}
+
+func (s *Server) platformOrganizations(ctx context.Context) []Organization {
+	if s.identity == nil {
+		return nil
+	}
+	orgs, err := s.identity.ListOrganizations(ctx)
+	if err != nil {
+		return nil
+	}
+	organizations := make([]Organization, 0, len(orgs))
+	for _, org := range orgs {
+		organizations = append(organizations, organizationFromIdentityOrg(org))
+	}
+	sort.Slice(organizations, func(i, j int) bool {
+		if organizations[i].Name != organizations[j].Name {
+			return organizations[i].Name < organizations[j].Name
+		}
+		return organizations[i].Slug < organizations[j].Slug
+	})
+	return organizations
+}
+
+func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
+	errs.Organization = strings.TrimSpace(errs.Organization)
+	errs.Invite = strings.TrimSpace(errs.Invite)
+	view := PlatformAdminView{
+		PageBase:          s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		Organizations:     s.platformOrganizations(context.Background()),
+		Confirmation:      strings.TrimSpace(confirmation),
+		OrganizationError: errs.Organization,
+		InviteError:       errs.Invite,
+		Error:             firstNonEmpty(errs.Organization, errs.Invite),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requirePlatformAdmin(w, r)
+	if !ok {
+		return
+	}
+	if s.identity == nil {
+		http.Error(w, "identity unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/admin/orgs"))
+	if path != "" && path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{})
+		return
+	case http.MethodPost:
+		contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
+		if strings.HasPrefix(contentType, "multipart/form-data") {
+			r.Body = http.MaxBytesReader(w, r.Body, organizationLogoMaxBytes())
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				if isRequestTooLarge(err) {
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "logo file too large"})
+					return
+				}
+				http.Error(w, "invalid form", http.StatusBadRequest)
+				return
+			}
+			if r.MultipartForm != nil {
+				defer r.MultipartForm.RemoveAll()
+			}
+		} else if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		intent := strings.TrimSpace(r.FormValue("intent"))
+		if intent == "invite_org_admin" {
+			orgSlug := strings.TrimSpace(r.FormValue("org_slug"))
+			email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+			if email == "" {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "email is required"})
+				return
+			}
+			if orgSlug == "" {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "organization is required"})
+				return
+			}
+			redirectURL := inviteRedirectURL(r)
+			org, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug)
+			if err != nil || org == nil {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "organization not found"})
+				return
+			}
+			platformSession, err := s.ensurePlatformAdminOwnsOrganization(r.Context(), org.Slug, redirectURL)
+			if err != nil {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				return
+			}
+			defer func() {
+				_ = s.identity.DeleteSession(r.Context(), platformSession.Secret)
+			}()
+			memberships, err := s.identity.ListOrganizationMemberships(r.Context(), org.Slug)
+			if err != nil {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				return
+			}
+			for _, membership := range memberships {
+				if !strings.EqualFold(strings.TrimSpace(membership.Email), email) {
+					continue
+				}
+				if membership.IsOrgAdmin {
+					s.renderPlatformAdmin(w, admin, "org admin access already assigned", PlatformAdminErrors{})
+					return
+				}
+				if _, err := s.identity.UpdateOrganizationMembershipAsAdmin(r.Context(), org.Slug, membership.ID, nil, true); err != nil {
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+					return
+				}
+				s.renderPlatformAdmin(w, admin, "org admin access updated", PlatformAdminErrors{})
+				return
+			}
+			existingUser, err := s.identity.GetUserByEmail(r.Context(), email)
+			switch {
+			case err == nil:
+				if existingUser.OrgSlug != "" && !strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(org.Slug)) {
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "email already belongs to another organization"})
+					return
+				}
+				if _, err := s.identity.InviteOrganizationUser(r.Context(), platformSession.Secret, org.Slug, email, redirectURL, nil, true); err != nil {
+					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+					return
+				}
+				s.renderPlatformAdmin(w, admin, "invite sent", PlatformAdminErrors{})
+				return
+			case err != nil && !errors.Is(err, ErrIdentityNotFound):
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				return
+			}
+
+			if _, err := s.identity.InviteOrganizationUser(r.Context(), platformSession.Secret, org.Slug, email, redirectURL, nil, true); err != nil {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				return
+			}
+			s.renderPlatformAdmin(w, admin, "invite sent", PlatformAdminErrors{})
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization name is required"})
+			return
+		}
+		orgSlug := canonifySlug(name)
+		if existing, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
+			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists"})
+			return
+		}
+		logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
+		if logoErrMsg != "" {
+			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: logoErrMsg})
+			return
+		}
+		platformSession, err := s.platformAdminIdentitySession(r.Context())
+		if err != nil {
+			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to create organization"})
+			return
+		}
+		defer func() {
+			_ = s.identity.DeleteSession(r.Context(), platformSession.Secret)
+		}()
+		createdOrg, err := s.identity.CreateOrganization(r.Context(), platformSession.Secret, name)
+		if err != nil {
+			if isDuplicateSlugError(err) {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists"})
+				return
+			}
+			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to create organization"})
+			return
+		}
+		if logoUpload != nil {
+			logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), createdOrg.Slug, IdentityFile{
+				Filename:    logoUpload.Filename,
+				ContentType: logoUpload.ContentType,
+				Data:        logoUpload.Data,
+			})
+			if err != nil {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to upload logo"})
+				return
+			}
+			if _, err := s.identity.UpdateOrganizationAsAdmin(r.Context(), createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles); err != nil {
+				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to update organization"})
+				return
+			}
+		}
+		http.Redirect(w, r, "/admin/orgs", http.StatusSeeOther)
+		return
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func (s *Server) renderOrgAdmin(w http.ResponseWriter, user *AccountUser, orgSlug, inviteLink, errMsg string) {

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -80,7 +82,11 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	t.Setenv("APPWRITE_ORG_ASSETS_BUCKET", "org-assets")
 
 	var createTeamBody map[string]interface{}
+	var createTeamSessionHeader string
+	var createTeamKeyHeader string
 	var updateNameBody map[string]interface{}
+	var updateNameSessionHeader string
+	var updateNameKeyHeader string
 	var updatePrefsBodies []map[string]interface{}
 	var updatedLabelsBody map[string]interface{}
 	var createFileCalled bool
@@ -91,6 +97,8 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams":
+			createTeamSessionHeader = r.Header.Get("X-Appwrite-Session")
+			createTeamKeyHeader = r.Header.Get("X-Appwrite-Key")
 			if err := json.NewDecoder(r.Body).Decode(&createTeamBody); err != nil {
 				t.Fatalf("decode create team: %v", err)
 			}
@@ -126,6 +134,8 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"fresh-org","teamName":"Fresh Org","confirm":true,"roles":["member"]}]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/fresh-org":
+			updateNameSessionHeader = r.Header.Get("X-Appwrite-Session")
+			updateNameKeyHeader = r.Header.Get("X-Appwrite-Key")
 			if err := json.NewDecoder(r.Body).Decode(&updateNameBody); err != nil {
 				t.Fatalf("decode update team: %v", err)
 			}
@@ -177,6 +187,9 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	if len(labels) != 1 || labels[0] != identityOrgAdminLabel {
 		t.Fatalf("labels body = %#v", updatedLabelsBody)
 	}
+	if createTeamSessionHeader != "session-secret" {
+		t.Fatalf("create team session header = %q, want session-secret", createTeamSessionHeader)
+	}
 
 	uploadedLogo, err := identity.UploadOrganizationLogo(context.Background(), "fresh-org", IdentityFile{
 		Filename: "logo.png",
@@ -207,6 +220,9 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	}
 	if updateNameBody["name"] != "Updated Org" {
 		t.Fatalf("update name body = %#v", updateNameBody)
+	}
+	if updateNameSessionHeader != "session-secret" {
+		t.Fatalf("update name session header = %q, want session-secret", updateNameSessionHeader)
 	}
 	if len(updatePrefsBodies) != 2 {
 		t.Fatalf("prefs calls = %d, want 2", len(updatePrefsBodies))
@@ -243,12 +259,36 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	if len(updatedUserLabels) != 2 {
 		t.Fatalf("update labels body = %#v", updateLabelsBody)
 	}
+
+	createdAdminOrg, err := identity.CreateOrganizationAsAdmin(context.Background(), "Fresh Org")
+	if err != nil {
+		t.Fatalf("CreateOrganizationAsAdmin error: %v", err)
+	}
+	if createdAdminOrg.Slug != "fresh-org" || createTeamKeyHeader != "api-key-1" {
+		t.Fatalf("created admin org = %#v headers session=%q key=%q", createdAdminOrg, createTeamSessionHeader, createTeamKeyHeader)
+	}
+	if createTeamSessionHeader != "" {
+		t.Fatalf("create admin team session header = %q, want empty", createTeamSessionHeader)
+	}
+
+	updatedAdminOrg, err := identity.UpdateOrganizationAsAdmin(context.Background(), "fresh-org", "Updated Org", "logo-1", []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer"}})
+	if err != nil {
+		t.Fatalf("UpdateOrganizationAsAdmin error: %v", err)
+	}
+	if updatedAdminOrg.Slug != "updated-org" || updateNameKeyHeader != "api-key-1" {
+		t.Fatalf("updated admin org = %#v headers session=%q key=%q", updatedAdminOrg, updateNameSessionHeader, updateNameKeyHeader)
+	}
+	if updateNameSessionHeader != "" {
+		t.Fatalf("update admin team session header = %q, want empty", updateNameSessionHeader)
+	}
 }
 
 func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	var inviteSessionHeader string
+	var inviteKeyHeader string
 	var inviteBody map[string]interface{}
 	var updateMembershipSessionHeader string
+	var updateMembershipKeyHeader string
 	var updateMembershipBody map[string]interface{}
 	var deleteMembershipSessionHeader string
 	var userSearch string
@@ -276,12 +316,14 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 			]}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams/acme-team/memberships":
 			inviteSessionHeader = r.Header.Get("X-Appwrite-Session")
+			inviteKeyHeader = r.Header.Get("X-Appwrite-Key")
 			if err := json.NewDecoder(r.Body).Decode(&inviteBody); err != nil {
 				t.Fatalf("decode invite body: %v", err)
 			}
 			_, _ = w.Write([]byte(`{"$id":"membership-3","userId":"","userEmail":"invitee@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":false,"roles":["owner","attesta-role:approver"]}`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/v1/teams/acme-team/memberships/membership-1":
 			updateMembershipSessionHeader = r.Header.Get("X-Appwrite-Session")
+			updateMembershipKeyHeader = r.Header.Get("X-Appwrite-Key")
 			if err := json.NewDecoder(r.Body).Decode(&updateMembershipBody); err != nil {
 				t.Fatalf("decode update membership body: %v", err)
 			}
@@ -356,6 +398,79 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	}
 	if deleteMembershipSessionHeader != "session-secret" {
 		t.Fatalf("delete session header = %q", deleteMembershipSessionHeader)
+	}
+
+	adminInvite, err := identity.InviteOrganizationUserAsAdmin(context.Background(), "acme", "invitee@example.com", "https://attesta.example/invite/accept", []string{"approver"}, true)
+	if err != nil {
+		t.Fatalf("InviteOrganizationUserAsAdmin error: %v", err)
+	}
+	if adminInvite.Email != "invitee@example.com" || inviteKeyHeader != "api-key-1" {
+		t.Fatalf("admin invite = %#v key=%q session=%q", adminInvite, inviteKeyHeader, inviteSessionHeader)
+	}
+	if inviteSessionHeader != "" {
+		t.Fatalf("admin invite session header = %q, want empty", inviteSessionHeader)
+	}
+
+	adminUpdatedMembership, err := identity.UpdateOrganizationMembershipAsAdmin(context.Background(), "acme", "membership-1", []string{"approver"}, true)
+	if err != nil {
+		t.Fatalf("UpdateOrganizationMembershipAsAdmin error: %v", err)
+	}
+	if adminUpdatedMembership.Email != "member@example.com" || updateMembershipKeyHeader != "api-key-1" {
+		t.Fatalf("admin updated membership = %#v key=%q session=%q", adminUpdatedMembership, updateMembershipKeyHeader, updateMembershipSessionHeader)
+	}
+	if updateMembershipSessionHeader != "" {
+		t.Fatalf("admin update session header = %q, want empty", updateMembershipSessionHeader)
+	}
+}
+
+func TestAppwriteIdentityAddOrganizationUserByIDAsAdmin(t *testing.T) {
+	var createMembershipKeyHeader string
+	var createMembershipSessionHeader string
+	var createMembershipBody map[string]interface{}
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme":
+			http.NotFound(w, r)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams":
+			_, _ = w.Write([]byte(`{"total":1,"teams":[{"$id":"acme-team","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme-team":
+			_, _ = w.Write([]byte(`{"$id":"acme-team","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/user-9":
+			_, _ = w.Write([]byte(`{"$id":"user-9","email":"admin@example.com","status":true,"labels":["attesta:org-admin"]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/user-9/memberships":
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-3","userId":"user-9","userEmail":"admin@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":true,"roles":["owner"]}]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams/acme-team/memberships":
+			createMembershipKeyHeader = r.Header.Get("X-Appwrite-Key")
+			createMembershipSessionHeader = r.Header.Get("X-Appwrite-Session")
+			if err := json.NewDecoder(r.Body).Decode(&createMembershipBody); err != nil {
+				t.Fatalf("decode create membership body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"membership-3","userId":"user-9","userEmail":"admin@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":true,"roles":["owner"]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	membership, err := identity.AddOrganizationUserByIDAsAdmin(context.Background(), "acme", "user-9", nil, true)
+	if err != nil {
+		t.Fatalf("AddOrganizationUserByIDAsAdmin error: %v", err)
+	}
+	if createMembershipKeyHeader != "api-key-1" || createMembershipSessionHeader != "" {
+		t.Fatalf("headers key=%q session=%q", createMembershipKeyHeader, createMembershipSessionHeader)
+	}
+	if createMembershipBody["userId"] != "user-9" {
+		t.Fatalf("create membership body = %#v", createMembershipBody)
+	}
+	if _, ok := createMembershipBody["email"]; ok {
+		t.Fatalf("create membership body unexpectedly had email: %#v", createMembershipBody)
+	}
+	if membership.UserID != "user-9" || !membership.IsOrgAdmin || !membership.Confirmed {
+		t.Fatalf("membership = %#v", membership)
 	}
 }
 
@@ -1075,6 +1190,63 @@ func TestIdentityAppwriteHelpers(t *testing.T) {
 	if hasMembershipRole([]string{"member"}, identityMembershipOwnerRole) {
 		t.Fatal("did not expect owner membership role")
 	}
+
+	client := appwriteclient.Client{}
+	if got := appwriteSessionSecretFromJar(client); got != "" {
+		t.Fatalf("appwriteSessionSecretFromJar without http client = %q", got)
+	}
+	client.Endpoint = "://bad-url"
+	client.Client = &http.Client{}
+	if got := appwriteSessionSecretFromJar(client); got != "" {
+		t.Fatalf("appwriteSessionSecretFromJar with invalid endpoint = %q", got)
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookiejar.New error: %v", err)
+	}
+	parsed, err := url.Parse("https://appwrite.example/v1")
+	if err != nil {
+		t.Fatalf("url.Parse error: %v", err)
+	}
+	jar.SetCookies(parsed, []*http.Cookie{
+		{Name: "ignored", Value: "x"},
+		{Name: "a_session_project-1", Value: "session-secret"},
+	})
+	client.Endpoint = parsed.String()
+	client.Client = &http.Client{Jar: jar}
+	if got := appwriteSessionSecretFromJar(client); got != "session-secret" {
+		t.Fatalf("appwriteSessionSecretFromJar = %q, want session-secret", got)
+	}
+}
+
+func TestAppwriteIdentityUpdateCurrentPassword(t *testing.T) {
+	var sessionHeader string
+	var body map[string]interface{}
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch || r.URL.Path != "/v1/account/password" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		sessionHeader = r.Header.Get("X-Appwrite-Session")
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode password body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"$id":"user-1"}`))
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	if err := identity.UpdateCurrentPassword(context.Background(), "session-secret", "updated-password"); err != nil {
+		t.Fatalf("UpdateCurrentPassword error: %v", err)
+	}
+	if sessionHeader != "session-secret" {
+		t.Fatalf("session header = %q, want session-secret", sessionHeader)
+	}
+	if body["password"] != "updated-password" {
+		t.Fatalf("body = %#v", body)
+	}
 }
 
 func TestAppwriteIdentityCanceledContext(t *testing.T) {
@@ -1127,6 +1299,12 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			},
 		},
 		{
+			name: "update current password",
+			run: func() error {
+				return identity.UpdateCurrentPassword(ctx, "session-secret", "password")
+			},
+		},
+		{
 			name: "get session",
 			run: func() error {
 				_, err := identity.GetSession(ctx, "session-secret")
@@ -1161,9 +1339,23 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			},
 		},
 		{
+			name: "add organization user by id as admin",
+			run: func() error {
+				_, err := identity.AddOrganizationUserByIDAsAdmin(ctx, "acme", "user-1", nil, true)
+				return err
+			},
+		},
+		{
 			name: "invite organization user",
 			run: func() error {
 				_, err := identity.InviteOrganizationUser(ctx, "session-secret", "acme", "user@example.com", "https://attesta.example/invite/accept", nil, false)
+				return err
+			},
+		},
+		{
+			name: "invite organization user as admin",
+			run: func() error {
+				_, err := identity.InviteOrganizationUserAsAdmin(ctx, "acme", "user@example.com", "https://attesta.example/invite/accept", nil, true)
 				return err
 			},
 		},
@@ -1196,6 +1388,13 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			},
 		},
 		{
+			name: "create organization as admin",
+			run: func() error {
+				_, err := identity.CreateOrganizationAsAdmin(ctx, "Acme Org")
+				return err
+			},
+		},
+		{
 			name: "update organization",
 			run: func() error {
 				_, err := identity.UpdateOrganization(ctx, "session-secret", "acme", "Updated Org", "", nil)
@@ -1203,9 +1402,23 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			},
 		},
 		{
+			name: "update organization as admin",
+			run: func() error {
+				_, err := identity.UpdateOrganizationAsAdmin(ctx, "acme", "Updated Org", "", nil)
+				return err
+			},
+		},
+		{
 			name: "update organization membership",
 			run: func() error {
 				_, err := identity.UpdateOrganizationMembership(ctx, "session-secret", "acme", "membership-1", nil, false)
+				return err
+			},
+		},
+		{
+			name: "update organization membership as admin",
+			run: func() error {
+				_, err := identity.UpdateOrganizationMembershipAsAdmin(ctx, "acme", "membership-1", nil, true)
 				return err
 			},
 		},

@@ -105,6 +105,148 @@ func TestHandleInvitePasswordUpdatesCurrentPassword(t *testing.T) {
 	}
 }
 
+func TestHandleInvitePasswordBranches(t *testing.T) {
+	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
+	baseServer := func(identity *fakeIdentityStore) *Server {
+		return &Server{
+			identity:    identity,
+			tmpl:        invitePasswordTemplates(),
+			now:         func() time.Time { return now },
+			enforceAuth: true,
+		}
+	}
+
+	t.Run("get renders form", func(t *testing.T) {
+		server := baseServer(&fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", OrgSlug: "acme", PasswordSet: false}, nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodGet, "/invite/password", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "invite-session"})
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "INVITE_PASSWORD") {
+			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("password mismatch", func(t *testing.T) {
+		server := baseServer(&fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", OrgSlug: "acme", PasswordSet: false}, nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/invite/password", strings.NewReader("password=one&confirm_password=two"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "invite-session"})
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "passwords do not match") {
+			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update password failure", func(t *testing.T) {
+		server := baseServer(&fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", OrgSlug: "acme", PasswordSet: false}, nil
+			},
+			updateCurrentPasswordFunc: func(ctx context.Context, sessionSecret, password string) error {
+				return errors.New("boom")
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/invite/password", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "invite-session"})
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		server := baseServer(&fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", OrgSlug: "acme", PasswordSet: false}, nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodPut, "/invite/password", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "invite-session"})
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		}
+	})
+
+	t.Run("identity missing", func(t *testing.T) {
+		server := &Server{tmpl: invitePasswordTemplates(), now: func() time.Time { return now }, enforceAuth: true}
+		req := httptest.NewRequest(http.MethodGet, "/invite/password", nil)
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("unauthenticated redirects", func(t *testing.T) {
+		server := baseServer(&fakeIdentityStore{})
+		req := httptest.NewRequest(http.MethodGet, "/invite/password", nil)
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+	})
+
+	t.Run("short password", func(t *testing.T) {
+		server := baseServer(&fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", OrgSlug: "acme", PasswordSet: false}, nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/invite/password", strings.NewReader("password=short&confirm_password=short"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "invite-session"})
+		rec := httptest.NewRecorder()
+
+		server.handleInvite(rec, req)
+
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "password must be at least 12 characters") {
+			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+		}
+	})
+}
+
 func TestHandleResetConfirmCompletesRecovery(t *testing.T) {
 	var completedUserID string
 	var completedSecret string
@@ -241,5 +383,17 @@ func TestHandleResetRequestMethodNotAllowed(t *testing.T) {
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestHandleResetRequestInvalidForm(t *testing.T) {
+	server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/reset", strings.NewReader("%zz"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.handleResetRequest(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

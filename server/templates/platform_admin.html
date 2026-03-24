@@ -31,95 +31,24 @@
 
   <section class="panel">
     <h2>Invite organization admin</h2>
-    <p class="muted">Invite an admin with or without assigning an organization.</p>
+    <p class="muted">Invite an organization admin as an Appwrite team owner.</p>
     <form method="post" action="/admin/orgs" class="input-form">
       <input type="hidden" name="intent" value="invite_org_admin" />
       <label for="org-admin-email">Org admin email</label>
       <input id="org-admin-email" name="email" type="email" required />
-      <label for="org">Organization (optional)</label>
-      <select id="org" name="org_slug">
-        <option value="">Not assigned yet</option>
+      <label for="org">Organization</label>
+      <select id="org" name="org_slug" required>
+        <option value="">Select organization</option>
         {{range .Organizations}}
           <option value="{{.Slug}}">{{.Name}}</option>
         {{end}}
       </select>
       {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
+      {{if .Confirmation}}<p class="muted">{{.Confirmation}}</p>{{end}}
       <button class="primary" type="submit">Create org admin invite</button>
-      {{if .InviteLink}}
-        <button type="button" class="secondary js-invite-copy"  data-copy-invite-link="{{.InviteLink}}">
-          <svg data-copy-icon-default style="display: inline-block;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
-            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-          </svg>
-          <svg data-copy-icon-done style="display: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
-            <path d="m12 15 2 2 4-4"/>
-            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-          </svg>
-          <span data-copy-label>Copy invite link</span>
-        </button>
-      {{end}}
     </form>
   </section>
 </div>
-
-<script>
-  (() => {
-    const inviteCopyButtons = Array.from(document.querySelectorAll(".js-invite-copy"));
-    inviteCopyButtons.forEach((button) => {
-      let resetTimer = null;
-      const label = button.querySelector("[data-copy-label]");
-      const defaultLabel = label ? (label.textContent || "").trim() : "";
-      button.addEventListener("click", async () => {
-        const rawLink = (button.getAttribute("data-copy-invite-link") || "").trim();
-        if (!rawLink) {
-          return;
-        }
-        let inviteLink = rawLink;
-        try {
-          inviteLink = new URL(rawLink, window.location.origin).toString();
-        } catch (error) {
-          inviteLink = rawLink;
-        }
-
-        let copied = false;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          try {
-            await navigator.clipboard.writeText(inviteLink);
-            copied = true;
-          } catch (error) {
-            copied = false;
-          }
-        }
-        if (!copied) {
-          window.prompt("Copy invite link:", inviteLink);
-          return;
-        }
-
-        const defaultIcon = button.querySelector("[data-copy-icon-default]");
-        const doneIcon = button.querySelector("[data-copy-icon-done]");
-        if (defaultIcon && doneIcon) {
-          defaultIcon.style.display = "none";
-          doneIcon.style.display = "inline-block";
-          if (label) {
-            label.textContent = "Copied";
-          }
-          if (resetTimer) {
-            window.clearTimeout(resetTimer);
-          }
-          resetTimer = window.setTimeout(() => {
-            defaultIcon.style.display = "inline-block";
-            doneIcon.style.display = "none";
-            if (label) {
-              label.textContent = defaultLabel || "Copy invite link";
-            }
-            resetTimer = null;
-          }, 1800);
-        }
-      });
-    });
-  })();
-</script>
 {{end}}
 
 {{define "platform_admin.html"}}

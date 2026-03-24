@@ -80,6 +80,60 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	}
 }
 
+func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
+	server := &Server{
+		tmpl: testTemplates(),
+		now:  func() time.Time { return now },
+	}
+
+	form := url.Values{}
+	form.Set("email", "admin@example.com")
+	form.Set("password", "change-me")
+	form.Set("next", "/admin/orgs")
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/admin/orgs" {
+		t.Fatalf("location = %q, want /admin/orgs", rec.Header().Get("Location"))
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) == 0 || cookies[0].Name != "attesta_session" {
+		t.Fatalf("expected attesta_session cookie, got %#v", cookies)
+	}
+	if cookies[0].Value != platformAdminSessionValue() {
+		t.Fatalf("session cookie value = %q, want %q", cookies[0].Value, platformAdminSessionValue())
+	}
+}
+
+func TestHandleLoginPlatformAdminRejectsInvalidPassword(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	server := &Server{tmpl: testTemplates(), now: time.Now}
+	form := url.Values{}
+	form.Set("email", "admin@example.com")
+	form.Set("password", "wrong-password")
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
 func TestHandleLogoutClearsSession(t *testing.T) {
 	var deletedSecret string
 	server := &Server{
@@ -109,6 +163,34 @@ func TestHandleLogoutClearsSession(t *testing.T) {
 	}
 	if deletedSecret != "session-1" {
 		t.Fatalf("deleted secret = %q, want session-1", deletedSecret)
+	}
+}
+
+func TestHandleLogoutSkipsIdentityDeleteForPlatformAdminSession(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	var deleteCalls int
+	server := &Server{
+		identity: &fakeIdentityStore{
+			deleteSessionFunc: func(ctx context.Context, sessionSecret string) error {
+				deleteCalls++
+				return nil
+			},
+		},
+		now: time.Now,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/logout", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+
+	server.handleLogout(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if deleteCalls != 0 {
+		t.Fatalf("delete calls = %d, want 0", deleteCalls)
 	}
 }
 
@@ -280,6 +362,39 @@ func TestHandleLoginFailureReturnsServerError(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	server.handleLogin(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestHandleLoginMethodNotAllowed(t *testing.T) {
+	server := &Server{tmpl: testTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPut, "/login", nil)
+	rec := httptest.NewRecorder()
+
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestHandleLoginWriteSessionCookieFailure(t *testing.T) {
+	server := &Server{
+		identity: &fakeIdentityStore{
+			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+				return IdentitySession{UserID: "user-1", ExpiresAt: time.Now().Add(time.Hour)}, nil
+			},
+		},
+		tmpl: testTemplates(),
+		now:  time.Now,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("email=u1%40example.com&password=secret"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleLogin(rec, req)
+
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}

@@ -154,6 +154,28 @@ func TestSessionSecretFromRequest(t *testing.T) {
 	}
 }
 
+func TestCurrentUserReturnsPlatformAdminFromSession(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Now().UTC()
+	server := &Server{now: func() time.Time { return now }}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+
+	user, session, err := server.currentUser(req)
+
+	if err != nil {
+		t.Fatalf("currentUser error: %v", err)
+	}
+	if session.Secret != platformAdminSessionValue() {
+		t.Fatalf("session secret = %q", session.Secret)
+	}
+	if !user.IsPlatformAdmin || user.Email != "admin@example.com" {
+		t.Fatalf("user = %#v", user)
+	}
+}
+
 func TestStableIdentityHelpers(t *testing.T) {
 	orgID := stableOrgObjectID("Acme")
 	userID := stableIdentityUserObjectID("user-1")
@@ -278,6 +300,41 @@ func TestRequireOrgAdmin(t *testing.T) {
 	})
 }
 
+func TestRequirePlatformAdmin(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Now().UTC()
+	server := &Server{
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	t.Run("unauthenticated redirects", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		rec := httptest.NewRecorder()
+		if _, ok := server.requirePlatformAdmin(rec, req); ok {
+			t.Fatal("expected requirePlatformAdmin to fail")
+		}
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+	})
+
+	t.Run("platform admin allowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		user, ok := server.requirePlatformAdmin(rec, req)
+		if !ok {
+			t.Fatal("expected requirePlatformAdmin to allow platform admin")
+		}
+		if user == nil || !user.IsPlatformAdmin {
+			t.Fatalf("user = %#v", user)
+		}
+	})
+}
+
 func TestSessionTTLDaysAndNewSessionID(t *testing.T) {
 	t.Setenv("SESSION_TTL_DAYS", "45")
 	if got := sessionTTLDays(); got != 45 {
@@ -300,6 +357,57 @@ func TestSessionTTLDaysAndNewSessionID(t *testing.T) {
 	if first == "" || second == "" || first == second {
 		t.Fatalf("session ids = %q %q", first, second)
 	}
+}
+
+func TestCookieAndPlatformAdminHelpers(t *testing.T) {
+	t.Run("should secure cookie from env forwarded proto and tls", func(t *testing.T) {
+		t.Setenv("COOKIE_SECURE", "true")
+		req := httptest.NewRequest(http.MethodGet, "http://attesta.local/", nil)
+		if !shouldSecureCookie(req) {
+			t.Fatal("expected secure cookie from env")
+		}
+
+		t.Setenv("COOKIE_SECURE", "false")
+		req = httptest.NewRequest(http.MethodGet, "http://attesta.local/", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		if !shouldSecureCookie(req) {
+			t.Fatal("expected secure cookie from forwarded proto")
+		}
+
+		req = httptest.NewRequest(http.MethodGet, "https://attesta.local/", nil)
+		if !shouldSecureCookie(req) {
+			t.Fatal("expected secure cookie from tls request")
+		}
+	})
+
+	t.Run("platform admin helpers require credentials", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "")
+		t.Setenv("ADMIN_PASSWORD", "")
+		if user := platformAdminAccountUser(); user != nil {
+			t.Fatalf("platformAdminAccountUser = %#v, want nil", user)
+		}
+		server := &Server{now: time.Now}
+		if session, user, ok := server.platformAdminSession(); ok || session != nil || user != nil {
+			t.Fatalf("platformAdminSession = %#v %#v %t", session, user, ok)
+		}
+	})
+
+	t.Run("platform admin helpers derive session and user", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "ADMIN@EXAMPLE.COM")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		server := &Server{now: func() time.Time { return time.Date(2026, time.March, 24, 9, 0, 0, 0, time.UTC) }}
+		user := platformAdminAccountUser()
+		if user == nil || user.Email != "admin@example.com" || !user.IsPlatformAdmin {
+			t.Fatalf("platformAdminAccountUser = %#v", user)
+		}
+		session, sessionUser, ok := server.platformAdminSession()
+		if !ok || session == nil || sessionUser == nil {
+			t.Fatalf("platformAdminSession = %#v %#v %t", session, sessionUser, ok)
+		}
+		if session.Secret != platformAdminSessionValue() || session.UserID != user.ID.Hex() || sessionUser.Email != user.Email {
+			t.Fatalf("platformAdminSession = %#v %#v", session, sessionUser)
+		}
+	})
 }
 
 func TestWorkflowValidationAndRoleStyleHelpers(t *testing.T) {
