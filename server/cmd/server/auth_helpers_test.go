@@ -305,7 +305,9 @@ func TestRequirePlatformAdmin(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "change-me")
 
 	now := time.Now().UTC()
+	member := AccountUser{ID: primitive.NewObjectID(), Email: "member@example.com", Status: "active"}
 	server := &Server{
+		identity:    testIdentityForSessions(now, map[string]AccountUser{"session-member": member}),
 		enforceAuth: true,
 		now:         func() time.Time { return now },
 	}
@@ -331,6 +333,18 @@ func TestRequirePlatformAdmin(t *testing.T) {
 		}
 		if user == nil || !user.IsPlatformAdmin {
 			t.Fatalf("user = %#v", user)
+		}
+	})
+
+	t.Run("non platform admin forbidden", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-member"})
+		rec := httptest.NewRecorder()
+		if _, ok := server.requirePlatformAdmin(rec, req); ok {
+			t.Fatal("expected requirePlatformAdmin to reject non-platform admin")
+		}
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 		}
 	})
 }

@@ -711,6 +711,9 @@ func main() {
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
+	if err := server.bootstrapPlatformAdminIdentity(ctx); err != nil {
+		log.Fatal(err)
+	}
 
 	mux := server.newMux()
 
@@ -867,6 +870,17 @@ func (s *Server) platformAdminIdentitySession(ctx context.Context) (*IdentitySes
 		return nil, err
 	}
 	return &session, nil
+}
+
+func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
+	if s.identity == nil {
+		return nil
+	}
+	email, password, ok := platformAdminCredentials()
+	if !ok {
+		return nil
+	}
+	return s.identity.EnsurePlatformAdminAccount(ctx, email, password)
 }
 
 func (s *Server) ensurePlatformAdminOwnsOrganization(ctx context.Context, orgSlug, redirectURL string) (*IdentitySession, error) {

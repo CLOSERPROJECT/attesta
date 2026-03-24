@@ -78,6 +78,121 @@ func TestAppwriteIdentityCreateEmailPasswordSession(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityEnsurePlatformAdminAccount(t *testing.T) {
+	t.Run("blank credentials are ignored", func(t *testing.T) {
+		identity := NewAppwriteIdentity("http://example.invalid/v1", "project-1", "api-key-1", nil)
+		if err := identity.EnsurePlatformAdminAccount(context.Background(), " ", " "); err != nil {
+			t.Fatalf("EnsurePlatformAdminAccount error: %v", err)
+		}
+	})
+
+	t.Run("creates missing user", func(t *testing.T) {
+		var userSearch string
+		var createBody map[string]interface{}
+
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch {
+			case r.Method == http.MethodGet && r.URL.Path == "/v1/users":
+				userSearch = r.URL.Query().Get("search")
+				_, _ = w.Write([]byte(`{"total":0,"users":[]}`))
+			case r.Method == http.MethodPost && r.URL.Path == "/v1/users":
+				if err := json.NewDecoder(r.Body).Decode(&createBody); err != nil {
+					t.Fatalf("decode create body: %v", err)
+				}
+				_, _ = w.Write([]byte(`{"$id":"user-1","email":"admin@example.com","status":true,"labels":[]}`))
+			default:
+				t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
+
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+		if err := identity.EnsurePlatformAdminAccount(context.Background(), "ADMIN@example.com", "secret-password"); err != nil {
+			t.Fatalf("EnsurePlatformAdminAccount error: %v", err)
+		}
+		if userSearch != "admin@example.com" {
+			t.Fatalf("search = %q, want admin@example.com", userSearch)
+		}
+		if createBody["email"] != "admin@example.com" || createBody["password"] != "secret-password" || createBody["name"] != "Platform Admin" {
+			t.Fatalf("create body = %#v", createBody)
+		}
+	})
+
+	t.Run("updates password for existing user", func(t *testing.T) {
+		var userSearch string
+		var updatePasswordBody map[string]interface{}
+
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch {
+			case r.Method == http.MethodGet && r.URL.Path == "/v1/users":
+				userSearch = r.URL.Query().Get("search")
+				_, _ = w.Write([]byte(`{"total":1,"users":[{"$id":"user-1","email":"admin@example.com","status":true,"labels":[]}]}`))
+			case r.Method == http.MethodGet && r.URL.Path == "/v1/users/user-1":
+				_, _ = w.Write([]byte(`{"$id":"user-1","email":"admin@example.com","status":true,"labels":[]}`))
+			case r.Method == http.MethodGet && r.URL.Path == "/v1/users/user-1/memberships":
+				_, _ = w.Write([]byte(`{"total":0,"memberships":[]}`))
+			case r.Method == http.MethodPatch && r.URL.Path == "/v1/users/user-1/password":
+				if err := json.NewDecoder(r.Body).Decode(&updatePasswordBody); err != nil {
+					t.Fatalf("decode update password body: %v", err)
+				}
+				_, _ = w.Write([]byte(`{"$id":"user-1","email":"admin@example.com","status":true,"labels":[]}`))
+			default:
+				t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
+
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+		if err := identity.EnsurePlatformAdminAccount(context.Background(), "admin@example.com", "new-password"); err != nil {
+			t.Fatalf("EnsurePlatformAdminAccount error: %v", err)
+		}
+		if userSearch != "admin@example.com" {
+			t.Fatalf("search = %q, want admin@example.com", userSearch)
+		}
+		if updatePasswordBody["userId"] != "user-1" || updatePasswordBody["password"] != "new-password" {
+			t.Fatalf("update password body = %#v", updatePasswordBody)
+		}
+	})
+
+	t.Run("returns lookup error", func(t *testing.T) {
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, `{"message":"boom"}`, http.StatusInternalServerError)
+		}))
+		defer appwriteAPI.Close()
+
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+		if err := identity.EnsurePlatformAdminAccount(context.Background(), "admin@example.com", "secret-password"); err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("normalizes create error", func(t *testing.T) {
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch {
+			case r.Method == http.MethodGet && r.URL.Path == "/v1/users":
+				_, _ = w.Write([]byte(`{"total":0,"users":[]}`))
+			case r.Method == http.MethodPost && r.URL.Path == "/v1/users":
+				http.Error(w, `{"message":"unauthorized"}`, http.StatusUnauthorized)
+			default:
+				t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
+
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+		if err := identity.EnsurePlatformAdminAccount(context.Background(), "admin@example.com", "secret-password"); !errors.Is(err, ErrIdentityUnauthorized) {
+			t.Fatalf("error = %v, want %v", err, ErrIdentityUnauthorized)
+		}
+	})
+}
+
 func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	t.Setenv("APPWRITE_ORG_ASSETS_BUCKET", "org-assets")
 
@@ -471,6 +586,28 @@ func TestAppwriteIdentityAddOrganizationUserByIDAsAdmin(t *testing.T) {
 	}
 	if membership.UserID != "user-9" || !membership.IsOrgAdmin || !membership.Confirmed {
 		t.Fatalf("membership = %#v", membership)
+	}
+}
+
+func TestAppwriteIdentityAddOrganizationUserByIDAsAdminMissingOrganization(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/missing":
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"not found","code":404}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams":
+			_, _ = w.Write([]byte(`{"total":0,"teams":[]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	if _, err := identity.AddOrganizationUserByIDAsAdmin(context.Background(), "missing", "user-9", nil, true); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("error = %v, want %v", err, ErrIdentityNotFound)
 	}
 }
 
@@ -1277,6 +1414,12 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			run: func() error {
 				_, err := identity.CreateOrganization(ctx, "session-secret", "Acme Org")
 				return err
+			},
+		},
+		{
+			name: "ensure platform admin account",
+			run: func() error {
+				return identity.EnsurePlatformAdminAccount(ctx, "admin@example.com", "password")
 			},
 		},
 		{

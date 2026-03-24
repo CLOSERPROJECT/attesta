@@ -10,6 +10,7 @@ type fakeIdentityStore struct {
 	createAccountFunc                       func(ctx context.Context, email, password, name string) (IdentityUser, error)
 	createOrganizationFunc                  func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	createOrganizationAsAdminFunc           func(ctx context.Context, name string) (IdentityOrg, error)
+	ensurePlatformAdminAccountFunc          func(ctx context.Context, email, password string) error
 	acceptInviteFunc                        func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	createEmailPasswordSessionFunc          func(ctx context.Context, email, password string) (IdentitySession, error)
 	createRecoveryFunc                      func(ctx context.Context, email, redirectURL string) error
@@ -56,6 +57,13 @@ func (f *fakeIdentityStore) CreateOrganizationAsAdmin(ctx context.Context, name 
 		return f.createOrganizationAsAdminFunc(ctx, name)
 	}
 	return IdentityOrg{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) EnsurePlatformAdminAccount(ctx context.Context, email, password string) error {
+	if f.ensurePlatformAdminAccountFunc != nil {
+		return f.ensurePlatformAdminAccountFunc(ctx, email, password)
+	}
+	return nil
 }
 
 func (f *fakeIdentityStore) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {

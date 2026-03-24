@@ -40,6 +40,64 @@ func TestPlatformAdminIdentitySession(t *testing.T) {
 	})
 }
 
+func TestBootstrapPlatformAdminIdentity(t *testing.T) {
+	t.Run("no identity or creds is a no-op", func(t *testing.T) {
+		server := &Server{}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+
+		t.Setenv("ADMIN_EMAIL", "")
+		t.Setenv("ADMIN_PASSWORD", "")
+		server = &Server{identity: &fakeIdentityStore{
+			ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+				t.Fatal("did not expect bootstrap call")
+				return nil
+			},
+		}}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+	})
+
+	t.Run("delegates to identity store", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "ADMIN@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		var gotEmail string
+		var gotPassword string
+		server := &Server{
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					gotEmail = email
+					gotPassword = password
+					return nil
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if gotEmail != "admin@example.com" || gotPassword != "change-me" {
+			t.Fatalf("bootstrap args = %q %q", gotEmail, gotPassword)
+		}
+	})
+
+	t.Run("returns identity bootstrap error", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		server := &Server{
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					return errors.New("boom")
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err == nil || err.Error() != "boom" {
+			t.Fatalf("error = %v, want boom", err)
+		}
+	})
+}
+
 func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 	now := time.Now().UTC()
 

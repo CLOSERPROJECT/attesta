@@ -127,6 +127,36 @@ func (a *appwriteIdentity) CreateOrganizationAsAdmin(ctx context.Context, name s
 	return a.createOrganizationWithClient(ctx, a.adminClient, name)
 }
 
+func (a *appwriteIdentity) EnsurePlatformAdminAccount(ctx context.Context, email, password string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	password = strings.TrimSpace(password)
+	if email == "" || password == "" {
+		return nil
+	}
+	user, err := a.GetUserByEmail(ctx, email)
+	switch {
+	case err == nil:
+		if _, err := users.New(a.adminClient).UpdatePassword(strings.TrimSpace(user.ID), password); err != nil {
+			return normalizeIdentityError(err)
+		}
+		return nil
+	case err != nil && !errors.Is(err, ErrIdentityNotFound):
+		return err
+	}
+	if _, err := users.New(a.adminClient).Create(
+		id.Unique(),
+		users.New(a.adminClient).WithCreateEmail(email),
+		users.New(a.adminClient).WithCreatePassword(password),
+		users.New(a.adminClient).WithCreateName("Platform Admin"),
+	); err != nil {
+		return normalizeIdentityError(err)
+	}
+	return nil
+}
+
 func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
 	if err := ctx.Err(); err != nil {
 		return IdentitySession{}, err
