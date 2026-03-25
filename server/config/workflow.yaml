@@ -176,7 +176,7 @@ workflow:
           title: QA sign-off
           order: 1
           roles:
-            - qa-inspector
+            - qainspector
           inputKey: qaChecklist
           inputType: formata
           schema:
@@ -248,7 +248,7 @@ workflow:
           title: Finalize notarization
           order: 2
           roles:
-            - qa-inspector
+            - qainspector
           inputKey: finalHash
           inputType: formata
           schema:
@@ -291,7 +291,7 @@ roles:
     color: var(--role-emerald-bg)
     border: var(--role-emerald-border)
   - orgSlug: organization-3
-    slug: qa-inspector
+    slug: qainspector
     name: QA Inspector
     color: var(--role-pink-bg)
     border: var(--role-pink-border)

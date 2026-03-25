@@ -216,7 +216,7 @@ workflow:
           title: Indium recovery results report
           inputKey: Consolidated analysis report on indium recovery outcomes.
           roles:
-            - project-manager
+            - projectmanager
           inputType: formata
           schema:
             type: object
@@ -244,7 +244,7 @@ workflow:
             success or failure of each step, potential advantages and
             disadvantages, images, etc.
           roles:
-            - project-manager
+            - projectmanager
           inputType: formata
           schema:
             type: object
@@ -276,8 +276,8 @@ workflow:
           title: Transfilling document
           inputKey: Document outlining canister preparation and usage
           roles:
-            - head-of-rd
-            - tbs-operator
+            - headofrd
+            - tbsoperator
           inputType: formata
           schema:
             type: object
@@ -301,7 +301,7 @@ workflow:
           inputKey: Information on safe handling, hazards, and regulatory compliance of
             TMIn
           roles:
-            - head-of-shipping
+            - headofshipping
           inputType: formata
           schema:
             type: object
@@ -326,7 +326,7 @@ workflow:
             compliance. It may also contain other relevant info such as batch
             ID, safety info, etc
           roles:
-            - head-of-quality
+            - headofquality
           inputType: formata
           schema:
             type: object
@@ -355,7 +355,7 @@ workflow:
           inputKey: Detailed record of synthesis conditions, including solvents,
             temperatures, parameters and ligand information
           roles:
-            - analytical-chemist
+            - analyticalchemist
           inputType: formata
           schema:
             type: object
@@ -379,7 +379,7 @@ workflow:
           inputKey: Results of precursor initial screening and testing (e.g. thin-film
             processing and characterization)
           roles:
-            - chemical-process-technologist
+            - chemicalprocesstechnologist
           inputType: formata
           schema:
             type: object
@@ -403,7 +403,7 @@ workflow:
           inputKey: Document that summarizes the properties and specifications of the
             synthesized compound
           roles:
-            - project-manager
+            - projectmanager
           inputType: formata
           schema:
             type: object
@@ -475,17 +475,17 @@ roles:
     color: "#d7e9f2"
     border: "#d7e9f2"
   - name: Project manager
-    slug: project-manager
+    slug: projectmanager
     orgSlug: critical
     color: "#d7e9f2"
     border: "#d7e9f2"
   - name: Chemical process technologist
-    slug: chemical-process-technologist
+    slug: chemicalprocesstechnologist
     orgSlug: critical
     color: "#d7e9f2"
     border: "#d7e9f2"
   - name: Chemist (testing)
-    slug: chemist-testing
+    slug: chemisttesting
     orgSlug: critical
     color: "#d7e9f2"
     border: "#d7e9f2"
@@ -495,17 +495,17 @@ roles:
     color: "#d7e9f2"
     border: "#d7e9f2"
   - name: Shipping operator
-    slug: shipping-operator
+    slug: shippingoperator
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
   - name: Head of shipping
-    slug: head-of-shipping
+    slug: headofshipping
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
   - name: Head of R&D
-    slug: head-of-rd
+    slug: headofrd
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
@@ -515,22 +515,22 @@ roles:
     color: "#5a8cc2"
     border: "#5a8cc2"
   - name: Manager of T&BS
-    slug: manager-of-tbs
+    slug: manageroftbs
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
   - name: T&BS operator
-    slug: tbs-operator
+    slug: tbsoperator
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
   - name: Analytical chemist
-    slug: analytical-chemist
+    slug: analyticalchemist
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
   - name: Head of Quality
-    slug: head-of-quality
+    slug: headofquality
     orgSlug: dockweiler
     color: "#5a8cc2"
     border: "#5a8cc2"
@@ -540,47 +540,47 @@ roles:
     color: "#8e6cc2"
     border: "#8e6cc2"
   - name: Analytical chemist
-    slug: analytical-chemist
+    slug: analyticalchemist
     orgSlug: ifw
     color: "#8e6cc2"
     border: "#8e6cc2"
   - name: Chemical process technologist
-    slug: chemical-process-technologist
+    slug: chemicalprocesstechnologist
     orgSlug: ifw
     color: "#8e6cc2"
     border: "#8e6cc2"
   - name: Project manager
-    slug: project-manager
+    slug: projectmanager
     orgSlug: ifw
     color: "#8e6cc2"
     border: "#8e6cc2"
   - name: Material scientist
-    slug: material-scientist
+    slug: materialscientist
     orgSlug: ifw
     color: "#8e6cc2"
     border: "#8e6cc2"
   - name: Team member
-    slug: team-member
+    slug: teammember
     orgSlug: atlant-3d
     color: "#6cc28e"
     border: "#6cc28e"
   - name: Risk assessment manager
-    slug: risk-assessment-manager
+    slug: riskassessmentmanager
     orgSlug: atlant-3d
     color: "#6cc28e"
     border: "#6cc28e"
   - name: Application engineer
-    slug: application-engineer
+    slug: applicationengineer
     orgSlug: atlant-3d
     color: "#6cc28e"
     border: "#6cc28e"
   - name: Machine operator
-    slug: machine-operator
+    slug: machineoperator
     orgSlug: atlant-3d
     color: "#6cc28e"
     border: "#6cc28e"
   - name: Quality manager
-    slug: quality-manager
+    slug: qualitymanager
     orgSlug: atlant-3d
     color: "#6cc28e"
     border: "#6cc28e"
@@ -595,11 +595,11 @@ roles:
     color: "#6cc28e"
     border: "#6cc28e"
   - name: Shipping operator
-    slug: shipping-operator
+    slug: shippingoperator
     orgSlug: leonardo
     color: "#8e6cc2"
     border: "#8e6cc2"
-  - name: Fraunhofer
+  - name: Operator
     slug: operator
     orgSlug: fraunhofer
     color: "#8e6cc2"
