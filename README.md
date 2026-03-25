@@ -43,7 +43,7 @@ task start
 Now visit http://localhost/console/register and create the admin account, once logged in:
 * Create a new project and copy the project id inside the .env (APPWRITE_PROJECT_ID)
 * Create a new API key with Auth permission (all) and Storage permissions (files.read and files,write) and copy it inside the .env (APPWRITE_API_KEY)
-* Visit storage page and create a new bucket named `org-assets`
+* Visit storage page and create a new bucket with **Bucket ID** `org-assets`
 
 Now beck to the terminal run:
 
