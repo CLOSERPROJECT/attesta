@@ -227,13 +227,13 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 				t.Fatalf("decode labels: %v", err)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attestaOrgAdmin"]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/users/member-1/labels":
 			if err := json.NewDecoder(r.Body).Decode(&updateLabelsBody); err != nil {
 				t.Fatalf("decode update labels: %v", err)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:qa-reviewer","attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["rqa-reviewer","attestaOrgAdmin"]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/fresh-org/prefs":
 			var body map[string]interface{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -258,7 +258,7 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 			_, _ = w.Write([]byte(`{"$id":"fresh-org","name":"Updated Org"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/member-1":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:qa-reviewer"]}`))
+			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["rqa-reviewer"]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/member-1/memberships":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"fresh-org","teamName":"Fresh Org","confirm":true,"roles":["owner"]}]}`))
@@ -417,9 +417,9 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 			_, _ = w.Write([]byte(`{"total":1,"teams":[{"$id":"acme-team","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users":
 			userSearch = r.URL.Query().Get("search")
-			_, _ = w.Write([]byte(`{"total":1,"users":[{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:qa-reviewer"]}]}`))
+			_, _ = w.Write([]byte(`{"total":1,"users":[{"$id":"member-1","email":"member@example.com","status":true,"labels":["rqa-reviewer"]}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/member-1":
-			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:qa-reviewer"]}`))
+			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["rqa-reviewer"]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/member-1/memberships":
 			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":true,"roles":["owner"]}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme-team":
@@ -427,7 +427,7 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme-team/memberships":
 			_, _ = w.Write([]byte(`{"total":2,"memberships":[
 				{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"acme-team","teamName":"Acme Org","invited":"2026-03-10T10:00:00Z","joined":"2026-03-10T11:00:00Z","confirm":true,"roles":["owner"]},
-				{"$id":"membership-2","userId":"","userEmail":"pending@example.com","teamId":"acme-team","teamName":"Acme Org","invited":"2026-03-10T10:00:00Z","confirm":false,"roles":["member","attesta-role:approver"]}
+				{"$id":"membership-2","userId":"","userEmail":"pending@example.com","teamId":"acme-team","teamName":"Acme Org","invited":"2026-03-10T10:00:00Z","confirm":false,"roles":["member","iapprover"]}
 			]}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams/acme-team/memberships":
 			inviteSessionHeader = r.Header.Get("X-Appwrite-Session")
@@ -435,16 +435,16 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&inviteBody); err != nil {
 				t.Fatalf("decode invite body: %v", err)
 			}
-			_, _ = w.Write([]byte(`{"$id":"membership-3","userId":"","userEmail":"invitee@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":false,"roles":["owner","attesta-role:approver"]}`))
+			_, _ = w.Write([]byte(`{"$id":"membership-3","userId":"","userEmail":"invitee@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":false,"roles":["owner","iapprover"]}`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/v1/teams/acme-team/memberships/membership-1":
 			updateMembershipSessionHeader = r.Header.Get("X-Appwrite-Session")
 			updateMembershipKeyHeader = r.Header.Get("X-Appwrite-Key")
 			if err := json.NewDecoder(r.Body).Decode(&updateMembershipBody); err != nil {
 				t.Fatalf("decode update membership body: %v", err)
 			}
-			_, _ = w.Write([]byte(`{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":true,"roles":["member","attesta-role:approver"]}`))
+			_, _ = w.Write([]byte(`{"$id":"membership-1","userId":"member-1","userEmail":"member@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":true,"roles":["member","iapprover"]}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/users/member-1/labels":
-			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["attesta:role:approver","attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["rapprover","attestaOrgAdmin"]}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/teams/acme-team/memberships/membership-1":
 			deleteMembershipSessionHeader = r.Header.Get("X-Appwrite-Session")
 			_, _ = w.Write([]byte(`{}`))
@@ -553,7 +553,7 @@ func TestAppwriteIdentityAddOrganizationUserByIDAsAdmin(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme-team":
 			_, _ = w.Write([]byte(`{"$id":"acme-team","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/user-9":
-			_, _ = w.Write([]byte(`{"$id":"user-9","email":"admin@example.com","status":true,"labels":["attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"user-9","email":"admin@example.com","status":true,"labels":["attestaOrgAdmin"]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/user-9/memberships":
 			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-3","userId":"user-9","userEmail":"admin@example.com","teamId":"acme-team","teamName":"Acme Org","confirm":true,"roles":["owner"]}]}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams/acme-team/memberships":
@@ -655,7 +655,7 @@ func TestAppwriteIdentityListOrganizationMembershipsPendingMembership(t *testing
 		case "/v1/teams/acme":
 			_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
 		case "/v1/teams/acme/memberships":
-			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","attesta-role:approver"]}]}`))
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iapprover"]}]}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -748,7 +748,7 @@ func TestAppwriteIdentityGetCurrentUserHydratesMembership(t *testing.T) {
 				"$id":"user-1",
 				"email":"org-admin@example.com",
 				"status":true,
-				"labels":["attesta:org-admin","attesta:role:qa-reviewer"]
+				"labels":["attestaOrgAdmin","rqa-reviewer"]
 			}`))
 		case "/v1/users/user-1/memberships":
 			membershipsKeyHeader = r.Header.Get("X-Appwrite-Key")
@@ -924,6 +924,7 @@ func TestAppwriteIdentityAcceptInvite(t *testing.T) {
 	var membershipPath string
 	var sessionPath string
 	var membershipBody map[string]interface{}
+	var updatedLabelsBody map[string]interface{}
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -934,7 +935,14 @@ func TestAppwriteIdentityAcceptInvite(t *testing.T) {
 				t.Fatalf("decode membership body: %v", err)
 			}
 			http.SetCookie(w, &http.Cookie{Name: "a_session_project-1", Value: "session-secret", Path: "/"})
-			_, _ = w.Write([]byte(`{"$id":"membership-1","teamId":"acme","userId":"user-1","confirm":true,"roles":["member"]}`))
+			_, _ = w.Write([]byte(`{"$id":"membership-1","teamId":"acme","userId":"user-1","confirm":true,"roles":["owner","iapprover"]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/account":
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"invitee@example.com","status":true,"labels":["customKeep"]}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/users/user-1/labels":
+			if err := json.NewDecoder(r.Body).Decode(&updatedLabelsBody); err != nil {
+				t.Fatalf("decode updated labels body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"invitee@example.com","status":true,"labels":["customKeep","rapprover","attestaOrgAdmin"]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/account/sessions/current":
 			sessionPath = r.URL.Path
 			_, _ = w.Write([]byte(`{"$id":"session-1","userId":"user-1","expire":"2026-03-18T10:11:12Z","secret":"session-secret"}`))
@@ -959,6 +967,10 @@ func TestAppwriteIdentityAcceptInvite(t *testing.T) {
 	if sessionPath != "/v1/account/sessions/current" {
 		t.Fatalf("session path = %q", sessionPath)
 	}
+	labels, _ := updatedLabelsBody["labels"].([]interface{})
+	if len(labels) != 3 || labels[0] != "customKeep" || labels[1] != "rapprover" || labels[2] != "attestaOrgAdmin" {
+		t.Fatalf("updated labels body = %#v", updatedLabelsBody)
+	}
 	if session.Secret != "session-secret" {
 		t.Fatalf("session secret = %q, want session-secret", session.Secret)
 	}
@@ -973,7 +985,7 @@ func TestAppwriteIdentityGetUserByIDAndGetOrganizationBySlug(t *testing.T) {
 				"$id":"user-2",
 				"email":"reviewer@example.com",
 				"status":true,
-				"labels":["attesta:role:qa-reviewer"]
+				"labels":["rqa-reviewer"]
 			}`))
 		case "/v1/users/user-2/memberships":
 			_, _ = w.Write([]byte(`{
@@ -985,7 +997,7 @@ func TestAppwriteIdentityGetUserByIDAndGetOrganizationBySlug(t *testing.T) {
 						"teamId":"acme",
 						"teamName":"Acme Org",
 						"confirm":false,
-						"roles":["owner","attesta-role:qa-reviewer"]
+						"roles":["owner","iqa-reviewer"]
 					}
 				]
 			}`))
@@ -1177,12 +1189,12 @@ func TestAppwriteIdentityCreateOrganizationKeepsExistingAdminLabel(t *testing.T)
 		case "/v1/teams/fresh-org/prefs":
 			_, _ = w.Write([]byte(`{"schemaVersion":1,"slug":"fresh-org"}`))
 		case "/v1/account":
-			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attestaOrgAdmin"]}`))
 		case "/v1/users/user-1/labels":
 			if err := json.NewDecoder(r.Body).Decode(&updatedLabelsBody); err != nil {
 				t.Fatalf("decode labels body: %v", err)
 			}
-			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"owner@example.com","status":true,"labels":["attestaOrgAdmin"]}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -1207,6 +1219,10 @@ func TestAppwriteIdentityAcceptInviteSessionFailure(t *testing.T) {
 		case "/v1/teams/acme/memberships/membership-1/status":
 			http.SetCookie(w, &http.Cookie{Name: "a_session_project-1", Value: "session-secret", Path: "/"})
 			_, _ = w.Write([]byte(`{"$id":"membership-1","teamId":"acme","userId":"user-1","confirm":true,"roles":["member"]}`))
+		case "/v1/account":
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"invitee@example.com","status":true,"labels":[]}`))
+		case "/v1/users/user-1/labels":
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"invitee@example.com","status":true,"labels":[]}`))
 		case "/v1/account/sessions/current":
 			http.Error(w, `{"message":"session failed"}`, http.StatusInternalServerError)
 		default:
@@ -1268,7 +1284,7 @@ func TestAppwriteIdentityDirectTeamLookupAndCurrentUserFallback(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/v1/account":
-			_, _ = w.Write([]byte(`{"$id":"user-1","email":"org-admin@example.com","status":true,"labels":["attesta:org-admin"]}`))
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"org-admin@example.com","status":true,"labels":["attestaOrgAdmin"]}`))
 		case "/v1/users/user-1/memberships":
 			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"user-1","teamId":"team-1","teamName":"Acme Org","confirm":true,"roles":["owner"]}]}`))
 		case "/v1/teams/missing":

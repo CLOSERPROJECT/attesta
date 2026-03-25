@@ -3,9 +3,9 @@ package main
 import "strings"
 
 const (
-	identityOrgAdminLabel          = "attesta:org-admin"
-	identityRoleLabelPrefix        = "attesta:role:"
-	identityInviteRolePrefix       = "attesta-role:"
+	identityOrgAdminLabel          = "attestaOrgAdmin"
+	identityRoleLabelPrefix        = "r"
+	identityInviteRolePrefix       = "i"
 	identityMembershipOwnerRole    = "owner"
 	identityMembershipMemberRole   = "member"
 	identityTeamPrefsSchemaVersion = 1
@@ -76,6 +76,14 @@ func encodeInviteMembershipRoles(roleSlugs []string, isOrgAdmin bool) []string {
 		roles = append(roles, identityInviteRolePrefix+slug)
 	}
 	return roles
+}
+
+func isManagedIdentityLabel(label string) bool {
+	label = strings.TrimSpace(label)
+	if strings.EqualFold(label, identityOrgAdminLabel) {
+		return true
+	}
+	return strings.HasPrefix(label, identityRoleLabelPrefix)
 }
 
 func decodeInviteMembershipRoles(roles []string) identityInviteRoles {

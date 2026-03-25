@@ -110,10 +110,14 @@ func (a *appwriteIdentity) CreateOrganization(ctx context.Context, sessionSecret
 	if err != nil {
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}
-	labels := append([]string(nil), accountUser.Labels...)
-	if !hasIdentityLabel(labels, identityOrgAdminLabel) {
-		labels = append(labels, identityOrgAdminLabel)
+	labels := make([]string, 0, len(accountUser.Labels)+1)
+	for _, label := range accountUser.Labels {
+		if strings.EqualFold(strings.TrimSpace(label), identityOrgAdminLabel) {
+			continue
+		}
+		labels = append(labels, strings.TrimSpace(label))
 	}
+	labels = append(labels, identityOrgAdminLabel)
 	if _, err := users.New(a.adminClient).UpdateLabels(accountUser.Id, uniqueIdentityStrings(labels)); err != nil {
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}
@@ -165,13 +169,34 @@ func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipI
 	if err != nil {
 		return IdentitySession{}, err
 	}
-	_, err = teams.New(sessionClient).UpdateMembershipStatus(
+	membership, err := teams.New(sessionClient).UpdateMembershipStatus(
 		strings.TrimSpace(teamID),
 		strings.TrimSpace(membershipID),
 		strings.TrimSpace(userID),
 		strings.TrimSpace(secret),
 	)
 	if err != nil {
+		return IdentitySession{}, normalizeIdentityError(err)
+	}
+	accountUser, err := account.New(sessionClient).Get()
+	if err != nil {
+		return IdentitySession{}, normalizeIdentityError(err)
+	}
+	decodedRoles := decodeInviteMembershipRoles(membership.Roles)
+	labels := make([]string, 0, len(accountUser.Labels)+len(decodedRoles.BusinessRoles)+1)
+	for _, label := range accountUser.Labels {
+		if isManagedIdentityLabel(label) {
+			continue
+		}
+		labels = append(labels, strings.TrimSpace(label))
+	}
+	for _, roleSlug := range decodedRoles.BusinessRoles {
+		labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+	}
+	if decodedRoles.IsOrgAdmin {
+		labels = append(labels, identityOrgAdminLabel)
+	}
+	if _, err := users.New(a.adminClient).UpdateLabels(accountUser.Id, uniqueIdentityStrings(labels)); err != nil {
 		return IdentitySession{}, normalizeIdentityError(err)
 	}
 	session, err := account.New(sessionClient).GetSession("current")

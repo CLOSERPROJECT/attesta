@@ -2842,6 +2842,11 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role name is required"})
 			return
 		}
+		roleSlug := canonifyIdentityRoleSlug(name)
+		if roleSlug == "" {
+			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: invalidRoleNameMessage})
+			return
+		}
 		if palette == "" {
 			palette = defaultRolePaletteFromInput(name)
 		}
@@ -2855,9 +2860,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		roleSlug := canonifySlug(name)
 		for _, existingRole := range ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org)) {
-			if strings.EqualFold(strings.TrimSpace(existingRole.Slug), roleSlug) {
+			if strings.EqualFold(canonifyIdentityRoleSlug(existingRole.Slug), roleSlug) {
 				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
 				return
 			}
@@ -3207,7 +3211,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		labels := make([]string, 0, len(target.Labels)+len(selectedRoles)+1)
 		for _, label := range target.Labels {
-			if strings.HasPrefix(strings.TrimSpace(label), identityRoleLabelPrefix) || strings.EqualFold(strings.TrimSpace(label), identityOrgAdminLabel) {
+			if isManagedIdentityLabel(label) {
 				continue
 			}
 			labels = append(labels, strings.TrimSpace(label))
@@ -3275,7 +3279,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			}
 			labels := make([]string, 0, len(targetUser.Labels))
 			for _, label := range targetUser.Labels {
-				if strings.HasPrefix(strings.TrimSpace(label), identityRoleLabelPrefix) || strings.EqualFold(strings.TrimSpace(label), identityOrgAdminLabel) {
+				if isManagedIdentityLabel(label) {
 					continue
 				}
 				labels = append(labels, strings.TrimSpace(label))

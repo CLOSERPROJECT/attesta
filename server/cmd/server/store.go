@@ -937,6 +937,20 @@ func detectAttachmentContentType(filename string) string {
 
 var nonSlugPattern = regexp.MustCompile(`[^a-z0-9]+`)
 
+const maxIdentityRoleNameLen = 35
+const invalidRoleNameMessage = "role name must contain at least one letter or number"
+
+var nonIdentityRoleSlugPattern = regexp.MustCompile(`[^a-z0-9]+`)
+
+func canonifyIdentityRoleSlug(input string) string {
+	normalized := strings.ToLower(strings.TrimSpace(input))
+	normalized = nonIdentityRoleSlugPattern.ReplaceAllString(normalized, "")
+	if len(normalized) > maxIdentityRoleNameLen {
+		normalized = normalized[:maxIdentityRoleNameLen]
+	}
+	return normalized
+}
+
 func canonifySlug(input string) string {
 	normalized := strings.ToLower(strings.TrimSpace(input))
 	normalized = strings.ReplaceAll(normalized, "_", "-")

@@ -1731,6 +1731,54 @@ func TestHandleOrgAdminRolesWithIdentity(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminRolesSlugifiesAndTruncatesName(t *testing.T) {
+	now := time.Now().UTC()
+	org := IdentityOrg{
+		ID:   "team-1",
+		Slug: "acme",
+		Name: "Acme Org",
+	}
+	var updatedRoles []IdentityRole
+
+	server := &Server{
+		store: NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"}, nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				current := org
+				return &current, nil
+			},
+			updateOrganizationFunc: func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error) {
+				updatedRoles = append([]IdentityRole(nil), roles...)
+				org.Roles = append([]IdentityRole(nil), roles...)
+				return org, nil
+			},
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA+Reviewer!!!1234567890123456789012345678901234567890&palette=blue"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+
+	server.handleOrgAdminRoles(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if len(updatedRoles) != 1 || updatedRoles[0].Slug != "qareviewer1234567890123456789012345" {
+		t.Fatalf("updated roles = %#v", updatedRoles)
+	}
+}
+
 func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 	now := time.Now().UTC()
 	users := []IdentityUser{
@@ -2786,6 +2834,22 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		notFound.handleOrgAdminRoles(rec2, req2)
 		if rec2.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec2.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("invalid role name", func(t *testing.T) {
+		server := baseServer(
+			IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"},
+			&IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"},
+			nil,
+		)
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=%21%21%21&palette=blue"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminRoles(rec, req)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), invalidRoleNameMessage) {
+			t.Fatalf("response = %d %q", rec.Code, rec.Body.String())
 		}
 	})
 

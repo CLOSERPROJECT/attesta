@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIdentityRoleLabelsRoundTrip(t *testing.T) {
 	labels := []string{
@@ -74,5 +77,20 @@ func TestInviteMembershipRolesRoundTrip(t *testing.T) {
 	}
 	if decoded.BusinessRoles[0] != "qa-reviewer" || decoded.BusinessRoles[1] != "qa-approver" {
 		t.Fatalf("business roles = %#v", decoded.BusinessRoles)
+	}
+}
+
+func TestIdentityLabelsAvoidColon(t *testing.T) {
+	if strings.Contains(identityOrgAdminLabel, ":") {
+		t.Fatalf("identityOrgAdminLabel = %q, contains ':'", identityOrgAdminLabel)
+	}
+	if strings.Contains(identityRoleLabelPrefix, ":") {
+		t.Fatalf("identityRoleLabelPrefix = %q, contains ':'", identityRoleLabelPrefix)
+	}
+	if strings.Contains(identityInviteRolePrefix, ":") {
+		t.Fatalf("identityInviteRolePrefix = %q, contains ':'", identityInviteRolePrefix)
+	}
+	if strings.Contains(encodeIdentityRoleLabel("qa-reviewer"), ":") {
+		t.Fatalf("encoded role label contains ':'")
 	}
 }
