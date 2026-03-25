@@ -2977,16 +2977,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
-			s.renderOrgAdmin(w, updatedAdmin, createdOrg.Slug, "", "")
-			return
-		}
-		updatedAdmin := *admin
-		orgID := stableOrgObjectID(createdOrg.Slug)
-		updatedAdmin.OrgID = &orgID
-		updatedAdmin.OrgSlug = createdOrg.Slug
-		updatedAdmin.RoleSlugs = canonifyRoleSlugs(append(append([]string{}, admin.RoleSlugs...), "org-admin"))
-		s.renderOrgAdmin(w, &updatedAdmin, createdOrg.Slug, "", "")
+		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -3159,15 +3150,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				log.Printf("failed to delete previous organization logo %q: %v", previousLogoFileID, err)
 			}
 		}
-		if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
-			s.renderOrgAdmin(w, updatedAdmin, updatedOrg.Slug, "", "")
-			return
-		}
-		updatedAdmin := *admin
-		orgID := stableOrgObjectID(updatedOrg.Slug)
-		updatedAdmin.OrgID = &orgID
-		updatedAdmin.OrgSlug = updatedOrg.Slug
-		s.renderOrgAdmin(w, &updatedAdmin, updatedOrg.Slug, "", "")
+		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
 	case "set_roles":
 		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
 		if userMongoID == "" {

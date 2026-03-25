@@ -1432,18 +1432,14 @@ func TestHandleOrgAdminUsersCreateOrgWithIdentity(t *testing.T) {
 
 	server.handleOrgAdminUsers(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	if createSessionSecret != "session-1" || createName != "Fresh Org" {
 		t.Fatalf("create args = %q %q", createSessionSecret, createName)
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "ORG_ADMIN fresh-org") {
-		t.Fatalf("expected org admin body, got %q", body)
-	}
-	if !strings.Contains(body, "USERS 1") {
-		t.Fatalf("expected current user row after bootstrap, got %q", body)
+	if rec.Header().Get("Location") != "/org-admin/users" {
+		t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
 	}
 }
 
@@ -1603,8 +1599,8 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 
 	server.handleOrgAdminUsers(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	if updateSessionSecret != "session-1" || updateCurrentSlug != "acme" || updateName != "Updated Name Org" || updateLogoFileID != "logo-new" {
 		t.Fatalf("update args = %q %q %q %q", updateSessionSecret, updateCurrentSlug, updateName, updateLogoFileID)
@@ -1618,8 +1614,8 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	if deletedLogoFileID != "logo-old" {
 		t.Fatalf("deleted logo = %q, want logo-old", deletedLogoFileID)
 	}
-	if !strings.Contains(rec.Body.String(), "ORG_ADMIN updated-name-org") {
-		t.Fatalf("expected updated org slug in body, got %q", rec.Body.String())
+	if rec.Header().Get("Location") != "/org-admin/users" {
+		t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
 	}
 }
 
