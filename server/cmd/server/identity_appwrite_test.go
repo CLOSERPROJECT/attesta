@@ -207,6 +207,7 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	var createFileCalled bool
 	var createFileContentType string
 	var createFileBody []byte
+	var deleteFilePath string
 	var updateLabelsBody map[string]interface{}
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -268,6 +269,10 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/storage/buckets/org-assets/files/logo-1/view":
 			w.Header().Set("Content-Type", "image/png")
 			_, _ = w.Write([]byte("PNG"))
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/storage/buckets/org-assets/files/logo-1":
+			deleteFilePath = r.URL.Path
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/storage/buckets/org-assets/files/"):
 			http.NotFound(w, r)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/storage/buckets/org-assets/files":
@@ -353,6 +358,12 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	}
 	if logo.Filename != "logo.png" || logo.ContentType != "image/png" || string(logo.Data) != "PNG" {
 		t.Fatalf("logo = %#v", logo)
+	}
+	if err := identity.DeleteOrganizationLogo(context.Background(), "logo-1"); err != nil {
+		t.Fatalf("DeleteOrganizationLogo error: %v", err)
+	}
+	if deleteFilePath != "/v1/storage/buckets/org-assets/files/logo-1" {
+		t.Fatalf("delete path = %q", deleteFilePath)
 	}
 
 	orgUsers, err := identity.ListOrganizationUsers(context.Background(), "fresh-org")

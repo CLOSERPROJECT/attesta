@@ -613,6 +613,14 @@ func (a *appwriteIdentity) UploadOrganizationLogo(ctx context.Context, orgSlug s
 	}, nil
 }
 
+func (a *appwriteIdentity) DeleteOrganizationLogo(ctx context.Context, fileID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := storage.New(a.adminClient).DeleteFile(a.orgAssetsBucket, strings.TrimSpace(fileID))
+	return normalizeIdentityError(err)
+}
+
 func (a *appwriteIdentity) GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error) {
 	if err := ctx.Err(); err != nil {
 		return IdentityFile{}, err

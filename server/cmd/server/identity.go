@@ -39,6 +39,7 @@ type IdentityStore interface {
 	DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
 	InviteOrganizationUserAsAdmin(ctx context.Context, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
+	DeleteOrganizationLogo(ctx context.Context, fileID string) error
 	GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error)
 }
 

@@ -1524,6 +1524,7 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	var updateName string
 	var updateLogoFileID string
 	var updateRoles []IdentityRole
+	var deletedLogoFileID string
 
 	server := &Server{
 		store: NewMemoryStore(),
@@ -1565,6 +1566,10 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 				currentUser.OrgSlug = org.Slug
 				currentUser.OrgName = org.Name
 				return org, nil
+			},
+			deleteOrganizationLogoFunc: func(ctx context.Context, fileID string) error {
+				deletedLogoFileID = fileID
+				return nil
 			},
 		},
 		tmpl:        testTemplates(),
@@ -1609,6 +1614,9 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	}
 	if len(updateRoles) != 1 || updateRoles[0].Slug != "qa-reviewer" {
 		t.Fatalf("update roles = %#v", updateRoles)
+	}
+	if deletedLogoFileID != "logo-old" {
+		t.Fatalf("deleted logo = %q, want logo-old", deletedLogoFileID)
 	}
 	if !strings.Contains(rec.Body.String(), "ORG_ADMIN updated-name-org") {
 		t.Fatalf("expected updated org slug in body, got %q", rec.Body.String())

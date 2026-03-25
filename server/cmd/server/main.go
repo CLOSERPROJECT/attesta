@@ -3126,7 +3126,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: logoErrMsg})
 			return
 		}
-		logoFileID := strings.TrimSpace(org.LogoFileID)
+		previousLogoFileID := strings.TrimSpace(org.LogoFileID)
+		logoFileID := previousLogoFileID
 		if logoUpload != nil {
 			logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), targetOrgSlug, IdentityFile{
 				Filename:    logoUpload.Filename,
@@ -3152,6 +3153,11 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			}
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to update organization"})
 			return
+		}
+		if logoUpload != nil && previousLogoFileID != "" && previousLogoFileID != strings.TrimSpace(updatedOrg.LogoFileID) {
+			if err := s.identity.DeleteOrganizationLogo(r.Context(), previousLogoFileID); err != nil && !errors.Is(err, ErrIdentityNotFound) {
+				log.Printf("failed to delete previous organization logo %q: %v", previousLogoFileID, err)
+			}
 		}
 		if updatedAdmin, _, err := s.currentUser(r); err == nil && updatedAdmin != nil {
 			s.renderOrgAdmin(w, updatedAdmin, updatedOrg.Slug, "", "")

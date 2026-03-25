@@ -35,6 +35,7 @@ type fakeIdentityStore struct {
 	deleteOrganizationMembershipFunc        func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
 	inviteOrganizationUserAsAdminFunc       func(ctx context.Context, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	uploadOrganizationLogoFunc              func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
+	deleteOrganizationLogoFunc              func(ctx context.Context, fileID string) error
 	getOrganizationLogoFunc                 func(ctx context.Context, fileID string) (IdentityFile, error)
 }
 
@@ -232,6 +233,13 @@ func (f *fakeIdentityStore) UploadOrganizationLogo(ctx context.Context, orgSlug 
 		return f.uploadOrganizationLogoFunc(ctx, orgSlug, upload)
 	}
 	return IdentityFile{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) DeleteOrganizationLogo(ctx context.Context, fileID string) error {
+	if f.deleteOrganizationLogoFunc != nil {
+		return f.deleteOrganizationLogoFunc(ctx, fileID)
+	}
+	return nil
 }
 
 func (f *fakeIdentityStore) GetOrganizationLogo(ctx context.Context, fileID string) (IdentityFile, error) {
