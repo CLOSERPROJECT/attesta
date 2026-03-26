@@ -1,3 +1,8 @@
+include:
+  - path: ./appwrite/docker-compose.appwrite.yaml
+    env_file:
+      - ./appwrite/.env.appwrite.example
+
 services:
   mongodb:
     image: mongo:7.0
@@ -30,6 +35,16 @@ services:
     depends_on:
       - mongodb
 
+  mailpit:
+    image: axllent/mailpit:v1.29.3
+    container_name: attesta-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - default
+      - appwrite
+
   attesta:
     build:
       context: ..
@@ -38,11 +53,21 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017
       CERBOS_URL: http://cerbos:3592
+      APPWRITE_ENDPOINT: http://appwrite/v1
+      APPWRITE_PROJECT_ID: 69bbd0f4002a09b17d1e
+      APPWRITE_API_KEY: standard_247a97933aa7a18373ffaad69c74b02dd5813b20d139f8f367a3ca443550d794c8438aeb4e1a7b79e299c83fe99aea52fcf4d29ad063659537e8f42d06dd69a5b59e5d50a16125c469a628aa0a3394c3cfaf32e5e4ca6e96c3ed855e3fe52bbe59b1ed44d3ae0a6fbb42746a5800d7588bcfeef93044ea2fa1efe1155a9b2024
+      APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}
+      APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}
+      APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
     ports:
       - "3030:3000"
+    networks:
+      - default
+      - appwrite
     depends_on:
       - mongodb
       - cerbos
+      - appwrite
 
 volumes:
   mongodb_data:

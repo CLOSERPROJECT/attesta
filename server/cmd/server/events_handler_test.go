@@ -142,7 +142,8 @@ func (w *nonFlusherResponseWriter) WriteHeader(code int) {
 
 func waitForSSESubscriber(t *testing.T, hub *SSEHub, key string) {
 	t.Helper()
-	for i := 0; i < 1000; i++ {
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
 		hub.mu.Lock()
 		count := len(hub.stream[key])
 		hub.mu.Unlock()
@@ -150,6 +151,7 @@ func waitForSSESubscriber(t *testing.T, hub *SSEHub, key string) {
 			return
 		}
 		runtime.Gosched()
+		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("subscriber for key %q was not established", key)
 }

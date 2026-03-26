@@ -598,7 +598,11 @@ func TestValidateWorkflowRefsMissingOrganization(t *testing.T) {
 			},
 		},
 	}
-	server := &Server{store: NewMemoryStore(), enforceAuth: true}
+	server := &Server{
+		store:    NewMemoryStore(),
+		identity: &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }},
+		enforceAuth: true,
+	}
 
 	err := server.validateWorkflowRefs(t.Context(), cfg)
 	if err == nil {
@@ -610,11 +614,6 @@ func TestValidateWorkflowRefsMissingOrganization(t *testing.T) {
 }
 
 func TestValidateWorkflowRefsMissingRole(t *testing.T) {
-	store := NewMemoryStore()
-	if _, err := store.CreateOrganization(t.Context(), Organization{Name: "Organization 1"}); err != nil {
-		t.Fatalf("CreateOrganization error: %v", err)
-	}
-
 	cfg := RuntimeConfig{
 		Organizations: []WorkflowOrganization{
 			{Slug: "organization-1", Name: "Organization 1"},
@@ -637,7 +636,13 @@ func TestValidateWorkflowRefsMissingRole(t *testing.T) {
 			},
 		},
 	}
-	server := &Server{store: store, enforceAuth: true}
+	server := &Server{
+		store: NewMemoryStore(),
+		identity: &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+			return []IdentityOrg{{ID: "team-1", Slug: "organization-1", Name: "Organization 1"}}, nil
+		}},
+		enforceAuth: true,
+	}
 
 	err := server.validateWorkflowRefs(t.Context(), cfg)
 	if err == nil {
@@ -649,30 +654,6 @@ func TestValidateWorkflowRefsMissingRole(t *testing.T) {
 }
 
 func TestValidateWorkflowRefsAllowsDuplicateRoleSlugAcrossOrganizations(t *testing.T) {
-	store := NewMemoryStore()
-	closingOrg, err := store.CreateOrganization(t.Context(), Organization{Name: "Closing the loop"})
-	if err != nil {
-		t.Fatalf("CreateOrganization(closing): %v", err)
-	}
-	fivrecOrg, err := store.CreateOrganization(t.Context(), Organization{Name: "Fivrec"})
-	if err != nil {
-		t.Fatalf("CreateOrganization(fivrec): %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:   closingOrg.ID,
-		OrgSlug: closingOrg.Slug,
-		Name:    "Operator",
-	}); err != nil {
-		t.Fatalf("CreateRole(closing/operator): %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:   fivrecOrg.ID,
-		OrgSlug: fivrecOrg.Slug,
-		Name:    "Operator",
-	}); err != nil {
-		t.Fatalf("CreateRole(fivrec/operator): %v", err)
-	}
-
 	cfg := RuntimeConfig{
 		Organizations: []WorkflowOrganization{
 			{Slug: "closing-the-loop", Name: "Closing the loop"},
@@ -704,10 +685,119 @@ func TestValidateWorkflowRefsAllowsDuplicateRoleSlugAcrossOrganizations(t *testi
 			},
 		},
 	}
-	server := &Server{store: store, enforceAuth: true}
+	server := &Server{
+		store: NewMemoryStore(),
+		identity: &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+			return []IdentityOrg{
+				{ID: "team-1", Slug: "closing-the-loop", Name: "Closing the loop", Roles: []IdentityRole{{Slug: "operator", Name: "Operator"}}},
+				{ID: "team-2", Slug: "fivrec", Name: "Fivrec", Roles: []IdentityRole{{Slug: "operator", Name: "Operator"}}},
+			}, nil
+		}},
+		enforceAuth: true,
+	}
 
 	if err := server.validateWorkflowRefs(t.Context(), cfg); err != nil {
 		t.Fatalf("validateWorkflowRefs returned error: %v", err)
+	}
+}
+
+func TestValidateWorkflowRefsShortCircuitsWithoutIdentityChecks(t *testing.T) {
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{{Slug: "org1", Name: "Organization 1"}},
+		Roles:         []WorkflowRole{{OrgSlug: "org1", Slug: "dep1", Name: "Department 1"}},
+	}
+
+	if err := (&Server{}).validateWorkflowRefs(t.Context(), cfg); err != nil {
+		t.Fatalf("validateWorkflowRefs without identity returned error: %v", err)
+	}
+
+	server := &Server{identity: &fakeIdentityStore{}, enforceAuth: false}
+	if err := server.validateWorkflowRefs(t.Context(), cfg); err != nil {
+		t.Fatalf("validateWorkflowRefs without auth enforcement returned error: %v", err)
+	}
+
+	server = &Server{identity: &fakeIdentityStore{}, enforceAuth: true}
+	if err := server.validateWorkflowRefs(t.Context(), RuntimeConfig{}); err != nil {
+		t.Fatalf("validateWorkflowRefs empty config returned error: %v", err)
+	}
+}
+
+func TestValidateWorkflowRefsListOrganizationsError(t *testing.T) {
+	server := &Server{
+		identity: &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+			return nil, errors.New("boom")
+		}},
+		enforceAuth: true,
+	}
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{{Slug: "org1", Name: "Organization 1"}},
+	}
+
+	err := server.validateWorkflowRefs(t.Context(), cfg)
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("validateWorkflowRefs error = %v, want boom", err)
+	}
+}
+
+func TestValidateWorkflowRefsReportsStepAndRoleMismatches(t *testing.T) {
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{
+			{Slug: "org1", Name: "Organization 1"},
+			{Slug: "org2", Name: "Organization 2"},
+		},
+		Roles: []WorkflowRole{
+			{OrgSlug: "org1", Slug: "dep1", Name: "Department 1"},
+			{OrgSlug: "org2", Slug: "reviewer", Name: "Reviewer"},
+		},
+		Workflow: WorkflowDef{
+			Name: "Workflow",
+			Steps: []WorkflowStep{
+				{
+					StepID:           "1",
+					Title:            "Step 1",
+					Order:            1,
+					OrganizationSlug: "missing-org",
+					Substep: []WorkflowSub{
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, InputKey: "value", InputType: "string"},
+					},
+				},
+				{
+					StepID:           "2",
+					Title:            "Step 2",
+					Order:            2,
+					OrganizationSlug: "org1",
+					Substep: []WorkflowSub{
+						{SubstepID: "2.1", Title: "Sub 2", Order: 1, Roles: []string{"reviewer"}, InputKey: "value", InputType: "string"},
+						{SubstepID: "2.2", Title: "Sub 3", Order: 2, Roles: []string{"missing-role"}, InputKey: "value", InputType: "string"},
+					},
+				},
+			},
+		},
+	}
+	server := &Server{
+		identity: &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+			return []IdentityOrg{
+				{ID: "team-1", Slug: "org1", Name: "Organization 1", Roles: []IdentityRole{{Slug: "dep1", Name: "Department 1"}}},
+				{ID: "team-2", Slug: "org2", Name: "Organization 2", Roles: []IdentityRole{{Slug: "reviewer", Name: "Reviewer"}}},
+			}, nil
+		}},
+		enforceAuth: true,
+	}
+
+	err := server.validateWorkflowRefs(t.Context(), cfg)
+	if err == nil {
+		t.Fatal("expected workflow ref validation error")
+	}
+	message := err.Error()
+	for _, want := range []string{
+		"step 1 references organization not in yaml: missing-org",
+		"substep 1.1 has no roles",
+		"substep 2.1 role reviewer not in step organization org1",
+		"substep 2.2 references role not in yaml: missing-role",
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("validateWorkflowRefs error %q missing %q", message, want)
+		}
 	}
 }
 

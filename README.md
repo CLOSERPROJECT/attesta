@@ -33,14 +33,25 @@ cd attesta
 mise trust
 mise install
 
-# Start the development environment
+# create .env
+cp .env.example .env
+
+# Start the backend services
+task start
+```
+
+Now visit http://localhost/console/register and create the admin account, once logged in:
+* Create a new project and copy the project id inside the .env (APPWRITE_PROJECT_ID)
+* Create a new API key with Auth permission (all) and Storage permissions (files.read and files,write) and copy it inside the .env (APPWRITE_API_KEY)
+* Visit storage page and create a new bucket with **Bucket ID** `org-assets`
+
+Now beck to the terminal run:
+
+```bash
 task dev
 ```
 
-Open:
-- Home: http://localhost:3000
-- Backoffice: http://localhost:3000/backoffice
-- Mongo Express (optional): http://localhost:8081
+Open http://localhost:3000 to your local running attesta software.
 
 ## Add new streams
 
@@ -93,21 +104,52 @@ curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/com
 - Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
 
 ## Deployment Checklist
-1. Set auth/bootstrap env vars:
-   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+1. Set Attesta auth env vars:
    - `ANYONE_CAN_CREATE_ACCOUNT` (recommended `false` in production)
-   - `SESSION_TTL_DAYS` and `COOKIE_SECURE=true` behind HTTPS
-2. Start services and verify Mongo + Cerbos health.
-3. Login as platform admin and create organizations.
-4. Create org admin invites, then create org roles/users from org admin pages.
-5. Ensure workflow YAML org/role slugs match Mongo entities.
-6. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
+   - `SESSION_TTL_DAYS`
+   - `COOKIE_SECURE=true` behind HTTPS
+2. Set Attesta Appwrite env vars:
+   - `APPWRITE_ENDPOINT`
+   - `APPWRITE_PROJECT_ID`
+   - `APPWRITE_API_KEY`
+   - `APPWRITE_INVITE_REDIRECT_URL`
+   - `APPWRITE_RESET_REDIRECT_URL`
+   - `APPWRITE_ORG_ASSETS_BUCKET`
+3. Start services and verify Mongo + Cerbos health.
+4. Bootstrap Appwrite from the Console:
+   - create the first console account
+   - create the Attesta project
+   - create the Attesta API key
+   - create the org assets storage bucket
+5. Create organizations and first org-admin memberships in Appwrite, then manage roles and users from Attesta `/org-admin/*`.
+6. Ensure workflow YAML org/role slugs match Appwrite teams and role catalogs.
+7. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
+
+## Appwrite Cutover
+Migration prerequisites:
+1. Provision the Appwrite project, platform entries, email templates, and the `org-assets` storage bucket.
+2. Export Mongo organizations, roles, and active users into Appwrite teams, team prefs, memberships, and labels.
+3. Manually bootstrap the first org-admin owner for each Appwrite team from the Appwrite Console.
+4. Deploy Attesta with `APPWRITE_*` env vars configured and the internal `/admin/orgs` flow removed.
+5. Invalidate old Mongo-backed sessions so users authenticate again through Appwrite.
+6. Expire old pending invite and password-reset tokens and re-issue them through Appwrite.
+
+Rollback note:
+- Rollback is only application-safe before Attesta starts writing auth and org mutations into Appwrite.
+- After cutover, rolling back Attesta code does not restore Mongo as the source of truth for users, invites, or memberships.
+
+Staging rehearsal:
+1. invited user acceptance
+2. self-signup when enabled
+3. org creation by an unassigned user
+4. org-admin invite from Attesta
+5. role edit and user removal
 
 ## Org admin edge cases
-- `Delete account` is a soft delete: the backend sets `status=deleted`, clears `passwordHash`, and clears `roleSlugs`.
-- Invite status is derived from invite timestamps:
-  - `accepted` when `usedAt` is present
-  - `expired` when `usedAt` is empty and `expiresAt` is in the past
+- `Delete user` removes the Appwrite team membership and clears Attesta role labels, but does not delete the global Appwrite account.
+- Invite status is derived from Appwrite memberships:
+  - `accepted` when the membership is active
+  - `expired` when the membership is no longer usable before acceptance
   - `pending` otherwise
 - Inviting an email that already belongs to another organization is rejected.
 

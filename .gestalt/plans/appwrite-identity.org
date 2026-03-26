@@ -1,0 +1,417 @@
+#+TITLE: Appwrite Identity
+#+SUBTITLE: Replace Mongo-backed auth and org data with Appwrite sessions, teams, labels, and invite flows while keeping org-admin in Attesta
+#+DATE: 2026-03-18
+#+KEYWORDS: attesta, appwrite, auth, sessions, teams, labels, invites, org-admin, migration
+
+Summary
+- Replace Mongo-backed auth, sessions, organizations, roles, invites, and password resets with Appwrite. Keep Mongo only for processes, progress, attachments, and other workflow data not covered by this task.
+- Remove Attesta platform-admin behavior and `/admin/orgs`; bootstrap organizations and first org-admins in Appwrite Console, while `/org-admin/*` stays in Attesta and mutates Appwrite through the Go backend.
+- Keep workflow YAML `organizations` and `roles` as validation-only config. Use Appwrite teams for org membership, user labels for accepted business roles, and team prefs for org role catalog plus org metadata.
+- Migrate process actor identity from Mongo ObjectIDs to opaque IDs so existing history remains readable and new Appwrite users can appear in action lists, timelines, and DPP traces.
+- Vendor a pinned Appwrite self-hosting stack under `deployment/` and update both `deployment/docker-compose.local.yaml` and `deployment/docker-compose.coolify.yaml` so they start Attesta with the required Appwrite services, volumes, and env wiring.
+
+* DONE [#A] Freeze the new identity boundary and data model
+Effort: M
+Goal: Replace the current Mongo-shaped auth model with an Appwrite-shaped identity boundary before any handler rewrites begin.
+Notes: This is the root-cause step. Do not bolt Appwrite onto the existing `primitive.ObjectID` auth model; that would leak Mongo assumptions everywhere and make the migration brittle.
+
+** DONE [#A] Introduce an Appwrite identity port and Appwrite-native DTOs
+Why: Current auth structs in `server/cmd/server/store.go` and helper code in `server/cmd/server/main.go` assume Mongo IDs, Mongo sessions, and Mongo invite/reset documents. Appwrite is an external identity system and needs opaque IDs plus a dedicated port.
+Change:
+- Add a new identity adapter file, for example `server/cmd/server/identity_appwrite.go`, plus a narrow interface in `server/cmd/server/main.go` or a new `server/cmd/server/identity.go`.
+- Define Appwrite-facing DTOs that are not Mongo-specific, for example:
+  - `IdentityUser{ID string, Email string, OrgSlug string, OrgName string, Labels []string, IsOrgAdmin bool, MembershipID string, MembershipRoles []string, Status string}`
+  - `IdentityOrg{ID string, Slug string, Name string, LogoFileID string, Roles []IdentityRole}`
+  - `IdentityRole{Slug string, Name string, Color string, Border string}`
+  - `IdentitySession{Secret string, ExpiresAt time.Time, UserID string}`
+- Keep the existing process store port in `server/cmd/server/store.go`, but remove auth/org concerns from that port in the implementation task:
+  - users
+  - organizations
+  - roles
+  - invites
+  - sessions
+  - password resets
+- Add a single official dependency in `server/go.mod`: Appwrite’s Go SDK. Use raw `net/http` only for Appwrite’s email-invite flow where the server SDK semantics are wrong for this product requirement.
+Tests:
+- Add focused adapter contract tests in `server/cmd/server/identity_appwrite_test.go` using fake transport or interface-level fakes.
+- Keep process-store tests intact; auth tests should gradually move away from `MemoryStore` auth helpers.
+Done when:
+- The server has a dedicated identity port with string IDs and Appwrite-shaped DTOs, and no new auth code depends on `primitive.ObjectID`.
+
+** DONE [#A] Decide and encode the Appwrite data mapping
+Why: The user requested `org -> team`, `roles -> user labels`, `user -> user`, while Attesta still needs an org-scoped role catalog and org-admin behavior.
+Change:
+- Use Appwrite team ID = Attesta org slug when possible; team name = org display name.
+- Store org role catalog in team prefs because labels alone do not define the available roles or their color metadata:
+  - team prefs shape:
+    - `schemaVersion`
+    - `logoFileId`
+    - `roles: [{slug,name,color,border}]`
+- Store accepted business roles as user labels with an Attesta namespace:
+  - `attesta:role:<slug>`
+  - `attesta:org-admin`
+- Use Appwrite team membership roles only for team access mechanics:
+  - `owner` for org admins
+  - `member` for non-admins
+- For invite emails, temporarily encode requested business roles into membership roles too:
+  - `attesta-role:<slug>`
+  - optional `owner`
+  On invite acceptance / first authenticated sync, copy the `attesta-role:*` membership roles into user labels and normalize membership roles back to `owner|member`.
+- Keep workflow YAML `organizations` and `roles` in `server/config/*.yaml` as validation-only source; do not write back to YAML from Appwrite.
+Tests:
+- Add pure mapping tests covering:
+  - label encode/decode
+  - team prefs round-trip
+  - invite membership role encode/decode
+Done when:
+- There is one documented mapping from Appwrite objects to Attesta concepts, including pending-invite role transport.
+
+* DONE [#A] Migrate request authentication, sessions, signup, and recovery to Appwrite
+Effort: L
+Goal: The `attesta_session` cookie becomes an Appwrite session secret, login/signup/reset stop touching Mongo, and the auth routes keep the existing server-rendered UX where practical.
+Notes: Keep `attesta_session` as the cookie name for minimal template and middleware churn, but its value must be an Appwrite-managed session secret.
+
+** DONE [#A] Rework login, logout, current-user lookup, and route guards
+Why: `handleLogin`, `handleLogout`, `readSession`, `currentUser`, and `requireAuthenticated*` in `server/cmd/server/main.go` currently depend on Mongo session storage.
+Change:
+- Update `POST /login` in `server/cmd/server/main.go` to call Appwrite email/password session creation.
+- Store Appwrite session `secret` in the existing `attesta_session` cookie and use Appwrite session expiry for cookie expiration.
+- Update `readSession` / `currentUser` to:
+  - read cookie
+  - call Appwrite with `setSession(secret)`
+  - load current account
+  - hydrate org/team membership and Attesta labels
+- Update `POST /logout` to delete the current Appwrite session and expire the cookie locally.
+- Remove any dependency on `CreateSession`, `LoadSessionByID`, and `DeleteSession` from `server/cmd/server/store.go`.
+- Preserve existing route guards and redirect behavior so page flow remains stable.
+Tests:
+- Rewrite `server/cmd/server/auth_session_handler_test.go` and helper tests to fake the identity port instead of creating Mongo sessions.
+- Cover:
+  - successful login
+  - invalid credentials
+  - expired/invalid cookie
+  - logout deletes remote session and clears cookie
+Done when:
+- No authenticated route depends on Mongo sessions, and the same `attesta_session` cookie drives Appwrite-backed auth.
+
+** DONE [#A] Add signup and reset flows with Appwrite-compatible callbacks
+Why: The user wants `ANYONE_CAN_CREATE_ACCOUNT=false` to keep invite-only behavior, but `true` must expose signup; password reset must move off Mongo reset tokens too.
+Change:
+- Add `GET/POST /signup` only when `ANYONE_CAN_CREATE_ACCOUNT=true`.
+- Signup behavior:
+  - create Appwrite account
+  - create Appwrite session
+  - if the user has no org/team, redirect to the existing org-admin bootstrap view to create an org
+- Replace the bootstrap env behavior in `bootstrapPlatformAdmin`:
+  - remove `ADMIN_EMAIL`
+  - remove `ADMIN_PASSWORD`
+  - keep `ANYONE_CAN_CREATE_ACCOUNT`
+  - closed signup means only invited users can create accounts
+- Rewire reset flow:
+  - `GET/POST /reset` remains the request page
+  - `POST /reset` calls Appwrite password recovery with callback URL under Attesta
+  - replace `/reset/:token` with an Appwrite-compatible callback route, for example `/reset/confirm?userId=...&secret=...`
+  - keep the current HTML reset form but submit to Appwrite’s recovery completion API
+- Rewire invite acceptance similarly:
+  - remove reliance on `/invite/:token`
+  - add an Appwrite-compatible callback route, for example `/invite/accept?teamId=...&membershipId=...&userId=...&secret=...`
+  - on successful acceptance Appwrite creates the session; Attesta stores the returned session secret in `attesta_session` and redirects into the app
+- Update `server/templates/login.html`, add `server/templates/signup.html`, and adjust `server/templates/reset_request.html` / `server/templates/reset_set.html` accordingly.
+Tests:
+- Add handler tests for:
+  - signup hidden when `ANYONE_CAN_CREATE_ACCOUNT=false`
+  - signup creates user + session when enabled
+  - reset request triggers Appwrite recovery call
+  - reset confirm updates password through Appwrite
+  - invite accept callback creates a local session cookie from Appwrite session output
+Done when:
+- Auth, signup, invite acceptance, and password reset all use Appwrite flows and no Mongo token/session documents remain in use.
+
+* DONE [#A] Keep org-admin in Attesta but move its state and mutations to Appwrite
+Effort: L
+Goal: `/org-admin/users`, `/org-admin/roles`, `/org-admin/logo/*`, and org creation/update remain Attesta pages, but every org/user/role change persists in Appwrite instead of Mongo.
+Notes: This retains the existing UX surface for org admins, which is what the user asked for, while removing platform-admin behavior.
+
+** DONE [#A] Replace org creation and org profile updates with Appwrite team operations
+Why: Current org creation/update in `handleOrgAdminUsers` and logo loading in `handleOrgAdminLogo` persist organizations in Mongo and files in GridFS.
+Change:
+- For self-serve org creation when `ANYONE_CAN_CREATE_ACCOUNT=true` and the signed-in user has no org:
+  - `intent=create_org` creates an Appwrite team with ID = slug
+  - grants the creator `owner`
+  - initializes team prefs with `schemaVersion`, empty `roles`, and optional logo metadata
+  - updates the signed-in user labels to include `attesta:org-admin`
+- For org profile update:
+  - team name update = org rename
+  - team prefs update = role catalog and logo metadata update
+- Move org logo storage from Mongo/GridFS to Appwrite Storage in a dedicated bucket, for example `org-assets`.
+- Update `GET /org-admin/logo/:fileId` to stream from Appwrite Storage instead of Mongo attachment APIs.
+- Exact files likely touched:
+  - `server/cmd/server/main.go`
+  - new `server/cmd/server/identity_appwrite.go`
+  - possibly new `server/cmd/server/appwrite_storage.go`
+  - `server/templates/org_admin.html`
+Tests:
+- Rewrite org create/update/logo tests in `server/cmd/server/admin_handler_test.go` against the identity/storage fake.
+- Cover slug collisions, missing org context, logo upload validation, and owner bootstrap behavior.
+Done when:
+- Org admins can create and edit their org from Attesta without touching Mongo org records.
+
+** DONE [#A] Replace role catalog CRUD and role assignment with Appwrite team prefs plus labels
+Why: Current role creation and role assignment are backed by Mongo `roles` plus user `roleSlugs`. Appwrite labels are the new role store for accepted users, but the org still needs a role catalog.
+Change:
+- `POST /org-admin/roles`:
+  - load team prefs
+  - validate slug uniqueness within `prefs.roles`
+  - append `{slug,name,color,border}`
+  - write the full prefs object back with optimistic overwrite discipline
+- `renderOrgAdmin`:
+  - load current org from Appwrite team + prefs
+  - derive role pills and user rows from team prefs + user labels
+- `intent=set_roles`:
+  - replace Attesta role labels for the target user with the submitted set
+  - keep `attesta:org-admin` only for org admins
+  - enforce self-protection: current org admin cannot remove their own admin ability
+- Keep the existing palette behavior and slug rules from the current implementation.
+Tests:
+- Migrate role handler tests to adapter fakes.
+- Cover:
+  - duplicate role slug
+  - color/border persistence
+  - replacing a user’s labels with exact submitted roles
+  - self-protection on org-admin role removal
+Done when:
+- Roles live in Appwrite team prefs and user labels, and the org-admin screens still behave as they do today.
+
+** DONE [#A] Replace user invites and user lifecycle operations with Appwrite membership flows
+Why: The user explicitly wants real invitation emails sent by Appwrite, triggered from Attesta UI, while user/org/role state must no longer live in Mongo.
+Change:
+- Remove `CreateInvite`, `LoadInviteByTokenHash`, `ListInvitesByCreator`, and `DisableUser` from the Mongo store path.
+- Invite behavior in `POST /org-admin/users` with `intent=invite`:
+  - backend reads the current user’s Appwrite session secret from `attesta_session`
+  - backend calls Appwrite’s team-membership invite endpoint using a client-style authenticated HTTP request, not the API-key server-SDK membership create path
+  - reason: Appwrite docs state client-side membership creation sends the email invite, while server-side membership creation auto-adds the member and skips the acceptance flow
+  - membership roles carry `owner|member` plus `attesta-role:*` pending roles until acceptance
+- “Invites I sent”:
+  - derive from pending and accepted Appwrite team memberships instead of Mongo invite documents
+  - render `pending`, `accepted`, and `expired` from membership status and expiry fields exposed by Appwrite
+- `intent=delete_user`:
+  - if target is in the org team, remove team membership
+  - clear Attesta role labels on the Appwrite user
+  - do not delete the Appwrite user account globally
+- Existing-user invite behavior:
+  - if the user is already an accepted member of the org team, update labels directly and do not send a redundant invite
+  - if the email belongs to another org team, reject as cross-org conflict, preserving current single-org semantics
+Tests:
+- Add invite and lifecycle tests covering:
+  - invite email path uses the client-style Appwrite flow
+  - duplicate pending invite does not create a second invite
+  - existing in-org user update skips invite email
+  - cross-org invite is rejected
+  - delete-user removes membership and labels but not the global account
+Done when:
+- Org admins can invite and manage users from Attesta while Appwrite remains the source of truth and mail sender.
+
+* DONE [#A] Remove platform admin behavior and Mongo auth/org persistence from Attesta
+Effort: M
+Goal: The app no longer exposes platform-admin features or stores auth/org state in Mongo, but it still works for normal users and org admins.
+Notes: The person with Appwrite Console access becomes the bootstrap operator outside Attesta. This is a deliberate product change, not an implementation detail.
+
+** DONE [#A] Delete the platform-admin route/UI path and simplify topbar behavior
+Why: The user explicitly said platform admin is no longer needed inside Attesta.
+Change:
+- Remove route registration for `/admin/orgs` from `server/cmd/server/main.go`.
+- Remove:
+  - `requirePlatformAdmin`
+  - `renderPlatformAdmin`
+  - `handleAdminOrgs`
+  - `createPlatformOrgAdminInvite`
+  - `bootstrapPlatformAdmin`
+  - `IsPlatformAdmin` from the user model
+- Simplify `pageBaseForUser` and layout rendering:
+  - remove `ShowOrgsLink`
+  - keep only org-admin-aware links
+- Update `server/templates/layout.html` to remove the `Orgs` menu entry.
+- Mark `server/templates/platform_admin.html` for deletion if no longer referenced.
+Tests:
+- Remove or rewrite platform-admin tests in:
+  - `server/cmd/server/admin_handler_test.go`
+  - `server/cmd/server/auth_bootstrap_test.go`
+  - `server/cmd/server/home_handler_test.go`
+  - `server/cmd/server/public_catalog_handler_test.go`
+  - `server/cmd/server/formata_builder_handler_test.go`
+- Add a simple negative route test that `/admin/orgs` is no longer mounted.
+Done when:
+- There is no Attesta platform-admin path, UI link, or bootstrap env dependency left.
+
+** DONE [#A] Strip auth/org persistence out of the Mongo store and test helpers
+Why: Leaving dead auth/org persistence in `store.go` would mislead future work and make the server look half-migrated.
+Change:
+- Reduce `server/cmd/server/store.go` to workflow/process/attachment/formata responsibilities.
+- Remove or relocate:
+  - auth structs backed only by Mongo
+  - auth collection constants
+  - auth index creation paths
+  - memory-store auth helpers used only for the old model
+- Replace handler test setup helpers that currently create Mongo users/sessions with identity-port fakes.
+- Keep Mongo unchanged for:
+  - process documents
+  - progress
+  - attachments/GridFS unless separately migrated later
+  - formata builder streams unless separately migrated later
+Tests:
+- Delete obsolete Mongo auth store tests once equivalent identity tests exist.
+- Keep non-auth Mongo tests green.
+Done when:
+- Mongo storage is no longer responsible for identity concerns and test helpers reflect that split.
+
+* DONE [#A] Package Appwrite for local and Coolify deployments
+Effort: M
+Goal: The repository-managed Docker Compose definitions can start Attesta together with a supported Appwrite stack and the dependencies Appwrite requires.
+Notes: Do not hand-author a partial Appwrite topology inside the existing compose files. Vendor the official Appwrite self-hosting stack under `deployment/` and keep Attesta-specific wiring as a thin wrapper so upgrades remain explicit and diffable.
+
+** DONE [#A] Vendor the Appwrite stack as a pinned deployment module
+Why: Appwrite self-hosting is a multi-service system. Adding only an `appwrite` container to Attesta’s compose files would produce a broken deployment plan and hide upgrade risk.
+Change:
+- Add a dedicated deployment module, for example:
+  - `deployment/appwrite/docker-compose.appwrite.yaml`
+  - `deployment/appwrite/.env.appwrite.example`
+  - `deployment/appwrite/README.md`
+- Vendor the official upstream Appwrite compose/env template into that module, pin the Appwrite version explicitly, and record the upstream source URL or commit used for the vendored baseline.
+- Keep Appwrite-owned service names, volumes, and env blocks as close to upstream as possible; Attesta should only add the minimum wrapper config needed for cross-service networking.
+- Define the internal contract Attesta will rely on:
+  - local API endpoint resolves to the Appwrite service over Docker network, e.g. `http://appwrite/v1`
+  - Coolify API endpoint resolves through the final service DNS name produced by the compose, e.g. `http://${SERVICE_NAME_APPWRITE}/v1`
+  - Appwrite data volumes remain separate from Mongo and Cerbos volumes
+Tests:
+- Validate the vendored stack on its own with `docker compose -f deployment/appwrite/docker-compose.appwrite.yaml config`.
+- Add a short operator smoke checklist in the module README for first boot, project creation, and bucket setup.
+Done when:
+- The repo contains a pinned, reviewable Appwrite deployment module instead of an underspecified single-container placeholder.
+
+** DONE [#A] Update local compose to start Attesta and Appwrite together
+Why: `deployment/docker-compose.local.yaml` currently starts Mongo, Cerbos, Mongo Express, and Attesta only. Local Appwrite development should be one repo command, not a manual second stack.
+Change:
+- Update `deployment/docker-compose.local.yaml` to include or merge the vendored Appwrite deployment module rather than inlining the full Appwrite service graph by hand.
+- Keep the existing Attesta services:
+  - `mongodb`
+  - `cerbos`
+  - optional `mongo-express`
+  - `attesta`
+- Add the Attesta env wiring needed by the new identity adapter:
+  - `APPWRITE_ENDPOINT`
+  - `APPWRITE_PROJECT_ID`
+  - `APPWRITE_API_KEY`
+  - `APPWRITE_INVITE_REDIRECT_URL`
+  - `APPWRITE_RESET_REDIRECT_URL`
+  - `APPWRITE_ORG_ASSETS_BUCKET`
+- Publish only the minimum host ports needed locally:
+  - keep Attesta on `3030:3000`
+  - expose one stable Appwrite HTTP entrypoint for operator console/API access
+  - avoid publishing internal Appwrite dependency ports unless the upstream stack requires them
+- Update local docs in `README.md`, `QUICKSTART.md`, and `DOCKER.md` so the compose quickstart now includes Appwrite bootstrap prerequisites after `up -d`.
+Tests:
+- Validate `deployment/docker-compose.local.yaml` with `docker compose -f deployment/docker-compose.local.yaml config`.
+- Require a local smoke pass that covers:
+  - Appwrite console/API reachable from the host
+  - Attesta can reach Appwrite over the internal Docker network
+  - invite and reset callback URLs point back to local Attesta routes
+Done when:
+- A developer can start Mongo, Cerbos, Attesta, and Appwrite from the repo’s local compose file without undocumented sidecars.
+
+** DONE [#A] Update Coolify compose to start Attesta and Appwrite together
+Why: `deployment/docker-compose.coolify.yaml` currently assumes identity remains outside the stack. The Appwrite migration is incomplete if Coolify still depends on a separately managed Appwrite deployment.
+Change:
+- Update `deployment/docker-compose.coolify.yaml` to include the vendored Appwrite deployment module and wire Attesta to the resulting internal Appwrite service URL.
+- Preserve the existing Coolify conventions already used in this repo:
+  - no explicit `ports:` on proxied services
+  - keep `SERVICE_FQDN_*` env slots for services that need public ingress
+  - keep persistent state in named volumes
+- Add the Appwrite-specific env contract to the Attesta service in Coolify:
+  - internal `APPWRITE_ENDPOINT`
+  - `APPWRITE_PROJECT_ID`
+  - `APPWRITE_API_KEY`
+  - public invite/reset redirect URLs that resolve through Attesta’s Coolify fqdn
+  - `APPWRITE_ORG_ASSETS_BUCKET`
+- Decide explicitly whether Appwrite Console gets its own public fqdn in Coolify; if yes, add the matching `SERVICE_FQDN_*` env slot and document it in the deployment notes.
+- Keep `mongoexpress` orthogonal; if it stays in the stack, it must not be coupled to the Appwrite rollout.
+- Note the intentional deviation if upstream Appwrite guidance prefers a separate standalone deployment instead of embedding the full Appwrite stack inside Attesta’s Coolify compose.
+Tests:
+- Validate `deployment/docker-compose.coolify.yaml` with `docker compose -f deployment/docker-compose.coolify.yaml config`.
+- Require a Coolify staging smoke pass that covers:
+  - Appwrite console/API reachable on the expected fqdn
+  - Attesta login, invite, and reset flows can reach Appwrite over internal networking
+  - Appwrite and Mongo volumes survive restart
+Done when:
+- The repo’s Coolify compose can launch a functional Appwrite-backed Attesta stack without relying on out-of-band Appwrite services.
+
+* DONE [#A] Migrate actor identity, catalogs, docs, and rollout safely
+Effort: M
+Goal: Existing process history remains readable, workflow validation keeps working, and deployment has a clear cutover sequence.
+Notes: This is the step that avoids silent regressions in timelines, DPP traceability, and operational setup.
+
+** DONE [#A] Make actor IDs opaque and backward-compatible
+Why: Process history currently stores `DoneBy.ID` as a Mongo hex string and later resolves it through `lookupUserIdentityByActorID`. New Appwrite users cannot fit that assumption.
+Change:
+- Change `accountActorID` in `server/cmd/server/main.go` to emit `appwrite:<userId>` for Appwrite-backed users.
+- Update `lookupUserIdentityByActorID` to support both formats:
+  - legacy Mongo hex -> old store lookup for historical rows only
+  - `appwrite:<id>` -> Appwrite identity lookup
+- Update:
+  - `applyDoneByEmailToActions`
+  - `applyDoneByEmailToTimeline`
+  - `applyDoneByMongoIDToDPPTraceability`
+  so they stop assuming that non-email display fallback must be a Mongo ID; use a generic stable fallback such as the Appwrite user ID or masked email when email disclosure is not allowed.
+- Keep old process documents untouched; this is a read-path compatibility change, not a backfill requirement.
+Tests:
+- Add mixed-history tests:
+  - legacy Mongo actor IDs still resolve
+  - new `appwrite:<id>` actor IDs resolve
+  - unknown actor IDs fail closed without panics
+Done when:
+- Historical process data still renders and newly completed substeps store non-Mongo actor IDs safely.
+
+** DONE [#B] Keep workflow validation and public catalog behavior aligned with Appwrite
+Why: Workflow YAML remains validation-only, so Attesta must compare configured org/role slugs with Appwrite state instead of Mongo state.
+Change:
+- Update config validation paths in `server/cmd/server/main.go` to query Appwrite orgs/role catalogs when checking that configured org/role slugs exist.
+- Update `/api/catalog` to source orgs and roles from Appwrite teams + prefs, still filtering out `org-admin` from public role listings if that remains desired.
+- Keep slug normalization rules identical to current behavior.
+Tests:
+- Update `server/cmd/server/config_test.go` and `server/cmd/server/public_catalog_handler_test.go` to use identity fakes.
+- Cover mismatched YAML/Appwrite slugs with clear validation errors.
+Done when:
+- YAML remains authoritative for allowed references, but live org/role existence is checked against Appwrite instead of Mongo.
+
+** DONE [#B] Define rollout, migration, and operational prerequisites
+Why: This is a breaking auth migration. Without an explicit cutover plan, existing users, invites, and orgs will drift or fail.
+Change:
+- Add deployment/env docs in:
+  - `README.md`
+  - `QUICKSTART.md`
+  - `.env.example`
+- New required env vars:
+  - `APPWRITE_ENDPOINT`
+  - `APPWRITE_PROJECT_ID`
+  - `APPWRITE_API_KEY`
+  - `APPWRITE_INVITE_REDIRECT_URL`
+  - `APPWRITE_RESET_REDIRECT_URL`
+  - `APPWRITE_ORG_ASSETS_BUCKET`
+  - keep `ANYONE_CAN_CREATE_ACCOUNT`
+- Migration sequence:
+  1. Provision Appwrite project, platforms, email templates, and org-assets bucket.
+  2. Export Mongo organizations, roles, and active users into Appwrite teams, team prefs, team memberships, and labels.
+  3. Manually bootstrap first org-admin owners for each team in Appwrite Console.
+  4. Deploy Attesta with Appwrite enabled and `/admin/orgs` removed.
+  5. Invalidate old Mongo-backed sessions; users must log in again through Appwrite.
+  6. Do not migrate old pending invite or password-reset tokens; expire them and require re-issue through Appwrite.
+- Rollback note:
+  - rollback is application-only until writes occur in Appwrite; after cutover, rolling back Attesta code does not restore Mongo auth truth automatically
+Tests:
+- No dedicated unit tests, but the plan should require a staging cutover rehearsal with at least:
+  - invited user acceptance
+  - self-signup when enabled
+  - org creation by unassigned user
+  - org-admin invite from Attesta
+  - role edit and user removal
+Done when:
+- Operators have an explicit cutover checklist, env spec, and known non-migrated artifacts.

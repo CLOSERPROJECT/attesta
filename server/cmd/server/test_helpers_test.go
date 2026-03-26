@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"os"
+	"strings"
+	"time"
 )
 
 func testRuntimeConfig() RuntimeConfig {
@@ -55,28 +58,31 @@ func testRuntimeConfig() RuntimeConfig {
 
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
-{{define "layout.html"}}
-  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
-  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
-  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
-  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
-  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
-  {{else if eq .Body "home_body"}}{{template "home_body" .}}
-  {{else if eq .Body "process_body"}}{{template "process_body" .}}
+	{{define "layout.html"}}
+	  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
+	  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+	  {{else if eq .Body "signup_body"}}{{template "signup_body" .}}
+	  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
+	  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
+	  {{else if eq .Body "org_admin_body"}}{{template "org_admin_body" .}}
+	  {{else if eq .Body "home_body"}}{{template "home_body" .}}
+	  {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
   {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
   {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
-{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
-{{define "home_body"}}HOME{{end}}
-{{define "home.html"}}{{template "layout.html" .}}{{end}}
+	{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
+	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}
+	{{define "signup.html"}}{{template "layout.html" .}}{{end}}
+	{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.Confirmation}}{{if .Error}} {{.Error}}{{end}}{{end}}
+	{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
+	{{define "home_body"}}HOME{{end}}
+	{{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_body"}}DASHBOARD_ME {{.ID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
-{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
-{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.RoleColor}} {{.RoleBorder}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{template "timeline.html" .Timeline}}{{end}}
@@ -141,4 +147,51 @@ func writeTwoSubstepWorkflowConfig(t testHelperT, path, name string) {
 type testHelperT interface {
 	Helper()
 	Fatalf(format string, args ...interface{})
+}
+
+func identityUserFromAccountUser(user AccountUser) IdentityUser {
+	orgSlug := strings.TrimSpace(user.OrgSlug)
+	identityUserID := strings.TrimSpace(user.IdentityUserID)
+	if identityUserID == "" && !user.ID.IsZero() {
+		identityUserID = user.ID.Hex()
+	}
+	labels := make([]string, 0, len(user.RoleSlugs))
+	isOrgAdmin := false
+	for _, roleSlug := range canonifyRoleSlugs(user.RoleSlugs) {
+		if containsRole([]string{roleSlug}, "org-admin") || containsRole([]string{roleSlug}, "org_admin") {
+			isOrgAdmin = true
+			continue
+		}
+		labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+	}
+	if isOrgAdmin {
+		labels = append(labels, identityOrgAdminLabel)
+	}
+	return IdentityUser{
+		ID:         identityUserID,
+		Email:      strings.TrimSpace(user.Email),
+		OrgSlug:    orgSlug,
+		Labels:     labels,
+		IsOrgAdmin: isOrgAdmin,
+		Status:     strings.TrimSpace(user.Status),
+	}
+}
+
+func testIdentityForSessions(now time.Time, sessions map[string]AccountUser) *fakeIdentityStore {
+	return &fakeIdentityStore{
+		getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+			user, ok := sessions[strings.TrimSpace(sessionSecret)]
+			if !ok {
+				return IdentitySession{}, ErrIdentityUnauthorized
+			}
+			return fakeIdentitySession(sessionSecret, user.ID.Hex(), now.Add(24*time.Hour)), nil
+		},
+		getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+			user, ok := sessions[strings.TrimSpace(sessionSecret)]
+			if !ok {
+				return IdentityUser{}, ErrIdentityUnauthorized
+			}
+			return identityUserFromAccountUser(user), nil
+		},
+	}
 }

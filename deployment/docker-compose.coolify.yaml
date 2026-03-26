@@ -1,4 +1,14 @@
+include:
+  - path: ./appwrite/docker-compose.appwrite.yaml
+    env_file:
+      - ./appwrite/.env.appwrite.coolify
+
 services:
+  traefik:
+    ports: !override []
+    environment:
+      SERVICE_FQDN_APPWRITE_80:
+
   mongodb:
     image: mongo:7.0
     volumes:
@@ -16,17 +26,27 @@ services:
       context: .
       dockerfile: deployment/Dockerfile.coolify
     environment:
-      MONGODB_URI: mongodb://${SERVICE_NAME_MONGODB}:27017
-      CERBOS_URL: http://${SERVICE_NAME_CERBOS}:3592
+      MONGODB_URI: mongodb://${SERVICE_NAME_MONGODB:-mongodb}:27017
+      CERBOS_URL: http://${SERVICE_NAME_CERBOS:-cerbos}:3592
+      APPWRITE_ENDPOINT: http://${SERVICE_NAME_APPWRITE:-appwrite}:80/v1
+      APPWRITE_PROJECT_ID:
+      APPWRITE_API_KEY:
+      APPWRITE_INVITE_REDIRECT_URL:
+      APPWRITE_RESET_REDIRECT_URL:
+      APPWRITE_ORG_ASSETS_BUCKET: org-assets
       SERVICE_FQDN_ATTESTA_3000:
+    networks:
+      - default
+      - appwrite
     depends_on:
       - mongodb
       - cerbos
+      - appwrite
 
   mongoexpress:
     image: mongo-express:1.0.2
     environment:
-      ME_CONFIG_MONGODB_URL: mongodb://${SERVICE_NAME_MONGODB}:27017
+      ME_CONFIG_MONGODB_URL: mongodb://${SERVICE_NAME_MONGODB:-mongodb}:27017
       SERVICE_FQDN_MONGOEXPRESS_8081:
     depends_on:
       - mongodb

@@ -9,38 +9,29 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	store := NewMemoryStore()
-	server := &Server{store: store, enforceAuth: true, now: time.Now}
-
-	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Builder Org"})
-	if err != nil {
-		t.Fatalf("CreateOrganization error: %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:     org.ID,
-		OrgSlug:   org.Slug,
-		Slug:      "org-admin",
-		Name:      "Org Admin",
-		CreatedAt: time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateRole error: %v", err)
-	}
-	orgID := org.ID
-	orgAdmin, err := store.CreateUser(t.Context(), AccountUser{
+	orgID := stableOrgObjectID("builder-org")
+	orgAdmin := AccountUser{
+		ID:        primitive.NewObjectID(),
 		OrgID:     &orgID,
-		OrgSlug:   org.Slug,
+		OrgSlug:   "builder-org",
 		Email:     "org-admin-builder@example.com",
 		RoleSlugs: []string{"org-admin"},
 		Status:    "active",
 		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser org-admin error: %v", err)
 	}
-	orgAdminSession := createSessionForTestUser(t, store, orgAdmin)
+	orgAdminSession := "session-builder-org-admin"
+	server := &Server{
+		store:       store,
+		identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{orgAdminSession: orgAdmin}),
+		enforceAuth: true,
+		now:         time.Now,
+	}
 
 	t.Run("unauthenticated redirects to login", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
@@ -162,26 +153,6 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		}
 	})
 
-	t.Run("platform admin get is forbidden", func(t *testing.T) {
-		platformAdmin, err := store.CreateUser(t.Context(), AccountUser{
-			Email:           "platform-builder-get@example.com",
-			IsPlatformAdmin: true,
-			Status:          "active",
-			CreatedAt:       time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser platform admin error: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store, platformAdmin)
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-		rec := httptest.NewRecorder()
-		server.handleOrgAdminFormataBuilder(rec, req)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-		}
-	})
-
 	t.Run("method not allowed", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/org-admin/formata-builder", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
@@ -195,45 +166,33 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 
 func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	store := NewMemoryStore()
-	server := &Server{store: store, enforceAuth: true, now: time.Now}
-
-	org, err := store.CreateOrganization(t.Context(), Organization{Name: "Builder Post Org"})
-	if err != nil {
-		t.Fatalf("CreateOrganization error: %v", err)
-	}
-	if _, err := store.CreateRole(t.Context(), Role{
-		OrgID:     org.ID,
-		OrgSlug:   org.Slug,
-		Slug:      "org-admin",
-		Name:      "Org Admin",
-		CreatedAt: time.Now().UTC(),
-	}); err != nil {
-		t.Fatalf("CreateRole error: %v", err)
-	}
-	orgID := org.ID
-	orgAdmin, err := store.CreateUser(t.Context(), AccountUser{
+	orgID := stableOrgObjectID("builder-post-org")
+	orgAdmin := AccountUser{
+		ID:        primitive.NewObjectID(),
 		OrgID:     &orgID,
-		OrgSlug:   org.Slug,
+		OrgSlug:   "builder-post-org",
 		Email:     "org-admin-builder-post@example.com",
 		RoleSlugs: []string{"org-admin"},
 		Status:    "active",
 		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser org-admin error: %v", err)
 	}
-	orgAdminSession := createSessionForTestUser(t, store, orgAdmin)
-
-	platformAdmin, err := store.CreateUser(t.Context(), AccountUser{
-		Email:           "platform-builder-post@example.com",
-		IsPlatformAdmin: true,
-		Status:          "active",
-		CreatedAt:       time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("CreateUser platform admin error: %v", err)
+	orgAdminSession := "session-builder-post-org-admin"
+	plain := AccountUser{
+		ID:        primitive.NewObjectID(),
+		Email:     "plain-builder-post@example.com",
+		RoleSlugs: []string{"inspector"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
 	}
-	platformSession := createSessionForTestUser(t, store, platformAdmin)
+	server := &Server{
+		store: store,
+		identity: testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{
+			orgAdminSession: orgAdmin,
+			"session-plain": plain,
+		}),
+		enforceAuth: true,
+		now:         time.Now,
+	}
 
 	t.Run("unauthenticated is unauthorized", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("stream"))
@@ -245,18 +204,8 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("forbidden for non admin role", func(t *testing.T) {
-		plain, err := store.CreateUser(t.Context(), AccountUser{
-			Email:     "plain-builder-post@example.com",
-			RoleSlugs: []string{"inspector"},
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			t.Fatalf("CreateUser plain error: %v", err)
-		}
-		sessionID := createSessionForTestUser(t, store, plain)
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("stream"))
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-plain"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusForbidden {
@@ -279,8 +228,9 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		if stream.Stream != `{"nodes":[]}` {
 			t.Fatalf("stream = %q, want %q", stream.Stream, `{"nodes":[]}`)
 		}
-		if stream.UpdatedByUserMongoID != orgAdmin.ID {
-			t.Fatalf("updatedByUserMongoID = %s, want %s", stream.UpdatedByUserMongoID.Hex(), orgAdmin.ID.Hex())
+		expectedID := stableIdentityUserObjectID(orgAdmin.ID.Hex())
+		if stream.UpdatedByUserMongoID != expectedID {
+			t.Fatalf("updatedByUserMongoID = %s, want %s", stream.UpdatedByUserMongoID.Hex(), expectedID.Hex())
 		}
 	})
 
@@ -291,26 +241,6 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
-		}
-	})
-
-	t.Run("platform admin can save stream", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader(`{"nodes":[1]}`))
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformSession})
-		rec := httptest.NewRecorder()
-		server.handleOrgAdminFormataBuilder(rec, req)
-		if rec.Code != http.StatusNoContent {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
-		}
-		stream, err := store.LoadFormataBuilderStream(t.Context())
-		if err != nil {
-			t.Fatalf("LoadFormataBuilderStream error: %v", err)
-		}
-		if stream.Stream != `{"nodes":[1]}` {
-			t.Fatalf("stream = %q, want %q", stream.Stream, `{"nodes":[1]}`)
-		}
-		if stream.UpdatedByUserMongoID != platformAdmin.ID {
-			t.Fatalf("updatedByUserMongoID = %s, want %s", stream.UpdatedByUserMongoID.Hex(), platformAdmin.ID.Hex())
 		}
 	})
 
