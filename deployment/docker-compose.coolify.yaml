@@ -7,7 +7,7 @@ services:
 
   cerbos:
     build:
-      context: ..
+      context: .
       dockerfile: deployment/Dockerfile.cerbos
     restart: unless-stopped
     command:
@@ -16,7 +16,7 @@ services:
 
   attesta:
     build:
-      context: ..
+      context: .
       dockerfile: deployment/Dockerfile.coolify
     restart: unless-stopped
     environment:
@@ -25,7 +25,7 @@ services:
       APPWRITE_ENDPOINT: https://appwrite-attesta.apps.forkbomb.eu/v1
       APPWRITE_PROJECT_ID:
       APPWRITE_API_KEY:
-      APPWRITE_INVITE_REDIRECT_URL: https://
+      APPWRITE_INVITE_REDIRECT_URL:
       APPWRITE_RESET_REDIRECT_URL:
       APPWRITE_ORG_ASSETS_BUCKET: org-assets
       SERVICE_FQDN_ATTESTA_3000:
