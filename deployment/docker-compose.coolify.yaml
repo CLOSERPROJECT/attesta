@@ -190,9 +190,6 @@ services:
       APPWRITE_RESET_REDIRECT_URL:
       APPWRITE_ORG_ASSETS_BUCKET: org-assets
       SERVICE_FQDN_ATTESTA_3000:
-    networks:
-      - default
-      - appwrite
     depends_on:
       - mongodb
       - cerbos
@@ -206,10 +203,6 @@ services:
       SERVICE_FQDN_MONGOEXPRESS_8081:
     depends_on:
       - mongodb
-
-networks:
-  runtimes:
-    name: runtimes
 
 volumes:
   appwrite-mariadb:
