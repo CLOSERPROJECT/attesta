@@ -15,6 +15,14 @@ services:
     container_name: appwrite
     environment:
       SERVICE_URL_APPWRITE: /
+      _APP_DB_HOST: appwrite-mariadb
+      _APP_DB_PORT: 3306
+      _APP_DB_SCHEMA: appwrite
+      _APP_DB_USER: ${SERVICE_USER_MARIADB}
+      _APP_DB_PASS: ${SERVICE_PASSWORD_MARIADB}
+      _APP_REDIS_HOST: appwrite-redis
+      _APP_REDIS_PORT: 6379
+      _APP_OPENSSL_KEY_V1: ${SERVICE_PASSWORD_64_APPWRITE}
     volumes:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-imports:/storage/imports:rw
