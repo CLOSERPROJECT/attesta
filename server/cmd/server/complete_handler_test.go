@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -450,6 +451,46 @@ func TestHandleCompleteSubstepStoreFailures(t *testing.T) {
 	server.handleCompleteSubstep(notarizeRec, notarizeReq, processID, "1.1")
 	if notarizeRec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected notarization error status %d, got %d", http.StatusInternalServerError, notarizeRec.Code)
+	}
+}
+
+func TestHandleCompleteSubstepLogsPreciseStoreError(t *testing.T) {
+	store := NewMemoryStore()
+	store.UpdateProgressErr = assertErr("write failed: duplicate key on progress update")
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	var logs bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	oldPrefix := log.Prefix()
+	log.SetOutput(&logs)
+	log.SetFlags(0)
+	log.SetPrefix("")
+	t.Cleanup(func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+		log.SetPrefix(oldPrefix)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rec, req, processID, "1.1")
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Failed to update process.") {
+		t.Fatalf("expected human readable error message, got %q", rec.Body.String())
+	}
+	logOutput := logs.String()
+	if !strings.Contains(logOutput, "failed to update process "+processID+" substep 1.1") {
+		t.Fatalf("expected contextual log message, got %q", logOutput)
+	}
+	if !strings.Contains(logOutput, "write failed: duplicate key on progress update") {
+		t.Fatalf("expected precise store error in logs, got %q", logOutput)
 	}
 }
 

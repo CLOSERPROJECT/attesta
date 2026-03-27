@@ -1139,6 +1139,37 @@ func logRequests(next http.Handler) http.Handler {
 	})
 }
 
+func logRequestError(r *http.Request, err error, message string, args ...interface{}) {
+	if err == nil {
+		return
+	}
+	summary := fmt.Sprintf(message, args...)
+	if r == nil {
+		log.Printf("%s: %v", summary, err)
+		return
+	}
+	path := ""
+	if r.URL != nil {
+		path = r.URL.Path
+	}
+	log.Printf("%s %s: %s: %v", r.Method, path, summary, err)
+}
+
+func logAndHTTPError(w http.ResponseWriter, r *http.Request, status int, userMessage string, err error, message string, args ...interface{}) {
+	logRequestError(r, err, message, args...)
+	http.Error(w, userMessage, status)
+}
+
+func (s *Server) logAndRenderPlatformAdminError(w http.ResponseWriter, r *http.Request, user *AccountUser, confirmation string, errs PlatformAdminErrors, err error, message string, args ...interface{}) {
+	logRequestError(r, err, message, args...)
+	s.renderPlatformAdmin(w, user, confirmation, errs)
+}
+
+func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Request, user *AccountUser, orgSlug, inviteLink string, errs OrgAdminErrors, err error, message string, args ...interface{}) {
+	logRequestError(r, err, message, args...)
+	s.renderOrgAdminWithErrors(w, user, orgSlug, inviteLink, errs)
+}
+
 func workflowPath(key string) string {
 	return "/w/" + strings.TrimSpace(key)
 }
@@ -1732,7 +1763,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse login form")
 			return
 		}
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
@@ -1758,7 +1789,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if err := s.writeSessionCookie(w, r, *session); err != nil {
-				http.Error(w, "login failed", http.StatusInternalServerError)
+				logAndHTTPError(w, r, http.StatusInternalServerError, "login failed", err, "failed to write platform admin session cookie")
 				return
 			}
 			http.Redirect(w, r, next, http.StatusSeeOther)
@@ -1783,11 +1814,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			http.Error(w, "login failed", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "login failed", err, "failed to create email/password session for %s", email)
 			return
 		}
 		if err := s.writeSessionCookie(w, r, session); err != nil {
-			http.Error(w, "login failed", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "login failed", err, "failed to write session cookie for %s", email)
 			return
 		}
 		http.Redirect(w, r, next, http.StatusSeeOther)
@@ -1817,7 +1848,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse signup form")
 			return
 		}
 		if s.identity == nil {
@@ -1836,21 +1867,21 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if _, err := s.identity.CreateAccount(r.Context(), email, password, ""); err != nil && !errors.Is(err, ErrIdentityUnauthorized) {
-			http.Error(w, "signup failed", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to create account for %s", email)
 			return
 		}
 		session, err := s.identity.CreateEmailPasswordSession(r.Context(), email, password)
 		if err != nil {
-			http.Error(w, "signup failed", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to create session after signup for %s", email)
 			return
 		}
 		if err := s.writeSessionCookie(w, r, session); err != nil {
-			http.Error(w, "signup failed", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to write signup session cookie for %s", email)
 			return
 		}
 		identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret)
 		if err != nil {
-			http.Error(w, "signup failed", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to load signed up user %s", email)
 			return
 		}
 		redirectTarget := "/"
@@ -1871,7 +1902,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	if cookie, err := r.Cookie("attesta_session"); err == nil && strings.TrimSpace(cookie.Value) != "" {
 		if s.identity != nil && !isPlatformAdminSessionValue(cookie.Value) {
-			_ = s.identity.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value))
+			if deleteErr := s.identity.DeleteSession(r.Context(), strings.TrimSpace(cookie.Value)); deleteErr != nil {
+				logRequestError(r, deleteErr, "failed to delete session during logout")
+			}
 		}
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -1931,16 +1964,18 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := s.identity.AcceptInvite(r.Context(), teamID, membershipID, userID, secret)
 	if err != nil {
-		http.Error(w, "failed to accept invite", http.StatusBadRequest)
+		logAndHTTPError(w, r, http.StatusBadRequest, "failed to accept invite", err, "failed to accept invite team=%s membership=%s user=%s", teamID, membershipID, userID)
 		return
 	}
 	if err := s.writeSessionCookie(w, r, session); err != nil {
-		http.Error(w, "failed to login", http.StatusInternalServerError)
+		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to login", err, "failed to write invite session cookie for user %s", userID)
 		return
 	}
 	if identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret); err == nil && !identityUser.PasswordSet {
 		http.Redirect(w, r, "/invite/password", http.StatusSeeOther)
 		return
+	} else if err != nil {
+		logRequestError(r, err, "failed to load invited user after accepting invite")
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -1969,7 +2004,7 @@ func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse invite password form")
 			return
 		}
 		password := strings.TrimSpace(r.FormValue("password"))
@@ -1999,7 +2034,7 @@ func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.identity.UpdateCurrentPassword(r.Context(), session.Secret, password); err != nil {
-			http.Error(w, "failed to update password", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to update password", err, "failed to update invited user password for %s", user.Email)
 			return
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -2058,7 +2093,7 @@ func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse reset request form")
 			return
 		}
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
@@ -2070,7 +2105,9 @@ func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if s.identity != nil {
-			_ = s.identity.CreateRecovery(r.Context(), email, resetRedirectURL(r))
+			if err := s.identity.CreateRecovery(r.Context(), email, resetRedirectURL(r)); err != nil {
+				logRequestError(r, err, "failed to create password recovery for %s", email)
+			}
 		}
 
 		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
@@ -2114,7 +2151,7 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse reset confirmation form")
 			return
 		}
 		password := strings.TrimSpace(r.FormValue("password"))
@@ -2130,7 +2167,7 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.identity.CompleteRecovery(r.Context(), userID, secret, password); err != nil {
-			http.Error(w, "failed to reset password", http.StatusInternalServerError)
+			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to reset password", err, "failed to complete password recovery for user %s", userID)
 			return
 		}
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -2403,6 +2440,7 @@ func (s *Server) platformOrganizations(ctx context.Context) []Organization {
 	}
 	orgs, err := s.identity.ListOrganizations(ctx)
 	if err != nil {
+		log.Printf("failed to list platform organizations: %v", err)
 		return nil
 	}
 	organizations := make([]Organization, 0, len(orgs))
@@ -2461,14 +2499,14 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "logo file too large"})
 					return
 				}
-				http.Error(w, "invalid form", http.StatusBadRequest)
+				logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse platform admin multipart form")
 				return
 			}
 			if r.MultipartForm != nil {
 				defer r.MultipartForm.RemoveAll()
 			}
 		} else if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse platform admin form")
 			return
 		}
 		intent := strings.TrimSpace(r.FormValue("intent"))
@@ -2486,12 +2524,15 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			redirectURL := inviteRedirectURL(r)
 			org, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug)
 			if err != nil || org == nil {
+				if err != nil {
+					logRequestError(r, err, "failed to load organization %s for platform admin invite", orgSlug)
+				}
 				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "organization not found"})
 				return
 			}
 			platformSession, err := s.ensurePlatformAdminOwnsOrganization(r.Context(), org.Slug, redirectURL)
 			if err != nil {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite"}, err, "failed to ensure platform admin owns organization %s for invite %s", org.Slug, email)
 				return
 			}
 			defer func() {
@@ -2499,7 +2540,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			}()
 			memberships, err := s.identity.ListOrganizationMemberships(r.Context(), org.Slug)
 			if err != nil {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite"}, err, "failed to list memberships for organization %s during platform admin invite", org.Slug)
 				return
 			}
 			for _, membership := range memberships {
@@ -2511,7 +2552,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if _, err := s.identity.UpdateOrganizationMembershipAsAdmin(r.Context(), org.Slug, membership.ID, nil, true); err != nil {
-					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+					s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite"}, err, "failed to promote membership %s to org-admin in %s", membership.ID, org.Slug)
 					return
 				}
 				s.renderPlatformAdmin(w, admin, "org admin access updated", PlatformAdminErrors{})
@@ -2525,18 +2566,18 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if _, err := s.identity.InviteOrganizationUser(r.Context(), platformSession.Secret, org.Slug, email, redirectURL, nil, true); err != nil {
-					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+					s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite"}, err, "failed to invite %s to organization %s as org-admin", email, org.Slug)
 					return
 				}
 				s.renderPlatformAdmin(w, admin, "invite sent", PlatformAdminErrors{})
 				return
 			case err != nil && !errors.Is(err, ErrIdentityNotFound):
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite"}, err, "failed to look up existing user %s during platform admin invite", email)
 				return
 			}
 
 			if _, err := s.identity.InviteOrganizationUser(r.Context(), platformSession.Secret, org.Slug, email, redirectURL, nil, true); err != nil {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "failed to create invite"})
+				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite"}, err, "failed to invite new user %s to organization %s as org-admin", email, org.Slug)
 				return
 			}
 			s.renderPlatformAdmin(w, admin, "invite sent", PlatformAdminErrors{})
@@ -2559,7 +2600,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 		}
 		platformSession, err := s.platformAdminIdentitySession(r.Context())
 		if err != nil {
-			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to create organization"})
+			s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to create organization"}, err, "failed to create platform admin session for organization creation")
 			return
 		}
 		defer func() {
@@ -2571,7 +2612,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists"})
 				return
 			}
-			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to create organization"})
+			s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to create organization"}, err, "failed to create organization %s", name)
 			return
 		}
 		if logoUpload != nil {
@@ -2581,11 +2622,11 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				Data:        logoUpload.Data,
 			})
 			if err != nil {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to upload logo"})
+				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to upload logo"}, err, "failed to upload logo for organization %s", createdOrg.Slug)
 				return
 			}
 			if _, err := s.identity.UpdateOrganizationAsAdmin(r.Context(), createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles); err != nil {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "failed to update organization"})
+				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to update organization"}, err, "failed to attach logo to organization %s", createdOrg.Slug)
 				return
 			}
 		}
@@ -2747,6 +2788,9 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 
 	org, roles, orgUsers, orgInvites, err := s.loadOrgAdminState(context.Background(), user, orgSlug)
 	if err != nil {
+		if !errors.Is(err, ErrIdentityNotFound) {
+			log.Printf("failed to load org-admin state for org %s: %v", orgSlug, err)
+		}
 		http.Error(w, "organization not found", http.StatusNotFound)
 		return
 	}
@@ -2796,6 +2840,9 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 	}
 	org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
 	if err != nil || org == nil {
+		if err != nil {
+			logRequestError(r, err, "failed to load organization %s logo metadata", admin.OrgSlug)
+		}
 		http.NotFound(w, r)
 		return
 	}
@@ -2805,6 +2852,9 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 	}
 	logo, err := s.identity.GetOrganizationLogo(r.Context(), logoID)
 	if err != nil {
+		if !errors.Is(err, ErrIdentityNotFound) {
+			logRequestError(r, err, "failed to load organization logo %s", logoID)
+		}
 		http.NotFound(w, r)
 		return
 	}
@@ -2833,7 +2883,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse org-admin roles form")
 			return
 		}
 		name := strings.TrimSpace(r.FormValue("name"))
@@ -2857,6 +2907,9 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		}
 		org, err := s.identity.GetOrganizationBySlug(r.Context(), user.OrgSlug)
 		if err != nil || org == nil {
+			if err != nil {
+				logRequestError(r, err, "failed to load organization %s for role creation", user.OrgSlug)
+			}
 			http.NotFound(w, r)
 			return
 		}
@@ -2868,7 +2921,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		}
 		sessionSecret, err := sessionSecretFromRequest(r)
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for org-admin role creation")
 			return
 		}
 		updatedRoles := append(append([]IdentityRole(nil), org.Roles...), IdentityRole{
@@ -2882,7 +2935,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
 				return
 			}
-			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to create role"})
+			s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to create role"}, err, "failed to update organization %s with new role %s", user.OrgSlug, roleSlug)
 			return
 		}
 		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
@@ -2913,14 +2966,14 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "logo file too large"})
 				return
 			}
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse org-admin multipart form")
 			return
 		}
 		if r.MultipartForm != nil {
 			defer r.MultipartForm.RemoveAll()
 		}
 	} else if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
+		logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse org-admin users form")
 		return
 	}
 	intent := strings.TrimSpace(r.FormValue("intent"))
@@ -2949,7 +3002,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		sessionSecret, err := sessionSecretFromRequest(r)
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for organization creation")
 			return
 		}
 		createdOrg, err := s.identity.CreateOrganization(r.Context(), sessionSecret, name)
@@ -2958,7 +3011,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
 				return
 			}
-			s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"})
+			s.logAndRenderOrgAdminError(w, r, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"}, err, "failed to create organization %s", name)
 			return
 		}
 		if logoUpload != nil {
@@ -2968,12 +3021,12 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				Data:        logoUpload.Data,
 			})
 			if err != nil {
-				s.renderOrgAdminWithErrors(w, admin, "", "", OrgAdminErrors{Organization: "failed to upload logo"})
+				s.logAndRenderOrgAdminError(w, r, admin, "", "", OrgAdminErrors{Organization: "failed to upload logo"}, err, "failed to upload logo for organization %s", createdOrg.Slug)
 				return
 			}
 			createdOrg, err = s.identity.UpdateOrganization(r.Context(), sessionSecret, createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles)
 			if err != nil {
-				s.renderOrgAdminWithErrors(w, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update organization"})
+				s.logAndRenderOrgAdminError(w, r, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update organization"}, err, "failed to attach logo to organization %s", createdOrg.Slug)
 				return
 			}
 		}
@@ -2992,6 +3045,9 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
 		if err != nil || org == nil {
+			if err != nil {
+				logRequestError(r, err, "failed to load organization %s for invite", admin.OrgSlug)
+			}
 			http.NotFound(w, r)
 			return
 		}
@@ -3018,7 +3074,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
 		if err != nil {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to list memberships for organization %s during invite", admin.OrgSlug)
 			return
 		}
 		for _, membership := range memberships {
@@ -3034,7 +3090,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 					labels = append(labels, identityOrgAdminLabel)
 				}
 				if _, err := s.identity.UpdateUserLabels(r.Context(), membership.UserID, labels); err != nil {
-					s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"})
+					s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for invited member %s in organization %s", membership.UserID, admin.OrgSlug)
 					return
 				}
 				s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
@@ -3051,11 +3107,11 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			}
 			sessionSecret, err := sessionSecretFromRequest(r)
 			if err != nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for membership update in %s", admin.OrgSlug)
 				return
 			}
 			if _, err := s.identity.UpdateOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, membership.ID, businessRoles, isOrgAdmin); err != nil {
-				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
+				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to update membership %s in organization %s", membership.ID, admin.OrgSlug)
 				return
 			}
 			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
@@ -3075,22 +3131,22 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				labels = append(labels, identityOrgAdminLabel)
 			}
 			if _, err := s.identity.UpdateUserLabels(r.Context(), existingUser.ID, labels); err != nil {
-				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"})
+				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for existing user %s in organization %s", existingUser.ID, admin.OrgSlug)
 				return
 			}
 			s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 			return
 		case err != nil && !errors.Is(err, ErrIdentityNotFound):
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"}, err, "failed to look up existing user %s during invite", email)
 			return
 		}
 		sessionSecret, err := sessionSecretFromRequest(r)
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for invite creation in %s", admin.OrgSlug)
 			return
 		}
 		if _, err := s.identity.InviteOrganizationUser(r.Context(), sessionSecret, admin.OrgSlug, email, inviteRedirectURL(r), businessRoles, isOrgAdmin); err != nil {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to create invite for %s in organization %s", email, admin.OrgSlug)
 			return
 		}
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
@@ -3102,6 +3158,9 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
 		if err != nil || org == nil {
+			if err != nil {
+				logRequestError(r, err, "failed to load organization %s for update", admin.OrgSlug)
+			}
 			http.NotFound(w, r)
 			return
 		}
@@ -3126,14 +3185,14 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				Data:        logoUpload.Data,
 			})
 			if err != nil {
-				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to upload logo"})
+				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to upload logo"}, err, "failed to upload updated logo for organization %s", targetOrgSlug)
 				return
 			}
 			logoFileID = logoFile.ID
 		}
 		sessionSecret, err := sessionSecretFromRequest(r)
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for organization update in %s", admin.OrgSlug)
 			return
 		}
 		updatedOrg, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, admin.OrgSlug, name, logoFileID, append([]IdentityRole(nil), org.Roles...))
@@ -3142,7 +3201,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "organization slug already exists"})
 				return
 			}
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to update organization"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "failed to update organization"}, err, "failed to update organization %s", admin.OrgSlug)
 			return
 		}
 		if logoUpload != nil && previousLogoFileID != "" && previousLogoFileID != strings.TrimSpace(updatedOrg.LogoFileID) {
@@ -3159,12 +3218,15 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		org, err := s.identity.GetOrganizationBySlug(r.Context(), admin.OrgSlug)
 		if err != nil || org == nil {
+			if err != nil {
+				logRequestError(r, err, "failed to load organization %s for role update", admin.OrgSlug)
+			}
 			http.NotFound(w, r)
 			return
 		}
 		targetUsers, err := s.identity.ListOrganizationUsers(r.Context(), admin.OrgSlug)
 		if err != nil {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"}, err, "failed to list organization users for %s", admin.OrgSlug)
 			return
 		}
 		var target *IdentityUser
@@ -3217,7 +3279,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			labels = append(labels, identityOrgAdminLabel)
 		}
 		if _, err := s.identity.UpdateUserLabels(r.Context(), target.ID, labels); err != nil {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to update user roles"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to update user roles"}, err, "failed to update labels for user %s in organization %s", target.ID, admin.OrgSlug)
 			return
 		}
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
@@ -3229,7 +3291,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
 		if err != nil {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"}, err, "failed to list memberships for organization %s during delete", admin.OrgSlug)
 			return
 		}
 		var target *IdentityMembership
@@ -3253,17 +3315,17 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		sessionSecret, err := sessionSecretFromRequest(r)
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for membership delete in %s", admin.OrgSlug)
 			return
 		}
 		if err := s.identity.DeleteOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, target.ID); err != nil {
-			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, err, "failed to delete membership %s in organization %s", target.ID, admin.OrgSlug)
 			return
 		}
 		if strings.TrimSpace(target.UserID) != "" {
 			targetUser, getErr := s.identity.GetUserByID(r.Context(), target.UserID)
 			if getErr != nil && !errors.Is(getErr, ErrIdentityNotFound) {
-				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
+				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, getErr, "failed to load deleted membership user %s in organization %s", target.UserID, admin.OrgSlug)
 				return
 			}
 			labels := make([]string, 0, len(targetUser.Labels))
@@ -3274,7 +3336,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				labels = append(labels, strings.TrimSpace(label))
 			}
 			if _, err := s.identity.UpdateUserLabels(r.Context(), target.UserID, labels); err != nil {
-				s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"})
+				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, err, "failed to clear labels for deleted user %s in organization %s", target.UserID, admin.OrgSlug)
 				return
 			}
 		}
@@ -3349,6 +3411,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
 	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
+		logRequestError(r, err, "failed to list recent processes for workflow %s", workflowKey)
 		processesRaw = nil
 	}
 
@@ -4159,6 +4222,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
 	if err != nil {
+		logRequestError(r, err, "failed to resolve workflow for completion")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -4179,6 +4243,9 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	ctx := r.Context()
 	process, err := s.loadProcess(ctx, processID)
 	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			logRequestError(r, err, "failed to load process %s for substep %s completion", processID, substepID)
+		}
 		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
 		return
 	}
@@ -4222,6 +4289,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, step.OrganizationSlug, sequenceOK)
 	if err != nil {
+		logRequestError(r, err, "cerbos check failed for process %s substep %s", processID, substepID)
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
 	}
@@ -4268,6 +4336,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 
 	if err := s.store.UpdateProcessProgress(ctx, process.ID, workflowKey, substepID, progressUpdate); err != nil {
+		logRequestError(r, err, "failed to update process %s substep %s", process.ID.Hex(), substepID)
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
 		return
 	}
@@ -4284,6 +4353,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		},
 	}
 	if err := s.store.InsertNotarization(ctx, notary); err != nil {
+		logRequestError(r, err, "failed to notarize process %s substep %s", process.ID.Hex(), substepID)
 		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
 		return
 	}

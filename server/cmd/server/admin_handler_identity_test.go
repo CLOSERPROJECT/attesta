@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -2539,6 +2540,48 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		server.handleOrgAdminUsers(rec, req)
 		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "failed to create invite") {
 			t.Fatalf("invite create failure response = %d %q", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invite logs precise create invite failure", func(t *testing.T) {
+		fake := baseIdentity()
+		fake.listOrganizationMembershipsFunc = func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) { return nil, nil }
+		fake.getUserByEmailFunc = func(ctx context.Context, email string) (IdentityUser, error) {
+			return IdentityUser{}, ErrIdentityNotFound
+		}
+		fake.inviteOrganizationUserFunc = func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+			return IdentityMembership{}, errors.New("appwrite memberships.create: duplicate membership state")
+		}
+		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+
+		var logs bytes.Buffer
+		oldWriter := log.Writer()
+		oldFlags := log.Flags()
+		oldPrefix := log.Prefix()
+		log.SetOutput(&logs)
+		log.SetFlags(0)
+		log.SetPrefix("")
+		t.Cleanup(func() {
+			log.SetOutput(oldWriter)
+			log.SetFlags(oldFlags)
+			log.SetPrefix(oldPrefix)
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "failed to create invite") {
+			t.Fatalf("invite create failure response = %d %q", rec.Code, rec.Body.String())
+		}
+		logOutput := logs.String()
+		if !strings.Contains(logOutput, "failed to create invite for new@example.com in organization acme") {
+			t.Fatalf("expected contextual log message, got %q", logOutput)
+		}
+		if !strings.Contains(logOutput, "appwrite memberships.create: duplicate membership state") {
+			t.Fatalf("expected precise invite error in logs, got %q", logOutput)
 		}
 	})
 
