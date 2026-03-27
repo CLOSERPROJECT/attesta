@@ -224,4 +224,7 @@ volumes:
   appwrite-imports:
   appwrite-certificates:
   appwrite-config:
+  appwrite-functions:
+  appwrite-sites:
+  appwrite-builds:
   mongodb_data:
