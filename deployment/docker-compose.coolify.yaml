@@ -37,7 +37,7 @@ services:
       retries: 3
 
   appwrite-console:
-    image: appwrite/console:7.8.29
+    image: appwrite/console:7.5.7
     container_name: appwrite-console
     environment:
       SERVICE_URL_APPWRITE: /console
