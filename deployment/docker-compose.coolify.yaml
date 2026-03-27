@@ -18,6 +18,11 @@ services:
       _APP_DB_USER: ${SERVICE_USER_MARIADB}
       _APP_DB_PASS: ${SERVICE_PASSWORD_MARIADB}
       _APP_OPENSSL_KEY_V1: ${SERVICE_PASSWORD_64_APPWRITE}
+      _APP_SMTP_HOST: ${SERVICE_HOST_SMTP}
+      _APP_SMTP_PORT: ${SERVICE_PORT_SMTP}
+      _APP_SMTP_SECURE: ${SERVICE_SECURE_SMTP}
+      _APP_SMTP_USERNAME: ${SERVICE_USERNAME_SMTP}
+      _APP_SMTP_PASSWORD: ${SERVICE_PASSWORD_SMTP}
     volumes:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-imports:/storage/imports:rw
