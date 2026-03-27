@@ -3,6 +3,12 @@ x-appwrite-base: &appwrite-base
   env_file:
     - ./appwrite/.env.appwrite.coolify
 
+x-appwrite-worker: &appwrite-worker
+  <<: *appwrite-base
+  depends_on:
+    - appwrite-mariadb
+    - appwrite-redis
+
 services:
   appwrite:
     <<: *appwrite-base
@@ -51,7 +57,7 @@ services:
       retries: 3
 
   appwrite-worker-audits:
-    <<: *appwrite-base
+    <<: *appwrite-worker
     entrypoint: worker-audits
     container_name: appwrite-worker-audits
     healthcheck:
@@ -61,7 +67,7 @@ services:
       retries: 3
 
   appwrite-worker-webhooks:
-    <<: *appwrite-base
+    <<: *appwrite-worker
     entrypoint: worker-webhooks
     container_name: appwrite-worker-webhooks
     healthcheck:
@@ -71,7 +77,7 @@ services:
       retries: 3
 
   appwrite-worker-deletes:
-    <<: *appwrite-base
+    <<: *appwrite-worker
     entrypoint: worker-deletes
     container_name: appwrite-worker-deletes
     volumes:
@@ -88,7 +94,7 @@ services:
       retries: 3
 
   appwrite-worker-databases:
-    <<: *appwrite-base
+    <<: *appwrite-worker
     entrypoint: worker-databases
     container_name: appwrite-worker-databases
     healthcheck:
@@ -101,6 +107,8 @@ services:
     <<: *appwrite-base
     entrypoint: worker-mails
     container_name: appwrite-worker-mails
+    depends_on:
+      - appwrite-redis
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-mails' || exit 1"]
       interval: 20s
@@ -113,6 +121,8 @@ services:
     container_name: appwrite-worker-migrations
     volumes:
       - appwrite-imports:/storage/imports:rw
+    depends_on:
+      - appwrite-mariadb
     # disable healthcheck in coolify  
     exclude_from_hc: true
 
@@ -120,6 +130,8 @@ services:
     <<: *appwrite-base
     entrypoint: maintenance
     container_name: appwrite-task-maintenance
+    depends_on:
+      - appwrite-redis
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[m]aintenance' || exit 1"]
       interval: 20s
