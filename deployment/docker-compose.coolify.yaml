@@ -124,6 +124,12 @@ services:
     container_name: appwrite-worker-mails
     depends_on:
       - appwrite-redis
+    environment:
+      _APP_SMTP_HOST: ${SERVICE_HOST_SMTP}
+      _APP_SMTP_PORT: ${SERVICE_PORT_SMTP}
+      _APP_SMTP_SECURE: ${SERVICE_SECURE_SMTP}
+      _APP_SMTP_USERNAME: ${SERVICE_USERNAME_SMTP}
+      _APP_SMTP_PASSWORD: ${SERVICE_PASSWORD_SMTP}
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-mails' || exit 1"]
       interval: 20s
