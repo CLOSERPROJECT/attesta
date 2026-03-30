@@ -213,3 +213,4 @@ This repository/website is part of the CLOSER project and has received funding f
 
 ## Troubleshooting
 - `open Dockerfile.local`: you’re on an old checkout — `deployment/Dockerfile.local` is required by `deployment/docker-compose.local.yaml`.
+
