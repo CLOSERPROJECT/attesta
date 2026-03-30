@@ -1,7 +1,44 @@
 x-appwrite-base: &appwrite-base
   image: appwrite/appwrite:1.8.1
-  env_file:
-    - ./appwrite/.env.appwrite.coolify
+  environment: &appwrite-env
+    _APP_ENV: production
+    _APP_WORKER_PER_CORE: 6
+    _APP_EDITION: self-hosted
+    _APP_LOCALE: en
+    _APP_CONSOLE_WHITELIST_ROOT: enabled
+    _APP_SYSTEM_EMAIL_NAME: Appwrite
+    _APP_SYSTEM_EMAIL_ADDRESS: attesta@apps.forkbomb.eu
+    _APP_SYSTEM_TEAM_EMAIL: attesta@apps.forkbomb.eu
+    _APP_SYSTEM_SECURITY_EMAIL_ADDRESS: certs@appwrite.io
+    _APP_OPTIONS_ABUSE: enabled
+    _APP_OPTIONS_ROUTER_PROTECTION: disabled
+    _APP_OPTIONS_FORCE_HTTPS: disabled
+    _APP_OPTIONS_ROUTER_FORCE_HTTPS: disabled
+    _APP_DOMAIN: ${SERVICE_FQDN_APPWRITE}
+    _APP_DOMAIN_TARGET_CNAME: localhost
+    _APP_DOMAIN_TARGET_AAAA: ::1
+    _APP_DOMAIN_TARGET_A: 127.0.0.1
+    _APP_DOMAIN_TARGET_CAA: ""
+    _APP_DNS: ""
+    _APP_REDIS_HOST: appwrite-redis
+    _APP_REDIS_PORT: 6379
+    _APP_DB_HOST: appwrite-mariadb
+    _APP_DB_PORT: 3306
+    _APP_DB_SCHEMA: appwrite
+    _APP_USAGE_STATS: enabled
+    _APP_STORAGE_DEVICE: local
+    _APP_STORAGE_LIMIT: 30000000
+    _APP_STORAGE_PREVIEW_LIMIT: 20000000
+    _APP_MAINTENANCE_INTERVAL: 86400
+    _APP_MAINTENANCE_RETENTION_EXECUTION: 1209600
+    _APP_MAINTENANCE_RETENTION_CACHE: 2592000
+    _APP_MAINTENANCE_RETENTION_ABUSE: 86400
+    _APP_MAINTENANCE_RETENTION_AUDIT: 1209600
+    _APP_MAINTENANCE_RETENTION_USAGE_HOURLY: 8640000
+    _APP_MAINTENANCE_RETENTION_SCHEDULES: 86400
+    _APP_GRAPHQL_MAX_BATCH_SIZE: 10
+    _APP_GRAPHQL_MAX_COMPLEXITY: 250
+    _APP_GRAPHQL_MAX_DEPTH: 3
 
 x-appwrite-worker: &appwrite-worker
   <<: *appwrite-base
@@ -14,6 +51,7 @@ services:
     <<: *appwrite-base
     container_name: appwrite
     environment:
+      <<: *appwrite-env
       SERVICE_URL_APPWRITE: /
       _APP_DB_USER: ${SERVICE_USER_MARIADB}
       _APP_DB_PASS: ${SERVICE_PASSWORD_MARIADB}
@@ -57,6 +95,7 @@ services:
     entrypoint: realtime
     container_name: appwrite-realtime
     environment:
+      <<: *appwrite-env
       SERVICE_URL_APPWRITE: /v1/realtime
       _APP_DB_USER: ${SERVICE_USER_MARIADB}
       _APP_DB_PASS: ${SERVICE_PASSWORD_MARIADB}
@@ -72,6 +111,7 @@ services:
     entrypoint: worker-audits
     container_name: appwrite-worker-audits
     environment:
+      <<: *appwrite-env
       _APP_DB_USER: ${SERVICE_USER_MARIADB}
       _APP_DB_PASS: ${SERVICE_PASSWORD_MARIADB}
       _APP_OPENSSL_KEY_V1: ${SERVICE_PASSWORD_64_APPWRITE}
@@ -125,6 +165,7 @@ services:
     depends_on:
       - appwrite-redis
     environment:
+      <<: *appwrite-env
       _APP_SMTP_HOST: ${SERVICE_HOST_SMTP}
       _APP_SMTP_PORT: ${SERVICE_PORT_SMTP}
       _APP_SMTP_SECURE: ${SERVICE_SECURE_SMTP}
@@ -152,6 +193,7 @@ services:
     entrypoint: maintenance
     container_name: appwrite-task-maintenance
     environment:
+      <<: *appwrite-env
       _APP_DB_USER: ${SERVICE_USER_MARIADB}
       _APP_DB_PASS: ${SERVICE_PASSWORD_MARIADB}
       _APP_OPENSSL_KEY_V1: ${SERVICE_PASSWORD_64_APPWRITE}
