@@ -208,6 +208,11 @@ services:
   appwrite-mariadb:
     image: mariadb:10.11
     container_name: appwrite-mariadb
+    networks:
+      default:
+        aliases:
+          - appwrite-mariadb
+          - mariadb
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
     environment:
@@ -226,6 +231,11 @@ services:
   appwrite-redis:
     image: redis:7.2.4-alpine
     container_name: appwrite-redis
+    networks:
+      default:
+        aliases:
+          - appwrite-redis
+          - redis
     command: >
       redis-server
       --maxmemory            512mb
