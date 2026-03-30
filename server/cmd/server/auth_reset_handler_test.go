@@ -397,3 +397,56 @@ func TestHandleResetRequestInvalidForm(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
+
+func TestHandleResetRequestAdditionalBranches(t *testing.T) {
+	t.Run("recovery failure still renders confirmation", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createRecoveryFunc: func(ctx context.Context, email, redirectURL string) error {
+					return errors.New("boom")
+				},
+			},
+			tmpl: resetTemplates(),
+			now:  time.Now,
+		}
+		req := httptest.NewRequest(http.MethodPost, "/reset", strings.NewReader("email=user%40example.com"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleResetRequest(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "If the account exists") {
+			t.Fatalf("body = %q", rec.Body.String())
+		}
+	})
+}
+
+func TestHandleResetConfirmAdditionalBranches(t *testing.T) {
+	t.Run("identity missing", func(t *testing.T) {
+		server := &Server{tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodGet, "/reset/confirm?userId=user-1&secret=secret-1", nil)
+		rec := httptest.NewRecorder()
+
+		server.handleResetSet(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("invalid post form", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("%zz"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleResetSet(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+}

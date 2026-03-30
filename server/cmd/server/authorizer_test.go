@@ -191,3 +191,42 @@ func TestCerbosAuthorizerCanCompleteReturnsErrorForBadStatusAndBadJSON(t *testin
 		t.Fatal("expected JSON decode error")
 	}
 }
+
+func TestCerbosAuthorizerCanCompleteFallsBackToLegacyRoleFields(t *testing.T) {
+	var captured map[string]interface{}
+	pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"resourceInstances":{"1.1":{"actions":{"complete":"EFFECT_ALLOW"}}}}`))
+	}))
+	defer pdp.Close()
+
+	authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now)
+	allowed, err := authorizer.CanComplete(context.Background(), Actor{ID: "u1", Role: "dep1", WorkflowKey: "wf-a"}, "proc-1", "wf-a", WorkflowSub{
+		SubstepID: "1.1",
+		Order:     1,
+		Role:      "dep1",
+	}, 1, "org1", true)
+	if err != nil {
+		t.Fatalf("CanComplete returned error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected allow result")
+	}
+
+	principal := captured["principal"].(map[string]interface{})
+	attr := principal["attr"].(map[string]interface{})
+	roleSlugs := attr["roleSlugs"].([]interface{})
+	if len(roleSlugs) != 1 || roleSlugs[0] != "dep1" {
+		t.Fatalf("roleSlugs = %#v", roleSlugs)
+	}
+	resource := captured["resource"].(map[string]interface{})
+	instances := resource["instances"].(map[string]interface{})
+	sub := instances["1.1"].(map[string]interface{})
+	subAttr := sub["attr"].(map[string]interface{})
+	rolesAllowed := subAttr["rolesAllowed"].([]interface{})
+	if len(rolesAllowed) != 1 || rolesAllowed[0] != "dep1" {
+		t.Fatalf("rolesAllowed = %#v", rolesAllowed)
+	}
+}

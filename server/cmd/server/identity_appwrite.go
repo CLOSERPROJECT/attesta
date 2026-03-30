@@ -703,11 +703,11 @@ func cloneHTTPClient(base *http.Client, withJar bool) *http.Client {
 	}
 	cloned := *base
 	if withJar {
-		if base.Jar != nil {
-			cloned.Jar = base.Jar
-		} else if jar, err := cookiejar.New(nil); err == nil {
+		if jar, err := cookiejar.New(nil); err == nil {
 			cloned.Jar = jar
 		}
+	} else {
+		cloned.Jar = nil
 	}
 	return &cloned
 }

@@ -625,3 +625,81 @@ func TestHandleSignupReturnsServerErrors(t *testing.T) {
 		}
 	})
 }
+
+func TestHandleSignupAdditionalBranches(t *testing.T) {
+	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
+
+	t.Run("method not allowed", func(t *testing.T) {
+		server := &Server{tmpl: testTemplates(), now: func() time.Time { return now }}
+		req := httptest.NewRequest(http.MethodPut, "/signup", nil)
+		rec := httptest.NewRecorder()
+
+		server.handleSignup(rec, req)
+
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		}
+	})
+
+	t.Run("invalid form", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), now: func() time.Time { return now }}
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("%zz"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleSignup(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("create session failure", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-1", Email: email, Status: "active"}, nil
+				},
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return IdentitySession{}, errors.New("boom")
+				},
+			},
+			tmpl: testTemplates(),
+			now:  func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u1%40example.com&password=this-is-strong-enough"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleSignup(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("write session cookie failure", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-1", Email: email, Status: "active"}, nil
+				},
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return IdentitySession{UserID: "user-1", ExpiresAt: now.Add(24 * time.Hour)}, nil
+				},
+			},
+			tmpl: testTemplates(),
+			now:  func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("email=u1%40example.com&password=this-is-strong-enough"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleSignup(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+}
