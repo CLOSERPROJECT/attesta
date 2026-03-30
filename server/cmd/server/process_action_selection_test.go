@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -139,4 +140,118 @@ func TestHandleProcessActionsPartialShowsDoneResourcesState(t *testing.T) {
 	if !strings.Contains(body, "DPP /01/09506000134352/10/LOT-001/21/SERIAL-001") {
 		t.Fatalf("expected dpp link in action view, got %q", body)
 	}
+}
+
+func TestHandleProcessActionsPartialErrorBranches(t *testing.T) {
+	t.Run("requires authentication when enabled", func(t *testing.T) {
+		server := &Server{
+			store:       NewMemoryStore(),
+			tmpl:        testTemplates(),
+			enforceAuth: true,
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/actions", nil)
+		rec := httptest.NewRecorder()
+		server.handleProcessRoutes(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+	})
+
+	t.Run("config error", func(t *testing.T) {
+		server := &Server{
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, context.DeadlineExceeded
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/actions", nil)
+		rec := httptest.NewRecorder()
+		server.handleProcessRoutes(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("missing process", func(t *testing.T) {
+		server := &Server{
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/actions", nil)
+		rec := httptest.NewRecorder()
+		server.handleProcessRoutes(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("workflow mismatch", func(t *testing.T) {
+		store := NewMemoryStore()
+		processID := store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "other",
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress:    map[string]ProcessStep{"1_1": {State: "pending"}},
+		})
+		server := &Server{
+			store: store,
+			tmpl:  testTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/actions", nil)
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+		rec := httptest.NewRecorder()
+		server.handleProcessRoutes(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("template error", func(t *testing.T) {
+		store := NewMemoryStore()
+		processID := store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: "workflow",
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress:    map[string]ProcessStep{"1_1": {State: "pending"}},
+		})
+		tmpl := template.Must(template.New("broken").Parse(`{{define "action_list.html"}}{{template "missing" .}}{{end}}`))
+		server := &Server{
+			store: store,
+			tmpl:  tmpl,
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/actions", nil)
+		rec := httptest.NewRecorder()
+		server.handleProcessRoutes(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
 }

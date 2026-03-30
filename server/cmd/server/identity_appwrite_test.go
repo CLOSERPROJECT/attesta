@@ -1269,6 +1269,107 @@ func TestNewAppwriteIdentitySessionClientHasCookieJar(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityMethodsRespectCanceledContext(t *testing.T) {
+	identityStore := NewAppwriteIdentity("http://example.invalid/v1", "project-1", "api-key-1", http.DefaultClient)
+	identity, ok := identityStore.(*appwriteIdentity)
+	if !ok {
+		t.Fatalf("identity type = %T", identityStore)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := identity.CreateEmailPasswordSession(ctx, "user@example.com", "password"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateEmailPasswordSession error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.CreateAccount(ctx, "user@example.com", "password", "User"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateAccount error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.CreateOrganization(ctx, "session-secret", "Acme"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateOrganization error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.CreateOrganizationAsAdmin(ctx, "Acme"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateOrganizationAsAdmin error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.EnsurePlatformAdminAccount(ctx, "admin@example.com", "password"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("EnsurePlatformAdminAccount error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.AcceptInvite(ctx, "team-1", "membership-1", "user-1", "secret-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("AcceptInvite error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.CreateRecovery(ctx, "user@example.com", "http://attesta.local/reset/confirm"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateRecovery error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.CompleteRecovery(ctx, "user-1", "secret-1", "password"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CompleteRecovery error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.UpdateCurrentPassword(ctx, "session-secret", "password"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateCurrentPassword error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.GetSession(ctx, "session-secret"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetSession error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.DeleteSession(ctx, "session-secret"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("DeleteSession error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.GetCurrentUser(ctx, "session-secret"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetCurrentUser error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.GetUserByID(ctx, "user-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetUserByID error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.GetUserByEmail(ctx, "user@example.com"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetUserByEmail error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.AddOrganizationUserByIDAsAdmin(ctx, "acme", "user-1", []string{"approver"}, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("AddOrganizationUserByIDAsAdmin error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.InviteOrganizationUser(ctx, "session-secret", "acme", "user@example.com", "http://attesta.local/invite/accept", []string{"approver"}, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("InviteOrganizationUser error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.InviteOrganizationUserAsAdmin(ctx, "acme", "user@example.com", "http://attesta.local/invite/accept", []string{"approver"}, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("InviteOrganizationUserAsAdmin error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.ListOrganizations(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ListOrganizations error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.ListOrganizationUsers(ctx, "acme"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ListOrganizationUsers error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.ListOrganizationMemberships(ctx, "acme"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ListOrganizationMemberships error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.GetOrganizationBySlug(ctx, "acme"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetOrganizationBySlug error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.UpdateOrganization(ctx, "session-secret", "acme", "Acme", "logo-1", nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateOrganization error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.UpdateOrganizationAsAdmin(ctx, "acme", "Acme", "logo-1", nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateOrganizationAsAdmin error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.UpdateOrganizationMembership(ctx, "session-secret", "acme", "membership-1", []string{"approver"}, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateOrganizationMembership error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.UpdateOrganizationMembershipAsAdmin(ctx, "acme", "membership-1", []string{"approver"}, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateOrganizationMembershipAsAdmin error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.UpdateUserLabels(ctx, "user-1", []string{"label"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateUserLabels error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.DeleteOrganizationMembership(ctx, "session-secret", "acme", "membership-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("DeleteOrganizationMembership error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.UploadOrganizationLogo(ctx, "acme", IdentityFile{Filename: "logo.png", Data: []byte("png")}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UploadOrganizationLogo error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.DeleteOrganizationLogo(ctx, "logo-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("DeleteOrganizationLogo error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := identity.GetOrganizationLogo(ctx, "logo-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetOrganizationLogo error = %v, want %v", err, context.Canceled)
+	}
+}
+
 func TestCloneHTTPClientWithJarUsesIsolatedJar(t *testing.T) {
 	baseJar, err := cookiejar.New(nil)
 	if err != nil {
@@ -1296,6 +1397,40 @@ func TestCloneHTTPClientWithJarUsesIsolatedJar(t *testing.T) {
 	if got := len(cloned.Jar.Cookies(endpoint)); got != 1 {
 		t.Fatalf("cloned jar cookies = %d, want 1", got)
 	}
+}
+
+func TestAppwriteIdentityHelperBranches(t *testing.T) {
+	t.Run("org assets bucket defaults", func(t *testing.T) {
+		t.Setenv("APPWRITE_ORG_ASSETS_BUCKET", "   ")
+		if got := appwriteOrgAssetsBucket(); got != "org-assets" {
+			t.Fatalf("appwriteOrgAssetsBucket = %q, want org-assets", got)
+		}
+	})
+
+	t.Run("session secret from jar requires endpoint", func(t *testing.T) {
+		client := appwriteclient.Client{Client: &http.Client{Jar: http.DefaultClient.Jar}}
+		if got := appwriteSessionSecretFromJar(client); got != "" {
+			t.Fatalf("appwriteSessionSecretFromJar = %q, want empty", got)
+		}
+	})
+
+	t.Run("to identity user handles disabled account", func(t *testing.T) {
+		user := &models.User{Id: "user-1", Email: "user@example.com", Status: false}
+		got := toIdentityUser(user, nil)
+		if got.Status != "disabled" {
+			t.Fatalf("status = %q, want disabled", got.Status)
+		}
+	})
+
+	t.Run("parse appwrite time falls back to RFC3339", func(t *testing.T) {
+		got, err := parseAppwriteTime("2026-03-18T10:11:12Z")
+		if err != nil {
+			t.Fatalf("parseAppwriteTime error: %v", err)
+		}
+		if !got.Equal(time.Date(2026, time.March, 18, 10, 11, 12, 0, time.UTC)) {
+			t.Fatalf("time = %s", got)
+		}
+	})
 }
 
 func TestAppwriteIdentityGetOrganizationLogoViewFailure(t *testing.T) {

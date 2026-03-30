@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -383,5 +384,63 @@ func TestProcessExportHandlersConfigError(t *testing.T) {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 			}
 		})
+	}
+}
+
+func TestCollectProcessAttachmentsAdditionalBranches(t *testing.T) {
+	if got := collectProcessAttachments(WorkflowDef{}, nil); got != nil {
+		t.Fatalf("collectProcessAttachments(nil) = %#v, want nil", got)
+	}
+
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Order:  1,
+				Substep: []WorkflowSub{
+					{SubstepID: "1.1", Order: 1, InputKey: "attachment", InputType: "file"},
+					{SubstepID: "1.2", Order: 2, InputKey: "attachment", InputType: "file"},
+				},
+			},
+		},
+	}
+	process := &Process{
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": "att-1",
+						"filename":     "proof.pdf",
+					},
+					"duplicate": map[string]interface{}{
+						"attachmentId": "att-1",
+						"filename":     "proof.pdf",
+					},
+				},
+			},
+			"1.2": {State: "pending"},
+		},
+	}
+
+	files := collectProcessAttachments(def, process)
+	if len(files) != 1 || files[0].AttachmentID != "att-1" {
+		t.Fatalf("files = %#v", files)
+	}
+}
+
+func TestBuildProcessDownloadAttachmentsAdditionalOrdering(t *testing.T) {
+	process := &Process{ID: primitive.NewObjectID()}
+	files := []ProcessAttachmentExport{
+		{SubstepID: "1.1", AttachmentID: "b", Filename: "same.pdf"},
+		{SubstepID: "1.1", AttachmentID: "a", Filename: "same.pdf"},
+	}
+
+	views := buildProcessDownloadAttachments("workflow", process, files)
+	if len(views) != 2 {
+		t.Fatalf("views = %#v", views)
+	}
+	if !strings.Contains(views[0].URL, "/attachment/a/file") || !strings.Contains(views[1].URL, "/attachment/b/file") {
+		t.Fatalf("views = %#v", views)
 	}
 }
