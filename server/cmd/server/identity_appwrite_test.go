@@ -1269,6 +1269,35 @@ func TestNewAppwriteIdentitySessionClientHasCookieJar(t *testing.T) {
 	}
 }
 
+func TestCloneHTTPClientWithJarUsesIsolatedJar(t *testing.T) {
+	baseJar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookiejar.New error: %v", err)
+	}
+	base := &http.Client{Jar: baseJar}
+
+	cloned := cloneHTTPClient(base, true)
+	if cloned == nil {
+		t.Fatal("cloned client is nil")
+	}
+	if cloned.Jar == nil {
+		t.Fatal("cloned jar is nil")
+	}
+
+	endpoint, err := url.Parse("https://appwrite.example/v1")
+	if err != nil {
+		t.Fatalf("url.Parse error: %v", err)
+	}
+	cloned.Jar.SetCookies(endpoint, []*http.Cookie{{Name: "a_session_project-1", Value: "invite-session"}})
+
+	if got := len(base.Jar.Cookies(endpoint)); got != 0 {
+		t.Fatalf("base jar cookies = %d, want 0", got)
+	}
+	if got := len(cloned.Jar.Cookies(endpoint)); got != 1 {
+		t.Fatalf("cloned jar cookies = %d, want 1", got)
+	}
+}
+
 func TestAppwriteIdentityGetOrganizationLogoViewFailure(t *testing.T) {
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
