@@ -20,9 +20,9 @@ x-appwrite-base: &appwrite-base
     _APP_DOMAIN_TARGET_A: 127.0.0.1
     _APP_DOMAIN_TARGET_CAA: ""
     _APP_DNS: ""
-    _APP_REDIS_HOST: appwrite-redis
+    _APP_REDIS_HOST: ${SERVICE_NAME_APPWRITE_REDIS:-appwrite-redis}
     _APP_REDIS_PORT: 6379
-    _APP_DB_HOST: appwrite-mariadb
+    _APP_DB_HOST: ${SERVICE_NAME_APPWRITE_MARIADB:-appwrite-mariadb}
     _APP_DB_PORT: 3306
     _APP_DB_SCHEMA: appwrite
     _APP_USAGE_STATS: enabled
