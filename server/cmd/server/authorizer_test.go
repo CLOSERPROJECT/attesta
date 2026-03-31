@@ -230,3 +230,108 @@ func TestCerbosAuthorizerCanCompleteFallsBackToLegacyRoleFields(t *testing.T) {
 		t.Fatalf("rolesAllowed = %#v", rolesAllowed)
 	}
 }
+
+func TestCerbosAuthorizerCanDeleteStreamBuildsRequestAndMapsAllow(t *testing.T) {
+	var captured map[string]interface{}
+
+	pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"resourceInstances":{"wf-a":{"actions":{"delete":"EFFECT_ALLOW"}}}}`))
+	}))
+	defer pdp.Close()
+
+	authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), func() time.Time {
+		return time.Unix(1700000000, 0)
+	})
+
+	allowed, err := authorizer.CanDeleteStream(context.Background(), &AccountUser{
+		IdentityUserID: "user-1",
+		RoleSlugs:      []string{"org-admin"},
+		Status:         "active",
+	}, "wf-a", "user-1", false)
+	if err != nil {
+		t.Fatalf("CanDeleteStream returned error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected allow result")
+	}
+
+	principal := captured["principal"].(map[string]interface{})
+	if principal["id"] != "user-1" {
+		t.Fatalf("principal.id = %#v, want user-1", principal["id"])
+	}
+	roles := principal["roles"].([]interface{})
+	if len(roles) != 2 || roles[0] != "authenticated" || roles[1] != "org_admin" {
+		t.Fatalf("principal.roles = %#v", roles)
+	}
+	resource := captured["resource"].(map[string]interface{})
+	if resource["kind"] != "stream" {
+		t.Fatalf("resource.kind = %#v, want stream", resource["kind"])
+	}
+	instances := resource["instances"].(map[string]interface{})
+	stream := instances["wf-a"].(map[string]interface{})
+	attr := stream["attr"].(map[string]interface{})
+	if attr["createdByUserId"] != "user-1" {
+		t.Fatalf("createdByUserId = %#v, want user-1", attr["createdByUserId"])
+	}
+	if attr["hasProcesses"] != false {
+		t.Fatalf("hasProcesses = %#v, want false", attr["hasProcesses"])
+	}
+}
+
+func TestCerbosAuthorizerCanDeleteStreamMapsDenyAndPlatformAdmin(t *testing.T) {
+	t.Run("deny maps to false", func(t *testing.T) {
+		pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"resourceInstances":{"wf-a":{"actions":{"delete":"EFFECT_DENY"}}}}`))
+		}))
+		defer pdp.Close()
+
+		authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now)
+		allowed, err := authorizer.CanDeleteStream(context.Background(), &AccountUser{
+			IdentityUserID: "user-1",
+			Status:         "active",
+		}, "wf-a", "other-user", true)
+		if err != nil {
+			t.Fatalf("CanDeleteStream returned error: %v", err)
+		}
+		if allowed {
+			t.Fatal("expected deny to map to false")
+		}
+	})
+
+	t.Run("platform admin request carries role", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "secret")
+		var captured map[string]interface{}
+		pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"resourceInstances":{"wf-a":{"actions":{"delete":"EFFECT_ALLOW"}}}}`))
+		}))
+		defer pdp.Close()
+
+		authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now)
+		allowed, err := authorizer.CanDeleteStream(context.Background(), &AccountUser{
+			Email:           "admin@example.com",
+			IsPlatformAdmin: true,
+			Status:          "active",
+		}, "wf-a", "anyone", true)
+		if err != nil {
+			t.Fatalf("CanDeleteStream returned error: %v", err)
+		}
+		if !allowed {
+			t.Fatal("expected allow result")
+		}
+		principal := captured["principal"].(map[string]interface{})
+		roles := principal["roles"].([]interface{})
+		if len(roles) != 2 || roles[0] != "authenticated" || roles[1] != "platform_admin" {
+			t.Fatalf("principal.roles = %#v", roles)
+		}
+		if principal["id"] != "platform-admin:admin@example.com" {
+			t.Fatalf("principal.id = %#v", principal["id"])
+		}
+	})
+}

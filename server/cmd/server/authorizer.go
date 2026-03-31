@@ -12,6 +12,7 @@ import (
 
 type Authorizer interface {
 	CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
+	CanDeleteStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error)
 }
 
 type CerbosAuthorizer struct {
@@ -30,44 +31,19 @@ func NewCerbosAuthorizer(url string, client *http.Client, now func() time.Time) 
 	return &CerbosAuthorizer{url: url, client: client, now: now}
 }
 
-func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
-	rolesAllowed := append([]string(nil), sub.Roles...)
-	if len(rolesAllowed) == 0 && strings.TrimSpace(sub.Role) != "" {
-		rolesAllowed = []string{strings.TrimSpace(sub.Role)}
-	}
-	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
-		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
-	}
+func (a *CerbosAuthorizer) checkResourceAction(ctx context.Context, principal map[string]interface{}, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error) {
 	request := map[string]interface{}{
 		"requestId": fmt.Sprintf("req-%d", a.now().UnixNano()),
-		"principal": map[string]interface{}{
-			"id":    actor.ID,
-			"roles": []string{"authenticated"},
-			"attr": map[string]interface{}{
-				"orgSlug":     strings.TrimSpace(actor.OrgSlug),
-				"roleSlugs":   actor.RoleSlugs,
-				"activeRole":  strings.TrimSpace(actor.Role),
-				"workflowKey": strings.TrimSpace(actor.WorkflowKey),
-			},
-		},
+		"principal": principal,
 		"resource": map[string]interface{}{
-			"kind": "substep",
+			"kind": resourceKind,
 			"instances": map[string]interface{}{
-				sub.SubstepID: map[string]interface{}{
-					"attr": map[string]interface{}{
-						"orgSlug":      strings.TrimSpace(stepOrgSlug),
-						"rolesAllowed": rolesAllowed,
-						"stepOrder":    stepOrder,
-						"substepOrder": sub.Order,
-						"substepId":    sub.SubstepID,
-						"processId":    processID,
-						"workflowKey":  strings.TrimSpace(workflowKey),
-						"sequenceOk":   sequenceOK,
-					},
+				resourceID: map[string]interface{}{
+					"attr": resourceAttr,
 				},
 			},
 		},
-		"actions": []string{"complete"},
+		"actions": []string{action},
 	}
 
 	body, err := json.Marshal(request)
@@ -98,10 +74,83 @@ func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, process
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return false, err
 	}
-	if res, ok := result.ResourceInstances[sub.SubstepID]; ok {
-		if effect, ok := res.Actions["complete"]; ok {
+	if res, ok := result.ResourceInstances[resourceID]; ok {
+		if effect, ok := res.Actions[action]; ok {
 			return strings.EqualFold(effect, "EFFECT_ALLOW"), nil
 		}
 	}
 	return false, nil
+}
+
+func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
+	rolesAllowed := append([]string(nil), sub.Roles...)
+	if len(rolesAllowed) == 0 && strings.TrimSpace(sub.Role) != "" {
+		rolesAllowed = []string{strings.TrimSpace(sub.Role)}
+	}
+	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
+		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
+	}
+	return a.checkResourceAction(ctx,
+		map[string]interface{}{
+			"id":    actor.ID,
+			"roles": []string{"authenticated"},
+			"attr": map[string]interface{}{
+				"orgSlug":     strings.TrimSpace(actor.OrgSlug),
+				"roleSlugs":   actor.RoleSlugs,
+				"activeRole":  strings.TrimSpace(actor.Role),
+				"workflowKey": strings.TrimSpace(actor.WorkflowKey),
+			},
+		},
+		"substep",
+		sub.SubstepID,
+		map[string]interface{}{
+			"orgSlug":      strings.TrimSpace(stepOrgSlug),
+			"rolesAllowed": rolesAllowed,
+			"stepOrder":    stepOrder,
+			"substepOrder": sub.Order,
+			"substepId":    sub.SubstepID,
+			"processId":    processID,
+			"workflowKey":  strings.TrimSpace(workflowKey),
+			"sequenceOk":   sequenceOK,
+		},
+		"complete",
+	)
+}
+
+func (a *CerbosAuthorizer) CanDeleteStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+	if user == nil {
+		return false, nil
+	}
+	roles := []string{"authenticated"}
+	if user.IsPlatformAdmin {
+		roles = append(roles, "platform_admin")
+	}
+	if userIsOrgAdmin(user) {
+		roles = append(roles, "org_admin")
+	}
+
+	principalID := formataStreamUserID(user)
+	if principalID == "" {
+		principalID = accountActorID(user)
+	}
+
+	return a.checkResourceAction(ctx,
+		map[string]interface{}{
+			"id":    principalID,
+			"roles": roles,
+			"attr": map[string]interface{}{
+				"userId":          strings.TrimSpace(principalID),
+				"workflowKey":     strings.TrimSpace(workflowKey),
+				"isPlatformAdmin": user.IsPlatformAdmin,
+			},
+		},
+		"stream",
+		strings.TrimSpace(workflowKey),
+		map[string]interface{}{
+			"workflowKey":     strings.TrimSpace(workflowKey),
+			"createdByUserId": strings.TrimSpace(createdByUserID),
+			"hasProcesses":    hasProcesses,
+		},
+		"delete",
+	)
 }

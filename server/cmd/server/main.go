@@ -1295,23 +1295,6 @@ func homePickerMessage(r *http.Request, key string) string {
 	return strings.TrimSpace(r.URL.Query().Get(key))
 }
 
-func workflowCanBeDeletedByUser(user *AccountUser, workflowKey string, counts WorkflowProcessCounts, streamsByKey map[string]FormataBuilderStream) bool {
-	if user == nil {
-		return false
-	}
-	stream, ok := streamsByKey[workflowKey]
-	if !ok {
-		return false
-	}
-	if user.IsPlatformAdmin {
-		return true
-	}
-	if counts.NotStarted+counts.Started+counts.Terminated > 0 {
-		return false
-	}
-	return formataStreamUserID(user) != "" && formataStreamCreatorID(stream) == formataStreamUserID(user)
-}
-
 func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]WorkflowOption, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
@@ -1350,7 +1333,13 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			return nil, listErr
 		}
 		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
-		option.CanDelete = workflowCanBeDeletedByUser(user, key, option.Counts, streamsByKey)
+		stream, ok := streamsByKey[key]
+		if ok && s.authorizer != nil && user != nil {
+			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0)
+			if err == nil {
+				option.CanDelete = allowed
+			}
+		}
 		options = append(options, option)
 	}
 	return options, nil
@@ -3524,20 +3513,29 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !user.IsPlatformAdmin {
-		if formataStreamUserID(user) == "" || formataStreamCreatorID(*stream) != formataStreamUserID(user) {
-			redirectHomeWithMessage(w, r, "error", "Only the stream creator or a platform admin can delete "+cfg.Workflow.Name+".")
-			return
-		}
-		hasProcesses, err := s.store.HasProcessesByWorkflow(r.Context(), workflowKey)
-		if err != nil {
-			http.Error(w, "failed to check stream processes", http.StatusInternalServerError)
-			return
-		}
-		if hasProcesses {
+	hasProcesses, err := s.store.HasProcessesByWorkflow(r.Context(), workflowKey)
+	if err != nil {
+		http.Error(w, "failed to check stream processes", http.StatusInternalServerError)
+		return
+	}
+	if s.authorizer == nil {
+		http.Error(w, "cerbos check failed", http.StatusBadGateway)
+		return
+	}
+	allowed, err := s.authorizer.CanDeleteStream(r.Context(), user, workflowKey, formataStreamCreatorID(*stream), hasProcesses)
+	if err != nil {
+		logRequestError(r, err, "cerbos check failed for stream %s delete", workflowKey)
+		http.Error(w, "cerbos check failed", http.StatusBadGateway)
+		return
+	}
+	if !allowed {
+		switch {
+		case hasProcesses && !user.IsPlatformAdmin:
 			redirectHomeWithMessage(w, r, "error", cfg.Workflow.Name+" cannot be deleted because one or more processes have already been started.")
-			return
+		default:
+			redirectHomeWithMessage(w, r, "error", "Only the stream creator or a platform admin can delete "+cfg.Workflow.Name+".")
 		}
+		return
 	}
 
 	if user.IsPlatformAdmin {

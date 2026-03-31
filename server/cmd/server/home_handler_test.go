@@ -274,6 +274,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		server := &Server{
 			store:       store,
 			identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
 			tmpl:        tmpl,
 			enforceAuth: true,
 			now:         func() time.Time { return now },
@@ -322,6 +323,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		server := &Server{
 			store:       store,
 			identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
 			tmpl:        tmpl,
 			enforceAuth: true,
 			now:         func() time.Time { return now },
@@ -366,6 +368,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 
 		server := &Server{
 			store:       store,
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
 			tmpl:        tmpl,
 			enforceAuth: true,
 			now:         func() time.Time { return now },
@@ -589,4 +592,14 @@ func homePickerTemplates() *template.Template {
 
 func ptrTime(t time.Time) *time.Time {
 	return &t
+}
+
+func workflowDeleteDecision(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+	if user == nil {
+		return false, nil
+	}
+	if user.IsPlatformAdmin {
+		return true, nil
+	}
+	return !hasProcesses && formataStreamUserID(user) == createdByUserID, nil
 }

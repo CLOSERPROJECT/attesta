@@ -40,6 +40,7 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 		server := &Server{
 			store:       store,
 			identity:    workflowDeleteIdentity(now, sessionID, user),
+			authorizer:  fakeAuthorizer{},
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
@@ -91,8 +92,11 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 		})
 
 		server := &Server{
-			store:       store,
-			identity:    workflowDeleteIdentity(now, sessionID, user),
+			store:    store,
+			identity: workflowDeleteIdentity(now, sessionID, user),
+			authorizer: fakeAuthorizer{deleteDecide: func(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+				return false, nil
+			}},
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
@@ -154,6 +158,7 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 
 		server := &Server{
 			store:       store,
+			authorizer:  fakeAuthorizer{},
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
@@ -183,6 +188,46 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 		store.mu.RUnlock()
 		if attachmentCount != 0 {
 			t.Fatalf("expected attachments to be purged, got %d", attachmentCount)
+		}
+	})
+
+	t.Run("cerbos error returns bad gateway", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{
+			ID:             primitive.NewObjectID(),
+			IdentityUserID: "creator-error-user",
+			Email:          "creator-error@example.com",
+			RoleSlugs:      []string{"org-admin"},
+			Status:         "active",
+		}
+		sessionID := "session-creator-error"
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Error stream"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+
+		server := &Server{
+			store:    store,
+			identity: workflowDeleteIdentity(now, sessionID, user),
+			authorizer: fakeAuthorizer{deleteDecide: func(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+				return false, errors.New("cerbos down")
+			}},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
 		}
 	})
 }

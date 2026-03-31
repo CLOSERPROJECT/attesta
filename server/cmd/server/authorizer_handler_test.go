@@ -149,7 +149,8 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 }
 
 type fakeAuthorizer struct {
-	decide func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
+	decide       func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
+	deleteDecide func(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error)
 }
 
 func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
@@ -157,4 +158,11 @@ func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID 
 		return true, nil
 	}
 	return f.decide(actor, processID, workflowKey, sub, stepOrder, stepOrgSlug, sequenceOK)
+}
+
+func (f fakeAuthorizer) CanDeleteStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+	if f.deleteDecide == nil {
+		return true, nil
+	}
+	return f.deleteDecide(user, workflowKey, createdByUserID, hasProcesses)
 }
