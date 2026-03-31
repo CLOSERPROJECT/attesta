@@ -229,21 +229,6 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 			*target = v
 			return nil
 		}
-	case *Session:
-		if v, ok := item.(Session); ok {
-			*target = v
-			return nil
-		}
-	case *Invite:
-		if v, ok := item.(Invite); ok {
-			*target = v
-			return nil
-		}
-	case *PasswordReset:
-		if v, ok := item.(PasswordReset); ok {
-			*target = v
-			return nil
-		}
 	case *Process:
 		if v, ok := item.(Process); ok {
 			*target = v

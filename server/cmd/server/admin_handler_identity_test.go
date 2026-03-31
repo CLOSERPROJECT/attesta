@@ -1844,8 +1844,8 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	targetID := stableIdentityUserObjectID("user-2").Hex()
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+targetID+"&roles=approver&roles=org-admin"))
+	targetID := "user-2"
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId="+targetID+"&roles=approver&roles=org-admin"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -1859,8 +1859,8 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 		t.Fatalf("updated user labels = %#v", users[1].Labels)
 	}
 
-	selfID := stableIdentityUserObjectID("user-1").Hex()
-	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+selfID+"&roles=approver"))
+	selfID := "user-1"
+	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId="+selfID+"&roles=approver"))
 	selfReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	selfReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	selfRec := httptest.NewRecorder()
@@ -2104,8 +2104,8 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	targetID := stableIdentityUserObjectID("user-2").Hex()
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+targetID))
+	targetID := "user-2"
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId="+targetID))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2245,7 +2245,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake := baseIdentity()
 		fake.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) { return nil, nil }
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+stableIdentityUserObjectID("missing").Hex()+"&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=missing&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2261,7 +2261,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			return []IdentityMembership{{ID: "membership-1", UserID: "user-1", Email: "owner@example.com", Confirmed: true}}, nil
 		}
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+stableIdentityUserObjectID("user-1").Hex()))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-1"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2310,7 +2310,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			return IdentityUser{}, errors.New("boom")
 		}
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+stableIdentityUserObjectID("user-2").Hex()+"&roles=approver&roles=org-admin"))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver&roles=org-admin"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2329,7 +2329,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			return errors.New("boom")
 		}
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+stableIdentityUserObjectID("user-2").Hex()))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2459,7 +2459,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			return IdentityUser{}, errors.New("boom")
 		}
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+stableIdentityUserObjectID("user-2").Hex()))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2591,7 +2591,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			return []IdentityUser{{ID: "user-2", Email: "member@example.com", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("approver")}, Status: "active"}}, nil
 		}
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userMongoId="+stableIdentityUserObjectID("user-2").Hex()+"&roles=missing"))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=missing"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2611,7 +2611,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			return IdentityUser{}, errors.New("boom")
 		}
 		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userMongoId="+stableIdentityUserObjectID("user-2").Hex()))
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2663,7 +2663,7 @@ func TestLoadOrgAdminStateIdentityFallbacks(t *testing.T) {
 		now: func() time.Time { return now },
 	}
 	adminOrgID := stableOrgObjectID("acme-org")
-	admin := &AccountUser{ID: stableIdentityUserObjectID("owner"), Email: "owner@example.com", OrgID: &adminOrgID, OrgSlug: "acme-org", RoleSlugs: []string{"org-admin"}, Status: "active"}
+	admin := &AccountUser{IdentityUserID: "owner", Email: "owner@example.com", OrgID: &adminOrgID, OrgSlug: "acme-org", RoleSlugs: []string{"org-admin"}, Status: "active"}
 	gotOrg, roles, users, invites, err := server.loadOrgAdminState(t.Context(), admin, "acme-org")
 	if err != nil {
 		t.Fatalf("loadOrgAdminState error: %v", err)

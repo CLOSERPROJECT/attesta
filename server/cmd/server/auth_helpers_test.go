@@ -42,6 +42,9 @@ func TestAccountUserFromIdentity(t *testing.T) {
 	if user.IdentityUserID != "user-1" || user.Email != "legacy@example.com" || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
 		t.Fatalf("user = %#v", user)
 	}
+	if !user.ID.IsZero() {
+		t.Fatalf("user ID = %s, want zero value for Appwrite-backed account", user.ID.Hex())
+	}
 }
 
 func TestReadSessionAndCurrentUserIdentityOnly(t *testing.T) {
@@ -176,11 +179,10 @@ func TestCurrentUserReturnsPlatformAdminFromSession(t *testing.T) {
 	}
 }
 
-func TestStableIdentityHelpers(t *testing.T) {
+func TestStableOrgHelpers(t *testing.T) {
 	orgID := stableOrgObjectID("Acme")
-	userID := stableIdentityUserObjectID("user-1")
-	if orgID == primitive.NilObjectID || userID == primitive.NilObjectID {
-		t.Fatal("stable object ids should not be nil")
+	if orgID == primitive.NilObjectID {
+		t.Fatal("stable org object id should not be nil")
 	}
 }
 
@@ -215,15 +217,18 @@ func TestAccountMatchesOrg(t *testing.T) {
 }
 
 func TestIsSameAccount(t *testing.T) {
-	accountID := stableIdentityUserObjectID("user-1")
-	if !isSameAccount(&AccountUser{ID: accountID}, &AccountUser{ID: accountID}) {
-		t.Fatal("expected same account ids to match")
+	if !isSameAccount(&AccountUser{IdentityUserID: "user-1"}, &AccountUser{IdentityUserID: "user-1"}) {
+		t.Fatal("expected same identity user ids to match")
 	}
-	if isSameAccount(nil, &AccountUser{ID: accountID}) {
+	if isSameAccount(nil, &AccountUser{IdentityUserID: "user-1"}) {
 		t.Fatal("nil account should not match")
 	}
-	if isSameAccount(&AccountUser{}, &AccountUser{ID: accountID}) {
-		t.Fatal("zero account id should not match")
+	if isSameAccount(&AccountUser{}, &AccountUser{IdentityUserID: "user-1"}) {
+		t.Fatal("missing identity user id should not match")
+	}
+	legacyID := primitive.NewObjectID()
+	if !isSameAccount(&AccountUser{ID: legacyID}, &AccountUser{ID: legacyID}) {
+		t.Fatal("expected legacy account ids to match")
 	}
 }
 
@@ -418,7 +423,7 @@ func TestCookieAndPlatformAdminHelpers(t *testing.T) {
 		if !ok || session == nil || sessionUser == nil {
 			t.Fatalf("platformAdminSession = %#v %#v %t", session, sessionUser, ok)
 		}
-		if session.Secret != platformAdminSessionValue() || session.UserID != user.ID.Hex() || sessionUser.Email != user.Email {
+		if session.Secret != platformAdminSessionValue() || session.UserID != platformAdminStreamUserID() || sessionUser.Email != user.Email {
 			t.Fatalf("platformAdminSession = %#v %#v", session, sessionUser)
 		}
 	})

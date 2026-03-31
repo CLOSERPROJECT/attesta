@@ -2,26 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
-type fakeLegacyLookupStore struct {
-	*MemoryStore
-	users map[primitive.ObjectID]AccountUser
-}
-
-func (s *fakeLegacyLookupStore) GetUserByMongoID(_ context.Context, userMongoID primitive.ObjectID) (*AccountUser, error) {
-	user, ok := s.users[userMongoID]
-	if !ok {
-		return nil, errors.New("not found")
-	}
-	copy := user
-	return &copy, nil
-}
 
 func TestViewerCanSeeDoneByEmail(t *testing.T) {
 	def := WorkflowDef{
@@ -51,7 +33,6 @@ func TestActorFromAccountUser(t *testing.T) {
 	}
 
 	user := &AccountUser{
-		ID:             primitive.NewObjectID(),
 		IdentityUserID: "user-1",
 		OrgSlug:        "org-a",
 		RoleSlugs:      []string{"dep2", "dep1"},
@@ -77,13 +58,13 @@ func TestLookupUserIdentityByActorIDBranches(t *testing.T) {
 	server := &Server{}
 	cache := map[string]userIdentityView{}
 	if _, ok := server.lookupUserIdentityByActorID(context.Background(), "", cache); ok {
-		t.Fatal("empty userMongoID should be unresolved")
+		t.Fatal("empty actor id should be unresolved")
 	}
 	if _, ok := server.lookupUserIdentityByActorID(context.Background(), "u-1", cache); ok {
-		t.Fatal("missing store should be unresolved")
+		t.Fatal("non-appwrite actor id should be unresolved")
 	}
 	if _, exists := cache["u-1"]; !exists {
-		t.Fatal("expected missing-store lookup to prime cache")
+		t.Fatal("expected unresolved lookup to prime cache")
 	}
 	cache["u-2"] = userIdentityView{email: "cached@example.com", fallbackID: "u-2"}
 	identity, ok := server.lookupUserIdentityByActorID(context.Background(), "u-2", cache)
@@ -92,19 +73,8 @@ func TestLookupUserIdentityByActorIDBranches(t *testing.T) {
 	}
 }
 
-func TestLookupUserIdentityByActorIDMixedHistory(t *testing.T) {
-	legacy := AccountUser{
-		ID:        primitive.NewObjectID(),
-		Email:     "legacy@example.com",
-		Status:    "active",
-		CreatedAt: time.Now().UTC(),
-	}
-	store := &fakeLegacyLookupStore{
-		MemoryStore: NewMemoryStore(),
-		users:       map[primitive.ObjectID]AccountUser{legacy.ID: legacy},
-	}
+func TestLookupUserIdentityByActorIDAppwriteOnly(t *testing.T) {
 	server := &Server{
-		store: store,
 		identity: &fakeIdentityStore{
 			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
 				if userID != "user-1" {
@@ -113,11 +83,6 @@ func TestLookupUserIdentityByActorIDMixedHistory(t *testing.T) {
 				return IdentityUser{ID: "user-1", Email: "appwrite@example.com", Status: "active"}, nil
 			},
 		},
-	}
-
-	legacyIdentity, ok := server.lookupUserIdentityByActorID(context.Background(), legacy.ID.Hex(), map[string]userIdentityView{})
-	if !ok || legacyIdentity.email != "legacy@example.com" || legacyIdentity.fallbackID != legacy.ID.Hex() {
-		t.Fatalf("legacy identity = %#v ok=%v", legacyIdentity, ok)
 	}
 
 	appwriteIdentity, ok := server.lookupUserIdentityByActorID(context.Background(), "appwrite:user-1", map[string]userIdentityView{})
@@ -131,19 +96,7 @@ func TestLookupUserIdentityByActorIDMixedHistory(t *testing.T) {
 }
 
 func TestApplyDoneByEmailVisibility(t *testing.T) {
-	created := AccountUser{
-		ID:        primitive.NewObjectID(),
-		Email:     "done@example.com",
-		Status:    "active",
-		RoleSlugs: []string{"dep1"},
-		CreatedAt: time.Now().UTC(),
-	}
-	store := &fakeLegacyLookupStore{
-		MemoryStore: NewMemoryStore(),
-		users:       map[primitive.ObjectID]AccountUser{created.ID: created},
-	}
 	server := &Server{
-		store: store,
 		identity: &fakeIdentityStore{
 			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
 				if userID != "user-1" {
@@ -160,72 +113,60 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		},
 	}
 	actions := []ActionView{
-		{SubstepID: "1.1", DoneBy: created.ID.Hex()},
-		{SubstepID: "1.15", DoneBy: "appwrite:user-1"},
+		{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
+		{SubstepID: "1.15", DoneBy: "appwrite:user-2"},
 		{SubstepID: "1.2", DoneBy: "legacy-user"},
 	}
 	timeline := []TimelineStep{
 		{
 			StepID: "1",
 			Substeps: []TimelineSubstep{
-				{SubstepID: "1.1", DoneBy: created.ID.Hex()},
-				{SubstepID: "1.15", DoneBy: "appwrite:user-1"},
+				{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
+				{SubstepID: "1.15", DoneBy: "appwrite:user-2"},
 				{SubstepID: "1.2", DoneBy: "legacy-user"},
 			},
 		},
 	}
 
 	deniedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]ActionView(nil), actions...))
-	if deniedActions[0].DoneBy != created.ID.Hex() {
-		t.Fatalf("denied action doneBy = %q, want mongoID %q", deniedActions[0].DoneBy, created.ID.Hex())
+	if deniedActions[0].DoneBy != "appwrite:user-1" {
+		t.Fatalf("denied action doneBy = %q, want appwrite:user-1", deniedActions[0].DoneBy)
 	}
-	if deniedActions[1].DoneBy != "appwrite:user-1" {
-		t.Fatalf("denied action doneBy = %q, want appwrite:user-1", deniedActions[1].DoneBy)
+	if deniedActions[1].DoneBy != "appwrite:user-2" {
+		t.Fatalf("denied action doneBy = %q, want appwrite:user-2", deniedActions[1].DoneBy)
 	}
 	deniedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-z"}, cloneTimelineSteps(timeline))
-	if deniedTimeline[0].Substeps[0].DoneBy != created.ID.Hex() {
-		t.Fatalf("denied timeline doneBy = %q, want mongoID %q", deniedTimeline[0].Substeps[0].DoneBy, created.ID.Hex())
+	if deniedTimeline[0].Substeps[0].DoneBy != "appwrite:user-1" {
+		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-1", deniedTimeline[0].Substeps[0].DoneBy)
 	}
-	if deniedTimeline[0].Substeps[1].DoneBy != "appwrite:user-1" {
-		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-1", deniedTimeline[0].Substeps[1].DoneBy)
+	if deniedTimeline[0].Substeps[1].DoneBy != "appwrite:user-2" {
+		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-2", deniedTimeline[0].Substeps[1].DoneBy)
 	}
 
 	allowedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]ActionView(nil), actions...))
-	if allowedActions[0].DoneBy != "done@example.com" {
-		t.Fatalf("allowed action doneBy = %q, want email", allowedActions[0].DoneBy)
+	if allowedActions[0].DoneBy != "appwrite@example.com" {
+		t.Fatalf("allowed action doneBy = %q, want appwrite@example.com", allowedActions[0].DoneBy)
 	}
-	if allowedActions[1].DoneBy != "appwrite@example.com" {
-		t.Fatalf("allowed action doneBy = %q, want appwrite email", allowedActions[1].DoneBy)
+	if allowedActions[1].DoneBy != "appwrite:user-2" {
+		t.Fatalf("allowed action doneBy = %q, want unresolved appwrite fallback", allowedActions[1].DoneBy)
 	}
 	if allowedActions[2].DoneBy != "legacy-user" {
-		t.Fatalf("legacy action doneBy = %q, want unchanged userMongoID", allowedActions[2].DoneBy)
+		t.Fatalf("legacy action doneBy = %q, want unchanged legacy-user", allowedActions[2].DoneBy)
 	}
 	allowedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-a"}, cloneTimelineSteps(timeline))
-	if allowedTimeline[0].Substeps[0].DoneBy != "done@example.com" {
-		t.Fatalf("allowed timeline doneBy = %q, want email", allowedTimeline[0].Substeps[0].DoneBy)
+	if allowedTimeline[0].Substeps[0].DoneBy != "appwrite@example.com" {
+		t.Fatalf("allowed timeline doneBy = %q, want appwrite@example.com", allowedTimeline[0].Substeps[0].DoneBy)
 	}
-	if allowedTimeline[0].Substeps[1].DoneBy != "appwrite@example.com" {
-		t.Fatalf("allowed timeline doneBy = %q, want appwrite email", allowedTimeline[0].Substeps[1].DoneBy)
+	if allowedTimeline[0].Substeps[1].DoneBy != "appwrite:user-2" {
+		t.Fatalf("allowed timeline doneBy = %q, want unresolved appwrite fallback", allowedTimeline[0].Substeps[1].DoneBy)
 	}
 	if allowedTimeline[0].Substeps[2].DoneBy != "legacy-user" {
-		t.Fatalf("legacy timeline doneBy = %q, want unchanged userMongoID", allowedTimeline[0].Substeps[2].DoneBy)
+		t.Fatalf("legacy timeline doneBy = %q, want unchanged legacy-user", allowedTimeline[0].Substeps[2].DoneBy)
 	}
 }
 
-func TestApplyDoneByMongoIDToDPPTraceability(t *testing.T) {
-	created := AccountUser{
-		ID:        primitive.NewObjectID(),
-		Email:     "dpp@example.com",
-		Status:    "active",
-		RoleSlugs: []string{"dep1"},
-		CreatedAt: time.Now().UTC(),
-	}
-	store := &fakeLegacyLookupStore{
-		MemoryStore: NewMemoryStore(),
-		users:       map[primitive.ObjectID]AccountUser{created.ID: created},
-	}
+func TestApplyDoneByIdentityFallbackToDPPTraceability(t *testing.T) {
 	server := &Server{
-		store: store,
 		identity: &fakeIdentityStore{
 			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
 				if userID != "user-1" {
@@ -240,21 +181,21 @@ func TestApplyDoneByMongoIDToDPPTraceability(t *testing.T) {
 		{
 			StepID: "1",
 			Substeps: []DPPTraceabilitySubstep{
-				{SubstepID: "1.1", DoneBy: created.ID.Hex()},
+				{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
 				{SubstepID: "1.15", DoneBy: "appwrite:user-1"},
 				{SubstepID: "1.2", DoneBy: "legacy-user"},
 			},
 		},
 	}
-	mapped := server.applyDoneByMongoIDToDPPTraceability(context.Background(), traceability)
-	if mapped[0].Substeps[0].DoneBy != created.ID.Hex() {
-		t.Fatalf("mapped dpp doneBy = %q, want mongoID %q", mapped[0].Substeps[0].DoneBy, created.ID.Hex())
+	mapped := server.applyDoneByIdentityFallbackToDPPTraceability(context.Background(), traceability)
+	if mapped[0].Substeps[0].DoneBy != "appwrite:user-1" {
+		t.Fatalf("mapped dpp doneBy = %q, want appwrite fallback id", mapped[0].Substeps[0].DoneBy)
 	}
 	if mapped[0].Substeps[1].DoneBy != "appwrite:user-1" {
 		t.Fatalf("mapped dpp doneBy = %q, want appwrite fallback id", mapped[0].Substeps[1].DoneBy)
 	}
 	if mapped[0].Substeps[2].DoneBy != "legacy-user" {
-		t.Fatalf("legacy dpp doneBy = %q, want unchanged userMongoID", mapped[0].Substeps[2].DoneBy)
+		t.Fatalf("legacy dpp doneBy = %q, want unchanged legacy-user", mapped[0].Substeps[2].DoneBy)
 	}
 }
 

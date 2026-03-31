@@ -499,7 +499,7 @@ type OrgAdminRoleOption struct {
 }
 
 type OrgAdminUserRow struct {
-	UserMongoID string
+	UserID      string
 	Email       string
 	Status      string
 	Activated   bool
@@ -878,7 +878,7 @@ func (s *Server) platformAdminSession() (*IdentitySession, *AccountUser, bool) {
 	}
 	session := &IdentitySession{
 		Secret:    platformAdminSessionValue(),
-		UserID:    user.ID.Hex(),
+		UserID:    platformAdminStreamUserID(),
 		ExpiresAt: s.nowUTC().Add(time.Duration(sessionTTLDays()) * 24 * time.Hour),
 	}
 	return session, user, true
@@ -1060,7 +1060,6 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
 	}
 	user := &AccountUser{
-		ID:             stableIdentityUserObjectID(identityUser.ID),
 		IdentityUserID: strings.TrimSpace(identityUser.ID),
 		Email:          strings.TrimSpace(identityUser.Email),
 		OrgSlug:        strings.TrimSpace(identityUser.OrgSlug),
@@ -2295,6 +2294,9 @@ func isSameAccount(a, b *AccountUser) bool {
 	if a == nil || b == nil {
 		return false
 	}
+	if strings.TrimSpace(a.IdentityUserID) != "" && strings.TrimSpace(b.IdentityUserID) != "" {
+		return strings.TrimSpace(a.IdentityUserID) == strings.TrimSpace(b.IdentityUserID)
+	}
 	return !a.ID.IsZero() && !b.ID.IsZero() && a.ID == b.ID
 }
 
@@ -2320,10 +2322,6 @@ func stableObjectID(seed string) primitive.ObjectID {
 
 func stableOrgObjectID(slug string) primitive.ObjectID {
 	return stableObjectID("org:" + canonifySlug(slug))
-}
-
-func stableIdentityUserObjectID(userID string) primitive.ObjectID {
-	return stableObjectID("identity-user:" + strings.TrimSpace(userID))
 }
 
 const appwriteActorPrefix = "appwrite:"
@@ -2770,7 +2768,7 @@ func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []I
 			userID = strings.TrimSpace(orgUser.Email)
 		}
 		orgUsers = append(orgUsers, OrgAdminUserRow{
-			UserMongoID: stableIdentityUserObjectID(userID).Hex(),
+			UserID:      userID,
 			Email:       orgUser.Email,
 			Status:      orgUser.Status,
 			Activated:   !strings.EqualFold(strings.TrimSpace(orgUser.Status), "pending") && !strings.EqualFold(strings.TrimSpace(orgUser.Status), "invited"),
@@ -3290,8 +3288,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
 	case "set_roles":
-		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
-		if userMongoID == "" {
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
 			return
 		}
@@ -3310,11 +3308,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		var target *IdentityUser
 		for idx := range targetUsers {
-			targetKey := strings.TrimSpace(targetUsers[idx].ID)
-			if targetKey == "" {
-				targetKey = strings.TrimSpace(targetUsers[idx].Email)
-			}
-			if stableIdentityUserObjectID(targetKey).Hex() == userMongoID {
+			targetKey := firstNonEmpty(targetUsers[idx].ID, targetUsers[idx].Email)
+			if strings.TrimSpace(targetKey) == userID {
 				target = &targetUsers[idx]
 				break
 			}
@@ -3335,7 +3330,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if stableIdentityUserObjectID(strings.TrimSpace(target.ID)).Hex() == admin.ID.Hex() && !containsRole(selectedRoles, "org-admin") {
+		if firstNonEmpty(target.ID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) && !containsRole(selectedRoles, "org-admin") {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove org-admin from your own account"})
 			return
 		}
@@ -3363,8 +3358,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 	case "delete_user":
-		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
-		if userMongoID == "" {
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
 			return
 		}
@@ -3375,11 +3370,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		var target *IdentityMembership
 		for idx := range memberships {
-			targetKey := strings.TrimSpace(memberships[idx].UserID)
-			if targetKey == "" {
-				targetKey = strings.TrimSpace(memberships[idx].Email)
-			}
-			if stableIdentityUserObjectID(targetKey).Hex() == userMongoID {
+			targetKey := firstNonEmpty(memberships[idx].UserID, memberships[idx].Email)
+			if strings.TrimSpace(targetKey) == userID {
 				target = &memberships[idx]
 				break
 			}
@@ -3388,7 +3380,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
 		}
-		if stableIdentityUserObjectID(strings.TrimSpace(target.UserID)).Hex() == admin.ID.Hex() {
+		if firstNonEmpty(target.UserID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot delete yourself"})
 			return
 		}
@@ -3871,31 +3863,8 @@ func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string
 		cache[id] = identity
 		return identity, identity.email != "" || identity.fallbackID != ""
 	}
-	lookup, ok := any(s.store).(interface {
-		GetUserByMongoID(context.Context, primitive.ObjectID) (*AccountUser, error)
-	})
-	if !ok {
-		cache[id] = userIdentityView{}
-		return userIdentityView{}, false
-	}
-	mongoID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		cache[id] = userIdentityView{}
-		return userIdentityView{}, false
-	}
-	user, err := lookup.GetUserByMongoID(ctx, mongoID)
-	if err != nil || user == nil {
-		cache[id] = userIdentityView{}
-		return userIdentityView{}, false
-	}
-	identity := userIdentityView{
-		email: strings.TrimSpace(user.Email),
-	}
-	if !user.ID.IsZero() {
-		identity.fallbackID = user.ID.Hex()
-	}
-	cache[id] = identity
-	return identity, identity.email != "" || identity.fallbackID != ""
+	cache[id] = userIdentityView{}
+	return userIdentityView{}, false
 }
 
 func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []ActionView) []ActionView {
@@ -3952,7 +3921,7 @@ func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef
 	return timeline
 }
 
-func (s *Server) applyDoneByMongoIDToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
+func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
 	if len(traceability) == 0 {
 		return traceability
 	}
@@ -4014,7 +3983,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
-	traceability = s.applyDoneByMongoIDToDPPTraceability(r.Context(), traceability)
+	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		ProcessID:    process.ID.Hex(),

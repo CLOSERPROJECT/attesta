@@ -1,16 +1,12 @@
 package main
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"testing"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestIsMongoIndexNotFoundError(t *testing.T) {
@@ -48,51 +44,4 @@ func TestCanonifyOptionalSlugAndHashLookupToken(t *testing.T) {
 	if got := hashLookupToken(token); got != want {
 		t.Fatalf("hashLookupToken = %q, want %q", got, want)
 	}
-}
-
-func TestMongoStoreGetUserByMongoID(t *testing.T) {
-	t.Run("loads user", func(t *testing.T) {
-		userID := primitive.NewObjectID()
-		want := AccountUser{ID: userID, Email: "user@example.com"}
-		collection := &fakeMongoCollection{
-			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
-				return fakeSingleResult{decodeFn: func(v interface{}) error {
-					*(v.(*AccountUser)) = want
-					return nil
-				}}
-			},
-		}
-		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"users": collection}}
-		store := &MongoStore{dbPort: db}
-
-		got, err := store.GetUserByMongoID(t.Context(), userID)
-		if err != nil {
-			t.Fatalf("GetUserByMongoID error: %v", err)
-		}
-		if got.Email != want.Email || got.ID != want.ID {
-			t.Fatalf("user = %#v, want %#v", got, want)
-		}
-		if len(collection.findOneFilters) != 1 || collection.findOneFilters[0] == nil {
-			t.Fatalf("findOne filters = %#v", collection.findOneFilters)
-		}
-		filter, ok := collection.findOneFilters[0].(bson.M)
-		if !ok || filter["_id"] != userID {
-			t.Fatalf("filter = %#v, want _id=%s", collection.findOneFilters[0], userID.Hex())
-		}
-	})
-
-	t.Run("propagates decode error", func(t *testing.T) {
-		boom := errors.New("boom")
-		collection := &fakeMongoCollection{
-			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
-				return fakeSingleResult{err: boom}
-			},
-		}
-		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"users": collection}}
-		store := &MongoStore{dbPort: db}
-
-		if _, err := store.GetUserByMongoID(t.Context(), primitive.NewObjectID()); !errors.Is(err, boom) {
-			t.Fatalf("GetUserByMongoID error = %v, want %v", err, boom)
-		}
-	})
 }

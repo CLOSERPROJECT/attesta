@@ -77,40 +77,6 @@ type AccountUser struct {
 	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
 }
 
-type Invite struct {
-	ID                   primitive.ObjectID `bson:"_id,omitempty"`
-	OrgID                primitive.ObjectID `bson:"orgId"`
-	Email                string             `bson:"email"`
-	UserMongoID          primitive.ObjectID `bson:"userMongoId"`
-	RoleSlugs            []string           `bson:"roleSlugs"`
-	Token                string             `bson:"token,omitempty"`
-	TokenHash            string             `bson:"tokenHash"`
-	ExpiresAt            time.Time          `bson:"expiresAt"`
-	UsedAt               *time.Time         `bson:"usedAt,omitempty"`
-	CreatedAt            time.Time          `bson:"createdAt"`
-	CreatedByUserMongoID primitive.ObjectID `bson:"createdByUserMongoId"`
-}
-
-type Session struct {
-	ID          primitive.ObjectID  `bson:"_id,omitempty"`
-	SessionID   string              `bson:"sessionId"`
-	UserMongoID primitive.ObjectID  `bson:"userMongoId"`
-	OrgID       *primitive.ObjectID `bson:"orgId,omitempty"`
-	CreatedAt   time.Time           `bson:"createdAt"`
-	LastLoginAt time.Time           `bson:"lastLoginAt"`
-	ExpiresAt   time.Time           `bson:"expiresAt"`
-}
-
-type PasswordReset struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty"`
-	Email       string             `bson:"email"`
-	UserMongoID primitive.ObjectID `bson:"userMongoId"`
-	TokenHash   string             `bson:"tokenHash"`
-	ExpiresAt   time.Time          `bson:"expiresAt"`
-	UsedAt      *time.Time         `bson:"usedAt,omitempty"`
-	CreatedAt   time.Time          `bson:"createdAt"`
-}
-
 type FormataBuilderStream struct {
 	ID              primitive.ObjectID `bson:"_id,omitempty"`
 	Stream          string             `bson:"stream"`

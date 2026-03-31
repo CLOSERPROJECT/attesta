@@ -14,12 +14,12 @@ import (
 func TestLoadOrgAdminStateErrorBranches(t *testing.T) {
 	adminOrgID := stableOrgObjectID("acme")
 	admin := &AccountUser{
-		ID:        stableIdentityUserObjectID("owner"),
-		Email:     "owner@example.com",
-		OrgID:     &adminOrgID,
-		OrgSlug:   "acme",
-		RoleSlugs: []string{"org-admin"},
-		Status:    "active",
+		IdentityUserID: "owner",
+		Email:          "owner@example.com",
+		OrgID:          &adminOrgID,
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"org-admin"},
+		Status:         "active",
 	}
 
 	t.Run("identity missing", func(t *testing.T) {
@@ -64,12 +64,12 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 	now := time.Date(2026, 3, 10, 9, 0, 0, 0, time.UTC)
 	adminOrgID := stableOrgObjectID("acme")
 	admin := &AccountUser{
-		ID:        stableIdentityUserObjectID("owner"),
-		Email:     "owner@example.com",
-		OrgID:     &adminOrgID,
-		OrgSlug:   "acme",
-		RoleSlugs: []string{"org-admin"},
-		Status:    "active",
+		IdentityUserID: "owner",
+		Email:          "owner@example.com",
+		OrgID:          &adminOrgID,
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"org-admin"},
+		Status:         "active",
 	}
 
 	t.Run("setup branch renders without org context", func(t *testing.T) {
