@@ -168,13 +168,14 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	store := NewMemoryStore()
 	orgID := stableOrgObjectID("builder-post-org")
 	orgAdmin := AccountUser{
-		ID:        primitive.NewObjectID(),
-		OrgID:     &orgID,
-		OrgSlug:   "builder-post-org",
-		Email:     "org-admin-builder-post@example.com",
-		RoleSlugs: []string{"org-admin"},
-		Status:    "active",
-		CreatedAt: time.Now().UTC(),
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "builder-post-org-admin",
+		OrgID:          &orgID,
+		OrgSlug:        "builder-post-org",
+		Email:          "org-admin-builder-post@example.com",
+		RoleSlugs:      []string{"org-admin"},
+		Status:         "active",
+		CreatedAt:      time.Now().UTC(),
 	}
 	orgAdminSession := "session-builder-post-org-admin"
 	plain := AccountUser{
@@ -228,9 +229,12 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		if stream.Stream != `{"nodes":[]}` {
 			t.Fatalf("stream = %q, want %q", stream.Stream, `{"nodes":[]}`)
 		}
-		expectedID := stableIdentityUserObjectID(orgAdmin.ID.Hex())
-		if stream.UpdatedByUserMongoID != expectedID {
-			t.Fatalf("updatedByUserMongoID = %s, want %s", stream.UpdatedByUserMongoID.Hex(), expectedID.Hex())
+		expectedID := orgAdmin.IdentityUserID
+		if stream.CreatedByUserID != expectedID {
+			t.Fatalf("createdByUserID = %q, want %q", stream.CreatedByUserID, expectedID)
+		}
+		if stream.UpdatedByUserID != expectedID {
+			t.Fatalf("updatedByUserID = %q, want %q", stream.UpdatedByUserID, expectedID)
 		}
 	})
 

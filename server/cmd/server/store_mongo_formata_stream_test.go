@@ -15,7 +15,8 @@ import (
 
 func TestMongoStoreSaveFormataBuilderStream(t *testing.T) {
 	updatedAt := time.Date(2026, 3, 6, 10, 0, 0, 0, time.UTC)
-	userID := primitive.NewObjectID()
+	creatorID := "creator-1"
+	userID := "updater-1"
 
 	streamCollection := &fakeMongoCollection{}
 	db := &fakeMongoDatabase{
@@ -26,9 +27,10 @@ func TestMongoStoreSaveFormataBuilderStream(t *testing.T) {
 	store := &MongoStore{dbPort: db}
 
 	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-		Stream:               "stream-v1",
-		UpdatedAt:            updatedAt,
-		UpdatedByUserMongoID: userID,
+		CreatedByUserID: creatorID,
+		Stream:          "stream-v1",
+		UpdatedAt:       updatedAt,
+		UpdatedByUserID: userID,
 	})
 	if err != nil {
 		t.Fatalf("SaveFormataBuilderStream error: %v", err)
@@ -49,8 +51,11 @@ func TestMongoStoreSaveFormataBuilderStream(t *testing.T) {
 	if inserted.Stream != "stream-v1" {
 		t.Fatalf("inserted stream = %q, want %q", inserted.Stream, "stream-v1")
 	}
-	if inserted.UpdatedByUserMongoID != userID {
-		t.Fatalf("inserted updatedByUserMongoID = %s, want %s", inserted.UpdatedByUserMongoID.Hex(), userID.Hex())
+	if inserted.CreatedByUserID != creatorID {
+		t.Fatalf("inserted createdByUserID = %q, want %q", inserted.CreatedByUserID, creatorID)
+	}
+	if inserted.UpdatedByUserID != userID {
+		t.Fatalf("inserted updatedByUserID = %q, want %q", inserted.UpdatedByUserID, userID)
 	}
 }
 
@@ -72,10 +77,11 @@ func TestMongoStoreSaveFormataBuilderStreamErrors(t *testing.T) {
 
 func TestMongoStoreLoadFormataBuilderStream(t *testing.T) {
 	want := FormataBuilderStream{
-		ID:                   primitive.NewObjectID(),
-		Stream:               "stream-v2",
-		UpdatedAt:            time.Date(2026, 3, 6, 11, 0, 0, 0, time.UTC),
-		UpdatedByUserMongoID: primitive.NewObjectID(),
+		ID:              primitive.NewObjectID(),
+		Stream:          "stream-v2",
+		UpdatedAt:       time.Date(2026, 3, 6, 11, 0, 0, 0, time.UTC),
+		CreatedByUserID: "creator-2",
+		UpdatedByUserID: "updater-2",
 	}
 	collection := &fakeMongoCollection{
 		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
@@ -145,6 +151,122 @@ func TestMongoStoreListFormataBuilderStreams(t *testing.T) {
 	opts := collection.findOptionsCalls[0][0]
 	if opts.Sort == nil {
 		t.Fatal("expected find sort options")
+	}
+}
+
+func TestMongoStoreLoadFormataBuilderStreamByID(t *testing.T) {
+	want := FormataBuilderStream{
+		ID:              primitive.NewObjectID(),
+		Stream:          "stream-v3",
+		CreatedByUserID: "creator-3",
+	}
+	collection := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*FormataBuilderStream)) = want
+				return nil
+			}}
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
+	store := &MongoStore{dbPort: db}
+
+	got, err := store.LoadFormataBuilderStreamByID(t.Context(), want.ID)
+	if err != nil {
+		t.Fatalf("LoadFormataBuilderStreamByID error: %v", err)
+	}
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("stream = %#v, want %#v", *got, want)
+	}
+	if len(collection.findOneFilters) != 1 || !reflect.DeepEqual(collection.findOneFilters[0], bson.M{"_id": want.ID}) {
+		t.Fatalf("findOne filter = %#v, want stream id filter", collection.findOneFilters)
+	}
+}
+
+func TestMongoStoreDeleteFormataBuilderStream(t *testing.T) {
+	streamID := primitive.NewObjectID()
+	collection := &fakeMongoCollection{
+		deleteOneFn: func(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+			return &mongo.DeleteResult{DeletedCount: 1}, nil
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
+	store := &MongoStore{dbPort: db}
+
+	if err := store.DeleteFormataBuilderStream(t.Context(), streamID); err != nil {
+		t.Fatalf("DeleteFormataBuilderStream error: %v", err)
+	}
+	if len(collection.deleteOneFilters) != 1 || !reflect.DeepEqual(collection.deleteOneFilters[0], bson.M{"_id": streamID}) {
+		t.Fatalf("deleteOne filter = %#v, want stream id filter", collection.deleteOneFilters)
+	}
+}
+
+func TestMongoStoreHasProcessesByWorkflow(t *testing.T) {
+	collection := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{}
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
+	store := &MongoStore{dbPort: db}
+
+	hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), "workflow-1")
+	if err != nil {
+		t.Fatalf("HasProcessesByWorkflow error: %v", err)
+	}
+	if !hasProcesses {
+		t.Fatal("expected workflow to have processes")
+	}
+	if len(collection.findOneFilters) != 1 || !reflect.DeepEqual(collection.findOneFilters[0], bson.M{"workflowKey": "workflow-1"}) {
+		t.Fatalf("findOne filter = %#v, want workflow filter", collection.findOneFilters)
+	}
+}
+
+func TestMongoStoreDeleteWorkflowData(t *testing.T) {
+	processID := primitive.NewObjectID()
+	attachmentID := primitive.NewObjectID()
+	processesCollection := &fakeMongoCollection{
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{bson.M{"_id": processID}}}, nil
+		},
+	}
+	attachmentsFilesCollection := &fakeMongoCollection{
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{bson.M{"_id": attachmentID}}}, nil
+		},
+	}
+	attachmentsChunksCollection := &fakeMongoCollection{}
+	notarizationsCollection := &fakeMongoCollection{}
+	db := &fakeMongoDatabase{
+		collections: map[string]*fakeMongoCollection{
+			"processes":          processesCollection,
+			"attachments.files":  attachmentsFilesCollection,
+			"attachments.chunks": attachmentsChunksCollection,
+			"notarizations":      notarizationsCollection,
+		},
+	}
+	store := &MongoStore{dbPort: db}
+
+	if err := store.DeleteWorkflowData(t.Context(), "workflow-1"); err != nil {
+		t.Fatalf("DeleteWorkflowData error: %v", err)
+	}
+	if len(processesCollection.findFilters) != 1 || !reflect.DeepEqual(processesCollection.findFilters[0], bson.M{"workflowKey": "workflow-1"}) {
+		t.Fatalf("process find filter = %#v, want workflow filter", processesCollection.findFilters)
+	}
+	if len(attachmentsFilesCollection.findFilters) != 1 || !reflect.DeepEqual(attachmentsFilesCollection.findFilters[0], bson.M{"metadata.processId": bson.M{"$in": []primitive.ObjectID{processID}}}) {
+		t.Fatalf("attachment find filter = %#v", attachmentsFilesCollection.findFilters)
+	}
+	if len(attachmentsChunksCollection.deleteManyFilters) != 1 || !reflect.DeepEqual(attachmentsChunksCollection.deleteManyFilters[0], bson.M{"files_id": bson.M{"$in": []primitive.ObjectID{attachmentID}}}) {
+		t.Fatalf("chunks delete filter = %#v", attachmentsChunksCollection.deleteManyFilters)
+	}
+	if len(attachmentsFilesCollection.deleteManyFilters) != 1 || !reflect.DeepEqual(attachmentsFilesCollection.deleteManyFilters[0], bson.M{"_id": bson.M{"$in": []primitive.ObjectID{attachmentID}}}) {
+		t.Fatalf("files delete filter = %#v", attachmentsFilesCollection.deleteManyFilters)
+	}
+	if len(notarizationsCollection.deleteManyFilters) != 1 || !reflect.DeepEqual(notarizationsCollection.deleteManyFilters[0], bson.M{"processId": bson.M{"$in": []primitive.ObjectID{processID}}}) {
+		t.Fatalf("notarizations delete filter = %#v", notarizationsCollection.deleteManyFilters)
+	}
+	if len(processesCollection.deleteManyFilters) != 1 || !reflect.DeepEqual(processesCollection.deleteManyFilters[0], bson.M{"_id": bson.M{"$in": []primitive.ObjectID{processID}}}) {
+		t.Fatalf("process delete filter = %#v", processesCollection.deleteManyFilters)
 	}
 }
 

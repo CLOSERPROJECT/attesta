@@ -215,6 +215,14 @@ func TestBootstrapFormataBuilderStreamsSeedsFromConfigWhenEmpty(t *testing.T) {
 	if len(streams) != 2 {
 		t.Fatalf("stream count = %d, want 2", len(streams))
 	}
+	for _, stream := range streams {
+		if stream.CreatedByUserID != platformAdminStreamUserID() {
+			t.Fatalf("createdByUserID = %q, want %q", stream.CreatedByUserID, platformAdminStreamUserID())
+		}
+		if stream.UpdatedByUserID != platformAdminStreamUserID() {
+			t.Fatalf("updatedByUserID = %q, want %q", stream.UpdatedByUserID, platformAdminStreamUserID())
+		}
+	}
 
 	server := &Server{store: store}
 	catalog, err := server.workflowCatalog()
@@ -599,8 +607,8 @@ func TestValidateWorkflowRefsMissingOrganization(t *testing.T) {
 		},
 	}
 	server := &Server{
-		store:    NewMemoryStore(),
-		identity: &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }},
+		store:       NewMemoryStore(),
+		identity:    &fakeIdentityStore{listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }},
 		enforceAuth: true,
 	}
 

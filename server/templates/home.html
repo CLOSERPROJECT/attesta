@@ -7,29 +7,45 @@
 <section class="panel landing landing-wide">
   <h1>Choose a stream</h1>
   <p class="muted">Select a stream to start or continue process tracking.</p>
+  {{if .Confirmation}}
+    <p class="muted">{{.Confirmation}}</p>
+  {{end}}
+  {{template "error_banner.html" .}}
   {{if .Workflows}}
     <div class="workflow-grid">
       {{range .Workflows}}
-        <a class="workflow-card" href="/w/{{.Key}}/">
-          <h2 class="workflow-card-title">{{.Name}}</h2>
-          <p class="workflow-card-description{{if not .Description}} is-empty{{end}}">
-            {{if .Description}}{{.Description}}{{else}}&nbsp;{{end}}
-          </p>
-          <dl class="workflow-card-stats">
-            <div>
-              <dt>Not started</dt>
-              <dd>{{.Counts.NotStarted}}</dd>
-            </div>
-            <div>
-              <dt>Started</dt>
-              <dd>{{.Counts.Started}}</dd>
-            </div>
-            <div>
-              <dt>Terminated</dt>
-              <dd>{{.Counts.Terminated}}</dd>
-            </div>
-          </dl>
-        </a>
+        <div class="workflow-card-shell">
+          <a class="workflow-card" href="/w/{{.Key}}/">
+            <h2 class="workflow-card-title">{{.Name}}</h2>
+            <p class="workflow-card-description{{if not .Description}} is-empty{{end}}">
+              {{if .Description}}{{.Description}}{{else}}&nbsp;{{end}}
+            </p>
+            <dl class="workflow-card-stats">
+              <div>
+                <dt>Not started</dt>
+                <dd>{{.Counts.NotStarted}}</dd>
+              </div>
+              <div>
+                <dt>Started</dt>
+                <dd>{{.Counts.Started}}</dd>
+              </div>
+              <div>
+                <dt>Terminated</dt>
+                <dd>{{.Counts.Terminated}}</dd>
+              </div>
+            </dl>
+          </a>
+          {{if .CanDelete}}
+            <form method="post" action="{{.DeleteAction}}" class="workflow-card-delete">
+              <button type="submit" class="workflow-card-delete-button" aria-label="Delete {{.Name}}" title="Delete {{.Name}}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon-svg icon-svg-md" aria-hidden="true">
+                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
+                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"/>
+                </svg>
+              </button>
+            </form>
+          {{end}}
+        </div>
       {{end}}
       {{if .ShowCreateStreamCard}}
         <a class="workflow-card workflow-card-create" href="/org-admin/formata-builder">

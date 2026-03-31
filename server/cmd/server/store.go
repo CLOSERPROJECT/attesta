@@ -28,6 +28,7 @@ type Store interface {
 	LoadLatestProcessByWorkflow(ctx context.Context, workflowKey string) (*Process, error)
 	LoadProcessByDigitalLink(ctx context.Context, gtin, lot, serial string) (*Process, error)
 	ListRecentProcessesByWorkflow(ctx context.Context, workflowKey string, limit int64) ([]Process, error)
+	HasProcessesByWorkflow(ctx context.Context, workflowKey string) (bool, error)
 	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error
 	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error
 	UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error
@@ -37,7 +38,10 @@ type Store interface {
 	OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error)
 	SaveFormataBuilderStream(ctx context.Context, stream FormataBuilderStream) (FormataBuilderStream, error)
 	LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error)
+	LoadFormataBuilderStreamByID(ctx context.Context, id primitive.ObjectID) (*FormataBuilderStream, error)
 	ListFormataBuilderStreams(ctx context.Context) ([]FormataBuilderStream, error)
+	DeleteFormataBuilderStream(ctx context.Context, id primitive.ObjectID) error
+	DeleteWorkflowData(ctx context.Context, workflowKey string) error
 }
 
 type Organization struct {
@@ -108,10 +112,11 @@ type PasswordReset struct {
 }
 
 type FormataBuilderStream struct {
-	ID                   primitive.ObjectID `bson:"_id,omitempty"`
-	Stream               string             `bson:"stream"`
-	UpdatedAt            time.Time          `bson:"updatedAt"`
-	UpdatedByUserMongoID primitive.ObjectID `bson:"updatedByUserMongoId"`
+	ID              primitive.ObjectID `bson:"_id,omitempty"`
+	Stream          string             `bson:"stream"`
+	UpdatedAt       time.Time          `bson:"updatedAt"`
+	CreatedByUserID string             `bson:"createdByUserId,omitempty"`
+	UpdatedByUserID string             `bson:"updatedByUserId"`
 }
 
 const (
@@ -133,6 +138,8 @@ type mongoCollectionPort interface {
 	FindOne(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort
 	Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error)
 	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
+	DeleteOne(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error)
+	DeleteMany(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error)
 	FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
 	CreateIndexes(ctx context.Context, models []mongo.IndexModel) error
 	DropIndex(ctx context.Context, name string) error
@@ -193,6 +200,14 @@ func (c mongoDriverCollection) Find(ctx context.Context, filter interface{}, opt
 
 func (c mongoDriverCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
 	return c.collection.UpdateOne(ctx, filter, update, opts...)
+}
+
+func (c mongoDriverCollection) DeleteOne(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+	return c.collection.DeleteOne(ctx, filter, opts...)
+}
+
+func (c mongoDriverCollection) DeleteMany(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+	return c.collection.DeleteMany(ctx, filter, opts...)
 }
 
 func (c mongoDriverCollection) FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
@@ -362,6 +377,22 @@ func (s *MongoStore) ListRecentProcessesByWorkflow(ctx context.Context, workflow
 		processes = append(processes, process)
 	}
 	return processes, nil
+}
+
+func (s *MongoStore) HasProcessesByWorkflow(ctx context.Context, workflowKey string) (bool, error) {
+	err := s.database().Collection("processes").FindOne(
+		ctx,
+		bson.M{"workflowKey": strings.TrimSpace(workflowKey)},
+		options.FindOne().SetProjection(bson.M{"_id": 1}),
+	).Err()
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, mongo.ErrNoDocuments):
+		return false, nil
+	default:
+		return false, err
+	}
 }
 
 func (s *MongoStore) LoadProcessByDigitalLink(ctx context.Context, gtin, lot, serial string) (*Process, error) {
@@ -650,6 +681,17 @@ func (s *MemoryStore) ListRecentProcessesByWorkflow(_ context.Context, workflowK
 	return items, nil
 }
 
+func (s *MemoryStore) HasProcessesByWorkflow(_ context.Context, workflowKey string) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, process := range s.processes {
+		if strings.TrimSpace(process.WorkflowKey) == strings.TrimSpace(workflowKey) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *MemoryStore) UpdateProcessProgress(_ context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error {
 	if s.UpdateProgressErr != nil {
 		return s.UpdateProgressErr
@@ -807,6 +849,9 @@ func (s *MemoryStore) SaveFormataBuilderStream(_ context.Context, stream Formata
 	if stream.UpdatedAt.IsZero() {
 		stream.UpdatedAt = time.Now().UTC()
 	}
+	if strings.TrimSpace(stream.CreatedByUserID) == "" {
+		stream.CreatedByUserID = strings.TrimSpace(stream.UpdatedByUserID)
+	}
 	if _, exists := s.formataStreams[stream.ID]; exists {
 		return FormataBuilderStream{}, errors.New("formata builder stream id already exists")
 	}
@@ -834,6 +879,17 @@ func (s *MemoryStore) LoadFormataBuilderStream(_ context.Context) (*FormataBuild
 	return &copied, nil
 }
 
+func (s *MemoryStore) LoadFormataBuilderStreamByID(_ context.Context, id primitive.ObjectID) (*FormataBuilderStream, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	stream, ok := s.formataStreams[id]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	copied := stream
+	return &copied, nil
+}
+
 func (s *MemoryStore) ListFormataBuilderStreams(_ context.Context) ([]FormataBuilderStream, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -851,6 +907,52 @@ func (s *MemoryStore) ListFormataBuilderStreams(_ context.Context) ([]FormataBui
 		return items[i].UpdatedAt.After(items[j].UpdatedAt)
 	})
 	return items, nil
+}
+
+func (s *MemoryStore) DeleteFormataBuilderStream(_ context.Context, id primitive.ObjectID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.formataStreams[id]; !ok {
+		return mongo.ErrNoDocuments
+	}
+	delete(s.formataStreams, id)
+	return nil
+}
+
+func (s *MemoryStore) DeleteWorkflowData(_ context.Context, workflowKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	trimmedKey := strings.TrimSpace(workflowKey)
+	processIDs := make(map[primitive.ObjectID]struct{})
+	for id, process := range s.processes {
+		if strings.TrimSpace(process.WorkflowKey) != trimmedKey {
+			continue
+		}
+		processIDs[id] = struct{}{}
+		delete(s.processes, id)
+	}
+
+	if len(processIDs) == 0 {
+		return nil
+	}
+
+	notarizations := s.notarizations[:0]
+	for _, notarization := range s.notarizations {
+		if _, ok := processIDs[notarization.ProcessID]; ok {
+			continue
+		}
+		notarizations = append(notarizations, notarization)
+	}
+	s.notarizations = notarizations
+
+	for id, attachment := range s.attachments {
+		if _, ok := processIDs[attachment.meta.ProcessID]; ok {
+			delete(s.attachments, id)
+		}
+	}
+
+	return nil
 }
 
 func cloneProcess(process Process) Process {
@@ -999,6 +1101,9 @@ func (s *MongoStore) SaveFormataBuilderStream(ctx context.Context, stream Format
 	if stream.UpdatedAt.IsZero() {
 		stream.UpdatedAt = time.Now().UTC()
 	}
+	if strings.TrimSpace(stream.CreatedByUserID) == "" {
+		stream.CreatedByUserID = strings.TrimSpace(stream.UpdatedByUserID)
+	}
 	if _, err := s.database().Collection(collectionFormataStream).InsertOne(ctx, stream); err != nil {
 		return FormataBuilderStream{}, err
 	}
@@ -1011,6 +1116,17 @@ func (s *MongoStore) LoadFormataBuilderStream(ctx context.Context) (*FormataBuil
 		ctx,
 		bson.M{},
 		options.FindOne().SetSort(bson.D{{Key: "updatedAt", Value: -1}, {Key: "_id", Value: -1}}),
+	).Decode(&stream); err != nil {
+		return nil, err
+	}
+	return &stream, nil
+}
+
+func (s *MongoStore) LoadFormataBuilderStreamByID(ctx context.Context, id primitive.ObjectID) (*FormataBuilderStream, error) {
+	var stream FormataBuilderStream
+	if err := s.database().Collection(collectionFormataStream).FindOne(
+		ctx,
+		bson.M{"_id": id},
 	).Decode(&stream); err != nil {
 		return nil, err
 	}
@@ -1036,4 +1152,83 @@ func (s *MongoStore) ListFormataBuilderStreams(ctx context.Context) ([]FormataBu
 		items = append(items, stream)
 	}
 	return items, nil
+}
+
+func (s *MongoStore) DeleteFormataBuilderStream(ctx context.Context, id primitive.ObjectID) error {
+	result, err := s.database().Collection(collectionFormataStream).DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return err
+	}
+	if result != nil && result.DeletedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+func (s *MongoStore) DeleteWorkflowData(ctx context.Context, workflowKey string) error {
+	processCursor, err := s.database().Collection("processes").Find(
+		ctx,
+		bson.M{"workflowKey": strings.TrimSpace(workflowKey)},
+		options.Find().SetProjection(bson.M{"_id": 1}),
+	)
+	if err != nil {
+		return err
+	}
+	defer processCursor.Close(ctx)
+
+	processIDs := make([]primitive.ObjectID, 0)
+	for processCursor.Next(ctx) {
+		var doc bson.M
+		if err := processCursor.Decode(&doc); err != nil {
+			continue
+		}
+		id, ok := doc["_id"].(primitive.ObjectID)
+		if !ok || id.IsZero() {
+			continue
+		}
+		processIDs = append(processIDs, id)
+	}
+	if len(processIDs) == 0 {
+		return nil
+	}
+
+	attachmentCursor, err := s.database().Collection("attachments.files").Find(
+		ctx,
+		bson.M{"metadata.processId": bson.M{"$in": processIDs}},
+		options.Find().SetProjection(bson.M{"_id": 1}),
+	)
+	if err != nil {
+		return err
+	}
+	defer attachmentCursor.Close(ctx)
+
+	attachmentIDs := make([]primitive.ObjectID, 0)
+	for attachmentCursor.Next(ctx) {
+		var doc bson.M
+		if err := attachmentCursor.Decode(&doc); err != nil {
+			continue
+		}
+		id, ok := doc["_id"].(primitive.ObjectID)
+		if !ok || id.IsZero() {
+			continue
+		}
+		attachmentIDs = append(attachmentIDs, id)
+	}
+
+	if len(attachmentIDs) > 0 {
+		if _, err := s.database().Collection("attachments.chunks").DeleteMany(ctx, bson.M{"files_id": bson.M{"$in": attachmentIDs}}); err != nil {
+			return err
+		}
+		if _, err := s.database().Collection("attachments.files").DeleteMany(ctx, bson.M{"_id": bson.M{"$in": attachmentIDs}}); err != nil {
+			return err
+		}
+	}
+
+	if _, err := s.database().Collection("notarizations").DeleteMany(ctx, bson.M{"processId": bson.M{"$in": processIDs}}); err != nil {
+		return err
+	}
+	if _, err := s.database().Collection("processes").DeleteMany(ctx, bson.M{"_id": bson.M{"$in": processIDs}}); err != nil {
+		return err
+	}
+	return nil
 }

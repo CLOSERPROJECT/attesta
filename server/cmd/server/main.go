@@ -332,10 +332,12 @@ type PageBase struct {
 }
 
 type WorkflowOption struct {
-	Key         string
-	Name        string
-	Description string
-	Counts      WorkflowProcessCounts
+	Key          string
+	Name         string
+	Description  string
+	Counts       WorkflowProcessCounts
+	CanDelete    bool
+	DeleteAction string
 }
 
 type WorkflowProcessCounts struct {
@@ -367,6 +369,8 @@ type WorkflowPickerView struct {
 	PageBase
 	Workflows            []WorkflowOption
 	ShowCreateStreamCard bool
+	Error                string
+	Confirmation         string
 }
 
 type HomeWorkflowPickerView struct {
@@ -844,6 +848,29 @@ func platformAdminAccountUser() *AccountUser {
 	}
 }
 
+func platformAdminStreamUserID() string {
+	if user := platformAdminAccountUser(); user != nil {
+		email := strings.TrimSpace(user.Email)
+		if email != "" {
+			return "platform-admin:" + email
+		}
+	}
+	return "platform-admin"
+}
+
+func formataStreamUserID(user *AccountUser) string {
+	if user == nil {
+		return ""
+	}
+	if trimmed := strings.TrimSpace(user.IdentityUserID); trimmed != "" {
+		return trimmed
+	}
+	if user.IsPlatformAdmin {
+		return platformAdminStreamUserID()
+	}
+	return ""
+}
+
 func (s *Server) platformAdminSession() (*IdentitySession, *AccountUser, bool) {
 	user := platformAdminAccountUser()
 	if user == nil {
@@ -1095,9 +1122,12 @@ func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir 
 		if readErr != nil {
 			return fmt.Errorf("read config %s: %w", path, readErr)
 		}
+		creatorID := platformAdminStreamUserID()
 		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
-			Stream:    string(data),
-			UpdatedAt: updatedAt,
+			Stream:          string(data),
+			UpdatedAt:       updatedAt,
+			CreatedByUserID: creatorID,
+			UpdatedByUserID: creatorID,
 		}); saveErr != nil {
 			return fmt.Errorf("seed formata stream %s: %w", filepath.Base(path), saveErr)
 		}
@@ -1251,29 +1281,77 @@ func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcess
 	return counts
 }
 
-func (s *Server) workflowOptions(ctx context.Context) ([]WorkflowOption, error) {
+func formataStreamCreatorID(stream FormataBuilderStream) string {
+	if trimmed := strings.TrimSpace(stream.CreatedByUserID); trimmed != "" {
+		return trimmed
+	}
+	return strings.TrimSpace(stream.UpdatedByUserID)
+}
+
+func homePickerMessage(r *http.Request, key string) string {
+	if r == nil || r.URL == nil {
+		return ""
+	}
+	return strings.TrimSpace(r.URL.Query().Get(key))
+}
+
+func workflowCanBeDeletedByUser(user *AccountUser, workflowKey string, counts WorkflowProcessCounts, streamsByKey map[string]FormataBuilderStream) bool {
+	if user == nil {
+		return false
+	}
+	stream, ok := streamsByKey[workflowKey]
+	if !ok {
+		return false
+	}
+	if user.IsPlatformAdmin {
+		return true
+	}
+	if counts.NotStarted+counts.Started+counts.Terminated > 0 {
+		return false
+	}
+	return formataStreamUserID(user) != "" && formataStreamCreatorID(stream) == formataStreamUserID(user)
+}
+
+func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]WorkflowOption, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return nil, err
+	}
+	streamsByKey := map[string]FormataBuilderStream{}
+	if s.store != nil {
+		streams, err := s.store.ListFormataBuilderStreams(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, stream := range streams {
+			if stream.ID.IsZero() {
+				continue
+			}
+			streamsByKey[stream.ID.Hex()] = stream
+		}
 	}
 	keys := sortedWorkflowKeys(catalog)
 	options := make([]WorkflowOption, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
-		options = append(options, WorkflowOption{
-			Key:         key,
-			Name:        cfg.Workflow.Name,
-			Description: strings.TrimSpace(cfg.Workflow.Description),
-			Counts:      WorkflowProcessCounts{},
-		})
+		option := WorkflowOption{
+			Key:          key,
+			Name:         cfg.Workflow.Name,
+			Description:  strings.TrimSpace(cfg.Workflow.Description),
+			Counts:       WorkflowProcessCounts{},
+			DeleteAction: workflowPath(key) + "/delete",
+		}
 		if s.store == nil {
+			options = append(options, option)
 			continue
 		}
 		processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
 		if listErr != nil {
 			return nil, listErr
 		}
-		options[len(options)-1].Counts = workflowProcessCounts(cfg.Workflow, processes)
+		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
+		option.CanDelete = workflowCanBeDeletedByUser(user, key, option.Counts, streamsByKey)
+		options = append(options, option)
 	}
 	return options, nil
 }
@@ -1519,6 +1597,16 @@ func sortHomeProcessList(items []ProcessListItem, sortKey string) {
 	}
 }
 
+func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, message string) {
+	target := "/"
+	trimmedKey := strings.TrimSpace(key)
+	trimmedMessage := strings.TrimSpace(message)
+	if trimmedKey != "" && trimmedMessage != "" {
+		target += "?" + url.Values{trimmedKey: []string{trimmedMessage}}.Encode()
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -1528,7 +1616,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	options, err := s.workflowOptions(r.Context())
+	options, err := s.workflowOptions(r.Context(), user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1538,6 +1626,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows:            options,
 			ShowCreateStreamCard: userIsOrgAdmin(user),
+			Error:                homePickerMessage(r, "error"),
+			Confirmation:         homePickerMessage(r, "confirmation"),
 		},
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
@@ -3386,6 +3476,9 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/process/start":
 		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, rest))
 		return
+	case rest == "/delete":
+		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, rest))
+		return
 	case strings.HasPrefix(rest, "/process/"):
 		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -3395,6 +3488,74 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if s.store == nil {
+		http.Error(w, "store not configured", http.StatusInternalServerError)
+		return
+	}
+
+	streamID, err := primitive.ObjectIDFromHex(workflowKey)
+	if err != nil {
+		redirectHomeWithMessage(w, r, "error", "Only saved streams can be deleted.")
+		return
+	}
+	stream, err := s.store.LoadFormataBuilderStreamByID(r.Context(), streamID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			redirectHomeWithMessage(w, r, "error", "Stream not found.")
+			return
+		}
+		http.Error(w, "failed to load stream", http.StatusInternalServerError)
+		return
+	}
+
+	if !user.IsPlatformAdmin {
+		if formataStreamUserID(user) == "" || formataStreamCreatorID(*stream) != formataStreamUserID(user) {
+			redirectHomeWithMessage(w, r, "error", "Only the stream creator or a platform admin can delete "+cfg.Workflow.Name+".")
+			return
+		}
+		hasProcesses, err := s.store.HasProcessesByWorkflow(r.Context(), workflowKey)
+		if err != nil {
+			http.Error(w, "failed to check stream processes", http.StatusInternalServerError)
+			return
+		}
+		if hasProcesses {
+			redirectHomeWithMessage(w, r, "error", cfg.Workflow.Name+" cannot be deleted because one or more processes have already been started.")
+			return
+		}
+	}
+
+	if user.IsPlatformAdmin {
+		if err := s.store.DeleteWorkflowData(r.Context(), workflowKey); err != nil {
+			http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
+			return
+		}
+	}
+	if err := s.store.DeleteFormataBuilderStream(r.Context(), streamID); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			redirectHomeWithMessage(w, r, "error", "Stream not found.")
+			return
+		}
+		http.Error(w, "failed to delete stream", http.StatusInternalServerError)
+		return
+	}
+
+	redirectHomeWithMessage(w, r, "confirmation", cfg.Workflow.Name+" was deleted.")
 }
 
 func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {

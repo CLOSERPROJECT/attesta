@@ -69,9 +69,10 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if _, err := s.store.SaveFormataBuilderStream(r.Context(), FormataBuilderStream{
-			Stream:               stream,
-			UpdatedAt:            s.nowUTC(),
-			UpdatedByUserMongoID: user.ID,
+			Stream:          stream,
+			UpdatedAt:       s.nowUTC(),
+			CreatedByUserID: formataStreamUserID(user),
+			UpdatedByUserID: formataStreamUserID(user),
 		}); err != nil {
 			http.Error(w, "failed to save stream", http.StatusInternalServerError)
 			return
