@@ -866,6 +866,10 @@ button.secondary {
   margin-top: 12px;
 }
 
+.workflow-card-shell {
+  position: relative;
+}
+
 .workflow-card {
   display: flex;
   flex-direction: column;
@@ -879,6 +883,10 @@ button.secondary {
   color: var(--ink);
   text-decoration: none;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.workflow-card-shell .workflow-card {
+  height: 100%;
 }
 
 .workflow-card:hover {
@@ -967,6 +975,36 @@ button.secondary {
 
 .workflow-card-create .workflow-card-description {
   min-height: 0;
+}
+
+.workflow-card-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+.workflow-card-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 88%, white);
+  color: var(--danger);
+  box-shadow: 0 8px 18px var(--shadow);
+}
+
+.workflow-card-delete-button:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+}
+
+.workflow-card-delete-button:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
 }
 
 .workflow-card-cta {

@@ -151,10 +151,7 @@ type testHelperT interface {
 
 func identityUserFromAccountUser(user AccountUser) IdentityUser {
 	orgSlug := strings.TrimSpace(user.OrgSlug)
-	identityUserID := strings.TrimSpace(user.IdentityUserID)
-	if identityUserID == "" && !user.ID.IsZero() {
-		identityUserID = user.ID.Hex()
-	}
+	identityUserID := firstNonEmpty(strings.TrimSpace(user.IdentityUserID), strings.TrimSpace(user.Email))
 	labels := make([]string, 0, len(user.RoleSlugs))
 	isOrgAdmin := false
 	for _, roleSlug := range canonifyRoleSlugs(user.RoleSlugs) {
@@ -184,7 +181,7 @@ func testIdentityForSessions(now time.Time, sessions map[string]AccountUser) *fa
 			if !ok {
 				return IdentitySession{}, ErrIdentityUnauthorized
 			}
-			return fakeIdentitySession(sessionSecret, user.ID.Hex(), now.Add(24*time.Hour)), nil
+			return fakeIdentitySession(sessionSecret, firstNonEmpty(strings.TrimSpace(user.IdentityUserID), strings.TrimSpace(user.Email), user.ID.Hex()), now.Add(24*time.Hour)), nil
 		},
 		getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
 			user, ok := sessions[strings.TrimSpace(sessionSecret)]

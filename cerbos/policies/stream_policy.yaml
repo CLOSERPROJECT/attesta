@@ -1,0 +1,18 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "stream"
+  rules:
+    - actions: ["delete"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    - actions: ["delete"]
+      effect: EFFECT_ALLOW
+      roles: ["authenticated"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: request.resource.attr.hasProcesses == false
+              - expr: request.principal.id == request.resource.attr.createdByUserId

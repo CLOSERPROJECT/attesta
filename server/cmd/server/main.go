@@ -332,10 +332,12 @@ type PageBase struct {
 }
 
 type WorkflowOption struct {
-	Key         string
-	Name        string
-	Description string
-	Counts      WorkflowProcessCounts
+	Key          string
+	Name         string
+	Description  string
+	Counts       WorkflowProcessCounts
+	CanDelete    bool
+	DeleteAction string
 }
 
 type WorkflowProcessCounts struct {
@@ -367,6 +369,8 @@ type WorkflowPickerView struct {
 	PageBase
 	Workflows            []WorkflowOption
 	ShowCreateStreamCard bool
+	Error                string
+	Confirmation         string
 }
 
 type HomeWorkflowPickerView struct {
@@ -495,7 +499,7 @@ type OrgAdminRoleOption struct {
 }
 
 type OrgAdminUserRow struct {
-	UserMongoID string
+	UserID      string
 	Email       string
 	Status      string
 	Activated   bool
@@ -844,6 +848,29 @@ func platformAdminAccountUser() *AccountUser {
 	}
 }
 
+func platformAdminStreamUserID() string {
+	if user := platformAdminAccountUser(); user != nil {
+		email := strings.TrimSpace(user.Email)
+		if email != "" {
+			return "platform-admin:" + email
+		}
+	}
+	return "platform-admin"
+}
+
+func formataStreamUserID(user *AccountUser) string {
+	if user == nil {
+		return ""
+	}
+	if trimmed := strings.TrimSpace(user.IdentityUserID); trimmed != "" {
+		return trimmed
+	}
+	if user.IsPlatformAdmin {
+		return platformAdminStreamUserID()
+	}
+	return ""
+}
+
 func (s *Server) platformAdminSession() (*IdentitySession, *AccountUser, bool) {
 	user := platformAdminAccountUser()
 	if user == nil {
@@ -851,7 +878,7 @@ func (s *Server) platformAdminSession() (*IdentitySession, *AccountUser, bool) {
 	}
 	session := &IdentitySession{
 		Secret:    platformAdminSessionValue(),
-		UserID:    user.ID.Hex(),
+		UserID:    platformAdminStreamUserID(),
 		ExpiresAt: s.nowUTC().Add(time.Duration(sessionTTLDays()) * 24 * time.Hour),
 	}
 	return session, user, true
@@ -1033,7 +1060,6 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
 	}
 	user := &AccountUser{
-		ID:             stableIdentityUserObjectID(identityUser.ID),
 		IdentityUserID: strings.TrimSpace(identityUser.ID),
 		Email:          strings.TrimSpace(identityUser.Email),
 		OrgSlug:        strings.TrimSpace(identityUser.OrgSlug),
@@ -1095,9 +1121,12 @@ func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir 
 		if readErr != nil {
 			return fmt.Errorf("read config %s: %w", path, readErr)
 		}
+		creatorID := platformAdminStreamUserID()
 		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
-			Stream:    string(data),
-			UpdatedAt: updatedAt,
+			Stream:          string(data),
+			UpdatedAt:       updatedAt,
+			CreatedByUserID: creatorID,
+			UpdatedByUserID: creatorID,
 		}); saveErr != nil {
 			return fmt.Errorf("seed formata stream %s: %w", filepath.Base(path), saveErr)
 		}
@@ -1251,29 +1280,66 @@ func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcess
 	return counts
 }
 
-func (s *Server) workflowOptions(ctx context.Context) ([]WorkflowOption, error) {
+func formataStreamCreatorID(stream FormataBuilderStream) string {
+	if trimmed := strings.TrimSpace(stream.CreatedByUserID); trimmed != "" {
+		return trimmed
+	}
+	return strings.TrimSpace(stream.UpdatedByUserID)
+}
+
+func homePickerMessage(r *http.Request, key string) string {
+	if r == nil || r.URL == nil {
+		return ""
+	}
+	return strings.TrimSpace(r.URL.Query().Get(key))
+}
+
+func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]WorkflowOption, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return nil, err
+	}
+	streamsByKey := map[string]FormataBuilderStream{}
+	if s.store != nil {
+		streams, err := s.store.ListFormataBuilderStreams(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, stream := range streams {
+			if stream.ID.IsZero() {
+				continue
+			}
+			streamsByKey[stream.ID.Hex()] = stream
+		}
 	}
 	keys := sortedWorkflowKeys(catalog)
 	options := make([]WorkflowOption, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
-		options = append(options, WorkflowOption{
-			Key:         key,
-			Name:        cfg.Workflow.Name,
-			Description: strings.TrimSpace(cfg.Workflow.Description),
-			Counts:      WorkflowProcessCounts{},
-		})
+		option := WorkflowOption{
+			Key:          key,
+			Name:         cfg.Workflow.Name,
+			Description:  strings.TrimSpace(cfg.Workflow.Description),
+			Counts:       WorkflowProcessCounts{},
+			DeleteAction: workflowPath(key) + "/delete",
+		}
 		if s.store == nil {
+			options = append(options, option)
 			continue
 		}
 		processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
 		if listErr != nil {
 			return nil, listErr
 		}
-		options[len(options)-1].Counts = workflowProcessCounts(cfg.Workflow, processes)
+		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
+		stream, ok := streamsByKey[key]
+		if ok && s.authorizer != nil && user != nil {
+			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0)
+			if err == nil {
+				option.CanDelete = allowed
+			}
+		}
+		options = append(options, option)
 	}
 	return options, nil
 }
@@ -1519,6 +1585,16 @@ func sortHomeProcessList(items []ProcessListItem, sortKey string) {
 	}
 }
 
+func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, message string) {
+	target := "/"
+	trimmedKey := strings.TrimSpace(key)
+	trimmedMessage := strings.TrimSpace(message)
+	if trimmedKey != "" && trimmedMessage != "" {
+		target += "?" + url.Values{trimmedKey: []string{trimmedMessage}}.Encode()
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -1528,7 +1604,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	options, err := s.workflowOptions(r.Context())
+	options, err := s.workflowOptions(r.Context(), user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1538,6 +1614,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows:            options,
 			ShowCreateStreamCard: userIsOrgAdmin(user),
+			Error:                homePickerMessage(r, "error"),
+			Confirmation:         homePickerMessage(r, "confirmation"),
 		},
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
@@ -2216,6 +2294,9 @@ func isSameAccount(a, b *AccountUser) bool {
 	if a == nil || b == nil {
 		return false
 	}
+	if strings.TrimSpace(a.IdentityUserID) != "" && strings.TrimSpace(b.IdentityUserID) != "" {
+		return strings.TrimSpace(a.IdentityUserID) == strings.TrimSpace(b.IdentityUserID)
+	}
 	return !a.ID.IsZero() && !b.ID.IsZero() && a.ID == b.ID
 }
 
@@ -2241,10 +2322,6 @@ func stableObjectID(seed string) primitive.ObjectID {
 
 func stableOrgObjectID(slug string) primitive.ObjectID {
 	return stableObjectID("org:" + canonifySlug(slug))
-}
-
-func stableIdentityUserObjectID(userID string) primitive.ObjectID {
-	return stableObjectID("identity-user:" + strings.TrimSpace(userID))
 }
 
 const appwriteActorPrefix = "appwrite:"
@@ -2691,7 +2768,7 @@ func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []I
 			userID = strings.TrimSpace(orgUser.Email)
 		}
 		orgUsers = append(orgUsers, OrgAdminUserRow{
-			UserMongoID: stableIdentityUserObjectID(userID).Hex(),
+			UserID:      userID,
 			Email:       orgUser.Email,
 			Status:      orgUser.Status,
 			Activated:   !strings.EqualFold(strings.TrimSpace(orgUser.Status), "pending") && !strings.EqualFold(strings.TrimSpace(orgUser.Status), "invited"),
@@ -3211,8 +3288,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
 	case "set_roles":
-		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
-		if userMongoID == "" {
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
 			return
 		}
@@ -3231,11 +3308,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		var target *IdentityUser
 		for idx := range targetUsers {
-			targetKey := strings.TrimSpace(targetUsers[idx].ID)
-			if targetKey == "" {
-				targetKey = strings.TrimSpace(targetUsers[idx].Email)
-			}
-			if stableIdentityUserObjectID(targetKey).Hex() == userMongoID {
+			targetKey := firstNonEmpty(targetUsers[idx].ID, targetUsers[idx].Email)
+			if strings.TrimSpace(targetKey) == userID {
 				target = &targetUsers[idx]
 				break
 			}
@@ -3256,7 +3330,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if stableIdentityUserObjectID(strings.TrimSpace(target.ID)).Hex() == admin.ID.Hex() && !containsRole(selectedRoles, "org-admin") {
+		if firstNonEmpty(target.ID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) && !containsRole(selectedRoles, "org-admin") {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove org-admin from your own account"})
 			return
 		}
@@ -3284,8 +3358,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		s.renderOrgAdmin(w, admin, admin.OrgSlug, "", "")
 	case "delete_user":
-		userMongoID := strings.TrimSpace(r.FormValue("userMongoId"))
-		if userMongoID == "" {
+		userID := strings.TrimSpace(r.FormValue("userId"))
+		if userID == "" {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user is required"})
 			return
 		}
@@ -3296,11 +3370,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		var target *IdentityMembership
 		for idx := range memberships {
-			targetKey := strings.TrimSpace(memberships[idx].UserID)
-			if targetKey == "" {
-				targetKey = strings.TrimSpace(memberships[idx].Email)
-			}
-			if stableIdentityUserObjectID(targetKey).Hex() == userMongoID {
+			targetKey := firstNonEmpty(memberships[idx].UserID, memberships[idx].Email)
+			if strings.TrimSpace(targetKey) == userID {
 				target = &memberships[idx]
 				break
 			}
@@ -3309,7 +3380,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
 		}
-		if stableIdentityUserObjectID(strings.TrimSpace(target.UserID)).Hex() == admin.ID.Hex() {
+		if firstNonEmpty(target.UserID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot delete yourself"})
 			return
 		}
@@ -3386,6 +3457,9 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "/process/start":
 		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, rest))
 		return
+	case rest == "/delete":
+		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, rest))
+		return
 	case strings.HasPrefix(rest, "/process/"):
 		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, rest))
 		return
@@ -3395,6 +3469,83 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if s.store == nil {
+		http.Error(w, "store not configured", http.StatusInternalServerError)
+		return
+	}
+
+	streamID, err := primitive.ObjectIDFromHex(workflowKey)
+	if err != nil {
+		redirectHomeWithMessage(w, r, "error", "Only saved streams can be deleted.")
+		return
+	}
+	stream, err := s.store.LoadFormataBuilderStreamByID(r.Context(), streamID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			redirectHomeWithMessage(w, r, "error", "Stream not found.")
+			return
+		}
+		http.Error(w, "failed to load stream", http.StatusInternalServerError)
+		return
+	}
+
+	hasProcesses, err := s.store.HasProcessesByWorkflow(r.Context(), workflowKey)
+	if err != nil {
+		http.Error(w, "failed to check stream processes", http.StatusInternalServerError)
+		return
+	}
+	if s.authorizer == nil {
+		http.Error(w, "cerbos check failed", http.StatusBadGateway)
+		return
+	}
+	allowed, err := s.authorizer.CanDeleteStream(r.Context(), user, workflowKey, formataStreamCreatorID(*stream), hasProcesses)
+	if err != nil {
+		logRequestError(r, err, "cerbos check failed for stream %s delete", workflowKey)
+		http.Error(w, "cerbos check failed", http.StatusBadGateway)
+		return
+	}
+	if !allowed {
+		switch {
+		case hasProcesses && !user.IsPlatformAdmin:
+			redirectHomeWithMessage(w, r, "error", cfg.Workflow.Name+" cannot be deleted because one or more processes have already been started.")
+		default:
+			redirectHomeWithMessage(w, r, "error", "Only the stream creator or a platform admin can delete "+cfg.Workflow.Name+".")
+		}
+		return
+	}
+
+	if user.IsPlatformAdmin {
+		if err := s.store.DeleteWorkflowData(r.Context(), workflowKey); err != nil {
+			http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
+			return
+		}
+	}
+	if err := s.store.DeleteFormataBuilderStream(r.Context(), streamID); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			redirectHomeWithMessage(w, r, "error", "Stream not found.")
+			return
+		}
+		http.Error(w, "failed to delete stream", http.StatusInternalServerError)
+		return
+	}
+
+	redirectHomeWithMessage(w, r, "confirmation", cfg.Workflow.Name+" was deleted.")
 }
 
 func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
@@ -3712,31 +3863,8 @@ func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string
 		cache[id] = identity
 		return identity, identity.email != "" || identity.fallbackID != ""
 	}
-	lookup, ok := any(s.store).(interface {
-		GetUserByMongoID(context.Context, primitive.ObjectID) (*AccountUser, error)
-	})
-	if !ok {
-		cache[id] = userIdentityView{}
-		return userIdentityView{}, false
-	}
-	mongoID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		cache[id] = userIdentityView{}
-		return userIdentityView{}, false
-	}
-	user, err := lookup.GetUserByMongoID(ctx, mongoID)
-	if err != nil || user == nil {
-		cache[id] = userIdentityView{}
-		return userIdentityView{}, false
-	}
-	identity := userIdentityView{
-		email: strings.TrimSpace(user.Email),
-	}
-	if !user.ID.IsZero() {
-		identity.fallbackID = user.ID.Hex()
-	}
-	cache[id] = identity
-	return identity, identity.email != "" || identity.fallbackID != ""
+	cache[id] = userIdentityView{}
+	return userIdentityView{}, false
 }
 
 func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []ActionView) []ActionView {
@@ -3793,7 +3921,7 @@ func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef
 	return timeline
 }
 
-func (s *Server) applyDoneByMongoIDToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
+func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
 	if len(traceability) == 0 {
 		return traceability
 	}
@@ -3855,7 +3983,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
-	traceability = s.applyDoneByMongoIDToDPPTraceability(r.Context(), traceability)
+	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		ProcessID:    process.ID.Hex(),

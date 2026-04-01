@@ -247,6 +247,147 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 
 }
 
+func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	now := time.Date(2026, 3, 7, 11, 0, 0, 0, time.UTC)
+
+	t.Run("visible for creator before any process starts", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{
+			ID:             primitive.NewObjectID(),
+			IdentityUserID: "creator-home-user",
+			Email:          "creator-home@example.com",
+			RoleSlugs:      []string{"org-admin"},
+			Status:         "active",
+		}
+		sessionID := "session-home-creator"
+		stream, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Delete from home"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+
+		server := &Server{
+			store:       store,
+			identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
+			tmpl:        tmpl,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), `action="/w/`+stream.ID.Hex()+`/delete"`) {
+			t.Fatalf("expected delete button for creator, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("hidden for creator after process start", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{
+			ID:             primitive.NewObjectID(),
+			IdentityUserID: "creator-home-started-user",
+			Email:          "creator-home-started@example.com",
+			RoleSlugs:      []string{"org-admin"},
+			Status:         "active",
+		}
+		sessionID := "session-home-started"
+		stream, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Started stream"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: stream.ID.Hex(),
+			CreatedAt:   now,
+			Status:      "active",
+			Progress:    map[string]ProcessStep{},
+		})
+
+		server := &Server{
+			store:       store,
+			identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
+			tmpl:        tmpl,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if strings.Contains(rec.Body.String(), `action="/w/`+stream.ID.Hex()+`/delete"`) {
+			t.Fatalf("did not expect delete button for started stream, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("visible for platform admin even with processes", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "secret")
+
+		store := NewMemoryStore()
+		stream, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Platform delete"),
+			CreatedByUserID: "someone-else",
+			UpdatedByUserID: "someone-else",
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: stream.ID.Hex(),
+			CreatedAt:   now,
+			Status:      "done",
+			Progress: map[string]ProcessStep{
+				"1_1": {State: "done"},
+			},
+		})
+
+		server := &Server{
+			store:       store,
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
+			tmpl:        tmpl,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), `action="/w/`+stream.ID.Hex()+`/delete"`) {
+			t.Fatalf("expected delete button for platform admin, got %q", rec.Body.String())
+		}
+	})
+}
+
 func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTwoSubstepWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow")
@@ -451,4 +592,14 @@ func homePickerTemplates() *template.Template {
 
 func ptrTime(t time.Time) *time.Time {
 	return &t
+}
+
+func workflowDeleteDecision(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+	if user == nil {
+		return false, nil
+	}
+	if user.IsPlatformAdmin {
+		return true, nil
+	}
+	return !hasProcesses && formataStreamUserID(user) == createdByUserID, nil
 }

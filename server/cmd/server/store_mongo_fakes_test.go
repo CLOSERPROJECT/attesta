@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -44,6 +45,8 @@ type fakeMongoCollection struct {
 	findOneFn           func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort
 	findFn              func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error)
 	updateOneFn         func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
+	deleteOneFn         func(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error)
+	deleteManyFn        func(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error)
 	findOneAndUpdateFn  func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort
 	insertDocuments     []interface{}
 	findOneFilters      []interface{}
@@ -53,6 +56,10 @@ type fakeMongoCollection struct {
 	updateOneFilters    []interface{}
 	updateOneUpdates    []interface{}
 	updateOneOptions    [][]*options.UpdateOptions
+	deleteOneFilters    []interface{}
+	deleteOneOptions    [][]*options.DeleteOptions
+	deleteManyFilters   []interface{}
+	deleteManyOptions   [][]*options.DeleteOptions
 	findOneAndUpdFilter []interface{}
 	findOneAndUpdUpdate []interface{}
 	createIndexesFn     func(ctx context.Context, models []mongo.IndexModel) error
@@ -95,6 +102,24 @@ func (c *fakeMongoCollection) UpdateOne(ctx context.Context, filter interface{},
 		return c.updateOneFn(ctx, filter, update, opts...)
 	}
 	return &mongo.UpdateResult{}, nil
+}
+
+func (c *fakeMongoCollection) DeleteOne(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+	c.deleteOneFilters = append(c.deleteOneFilters, filter)
+	c.deleteOneOptions = append(c.deleteOneOptions, opts)
+	if c.deleteOneFn != nil {
+		return c.deleteOneFn(ctx, filter, opts...)
+	}
+	return &mongo.DeleteResult{}, nil
+}
+
+func (c *fakeMongoCollection) DeleteMany(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+	c.deleteManyFilters = append(c.deleteManyFilters, filter)
+	c.deleteManyOptions = append(c.deleteManyOptions, opts)
+	if c.deleteManyFn != nil {
+		return c.deleteManyFn(ctx, filter, opts...)
+	}
+	return &mongo.DeleteResult{}, nil
 }
 
 func (c *fakeMongoCollection) FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
@@ -204,21 +229,6 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 			*target = v
 			return nil
 		}
-	case *Session:
-		if v, ok := item.(Session); ok {
-			*target = v
-			return nil
-		}
-	case *Invite:
-		if v, ok := item.(Invite); ok {
-			*target = v
-			return nil
-		}
-	case *PasswordReset:
-		if v, ok := item.(PasswordReset); ok {
-			*target = v
-			return nil
-		}
 	case *Process:
 		if v, ok := item.(Process); ok {
 			*target = v
@@ -226,6 +236,11 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 		}
 	case *FormataBuilderStream:
 		if v, ok := item.(FormataBuilderStream); ok {
+			*target = v
+			return nil
+		}
+	case *bson.M:
+		if v, ok := item.(bson.M); ok {
 			*target = v
 			return nil
 		}

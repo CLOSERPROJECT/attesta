@@ -18,10 +18,10 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 		},
 		Users: []OrgAdminUserRow{
 			{
-				UserMongoID: "507f1f77bcf86cd799439011",
-				Email:       "user@example.com",
-				Activated:   true,
-				IsOrgAdmin:  true,
+				UserID:     "user-1",
+				Email:      "user@example.com",
+				Activated:  true,
+				IsOrgAdmin: true,
 				RoleOptions: []OrgAdminRoleOption{
 					{
 						Slug:       "org-admin",
