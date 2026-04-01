@@ -819,6 +819,22 @@ func platformAdminCredentials() (string, string, bool) {
 	return email, password, true
 }
 
+func isPlatformAdminEmail(email string) bool {
+	adminEmail, _, ok := platformAdminCredentials()
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(email), adminEmail)
+}
+
+func isPlatformAdminIdentityUser(user IdentityUser) bool {
+	return isPlatformAdminEmail(user.Email)
+}
+
+func isPlatformAdminMembership(membership IdentityMembership) bool {
+	return isPlatformAdminEmail(membership.Email)
+}
+
 func platformAdminSessionValue() string {
 	email, password, ok := platformAdminCredentials()
 	if !ok {
@@ -2866,6 +2882,9 @@ func buildOrgAdminRolePills(roles []Role) []OrgAdminRoleOption {
 func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []IdentityUser) []OrgAdminUserRow {
 	orgUsers := make([]OrgAdminUserRow, 0, len(users))
 	for _, orgUser := range users {
+		if isPlatformAdminIdentityUser(orgUser) {
+			continue
+		}
 		roleSlugs := decodeIdentityRoleLabels(orgUser.Labels)
 		roleOptions := make([]OrgAdminRoleOption, 0, len(rolePills))
 		for _, role := range rolePills {
@@ -3436,6 +3455,10 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
 		}
+		if isPlatformAdminIdentityUser(*target) {
+			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+			return
+		}
 		selectedRoles := requestedRoleSlugs(r.Form)
 		allowedRoles := ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org))
 		allowed := make(map[string]struct{}, len(allowedRoles))
@@ -3495,6 +3518,10 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if target == nil {
+			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
+			return
+		}
+		if isPlatformAdminMembership(*target) {
 			s.renderOrgAdminWithErrors(w, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
 		}
