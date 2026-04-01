@@ -13,6 +13,7 @@ import (
 type Authorizer interface {
 	CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
 	CanDeleteStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error)
+	CanAccess(ctx context.Context, user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error)
 }
 
 type CerbosAuthorizer struct {
@@ -82,6 +83,36 @@ func (a *CerbosAuthorizer) checkResourceAction(ctx context.Context, principal ma
 	return false, nil
 }
 
+func principalForAccountUser(user *AccountUser) (string, []string, map[string]interface{}) {
+	if user == nil {
+		return "", nil, nil
+	}
+
+	roles := []string{"authenticated"}
+	if user.IsPlatformAdmin {
+		roles = append(roles, "platform_admin")
+	}
+	if userIsOrgAdmin(user) {
+		roles = append(roles, "org_admin")
+	}
+
+	principalID := formataStreamUserID(user)
+	if principalID == "" {
+		principalID = accountActorID(user)
+	}
+
+	attr := map[string]interface{}{
+		"userId":          strings.TrimSpace(principalID),
+		"identityUserId":  strings.TrimSpace(user.IdentityUserID),
+		"orgSlug":         strings.TrimSpace(user.OrgSlug),
+		"roleSlugs":       append([]string(nil), user.RoleSlugs...),
+		"isPlatformAdmin": user.IsPlatformAdmin,
+		"isOrgAdmin":      userIsOrgAdmin(user),
+		"status":          strings.TrimSpace(user.Status),
+	}
+	return principalID, roles, attr
+}
+
 func (a *CerbosAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
 	rolesAllowed := append([]string(nil), sub.Roles...)
 	if len(rolesAllowed) == 0 && strings.TrimSpace(sub.Role) != "" {
@@ -121,28 +152,15 @@ func (a *CerbosAuthorizer) CanDeleteStream(ctx context.Context, user *AccountUse
 	if user == nil {
 		return false, nil
 	}
-	roles := []string{"authenticated"}
-	if user.IsPlatformAdmin {
-		roles = append(roles, "platform_admin")
-	}
-	if userIsOrgAdmin(user) {
-		roles = append(roles, "org_admin")
-	}
-
-	principalID := formataStreamUserID(user)
-	if principalID == "" {
-		principalID = accountActorID(user)
-	}
+	principalID, roles, attr := principalForAccountUser(user)
 
 	return a.checkResourceAction(ctx,
 		map[string]interface{}{
 			"id":    principalID,
 			"roles": roles,
-			"attr": map[string]interface{}{
-				"userId":          strings.TrimSpace(principalID),
-				"workflowKey":     strings.TrimSpace(workflowKey),
-				"isPlatformAdmin": user.IsPlatformAdmin,
-			},
+			"attr": mergeStringMap(attr, map[string]interface{}{
+				"workflowKey": strings.TrimSpace(workflowKey),
+			}),
 		},
 		"stream",
 		strings.TrimSpace(workflowKey),
@@ -153,4 +171,36 @@ func (a *CerbosAuthorizer) CanDeleteStream(ctx context.Context, user *AccountUse
 		},
 		"delete",
 	)
+}
+
+func (a *CerbosAuthorizer) CanAccess(ctx context.Context, user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error) {
+	if user == nil {
+		return false, nil
+	}
+	principalID, roles, attr := principalForAccountUser(user)
+	return a.checkResourceAction(ctx,
+		map[string]interface{}{
+			"id":    principalID,
+			"roles": roles,
+			"attr":  attr,
+		},
+		strings.TrimSpace(resourceKind),
+		strings.TrimSpace(resourceID),
+		resourceAttr,
+		strings.TrimSpace(action),
+	)
+}
+
+func mergeStringMap(base map[string]interface{}, extra map[string]interface{}) map[string]interface{} {
+	if len(base) == 0 && len(extra) == 0 {
+		return map[string]interface{}{}
+	}
+	merged := make(map[string]interface{}, len(base)+len(extra))
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range extra {
+		merged[key] = value
+	}
+	return merged
 }

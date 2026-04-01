@@ -39,7 +39,17 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 
 	switch r.Method {
 	case http.MethodGet:
-		if _, ok := s.requireOrgAdmin(w, r); !ok {
+		user, _, ok := s.requireAuthenticatedPage(w, r)
+		if !ok {
+			return
+		}
+		allowed, err := s.canViewFormataBuilder(r.Context(), user)
+		if err != nil {
+			logAndHTTPError(w, r, http.StatusBadGateway, "cerbos check failed", err, "cerbos check failed for formata builder view")
+			return
+		}
+		if !allowed {
+			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
 		s.serveEmbeddedFormataBuilder(w, r, isRootPath)
@@ -49,8 +59,17 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			http.NotFound(w, r)
 			return
 		}
-		user, ok := s.requireOrgOrPlatformAdminAPI(w, r)
+		user, _, ok := s.requireAuthenticatedPost(w, r)
 		if !ok {
+			return
+		}
+		allowed, err := s.canSaveFormataBuilder(r.Context(), user)
+		if err != nil {
+			logAndHTTPError(w, r, http.StatusBadGateway, "cerbos check failed", err, "cerbos check failed for formata builder save")
+			return
+		}
+		if !allowed {
+			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, formataBuilderStreamMaxBytes())

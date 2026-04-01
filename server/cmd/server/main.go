@@ -1238,6 +1238,63 @@ func userHasOrganizationContext(user *AccountUser) bool {
 	return strings.TrimSpace(user.OrgSlug) != ""
 }
 
+const (
+	cerbosResourceCatalog              = "catalog"
+	cerbosResourceFormataBuilder       = "formata_builder"
+	cerbosResourceOrgAdminConsole      = "org_admin_console"
+	cerbosResourcePlatformAdminConsole = "platform_admin_console"
+
+	cerbosActionAccess = "access"
+	cerbosActionPurge  = "purge_history"
+	cerbosActionSave   = "save"
+	cerbosActionView   = "view"
+)
+
+func (s *Server) authorizeUserAction(ctx context.Context, user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error) {
+	if user == nil {
+		return false, nil
+	}
+	if s == nil || s.authorizer == nil {
+		return false, errors.New("authorizer unavailable")
+	}
+	return s.authorizer.CanAccess(ctx, user, resourceKind, resourceID, resourceAttr, action)
+}
+
+func (s *Server) canAccessPlatformAdminConsole(ctx context.Context, user *AccountUser) (bool, error) {
+	return s.authorizeUserAction(ctx, user, cerbosResourcePlatformAdminConsole, "platform-admin-console", nil, cerbosActionAccess)
+}
+
+func (s *Server) canAccessOrgAdminConsole(ctx context.Context, user *AccountUser) (bool, error) {
+	return s.authorizeUserAction(ctx, user, cerbosResourceOrgAdminConsole, "org-admin-console", map[string]interface{}{
+		"orgSlug": strings.TrimSpace(user.OrgSlug),
+	}, cerbosActionAccess)
+}
+
+func (s *Server) canViewCatalog(ctx context.Context, user *AccountUser) (bool, error) {
+	return s.authorizeUserAction(ctx, user, cerbosResourceCatalog, "public-catalog", nil, cerbosActionView)
+}
+
+func (s *Server) canViewFormataBuilder(ctx context.Context, user *AccountUser) (bool, error) {
+	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, cerbosActionView)
+}
+
+func (s *Server) canSaveFormataBuilder(ctx context.Context, user *AccountUser) (bool, error) {
+	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, cerbosActionSave)
+}
+
+func (s *Server) canPurgeWorkflowData(ctx context.Context, user *AccountUser, workflowKey string) (bool, error) {
+	return s.authorizeUserAction(ctx, user, "stream", strings.TrimSpace(workflowKey), map[string]interface{}{
+		"workflowKey": strings.TrimSpace(workflowKey),
+	}, cerbosActionPurge)
+}
+
+func logCapabilityCheckError(err error, message string, args ...interface{}) {
+	if err == nil {
+		return
+	}
+	log.Printf(message+": %v", append(args, err)...)
+}
+
 func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowName string) PageBase {
 	base := s.pageBase(body, workflowKey, workflowName)
 	if user == nil {
@@ -1245,8 +1302,16 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	}
 	base.UserEmail = strings.TrimSpace(user.Email)
 	base.ShowLogout = s.enforceAuth
-	base.ShowOrgsLink = user.IsPlatformAdmin
-	base.ShowMyOrgLink = userIsOrgAdmin(user)
+	showOrgsLink, err := s.canAccessPlatformAdminConsole(context.Background(), user)
+	if err != nil {
+		logCapabilityCheckError(err, "cerbos check failed for platform admin navigation")
+	}
+	base.ShowOrgsLink = showOrgsLink
+	showMyOrgLink, err := s.canAccessOrgAdminConsole(context.Background(), user)
+	if err != nil {
+		logCapabilityCheckError(err, "cerbos check failed for org admin navigation")
+	}
+	base.ShowMyOrgLink = showMyOrgLink
 	return base
 }
 
@@ -1643,11 +1708,15 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	showCreateStreamCard, authErr := s.canViewFormataBuilder(r.Context(), user)
+	if authErr != nil {
+		logRequestError(r, authErr, "cerbos check failed for formata builder card")
+	}
 	view := HomeWorkflowPickerView{
 		WorkflowPickerView: WorkflowPickerView{
 			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows:            options,
-			ShowCreateStreamCard: userIsOrgAdmin(user),
+			ShowCreateStreamCard: showCreateStreamCard,
 			Error:                homePickerMessage(r, "error"),
 			Confirmation:         homePickerMessage(r, "confirmation"),
 		},
@@ -1707,7 +1776,7 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if _, ok := s.requireOrgOrPlatformAdminAPI(w, r); !ok {
+	if _, ok := s.requireCatalogAccessAPI(w, r); !ok {
 		return
 	}
 	if s == nil || s.identity == nil || s.store == nil {
@@ -1777,16 +1846,21 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, response)
 }
 
-func (s *Server) requireOrgOrPlatformAdminAPI(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
+func (s *Server) requireCatalogAccessAPI(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
 	user, _, ok := s.requireAuthenticatedPost(w, r)
 	if !ok {
 		return nil, false
 	}
-	if user != nil && (user.IsPlatformAdmin || userIsOrgAdmin(user)) {
-		return user, true
+	allowed, err := s.canViewCatalog(r.Context(), user)
+	if err != nil {
+		logAndHTTPError(w, r, http.StatusBadGateway, "cerbos check failed", err, "cerbos check failed for public catalog")
+		return nil, false
 	}
-	http.Error(w, "forbidden", http.StatusForbidden)
-	return nil, false
+	if !allowed {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return user, true
 }
 
 func (s *Server) newMux() *http.ServeMux {
@@ -2432,7 +2506,12 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 	if !ok {
 		return nil, false
 	}
-	if !userIsOrgAdmin(user) {
+	allowed, err := s.canAccessOrgAdminConsole(r.Context(), user)
+	if err != nil {
+		logAndHTTPError(w, r, http.StatusBadGateway, "cerbos check failed", err, "cerbos check failed for org admin console")
+		return nil, false
+	}
+	if !allowed {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return nil, false
 	}
@@ -2444,7 +2523,12 @@ func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*
 	if !ok {
 		return nil, false
 	}
-	if !user.IsPlatformAdmin {
+	allowed, err := s.canAccessPlatformAdminConsole(r.Context(), user)
+	if err != nil {
+		logAndHTTPError(w, r, http.StatusBadGateway, "cerbos check failed", err, "cerbos check failed for platform admin console")
+		return nil, false
+	}
+	if !allowed {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return nil, false
 	}
@@ -3554,9 +3638,15 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cerbos check failed", http.StatusBadGateway)
 		return
 	}
+	canPurgeWorkflowData, err := s.canPurgeWorkflowData(r.Context(), user, workflowKey)
+	if err != nil {
+		logRequestError(r, err, "cerbos check failed for stream %s purge_history", workflowKey)
+		http.Error(w, "cerbos check failed", http.StatusBadGateway)
+		return
+	}
 	if !allowed {
 		switch {
-		case hasProcesses && !user.IsPlatformAdmin:
+		case hasProcesses && !canPurgeWorkflowData:
 			redirectHomeWithMessage(w, r, "error", cfg.Workflow.Name+" cannot be deleted because one or more processes have already been started.")
 		default:
 			redirectHomeWithMessage(w, r, "error", "Only the stream creator or a platform admin can delete "+cfg.Workflow.Name+".")
@@ -3564,7 +3654,7 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.IsPlatformAdmin {
+	if canPurgeWorkflowData {
 		if err := s.store.DeleteWorkflowData(r.Context(), workflowKey); err != nil {
 			http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
 			return

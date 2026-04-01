@@ -1,0 +1,12 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "catalog"
+  rules:
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["org_admin"]

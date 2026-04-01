@@ -335,3 +335,70 @@ func TestCerbosAuthorizerCanDeleteStreamMapsDenyAndPlatformAdmin(t *testing.T) {
 		}
 	})
 }
+
+func TestCerbosAuthorizerCanAccessBuildsRequestAndMapsAllow(t *testing.T) {
+	var captured map[string]interface{}
+
+	pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"resourceInstances":{"formata-builder":{"actions":{"save":"EFFECT_ALLOW"}}}}`))
+	}))
+	defer pdp.Close()
+
+	authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now)
+	allowed, err := authorizer.CanAccess(context.Background(), &AccountUser{
+		IdentityUserID: "user-1",
+		OrgSlug:        "acme-org",
+		RoleSlugs:      []string{"org-admin", "approver"},
+		Status:         "active",
+	}, "formata_builder", "formata-builder", map[string]interface{}{"orgSlug": "acme-org"}, "save")
+	if err != nil {
+		t.Fatalf("CanAccess returned error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected allow result")
+	}
+
+	principal := captured["principal"].(map[string]interface{})
+	roles := principal["roles"].([]interface{})
+	if len(roles) != 2 || roles[0] != "authenticated" || roles[1] != "org_admin" {
+		t.Fatalf("principal.roles = %#v", roles)
+	}
+	principalAttr := principal["attr"].(map[string]interface{})
+	if principalAttr["orgSlug"] != "acme-org" {
+		t.Fatalf("principal.attr.orgSlug = %#v", principalAttr["orgSlug"])
+	}
+
+	resource := captured["resource"].(map[string]interface{})
+	if resource["kind"] != "formata_builder" {
+		t.Fatalf("resource.kind = %#v", resource["kind"])
+	}
+	instances := resource["instances"].(map[string]interface{})
+	instance := instances["formata-builder"].(map[string]interface{})
+	attr := instance["attr"].(map[string]interface{})
+	if attr["orgSlug"] != "acme-org" {
+		t.Fatalf("resource attr = %#v", attr)
+	}
+}
+
+func TestCerbosAuthorizerCanAccessMapsDenyToFalse(t *testing.T) {
+	pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"resourceInstances":{"platform-admin-console":{"actions":{"access":"EFFECT_DENY"}}}}`))
+	}))
+	defer pdp.Close()
+
+	authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now)
+	allowed, err := authorizer.CanAccess(context.Background(), &AccountUser{
+		Email:           "admin@example.com",
+		IsPlatformAdmin: true,
+		Status:          "active",
+	}, "platform_admin_console", "platform-admin-console", nil, "access")
+	if err != nil {
+		t.Fatalf("CanAccess returned error: %v", err)
+	}
+	if allowed {
+		t.Fatal("expected deny to map to false")
+	}
+}

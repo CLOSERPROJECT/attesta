@@ -151,6 +151,7 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 type fakeAuthorizer struct {
 	decide       func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error)
 	deleteDecide func(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error)
+	accessDecide func(user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error)
 }
 
 func (f fakeAuthorizer) CanComplete(ctx context.Context, actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
@@ -165,4 +166,33 @@ func (f fakeAuthorizer) CanDeleteStream(ctx context.Context, user *AccountUser, 
 		return true, nil
 	}
 	return f.deleteDecide(user, workflowKey, createdByUserID, hasProcesses)
+}
+
+func (f fakeAuthorizer) CanAccess(ctx context.Context, user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error) {
+	if f.accessDecide == nil {
+		return fakeCanAccessDecision(user, resourceKind, action), nil
+	}
+	return f.accessDecide(user, resourceKind, resourceID, resourceAttr, action)
+}
+
+func fakeCanAccessDecision(user *AccountUser, resourceKind, action string) bool {
+	if user == nil {
+		return false
+	}
+	switch {
+	case resourceKind == cerbosResourcePlatformAdminConsole && action == cerbosActionAccess:
+		return user.IsPlatformAdmin
+	case resourceKind == cerbosResourceOrgAdminConsole && action == cerbosActionAccess:
+		return userIsOrgAdmin(user)
+	case resourceKind == cerbosResourceCatalog && action == cerbosActionView:
+		return user.IsPlatformAdmin || userIsOrgAdmin(user)
+	case resourceKind == cerbosResourceFormataBuilder && action == cerbosActionView:
+		return userIsOrgAdmin(user)
+	case resourceKind == cerbosResourceFormataBuilder && action == cerbosActionSave:
+		return user.IsPlatformAdmin || userIsOrgAdmin(user)
+	case resourceKind == "stream" && action == cerbosActionPurge:
+		return user.IsPlatformAdmin
+	default:
+		return false
+	}
 }
