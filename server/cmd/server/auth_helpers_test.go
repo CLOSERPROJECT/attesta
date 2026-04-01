@@ -30,7 +30,8 @@ func TestRequestedRoleSlugs(t *testing.T) {
 }
 
 func TestAccountUserFromIdentity(t *testing.T) {
-	server := &Server{}
+	server := &Server{
+		authorizer: fakeAuthorizer{}}
 	user := server.accountUserFromIdentity(context.Background(), IdentityUser{
 		ID:         "user-1",
 		Email:      "legacy@example.com",
@@ -50,6 +51,7 @@ func TestAccountUserFromIdentity(t *testing.T) {
 func TestReadSessionAndCurrentUserIdentityOnly(t *testing.T) {
 	now := time.Now().UTC()
 	server := &Server{
+		authorizer: fakeAuthorizer{},
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				if sessionSecret == "expired" {
@@ -82,7 +84,8 @@ func TestReadSessionAndCurrentUserIdentityOnly(t *testing.T) {
 }
 
 func TestReadSessionRequiresIdentity(t *testing.T) {
-	server := &Server{}
+	server := &Server{
+		authorizer: fakeAuthorizer{}}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	if _, err := server.readSession(req); !errors.Is(err, ErrIdentityUnauthorized) {
@@ -92,6 +95,7 @@ func TestReadSessionRequiresIdentity(t *testing.T) {
 
 func TestCurrentUserPropagatesIdentityLookupError(t *testing.T) {
 	server := &Server{
+		authorizer: fakeAuthorizer{},
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", time.Now().Add(time.Hour)), nil
@@ -162,7 +166,8 @@ func TestCurrentUserReturnsPlatformAdminFromSession(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "change-me")
 
 	now := time.Now().UTC()
-	server := &Server{now: func() time.Time { return now }}
+	server := &Server{
+		authorizer: fakeAuthorizer{}, now: func() time.Time { return now }}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 
@@ -263,6 +268,7 @@ func TestRequireOrgAdmin(t *testing.T) {
 	admin := AccountUser{ID: primitive.NewObjectID(), OrgID: &orgID, OrgSlug: "acme", Email: "admin@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
 	member := AccountUser{ID: primitive.NewObjectID(), OrgID: &orgID, OrgSlug: "acme", Email: "member@example.com", RoleSlugs: []string{"qa-reviewer"}, Status: "active"}
 	server := &Server{
+		authorizer:  fakeAuthorizer{},
 		identity:    testIdentityForSessions(now, map[string]AccountUser{"session-admin": admin, "session-member": member}),
 		enforceAuth: true,
 		now:         func() time.Time { return now },
@@ -312,6 +318,7 @@ func TestRequirePlatformAdmin(t *testing.T) {
 	now := time.Now().UTC()
 	member := AccountUser{ID: primitive.NewObjectID(), Email: "member@example.com", Status: "active"}
 	server := &Server{
+		authorizer:  fakeAuthorizer{},
 		identity:    testIdentityForSessions(now, map[string]AccountUser{"session-member": member}),
 		enforceAuth: true,
 		now:         func() time.Time { return now },
@@ -405,7 +412,8 @@ func TestCookieAndPlatformAdminHelpers(t *testing.T) {
 		if user := platformAdminAccountUser(); user != nil {
 			t.Fatalf("platformAdminAccountUser = %#v, want nil", user)
 		}
-		server := &Server{now: time.Now}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, now: time.Now}
 		if session, user, ok := server.platformAdminSession(); ok || session != nil || user != nil {
 			t.Fatalf("platformAdminSession = %#v %#v %t", session, user, ok)
 		}
@@ -414,7 +422,8 @@ func TestCookieAndPlatformAdminHelpers(t *testing.T) {
 	t.Run("platform admin helpers derive session and user", func(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "ADMIN@EXAMPLE.COM")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
-		server := &Server{now: func() time.Time { return time.Date(2026, time.March, 24, 9, 0, 0, 0, time.UTC) }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, now: func() time.Time { return time.Date(2026, time.March, 24, 9, 0, 0, 0, time.UTC) }}
 		user := platformAdminAccountUser()
 		if user == nil || user.Email != "admin@example.com" || !user.IsPlatformAdmin {
 			t.Fatalf("platformAdminAccountUser = %#v", user)

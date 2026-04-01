@@ -1,0 +1,8 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "platform_admin_console"
+  rules:
+    - actions: ["access"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]

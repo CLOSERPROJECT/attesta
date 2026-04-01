@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "formata_builder"
+  rules:
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["org_admin"]
+
+    - actions: ["save"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    - actions: ["save"]
+      effect: EFFECT_ALLOW
+      roles: ["org_admin"]

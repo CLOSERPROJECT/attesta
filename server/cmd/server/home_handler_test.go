@@ -56,8 +56,9 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	store.SeedProcess(done)
 
 	server := &Server{
-		store: store,
-		tmpl:  homeTestTemplates(),
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
 		configProvider: func() (RuntimeConfig, error) {
 			cfg := testRuntimeConfig()
 			cfg.Workflow.Description = "Demo workflow description"
@@ -106,8 +107,9 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow", "number")
 
 	server := &Server{
-		tmpl:      homePickerTemplates(),
-		configDir: tempDir,
+		authorizer: fakeAuthorizer{},
+		tmpl:       homePickerTemplates(),
+		configDir:  tempDir,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -136,8 +138,9 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 
 	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
 	server := &Server{
-		tmpl:      tmpl,
-		configDir: tempDir,
+		authorizer: fakeAuthorizer{},
+		tmpl:       tmpl,
+		configDir:  tempDir,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -186,6 +189,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		sessionID := "session-org-admin"
 
 		server := &Server{
+			authorizer:  fakeAuthorizer{},
 			store:       store,
 			identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
 			tmpl:        tmpl,
@@ -225,6 +229,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		sessionID := "session-member"
 
 		server := &Server{
+			authorizer:  fakeAuthorizer{},
 			store:       store,
 			identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
 			tmpl:        tmpl,
@@ -273,8 +278,9 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	}
 
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  tmpl,
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		tmpl:       tmpl,
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return IdentitySession{Secret: sessionSecret, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil
@@ -520,9 +526,10 @@ func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	})
 
 	server := &Server{
-		tmpl:      homePickerTemplates(),
-		configDir: tempDir,
-		store:     store,
+		authorizer: fakeAuthorizer{},
+		tmpl:       homePickerTemplates(),
+		configDir:  tempDir,
+		store:      store,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -564,8 +571,9 @@ func TestSortHomeProcessListByStatus(t *testing.T) {
 func TestHandleHomeErrorPaths(t *testing.T) {
 	t.Run("workflow options error", func(t *testing.T) {
 		server := &Server{
-			tmpl:      homePickerTemplates(),
-			configDir: t.TempDir(),
+			authorizer: fakeAuthorizer{},
+			tmpl:       homePickerTemplates(),
+			configDir:  t.TempDir(),
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -581,8 +589,9 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 		writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 
 		server := &Server{
-			tmpl:      template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
-			configDir: tempDir,
+			authorizer: fakeAuthorizer{},
+			tmpl:       template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
+			configDir:  tempDir,
 			configProvider: func() (RuntimeConfig, error) {
 				return RuntimeConfig{}, errors.New("not used")
 			},
@@ -600,7 +609,8 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 	t.Run("selected workflow error", func(t *testing.T) {
 		server := &Server{
-			tmpl: testTemplates(),
+			authorizer: fakeAuthorizer{},
+			tmpl:       testTemplates(),
 			configProvider: func() (RuntimeConfig, error) {
 				return RuntimeConfig{}, errors.New("config down")
 			},
@@ -616,8 +626,9 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 
 	t.Run("template error", func(t *testing.T) {
 		server := &Server{
-			store: NewMemoryStore(),
-			tmpl:  template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
+			tmpl:       template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
 			configProvider: func() (RuntimeConfig, error) {
 				return testRuntimeConfig(), nil
 			},

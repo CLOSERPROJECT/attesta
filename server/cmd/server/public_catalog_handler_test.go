@@ -33,10 +33,11 @@ func (s *failingCatalogStore) LoadFormataBuilderStream(ctx context.Context) (*Fo
 
 func catalogServer(now time.Time, identity *publicCatalogIdentity) *Server {
 	return &Server{
-		store: NewMemoryStore(),
-		identity: identity,
+		authorizer:  fakeAuthorizer{},
+		store:       NewMemoryStore(),
+		identity:    identity,
 		enforceAuth: true,
-		now: func() time.Time { return now },
+		now:         func() time.Time { return now },
 	}
 }
 
@@ -119,7 +120,8 @@ func TestHandlePublicCatalog(t *testing.T) {
 }
 
 func TestHandlePublicCatalogMethodNotAllowed(t *testing.T) {
-	server := &Server{store: NewMemoryStore(), identity: &fakeIdentityStore{}}
+	server := &Server{
+		authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: &fakeIdentityStore{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/catalog", nil)
 	rec := httptest.NewRecorder()
 	server.handlePublicCatalog(rec, req)
@@ -198,6 +200,7 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 
 	t.Run("not configured", func(t *testing.T) {
 		server := &Server{
+			authorizer:  fakeAuthorizer{},
 			identity:    catalogAuthIdentity(now, true),
 			enforceAuth: true,
 			now:         func() time.Time { return now },

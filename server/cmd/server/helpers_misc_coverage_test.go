@@ -39,9 +39,10 @@ func TestHelperCoverageBranches(t *testing.T) {
 	})
 
 	t.Run("selected workflow falls back and errors", func(t *testing.T) {
-		server := &Server{configProvider: func() (RuntimeConfig, error) {
-			return RuntimeConfig{}, errors.New("boom")
-		}}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, configProvider: func() (RuntimeConfig, error) {
+				return RuntimeConfig{}, errors.New("boom")
+			}}
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, "wrong-type"))
 		if _, _, err := server.selectedWorkflow(req); err == nil || !strings.Contains(err.Error(), "boom") {
@@ -57,7 +58,8 @@ func TestHelperCoverageBranches(t *testing.T) {
 		if sameCatalogModTimes(map[string]time.Time{"a": now}, map[string]time.Time{"a": now.Add(time.Second)}) {
 			t.Fatal("different modtimes should not match")
 		}
-		server := &Server{}
+		server := &Server{
+			authorizer: fakeAuthorizer{}}
 		cfg := RuntimeConfig{
 			Roles:       []WorkflowRole{{Slug: "approver"}},
 			Departments: []Department{{ID: "qa"}},
@@ -89,7 +91,8 @@ func TestHelperCoverageBranches(t *testing.T) {
 func TestRenderPlatformAdminAdditionalBranches(t *testing.T) {
 	now := time.Now().UTC()
 	server := &Server{
-		tmpl: template.Must(template.New("platform-admin-test").Parse(`{{define "platform_admin.html"}}{{range .Organizations}}{{.Name}}:{{.Slug}}|{{end}}{{.Error}}{{end}}`)),
+		authorizer: fakeAuthorizer{},
+		tmpl:       template.Must(template.New("platform-admin-test").Parse(`{{define "platform_admin.html"}}{{range .Organizations}}{{.Name}}:{{.Slug}}|{{end}}{{.Error}}{{end}}`)),
 		identity: &fakeIdentityStore{
 			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
 				return []IdentityOrg{
@@ -111,7 +114,8 @@ func TestRenderPlatformAdminAdditionalBranches(t *testing.T) {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 
-	broken := &Server{tmpl: template.Must(template.New("broken").Parse(`{{define "platform_admin.html"}}{{template "missing" .}}{{end}}`)), now: func() time.Time { return now }}
+	broken := &Server{
+		authorizer: fakeAuthorizer{}, tmpl: template.Must(template.New("broken").Parse(`{{define "platform_admin.html"}}{{template "missing" .}}{{end}}`)), now: func() time.Time { return now }}
 	errRec := httptest.NewRecorder()
 	broken.renderPlatformAdmin(errRec, &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
 	if errRec.Code != http.StatusInternalServerError {
@@ -173,7 +177,8 @@ func TestHandlePublicCatalogAdditionalOrderingAndStreamBranches(t *testing.T) {
 }
 
 func TestOrganizationLogoAdditionalBranches(t *testing.T) {
-	server := &Server{}
+	server := &Server{
+		authorizer: fakeAuthorizer{}}
 
 	t.Run("no multipart form", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", nil)
@@ -210,10 +215,11 @@ func TestOrganizationLogoAdditionalBranches(t *testing.T) {
 		}
 	})
 
-		t.Run("generic save failure", func(t *testing.T) {
+	t.Run("generic save failure", func(t *testing.T) {
 		server := &Server{
-			store: &failingSaveAttachmentStore{Store: NewMemoryStore(), err: errors.New("boom")},
-			now:   time.Now,
+			authorizer: fakeAuthorizer{},
+			store:      &failingSaveAttachmentStore{Store: NewMemoryStore(), err: errors.New("boom")},
+			now:        time.Now,
 		}
 		req := organizationLogoRequest(t, "logo.png", "", []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
 		attachmentID, errMsg := server.parseOrganizationLogoUpload(context.Background(), req, "Acme Org")

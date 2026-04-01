@@ -19,7 +19,8 @@ func TestPlatformAdminIdentitySession(t *testing.T) {
 	t.Run("missing identity", func(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
-		server := &Server{}
+		server := &Server{
+			authorizer: fakeAuthorizer{}}
 		if _, err := server.platformAdminIdentitySession(context.Background()); !errors.Is(err, ErrIdentityUnauthorized) {
 			t.Fatalf("error = %v", err)
 		}
@@ -29,6 +30,7 @@ func TestPlatformAdminIdentitySession(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return IdentitySession{}, ErrIdentityUnauthorized
@@ -43,19 +45,21 @@ func TestPlatformAdminIdentitySession(t *testing.T) {
 
 func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 	t.Run("no identity or creds is a no-op", func(t *testing.T) {
-		server := &Server{}
+		server := &Server{
+			authorizer: fakeAuthorizer{}}
 		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
 			t.Fatalf("error = %v", err)
 		}
 
 		t.Setenv("ADMIN_EMAIL", "")
 		t.Setenv("ADMIN_PASSWORD", "")
-		server = &Server{identity: &fakeIdentityStore{
-			ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
-				t.Fatal("did not expect bootstrap call")
-				return nil
-			},
-		}}
+		server = &Server{
+			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					t.Fatal("did not expect bootstrap call")
+					return nil
+				},
+			}}
 		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
 			t.Fatalf("error = %v", err)
 		}
@@ -67,6 +71,7 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 		var gotEmail string
 		var gotPassword string
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
 					gotEmail = email
@@ -87,6 +92,7 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
 					return errors.New("boom")
@@ -103,7 +109,8 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 	now := time.Now().UTC()
 
 	t.Run("platform organizations handles nil and errors", func(t *testing.T) {
-		server := &Server{}
+		server := &Server{
+			authorizer: fakeAuthorizer{}}
 		if got := server.platformOrganizations(context.Background()); got != nil {
 			t.Fatalf("got = %#v, want nil", got)
 		}
@@ -120,6 +127,7 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 
 	t.Run("platform organizations sorts values", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
 					return []IdentityOrg{
@@ -137,6 +145,7 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 
 	t.Run("render platform admin", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
 					return []IdentityOrg{{ID: "team-1", Slug: "acme", Name: "Acme Org"}}, nil
@@ -163,6 +172,7 @@ func TestEnsurePlatformAdminOwnsOrganizationErrorBranches(t *testing.T) {
 	t.Run("current user lookup failure closes session", func(t *testing.T) {
 		var deletedSecret string
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -188,6 +198,7 @@ func TestEnsurePlatformAdminOwnsOrganizationErrorBranches(t *testing.T) {
 	t.Run("membership listing failure closes session", func(t *testing.T) {
 		var deletedSecret string
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -216,6 +227,7 @@ func TestEnsurePlatformAdminOwnsOrganizationErrorBranches(t *testing.T) {
 	t.Run("promotion failure closes session", func(t *testing.T) {
 		var deletedSecret string
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -246,6 +258,7 @@ func TestEnsurePlatformAdminOwnsOrganizationErrorBranches(t *testing.T) {
 
 	t.Run("owner match by email returns session", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -271,6 +284,7 @@ func TestEnsurePlatformAdminOwnsOrganizationErrorBranches(t *testing.T) {
 	t.Run("add membership by user id failure closes session", func(t *testing.T) {
 		var deletedSecret string
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -302,6 +316,7 @@ func TestEnsurePlatformAdminOwnsOrganizationErrorBranches(t *testing.T) {
 	t.Run("missing appwrite identity on current user closes session", func(t *testing.T) {
 		var deletedSecret string
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -339,7 +354,8 @@ func TestHandleAdminOrgsCreateOrganizationWithPlatformAdmin(t *testing.T) {
 	var deletedSecret string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				loginEmail = email
@@ -392,6 +408,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 
 	t.Run("get renders organizations", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
 					return []IdentityOrg{{ID: "team-1", Slug: "acme", Name: "Acme Org"}}, nil
@@ -416,7 +433,8 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	})
 
 	t.Run("identity unavailable", func(t *testing.T) {
-		server := &Server{tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -429,7 +447,8 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	})
 
 	t.Run("invalid subpath", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/unknown", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -442,7 +461,8 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	})
 
 	t.Run("missing organization name", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(""))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
@@ -457,6 +477,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 
 	t.Run("duplicate organization slug", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					org := IdentityOrg{ID: "team-1", Slug: "fresh-org", Name: "Fresh Org"}
@@ -480,7 +501,8 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	})
 
 	t.Run("method not allowed", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPut, "/admin/orgs", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -494,6 +516,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 
 	t.Run("platform admin appwrite login fails on create org", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					return nil, ErrIdentityNotFound
@@ -532,7 +555,8 @@ func TestHandleAdminOrgsInviteOrgAdminWithPlatformAdmin(t *testing.T) {
 	var deletedSecret string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				loginEmail = email
@@ -620,7 +644,8 @@ func TestHandleAdminOrgsInviteOrgAdminSendsInviteForUnknownEmail(t *testing.T) {
 	var deletedSecret string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				loginEmail = email
@@ -696,7 +721,8 @@ func TestHandleAdminOrgsInviteOrgAdminUpdatesExistingMembershipOnly(t *testing.T
 	var deletedSecret string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				loginEmail = email
@@ -765,6 +791,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 
 	t.Run("already org admin", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -806,6 +833,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 
 	t.Run("reject cross-org email", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -846,7 +874,8 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 	})
 
 	t.Run("missing email", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		form := url.Values{}
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
@@ -863,7 +892,8 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 	})
 
 	t.Run("missing organization", func(t *testing.T) {
-		server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		form := url.Values{}
 		form.Set("intent", "invite_org_admin")
 		form.Set("email", "owner@example.com")
@@ -881,6 +911,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 
 	t.Run("organization not found", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					return nil, ErrIdentityNotFound
@@ -908,6 +939,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 
 	t.Run("platform appwrite login fails", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return IdentitySession{}, ErrIdentityUnauthorized
@@ -939,6 +971,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 
 	t.Run("existing user lookup failure", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -980,6 +1013,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 
 	t.Run("invite failure", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 					return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -1033,7 +1067,8 @@ func TestHandleAdminOrgsCreateOrganizationWithLogo(t *testing.T) {
 	var uploadedFilename string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -1099,6 +1134,7 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 
 	t.Run("invalid logo type", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					return nil, ErrIdentityNotFound
@@ -1137,6 +1173,7 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 
 	t.Run("create organization failure", func(t *testing.T) {
 		server := &Server{
+			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					return nil, ErrIdentityNotFound
@@ -1167,7 +1204,8 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 
 	t.Run("logo upload failure", func(t *testing.T) {
 		server := &Server{
-			store: NewMemoryStore(),
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					return nil, ErrIdentityNotFound
@@ -1216,7 +1254,8 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 
 	t.Run("organization update failure after logo", func(t *testing.T) {
 		server := &Server{
-			store: NewMemoryStore(),
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
 			identity: &fakeIdentityStore{
 				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 					return nil, ErrIdentityNotFound
@@ -1275,6 +1314,7 @@ func TestEnsurePlatformAdminOwnsOrganizationAddsMembershipWhenMissing(t *testing
 	var addedOrgSlug string
 	var addedUserID string
 	server := &Server{
+		authorizer: fakeAuthorizer{},
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -1311,6 +1351,7 @@ func TestEnsurePlatformAdminOwnsOrganizationFallsBackToEmailInviteWithoutUserID(
 	now := time.Now().UTC()
 	var invitedEmail string
 	server := &Server{
+		authorizer: fakeAuthorizer{},
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -1346,6 +1387,7 @@ func TestEnsurePlatformAdminOwnsOrganizationPromotesMembershipWhenNeeded(t *test
 	now := time.Now().UTC()
 	var updatedMembershipID string
 	server := &Server{
+		authorizer: fakeAuthorizer{},
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
 				return fakeIdentitySession("platform-session", "platform-user", now.Add(time.Hour)), nil
@@ -1388,7 +1430,8 @@ func TestHandleOrgAdminUsersCreateOrgWithIdentity(t *testing.T) {
 	var createName string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1448,7 +1491,8 @@ func TestHandleOrgAdminUsersCreateOrgIdentityValidation(t *testing.T) {
 	now := time.Now().UTC()
 	createCalls := 0
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1524,7 +1568,8 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	var deletedLogoFileID string
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1623,7 +1668,8 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 func TestHandleOrgAdminLogoWithIdentity(t *testing.T) {
 	now := time.Now().UTC()
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1686,7 +1732,8 @@ func TestHandleOrgAdminRolesWithIdentity(t *testing.T) {
 	var updatedRoles []IdentityRole
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1746,7 +1793,8 @@ func TestHandleOrgAdminRolesSlugifiesAndTruncatesName(t *testing.T) {
 	var updatedRoles []IdentityRole
 
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1804,7 +1852,8 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 		},
 	}
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1882,7 +1931,8 @@ func TestHandleOrgAdminUsersInviteWithIdentity(t *testing.T) {
 	var invitedAdmin bool
 	var invitedRedirect string
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1951,7 +2001,8 @@ func TestHandleOrgAdminUsersInviteIdentityDuplicatePending(t *testing.T) {
 	now := time.Now().UTC()
 	inviteCalls := 0
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -1998,7 +2049,8 @@ func TestHandleOrgAdminUsersInviteIdentityExistingAndCrossOrg(t *testing.T) {
 	now := time.Now().UTC()
 	updatedUsers := make(map[string][]string)
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -2066,7 +2118,8 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 	deletedMemberships := []string{}
 	updatedUsers := map[string][]string{}
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -2156,7 +2209,8 @@ func TestHandleOrgAdminRolesIdentityErrors(t *testing.T) {
 	now := time.Now().UTC()
 	newServer := func(org IdentityOrg, updateErr error) *Server {
 		return &Server{
-			store: NewMemoryStore(),
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
 			identity: &fakeIdentityStore{
 				getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 					return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -2230,7 +2284,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			updated++
 			return IdentityMembership{ID: membershipID, Email: "pending@example.com"}, nil
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2244,7 +2299,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 	t.Run("set roles rejects unknown user", func(t *testing.T) {
 		fake := baseIdentity()
 		fake.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) { return nil, nil }
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=missing&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2260,7 +2316,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.listOrganizationMembershipsFunc = func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
 			return []IdentityMembership{{ID: "membership-1", UserID: "user-1", Email: "owner@example.com", Confirmed: true}}, nil
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-1"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2273,7 +2330,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 
 	t.Run("invite rejects unknown role", func(t *testing.T) {
 		fake := baseIdentity()
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com&roles=missing"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2290,7 +2348,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.getUserByEmailFunc = func(ctx context.Context, email string) (IdentityUser, error) {
 			return IdentityUser{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2309,7 +2368,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.updateUserLabelsFunc = func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
 			return IdentityUser{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver&roles=org-admin"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2328,7 +2388,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.deleteOrganizationMembershipFunc = func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
 			return errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2354,7 +2415,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 				return IdentityOrg{}, errors.New("boom")
 			},
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2390,7 +2452,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		part, _ := writer.CreateFormFile("logo", "logo.png")
 		_, _ = io.WriteString(part, "PNG")
 		_ = writer.Close()
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader(body.String()))
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2415,7 +2478,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 				return nil, ErrIdentityNotFound
 			}
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Other+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2435,7 +2499,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.updateOrganizationFunc = func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error) {
 			return IdentityOrg{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Updated+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2458,7 +2523,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.updateUserLabelsFunc = func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
 			return IdentityUser{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2474,7 +2540,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.listOrganizationMembershipsFunc = func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
 			return nil, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2493,7 +2560,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.updateOrganizationMembershipFunc = func(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
 			return IdentityMembership{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2512,7 +2580,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.updateUserLabelsFunc = func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
 			return IdentityUser{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=member%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2532,7 +2601,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.inviteOrganizationUserFunc = func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
 			return IdentityMembership{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2552,7 +2622,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.inviteOrganizationUserFunc = func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
 			return IdentityMembership{}, errors.New("appwrite memberships.create: duplicate membership state")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 
 		var logs bytes.Buffer
 		oldWriter := log.Writer()
@@ -2590,7 +2661,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
 			return []IdentityUser{{ID: "user-2", Email: "member@example.com", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("approver")}, Status: "active"}}, nil
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=missing"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2610,7 +2682,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.getUserByIDFunc = func(ctx context.Context, userID string) (IdentityUser, error) {
 			return IdentityUser{}, errors.New("boom")
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2626,7 +2699,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.getOrganizationBySlugFunc = func(ctx context.Context, slug string) (*IdentityOrg, error) {
 			return nil, ErrIdentityNotFound
 		}
-		server := &Server{store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
+		server := &Server{
+			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
 		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Updated+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -2641,7 +2715,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 func TestLoadOrgAdminStateIdentityFallbacks(t *testing.T) {
 	now := time.Now().UTC()
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 				return &IdentityOrg{
@@ -2690,6 +2765,7 @@ func TestHandleOrgAdminLogoIdentityBranches(t *testing.T) {
 			identity.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) { return nil, nil }
 		}
 		return &Server{
+			authorizer:  fakeAuthorizer{},
 			store:       NewMemoryStore(),
 			identity:    identity,
 			tmpl:        testTemplates(),
@@ -2792,7 +2868,8 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 	now := time.Now().UTC()
 	baseServer := func(user IdentityUser, org *IdentityOrg, updateErr error) *Server {
 		return &Server{
-			store: NewMemoryStore(),
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
 			identity: &fakeIdentityStore{
 				getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 					return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -2937,7 +3014,8 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 	now := time.Now().UTC()
 	baseServer := func(user IdentityUser) *Server {
 		return &Server{
-			store: NewMemoryStore(),
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
 			identity: &fakeIdentityStore{
 				getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 					return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
@@ -3038,7 +3116,8 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 func TestHandleOrgAdminUsersIdentityMultipartLogoValidation(t *testing.T) {
 	now := time.Now().UTC()
 	server := &Server{
-		store: NewMemoryStore(),
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil

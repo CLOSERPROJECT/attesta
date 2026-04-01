@@ -27,6 +27,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	}
 	orgAdminSession := "session-builder-org-admin"
 	server := &Server{
+		authorizer:  fakeAuthorizer{},
 		store:       store,
 		identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{orgAdminSession: orgAdmin}),
 		enforceAuth: true,
@@ -186,7 +187,8 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 	server := &Server{
-		store: store,
+		authorizer: fakeAuthorizer{},
+		store:      store,
 		identity: testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{
 			orgAdminSession: orgAdmin,
 			"session-plain": plain,
