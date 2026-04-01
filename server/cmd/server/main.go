@@ -407,6 +407,8 @@ type ProcessListItem struct {
 type HomeView struct {
 	PageBase
 	WorkflowDescription string
+	Error               string
+	CanStartProcess     bool
 	Sort                string
 	Processes           []ProcessListItem
 	History             []ProcessListItem
@@ -1344,12 +1346,9 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 	return options, nil
 }
 
-func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error) {
+func (s *Server) selectedWorkflowUnvalidated(r *http.Request) (string, RuntimeConfig, error) {
 	if value := r.Context().Value(workflowContextKey{}); value != nil {
 		if selected, ok := value.(workflowContextValue); ok {
-			if err := s.validateWorkflowRefs(r.Context(), selected.Cfg); err != nil {
-				return "", RuntimeConfig{}, err
-			}
 			return selected.Key, selected.Cfg, nil
 		}
 	}
@@ -1357,10 +1356,36 @@ func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error
 	if err != nil {
 		return "", RuntimeConfig{}, err
 	}
+	return s.defaultWorkflowKey(), cfg, nil
+}
+
+func (s *Server) selectedWorkflow(r *http.Request) (string, RuntimeConfig, error) {
+	key, cfg, err := s.selectedWorkflowUnvalidated(r)
+	if err != nil {
+		return "", RuntimeConfig{}, err
+	}
 	if err := s.validateWorkflowRefs(r.Context(), cfg); err != nil {
 		return "", RuntimeConfig{}, err
 	}
-	return s.defaultWorkflowKey(), cfg, nil
+	return key, cfg, nil
+}
+
+func (s *Server) selectedWorkflowOrRedirectHome(w http.ResponseWriter, r *http.Request) (string, RuntimeConfig, bool) {
+	workflowKey, cfg, err := s.selectedWorkflow(r)
+	if err == nil {
+		return workflowKey, cfg, true
+	}
+
+	var validationErr *WorkflowRefValidationError
+	if errors.As(err, &validationErr) {
+		if fallbackKey, _, fallbackErr := s.selectedWorkflowUnvalidated(r); fallbackErr == nil && strings.TrimSpace(fallbackKey) != "" {
+			redirectWorkflowHomeWithMessage(w, r, fallbackKey, validationErr.Error())
+			return "", RuntimeConfig{}, false
+		}
+	}
+
+	http.Error(w, err.Error(), http.StatusInternalServerError)
+	return "", RuntimeConfig{}, false
 }
 
 func (s *Server) validateWorkflowRefs(ctx context.Context, cfg RuntimeConfig) error {
@@ -1591,6 +1616,15 @@ func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, messag
 	trimmedMessage := strings.TrimSpace(message)
 	if trimmedKey != "" && trimmedMessage != "" {
 		target += "?" + url.Values{trimmedKey: []string{trimmedMessage}}.Encode()
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
+func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, workflowKey, message string) {
+	target := workflowPath(workflowKey) + "/"
+	trimmedMessage := strings.TrimSpace(message)
+	if trimmedMessage != "" {
+		target += "?" + url.Values{"error": []string{trimmedMessage}}.Encode()
 	}
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
@@ -3480,9 +3514,8 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.NotFound(w, r)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	if s.store == nil {
@@ -3553,12 +3586,23 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
+	workflowKey, cfg, err := s.selectedWorkflowUnvalidated(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	ctx := r.Context()
+	workflowError := homePickerMessage(r, "error")
+	if validationErr := s.validateWorkflowRefs(ctx, cfg); validationErr != nil {
+		var refErr *WorkflowRefValidationError
+		if !errors.As(validationErr, &refErr) {
+			http.Error(w, validationErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		if workflowError == "" {
+			workflowError = refErr.Error()
+		}
+	}
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
 	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
@@ -3600,6 +3644,8 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	view := HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
+		Error:               workflowError,
+		CanStartProcess:     workflowError == "",
 		Sort:                sortKey,
 		Processes:           processes,
 		History:             history,
@@ -3614,9 +3660,8 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
@@ -3729,9 +3774,8 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	if !ok {
 		return
 	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
@@ -4002,9 +4046,8 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, processID string) {
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
@@ -4036,9 +4079,8 @@ func (s *Server) handleProcessActionsPartial(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4070,9 +4112,8 @@ func (s *Server) handleProcessActionsPartial(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Request, processID string) {
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4137,9 +4178,8 @@ func (s *Server) ensureProcessCompletionArtifacts(ctx context.Context, cfg Runti
 }
 
 func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, processID string) {
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4199,9 +4239,8 @@ func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, 
 }
 
 func (s *Server) handleNotarizedJSON(w http.ResponseWriter, r *http.Request, processID string) {
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4218,9 +4257,8 @@ func (s *Server) handleNotarizedJSON(w http.ResponseWriter, r *http.Request, pro
 }
 
 func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, processID string) {
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4237,9 +4275,8 @@ func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, proces
 }
 
 func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4296,9 +4333,8 @@ func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.Request, processID, attachmentID string) {
-	workflowKey, _, err := s.selectedWorkflow(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, _, ok := s.selectedWorkflowOrRedirectHome(w, r)
+	if !ok {
 		return
 	}
 	process, err := s.loadProcess(r.Context(), processID)
@@ -4348,10 +4384,8 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	if !ok {
 		return
 	}
-	workflowKey, cfg, err := s.selectedWorkflow(r)
-	if err != nil {
-		logRequestError(r, err, "failed to resolve workflow for completion")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	workflowKey, cfg, selected := s.selectedWorkflowOrRedirectHome(w, r)
+	if !selected {
 		return
 	}
 	actor := Actor{
