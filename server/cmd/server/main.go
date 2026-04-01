@@ -3514,8 +3514,9 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
-	if !ok {
+	workflowKey, cfg, err := s.selectedWorkflowUnvalidated(r)
+	if err != nil {
+		http.NotFound(w, r)
 		return
 	}
 	if s.store == nil {
