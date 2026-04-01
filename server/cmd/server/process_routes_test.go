@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -185,6 +187,65 @@ func TestHandleWorkflowRoutesAdditionalBranches(t *testing.T) {
 	server.handleWorkflowRoutes(recEvents, reqEvents)
 	if recEvents.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recEvents.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleWorkflowRoutesRedirectsInvalidWorkflowToWorkflowHome(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTwoSubstepWorkflowConfig(t, tempDir+"/workflow.yaml", "Workflow with missing refs")
+
+	store := NewMemoryStore()
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+			"1_2": {State: "pending"},
+		},
+	}
+	store.SeedProcess(process)
+
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return IdentitySession{Secret: sessionSecret, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "user@example.com"}, nil
+			},
+			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+				return nil, nil
+			},
+		},
+		authorizer:  fakeAuthorizer{},
+		sse:         newSSEHub(),
+		enforceAuth: true,
+		now:         func() time.Time { return time.Date(2026, 2, 4, 11, 0, 0, 0, time.UTC) },
+		configDir:   tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/process/"+process.ID.Hex(), nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	server.handleWorkflowRoutes(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	location := rec.Header().Get("Location")
+	parsed, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	if parsed.Path != "/w/workflow/" {
+		t.Fatalf("redirect path = %q, want %q", parsed.Path, "/w/workflow/")
+	}
+	if got := parsed.Query().Get("error"); !strings.Contains(got, "workflow references are invalid") {
+		t.Fatalf("redirect error = %q, want workflow validation message", got)
 	}
 }
 

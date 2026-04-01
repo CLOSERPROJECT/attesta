@@ -82,15 +82,25 @@
         <p class="hero-description">{{.WorkflowDescription}}</p>
       {{end}}
     </div>
-    <form method="post" action="{{.WorkflowPath}}/process/start">
-      <button class="primary" type="submit">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-          <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
-        </svg>
-        New stream
-      </button>
-    </form>
+    {{if .CanStartProcess}}
+      <form method="post" action="{{.WorkflowPath}}/process/start">
+        <button class="primary" type="submit">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+            <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+          </svg>
+          New stream
+        </button>
+      </form>
+    {{end}}
   </section>
+
+  {{if .Error}}
+    <section class="panel">
+      <h2 style="margin-top: 0;">Stream configuration issue</h2>
+      <p class="muted">This stream cannot start new processes until its organization and role references are fixed.</p>
+      <div class="error" style="margin-bottom: 0;">{{.Error}}</div>
+    </section>
+  {{end}}
 
   <section class="panel">
     <div class="process-toolbar">

@@ -230,6 +230,60 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
 		}
 	})
+
+	t.Run("creator can delete stream even when workflow refs are invalid", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{
+			ID:             primitive.NewObjectID(),
+			IdentityUserID: "creator-invalid-user",
+			Email:          "creator-invalid@example.com",
+			RoleSlugs:      []string{"org-admin"},
+			Status:         "active",
+		}
+		sessionID := "session-invalid"
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Invalid refs stream"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+
+		server := &Server{
+			store: store,
+			identity: &fakeIdentityStore{
+				getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+					return IdentitySession{Secret: sessionSecret, ExpiresAt: now.Add(time.Hour)}, nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: user.IdentityUserID, Email: user.Email, IsOrgAdmin: true}, nil
+				},
+				listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+					return nil, nil
+				},
+			},
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if location := rec.Header().Get("Location"); !strings.Contains(location, "confirmation=Invalid+refs+stream+was+deleted.") {
+			t.Fatalf("location = %q", location)
+		}
+		if _, err := store.LoadFormataBuilderStreamByID(t.Context(), saved.ID); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("LoadFormataBuilderStreamByID error = %v, want mongo.ErrNoDocuments", err)
+		}
+	})
 }
 
 func workflowStreamYAML(name string) string {

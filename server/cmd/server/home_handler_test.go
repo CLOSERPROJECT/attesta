@@ -247,6 +247,72 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 
 }
 
+func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	cfg := RuntimeConfig{
+		Organizations: []WorkflowOrganization{
+			{Slug: "org1", Name: "Organization 1"},
+		},
+		Roles: []WorkflowRole{
+			{OrgSlug: "org1", Slug: "dep1", Name: "Department 1"},
+		},
+		Workflow: WorkflowDef{
+			Name: "Workflow with missing refs",
+			Steps: []WorkflowStep{
+				{
+					StepID:           "1",
+					Title:            "Step 1",
+					Order:            1,
+					OrganizationSlug: "org1",
+					Substep: []WorkflowSub{
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "string"},
+					},
+				},
+			},
+		},
+	}
+
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  tmpl,
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return IdentitySession{Secret: sessionSecret, ExpiresAt: time.Now().UTC().Add(time.Hour)}, nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "user@example.com"}, nil
+			},
+			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+				return nil, nil
+			},
+		},
+		enforceAuth: true,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: cfg,
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Stream configuration issue") {
+		t.Fatalf("expected validation panel heading, got %q", body)
+	}
+	if !strings.Contains(body, "workflow references are invalid") {
+		t.Fatalf("expected validation error details, got %q", body)
+	}
+	if strings.Contains(body, `action="/w/workflow/process/start"`) {
+		t.Fatalf("did not expect new stream action for invalid workflow, got %q", body)
+	}
+}
+
 func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
 	now := time.Date(2026, 3, 7, 11, 0, 0, 0, time.UTC)
