@@ -1924,6 +1924,82 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminUsersSetRolesHidesPlatformAdmin(t *testing.T) {
+	now := time.Now().UTC()
+	t.Setenv("ADMIN_EMAIL", "platform@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret-password")
+
+	users := []IdentityUser{
+		{
+			ID:         "user-1",
+			Email:      "owner@example.com",
+			OrgSlug:    "acme",
+			Labels:     []string{identityOrgAdminLabel},
+			IsOrgAdmin: true,
+			Status:     "active",
+		},
+		{
+			ID:         "user-2",
+			Email:      "platform@example.com",
+			OrgSlug:    "acme",
+			Labels:     []string{identityOrgAdminLabel},
+			IsOrgAdmin: true,
+			Status:     "active",
+		},
+	}
+	updateCalls := 0
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return users[0], nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				org := IdentityOrg{
+					ID:   "team-1",
+					Slug: "acme",
+					Name: "Acme Org",
+					Roles: []IdentityRole{
+						{Slug: "approver", Name: "Approver"},
+					},
+				}
+				return &org, nil
+			},
+			listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+				return append([]IdentityUser(nil), users...), nil
+			},
+			updateUserLabelsFunc: func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+				updateCalls++
+				return IdentityUser{}, nil
+			},
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "user not found") {
+		t.Fatalf("expected user not found, got %q", rec.Body.String())
+	}
+	if updateCalls != 0 {
+		t.Fatalf("update calls = %d, want 0", updateCalls)
+	}
+}
+
 func TestHandleOrgAdminUsersInviteWithIdentity(t *testing.T) {
 	now := time.Now().UTC()
 	inviteCalls := 0
@@ -2202,6 +2278,62 @@ func TestIdentityOrgAdminHelpers(t *testing.T) {
 	}, time.Now())
 	if len(rows) != 2 || rows[0].Status != "expired" || rows[1].Status != "accepted" {
 		t.Fatalf("invite rows = %#v", rows)
+	}
+}
+
+func TestHandleOrgAdminUsersDeleteUserHidesPlatformAdmin(t *testing.T) {
+	now := time.Now().UTC()
+	t.Setenv("ADMIN_EMAIL", "platform@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret-password")
+
+	deletedMemberships := []string{}
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"}, nil
+			},
+			listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+				return []IdentityMembership{
+					{ID: "membership-1", TeamID: "team-1", UserID: "user-2", Email: "platform@example.com", Confirmed: true, IsOrgAdmin: true},
+				}, nil
+			},
+			deleteOrganizationMembershipFunc: func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
+				deletedMemberships = append(deletedMemberships, membershipID)
+				return nil
+			},
+			listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+				return []IdentityUser{{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"}}, nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				org := IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"}
+				return &org, nil
+			},
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "user not found") {
+		t.Fatalf("expected user not found, got %q", rec.Body.String())
+	}
+	if len(deletedMemberships) != 0 {
+		t.Fatalf("deleted memberships = %#v, want none", deletedMemberships)
 	}
 }
 

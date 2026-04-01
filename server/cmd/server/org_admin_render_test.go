@@ -144,6 +144,48 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("platform admin is hidden from organization users", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "platform@example.com")
+		t.Setenv("ADMIN_PASSWORD", "secret-password")
+
+		server := &Server{
+			tmpl: testTemplates(),
+			identity: &fakeIdentityStore{
+				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+					return &IdentityOrg{
+						ID:   "team-1",
+						Slug: "acme",
+						Name: "Acme",
+						Roles: []IdentityRole{
+							{Slug: "qa-reviewer", Name: "QA Reviewer", Color: "#123", Border: "#456"},
+						},
+					}, nil
+				},
+				listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+					return []IdentityUser{
+						{ID: "user-1", Email: "member@example.com", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("qa-reviewer")}, Status: "active"},
+						{ID: "user-2", Email: "platform@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"},
+					}, nil
+				},
+				listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+					return nil, nil
+				},
+			},
+			now: func() time.Time { return now },
+		}
+		rec := httptest.NewRecorder()
+
+		server.renderOrgAdminWithErrors(rec, admin, "acme", "", OrgAdminErrors{})
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, "USERS 1") {
+			t.Fatalf("expected filtered user count, got %q", body)
+		}
+	})
+
 	t.Run("template error returns 500", func(t *testing.T) {
 		tmpl := template.Must(template.New("broken").Parse(`{{define "org_admin.html"}}{{template "missing" .}}{{end}}`))
 		server := &Server{tmpl: tmpl, now: func() time.Time { return now }}
