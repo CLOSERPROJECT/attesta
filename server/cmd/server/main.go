@@ -941,6 +941,16 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
+	if session, err := s.platformAdminIdentitySession(ctx); err == nil {
+		if session != nil && strings.TrimSpace(session.Secret) != "" {
+			if deleteErr := s.identity.DeleteSession(ctx, session.Secret); deleteErr != nil && !errors.Is(deleteErr, ErrIdentityUnauthorized) && !errors.Is(deleteErr, ErrIdentityNotFound) {
+				log.Printf("warning: failed to delete bootstrap platform admin session: %v", deleteErr)
+			}
+		}
+		return nil
+	} else if !errors.Is(err, ErrIdentityUnauthorized) && !errors.Is(err, ErrIdentityNotFound) {
+		return err
+	}
 	return s.identity.EnsurePlatformAdminAccount(ctx, email, password)
 }
 

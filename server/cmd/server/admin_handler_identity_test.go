@@ -73,6 +73,9 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return IdentitySession{}, ErrIdentityUnauthorized
+				},
 				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
 					gotEmail = email
 					gotPassword = password
@@ -88,12 +91,43 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 		}
 	})
 
+	t.Run("returns success when platform admin login already works", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		var deletedSecret string
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return fakeIdentitySession("bootstrap-session", "platform-user", time.Now().Add(time.Hour)), nil
+				},
+				deleteSessionFunc: func(ctx context.Context, sessionSecret string) error {
+					deletedSecret = sessionSecret
+					return nil
+				},
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					t.Fatal("did not expect ensure call")
+					return nil
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if deletedSecret != "bootstrap-session" {
+			t.Fatalf("deleted session = %q, want bootstrap-session", deletedSecret)
+		}
+	})
+
 	t.Run("returns identity bootstrap error", func(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
 		server := &Server{
 			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return IdentitySession{}, ErrIdentityUnauthorized
+				},
 				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
 					return errors.New("boom")
 				},
