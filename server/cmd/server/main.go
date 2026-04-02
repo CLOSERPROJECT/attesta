@@ -717,8 +717,8 @@ func main() {
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
-	if err := server.bootstrapPlatformAdminIdentity(ctx); err != nil {
-		log.Fatal(err)
+	if err := server.bootstrapPlatformAdminIdentityWithRetry(ctx); err != nil {
+		log.Printf("warning: platform admin bootstrap unavailable: %v", err)
 	}
 
 	mux := server.newMux()
@@ -770,6 +770,22 @@ func sessionTTLDays() int {
 		return 30
 	}
 	return days
+}
+
+func platformAdminBootstrapTimeout() time.Duration {
+	seconds := intEnvOr("PLATFORM_ADMIN_BOOTSTRAP_TIMEOUT_SECONDS", 45)
+	if seconds < 0 {
+		seconds = 0
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func platformAdminBootstrapRetryInterval() time.Duration {
+	millis := intEnvOr("PLATFORM_ADMIN_BOOTSTRAP_RETRY_INTERVAL_MS", 2000)
+	if millis <= 0 {
+		millis = 2000
+	}
+	return time.Duration(millis) * time.Millisecond
 }
 
 func safeNextPath(r *http.Request, fallback string) string {
@@ -926,6 +942,43 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 		return nil
 	}
 	return s.identity.EnsurePlatformAdminAccount(ctx, email, password)
+}
+
+func (s *Server) bootstrapPlatformAdminIdentityWithRetry(ctx context.Context) error {
+	err := s.bootstrapPlatformAdminIdentity(ctx)
+	if err == nil {
+		return nil
+	}
+
+	timeout := platformAdminBootstrapTimeout()
+	if timeout == 0 {
+		return err
+	}
+	deadline := time.Now().Add(timeout)
+	wait := platformAdminBootstrapRetryInterval()
+	attempt := 1
+
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if !time.Now().Before(deadline) {
+			return err
+		}
+		log.Printf("platform admin bootstrap retry %d after error: %v", attempt, err)
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+		err = s.bootstrapPlatformAdminIdentity(ctx)
+		if err == nil {
+			return nil
+		}
+		attempt++
+	}
 }
 
 func (s *Server) ensurePlatformAdminOwnsOrganization(ctx context.Context, orgSlug, redirectURL string) (*IdentitySession, error) {

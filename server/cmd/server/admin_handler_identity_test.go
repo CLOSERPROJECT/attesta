@@ -103,6 +103,49 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 			t.Fatalf("error = %v, want boom", err)
 		}
 	})
+
+	t.Run("retries until success", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		t.Setenv("PLATFORM_ADMIN_BOOTSTRAP_TIMEOUT_SECONDS", "1")
+		t.Setenv("PLATFORM_ADMIN_BOOTSTRAP_RETRY_INTERVAL_MS", "1")
+		attempts := 0
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					attempts++
+					if attempts < 3 {
+						return errors.New("appwrite unavailable")
+					}
+					return nil
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentityWithRetry(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if attempts != 3 {
+			t.Fatalf("attempts = %d, want 3", attempts)
+		}
+	})
+
+	t.Run("returns last error after timeout", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		t.Setenv("PLATFORM_ADMIN_BOOTSTRAP_TIMEOUT_SECONDS", "0")
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					return errors.New("boom")
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentityWithRetry(context.Background()); err == nil || err.Error() != "boom" {
+			t.Fatalf("error = %v, want boom", err)
+		}
+	})
 }
 
 func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
