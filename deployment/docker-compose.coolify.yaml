@@ -215,12 +215,16 @@ services:
           - mariadb
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
+      - ./deployment/appwrite/appwrite-seed.sql:/seed/appwrite-seed.sql:ro
+      - ./deployment/appwrite/mariadb-init-preview-seed.sh:/docker-entrypoint-initdb.d/10-preview-seed.sh:ro
     environment:
       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADBROOT
       - MYSQL_DATABASE=${_APP_DB_SCHEMA:-appwrite}
       - MYSQL_USER=$SERVICE_USER_MARIADB
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
       - MARIADB_AUTO_UPGRADE=1
+      # Set this only in Coolify preview deployment env vars.
+      - APPWRITE_RESTORE_SEED_SQL=${APPWRITE_RESTORE_SEED_SQL:-false}
     command: 'mysqld --innodb-flush-method=fsync'
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
