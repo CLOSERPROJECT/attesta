@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -32,6 +33,8 @@ type appwriteIdentity struct {
 	adminClient     appwriteclient.Client
 	sessionClient   appwriteclient.Client
 	orgAssetsBucket string
+	endpoint        string
+	projectID       string
 }
 
 // NewAppwriteIdentity builds the Appwrite-backed identity adapter used by later auth work.
@@ -53,6 +56,8 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 		adminClient:     adminClient,
 		sessionClient:   sessionClient,
 		orgAssetsBucket: appwriteOrgAssetsBucket(),
+		endpoint:        strings.TrimRight(strings.TrimSpace(endpoint), "/"),
+		projectID:       strings.TrimSpace(projectID),
 	}
 }
 
@@ -70,6 +75,7 @@ func (a *appwriteIdentity) CreateEmailPasswordSession(ctx context.Context, email
 	}
 	session, err := account.New(a.adminClient).CreateEmailPasswordSession(strings.TrimSpace(email), password)
 	if err != nil {
+		a.logAuthFailure("create_email_password_session", email, err)
 		return IdentitySession{}, normalizeIdentityError(err)
 	}
 	if err := ctx.Err(); err != nil {
@@ -932,4 +938,37 @@ func normalizeIdentityError(err error) error {
 		}
 	}
 	return err
+}
+
+func (a *appwriteIdentity) logAuthFailure(operation, email string, err error) {
+	var appwriteErr *appwriteclient.AppwriteError
+	if errors.As(err, &appwriteErr) {
+		log.Printf(
+			"appwrite auth debug: op=%s email=%s endpoint=%s project=%s status=%d message=%q response=%q",
+			strings.TrimSpace(operation),
+			strings.ToLower(strings.TrimSpace(email)),
+			a.endpoint,
+			a.projectID,
+			appwriteErr.GetStatusCode(),
+			strings.TrimSpace(appwriteErr.GetMessage()),
+			trimLogValue(strings.TrimSpace(appwriteErr.GetResponse()), 512),
+		)
+		return
+	}
+	log.Printf(
+		"appwrite auth debug: op=%s email=%s endpoint=%s project=%s error=%v",
+		strings.TrimSpace(operation),
+		strings.ToLower(strings.TrimSpace(email)),
+		a.endpoint,
+		a.projectID,
+		err,
+	)
+}
+
+func trimLogValue(value string, max int) string {
+	value = strings.TrimSpace(value)
+	if max <= 0 || len(value) <= max {
+		return value
+	}
+	return value[:max] + "..."
 }
