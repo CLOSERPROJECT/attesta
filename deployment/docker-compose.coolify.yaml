@@ -206,7 +206,9 @@ services:
       retries: 3
 
   appwrite-mariadb:
-    image: mariadb:10.11
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.appwrite-mariadb
     container_name: appwrite-mariadb
     networks:
       default:
@@ -215,8 +217,6 @@ services:
           - mariadb
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
-      - ./appwrite/appwrite-seed.sql:/seed/appwrite-seed.sql:ro
-      - ./appwrite/mariadb-init-preview-seed.sh:/docker-entrypoint-initdb.d/10-preview-seed.sh:ro
     environment:
       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADBROOT
       - MYSQL_DATABASE=${_APP_DB_SCHEMA:-appwrite}
