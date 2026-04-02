@@ -215,8 +215,8 @@ services:
           - mariadb
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
-      - ./deployment/appwrite/appwrite-seed.sql:/seed/appwrite-seed.sql:ro
-      - ./deployment/appwrite/mariadb-init-preview-seed.sh:/docker-entrypoint-initdb.d/10-preview-seed.sh:ro
+      - ./appwrite/appwrite-seed.sql:/seed/appwrite-seed.sql:ro
+      - ./appwrite/mariadb-init-preview-seed.sh:/docker-entrypoint-initdb.d/10-preview-seed.sh:ro
     environment:
       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADBROOT
       - MYSQL_DATABASE=${_APP_DB_SCHEMA:-appwrite}
