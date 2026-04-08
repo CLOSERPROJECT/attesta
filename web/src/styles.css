@@ -351,6 +351,18 @@ svg.bi {
   padding: 28px 32px 60px;
 }
 
+.mx-auto {
+  margin-inline: auto;
+}
+
+.max-w-prose {
+  max-width: 65ch;
+}
+
+.max-w-7xl {
+  max-width: 80rem;
+}
+
 .site-footer {
   margin-top: auto;
 }
