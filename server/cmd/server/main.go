@@ -2058,7 +2058,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		session, err := s.identity.CreateEmailPasswordSession(r.Context(), email, password)
-		if errors.Is(err, ErrIdentityUnauthorized) || errors.Is(err, ErrIdentityNotFound) {
+		if isLoginCredentialError(err) {
 			view := LoginView{
 				PageBase:   s.pageBase("login_body", "", ""),
 				Email:      email,
@@ -2445,6 +2445,26 @@ func isDuplicateSlugError(err error) bool {
 	return strings.Contains(message, "slug already exists") ||
 		strings.Contains(message, "role already exists") ||
 		strings.Contains(message, "duplicate key")
+}
+
+func isLoginCredentialError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrIdentityUnauthorized) || errors.Is(err, ErrIdentityNotFound) {
+		return true
+	}
+	type statusCoder interface {
+		GetStatusCode() int
+	}
+	var appErr statusCoder
+	if errors.As(err, &appErr) {
+		switch appErr.GetStatusCode() {
+		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusNotFound:
+			return true
+		}
+	}
+	return false
 }
 
 func requestedRoleSlugs(form url.Values) []string {
