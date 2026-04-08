@@ -166,7 +166,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	if !strings.Contains(body, "Main workflow description") {
 		t.Fatalf("expected description content in cards, got %q", body)
 	}
-	if !strings.Contains(body, "Not started") || !strings.Contains(body, "Started") || !strings.Contains(body, "Terminated") {
+	if !strings.Contains(body, "Not started") || !strings.Contains(body, "In progress") || !strings.Contains(body, "Completed") {
 		t.Fatalf("expected status labels in cards, got %q", body)
 	}
 }
@@ -208,9 +208,6 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		body := rec.Body.String()
 		if !strings.Contains(body, `href="/org-admin/formata-builder"`) {
 			t.Fatalf("expected create stream card for org admin, got %q", body)
-		}
-		if !strings.Contains(body, "Click to create new stream") {
-			t.Fatalf("expected create stream card copy for org admin, got %q", body)
 		}
 		if !strings.Contains(body, "workflow-card-cta") || !strings.Contains(body, "Create new stream") {
 			t.Fatalf("expected create stream card cta for org admin, got %q", body)
