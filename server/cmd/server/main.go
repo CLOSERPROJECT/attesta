@@ -479,10 +479,15 @@ type OrgAdminView struct {
 	NeedsOrganizationSetup bool
 	OrganizationError      string
 	RoleError              string
+	RoleDialogAction       string
+	RoleDialogSlug         string
+	RoleDialogName         string
+	RoleDialogPalette      string
 	InviteError            string
 	UsersError             string
 	Roles                  []Role
 	RolePills              []OrgAdminRoleOption
+	RoleRows               []OrgAdminRoleRow
 	Users                  []OrgAdminUserRow
 	Invites                []OrgAdminInviteRow
 	InviteLink             string
@@ -492,6 +497,10 @@ type OrgAdminView struct {
 type OrgAdminErrors struct {
 	Organization string
 	Role         string
+	RoleAction   string
+	RoleSlug     string
+	RoleName     string
+	RolePalette  string
 	Invite       string
 	Users        string
 }
@@ -502,6 +511,15 @@ type OrgAdminRoleOption struct {
 	RoleColor  template.CSS
 	RoleBorder template.CSS
 	Selected   bool
+}
+
+type OrgAdminRoleRow struct {
+	Slug       string
+	Name       string
+	Palette    string
+	RoleColor  template.CSS
+	RoleBorder template.CSS
+	InUse      bool
 }
 
 type OrgAdminUserRow struct {
@@ -658,6 +676,17 @@ func defaultRolePaletteFromInput(raw string) string {
 	hasher := fnv.New32a()
 	_, _ = hasher.Write([]byte(normalized))
 	return rolePaletteKeys[int(hasher.Sum32()%uint32(len(rolePaletteKeys)))]
+}
+
+func rolePaletteKeyFromStyle(color, border, fallbackName string) string {
+	trimmedColor := strings.TrimSpace(color)
+	trimmedBorder := strings.TrimSpace(border)
+	for key, style := range rolePaletteStyles {
+		if style.Color == trimmedColor && style.Border == trimmedBorder {
+			return key
+		}
+	}
+	return defaultRolePaletteFromInput(fallbackName)
 }
 
 func resolveRoleBadgeStyle(color, border string) rolePaletteStyle {
@@ -2905,6 +2934,45 @@ func buildOrgAdminRolePills(roles []Role) []OrgAdminRoleOption {
 	return rolePills
 }
 
+func organizationRoleInUse(roleSlug string, users []OrgAdminUserRow, invites []OrgAdminInviteRow) bool {
+	trimmedRoleSlug := strings.TrimSpace(roleSlug)
+	if trimmedRoleSlug == "" {
+		return false
+	}
+	for _, user := range users {
+		for _, role := range user.RoleOptions {
+			if role.Selected && containsRole([]string{role.Slug}, trimmedRoleSlug) {
+				return true
+			}
+		}
+	}
+	for _, invite := range invites {
+		if containsRole(invite.RoleSlugs, trimmedRoleSlug) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgAdminInviteRow) []OrgAdminRoleRow {
+	rows := make([]OrgAdminRoleRow, 0, len(roles))
+	for _, role := range roles {
+		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+			continue
+		}
+		roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
+		rows = append(rows, OrgAdminRoleRow{
+			Slug:       strings.TrimSpace(role.Slug),
+			Name:       strings.TrimSpace(role.Name),
+			Palette:    rolePaletteKeyFromStyle(role.Color, role.Border, role.Name),
+			RoleColor:  cssValue(roleStyle.Color, "var(--role-fallback)"),
+			RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
+			InUse:      organizationRoleInUse(role.Slug, users, invites),
+		})
+	}
+	return rows
+}
+
 func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []IdentityUser) []OrgAdminUserRow {
 	orgUsers := make([]OrgAdminUserRow, 0, len(users))
 	for _, orgUser := range users {
@@ -3015,6 +3083,10 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 			NeedsOrganizationSetup: true,
 			OrganizationError:      errs.Organization,
 			RoleError:              errs.Role,
+			RoleDialogAction:       strings.TrimSpace(errs.RoleAction),
+			RoleDialogSlug:         strings.TrimSpace(errs.RoleSlug),
+			RoleDialogName:         strings.TrimSpace(errs.RoleName),
+			RoleDialogPalette:      strings.TrimSpace(errs.RolePalette),
 			InviteError:            errs.Invite,
 			UsersError:             errs.Users,
 			InviteLink:             strings.TrimSpace(inviteLink),
@@ -3035,6 +3107,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		return
 	}
 	rolePills := buildOrgAdminRolePills(roles)
+	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
 
 	view := OrgAdminView{
 		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
@@ -3043,10 +3116,15 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		NeedsOrganizationSetup: false,
 		OrganizationError:      errs.Organization,
 		RoleError:              errs.Role,
+		RoleDialogAction:       strings.TrimSpace(errs.RoleAction),
+		RoleDialogSlug:         strings.TrimSpace(errs.RoleSlug),
+		RoleDialogName:         strings.TrimSpace(errs.RoleName),
+		RoleDialogPalette:      strings.TrimSpace(errs.RolePalette),
 		InviteError:            errs.Invite,
 		UsersError:             errs.Users,
 		Roles:                  roles,
 		RolePills:              rolePills,
+		RoleRows:               roleRows,
 		Users:                  orgUsers,
 		Invites:                orgInvites,
 		InviteLink:             strings.TrimSpace(inviteLink),
@@ -3126,21 +3204,10 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse org-admin roles form")
 			return
 		}
-		name := strings.TrimSpace(r.FormValue("name"))
-		palette := strings.TrimSpace(r.FormValue("palette"))
-		if name == "" {
-			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role name is required"})
-			return
+		intent := strings.TrimSpace(r.FormValue("intent"))
+		if intent == "" {
+			intent = "create_role"
 		}
-		roleSlug := canonifyIdentityRoleSlug(name)
-		if roleSlug == "" {
-			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: invalidRoleNameMessage})
-			return
-		}
-		if palette == "" {
-			palette = defaultRolePaletteFromInput(name)
-		}
-		paletteStyle := resolveRolePaletteStyle(palette)
 		if s.identity == nil {
 			http.Error(w, "identity unavailable", http.StatusServiceUnavailable)
 			return
@@ -3153,29 +3220,162 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		for _, existingRole := range ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org)) {
-			if strings.EqualFold(canonifyIdentityRoleSlug(existingRole.Slug), roleSlug) {
-				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
-				return
-			}
-		}
-		sessionSecret, err := sessionSecretFromRequest(r)
-		if err != nil {
-			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for org-admin role creation")
+		orgUsers, listUsersErr := s.identity.ListOrganizationUsers(r.Context(), user.OrgSlug)
+		if listUsersErr != nil {
+			s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to load organization users"}, listUsersErr, "failed to list organization users for role action in %s", user.OrgSlug)
 			return
 		}
-		updatedRoles := append(append([]IdentityRole(nil), org.Roles...), IdentityRole{
-			Slug:   roleSlug,
-			Name:   name,
-			Color:  paletteStyle.Color,
-			Border: paletteStyle.Border,
-		})
-		if _, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, user.OrgSlug, org.Name, org.LogoFileID, updatedRoles); err != nil {
-			if isDuplicateSlugError(err) {
-				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists"})
+		memberships, membershipsErr := s.identity.ListOrganizationMemberships(r.Context(), user.OrgSlug)
+		if membershipsErr != nil {
+			s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to load organization users"}, membershipsErr, "failed to list organization memberships for role action in %s", user.OrgSlug)
+			return
+		}
+		roleRows := buildOrgAdminRoleRows(rolesFromIdentityOrg(*org), buildOrgAdminUserRowsFromIdentity(buildOrgAdminRolePills(rolesFromIdentityOrg(*org)), orgUsers), buildOrgAdminInviteRowsFromMemberships(memberships, s.nowUTC()))
+
+		findRoleRow := func(roleSlug string) *OrgAdminRoleRow {
+			for idx := range roleRows {
+				if containsRole([]string{roleRows[idx].Slug}, roleSlug) {
+					return &roleRows[idx]
+				}
+			}
+			return nil
+		}
+
+		sessionSecret, err := sessionSecretFromRequest(r)
+		if err != nil {
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for org-admin role action")
+			return
+		}
+
+		switch intent {
+		case "create_role":
+			name := strings.TrimSpace(r.FormValue("name"))
+			palette := strings.TrimSpace(r.FormValue("palette"))
+			if name == "" {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role name is required", RoleAction: "create", RolePalette: palette})
 				return
 			}
-			s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to create role"}, err, "failed to update organization %s with new role %s", user.OrgSlug, roleSlug)
+			roleSlug := canonifyIdentityRoleSlug(name)
+			if roleSlug == "" {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: invalidRoleNameMessage, RoleAction: "create", RoleName: name, RolePalette: palette})
+				return
+			}
+			if palette == "" {
+				palette = defaultRolePaletteFromInput(name)
+			}
+			paletteStyle := resolveRolePaletteStyle(palette)
+			for _, existingRole := range ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org)) {
+				if strings.EqualFold(canonifyIdentityRoleSlug(existingRole.Slug), roleSlug) {
+					s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists", RoleAction: "create", RoleName: name, RolePalette: palette})
+					return
+				}
+			}
+			updatedRoles := append(append([]IdentityRole(nil), org.Roles...), IdentityRole{
+				Slug:   roleSlug,
+				Name:   name,
+				Color:  paletteStyle.Color,
+				Border: paletteStyle.Border,
+			})
+			if _, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, user.OrgSlug, org.Name, org.LogoFileID, updatedRoles); err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists", RoleAction: "create", RoleName: name, RolePalette: palette})
+					return
+				}
+				s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to create role", RoleAction: "create", RoleName: name, RolePalette: palette}, err, "failed to update organization %s with new role %s", user.OrgSlug, roleSlug)
+				return
+			}
+		case "set_role":
+			currentSlug := strings.TrimSpace(r.FormValue("role_slug"))
+			name := strings.TrimSpace(r.FormValue("name"))
+			palette := strings.TrimSpace(r.FormValue("palette"))
+			if currentSlug == "" {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "edit"})
+				return
+			}
+			if name == "" {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role name is required", RoleAction: "edit", RoleSlug: currentSlug, RolePalette: palette})
+				return
+			}
+			targetRow := findRoleRow(currentSlug)
+			if targetRow == nil {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette})
+				return
+			}
+			if targetRow.InUse {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "remove the role from the users that have it before continuing with the action", RoleAction: "edit", RoleSlug: currentSlug, RoleName: targetRow.Name, RolePalette: targetRow.Palette})
+				return
+			}
+			roleSlug := canonifyIdentityRoleSlug(name)
+			if roleSlug == "" {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: invalidRoleNameMessage, RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette})
+				return
+			}
+			if palette == "" {
+				palette = defaultRolePaletteFromInput(name)
+			}
+			paletteStyle := resolveRolePaletteStyle(palette)
+			updatedRoles := append([]IdentityRole(nil), org.Roles...)
+			found := false
+			for idx := range updatedRoles {
+				if !containsRole([]string{updatedRoles[idx].Slug}, currentSlug) {
+					if strings.EqualFold(canonifyIdentityRoleSlug(updatedRoles[idx].Slug), roleSlug) {
+						s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists", RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette})
+						return
+					}
+					continue
+				}
+				found = true
+				updatedRoles[idx].Slug = roleSlug
+				updatedRoles[idx].Name = name
+				updatedRoles[idx].Color = paletteStyle.Color
+				updatedRoles[idx].Border = paletteStyle.Border
+			}
+			if !found {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette})
+				return
+			}
+			if _, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, user.OrgSlug, org.Name, org.LogoFileID, updatedRoles); err != nil {
+				if isDuplicateSlugError(err) {
+					s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists", RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette})
+					return
+				}
+				s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to update role", RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette}, err, "failed to update role %s in organization %s", currentSlug, user.OrgSlug)
+				return
+			}
+		case "delete_role":
+			currentSlug := strings.TrimSpace(r.FormValue("role_slug"))
+			if currentSlug == "" {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "delete"})
+				return
+			}
+			targetRow := findRoleRow(currentSlug)
+			if targetRow == nil {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "delete", RoleSlug: currentSlug})
+				return
+			}
+			if targetRow.InUse {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "remove the role from the users that have it before continuing with the action", RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name})
+				return
+			}
+			updatedRoles := make([]IdentityRole, 0, len(org.Roles))
+			found := false
+			for _, role := range org.Roles {
+				if containsRole([]string{role.Slug}, currentSlug) {
+					found = true
+					continue
+				}
+				updatedRoles = append(updatedRoles, role)
+			}
+			if !found {
+				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "delete", RoleSlug: currentSlug})
+				return
+			}
+			if _, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, user.OrgSlug, org.Name, org.LogoFileID, updatedRoles); err != nil {
+				s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to delete role", RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name}, err, "failed to delete role %s from organization %s", currentSlug, user.OrgSlug)
+				return
+			}
+		default:
+			s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "unsupported action"})
 			return
 		}
 		http.Redirect(w, r, "/org-admin/users", http.StatusSeeOther)
