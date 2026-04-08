@@ -2,7 +2,7 @@
 
 {{define "platform_admin_body"}}
 
-<div class="stack">
+<div class="stack max-w-7xl mx-auto">
   <section class="hero">
     <button class="secondary" onclick="location.href='/'">
       <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
@@ -17,42 +17,264 @@
   </section>
 
   <section class="panel">
-    <div class="panel-heading">
-      <h2>New organization</h2>
-      <p>Add a new organization to the platform</p>
+    <div class="org-admin-panel-head">
+      <div class="panel-heading">
+        <h2>Organizations</h2>
+      </div>
+      <button class="primary" type="button" onclick="document.getElementById('create-org-dialog').showModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+          <path d="M5 12h14"/>
+          <path d="M12 5v14"/>
+        </svg>
+        Add organization
+      </button>
     </div>
-    <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
-      <label for="org-name">Organization name</label>
-      <input id="org-name" name="name" type="text" required />
-      <label for="org-logo">Organization logo</label>
-      <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
-      {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
-      <button class="primary" type="submit">Create organization</button>
-    </form>
-  </section>
 
-  <section class="panel">
-    <div class="panel-heading">
-      <h2>Invite organization admin</h2>
-      <p>Invite an organization admin as an Appwrite team owner.</p>
-    </div>
-    <form method="post" action="/admin/orgs" class="input-form">
-      <input type="hidden" name="intent" value="invite_org_admin" />
-      <label for="org-admin-email">Org admin email</label>
-      <input id="org-admin-email" name="email" type="email" required />
-      <label for="org">Organization</label>
-      <select id="org" name="org_slug" required>
-        <option value="">Select organization</option>
-        {{range .Organizations}}
-          <option value="{{.Slug}}">{{.Name}}</option>
-        {{end}}
-      </select>
-      {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
-      {{if .Confirmation}}<p class="muted">{{.Confirmation}}</p>{{end}}
-      <button class="primary" type="submit">Create org admin invite</button>
+    <form method="get" action="/admin/orgs" class="platform-admin-search" id="platform-admin-search">
+      <input type="hidden" name="page" value="1" />
+      <label class="platform-admin-search-field" for="platform-admin-search-input">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input id="platform-admin-search-input" type="search" name="q" value="{{.SearchQuery}}" placeholder="Search organizations by name" autocomplete="off" hx-get="/admin/orgs" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true" hx-include="#platform-admin-search" hx-trigger="input changed delay:200ms, search" />
+      </label>
     </form>
+
+    {{template "platform_admin_results" .}}
   </section>
 </div>
+
+<dialog id="create-org-dialog" class="manage-dialog">
+  <div class="manage-dialog-card">
+    <header class="manage-dialog-head">
+      <div>
+        <h3 class="manage-dialog-title">New organization</h3>
+        <p class="manage-dialog-subtitle">Add a new organization to the platform.</p>
+      </div>
+      <button type="button" class="secondary" onclick="document.getElementById('create-org-dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+          <path d="M18 6 6 18"/>
+          <path d="m6 6 12 12"/>
+        </svg>
+      </button>
+    </header>
+    <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
+      <input type="hidden" name="intent" value="create_org" />
+      <input type="hidden" name="q" value="{{.SearchQuery}}" />
+      <input type="hidden" name="page" value="{{.CurrentPage}}" />
+      <div class="form-field">
+        <label for="org-name">Organization name</label>
+        <input id="org-name" name="name" type="text" value="{{if eq .OrganizationDialogAction "create"}}{{.OrganizationDialogName}}{{end}}" required />
+      </div>
+      <div class="form-field">
+        <label for="org-logo">Organization logo</label>
+        <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+      </div>
+      {{if and .OrganizationError (eq .OrganizationDialogAction "create")}}<p class="error">{{.OrganizationError}}</p>{{end}}
+      <div class="form-actions form-actions-end">
+        <button class="primary" type="submit">Create organization</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    const createDialog = document.getElementById("create-org-dialog");
+    if (createDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "create")}}true{{else}}false{{end}} && !createDialog.open) {
+      createDialog.showModal();
+    }
+  })();
+</script>
+{{end}}
+
+{{define "platform_admin_results"}}
+<div id="platform-admin-results">
+  <p class="muted">{{.MatchedOrganizations}} organization{{if ne .MatchedOrganizations 1}}s{{end}} found.</p>
+  {{if and .Error (eq .OrganizationDialogAction "")}}<p class="error">{{.Error}}</p>{{end}}
+    {{if .Organizations}}
+      <ul class="platform-admin-list">
+        {{range .Organizations}}
+          <li class="platform-admin-item">
+            <div class="platform-admin-item-main">
+              {{if .LogoAttachmentID}}
+                <img src="/admin/orgs/logo/{{.LogoAttachmentID}}" alt="{{.Name}} logo" class="org-profile-logo org-profile-logo-sm" />
+              {{else}}
+                <span class="org-profile-logo-placeholder org-profile-logo-placeholder-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-lg">
+                    <line x1="2" x2="22" y1="2" y2="22"/>
+                    <path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/>
+                    <line x1="13.5" x2="6" y1="13.5" y2="21"/>
+                    <line x1="18" x2="21" y1="12" y2="15"/>
+                    <path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"/>
+                    <path d="M21 15V5a2 2 0 0 0-2-2H9"/>
+                  </svg>
+                </span>
+              {{end}}
+              <p class="platform-admin-item-name">{{.Name}}</p>
+            </div>
+            <div class="user-actions">
+              <button type="button" class="platform-admin-invite-button" onclick="document.getElementById('invite-org-{{.Slug}}').showModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                  <path d="M2 21a8 8 0 0 1 13.292-6"/>
+                  <circle cx="10" cy="8" r="5"/>
+                  <path d="M19 16v6"/>
+                  <path d="M22 19h-6"/>
+                </svg>
+              </button>
+              <button type="button" class="user-action-button" aria-label="Edit organization" onclick="document.getElementById('edit-org-{{.Slug}}').showModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                  <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+              <button type="button" class="user-action-button user-action-button-danger" aria-label="Delete organization" onclick="document.getElementById('delete-org-{{.Slug}}').showModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon-svg icon-svg-md" aria-hidden="true">
+                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
+                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"/>
+                </svg>
+              </button>
+            </div>
+
+            <dialog id="invite-org-{{.Slug}}" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">Invite organization admin</h3>
+                    <p class="manage-dialog-subtitle">{{.Name}}</p>
+                  </div>
+                  <button type="button" class="secondary" onclick="document.getElementById('invite-org-{{.Slug}}').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                      <path d="M18 6 6 18"/>
+                      <path d="m6 6 12 12"/>
+                    </svg>
+                  </button>
+                </header>
+                <form method="post" action="/admin/orgs" class="input-form">
+                  <input type="hidden" name="intent" value="invite_org_admin" />
+                  <input type="hidden" name="org_slug" value="{{.Slug}}" />
+                  <input type="hidden" name="q" value="{{$.SearchQuery}}" />
+                  <input type="hidden" name="page" value="{{$.CurrentPage}}" />
+                  <div class="form-field">
+                    <label for="invite-email-{{.Slug}}">Org admin email</label>
+                    <input id="invite-email-{{.Slug}}" name="email" type="email" value="{{if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug)}}{{$.InviteDialogEmail}}{{end}}" required />
+                  </div>
+                  {{if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) $.InviteError}}<p class="error">{{$.InviteError}}</p>{{end}}
+                  <div class="form-actions form-actions-end">
+                    <button class="primary" type="submit">Create org admin invite</button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+
+            <dialog id="edit-org-{{.Slug}}" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">Edit organization</h3>
+                    <p class="manage-dialog-subtitle">{{.Name}}</p>
+                  </div>
+                  <button type="button" class="secondary" onclick="document.getElementById('edit-org-{{.Slug}}').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                      <path d="M18 6 6 18"/>
+                      <path d="m6 6 12 12"/>
+                    </svg>
+                  </button>
+                </header>
+                <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
+                  <input type="hidden" name="intent" value="set_org" />
+                  <input type="hidden" name="org_slug" value="{{.Slug}}" />
+                  <input type="hidden" name="q" value="{{$.SearchQuery}}" />
+                  <input type="hidden" name="page" value="{{$.CurrentPage}}" />
+                  <div class="form-field">
+                    <label for="edit-org-name-{{.Slug}}">Organization name</label>
+                    <input id="edit-org-name-{{.Slug}}" name="name" type="text" value="{{if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationDialogName}}{{$.OrganizationDialogName}}{{else}}{{.Name}}{{end}}" required />
+                  </div>
+                  <div class="form-field">
+                    <label for="edit-org-logo-{{.Slug}}">Organization logo</label>
+                    <input id="edit-org-logo-{{.Slug}}" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+                  </div>
+                  {{if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError}}<p class="error">{{$.OrganizationError}}</p>{{end}}
+                  <div class="form-actions form-actions-end">
+                    <button class="primary" type="submit">Save organization</button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+
+            <dialog id="delete-org-{{.Slug}}" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">Delete organization</h3>
+                    <p class="manage-dialog-subtitle">{{.Name}}</p>
+                  </div>
+                  <button type="button" class="secondary" onclick="document.getElementById('delete-org-{{.Slug}}').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                      <path d="M18 6 6 18"/>
+                      <path d="m6 6 12 12"/>
+                    </svg>
+                  </button>
+                </header>
+                <div class="manage-dialog-danger-zone manage-dialog-danger-copy">
+                  <p class="manage-dialog-danger-title">Danger zone</p>
+                  <p class="manage-dialog-subtitle">This will permanently remove the organization and its memberships. Confirm only if you want to continue.</p>
+                </div>
+                {{if and (eq $.OrganizationDialogAction "delete") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError}}<p class="error">{{$.OrganizationError}}</p>{{end}}
+                <form method="post" action="/admin/orgs" class="input-form">
+                  <input type="hidden" name="intent" value="delete_org" />
+                  <input type="hidden" name="org_slug" value="{{.Slug}}" />
+                  <input type="hidden" name="q" value="{{$.SearchQuery}}" />
+                  <input type="hidden" name="page" value="{{$.CurrentPage}}" />
+                  <div class="form-actions form-actions-end">
+                    <button type="button" class="secondary" onclick="document.getElementById('delete-org-{{.Slug}}').close()">Cancel</button>
+                    <button type="submit" class="danger">Delete organization</button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="muted">No organizations match your search.</p>
+    {{end}}
+
+    {{if gt .TotalPages 1}}
+      <nav class="platform-admin-pagination" aria-label="Organizations pagination">
+        {{if .HasPreviousPage}}
+          <a class="secondary" href="/admin/orgs{{if or .SearchQuery (gt .PreviousPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .PreviousPage 1}}&{{end}}{{end}}{{if gt .PreviousPage 1}}page={{.PreviousPage}}{{end}}{{end}}" hx-get="/admin/orgs{{if or .SearchQuery (gt .PreviousPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .PreviousPage 1}}&{{end}}{{end}}{{if gt .PreviousPage 1}}page={{.PreviousPage}}{{end}}{{end}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">Previous</a>
+        {{end}}
+        <div class="platform-admin-pagination-pages">
+          {{range .PageNumbers}}
+            <a class="{{if eq . $.CurrentPage}}primary{{else}}secondary{{end}}" href="/admin/orgs{{if or $.SearchQuery (gt . 1)}}?{{if $.SearchQuery}}q={{$.SearchQuery | urlquery}}{{if gt . 1}}&{{end}}{{end}}{{if gt . 1}}page={{.}}{{end}}{{end}}" hx-get="/admin/orgs{{if or $.SearchQuery (gt . 1)}}?{{if $.SearchQuery}}q={{$.SearchQuery | urlquery}}{{if gt . 1}}&{{end}}{{end}}{{if gt . 1}}page={{.}}{{end}}{{end}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">{{.}}</a>
+          {{end}}
+        </div>
+        {{if .HasNextPage}}
+          <a class="secondary" href="/admin/orgs{{if or .SearchQuery (gt .NextPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .NextPage 1}}&{{end}}{{end}}{{if gt .NextPage 1}}page={{.NextPage}}{{end}}{{end}}" hx-get="/admin/orgs{{if or .SearchQuery (gt .NextPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .NextPage 1}}&{{end}}{{end}}{{if gt .NextPage 1}}page={{.NextPage}}{{end}}{{end}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">Next</a>
+        {{end}}
+      </nav>
+    {{end}}
+</div>
+<script>
+  (function () {
+    const inviteDialog = document.getElementById("invite-org-{{.OrganizationDialogSlug}}");
+    if (inviteDialog && {{if and .InviteError (eq .OrganizationDialogAction "invite") .OrganizationDialogSlug}}true{{else}}false{{end}} && !inviteDialog.open) {
+      inviteDialog.showModal();
+    }
+
+    const editDialog = document.getElementById("edit-org-{{.OrganizationDialogSlug}}");
+    if (editDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "edit") .OrganizationDialogSlug}}true{{else}}false{{end}} && !editDialog.open) {
+      editDialog.showModal();
+    }
+
+    const deleteDialog = document.getElementById("delete-org-{{.OrganizationDialogSlug}}");
+    if (deleteDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "delete") .OrganizationDialogSlug}}true{{else}}false{{end}} && !deleteDialog.open) {
+      deleteDialog.showModal();
+    }
+  })();
+</script>
 {{end}}
 
 {{define "platform_admin.html"}}

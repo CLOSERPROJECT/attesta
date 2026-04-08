@@ -1240,6 +1240,10 @@ button.secondary {
   gap: 18px;
 }
 
+.form-actions-end {
+  align-items: flex-end;
+}
+
 .password-field {
   position: relative;
   display: flex;
@@ -1493,6 +1497,12 @@ button.secondary {
   padding: 4px;
 }
 
+.org-profile-logo-sm {
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+}
+
 .org-profile-logo-placeholder {
   width: 64px;
   height: 64px;
@@ -1508,6 +1518,17 @@ button.secondary {
   font-weight: 600;
   text-align: center;
   line-height: 1.2;
+}
+
+.org-profile-logo-placeholder-sm {
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+}
+
+.org-profile-logo-placeholder-sm .icon-svg {
+  width: 16px;
+  height: 16px;
 }
 
 .org-profile-meta {
@@ -1555,6 +1576,102 @@ button.secondary {
 
 .roles-item .pill {
   justify-self: start;
+}
+
+.platform-admin-search {
+  margin-top: 4px;
+}
+
+.platform-admin-search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-2), var(--panel));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+
+.platform-admin-search-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.platform-admin-search-field input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.platform-admin-search-field input:focus {
+  outline: none;
+}
+
+.platform-admin-search-field input::placeholder {
+  color: var(--muted);
+}
+
+.platform-admin-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.platform-admin-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  gap: 16px;
+}
+
+.platform-admin-item-main {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.platform-admin-item-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.platform-admin-invite-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+}
+
+.platform-admin-invite-button:hover {
+  opacity: 0.85;
+}
+
+.platform-admin-pagination {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.platform-admin-pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .users-item {
@@ -1714,6 +1831,15 @@ hr {
   .org-admin-panel-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .platform-admin-item {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .platform-admin-pagination {
+    justify-content: flex-start;
   }
 }
 

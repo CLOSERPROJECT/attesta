@@ -29,6 +29,7 @@ type fakeIdentityStore struct {
 	getOrganizationBySlugFunc               func(ctx context.Context, slug string) (*IdentityOrg, error)
 	updateOrganizationFunc                  func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
 	updateOrganizationAsAdminFunc           func(ctx context.Context, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	deleteOrganizationAsAdminFunc           func(ctx context.Context, orgSlug string) error
 	updateOrganizationMembershipFunc        func(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	updateOrganizationMembershipAsAdminFunc func(ctx context.Context, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	updateUserLabelsFunc                    func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
@@ -191,6 +192,13 @@ func (f *fakeIdentityStore) UpdateOrganizationAsAdmin(ctx context.Context, curre
 		return f.updateOrganizationAsAdminFunc(ctx, currentSlug, name, logoFileID, roles)
 	}
 	return IdentityOrg{}, ErrIdentityUnauthorized
+}
+
+func (f *fakeIdentityStore) DeleteOrganizationAsAdmin(ctx context.Context, orgSlug string) error {
+	if f.deleteOrganizationAsAdminFunc != nil {
+		return f.deleteOrganizationAsAdminFunc(ctx, orgSlug)
+	}
+	return ErrIdentityUnauthorized
 }
 
 func (f *fakeIdentityStore) UpdateOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
