@@ -1442,6 +1442,7 @@ button.secondary {
 .org-admin-grid {
   display: grid;
   gap: 24px;
+  align-items: start;
 }
 
 .org-admin-grid-ready {
