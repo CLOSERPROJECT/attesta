@@ -453,6 +453,10 @@ type ResetSetView struct {
 	SubmitLabel string
 }
 
+type AboutView struct {
+	PageBase
+}
+
 type PlatformAdminView struct {
 	PageBase
 	Organizations     []Organization
@@ -1742,6 +1746,27 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/about" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	base := s.pageBase("about_body", "", "")
+	if s.enforceAuth {
+		if user, _, err := s.currentUser(r); err == nil {
+			base = s.pageBaseForUser(user, "about_body", "", "")
+		}
+	}
+	view := AboutView{PageBase: base}
+	if err := s.tmpl.ExecuteTemplate(w, "about.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 const swaggerUIPage = `<!doctype html>
 <html lang="en">
 <head>
@@ -1884,6 +1909,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("../web/dist"))))
 	mux.HandleFunc("/docs", s.handleDocs)
 	mux.HandleFunc("/docs/", s.handleDocs)
+	mux.HandleFunc("/about", s.handleAbout)
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)

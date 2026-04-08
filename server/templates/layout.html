@@ -33,6 +33,7 @@
         </a>
       </div>
       <nav class="nav">
+        <a href="/about">About</a>
         <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
           <svg xmlns="http://www.w3.org/2000/svg" stroke="currentColor" fill="none" class="icon-svg icon-svg-md theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
@@ -102,56 +103,9 @@
       {{else if eq .Body "home_body"}}{{template "home_body" .}}
       {{else if eq .Body "process_body"}}{{template "process_body" .}}
       {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
+      {{else if eq .Body "about_body"}}{{template "about_body" .}}
       {{end}}
     </main>
-    <footer
-      class="site-footer"
-      style="
-        padding: 18px 32px 24px;
-        border-top: 1px solid var(--border);
-        background: var(--chrome-bg);
-      "
-    >
-      <p
-        style="
-          margin: 0 0 8px;
-          color: var(--muted);
-          font-size: 12px;
-          line-height: 1.4;
-        "
-      >
-        © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
-        under the GNU AGPLv3.
-      </p>
-      <p
-        style="
-          margin: 0 0 8px;
-          color: var(--muted);
-          font-size: 12px;
-          line-height: 1.4;
-        "
-      >
-        CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
-        chips and microElectronics pRoduction, Project No. 101161109) is funded
-        by the European Union under the Interregional Innovation Investments
-        (I3) Instrument of the European Regional Development Fund, managed by
-        the European Innovation Council and SMEs Executive Agency (EISMEA).
-      </p>
-      <p
-        style="
-          margin: 0;
-          color: var(--muted);
-          font-size: 12px;
-          line-height: 1.4;
-        "
-      >
-        This repository/website is part of the CLOSER project and has received
-        funding from the European Union. Views and opinions expressed are those
-        of the author(s) only and do not necessarily reflect those of the
-        European Union or EISMEA. Neither the European Union nor the granting
-        authority can be held responsible for them.
-      </p>
-    </footer>
   </body>
 </html>
 {{end}}

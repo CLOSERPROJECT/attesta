@@ -68,6 +68,7 @@ func testTemplates() *template.Template {
 	  {{else if eq .Body "home_body"}}{{template "home_body" .}}
 	  {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
+  {{else if eq .Body "about_body"}}{{template "about_body" .}}
   {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
   {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
@@ -90,6 +91,8 @@ func testTemplates() *template.Template {
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
 {{define "dpp.html"}}{{template "layout.html" .}}{{end}}
+{{define "about_body"}}ABOUT{{end}}
+{{define "about.html"}}{{template "layout.html" .}}{{end}}
 {{define "timeline.html"}}TIMELINE {{range .}}{{.StepID}} {{end}}{{end}}
 {{define "backoffice_picker_body"}}BACKOFFICE_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "backoffice_landing_body"}}BACKOFFICE{{end}}
