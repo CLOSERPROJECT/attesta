@@ -2,8 +2,10 @@
 
 {{define "reset_request_body"}}
 <section class="panel landing" style="max-width: 520px;">
-  <h1>Reset Password</h1>
-  <p class="muted">Enter your email address to request a password reset.</p>
+  <div class="panel-heading">
+    <h1>Reset Password</h1>
+    <p>Enter your email address to request a password reset.</p>
+  </div>
   {{if .Confirmation}}
     <p class="muted">{{.Confirmation}}</p>
     {{if .ResetLink}}

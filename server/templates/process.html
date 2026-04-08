@@ -33,8 +33,10 @@
 
 {{define "process_downloads"}}
   <section class="panel" id="process-downloads">
-    <h2>Downloads</h2>
-    <p class="muted">Export attachments and notarized data for this stream.</p>
+    <div class="panel-heading">
+      <h2>Downloads</h2>
+      <p>Export attachments and notarized data for this stream.</p>
+    </div>
     {{if .Attachments}}
       <div class="panel-block" style="margin-bottom: 12px;">
         <p class="muted" style="margin: 0 0 8px;">Attachments</p>

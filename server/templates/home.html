@@ -5,8 +5,10 @@
 
 {{define "home_picker_body"}}
 <section class="panel landing landing-wide">
-  <h1>Choose a stream</h1>
-  <p class="muted">Select a stream to start or continue process tracking.</p>
+  <div class="panel-heading">
+    <h1>Choose a stream</h1>
+    <p>Select a stream to start or continue process tracking.</p>
+  </div>
   {{if .Confirmation}}
     <p class="muted">{{.Confirmation}}</p>
   {{end}}
@@ -20,20 +22,22 @@
             <p class="workflow-card-description{{if not .Description}} is-empty{{end}}">
               {{if .Description}}{{.Description}}{{else}}&nbsp;{{end}}
             </p>
-            <dl class="workflow-card-stats">
-              <div>
-                <dt>Not started</dt>
-                <dd>{{.Counts.NotStarted}}</dd>
-              </div>
-              <div>
-                <dt>Started</dt>
-                <dd>{{.Counts.Started}}</dd>
-              </div>
-              <div>
-                <dt>Terminated</dt>
-                <dd>{{.Counts.Terminated}}</dd>
-              </div>
-            </dl>
+            <div style="margin: auto 0 0; padding-top: 6px; border-top: 1px solid var(--border);">
+              <table class="workflow-card-stats">
+                <tr>
+                  <th>Not started</th>
+                  <td>{{.Counts.NotStarted}}</td>
+                </tr>
+                <tr>
+                  <th>In progress</th>
+                  <td>{{.Counts.Started}}</td>
+                </tr>
+                <tr>
+                  <th>Completed</th>
+                  <td>{{.Counts.Terminated}}</td>
+                </tr>
+              </table>
+            </div>
           </a>
           {{if .CanDelete}}
             <form method="post" action="{{.DeleteAction}}" class="workflow-card-delete">
@@ -49,14 +53,12 @@
       {{end}}
       {{if .ShowCreateStreamCard}}
         <a class="workflow-card workflow-card-create" href="/org-admin/formata-builder">
-          <h2 class="workflow-card-title">Create new stream</h2>
-          <p class="workflow-card-description">Click to create new stream</p>
           <span class="workflow-card-cta">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
               <path d="M5 12h14"/>
               <path d="M12 5v14"/>
             </svg>
-            Create new stream
+            <span style="margin-left: 4px;">Create new stream</span>
           </span>
         </a>
       {{end}}
@@ -96,8 +98,10 @@
 
   {{if .Error}}
     <section class="panel">
-      <h2 style="margin-top: 0;">Stream configuration issue</h2>
-      <p class="muted">This stream cannot start new processes until its organization and role references are fixed.</p>
+      <div class="panel-heading">
+        <h2>Stream configuration issue</h2>
+        <p>This stream cannot start new processes until its organization and role references are fixed.</p>
+      </div>
       <div class="error" style="margin-bottom: 0;">{{.Error}}</div>
     </section>
   {{end}}

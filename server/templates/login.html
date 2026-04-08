@@ -3,8 +3,10 @@
 {{define "login_body"}}
 <div class="login-wrapper">
   <section class="panel login">
-    <h1>Login</h1>
-    <p class="muted">Use your account credentials to continue.</p>
+    <div class="panel-heading">
+      <h1>Login</h1>
+      <p>Use your account credentials to continue.</p>
+    </div>
     {{if .Error}}
       <p class="muted" style="color: #a91919;">{{.Error}}</p>
     {{end}}

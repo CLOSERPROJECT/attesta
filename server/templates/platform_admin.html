@@ -17,8 +17,10 @@
   </section>
 
   <section class="panel">
-    <h2>New organization</h2>
-    <p class="muted">Add a new organization to the platform</p>
+    <div class="panel-heading">
+      <h2>New organization</h2>
+      <p>Add a new organization to the platform</p>
+    </div>
     <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
       <label for="org-name">Organization name</label>
       <input id="org-name" name="name" type="text" required />
@@ -30,8 +32,10 @@
   </section>
 
   <section class="panel">
-    <h2>Invite organization admin</h2>
-    <p class="muted">Invite an organization admin as an Appwrite team owner.</p>
+    <div class="panel-heading">
+      <h2>Invite organization admin</h2>
+      <p>Invite an organization admin as an Appwrite team owner.</p>
+    </div>
     <form method="post" action="/admin/orgs" class="input-form">
       <input type="hidden" name="intent" value="invite_org_admin" />
       <label for="org-admin-email">Org admin email</label>

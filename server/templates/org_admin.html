@@ -17,9 +17,15 @@
   </section>
 
   <section class="panel">
-    <h2>Organization profile</h2>
+    <div class="panel-heading">
+      <h2>Organization profile</h2>
+      {{if .NeedsOrganizationSetup}}
+        <p>Your org admin invite is not assigned to an organization yet. Create one now to continue.</p>
+      {{else}}
+        <p>Review and update your organization details.</p>
+      {{end}}
+    </div>
     {{if .NeedsOrganizationSetup}}
-      <p class="muted">Your org admin invite is not assigned to an organization yet. Create one now to continue.</p>
       <form method="post" action="/org-admin/users" class="input-form" enctype="multipart/form-data">
         <input type="hidden" name="intent" value="create_org" />
         <label for="org-name">Organization name</label>
@@ -30,7 +36,6 @@
         <button class="primary" type="submit">Create organization</button>
       </form>
     {{else}}
-      <p class="muted">Review and update your organization details.</p>
       <div class="org-profile-summary">
         {{if .OrganizationLogoURL}}
           <img src="{{.OrganizationLogoURL}}" alt="{{.Organization.Name}} logo" class="org-profile-logo" />
