@@ -1184,13 +1184,14 @@ button.secondary {
   color: var(--error-ink);
   padding: 10px 12px;
   border-radius: 10px;
-  margin-bottom: 12px;
+  margin-block-start: 0;
+  margin-block-end: 0;
 }
 
 .input-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 22px;
 }
 
 .input-form > label {
@@ -1201,12 +1202,29 @@ button.secondary {
   color: var(--muted);
 }
 
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field > label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .input-form input {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
+}
+
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .password-field {
