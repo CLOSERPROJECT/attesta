@@ -244,7 +244,7 @@
               <div class="manage-dialog-card">
                 <header class="manage-dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title">Delete organization</h3>
+                    <h3 class="manage-dialog-title manage-dialog-danger-title">Danger zone - Delete organization</h3>
                     <p class="manage-dialog-subtitle">{{.Name}}</p>
                   </div>
                   <button type="button" class="secondary" onclick="document.getElementById('delete-org-{{.Slug}}').close()">
@@ -254,10 +254,7 @@
                     </svg>
                   </button>
                 </header>
-                <div class="manage-dialog-danger-zone manage-dialog-danger-copy">
-                  <p class="manage-dialog-danger-title">Danger zone</p>
-                  <p class="manage-dialog-subtitle">This will permanently remove the organization and its memberships. Confirm only if you want to continue.</p>
-                </div>
+                <p style="margin: 0 0 20px;">This will permanently remove the organization and its memberships. Confirm only if you want to continue.</p>
                 {{if and (eq $.OrganizationDialogAction "delete") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError}}<p class="error">{{$.OrganizationError}}</p>{{end}}
                 <form method="post" action="/admin/orgs" class="input-form">
                   <input type="hidden" name="intent" value="delete_org" />
@@ -265,7 +262,6 @@
                   <input type="hidden" name="q" value="{{$.SearchQuery}}" />
                   <input type="hidden" name="page" value="{{$.CurrentPage}}" />
                   <div class="form-actions form-actions-end">
-                    <button type="button" class="secondary" onclick="document.getElementById('delete-org-{{.Slug}}').close()">Cancel</button>
                     <button type="submit" class="danger">Delete organization</button>
                   </div>
                 </form>
