@@ -1,22 +1,24 @@
-{{/* Used on /reset to render password reset request form (NOT USED YET!) */}}
+{{/* Used on /reset to render password reset request form */}}
 
 {{define "reset_request_body"}}
-<section class="panel landing" style="max-width: 520px;">
-  <div class="panel-heading">
-    <h1>Reset Password</h1>
-    <p>Enter your email address to request a password reset.</p>
-  </div>
-  {{if .Confirmation}}
-    <p class="muted">{{.Confirmation}}</p>
-    {{if .ResetLink}}
-      <p><a href="{{.ResetLink}}">Open reset link</a></p>
+<div class="login-wrapper">
+  <section class="panel login">
+    <div class="panel-heading">
+      <h1>Reset Password</h1>
+      <p>Enter your email address to request a password reset.</p>
+    </div>
+    <form method="post" action="/reset" class="input-form">
+      <div class="form-field">
+        <label class="muted" for="email">Email</label>
+        <input id="email" name="email" type="email" value="{{.Email}}" required />
+      </div>
+      <div class="form-actions">
+        <button class="primary" type="submit">Create reset link</button>
+      </div>
+    </form>
+    {{if .Confirmation}}
+      <p class="muted">{{.Confirmation}}</p>
     {{end}}
-  {{end}}
-  <form method="post" action="/reset" class="stack" style="gap: 12px;">
-    <label class="muted" for="email">Email</label>
-    <input id="email" name="email" type="email" value="{{.Email}}" required />
-    <button class="primary" type="submit">Create reset link</button>
-  </form>
 </section>
 {{end}}
 

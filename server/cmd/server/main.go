@@ -2450,6 +2450,18 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		password := strings.TrimSpace(r.FormValue("password"))
+		confirmPassword := strings.TrimSpace(r.FormValue("confirm_password"))
+		if password != confirmPassword {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "reset_set.html", ResetSetView{
+				PageBase:    s.pageBase("reset_set_body", "", ""),
+				Token:       "confirm?userId=" + url.QueryEscape(userID) + "&secret=" + url.QueryEscape(secret),
+				Error:       "passwords do not match",
+				Title:       "Set New Password",
+				SubmitLabel: "Update password",
+			})
+			return
+		}
 		if err := validatePassword(password); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = s.tmpl.ExecuteTemplate(w, "reset_set.html", ResetSetView{

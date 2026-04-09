@@ -264,7 +264,7 @@ func TestHandleResetConfirmCompletesRecovery(t *testing.T) {
 		now:  time.Now,
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough"))
+	req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	server.handleResetSet(rec, req)
@@ -306,12 +306,23 @@ func TestHandleResetSetBranches(t *testing.T) {
 
 	t.Run("short password", func(t *testing.T) {
 		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
-		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=short"))
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=short&confirm_password=short"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		server.handleResetSet(rec, req)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("password mismatch", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=one&confirm_password=two"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "passwords do not match") {
+			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
 		}
 	})
 
@@ -335,7 +346,7 @@ func TestHandleResetSetBranches(t *testing.T) {
 			tmpl: resetTemplates(),
 			now:  time.Now,
 		}
-		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough"))
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		server.handleResetSet(rec, req)
