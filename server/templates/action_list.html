@@ -60,13 +60,8 @@
                     </label>
                   {{end}}
                 {{end}}
-                <label {{if eq .InputType "formata"}}class="action-field-formata"{{end}}>
+                <label class="action-field-formata">
                   {{.InputKey}}
-                  {{if eq .InputType "number"}}
-                    <input type="number" name="value" placeholder="Enter number" {{if .Disabled}}disabled{{end}} />
-                  {{else if eq .InputType "file"}}
-                    <input type="file" name="{{.InputKey}}" {{if .Disabled}}disabled{{end}} />
-                  {{else if eq .InputType "formata"}}
                     <div
                       class="js-formata-host"
                       data-formata-schema='{{.FormSchema}}'
@@ -74,13 +69,7 @@
                       {{if .Disabled}}data-formata-disabled="true"{{end}}
                     ></div>
                     <input class="js-formata-value" type="hidden" name="value" {{if .Disabled}}disabled{{end}} />
-                  {{else}}
-                    <input type="text" name="value" placeholder="Enter value" {{if .Disabled}}disabled{{end}} />
-                  {{end}}
                 </label>
-                {{if ne .InputType "formata"}}
-                  <button type="submit" {{if .Disabled}}disabled{{end}}>Complete</button>
-                {{end}}
               </form>
             {{else}}
               <div class="action-submitted">

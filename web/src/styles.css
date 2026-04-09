@@ -716,7 +716,7 @@ button.secondary {
 .substep-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
   font-size: 12px;
   color: var(--muted);
   min-width: 0;

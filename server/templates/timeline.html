@@ -55,6 +55,7 @@
               </div>
               {{.Title}}
               {{if eq .Status "done"}}
+                <hr style="margin: 0;">
                 <div class="substep-meta">
                   {{if .DoneBy}}
                     <span class="actor">by {{.DoneBy}}</span>
