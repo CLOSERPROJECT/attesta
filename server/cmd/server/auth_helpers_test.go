@@ -443,7 +443,7 @@ func TestWorkflowValidationAndRoleStyleHelpers(t *testing.T) {
 		t.Fatalf("empty workflow validation error = %q", got)
 	}
 	errText := (&WorkflowRefValidationError{Messages: []string{"missing org", "missing role"}}).Error()
-	if errText != "workflow references are invalid: missing org; missing role" {
+	if errText != "workflow references are invalid:\nmissing org\nmissing role" {
 		t.Fatalf("workflow validation error = %q", errText)
 	}
 

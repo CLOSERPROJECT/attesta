@@ -591,7 +591,7 @@ func (e *WorkflowRefValidationError) Error() string {
 	if e == nil || len(e.Messages) == 0 {
 		return "workflow references are invalid"
 	}
-	return "workflow references are invalid: " + strings.Join(e.Messages, "; ")
+	return "workflow references are invalid:\n- " + strings.Join(e.Messages, "\n- ")
 }
 
 type ProcessPageView struct {

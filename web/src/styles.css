@@ -1224,6 +1224,7 @@ button.secondary {
   border-radius: 10px;
   margin-block-start: 0;
   margin-block-end: 0;
+  white-space: pre-line;
 }
 
 .input-form {

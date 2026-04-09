@@ -4,7 +4,7 @@
 */}}
 
 {{define "home_picker_body"}}
-<section class="panel landing landing-wide">
+<section class="panel max-w-7xl mx-auto">
   <div class="panel-heading">
     <h1>Choose a stream</h1>
     <p>Select a stream to start or continue process tracking.</p>
@@ -85,82 +85,77 @@
       {{end}}
     </div>
   </section>
-
-  {{if .Error}}
-    <section class="panel">
-      <div class="panel-heading">
-        <h2>Stream configuration issue</h2>
-        <p>This stream cannot start new processes until its organization and role references are fixed.</p>
-      </div>
-      <div class="error" style="margin-bottom: 0;">{{.Error}}</div>
-    </section>
-  {{end}}
-
   <section class="panel">
     <div class="panel-head-actions">
       <div class="panel-heading">
         <h2>Stream instances</h2>
         <p>View and manage all instances of this stream.</p>
       </div>
-      {{if .CanStartProcess}}
-        <form method="post" action="{{.WorkflowPath}}/process/start">
-          <button class="primary" type="submit">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-              <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
-            </svg>
-            New instance
-          </button>
-        </form>
-      {{end}}
+      <form method="post" action="{{.WorkflowPath}}/process/start">
+        <button class="primary" type="submit" {{if .Error}}disabled{{end}}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+            <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+          </svg>
+          New instance
+        </button>
+      </form>
     </div>
     <hr style="margin-bottom: 20px;">
-    <form method="get" action="{{.WorkflowPath}}/" class="process-toolbar">
-      <label class="process-control">
-        <span class="muted">Sort</span>
-        <select id="sort" name="sort" onchange="this.form.submit()">
-          <option value="time_desc" {{if eq .Sort "time_desc"}}selected{{end}}>Newest</option>
-          <option value="time_asc" {{if eq .Sort "time_asc"}}selected{{end}}>Oldest</option>
-          <option value="progress_desc" {{if eq .Sort "progress_desc"}}selected{{end}}>Most advanced</option>
-          <option value="progress_asc" {{if eq .Sort "progress_asc"}}selected{{end}}>Least advanced</option>
-          <option value="status" {{if eq .Sort "status"}}selected{{end}}>Status</option>
-        </select>
-      </label>
-      <label class="process-control">
-        <span class="muted">Filter</span>
-        <select id="filter" name="filter" onchange="this.form.submit()">
-          <option value="all" {{if eq .StatusFilter "all"}}selected{{end}}>All</option>
-          <option value="done" {{if eq .StatusFilter "done"}}selected{{end}}>Done</option>
-          <option value="active" {{if eq .StatusFilter "active"}}selected{{end}}>Active</option>
-        </select>
-      </label>
-    </form>
-
-    {{if .Processes}}
-      <ul class="process-list">
-        {{range .Processes}}
-          <li class="process-item">
-            <div class="process-head">
-              <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="status-tag status-tag-compact status-{{.Status}}">{{.Status}}</span>
-            </div>
-            <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
-              <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
-            </div>
-            <div class="process-meta">
-              <span class="process-meta-primary">{{.DoneSubsteps}} / {{.TotalSubsteps}} complete ({{.Percent}}%)</span>
-              <span>Created: {{.CreatedAt}}</span>
-              {{if .LastNotarizedAt}}
-                <span>Last notarized: {{.LastNotarizedAt}}</span>
-              {{end}}
-              {{if .LastDigestShort}}
-                <span class="pill">sha256 {{.LastDigestShort}}</span>
-              {{end}}
-            </div>
-          </li>
-        {{end}}
-      </ul>
+    {{if .Error}}
+      <div class="panel-heading">
+        <h3>Stream configuration issue</h3>
+        <p>This stream cannot start new processes until its organization and role references are fixed.</p>
+      </div>
+      <div class="error">{{.Error}}</div>
     {{else}}
-      <p class="muted" style="margin: 12px 0 0;">No instances yet.</p>
+      <form method="get" action="{{.WorkflowPath}}/" class="process-toolbar">
+        <label class="process-control">
+          <span class="muted">Sort</span>
+          <select id="sort" name="sort" onchange="this.form.submit()">
+            <option value="time_desc" {{if eq .Sort "time_desc"}}selected{{end}}>Newest</option>
+            <option value="time_asc" {{if eq .Sort "time_asc"}}selected{{end}}>Oldest</option>
+            <option value="progress_desc" {{if eq .Sort "progress_desc"}}selected{{end}}>Most advanced</option>
+            <option value="progress_asc" {{if eq .Sort "progress_asc"}}selected{{end}}>Least advanced</option>
+            <option value="status" {{if eq .Sort "status"}}selected{{end}}>Status</option>
+          </select>
+        </label>
+        <label class="process-control">
+          <span class="muted">Filter</span>
+          <select id="filter" name="filter" onchange="this.form.submit()">
+            <option value="all" {{if eq .StatusFilter "all"}}selected{{end}}>All</option>
+            <option value="done" {{if eq .StatusFilter "done"}}selected{{end}}>Done</option>
+            <option value="active" {{if eq .StatusFilter "active"}}selected{{end}}>Active</option>
+          </select>
+        </label>
+      </form>
+
+      {{if .Processes}}
+        <ul class="process-list">
+          {{range .Processes}}
+            <li class="process-item">
+              <div class="process-head">
+                <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
+                <span class="status-tag status-tag-compact status-{{.Status}}">{{.Status}}</span>
+              </div>
+              <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
+                <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
+              </div>
+              <div class="process-meta">
+                <span class="process-meta-primary">{{.DoneSubsteps}} / {{.TotalSubsteps}} complete ({{.Percent}}%)</span>
+                <span>Created: {{.CreatedAt}}</span>
+                {{if .LastNotarizedAt}}
+                  <span>Last notarized: {{.LastNotarizedAt}}</span>
+                {{end}}
+                {{if .LastDigestShort}}
+                  <span class="pill">sha256 {{.LastDigestShort}}</span>
+                {{end}}
+              </div>
+            </li>
+          {{end}}
+        </ul>
+      {{else}}
+        <p class="muted" style="margin: 12px 0 0;">No instances yet.</p>
+      {{end}}
     {{end}}
   </section>
 </div>
