@@ -213,8 +213,8 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `class="panel landing landing-wide"`) {
-		t.Fatalf("expected home picker section to include landing-wide class, got %q", body)
+	if !strings.Contains(body, `class="panel max-w-7xl mx-auto"`) {
+		t.Fatalf("expected home picker panel wrapper, got %q", body)
 	}
 	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
 		t.Fatalf("expected workflow card grid markup, got %q", body)
@@ -373,8 +373,11 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if !strings.Contains(body, "workflow references are invalid") {
 		t.Fatalf("expected validation error details, got %q", body)
 	}
-	if strings.Contains(body, `action="/w/workflow/process/start"`) {
-		t.Fatalf("did not expect new stream action for invalid workflow, got %q", body)
+	if !strings.Contains(body, `action="/w/workflow/process/start"`) {
+		t.Fatalf("expected new stream form to remain present, got %q", body)
+	}
+	if !strings.Contains(body, `<button class="primary" type="submit" disabled>`) {
+		t.Fatalf("expected new stream button to be disabled for invalid workflow, got %q", body)
 	}
 }
 
