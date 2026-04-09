@@ -2848,6 +2848,22 @@ func platformAdminPath(query string, page int) string {
 	return "/admin/orgs"
 }
 
+func redirectPlatformAdminWithMessage(w http.ResponseWriter, r *http.Request, query string, page int, confirmation string) {
+	target := platformAdminPath(query, page)
+	trimmed := strings.TrimSpace(confirmation)
+	if trimmed == "" {
+		http.Redirect(w, r, target, http.StatusSeeOther)
+		return
+	}
+	values := url.Values{}
+	if parsed, err := url.Parse(target); err == nil {
+		values = parsed.Query()
+		target = parsed.Path
+	}
+	values.Set("confirmation", trimmed)
+	http.Redirect(w, r, target+"?"+values.Encode(), http.StatusSeeOther)
+}
+
 var errPlatformAdminInviteCrossOrg = errors.New("platform admin invite email belongs to another organization")
 
 func platformAdminOrganizationRows(ctx context.Context, organizations []Organization, identity IdentityStore) []PlatformAdminOrganizationRow {
@@ -3038,11 +3054,12 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		searchQuery, page := platformAdminListStateFromRequest(r)
+		confirmation := homePickerMessage(r, "confirmation")
 		if isHTMXRequest(r) {
-			s.renderPlatformAdminResults(w, admin, "", PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+			s.renderPlatformAdminResults(w, admin, confirmation, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 			return
 		}
-		s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+		s.renderPlatformAdmin(w, admin, confirmation, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 		return
 	case http.MethodPost:
 		contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
@@ -3168,10 +3185,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 					s.logAndRenderPlatformAdminError(w, r, admin, "organization created", PlatformAdminErrors{Invite: "failed to create invite", DialogAction: "invite", OrgSlug: createdOrg.Slug, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page}, err, "failed to create org admin invite for new organization %s", createdOrg.Slug)
 					return
 				}
-				s.renderPlatformAdmin(w, admin, "organization created and "+message, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+				redirectPlatformAdminWithMessage(w, r, searchQuery, page, "organization created and "+message)
 				return
 			}
-			http.Redirect(w, r, platformAdminPath(searchQuery, page), http.StatusSeeOther)
+			redirectPlatformAdminWithMessage(w, r, searchQuery, page, "organization created")
 			return
 		case "set_org":
 			currentSlug := strings.TrimSpace(r.FormValue("org_slug"))

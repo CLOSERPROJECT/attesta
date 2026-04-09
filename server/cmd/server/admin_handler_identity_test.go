@@ -584,8 +584,8 @@ func TestHandleAdminOrgsCreateOrganizationWithPlatformAdmin(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/admin/orgs" {
-		t.Fatalf("location = %q", rec.Header().Get("Location"))
+	if location := rec.Header().Get("Location"); !strings.Contains(location, "/admin/orgs") || !strings.Contains(location, "confirmation=organization+created") {
+		t.Fatalf("location = %q", location)
 	}
 	if createName != "Fresh Org" {
 		t.Fatalf("createName = %q, want Fresh Org", createName)
@@ -649,14 +649,14 @@ func TestHandleAdminOrgsCreateOrganizationWithOptionalOrgAdminInvite(t *testing.
 
 	server.handleAdminOrgs(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	if inviteEmail != "owner@example.com" || inviteSessionSecret != "platform-session" {
 		t.Fatalf("inviteEmail=%q inviteSessionSecret=%q", inviteEmail, inviteSessionSecret)
 	}
-	if !strings.Contains(rec.Body.String(), "organization created and invite sent") {
-		t.Fatalf("body = %q", rec.Body.String())
+	if location := rec.Header().Get("Location"); !strings.Contains(location, "/admin/orgs") || !strings.Contains(location, "confirmation=organization+created+and+invite+sent") {
+		t.Fatalf("location = %q", location)
 	}
 }
 
