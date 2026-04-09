@@ -1143,10 +1143,10 @@ button.secondary {
 }
 
 .process-toolbar select {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: inherit;
   font-size: 13px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
