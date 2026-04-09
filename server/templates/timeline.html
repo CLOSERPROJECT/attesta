@@ -17,18 +17,18 @@
               role="button"
             >
               <div class="substep-head">
-                <span class="pill sid-pill">{{.SubstepID}}</span>
+                <span class="pill" style="--pill-bg: var(--panel); --border: var(--ink);">{{.SubstepID}}</span>
                 {{if .RoleBadges}}
                   {{range .RoleBadges}}
                     <span
                       class="pill role-pill"
-                      style="--pill-bg: {{.Color}}; --border: {{.Border}}"
+                      style="--pill-bg: {{.Color}}; --border: {{.Border}};"
                     >{{.Label}}</span>
                   {{end}}
                 {{else}}
                   <span
                     class="pill role-pill"
-                    style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}"
+                    style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}};"
                   >{{.RoleLabel}}</span>
                 {{end}}
                 <span class="status">{{.Status}}</span>

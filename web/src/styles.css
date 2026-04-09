@@ -52,7 +52,7 @@
   --role-pink-border: oklch(44.8% 0.183 354.08);
   --role-rose-bg: oklch(51.4% 0.222 16.935);
   --role-rose-border: oklch(45.5% 0.188 13.697);
-  --substep-bg: #f9faf6;
+  --substep-bg: #e7ebdb;
   --warning-bg: #fff7da;
   --tag-bg: #eef2e6;
   --tag-bg-available: #eef7f1;
@@ -113,7 +113,7 @@
   --role-pink-border: oklch(82.3% 0.12 346.018);
   --role-rose-bg: oklch(89.2% 0.058 10.001);
   --role-rose-border: oklch(81% 0.117 11.638);
-  --substep-bg: rgba(255, 255, 255, 0.04);
+  --substep-bg: rgba(255, 255, 255, 0.116);
   --warning-bg: rgba(242, 198, 79, 0.12);
   --tag-bg: rgba(255, 255, 255, 0.05);
   --tag-bg-available: rgba(87, 194, 166, 0.1);
@@ -566,14 +566,10 @@ button.secondary {
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  border-left: 6px solid var(--dept-border, var(--border));
-  background: linear-gradient(
-    90deg,
-    var(--dept-color, var(--dept-fallback)),
-    var(--substep-bg) 45%
-  );
+  border-left: 6px solid;
+  background: var(--substep-bg);
   cursor: pointer;
-  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  transition: transform 300ms ease, opacity 300ms ease;
   min-width: 0;
   display: grid;
   gap: 8px;
@@ -586,7 +582,8 @@ button.secondary {
 }
 
 .substep:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  opacity: 1;
 }
 
 .substep.substep-selected {
@@ -600,12 +597,14 @@ button.secondary {
 }
 
 .substep-done {
+  opacity: 0.5;
   border-color: var(--accent-2);
   background: var(--warning-bg);
 }
 
 .substep-locked {
-  opacity: 0.7;
+  opacity: 0.5;
+  border-color: color-mix(in srgb, var(--muted) 50%, var(--border));
 }
 
 .substep-head {
@@ -631,14 +630,14 @@ button.secondary {
 }
 
 .substep-available .substep-head .status {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-  background: var(--tag-bg-available);
-  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--panel);
 }
 
 .substep-done .substep-head .status {
   border-color: color-mix(in srgb, var(--accent-2) 40%, var(--border));
-  background: color-mix(in srgb, var(--accent-2) 16%, var(--surface-2));
+  background: var(--surface-2);
   color: color-mix(in srgb, var(--ink) 72%, var(--accent-2));
 }
 
@@ -708,10 +707,6 @@ button.secondary {
 
 .role-pill {
   color: var(--role-ink);
-}
-
-.sid-pill {
-  margin-right: 50px;
 }
 
 .actions {
