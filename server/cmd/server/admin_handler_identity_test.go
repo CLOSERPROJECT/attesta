@@ -162,6 +162,55 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 		}
 	})
 
+	t.Run("platform admin view summarizes org admin status", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+					return []IdentityOrg{
+						{ID: "team-1", Slug: "accepted", Name: "Accepted Org"},
+						{ID: "team-2", Slug: "pending", Name: "Pending Org"},
+						{ID: "team-3", Slug: "missing", Name: "Missing Org"},
+					}, nil
+				},
+				listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+					switch orgSlug {
+					case "accepted":
+						return []IdentityMembership{
+							{Email: "admin@example.com", Confirmed: true, IsOrgAdmin: true},
+							{Email: "owner@example.com", Confirmed: true, IsOrgAdmin: true},
+						}, nil
+					case "pending":
+						return []IdentityMembership{
+							{Email: "pending-owner@example.com", Confirmed: false, IsOrgAdmin: true},
+						}, nil
+					default:
+						return nil, nil
+					}
+				},
+			},
+		}
+
+		view := server.platformAdminView(&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
+		if len(view.Organizations) != 3 {
+			t.Fatalf("organizations = %#v", view.Organizations)
+		}
+		if view.Organizations[0].OrgAdminStatus != "At least one org admin accepted" {
+			t.Fatalf("accepted status = %q", view.Organizations[0].OrgAdminStatus)
+		}
+		if len(view.Organizations[0].OrgAdminEmails) != 1 || view.Organizations[0].OrgAdminEmails[0] != "owner@example.com" {
+			t.Fatalf("accepted admins = %#v", view.Organizations[0].OrgAdminEmails)
+		}
+		if view.Organizations[2].OrgAdminStatus != "All org admin invites pending" {
+			t.Fatalf("pending status = %q", view.Organizations[2].OrgAdminStatus)
+		}
+		if view.Organizations[1].OrgAdminStatus != "No org admin" {
+			t.Fatalf("missing status = %q", view.Organizations[1].OrgAdminStatus)
+		}
+	})
+
 	t.Run("render platform admin results and search helpers", func(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{},
@@ -543,6 +592,71 @@ func TestHandleAdminOrgsCreateOrganizationWithPlatformAdmin(t *testing.T) {
 	}
 	if createSessionSecret != "platform-session" || loginEmail != "admin@example.com" || deletedSecret != "platform-session" {
 		t.Fatalf("session wiring create=%q login=%q deleted=%q", createSessionSecret, loginEmail, deletedSecret)
+	}
+}
+
+func TestHandleAdminOrgsCreateOrganizationWithOptionalOrgAdminInvite(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Now().UTC()
+	var createdOrg IdentityOrg
+	var inviteEmail string
+	var inviteSessionSecret string
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+				return fakeIdentitySession("platform-session", "user-1", now.Add(time.Hour)), nil
+			},
+			createOrganizationFunc: func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error) {
+				createdOrg = IdentityOrg{ID: "team-1", Slug: "fresh-org", Name: name}
+				return createdOrg, nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				return nil, ErrIdentityNotFound
+			},
+			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+				if createdOrg.Slug == "" {
+					return nil, nil
+				}
+				return []IdentityOrg{createdOrg}, nil
+			},
+			listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+				return []IdentityMembership{{ID: "membership-admin", UserID: "user-1", Email: "admin@example.com", Confirmed: true, IsOrgAdmin: true}}, nil
+			},
+			getUserByEmailFunc: func(ctx context.Context, email string) (IdentityUser, error) {
+				return IdentityUser{}, ErrIdentityNotFound
+			},
+			inviteOrganizationUserFunc: func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+				inviteEmail = email
+				inviteSessionSecret = sessionSecret
+				return IdentityMembership{ID: "membership-2", Email: email, IsOrgAdmin: true}, nil
+			},
+			deleteSessionFunc: func(ctx context.Context, sessionSecret string) error { return nil },
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader("name=Fresh+Org&invite_email=owner%40example.com"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminOrgs(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if inviteEmail != "owner@example.com" || inviteSessionSecret != "platform-session" {
+		t.Fatalf("inviteEmail=%q inviteSessionSecret=%q", inviteEmail, inviteSessionSecret)
+	}
+	if !strings.Contains(rec.Body.String(), "organization created and invite sent") {
+		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
 

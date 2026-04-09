@@ -481,7 +481,7 @@ h3 {
 .primary,
 button {
   font-family: "Space Grotesk", system-ui, sans-serif;
-  border: none;
+  border: 1px solid var(--accent);
   background: var(--accent);
   color: #fff;
   padding: 10px 16px;
@@ -1662,9 +1662,33 @@ button.secondary {
   gap: 14px;
 }
 
+.platform-admin-item-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
 .platform-admin-item-name {
   margin: 0;
   font-weight: 600;
+}
+
+.platform-admin-item-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.platform-admin-item-status-accepted {
+  color: var(--accent);
+}
+
+.platform-admin-item-status-pending {
+  color: var(--accent-2);
+}
+
+.platform-admin-item-status-missing {
+  color: var(--danger);
 }
 
 .platform-admin-invite-button {
@@ -1682,7 +1706,7 @@ button.secondary {
   margin-top: 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -1690,8 +1714,29 @@ button.secondary {
 .platform-admin-pagination-pages {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.platform-admin-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.platform-admin-admin-summary .muted {
+  margin: 0;
+}
+
+.platform-admin-admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
 }
 
 .users-item {

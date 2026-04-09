@@ -64,12 +64,19 @@
       <input type="hidden" name="q" value="{{.SearchQuery}}" />
       <input type="hidden" name="page" value="{{.CurrentPage}}" />
       <div class="form-field">
-        <label for="org-name">Organization name</label>
+        <label for="org-name">Organization name *</label>
         <input id="org-name" name="name" type="text" value="{{if eq .OrganizationDialogAction "create"}}{{.OrganizationDialogName}}{{end}}" required />
       </div>
       <div class="form-field">
         <label for="org-logo">Organization logo</label>
         <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
+      </div>
+      <div class="form-field">
+        <label for="org-admin-email">Organization admin email</label>
+        <input id="org-admin-email" name="invite_email" type="email" value="{{if eq .OrganizationDialogAction "create"}}{{.InviteDialogEmail}}{{end}}"  />
+        <small class="muted">
+          Invite the first org admin now, or add more org admins later from the organization invite action.
+        </small>
       </div>
       {{if and .OrganizationError (eq .OrganizationDialogAction "create")}}<p class="error">{{.OrganizationError}}</p>{{end}}
       <div class="form-actions form-actions-end">
@@ -112,7 +119,10 @@
                   </svg>
                 </span>
               {{end}}
-              <p class="platform-admin-item-name">{{.Name}}</p>
+              <div class="platform-admin-item-copy">
+                <p class="platform-admin-item-name">{{.Name}}</p>
+                <p class="platform-admin-item-status platform-admin-item-status-{{.OrgAdminStatusClassName}}">{{.OrgAdminStatus}}</p>
+              </div>
             </div>
             <div class="user-actions">
               <button type="button" class="platform-admin-invite-button" onclick="document.getElementById('invite-org-{{.Slug}}').showModal()">
@@ -165,6 +175,33 @@
                     <button class="primary" type="submit">Create org admin invite</button>
                   </div>
                 </form>
+                <hr style="margin: 20px 0;">
+                <div class="platform-admin-admin-summary">
+                  <div>
+                    <h4 class="muted" style="margin-bottom: 10px;">Current org admins</h4>
+                    {{if .OrgAdminEmails}}
+                      <ul class="platform-admin-admin-list">
+                        {{range .OrgAdminEmails}}
+                          <li>{{.}}</li>
+                        {{end}}
+                      </ul>
+                    {{else}}
+                      <p style="font-size: 13px; margin: 0;">No accepted org admins yet.</p>
+                    {{end}}
+                  </div>
+                  <div>
+                    <h4 class="muted" style="margin-bottom: 10px;">Pending invites</h4>
+                    {{if .PendingOrgAdminEmails}}
+                      <ul class="platform-admin-admin-list">
+                        {{range .PendingOrgAdminEmails}}
+                          <li>{{.}}</li>
+                        {{end}}
+                      </ul>
+                    {{else}}
+                      <p style="font-size: 13px; margin: 0;">No pending org admin invites.</p>
+                    {{end}}
+                  </div>
+                </div>
               </div>
             </dialog>
 
@@ -243,17 +280,38 @@
 
     {{if gt .TotalPages 1}}
       <nav class="platform-admin-pagination" aria-label="Organizations pagination">
-        {{if .HasPreviousPage}}
-          <a class="secondary" href="/admin/orgs{{if or .SearchQuery (gt .PreviousPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .PreviousPage 1}}&{{end}}{{end}}{{if gt .PreviousPage 1}}page={{.PreviousPage}}{{end}}{{end}}" hx-get="/admin/orgs{{if or .SearchQuery (gt .PreviousPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .PreviousPage 1}}&{{end}}{{end}}{{if gt .PreviousPage 1}}page={{.PreviousPage}}{{end}}{{end}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">Previous</a>
-        {{end}}
         <div class="platform-admin-pagination-pages">
+          <a
+            class="secondary"
+            style="padding: 10px 8px; {{if not .HasPreviousPage}}pointer-events: none; opacity: 0.5;{{end}}"
+            href="/admin/orgs{{if or .SearchQuery (gt .PreviousPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .PreviousPage 1}}&{{end}}{{end}}{{if gt .PreviousPage 1}}page={{.PreviousPage}}{{end}}{{end}}" 
+            hx-get="/admin/orgs{{if or .SearchQuery (gt .PreviousPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .PreviousPage 1}}&{{end}}{{end}}{{if gt .PreviousPage 1}}page={{.PreviousPage}}{{end}}{{end}}"
+            hx-target="#platform-admin-results"
+            hx-select="#platform-admin-results"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
+          </a>
           {{range .PageNumbers}}
             <a class="{{if eq . $.CurrentPage}}primary{{else}}secondary{{end}}" href="/admin/orgs{{if or $.SearchQuery (gt . 1)}}?{{if $.SearchQuery}}q={{$.SearchQuery | urlquery}}{{if gt . 1}}&{{end}}{{end}}{{if gt . 1}}page={{.}}{{end}}{{end}}" hx-get="/admin/orgs{{if or $.SearchQuery (gt . 1)}}?{{if $.SearchQuery}}q={{$.SearchQuery | urlquery}}{{if gt . 1}}&{{end}}{{end}}{{if gt . 1}}page={{.}}{{end}}{{end}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">{{.}}</a>
           {{end}}
+          <a 
+            class="secondary"
+            style="padding: 10px 8px; {{if not .HasNextPage}}pointer-events: none; opacity: 0.5;{{end}}"
+            href="/admin/orgs{{if or .SearchQuery (gt .NextPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .NextPage 1}}&{{end}}{{end}}{{if gt .NextPage 1}}page={{.NextPage}}{{end}}{{end}}"
+            hx-get="/admin/orgs{{if or .SearchQuery (gt .NextPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .NextPage 1}}&{{end}}{{end}}{{if gt .NextPage 1}}page={{.NextPage}}{{end}}{{end}}"
+            hx-target="#platform-admin-results"
+            hx-select="#platform-admin-results"
+            hx-swap="outerHTML" hx-push-url="true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </a>
         </div>
-        {{if .HasNextPage}}
-          <a class="secondary" href="/admin/orgs{{if or .SearchQuery (gt .NextPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .NextPage 1}}&{{end}}{{end}}{{if gt .NextPage 1}}page={{.NextPage}}{{end}}{{end}}" hx-get="/admin/orgs{{if or .SearchQuery (gt .NextPage 1)}}?{{if .SearchQuery}}q={{.SearchQuery | urlquery}}{{if gt .NextPage 1}}&{{end}}{{end}}{{if gt .NextPage 1}}page={{.NextPage}}{{end}}{{end}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">Next</a>
-        {{end}}
       </nav>
     {{end}}
 </div>
