@@ -331,6 +331,7 @@ svg.bi {
 }
 
 .nav .account-menu-item-danger {
+  border: none;
   color: var(--danger);
 }
 
@@ -505,6 +506,7 @@ button[disabled] {
 
 button.danger {
   background: var(--danger);
+  border: none;
   color: #fff;
 }
 
