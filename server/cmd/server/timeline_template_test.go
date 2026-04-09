@@ -32,8 +32,8 @@ func TestTimelineTemplateRendersStepSummaryLayout(t *testing.T) {
 	if !strings.Contains(body, `src="/organization/logo/acme"`) {
 		t.Fatalf("expected org logo url, got: %s", body)
 	}
-	if !strings.Contains(body, `class="pill timeline-step-number"`) {
-		t.Fatalf("expected step number pill, got: %s", body)
+	if !strings.Contains(body, `class="pill"`) || !strings.Contains(body, ">Step 1</span>") {
+		t.Fatalf("expected step number pill copy, got: %s", body)
 	}
 	if !strings.Contains(body, "Acme Org") || !strings.Contains(body, "Review batch") {
 		t.Fatalf("expected org and title copy, got: %s", body)
