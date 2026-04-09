@@ -196,6 +196,48 @@ func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 	}
 }
 
+func TestBuildActionListDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID:           "1",
+				OrganizationSlug: "org-a",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Org-scoped step",
+						Order:     1,
+						Role:      "dep1",
+						InputKey:  "value",
+						InputType: "text",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID:       primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{},
+	}
+
+	actions := buildActionList(def, process, "workflow", Actor{
+		OrgSlug:   "org-b",
+		Role:      "dep1",
+		RoleSlugs: []string{"dep1"},
+	}, true, map[string]RoleMeta{})
+	action := findAction(t, actions, "1.1")
+
+	if action.Status != "available" {
+		t.Fatalf("expected status available, got %q", action.Status)
+	}
+	if !action.Disabled {
+		t.Fatal("expected wrong-org action to be disabled")
+	}
+	if action.Reason != "Not authorized for organization" {
+		t.Fatalf("expected org authorization reason, got %q", action.Reason)
+	}
+}
+
 func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{

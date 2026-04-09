@@ -6386,6 +6386,17 @@ func orderedSubsteps(def WorkflowDef) []WorkflowSub {
 	return ordered
 }
 
+func substepOrganizationMap(def WorkflowDef) map[string]string {
+	orgs := map[string]string{}
+	for _, step := range sortedSteps(def) {
+		orgSlug := strings.TrimSpace(step.OrganizationSlug)
+		for _, sub := range sortedSubsteps(step) {
+			orgs[sub.SubstepID] = orgSlug
+		}
+	}
+	return orgs
+}
+
 func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool) {
 	if process == nil {
 		return WorkflowSub{}, false
@@ -6403,6 +6414,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	var actions []ActionView
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
+	substepOrgs := substepOrganizationMap(def)
 	for _, sub := range ordered {
 		allowedRoles := substepRoles(sub)
 		ownedRoles := append([]string(nil), actor.RoleSlugs...)
@@ -6440,12 +6452,16 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				status = "available"
 			}
 		}
-		disabled := status != "available" || len(matchingRoles) == 0
+		stepOrgSlug := substepOrgs[sub.SubstepID]
+		orgAuthorized := stepOrgSlug == "" || strings.TrimSpace(actor.OrgSlug) == stepOrgSlug
+		disabled := status != "available" || len(matchingRoles) == 0 || !orgAuthorized
 		reason := ""
 		if status == "locked" {
 			reason = "Locked by sequence"
 		} else if status == "done" {
 			reason = "Already completed"
+		} else if !orgAuthorized {
+			reason = "Not authorized for organization"
 		} else if len(matchingRoles) == 0 {
 			reason = "Not authorized"
 		}
