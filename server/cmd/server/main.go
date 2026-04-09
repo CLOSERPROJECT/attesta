@@ -167,11 +167,13 @@ type TimelineRoleBadge struct {
 }
 
 type TimelineStep struct {
-	StepID   string
-	Title    string
-	OrgName  string
-	Expanded bool
-	Substeps []TimelineSubstep
+	StepID     string
+	Title      string
+	OrgSlug    string
+	OrgName    string
+	OrgLogoURL string
+	Expanded   bool
+	Substeps   []TimelineSubstep
 }
 
 type NotarizedAttachment struct {
@@ -1992,6 +1994,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/org-admin/users", s.handleOrgAdminUsers)
 	mux.HandleFunc("/org-admin/formata-builder", s.handleOrgAdminFormataBuilder)
 	mux.HandleFunc("/org-admin/formata-builder/", s.handleOrgAdminFormataBuilder)
+	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
 	mux.HandleFunc("/w/", s.handleWorkflowRoutes)
 	mux.HandleFunc("/", s.handleHome)
 	mux.HandleFunc("/events", s.handleEvents)
@@ -3581,6 +3584,45 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(logo.Data)
 }
 
+func (s *Server) handleOrganizationLogo(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	orgSlug := strings.Trim(strings.TrimPrefix(r.URL.Path, "/organization/logo/"), "/")
+	if orgSlug == "" || s.identity == nil {
+		http.NotFound(w, r)
+		return
+	}
+	org, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug)
+	if err != nil || org == nil || strings.TrimSpace(org.LogoFileID) == "" {
+		if err != nil && !errors.Is(err, ErrIdentityNotFound) {
+			logRequestError(r, err, "failed to load organization %s logo metadata", orgSlug)
+		}
+		http.NotFound(w, r)
+		return
+	}
+	logo, err := s.identity.GetOrganizationLogo(r.Context(), strings.TrimSpace(org.LogoFileID))
+	if err != nil {
+		if !errors.Is(err, ErrIdentityNotFound) {
+			logRequestError(r, err, "failed to load organization %s logo", orgSlug)
+		}
+		http.NotFound(w, r)
+		return
+	}
+	contentType := strings.TrimSpace(logo.ContentType)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	filename := sanitizeAttachmentFilename(logo.Filename)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
+	_, _ = w.Write(logo.Data)
+}
+
 func (s *Server) handlePlatformAdminLogo(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requirePlatformAdmin(w, r); !ok {
 		return
@@ -4592,6 +4634,7 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
 	filteredActions := filterActionsBySubstep(actions, selected, processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selected)
+	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
 
 	view := ActionListView{
 		WorkflowKey:       workflowKey,
@@ -4833,6 +4876,7 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 	processDone := process != nil && isProcessDone(cfg.Workflow, process)
 	selectedSubstepID := resolveSelectedSubstepID(actions, strings.TrimSpace(r.URL.Query().Get("substep")), processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selectedSubstepID)
+	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
 	viewer := Actor{WorkflowKey: workflowKey}
 	if user, _, userErr := s.currentUser(r); userErr == nil && user != nil {
 		viewer = actorFromAccountUser(user, workflowKey)
@@ -6158,6 +6202,25 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 	return out
 }
 
+func organizationLogoURLMap(ctx context.Context, identity IdentityStore) map[string]string {
+	if identity == nil {
+		return map[string]string{}
+	}
+	orgs, err := identity.ListOrganizations(ctx)
+	if err != nil {
+		return map[string]string{}
+	}
+	out := map[string]string{}
+	for _, org := range orgs {
+		slug := strings.TrimSpace(org.Slug)
+		if slug == "" || strings.TrimSpace(org.LogoFileID) == "" {
+			continue
+		}
+		out[slug] = "/organization/logo/" + url.PathEscape(slug)
+	}
+	return out
+}
+
 func organizationDisplayName(slug string, orgNames map[string]string) string {
 	slug = strings.TrimSpace(slug)
 	if slug == "" {
@@ -6178,6 +6241,7 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 		row := TimelineStep{
 			StepID:  step.StepID,
 			Title:   step.Title,
+			OrgSlug: strings.TrimSpace(step.OrganizationSlug),
 			OrgName: organizationDisplayName(step.OrganizationSlug, orgNames),
 		}
 		for _, sub := range sortedSubsteps(step) {
@@ -6716,6 +6780,16 @@ func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string
 			}
 		}
 		timeline[stepIndex].Expanded = expanded
+	}
+	return timeline
+}
+
+func decorateTimelineOrganizationLogos(timeline []TimelineStep, logoURLs map[string]string) []TimelineStep {
+	if len(timeline) == 0 || len(logoURLs) == 0 {
+		return timeline
+	}
+	for stepIndex := range timeline {
+		timeline[stepIndex].OrgLogoURL = strings.TrimSpace(logoURLs[strings.TrimSpace(timeline[stepIndex].OrgSlug)])
 	}
 	return timeline
 }

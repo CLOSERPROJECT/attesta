@@ -205,7 +205,28 @@ func TestBuildTimelineUsesOrganizationNameInStep(t *testing.T) {
 	if len(timeline) != 1 {
 		t.Fatalf("timeline len = %d, want 1", len(timeline))
 	}
+	if timeline[0].OrgSlug != "org-acme" {
+		t.Fatalf("timeline org slug = %q, want %q", timeline[0].OrgSlug, "org-acme")
+	}
 	if timeline[0].OrgName != "Acme Org" {
 		t.Fatalf("timeline org name = %q, want %q", timeline[0].OrgName, "Acme Org")
+	}
+}
+
+func TestDecorateTimelineOrganizationLogos(t *testing.T) {
+	timeline := []TimelineStep{
+		{StepID: "1", OrgSlug: "org-acme", OrgName: "Acme Org"},
+		{StepID: "2", OrgSlug: "org-beta", OrgName: "Beta Org"},
+	}
+
+	decorated := decorateTimelineOrganizationLogos(timeline, map[string]string{
+		"org-acme": "/organization/logo/org-acme",
+	})
+
+	if decorated[0].OrgLogoURL != "/organization/logo/org-acme" {
+		t.Fatalf("first timeline org logo url = %q", decorated[0].OrgLogoURL)
+	}
+	if decorated[1].OrgLogoURL != "" {
+		t.Fatalf("second timeline org logo url = %q, want empty", decorated[1].OrgLogoURL)
 	}
 }

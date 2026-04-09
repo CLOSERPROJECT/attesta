@@ -544,15 +544,66 @@ button.secondary {
 }
 
 .timeline-step-summary {
-  padding: 10px 12px;
+  padding: 12px;
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
 }
 
 .timeline-step-summary::marker,
 .timeline-step-summary::-webkit-details-marker {
   display: none;
+}
+
+.timeline-step-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.timeline-step-org-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.timeline-step-org-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.timeline-step-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+}
+
+.timeline-step-org {
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.timeline-step-title {
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .timeline-substeps {
