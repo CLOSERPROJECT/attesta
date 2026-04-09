@@ -1459,7 +1459,7 @@ button.secondary {
   gap: 28px;
 }
 
-.org-admin-panel-head {
+.panel-head-actions {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1467,12 +1467,8 @@ button.secondary {
   margin-bottom: 20px;
 }
 
-.org-admin-panel-head .panel-heading {
+.panel-head-actions .panel-heading {
   margin-bottom: 0;
-}
-
-.org-admin-panel-head .secondary {
-  flex: 0 0 auto;
 }
 
 .org-admin-form-actions {
@@ -1828,7 +1824,7 @@ hr {
 }
 
 @media (max-width: 720px) {
-  .org-admin-panel-head {
+  .panel-head-actions {
     flex-direction: column;
     align-items: stretch;
   }

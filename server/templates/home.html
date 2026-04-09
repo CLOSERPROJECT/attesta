@@ -70,7 +70,7 @@
 {{end}}
 
 {{define "home_body"}}
-<div class="stack">
+<div class="stack max-w-7xl mx-auto">
   <section class="hero">
     <button class="secondary" onclick="location.href='/'">
       <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
@@ -84,16 +84,6 @@
         <p class="hero-description">{{.WorkflowDescription}}</p>
       {{end}}
     </div>
-    {{if .CanStartProcess}}
-      <form method="post" action="{{.WorkflowPath}}/process/start">
-        <button class="primary" type="submit">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-            <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
-          </svg>
-          New stream
-        </button>
-      </form>
-    {{end}}
   </section>
 
   {{if .Error}}
@@ -107,8 +97,23 @@
   {{end}}
 
   <section class="panel">
+    <div class="panel-head-actions">
+      <div class="panel-heading">
+        <h2>Stream instances</h2>
+        <p>View and manage all instances of this stream.</p>
+      </div>
+      {{if .CanStartProcess}}
+        <form method="post" action="{{.WorkflowPath}}/process/start">
+          <button class="primary" type="submit">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
+              <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+            </svg>
+            New instance
+          </button>
+        </form>
+      {{end}}
+    </div>
     <div class="process-toolbar">
-      <h2 style="margin: 0;">All streams</h2>
       <form method="get" action="{{.WorkflowPath}}/" class="process-sort">
         <label class="muted" for="sort" style="font-size: 13px;">Sort</label>
         <select id="sort" name="sort" onchange="this.form.submit()">
@@ -146,12 +151,14 @@
         {{end}}
       </ul>
     {{else}}
-      <p class="muted" style="margin: 12px 0 0;">No streams yet.</p>
+      <p class="muted" style="margin: 12px 0 0;">No instances yet.</p>
     {{end}}
   </section>
 
   <section class="panel">
-    <h2 style="margin-top: 0;">History</h2>
+    <div class="panel-heading">
+      <h2>History</h2>
+    </div>
     {{if .History}}
       <ul class="process-list">
         {{range .History}}
@@ -177,7 +184,7 @@
         {{end}}
       </ul>
     {{else}}
-      <p class="muted" style="margin: 12px 0 0;">No finished streams yet.</p>
+      <p class="muted" style="margin: 12px 0 0;">No completed streams yet.</p>
     {{end}}
   </section>
 </div>
