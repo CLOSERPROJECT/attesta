@@ -103,25 +103,45 @@
                 {{.Name}}
               </span>
               <div class="user-actions">
-                <button type="button" class="user-action-button" aria-label="Edit role" onclick="document.getElementById('edit-role-{{.Slug}}').showModal()">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
-                    <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                </button>
-                <button type="button" class="user-action-button user-action-button-danger" aria-label="Delete role" onclick="document.getElementById('delete-role-{{.Slug}}').showModal()">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon-svg icon-svg-md" aria-hidden="true">
-                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
-                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"/>
-                  </svg>
-                </button>
+                {{if .InUse}}
+                  <button type="button" class="user-action-button" aria-label="Edit role" title="Role in use" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="user-action-button user-action-button-danger" aria-label="Delete role" title="Role in use" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="var(--muted)" class="icon-svg icon-svg-md" aria-hidden="true">
+                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
+                      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"/>
+                    </svg>
+                  </button>
+                {{else}}
+                  <span class="muted" style="font-size: 12px;">Not used</span>
+                  <button type="button" class="user-action-button" aria-label="Edit role" onclick="document.getElementById('edit-role-{{.Slug}}').showModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
+                      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="user-action-button user-action-button-danger" aria-label="Delete role" onclick="document.getElementById('delete-role-{{.Slug}}').showModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon-svg icon-svg-md" aria-hidden="true">
+                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
+                      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"/>
+                    </svg>
+                  </button>
+                {{end}}
               </div>
+              {{if and $.RoleError (or (eq $.RoleDialogAction "edit") (eq $.RoleDialogAction "delete")) (eq $.RoleDialogSlug .Slug) .InUse}}
+                <p class="error">{{$.RoleError}}</p>
+              {{end}}
+              {{if not .InUse}}
               <dialog id="edit-role-{{.Slug}}" class="manage-dialog">
                 <div class="manage-dialog-card">
                   <header class="manage-dialog-head">
                     <div>
                       <h3 class="manage-dialog-title">Edit Role</h3>
-                      <p class="manage-dialog-subtitle">{{.Name}}</p>
+                      <p class="manage-dialog-subtitle">Change the role name and color</p>
                     </div>
                     <button type="button" class="secondary" onclick="document.getElementById('edit-role-{{.Slug}}').close()">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
@@ -130,58 +150,56 @@
                       </svg>
                     </button>
                   </header>
-                  {{if .InUse}}
-                    <div class="manage-dialog-danger-zone manage-dialog-danger-copy">
-                      <p class="manage-dialog-danger-title">Role in use</p>
-                      <p class="manage-dialog-subtitle">Remove the role from the users that have it before continuing with the action.</p>
+                  <div class="manage-dialog-role-pill">
+                    <span class="pill pill-lg role-pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}">
+                      {{.Name}}
+                    </span>
+                  </div>
+                  <form method="post" action="/org-admin/roles" class="input-form">
+                    <input type="hidden" name="intent" value="set_role" />
+                    <input type="hidden" name="role_slug" value="{{.Slug}}" />
+                    <div class="form-field">
+                      <label for="edit-role-name-{{.Slug}}">Role name</label>
+                      <input id="edit-role-name-{{.Slug}}" name="name" type="text" value="{{if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleDialogName}}{{$.RoleDialogName}}{{else}}{{.Name}}{{end}}" required />
                     </div>
-                  {{else}}
-                    <form method="post" action="/org-admin/roles" class="input-form">
-                      <input type="hidden" name="intent" value="set_role" />
-                      <input type="hidden" name="role_slug" value="{{.Slug}}" />
-                      <div class="form-field">
-                        <label for="edit-role-name-{{.Slug}}">Role name</label>
-                        <input id="edit-role-name-{{.Slug}}" name="name" type="text" value="{{if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleDialogName}}{{$.RoleDialogName}}{{else}}{{.Name}}{{end}}" required />
+                    <div class="form-field">
+                      <label for="edit-role-palette-{{.Slug}}">Role color palette</label>
+                      <div class="role-palette-picker" data-role-palette-picker>
+                        <select id="edit-role-palette-{{.Slug}}" name="palette" required data-role-palette-select>
+                          <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" {{if eq (or $.RoleDialogPalette .Palette) "red"}}selected{{end}}>Red</option>
+                          <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)" {{if eq (or $.RoleDialogPalette .Palette) "orange"}}selected{{end}}>Orange</option>
+                          <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)" {{if eq (or $.RoleDialogPalette .Palette) "amber"}}selected{{end}}>Amber</option>
+                          <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)" {{if eq (or $.RoleDialogPalette .Palette) "yellow"}}selected{{end}}>Yellow</option>
+                          <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)" {{if eq (or $.RoleDialogPalette .Palette) "lime"}}selected{{end}}>Lime</option>
+                          <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)" {{if eq (or $.RoleDialogPalette .Palette) "green"}}selected{{end}}>Green</option>
+                          <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)" {{if eq (or $.RoleDialogPalette .Palette) "emerald"}}selected{{end}}>Emerald</option>
+                          <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)" {{if eq (or $.RoleDialogPalette .Palette) "teal"}}selected{{end}}>Teal</option>
+                          <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)" {{if eq (or $.RoleDialogPalette .Palette) "cyan"}}selected{{end}}>Cyan</option>
+                          <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)" {{if eq (or $.RoleDialogPalette .Palette) "sky"}}selected{{end}}>Sky</option>
+                          <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)" {{if eq (or $.RoleDialogPalette .Palette) "blue"}}selected{{end}}>Blue</option>
+                          <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)" {{if eq (or $.RoleDialogPalette .Palette) "indigo"}}selected{{end}}>Indigo</option>
+                          <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)" {{if eq (or $.RoleDialogPalette .Palette) "violet"}}selected{{end}}>Violet</option>
+                          <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)" {{if eq (or $.RoleDialogPalette .Palette) "purple"}}selected{{end}}>Purple</option>
+                          <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)" {{if eq (or $.RoleDialogPalette .Palette) "fuchsia"}}selected{{end}}>Fuchsia</option>
+                          <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)" {{if eq (or $.RoleDialogPalette .Palette) "pink"}}selected{{end}}>Pink</option>
+                          <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)" {{if eq (or $.RoleDialogPalette .Palette) "rose"}}selected{{end}}>Rose</option>
+                        </select>
+                        <span class="role-palette-preview" aria-hidden="true" data-role-palette-preview></span>
                       </div>
-                      <div class="form-field">
-                        <label for="edit-role-palette-{{.Slug}}">Role color palette</label>
-                        <div class="role-palette-picker" data-role-palette-picker>
-                          <select id="edit-role-palette-{{.Slug}}" name="palette" required data-role-palette-select>
-                            <option value="red" data-role-color="var(--role-red-bg)" data-role-border="var(--role-red-border)" {{if eq (or $.RoleDialogPalette .Palette) "red"}}selected{{end}}>Red</option>
-                            <option value="orange" data-role-color="var(--role-orange-bg)" data-role-border="var(--role-orange-border)" {{if eq (or $.RoleDialogPalette .Palette) "orange"}}selected{{end}}>Orange</option>
-                            <option value="amber" data-role-color="var(--role-amber-bg)" data-role-border="var(--role-amber-border)" {{if eq (or $.RoleDialogPalette .Palette) "amber"}}selected{{end}}>Amber</option>
-                            <option value="yellow" data-role-color="var(--role-yellow-bg)" data-role-border="var(--role-yellow-border)" {{if eq (or $.RoleDialogPalette .Palette) "yellow"}}selected{{end}}>Yellow</option>
-                            <option value="lime" data-role-color="var(--role-lime-bg)" data-role-border="var(--role-lime-border)" {{if eq (or $.RoleDialogPalette .Palette) "lime"}}selected{{end}}>Lime</option>
-                            <option value="green" data-role-color="var(--role-green-bg)" data-role-border="var(--role-green-border)" {{if eq (or $.RoleDialogPalette .Palette) "green"}}selected{{end}}>Green</option>
-                            <option value="emerald" data-role-color="var(--role-emerald-bg)" data-role-border="var(--role-emerald-border)" {{if eq (or $.RoleDialogPalette .Palette) "emerald"}}selected{{end}}>Emerald</option>
-                            <option value="teal" data-role-color="var(--role-teal-bg)" data-role-border="var(--role-teal-border)" {{if eq (or $.RoleDialogPalette .Palette) "teal"}}selected{{end}}>Teal</option>
-                            <option value="cyan" data-role-color="var(--role-cyan-bg)" data-role-border="var(--role-cyan-border)" {{if eq (or $.RoleDialogPalette .Palette) "cyan"}}selected{{end}}>Cyan</option>
-                            <option value="sky" data-role-color="var(--role-sky-bg)" data-role-border="var(--role-sky-border)" {{if eq (or $.RoleDialogPalette .Palette) "sky"}}selected{{end}}>Sky</option>
-                            <option value="blue" data-role-color="var(--role-blue-bg)" data-role-border="var(--role-blue-border)" {{if eq (or $.RoleDialogPalette .Palette) "blue"}}selected{{end}}>Blue</option>
-                            <option value="indigo" data-role-color="var(--role-indigo-bg)" data-role-border="var(--role-indigo-border)" {{if eq (or $.RoleDialogPalette .Palette) "indigo"}}selected{{end}}>Indigo</option>
-                            <option value="violet" data-role-color="var(--role-violet-bg)" data-role-border="var(--role-violet-border)" {{if eq (or $.RoleDialogPalette .Palette) "violet"}}selected{{end}}>Violet</option>
-                            <option value="purple" data-role-color="var(--role-purple-bg)" data-role-border="var(--role-purple-border)" {{if eq (or $.RoleDialogPalette .Palette) "purple"}}selected{{end}}>Purple</option>
-                            <option value="fuchsia" data-role-color="var(--role-fuchsia-bg)" data-role-border="var(--role-fuchsia-border)" {{if eq (or $.RoleDialogPalette .Palette) "fuchsia"}}selected{{end}}>Fuchsia</option>
-                            <option value="pink" data-role-color="var(--role-pink-bg)" data-role-border="var(--role-pink-border)" {{if eq (or $.RoleDialogPalette .Palette) "pink"}}selected{{end}}>Pink</option>
-                            <option value="rose" data-role-color="var(--role-rose-bg)" data-role-border="var(--role-rose-border)" {{if eq (or $.RoleDialogPalette .Palette) "rose"}}selected{{end}}>Rose</option>
-                          </select>
-                          <span class="role-palette-preview" aria-hidden="true" data-role-palette-preview></span>
-                        </div>
-                      </div>
-                      {{if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleError}}<p class="error">{{$.RoleError}}</p>{{end}}
-                      <div class="manage-dialog-actions manage-dialog-actions-end">
-                        <button class="primary" type="submit">Save role</button>
-                      </div>
-                    </form>
-                  {{end}}
+                    </div>
+                    {{if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleError}}<p class="error">{{$.RoleError}}</p>{{end}}
+                    <div class="manage-dialog-actions manage-dialog-actions-end">
+                      <button class="primary" type="submit">Save role</button>
+                    </div>
+                  </form>
                 </div>
               </dialog>
               <dialog id="delete-role-{{.Slug}}" class="manage-dialog">
                 <div class="manage-dialog-card">
                   <header class="manage-dialog-head">
                     <div>
-                      <h3 class="manage-dialog-title">Delete Role</h3>
-                      <p class="manage-dialog-subtitle">{{.Name}}</p>
+                      <h3 class="manage-dialog-title manage-dialog-danger-title">Danger zone - Delete role</h3>
+                      <p class="manage-dialog-subtitle">This action cannot be undone</p>
                     </div>
                     <button type="button" class="secondary" onclick="document.getElementById('delete-role-{{.Slug}}').close()">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
@@ -190,23 +208,23 @@
                       </svg>
                     </button>
                   </header>
-                  <div class="manage-dialog-danger-zone manage-dialog-danger-copy">
-                    <p class="manage-dialog-danger-title">{{if .InUse}}Role in use{{else}}Danger zone{{end}}</p>
-                    <p class="manage-dialog-subtitle">{{if .InUse}}Remove the role from the users that have it before continuing with the action.{{else}}This will permanently remove the role from your organization. Confirm only if you want to continue.{{end}}</p>
+                  <div class="manage-dialog-role-pill">
+                    <span class="pill pill-lg role-pill" style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}">
+                      {{.Name}}
+                    </span>
                   </div>
+                  <p>This will permanently remove the role from your organization. Confirm only if you want to continue.</p>
                   {{if and (eq $.RoleDialogAction "delete") (eq $.RoleDialogSlug .Slug) $.RoleError}}<p class="error">{{$.RoleError}}</p>{{end}}
                   <form method="post" action="/org-admin/roles" class="input-form">
                     <input type="hidden" name="intent" value="delete_role" />
                     <input type="hidden" name="role_slug" value="{{.Slug}}" />
                     <div class="manage-dialog-actions manage-dialog-actions-end">
-                      <button type="button" class="secondary" onclick="document.getElementById('delete-role-{{.Slug}}').close()">Cancel</button>
-                      {{if not .InUse}}
-                        <button type="submit" class="danger">Delete role</button>
-                      {{end}}
+                      <button type="submit" class="danger">Delete role</button>
                     </div>
                   </form>
                 </div>
               </dialog>
+              {{end}}
             </li>
           {{end}}
         </ul>
@@ -326,7 +344,7 @@
                 <div class="manage-dialog-card">
                   <header class="manage-dialog-head">
                     <div>
-                      <h3 class="manage-dialog-title">Delete Account</h3>
+                      <h3 class="manage-dialog-title manage-dialog-danger-title">Danger zone - Delete Account</h3>
                       <p class="manage-dialog-subtitle">{{.Email}}</p>
                     </div>
                     <button type="button" class="secondary" onclick="document.getElementById('delete-user-{{.UserID}}').close()">
@@ -336,15 +354,11 @@
                       </svg>
                     </button>
                   </header>
-                  <div class="manage-dialog-danger-zone manage-dialog-danger-copy">
-                    <p class="manage-dialog-danger-title">Danger zone</p>
-                    <p class="manage-dialog-subtitle">This will remove the account from your organization. Confirm only if you want to permanently delete this user access.</p>
-                  </div>
+                  <p style="margin: 0 0 20px;">This will remove the account from your organization. Confirm only if you want to permanently delete this user access.</p>
                   <form method="post" action="/org-admin/users" class="input-form">
                     <input type="hidden" name="intent" value="delete_user" />
                     <input type="hidden" name="userId" value="{{.UserID}}" />
                     <div class="manage-dialog-actions manage-dialog-actions-end">
-                      <button type="button" class="secondary" onclick="document.getElementById('delete-user-{{.UserID}}').close()">Cancel</button>
                       <button type="submit" class="danger">Delete account</button>
                     </div>
                   </form>

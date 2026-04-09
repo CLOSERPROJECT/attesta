@@ -1418,6 +1418,7 @@ button.secondary {
 .role-palette-picker {
   display: flex;
   align-items: center;
+  font-size: 13px;
   gap: 10px;
 }
 
@@ -1731,6 +1732,12 @@ button.secondary {
   opacity: 0.85;
 }
 
+.user-action-button:disabled,
+.user-action-button:disabled:hover {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .user-action-button-danger {
   color: var(--danger);
 }
@@ -1759,7 +1766,6 @@ button.secondary {
   box-shadow: 0 16px 34px var(--shadow);
   padding: 16px;
   display: grid;
-  gap: 14px;
 }
 
 .manage-dialog-head {
@@ -1767,7 +1773,7 @@ button.secondary {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .manage-dialog-title {
@@ -1795,9 +1801,14 @@ button.secondary {
   width: auto;
 }
 
+.manage-dialog-role-pill {
+  display: flex;
+  justify-content: center;
+}
+
 .manage-dialog-danger-zone {
   border-top: 1px solid var(--border);
-  padding-top: 12px;
+  margin-bottom: 20px;
 }
 
 .manage-dialog-danger-copy {
