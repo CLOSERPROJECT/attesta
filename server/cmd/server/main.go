@@ -410,8 +410,8 @@ type HomeView struct {
 	Error               string
 	CanStartProcess     bool
 	Sort                string
+	StatusFilter        string
 	Processes           []ProcessListItem
-	History             []ProcessListItem
 }
 
 type LoginView struct {
@@ -1659,6 +1659,15 @@ func normalizeHomeSortKey(value string) string {
 		return value
 	default:
 		return "time_desc"
+	}
+}
+
+func normalizeHomeStatusFilter(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "active", "done":
+		return strings.TrimSpace(strings.ToLower(value))
+	default:
+		return "all"
 	}
 }
 
@@ -4241,6 +4250,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
+	statusFilter := normalizeHomeStatusFilter(r.URL.Query().Get("filter"))
 	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
 		logRequestError(r, err, "failed to list recent processes for workflow %s", workflowKey)
@@ -4249,10 +4259,12 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []ProcessListItem
-	var history []ProcessListItem
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := deriveProcessStatus(cfg.Workflow, &process)
+		if statusFilter != "all" && status != statusFilter {
+			continue
+		}
 		doneCount, lastAt, lastDigest := processProgressStats(cfg.Workflow, &process)
 		percent := 0
 		if totalSubsteps > 0 {
@@ -4270,13 +4282,9 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			LastDigestShort: lastDigest,
 		}
 		processes = append(processes, item)
-		if status == "done" {
-			history = append(history, item)
-		}
 	}
 
 	sortHomeProcessList(processes, sortKey)
-	sortHomeProcessList(history, sortKey)
 
 	view := HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
@@ -4284,8 +4292,8 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		Error:               workflowError,
 		CanStartProcess:     workflowError == "",
 		Sort:                sortKey,
+		StatusFilter:        statusFilter,
 		Processes:           processes,
-		History:             history,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

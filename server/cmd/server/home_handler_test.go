@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
+func TestHandleHomeListsProcesses(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
 
@@ -81,8 +81,8 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "PROC 2 HIST 1") {
-		t.Fatalf("expected processes and history counts, got %q", body)
+	if !strings.Contains(body, "PROC 2 SORT time_desc FILTER all") {
+		t.Fatalf("expected processes count and default controls, got %q", body)
 	}
 	if !strings.Contains(body, activeID.Hex()+":active:28") {
 		t.Fatalf("expected active process stats, got %q", body)
@@ -96,8 +96,70 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	if !strings.Contains(body, "DESC Demo workflow description") {
 		t.Fatalf("expected workflow description, got %q", body)
 	}
-	if !strings.Contains(body, "HISTORY "+doneID.Hex()+":done") {
-		t.Fatalf("expected history to include only done process, got %q", body)
+}
+
+func TestHandleHomeFiltersProcessesByStatus(t *testing.T) {
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+
+	activeID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          activeID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-110 * time.Minute))},
+		},
+	})
+
+	doneID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          doneID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-70 * time.Minute))},
+			"1_2": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
+			"1_3": {State: "done", DoneAt: ptrTime(now.Add(-50 * time.Minute))},
+			"2_1": {State: "done", DoneAt: ptrTime(now.Add(-40 * time.Minute))},
+			"2_2": {State: "done", DoneAt: ptrTime(now.Add(-30 * time.Minute))},
+			"3_1": {State: "done", DoneAt: ptrTime(now.Add(-20 * time.Minute))},
+			"3_2": {State: "done", DoneAt: ptrTime(now.Add(-10 * time.Minute))},
+		},
+	})
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER done") {
+		t.Fatalf("expected done filter selection, got %q", body)
+	}
+	if !strings.Contains(body, doneID.Hex()+":done:100") {
+		t.Fatalf("expected done process in filtered list, got %q", body)
+	}
+	if strings.Contains(body, activeID.Hex()+":active") {
+		t.Fatalf("did not expect active process in done filter, got %q", body)
 	}
 }
 
@@ -554,6 +616,18 @@ func TestNormalizeHomeSortKey(t *testing.T) {
 	}
 }
 
+func TestNormalizeHomeStatusFilter(t *testing.T) {
+	if got := normalizeHomeStatusFilter("done"); got != "done" {
+		t.Fatalf("expected done, got %q", got)
+	}
+	if got := normalizeHomeStatusFilter("ACTIVE"); got != "active" {
+		t.Fatalf("expected active, got %q", got)
+	}
+	if got := normalizeHomeStatusFilter("unknown"); got != "all" {
+		t.Fatalf("expected all for unknown, got %q", got)
+	}
+}
+
 func TestSortHomeProcessListByStatus(t *testing.T) {
 	items := []ProcessListItem{
 		{ID: "a", Status: "done", Percent: 100, CreatedAtTime: time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)},
@@ -648,9 +722,8 @@ func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
-PROC {{len .Processes}} HIST {{len .History}} SORT {{.Sort}} DESC {{.WorkflowDescription}}
+PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} DESC {{.WorkflowDescription}}
 PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
-HISTORY {{range .History}}{{.ID}}:{{.Status}}|{{end}}
 {{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))

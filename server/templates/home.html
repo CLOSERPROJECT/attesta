@@ -113,9 +113,10 @@
         </form>
       {{end}}
     </div>
-    <div class="process-toolbar">
-      <form method="get" action="{{.WorkflowPath}}/" class="process-sort">
-        <label class="muted" for="sort" style="font-size: 13px;">Sort</label>
+    <hr style="margin-bottom: 20px;">
+    <form method="get" action="{{.WorkflowPath}}/" class="process-toolbar">
+      <label class="process-control">
+        <span class="muted">Sort</span>
         <select id="sort" name="sort" onchange="this.form.submit()">
           <option value="time_desc" {{if eq .Sort "time_desc"}}selected{{end}}>Newest</option>
           <option value="time_asc" {{if eq .Sort "time_asc"}}selected{{end}}>Oldest</option>
@@ -123,8 +124,16 @@
           <option value="progress_asc" {{if eq .Sort "progress_asc"}}selected{{end}}>Least advanced</option>
           <option value="status" {{if eq .Sort "status"}}selected{{end}}>Status</option>
         </select>
-      </form>
-    </div>
+      </label>
+      <label class="process-control">
+        <span class="muted">Filter</span>
+        <select id="filter" name="filter" onchange="this.form.submit()">
+          <option value="all" {{if eq .StatusFilter "all"}}selected{{end}}>All</option>
+          <option value="done" {{if eq .StatusFilter "done"}}selected{{end}}>Done</option>
+          <option value="active" {{if eq .StatusFilter "active"}}selected{{end}}>Active</option>
+        </select>
+      </label>
+    </form>
 
     {{if .Processes}}
       <ul class="process-list">
@@ -132,13 +141,13 @@
           <li class="process-item">
             <div class="process-head">
               <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
+              <span class="status-tag status-tag-compact status-{{.Status}}">{{.Status}}</span>
             </div>
             <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
               <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
             </div>
-            <div class="substep-meta" style="margin-top: 10px;">
-              <span>{{.DoneSubsteps}} / {{.TotalSubsteps}} ({{.Percent}}%)</span>
+            <div class="process-meta">
+              <span class="process-meta-primary">{{.DoneSubsteps}} / {{.TotalSubsteps}} complete ({{.Percent}}%)</span>
               <span>Created: {{.CreatedAt}}</span>
               {{if .LastNotarizedAt}}
                 <span>Last notarized: {{.LastNotarizedAt}}</span>
@@ -152,39 +161,6 @@
       </ul>
     {{else}}
       <p class="muted" style="margin: 12px 0 0;">No instances yet.</p>
-    {{end}}
-  </section>
-
-  <section class="panel">
-    <div class="panel-heading">
-      <h2>History</h2>
-    </div>
-    {{if .History}}
-      <ul class="process-list">
-        {{range .History}}
-          <li class="process-item">
-            <div class="process-head">
-              <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
-            </div>
-            <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
-              <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
-            </div>
-            <div class="substep-meta" style="margin-top: 10px;">
-              <span>{{.DoneSubsteps}} / {{.TotalSubsteps}} ({{.Percent}}%)</span>
-              <span>Created: {{.CreatedAt}}</span>
-              {{if .LastNotarizedAt}}
-                <span>Last notarized: {{.LastNotarizedAt}}</span>
-              {{end}}
-              {{if .LastDigestShort}}
-                <span class="pill">sha256 {{.LastDigestShort}}</span>
-              {{end}}
-            </div>
-          </li>
-        {{end}}
-      </ul>
-    {{else}}
-      <p class="muted" style="margin: 12px 0 0;">No completed streams yet.</p>
     {{end}}
   </section>
 </div>
