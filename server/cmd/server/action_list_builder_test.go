@@ -124,8 +124,8 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 
 	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
 	action := findAction(t, actions, "1.1")
-	if action.DoneAt != doneAt.Format(time.RFC3339) {
-		t.Fatalf("expected doneAt %q, got %q", doneAt.Format(time.RFC3339), action.DoneAt)
+	if action.DoneAt != "19 Feb 2026 at 09:00 UTC" {
+		t.Fatalf("expected doneAt %q, got %q", "19 Feb 2026 at 09:00 UTC", action.DoneAt)
 	}
 	if action.DoneBy != "u1" || action.DoneRole != "dep1" {
 		t.Fatalf("unexpected done actor: %q/%q", action.DoneBy, action.DoneRole)

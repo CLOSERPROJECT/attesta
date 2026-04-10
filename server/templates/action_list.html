@@ -42,6 +42,16 @@
           <dt>Description</dt>
           <dd>{{ .InputKey }}</dd>
         {{ end }}
+        {{ if eq .Status "done" }}
+          {{ if .DoneAt }}
+            <dt>Completed at</dt>
+            <dd>{{ .DoneAt }}</dd>
+          {{ end }}
+          {{ if .DoneBy }}
+            <dt>Completed by</dt>
+            <dd>{{ .DoneBy }}</dd>
+          {{ end }}
+        {{ end }}
       </dl>
       {{ if ne .Status "done" }}
         <form
@@ -120,14 +130,6 @@
                 </li>
               {{ end }}
             </ul>
-          {{ end }}
-          {{ if .DoneAt }}
-            <p class="muted">
-              Completed at:
-              {{ .DoneAt }}{{ if .DoneBy }}
-                by {{ .DoneBy }}{{ if .DoneRole }}({{ .DoneRole }}){{ end }}
-              {{ end }}
-            </p>
           {{ end }}
         </div>
       {{ end }}

@@ -79,6 +79,9 @@ func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 	if entry.DoneBy != "legacy-user" || entry.DoneRole != "dep1" {
 		t.Fatalf("unexpected legacy actor render: doneBy=%q doneRole=%q", entry.DoneBy, entry.DoneRole)
 	}
+	if entry.DoneAt != "26 Feb 2026 at 10:00 UTC" {
+		t.Fatalf("doneAt = %q, want %q", entry.DoneAt, "26 Feb 2026 at 10:00 UTC")
+	}
 }
 
 func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {

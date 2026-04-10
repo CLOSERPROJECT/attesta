@@ -6208,7 +6208,7 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 						}
 					}
 					if progress.DoneAt != nil {
-						entry.DoneAt = progress.DoneAt.Format(time.RFC3339)
+						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 					}
 					if sub.InputType == "file" {
 						if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
@@ -6585,7 +6585,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if status == "done" && process != nil {
 			if progress, ok := process.Progress[sub.SubstepID]; ok {
 				if progress.DoneAt != nil {
-					doneAt = progress.DoneAt.UTC().Format(time.RFC3339)
+					doneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 				}
 				if progress.DoneBy != nil {
 					doneBy = strings.TrimSpace(progress.DoneBy.ID)
