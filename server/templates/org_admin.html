@@ -343,11 +343,11 @@
                                 id="edit-role-name-{{ .Slug }}"
                                 name="name"
                                 type="text"
-                                value="{{ if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleDialogName }}
-                                  {{ $.RoleDialogName }}
+                                {{ if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleDialogName }}
+                                  value="{{ $.RoleDialogName }}"
                                 {{ else }}
-                                  {{ .Name }}
-                                {{ end }}"
+                                  value="{{ .Name }}"
+                                {{ end }}
                                 required
                               />
                             </div>
