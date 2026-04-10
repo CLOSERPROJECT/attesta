@@ -17,8 +17,8 @@ func TestLoginTemplateShowsForgotPasswordLink(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, `onclick="window.location.href='/reset'"`) {
-		t.Fatalf("expected reset button action, got: %s", body)
+	if !strings.Contains(body, `href="/reset"`) {
+		t.Fatalf("expected reset action link, got: %s", body)
 	}
 	if !strings.Contains(body, "Forgot password?") {
 		t.Fatalf("expected forgot password copy, got: %s", body)
