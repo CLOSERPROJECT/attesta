@@ -14,18 +14,16 @@ func TestActionListTemplateLockedFormataBuilderHint(t *testing.T) {
 	view := ActionListView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
-		Actions: []ActionView{
-			{
-				ProcessID:  "process-1",
-				SubstepID:  "1.2",
-				Title:      "Formata",
-				InputKey:   "payload",
-				InputType:  "formata",
-				FormSchema: `{"type":"object"}`,
-				Status:     "locked",
-				Disabled:   true,
-				Reason:     "Locked by sequence",
-			},
+		Action: &ActionView{
+			ProcessID:  "process-1",
+			SubstepID:  "1.2",
+			Title:      "Formata",
+			InputKey:   "payload",
+			InputType:  "formata",
+			FormSchema: `{"type":"object"}`,
+			Status:     "locked",
+			Disabled:   true,
+			Reason:     "Locked by sequence",
 		},
 	}
 

@@ -8,8 +8,7 @@
       {{template "process_downloads" .}}
     </div>
   {{else if .ProcessID}}
-    {{if .Actions}}
-      {{range .Actions}}
+    {{with .Action}}
           <h2 style="display: flex; align-items: center; gap: 8px;">
             <span class="pill .pill-step-number" style="--pill-bg: var(--panel); --border: var(--ink); font-size: 16px;">{{.SubstepID}}</span>
             <span>Details: {{.Title}}</span>
@@ -104,10 +103,9 @@
               {{end}}
             </div>
           {{end}}
-        {{end}}
-      {{else}}
-        <p class="muted">Select a substep from the timeline to view details.</p>
-      {{end}}
+    {{else}}
+      <p class="muted">Select a substep from the timeline to view details.</p>
+    {{end}}
   {{else}}
     <p class="muted">No actions available for this department yet.</p>
   {{end}}

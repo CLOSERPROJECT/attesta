@@ -14,19 +14,17 @@ func TestActionListTemplateLockedFormataHooks(t *testing.T) {
 	view := ActionListView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
-		Actions: []ActionView{
-			{
-				ProcessID:    "process-1",
-				SubstepID:    "1.2",
-				Title:        "Locked Formata",
-				InputKey:     "payload",
-				InputType:    "formata",
-				FormSchema:   `{"type":"object"}`,
-				FormUISchema: `{"type":"VerticalLayout","elements":[]}`,
-				Status:       "locked",
-				Disabled:     true,
-				Reason:       "Locked by sequence",
-			},
+		Action: &ActionView{
+			ProcessID:    "process-1",
+			SubstepID:    "1.2",
+			Title:        "Locked Formata",
+			InputKey:     "payload",
+			InputType:    "formata",
+			FormSchema:   `{"type":"object"}`,
+			FormUISchema: `{"type":"VerticalLayout","elements":[]}`,
+			Status:       "locked",
+			Disabled:     true,
+			Reason:       "Locked by sequence",
 		},
 	}
 

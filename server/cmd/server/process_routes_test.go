@@ -36,7 +36,7 @@ func TestHandleProcessRoutesDispatchesEndpoints(t *testing.T) {
 		authorizer: fakeAuthorizer{},
 		sse:        newSSEHub(),
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			return testFormataRuntimeConfig(), nil
 		},
 		now: func() time.Time { return time.Date(2026, 2, 4, 11, 0, 0, 0, time.UTC) },
 	}
@@ -54,7 +54,7 @@ func TestHandleProcessRoutesDispatchesEndpoints(t *testing.T) {
 		{name: "notarized export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/notarized.json", wantStatus: http.StatusOK},
 		{name: "merkle export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/merkle.json", wantStatus: http.StatusOK},
 		{name: "all files zip", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/files.zip", wantStatus: http.StatusOK},
-		{name: "complete substep", method: http.MethodPost, path: "/process/" + process.ID.Hex() + "/substep/1.1/complete", body: "value=10", wantStatus: http.StatusOK, wantBody: "PROCESS " + process.ID.Hex()},
+		{name: "complete substep", method: http.MethodPost, path: "/process/" + process.ID.Hex() + "/substep/1.1/complete", body: "value=%7B%22status%22%3A%22ok%22%7D", wantStatus: http.StatusOK, wantBody: "PROCESS " + process.ID.Hex()},
 		{name: "substep file branch", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/substep/1.3/file", wantStatus: http.StatusNotFound},
 	}
 

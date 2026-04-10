@@ -20,7 +20,7 @@ func TestHandleCompleteSubstepAuthorizerAllow(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
@@ -61,7 +61,7 @@ func TestHandleCompleteSubstepAuthorizerDenyReturns403(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
@@ -82,7 +82,7 @@ func TestHandleCompleteSubstepAuthorizerErrorReturns502(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10"))
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
@@ -103,7 +103,7 @@ func TestHandleCompleteSubstepAuthorizerDeniesInvalidActiveRole(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=10&activeRole=dep2"))
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D&activeRole=dep2"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 
@@ -141,7 +141,7 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 		authorizer: authorizer,
 		sse:        newSSEHub(),
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			return testFormataRuntimeConfig(), nil
 		},
 		now: func() time.Time { return fixedNow },
 	}

@@ -386,7 +386,7 @@ type ActionListView struct {
 	CurrentUser       Actor
 	SelectedSubstepID string
 	ProcessDone       bool
-	Actions           []ActionView
+	Action            *ActionView
 	Error             string
 	Timeline          []TimelineStep
 	DPPURL            string
@@ -4637,7 +4637,6 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, onlyRole, s.roleMetaMap(cfg))
 	processDone := process != nil && isProcessDone(cfg.Workflow, process)
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
-	filteredActions := filterActionsBySubstep(actions, selected, processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selected)
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
 
@@ -4648,9 +4647,11 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 		CurrentUser:       actor,
 		SelectedSubstepID: selected,
 		ProcessDone:       processDone,
-		Actions:           filteredActions,
 		Error:             message,
 		Timeline:          timeline,
+	}
+	if action, ok := selectedActionBySubstep(actions, selected, processDone); ok {
+		view.Action = &action
 	}
 
 	if processDone {
@@ -4660,7 +4661,10 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 			view.DPPGS1 = gs1ElementString(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
 		}
 	}
-	view.Actions = s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, view.Actions)
+	if view.Action != nil {
+		actionsWithIdentity := s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, []ActionView{*view.Action})
+		view.Action = &actionsWithIdentity[0]
+	}
 	view.Timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, actor, view.Timeline)
 	return view
 }
@@ -5242,11 +5246,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
 		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
 	}
-	if substep.InputType == "file" {
-		_ = r.ParseMultipartForm(attachmentMaxBytes())
-	} else {
-		_ = r.ParseForm()
-	}
+	_ = r.ParseForm()
 	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
 	if activeRole == "" && len(actor.RoleSlugs) == 1 {
 		activeRole = actor.RoleSlugs[0]
@@ -5291,17 +5291,13 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 
 	now := s.nowUTC()
-	payload, err := s.parseCompletionPayload(w, r, process.ID, substep, now)
+	payload, err := s.parseCompletionPayload(r, process.ID, substep, now)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrAttachmentTooLarge):
 			s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
-		case errors.Is(err, errFileRequired):
-			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "File is required.", process, actor)
 		case errors.Is(err, errInvalidForm):
 			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
-		case errors.Is(err, errValueRequired):
-			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Value is required.", process, actor)
 		default:
 			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
 		}
@@ -5364,101 +5360,14 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 }
 
 var (
-	errInvalidForm   = errors.New("invalid form")
-	errValueRequired = errors.New("value required")
-	errFileRequired  = errors.New("file required")
+	errInvalidForm = errors.New("invalid form")
 )
 
-func (s *Server) parseCompletionPayload(w http.ResponseWriter, r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	if substep.InputType == "file" {
-		return s.parseFilePayload(w, r, processID, substep, now)
+func (s *Server) parseCompletionPayload(r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
+	if substep.InputType != "formata" {
+		return nil, errors.New("Only formata substeps are supported.")
 	}
-	if substep.InputType == "formata" {
-		return s.parseFormataPayload(r, processID, substep, now)
-	}
-	return parseScalarPayload(r, substep)
-}
-
-func parseScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
-	if err := r.ParseForm(); err != nil {
-		return nil, errInvalidForm
-	}
-	value := strings.TrimSpace(r.FormValue("value"))
-	if value == "" {
-		return nil, errValueRequired
-	}
-	payload, err := normalizePayload(substep, value)
-	if err != nil {
-		return nil, err
-	}
-	return payload, nil
-}
-
-func (s *Server) parseFilePayload(w http.ResponseWriter, r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	maxBytes := attachmentMaxBytes()
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-	if err := r.ParseMultipartForm(1 << 20); err != nil {
-		if isRequestTooLarge(err) {
-			return nil, ErrAttachmentTooLarge
-		}
-		return nil, errInvalidForm
-	}
-	if r.MultipartForm != nil {
-		defer r.MultipartForm.RemoveAll()
-	}
-	files := r.MultipartForm.File[substep.InputKey]
-	if len(files) != 1 {
-		return nil, errFileRequired
-	}
-	part := files[0]
-	file, err := part.Open()
-	if err != nil {
-		return nil, errInvalidForm
-	}
-	defer file.Close()
-
-	contentType := strings.TrimSpace(part.Header.Get("Content-Type"))
-	reader := io.Reader(file)
-	if contentType == "" {
-		header := make([]byte, 512)
-		count, readErr := io.ReadFull(file, header)
-		switch {
-		case readErr == nil:
-		case errors.Is(readErr, io.EOF), errors.Is(readErr, io.ErrUnexpectedEOF):
-		default:
-			return nil, errInvalidForm
-		}
-		sniffed := bytes.TrimSpace(header[:count])
-		if len(sniffed) > 0 {
-			contentType = http.DetectContentType(sniffed)
-		}
-		reader = io.MultiReader(bytes.NewReader(header[:count]), file)
-	}
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	attachment, err := s.store.SaveAttachment(r.Context(), AttachmentUpload{
-		ProcessID:   processID,
-		SubstepID:   substep.SubstepID,
-		Filename:    part.Filename,
-		ContentType: contentType,
-		MaxBytes:    maxBytes,
-		UploadedAt:  now,
-	}, reader)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{
-		substep.InputKey: map[string]interface{}{
-			"attachmentId": attachment.ID.Hex(),
-			"filename":     attachment.Filename,
-			"contentType":  attachment.ContentType,
-			"size":         attachment.SizeBytes,
-			"sha256":       attachment.SHA256,
-		},
-	}, nil
+	return s.parseFormataPayload(r, processID, substep, now)
 }
 
 type decodedDataURL struct {
@@ -6757,20 +6666,23 @@ func resolveSelectedSubstepID(actions []ActionView, requested string, processDon
 	return actions[0].SubstepID
 }
 
-func filterActionsBySubstep(actions []ActionView, selectedSubstepID string, processDone bool) []ActionView {
+func selectedActionBySubstep(actions []ActionView, selectedSubstepID string, processDone bool) (ActionView, bool) {
 	if processDone {
-		return nil
+		return ActionView{}, false
 	}
 	selectedSubstepID = strings.TrimSpace(selectedSubstepID)
 	if selectedSubstepID == "" {
-		return actions
+		if len(actions) == 0 {
+			return ActionView{}, false
+		}
+		return actions[0], true
 	}
 	for _, action := range actions {
 		if action.SubstepID == selectedSubstepID {
-			return []ActionView{action}
+			return action, true
 		}
 	}
-	return nil
+	return ActionView{}, false
 }
 
 func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string) []TimelineStep {
@@ -7134,29 +7046,18 @@ func normalizeDPPSerialStrategy(raw string) (string, error) {
 }
 
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
-	payload := map[string]interface{}{}
-	switch sub.InputType {
-	case "number":
-		var number float64
-		_, err := fmt.Sscanf(value, "%f", &number)
-		if err != nil {
-			return nil, errors.New("Value must be a number.")
-		}
-		payload[sub.InputKey] = number
-	case "formata":
-		var decoded interface{}
-		if err := json.Unmarshal([]byte(value), &decoded); err != nil {
-			return nil, errors.New("Value must be a valid JSON object.")
-		}
-		valueObject, ok := decoded.(map[string]interface{})
-		if !ok {
-			return nil, errors.New("Value must be a valid JSON object.")
-		}
-		payload[sub.InputKey] = valueObject
-	default:
-		payload[sub.InputKey] = value
+	if sub.InputType != "formata" {
+		return nil, errors.New("Value must be a valid JSON object.")
 	}
-	return payload, nil
+	var decoded interface{}
+	if err := json.Unmarshal([]byte(value), &decoded); err != nil {
+		return nil, errors.New("Value must be a valid JSON object.")
+	}
+	valueObject, ok := decoded.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("Value must be a valid JSON object.")
+	}
+	return map[string]interface{}{sub.InputKey: valueObject}, nil
 }
 
 func prefersJSONResponse(r *http.Request) bool {

@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestResolveSelectedSubstepIDAndFilterActions(t *testing.T) {
+func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	actions := []ActionView{
 		{SubstepID: "1.1", Status: "locked"},
 		{SubstepID: "1.2", Status: "available"},
@@ -35,21 +35,19 @@ func TestResolveSelectedSubstepIDAndFilterActions(t *testing.T) {
 		t.Fatalf("resolveSelectedSubstepID empty list = %q, want empty", got)
 	}
 
-	filtered := filterActionsBySubstep(actions, "1.2", false)
-	if len(filtered) != 1 || filtered[0].SubstepID != "1.2" {
-		t.Fatalf("filterActionsBySubstep selected = %#v, want substep 1.2 only", filtered)
+	selected, ok := selectedActionBySubstep(actions, "1.2", false)
+	if !ok || selected.SubstepID != "1.2" {
+		t.Fatalf("selectedActionBySubstep selected = %#v (ok=%t), want substep 1.2 only", selected, ok)
 	}
-	filtered = filterActionsBySubstep(actions, "", false)
-	if len(filtered) != len(actions) {
-		t.Fatalf("filterActionsBySubstep empty selected len = %d, want %d", len(filtered), len(actions))
+	selected, ok = selectedActionBySubstep(actions, "", false)
+	if !ok || selected.SubstepID != "1.1" {
+		t.Fatalf("selectedActionBySubstep empty selected = %#v (ok=%t), want first action", selected, ok)
 	}
-	filtered = filterActionsBySubstep(actions, "404", false)
-	if len(filtered) != 0 {
-		t.Fatalf("filterActionsBySubstep missing selected = %#v, want empty", filtered)
+	if _, ok := selectedActionBySubstep(actions, "404", false); ok {
+		t.Fatal("selectedActionBySubstep missing selected should return false")
 	}
-	filtered = filterActionsBySubstep(actions, "1.2", true)
-	if len(filtered) != 0 {
-		t.Fatalf("filterActionsBySubstep done process = %#v, want empty", filtered)
+	if _, ok := selectedActionBySubstep(actions, "1.2", true); ok {
+		t.Fatal("selectedActionBySubstep done process should return false")
 	}
 }
 
@@ -70,7 +68,7 @@ func TestHandleProcessActionsPartialSelectsRequestedSubstep(t *testing.T) {
 			"3_2": {State: "pending"},
 		},
 	})
-	tmpl := template.Must(template.New("test").Parse(`{{define "action_list.html"}}SEL {{.SelectedSubstepID}} DONE {{.ProcessDone}} ACT {{range .Actions}}{{.SubstepID}}|{{end}}{{end}}`))
+	tmpl := template.Must(template.New("test").Parse(`{{define "action_list.html"}}SEL {{.SelectedSubstepID}} DONE {{.ProcessDone}} ACT {{with .Action}}{{.SubstepID}}|{{end}}{{end}}`))
 	server := &Server{
 		store: store,
 		tmpl:  tmpl,
@@ -117,7 +115,7 @@ func TestHandleProcessActionsPartialShowsDoneResourcesState(t *testing.T) {
 			Serial: "SERIAL-001",
 		},
 	})
-	tmpl := template.Must(template.New("test").Parse(`{{define "action_list.html"}}SEL {{.SelectedSubstepID}} DONE {{.ProcessDone}} DPP {{.DPPURL}} ACT {{range .Actions}}{{.SubstepID}}|{{end}}{{end}}`))
+	tmpl := template.Must(template.New("test").Parse(`{{define "action_list.html"}}SEL {{.SelectedSubstepID}} DONE {{.ProcessDone}} DPP {{.DPPURL}} ACT {{with .Action}}{{.SubstepID}}|{{end}}{{end}}`))
 	server := &Server{
 		store: store,
 		tmpl:  tmpl,

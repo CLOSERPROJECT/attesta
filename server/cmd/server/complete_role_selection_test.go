@@ -52,10 +52,10 @@ func TestHandleCompleteSubstepUsesSelectedActiveRole(t *testing.T) {
 				return actor.Role == "dep2", nil
 			},
 		},
-		configProvider: func() (RuntimeConfig, error) { return testRuntimeConfig(), nil },
+		configProvider: func() (RuntimeConfig, error) { return testFormataRuntimeConfig(), nil },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/"+process.ID.Hex()+"/substep/2.1/complete", strings.NewReader("value=42&activeRole=dep2"))
+	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/"+process.ID.Hex()+"/substep/2.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D&activeRole=dep2"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
@@ -113,11 +113,11 @@ func TestHandleCompleteSubstepRejectsInvalidActiveRole(t *testing.T) {
 		now:         func() time.Time { return now },
 		authorizer:  fakeAuthorizer{},
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			return testFormataRuntimeConfig(), nil
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/"+process.ID.Hex()+"/substep/2.1/complete", strings.NewReader("value=42&activeRole=dep3"))
+	req := httptest.NewRequest(http.MethodPost, "/w/workflow/process/"+process.ID.Hex()+"/substep/2.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D&activeRole=dep3"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})

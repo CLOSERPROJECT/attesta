@@ -56,6 +56,18 @@ func testRuntimeConfig() RuntimeConfig {
 	}
 }
 
+func testFormataRuntimeConfig() RuntimeConfig {
+	cfg := testRuntimeConfig()
+	for stepIndex := range cfg.Workflow.Steps {
+		for substepIndex := range cfg.Workflow.Steps[stepIndex].Substep {
+			substep := &cfg.Workflow.Steps[stepIndex].Substep[substepIndex]
+			substep.InputType = "formata"
+			substep.Schema = map[string]interface{}{"type": "object"}
+		}
+	}
+	return cfg
+}
+
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 	{{define "layout.html"}}
