@@ -167,7 +167,7 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{})
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, organizationNameMap(testRuntimeConfig()))
 	if len(view) == 0 {
 		t.Fatal("expected non-empty traceability view")
 	}
@@ -195,6 +195,62 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 	}
 	if !foundFile {
 		t.Fatal("expected inline file metadata for substep 1.3")
+	}
+}
+
+func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
+	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID:           "1",
+				Title:            "Review materials",
+				Order:            1,
+				OrganizationSlug: "org-a",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Check batch",
+						Order:     1,
+						Role:      "qa",
+						InputKey:  "value",
+						InputType: "string",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				DoneBy: &Actor{ID: "qa@example.com"},
+				Data:   map[string]interface{}{"value": "ok"},
+			},
+		},
+	}
+
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, map[string]string{"org-a": "Acme Org"})
+	if len(view) != 1 {
+		t.Fatalf("expected one traceability step, got %#v", view)
+	}
+	step := view[0]
+	if step.OrganizationName != "Acme Org" {
+		t.Fatalf("organization name = %q, want Acme Org", step.OrganizationName)
+	}
+	if step.CompletedAt != "2026-03-05T14:30:00Z" {
+		t.Fatalf("completedAt = %q, want RFC3339", step.CompletedAt)
+	}
+	if step.CompletedAtHuman != "5 Mar 2026 at 14:30 UTC" {
+		t.Fatalf("completedAtHuman = %q, want human-readable time", step.CompletedAtHuman)
+	}
+	if step.DetailsDialogID != "dpp-step-dialog-1" {
+		t.Fatalf("detailsDialogID = %q, want dpp-step-dialog-1", step.DetailsDialogID)
+	}
+	if step.Substeps[0].DoneAtHuman != "5 Mar 2026 at 14:30 UTC" {
+		t.Fatalf("substep DoneAtHuman = %q, want human-readable time", step.Substeps[0].DoneAtHuman)
 	}
 }
 
@@ -237,7 +293,7 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 
 	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{
 		"qa": {ID: "qa", Label: "Quality", Color: "#111111", Border: "#222222"},
-	})
+	}, nil)
 	if len(view) != 1 || len(view[0].Substeps) != 1 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
@@ -299,7 +355,7 @@ func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{})
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, nil)
 	if len(view) != 1 || len(view[0].Substeps) != 1 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
@@ -369,7 +425,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 		"manager": {ID: "manager", Label: "Manager", Color: "#333333", Border: "#444444"},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", roleMeta)
+	view := buildDPPTraceabilityView(def, process, "workflow", roleMeta, nil)
 	if len(view) != 1 || len(view[0].Substeps) != 3 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}

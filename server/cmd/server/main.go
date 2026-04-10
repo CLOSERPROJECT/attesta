@@ -626,9 +626,13 @@ type DPPPageView struct {
 }
 
 type DPPTraceabilityStep struct {
-	StepID   string
-	Title    string
-	Substeps []DPPTraceabilitySubstep
+	StepID           string
+	Title            string
+	OrganizationName string
+	CompletedAt      string
+	CompletedAtHuman string
+	DetailsDialogID  string
+	Substeps         []DPPTraceabilitySubstep
 }
 
 type DPPTraceabilitySubstep struct {
@@ -640,6 +644,7 @@ type DPPTraceabilitySubstep struct {
 	RoleBorder  template.CSS
 	Status      string
 	DoneAt      string
+	DoneAtHuman string
 	DoneBy      string
 	Digest      string
 	Values      []DPPTraceabilityValue
@@ -4838,7 +4843,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	if process.DPP != nil && !process.DPP.GeneratedAt.IsZero() {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
-	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg))
+	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg))
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
