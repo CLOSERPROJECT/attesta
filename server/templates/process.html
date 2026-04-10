@@ -1,83 +1,117 @@
 {{/* Used on /w/.WorkflowKey/process/.ProcessID to render process details page */}}
 
-{{define "process_body"}}
-<div class="stack max-w-7xl mx-auto">
-  <section class="hero">
-    <button class="secondary" onclick="location.href='/w/{{.WorkflowKey}}/'">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
-      </svg>
-      Back
-    </button>
-    <div class="hero-center">
-      <h1 class="hero-title">{{.WorkflowName}}</h1>
-      <p class="hero-description">{{.ProcessID}}</p>
+{{ define "process_body" }}
+  <div class="stack max-w-7xl mx-auto">
+    <section class="hero">
+      <button
+        class="secondary"
+        onclick="location.href='/w/{{ .WorkflowKey }}/'"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="currentColor"
+          class="icon-svg icon-svg-md"
+          viewBox="0 0 16 16"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"
+          />
+        </svg>
+        Back
+      </button>
+      <div class="hero-center">
+        <h1 class="hero-title">{{ .WorkflowName }}</h1>
+        <p class="hero-description">{{ .ProcessID }}</p>
+      </div>
+    </section>
+    <div
+      class="two-col"
+      data-process-id="{{ .ProcessID }}"
+      data-workflow-key="{{ .WorkflowKey }}"
+    >
+      <section class="panel">
+        <h2>Stream timeline</h2>
+        <div id="timeline">
+          {{ template "timeline.html" .ActionList.Timeline }}
+        </div>
+      </section>
+      <section class="panel">
+        <div id="action-area">
+          {{ template "action_list.html" .ActionList }}
+        </div>
+      </section>
     </div>
-  </section>
-  <div class="two-col" data-process-id="{{.ProcessID}}" data-workflow-key="{{.WorkflowKey}}">
-    <section class="panel">
-      <h2>Stream timeline</h2>
-      <div id="timeline">
-        {{template "timeline.html" .ActionList.Timeline}}
-      </div>
-    </section>
-    <section class="panel">
-      <div id="action-area">
-        {{template "action_list.html" .ActionList}}
-      </div>
-    </section>
   </div>
-</div>
-{{end}}
+{{ end }}
 
-{{define "process_downloads"}}
+{{ define "process_downloads" }}
   <section class="panel" id="process-downloads">
     <div class="panel-heading">
       <h2>Downloads</h2>
       <p>Export attachments and notarized data for this stream.</p>
     </div>
-    {{if .Attachments}}
+    {{ if .Attachments }}
       <div class="panel-block" style="margin-bottom: 12px;">
         <p class="muted" style="margin: 0 0 8px;">Attachments</p>
         <ul class="process-attachments-list">
-          {{range .Attachments}}
+          {{ range .Attachments }}
             <li>
-              <a href="{{.URL}}">{{.Filename}}</a>
-              <span class="muted">({{.SubstepID}})</span>
+              <a href="{{ .URL }}">{{ .Filename }}</a>
+              <span class="muted">({{ .SubstepID }})</span>
             </li>
-          {{end}}
+          {{ end }}
         </ul>
       </div>
-    {{end}}
+    {{ end }}
     <div class="stack" style="gap: 10px;">
-      <a class="primary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/files.zip">Download all files (zip)</a>
-      <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/notarized.json">Download notarized JSON</a>
-      <a class="secondary" href="{{.WorkflowPath}}/process/{{.ProcessID}}/merkle.json">Download Merkle tree</a>
+      <a
+        class="primary"
+        href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/files.zip"
+        >Download all files (zip)</a
+      >
+      <a
+        class="secondary"
+        href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/notarized.json"
+        >Download notarized JSON</a
+      >
+      <a
+        class="secondary"
+        href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/merkle.json"
+        >Download Merkle tree</a
+      >
     </div>
   </section>
-{{end}}
+{{ end }}
 
-{{define "process_dpp"}}
-  {{if .DPPURL}}
+{{ define "process_dpp" }}
+  {{ if .DPPURL }}
     <section class="panel dpp-downloads-section dpp-process-panel">
       <h2>DPP</h2>
       <div class="stack" style="gap: 8px;">
         <div>
           <strong>GS1 Digital Link:</strong>
-          <a href="{{.DPPURL}}"><code>{{.DPPURL}}</code></a>
+          <a href="{{ .DPPURL }}"><code>{{ .DPPURL }}</code></a>
         </div>
-        {{if .DPPGS1}}
+        {{ if .DPPGS1 }}
           <div>
             <strong>GS1 (01/10/21):</strong>
-            <code>{{.DPPGS1}}</code>
+            <code>{{ .DPPGS1 }}</code>
           </div>
-        {{end}}
-        <button type="button" class="secondary js-share-link" data-share-url="{{.DPPURL}}" data-share-label="DPP link">Share DPP link</button>
+        {{ end }}
+        <button
+          type="button"
+          class="secondary js-share-link"
+          data-share-url="{{ .DPPURL }}"
+          data-share-label="DPP link"
+        >
+          Share DPP link
+        </button>
       </div>
     </section>
-  {{end}}
-{{end}}
+  {{ end }}
+{{ end }}
 
-{{define "process.html"}}
-  {{template "layout.html" .}}
-{{end}}
+{{ define "process.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

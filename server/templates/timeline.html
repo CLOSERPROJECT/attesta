@@ -1,84 +1,128 @@
 {{/* Used on /w/.WorkflowKey/process/.ProcessID to render process timeline */}}
 
-{{define "timeline.html"}}
+{{ define "timeline.html" }}
   <div class="timeline-list">
-    {{range .}}
-      <details class="timeline-step" {{if .Expanded}}open{{end}}>
+    {{ range . }}
+      <details class="timeline-step" {{ if .Expanded }}open{{ end }}>
         <summary class="timeline-step-summary" aria-label="Open stream step">
           <div class="timeline-step-summary-main">
-            <span class="pill pill-step-number" style="--pill-bg: var(--panel); --border: var(--ink); ">{{.StepID}}</span>
-            {{if .OrgLogoURL}}
-              <img src="{{.OrgLogoURL}}" alt="" class="timeline-step-org-mark"/>
-            {{else}}
+            <span
+              class="pill pill-step-number"
+              style="--pill-bg: var(--panel); --border: var(--ink); "
+              >{{ .StepID }}</span
+            >
+            {{ if .OrgLogoURL }}
+              <img
+                src="{{ .OrgLogoURL }}"
+                alt=""
+                class="timeline-step-org-mark"
+              />
+            {{ else }}
               <span class="timeline-step-org-mark">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-lg">
-                  <line x1="2" x2="22" y1="2" y2="22"/>
-                  <path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/>
-                  <line x1="13.5" x2="6" y1="13.5" y2="21"/>
-                  <line x1="18" x2="21" y1="12" y2="15"/>
-                  <path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"/>
-                  <path d="M21 15V5a2 2 0 0 0-2-2H9"/>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="icon-svg icon-svg-lg"
+                >
+                  <line x1="2" x2="22" y1="2" y2="22" />
+                  <path d="M10.41 10.41a2 2 0 1 1-2.83-2.83" />
+                  <line x1="13.5" x2="6" y1="13.5" y2="21" />
+                  <line x1="18" x2="21" y1="12" y2="15" />
+                  <path
+                    d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"
+                  />
+                  <path d="M21 15V5a2 2 0 0 0-2-2H9" />
                 </svg>
               </span>
-            {{end}}
+            {{ end }}
             <span class="timeline-step-copy">
-              <span class="timeline-step-title">{{.Title}}</span>
-              <span class="timeline-step-org">{{if .OrgName}}{{.OrgName}}{{else}}No organization{{end}}</span>
+              <span class="timeline-step-title">{{ .Title }}</span>
+              <span class="timeline-step-org"
+                >{{ if .OrgName }}
+                  {{ .OrgName }}
+                {{ else }}
+                  No organization
+                {{ end }}</span
+              >
             </span>
           </div>
           <span class="timeline-step-chevron" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" class="icon-svg">
-              <path d="m6 9 6 6 6-6"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="icon-svg"
+            >
+              <path d="m6 9 6 6 6-6" />
             </svg>
           </span>
         </summary>
         <ul class="timeline-substeps">
-          {{range .Substeps}}
+          {{ range .Substeps }}
             <li
-              class="substep js-substep-nav substep-{{.Status}}{{if .Selected}} substep-selected{{end}}"
-              data-substep-id="{{.SubstepID}}"
-              style="--dept-color: {{.RoleColor}}; --dept-border: {{.RoleBorder}}"
+              class="substep js-substep-nav substep-{{ .Status }}{{ if .Selected }}
+                substep-selected
+              {{ end }}"
+              data-substep-id="{{ .SubstepID }}"
+              style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
               tabindex="0"
               role="button"
             >
               <div class="substep-head">
-                <span class="pill" style="--pill-bg: var(--panel); --border: var(--ink);">{{.SubstepID}}</span>
-                <span class="timeline-step-title" style="margin-left: 8px;">{{.Title}}</span>
-                <span class="status">{{.Status}}</span>
+                <span
+                  class="pill"
+                  style="--pill-bg: var(--panel); --border: var(--ink);"
+                  >{{ .SubstepID }}</span
+                >
+                <span class="timeline-step-title" style="margin-left: 8px;"
+                  >{{ .Title }}</span
+                >
+                <span class="status">{{ .Status }}</span>
               </div>
               <div style="padding-left: 48px;">
-                {{if .RoleBadges}}
+                {{ if .RoleBadges }}
                   <div style="display: flex; gap: 8px;">
-                    {{range .RoleBadges}}
+                    {{ range .RoleBadges }}
                       <span
                         class="pill role-pill"
-                        style="--pill-bg: {{.Color}}; --border: {{.Border}};"
-                      >{{.Label}}</span>
-                    {{end}}
+                        style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
+                        >{{ .Label }}</span
+                      >
+                    {{ end }}
                   </div>
-                {{else}}
+                {{ else }}
                   <span
                     class="pill role-pill"
-                    style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}};"
-                  >{{.RoleLabel}}</span>
-                {{end}}
-                {{if eq .Status "done"}}
+                    style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
+                    >{{ .RoleLabel }}</span
+                  >
+                {{ end }}
+                {{ if eq .Status "done" }}
                   <div class="substep-meta">
-                    {{if .DoneBy}}
-                      <span class="actor">by {{.DoneBy}}</span>
-                    {{else}}
+                    {{ if .DoneBy }}
+                      <span class="actor">by {{ .DoneBy }}</span>
+                    {{ else }}
                       <span class="actor">completed</span>
-                    {{end}}
-                    {{if .DoneAt}}
-                      <span class="time">{{.DoneAt}}</span>
-                    {{end}}
+                    {{ end }}
+                    {{ if .DoneAt }}
+                      <span class="time">{{ .DoneAt }}</span>
+                    {{ end }}
                   </div>
-                {{end}}
+                {{ end }}
               </div>
             </li>
-          {{end}}
+          {{ end }}
         </ul>
       </details>
-    {{end}}
+    {{ end }}
   </div>
-{{end}}
+{{ end }}

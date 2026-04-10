@@ -1,132 +1,210 @@
 {{/* Used on /01/09506000134352/10/defaultProduct/21/.StreamID to render Digital Product Passport */}}
 
-{{define "dpp_body"}}
-<div class="stack max-w-7xl mx-auto">
-  <section class="panel">
-    <div class="panel-heading">
-      <h2>Digital Product Passport</h2>
-      <p>GS1 Digital Link landing page for product and stream traceability.</p>
-    </div>
-    <hr style="margin-bottom: 24px;">
-    <div class="panel-heading">
-      <h2>{{.Workflow.Name}} ({{.ProcessID}})</h2>
-      {{if .Workflow.Description}}<p>{{.Workflow.Description}}</p>{{end}}
-    </div>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
-      <span class="pill" style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);">GTIN|{{.GTIN}}</span>
-      <span class="pill" style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);">Lot|{{.Lot}}</span>
-      <span class="pill" style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);">Serial|{{.Serial}}</span>
-    </div>
-    <div style="margin-bottom: 24px;" >
-      <a href="{{.DigitalLink}}" target="_blank" rel="noopener noreferrer">{{.DigitalLink}}</a>
-    </div>
+{{ define "dpp_body" }}
+  <div class="stack max-w-7xl mx-auto">
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>Digital Product Passport</h2>
+        <p>
+          GS1 Digital Link landing page for product and stream traceability.
+        </p>
+      </div>
+      <hr style="margin-bottom: 24px;" />
+      <div class="panel-heading">
+        <h2>{{ .Workflow.Name }} ({{ .ProcessID }})</h2>
+        {{ if .Workflow.Description }}
+          <p>{{ .Workflow.Description }}</p>
+        {{ end }}
+      </div>
+      <div
+        style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;"
+      >
+        <span
+          class="pill"
+          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          >GTIN|{{ .GTIN }}</span
+        >
+        <span
+          class="pill"
+          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          >Lot|{{ .Lot }}</span
+        >
+        <span
+          class="pill"
+          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          >Serial|{{ .Serial }}</span
+        >
+      </div>
+      <div style="margin-bottom: 24px;">
+        <a href="{{ .DigitalLink }}" target="_blank" rel="noopener noreferrer"
+          >{{ .DigitalLink }}</a
+        >
+      </div>
 
-    <hr style="margin-bottom: 24px;">
+      <hr style="margin-bottom: 24px;" />
 
-    <h2>History</h2>
-    <div class="dpp-history-list">
-      {{range .Traceability}}
-        <details class="dpp-history-item">
-          <summary class="dpp-history-summary" aria-label="Toggle step details">
-            <div class="dpp-history-rail" aria-hidden="true">
-              <span class="dpp-history-dot"></span>
-            </div>
-            <div class="dpp-history-card">
-              <div class="dpp-history-card-head">
-                <div class="dpp-history-card-copy">
-                  <span class="pill" style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);">Step {{.StepID}}</span>
-                  <h3>{{.Title}}</h3>
-                  <div class="dpp-history-meta">
-                    <span><strong>Completed:</strong> {{if .CompletedAtHuman}}<time datetime="{{.CompletedAt}}">{{.CompletedAtHuman}}</time>{{else}}Not completed{{end}}</span>
-                    <span><strong>Organization:</strong> {{if .OrganizationName}}{{.OrganizationName}}{{else}}No organization{{end}}</span>
+      <h2>History</h2>
+      <div class="dpp-history-list">
+        {{ range .Traceability }}
+          <details class="dpp-history-item">
+            <summary
+              class="dpp-history-summary"
+              aria-label="Toggle step details"
+            >
+              <div class="dpp-history-rail" aria-hidden="true">
+                <span class="dpp-history-dot"></span>
+              </div>
+              <div class="dpp-history-card">
+                <div class="dpp-history-card-head">
+                  <div class="dpp-history-card-copy">
+                    <span
+                      class="pill"
+                      style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
+                      >Step {{ .StepID }}</span
+                    >
+                    <h3>{{ .Title }}</h3>
+                    <div class="dpp-history-meta">
+                      <span
+                        ><strong>Completed:</strong> {{ if .CompletedAtHuman }}
+                          <time datetime="{{ .CompletedAt }}"
+                            >{{ .CompletedAtHuman }}</time
+                          >
+                        {{ else }}
+                          Not completed
+                        {{ end }}</span
+                      >
+                      <span
+                        ><strong>Organization:</strong>
+                        {{ if .OrganizationName }}
+                          {{ .OrganizationName }}
+                        {{ else }}
+                          No organization
+                        {{ end }}</span
+                      >
+                    </div>
+                  </div>
+                  <span class="dpp-history-toggle">
+                    <span class="dpp-history-toggle-open">Show details</span>
+                    <span class="dpp-history-toggle-close">Hide details</span>
+                  </span>
+                </div>
+                <div class="dpp-history-status">
+                  {{ len .Substeps }}
+                  substep{{ if ne (len .Substeps) 1 }}s{{ end }} recorded
+                </div>
+              </div>
+            </summary>
+
+            <div class="dpp-history-details">
+              <div class="dpp-history-details-offset" aria-hidden="true"></div>
+              <div class="dpp-history-details-wrap">
+                <div class="dpp-history-details-inner">
+                  <div class="dpp-history-accordion">
+                    {{ range .Substeps }}
+                      <section class="substep substep-{{ .Status }}">
+                        <div class="substep-head">
+                          <span class="pill">{{ .SubstepID }}</span>
+                          <span class="title">{{ .Title }}</span>
+                          <span
+                            class="pill role-pill"
+                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }}; margin-left: auto;"
+                            >{{ .Role }}</span
+                          >
+                        </div>
+                        <div class="action-submitted">
+                          {{ if .Values }}
+                            <dl class="action-submitted-values">
+                              {{ range .Values }}
+                                <dt>{{ .Key }}</dt>
+                                <dd>{{ .Value }}</dd>
+                              {{ end }}
+                            </dl>
+                          {{ end }}
+                          {{ if .Attachments }}
+                            <ul class="action-submitted-attachments">
+                              {{ range .Attachments }}
+                                <li>
+                                  <a href="{{ .URL }}">{{ .Filename }}</a>
+                                  {{ if .SHA256 }}
+                                    <code>{{ .SHA256 }}</code>
+                                    <button
+                                      type="button"
+                                      class="secondary hash-copy js-copy-text"
+                                      data-copy-text="{{ .SHA256 }}"
+                                      data-copy-label="sha256"
+                                    >
+                                      Copy
+                                    </button>
+                                  {{ end }}
+                                </li>
+                              {{ end }}
+                            </ul>
+                          {{ else if .FileURL }}
+                            <ul class="action-submitted-attachments">
+                              <li>
+                                <a href="{{ .FileURL }}">{{ .FileName }}</a>
+                                <a class="secondary" href="{{ .FileURL }}"
+                                  >Download</a
+                                >
+                                {{ if .FileSHA256 }}
+                                  <code>{{ .FileSHA256 }}</code>
+                                  <button
+                                    type="button"
+                                    class="secondary hash-copy js-copy-text"
+                                    data-copy-text="{{ .FileSHA256 }}"
+                                    data-copy-label="sha256"
+                                  >
+                                    Copy
+                                  </button>
+                                {{ end }}
+                              </li>
+                            </ul>
+                          {{ end }}
+                          <div class="substep-meta">
+                            {{ if .DoneAtHuman }}
+                              <span class="time"
+                                ><time datetime="{{ .DoneAt }}"
+                                  >{{ .DoneAtHuman }}</time
+                                ></span
+                              >
+                            {{ else if .DoneAt }}
+                              <span class="time">{{ .DoneAt }}</span>
+                            {{ end }}
+                            {{ if .DoneBy }}
+                              <span class="actor">by {{ .DoneBy }}</span>
+                            {{ end }}
+                            {{ if .Digest }}
+                              <span class="data"
+                                >digest: <code>{{ .Digest }}</code></span
+                              >
+                            {{ end }}
+                          </div>
+                        </div>
+                      </section>
+                    {{ end }}
                   </div>
                 </div>
-                <span class="dpp-history-toggle">
-                  <span class="dpp-history-toggle-open">Show details</span>
-                  <span class="dpp-history-toggle-close">Hide details</span>
-                </span>
-              </div>
-              <div class="dpp-history-status">{{len .Substeps}} substep{{if ne (len .Substeps) 1}}s{{end}} recorded</div>
-            </div>
-          </summary>
-
-          <div class="dpp-history-details">
-            <div class="dpp-history-details-offset" aria-hidden="true"></div>
-            <div class="dpp-history-details-wrap">
-              <div class="dpp-history-details-inner">
-                <div class="dpp-history-accordion">
-                  {{range .Substeps}}
-                    <section class="substep substep-{{.Status}}">
-                      <div class="substep-head">
-                        <span class="pill">{{.SubstepID}}</span>
-                        <span class="title">{{.Title}}</span>
-                        <span
-                          class="pill role-pill"
-                          style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}; margin-left: auto;"
-                        >{{.Role}}</span>
-                      </div>
-                      <div class="action-submitted">
-                        {{if .Values}}
-                          <dl class="action-submitted-values">
-                            {{range .Values}}
-                              <dt>{{.Key}}</dt>
-                              <dd>{{.Value}}</dd>
-                            {{end}}
-                          </dl>
-                        {{end}}
-                        {{if .Attachments}}
-                          <ul class="action-submitted-attachments">
-                            {{range .Attachments}}
-                              <li>
-                                <a href="{{.URL}}">{{.Filename}}</a>
-                                {{if .SHA256}}
-                                  <code>{{.SHA256}}</code>
-                                  <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.SHA256}}" data-copy-label="sha256">Copy</button>
-                                {{end}}
-                              </li>
-                            {{end}}
-                          </ul>
-                        {{else if .FileURL}}
-                          <ul class="action-submitted-attachments">
-                            <li>
-                              <a href="{{.FileURL}}">{{.FileName}}</a>
-                              <a class="secondary" href="{{.FileURL}}">Download</a>
-                              {{if .FileSHA256}}
-                                <code>{{.FileSHA256}}</code>
-                                <button type="button" class="secondary hash-copy js-copy-text" data-copy-text="{{.FileSHA256}}" data-copy-label="sha256">Copy</button>
-                              {{end}}
-                            </li>
-                          </ul>
-                        {{end}}
-                        <div class="substep-meta">
-                          {{if .DoneAtHuman}}<span class="time"><time datetime="{{.DoneAt}}">{{.DoneAtHuman}}</time></span>{{else if .DoneAt}}<span class="time">{{.DoneAt}}</span>{{end}}
-                          {{if .DoneBy}}<span class="actor">by {{.DoneBy}}</span>{{end}}
-                          {{if .Digest}}<span class="data">digest: <code>{{.Digest}}</code></span>{{end}}
-                        </div>
-                      </div>
-                    </section>
-                  {{end}}
-                </div>
               </div>
             </div>
-          </div>
-        </details>
-      {{end}}
-    </div>
-  </section>
+          </details>
+        {{ end }}
+      </div>
+    </section>
 
-  <section class="panel">
-    <h2>Integrity</h2>
-    <div><strong>Merkle root:</strong> <code>{{.Export.Merkle.Root}}</code></div>
-    <ul>
-      {{range .Export.Merkle.Leaves}}
-        <li><code>{{.SubstepID}}</code> <code>{{.Hash}}</code></li>
-      {{end}}
-    </ul>
-  </section>
-</div>
-{{end}}
+    <section class="panel">
+      <h2>Integrity</h2>
+      <div>
+        <strong>Merkle root:</strong> <code>{{ .Export.Merkle.Root }}</code>
+      </div>
+      <ul>
+        {{ range .Export.Merkle.Leaves }}
+          <li><code>{{ .SubstepID }}</code> <code>{{ .Hash }}</code></li>
+        {{ end }}
+      </ul>
+    </section>
+  </div>
+{{ end }}
 
-{{define "dpp.html"}}
-  {{template "layout.html" .}}
-{{end}}
+{{ define "dpp.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

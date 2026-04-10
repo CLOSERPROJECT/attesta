@@ -1,82 +1,142 @@
 {{/* Used on /invite/.Token to render invite acceptance form */}}
 
-{{define "invite_body"}}
-<div class="login-wrapper">
-  <section class="panel login">
-    <div class="panel-heading">
-      <h1>Accept Invite</h1>
-      <p>Account: <strong>{{.Email}}</strong></p>
-      <p>Organization: <strong>{{.Org}}</strong></p>
-      {{if .Roles}}
-        <p class="muted">Roles: {{range $index, $role := .Roles}}{{if $index}}, {{end}}{{$role}}{{end}}</p>
-      {{end}}
-    </div>
-    <form method="post" action="/invite/{{.Token}}" class="input-form">
-      <div class="form-field">
-        <label for="password">Set password</label>
-        <div class="password-field">
-          <input id="password" name="password" type="password" required />
-          <button type="button" class="toggle-password" data-target="password" aria-label="Toggle set password visibility">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md icon-eye" viewBox="0 0 16 16">
-              <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
-              <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
-            </svg>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md icon-eye-off" viewBox="0 0 16 16">
-              <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/>
-              <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/>
-              <path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/>
-            </svg>
-          </button>
-        </div>
+{{ define "invite_body" }}
+  <div class="login-wrapper">
+    <section class="panel login">
+      <div class="panel-heading">
+        <h1>Accept Invite</h1>
+        <p>Account: <strong>{{ .Email }}</strong></p>
+        <p>Organization: <strong>{{ .Org }}</strong></p>
+        {{ if .Roles }}
+          <p class="muted">
+            Roles:
+            {{ range $index, $role := .Roles }}
+              {{ if $index }},{{ end }}{{ $role }}
+            {{ end }}
+          </p>
+        {{ end }}
       </div>
-      <div class="form-field">
-        <label for="confirm-password">Confirm password</label>
-        <div class="password-field">
-          <input id="confirm-password" name="confirm_password" type="password" required />
-          <button type="button" class="toggle-password" data-target="confirm-password" aria-label="Toggle confirm password visibility">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md icon-eye" viewBox="0 0 16 16">
-              <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
-              <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
-            </svg>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md icon-eye-off" viewBox="0 0 16 16">
-              <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"/>
-              <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"/>
-              <path d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"/>
-            </svg>
-          </button>
+      <form method="post" action="/invite/{{ .Token }}" class="input-form">
+        <div class="form-field">
+          <label for="password">Set password</label>
+          <div class="password-field">
+            <input id="password" name="password" type="password" required />
+            <button
+              type="button"
+              class="toggle-password"
+              data-target="password"
+              aria-label="Toggle set password visibility"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                class="icon-svg icon-svg-md icon-eye"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"
+                />
+                <path
+                  d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"
+                />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                class="icon-svg icon-svg-md icon-eye-off"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"
+                />
+                <path
+                  d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"
+                />
+                <path
+                  d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
-      </div>
-      {{if .Error}}
-        <p class="error">{{.Error}}</p>
-      {{end}}
-      <button class="primary" type="submit">Activate account</button>
-    </form>
-  </section>
-</div>
-<script>
-  document.querySelectorAll(".toggle-password").forEach((toggle) => {
-    const inputId = toggle.getAttribute("data-target");
-    const input = inputId ? document.getElementById(inputId) : null;
-    if (!input) {
-      return;
-    }
-    toggle.addEventListener("click", () => {
-      const isPassword = input.type === "password";
-      input.type = isPassword ? "text" : "password";
+        <div class="form-field">
+          <label for="confirm-password">Confirm password</label>
+          <div class="password-field">
+            <input
+              id="confirm-password"
+              name="confirm_password"
+              type="password"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              data-target="confirm-password"
+              aria-label="Toggle confirm password visibility"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                class="icon-svg icon-svg-md icon-eye"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"
+                />
+                <path
+                  d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"
+                />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                class="icon-svg icon-svg-md icon-eye-off"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z"
+                />
+                <path
+                  d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829"
+                />
+                <path
+                  d="M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        {{ if .Error }}
+          <p class="error">{{ .Error }}</p>
+        {{ end }}
+        <button class="primary" type="submit">Activate account</button>
+      </form>
+    </section>
+  </div>
+  <script>
+    document.querySelectorAll(".toggle-password").forEach((toggle) => {
+      const inputId = toggle.getAttribute("data-target");
+      const input = inputId ? document.getElementById(inputId) : null;
+      if (!input) {
+        return;
+      }
+      toggle.addEventListener("click", () => {
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
 
-      const eye = toggle.querySelector(".icon-eye");
-      const eyeOff = toggle.querySelector(".icon-eye-off");
-      if (eye) {
-        eye.style.display = isPassword ? "none" : "block";
-      }
-      if (eyeOff) {
-        eyeOff.style.display = isPassword ? "block" : "none";
-      }
+        const eye = toggle.querySelector(".icon-eye");
+        const eyeOff = toggle.querySelector(".icon-eye-off");
+        if (eye) {
+          eye.style.display = isPassword ? "none" : "block";
+        }
+        if (eyeOff) {
+          eyeOff.style.display = isPassword ? "block" : "none";
+        }
+      });
     });
-  });
-</script>
-{{end}}
+  </script>
+{{ end }}
 
-{{define "invite.html"}}
-  {{template "layout.html" .}}
-{{end}}
+{{ define "invite.html" }}
+  {{ template "layout.html" . }}
+{{ end }}
