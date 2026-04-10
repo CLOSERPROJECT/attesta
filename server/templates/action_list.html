@@ -8,12 +8,17 @@
       {{template "process_downloads" .}}
     </div>
   {{else if .ProcessID}}
-    <div class="actions">
-      {{if .Actions}}
-        {{range .Actions}}
-          <div class="action-card action-{{.Status}}">
-            <div class="action-head">
-              <span class="pill" style="--pill-bg: var(--panel); --border: var(--ink);">{{.SubstepID}}</span>
+    {{if .Actions}}
+      {{range .Actions}}
+          <h2 style="display: flex; align-items: center; gap: 8px;">
+            <span class="pill .pill-step-number" style="--pill-bg: var(--panel); --border: var(--ink); font-size: 16px;">{{.SubstepID}}</span>
+            <span>Details: {{.Title}}</span>
+          </h2>
+          <dl class="action-submitted-values" style="margin-bottom: 8px;">
+            <dt>Status</dt>
+            <dd>{{.Status}}{{if .Reason}} - {{.Reason}}{{end}}</dd>
+            <dt>Roles</dt>
+            <dd>
               {{if .RoleBadges}}
                 {{range .RoleBadges}}
                   <span
@@ -25,32 +30,31 @@
                 <span
                   class="pill role-pill"
                   style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}}"
-                >{{.RoleLabel}}</span>
+              >{{.RoleLabel}}</span>
               {{end}}
-            </div>
-            <p>{{.Title}}</p>
-            {{if ne .Status "done"}}
-              <form
-                class="action-form"
-                method="post"
-                action="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
-                {{if eq .InputType "formata"}}
-                data-formata-substep="true"
-                data-formata-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+            </dd>
+            {{if .InputKey}}
+              <dt>Description</dt>
+              <dd>{{.InputKey}}</dd>
+            {{end}}
+          </dl>
+          {{if ne .Status "done"}}
+            <form
+              class="action-form"
+              method="post"
+              action="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+              data-formata-substep="true"
+              data-formata-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
+            >
+              {{if .MatchingRoles}}
+                {{if eq (len .MatchingRoles) 1}}
+                  <input type="hidden" name="activeRole" value="{{index .MatchingRoles 0}}" />
                 {{else}}
-                hx-post="/w/{{$.WorkflowKey}}/process/{{.ProcessID}}/substep/{{.SubstepID}}/complete"
-                hx-target="#action-area"
-                hx-swap="innerHTML"
-                hx-sync="this:drop"
-                {{end}}
-                {{if eq .InputType "file"}}enctype="multipart/form-data" hx-encoding="multipart/form-data"{{end}}
-              >
-                {{if .MatchingRoles}}
-                  {{if eq (len .MatchingRoles) 1}}
-                    <input type="hidden" name="activeRole" value="{{index .MatchingRoles 0}}" />
-                  {{else}}
-                    <label>
-                      Active role
+                  <hr>
+                  <div>
+                    <h3>Active Role</h3>
+                    <label style="display: flex; align-items: center; flex-direction: row; gap: 8px;">
+                      <span style="font-size: 13px;">Complete action as:</span>
                       <select name="activeRole" required {{if .Disabled}}disabled{{end}}>
                         <option value="">Select role</option>
                         {{range .MatchingRoles}}
@@ -58,52 +62,52 @@
                         {{end}}
                       </select>
                     </label>
+                  </div>
+                {{end}}
+              {{end}}
+              <hr>
+              <h3>Data form</h3>
+              <label class="action-field-formata">
+                  <div
+                    class="js-formata-host"
+                    data-formata-schema='{{.FormSchema}}'
+                    {{if .FormUISchema}}data-formata-uischema='{{.FormUISchema}}'{{end}}
+                    {{if .Disabled}}data-formata-disabled="true"{{end}}
+                  ></div>
+                  <input class="js-formata-value" type="hidden" name="value" {{if .Disabled}}disabled{{end}} />
+              </label>
+            </form>
+          {{else}}
+            <div class="action-submitted">
+              <hr>
+              <h3>Submitted</h3>
+              {{if .Values}}
+                <dl class="action-submitted-values">
+                  {{range .Values}}
+                    <dt>{{.Key}}</dt>
+                    <dd>{{.Value}}</dd>
                   {{end}}
-                {{end}}
-                <label class="action-field-formata">
-                  {{.InputKey}}
-                    <div
-                      class="js-formata-host"
-                      data-formata-schema='{{.FormSchema}}'
-                      {{if .FormUISchema}}data-formata-uischema='{{.FormUISchema}}'{{end}}
-                      {{if .Disabled}}data-formata-disabled="true"{{end}}
-                    ></div>
-                    <input class="js-formata-value" type="hidden" name="value" {{if .Disabled}}disabled{{end}} />
-                </label>
-              </form>
-            {{else}}
-              <div class="action-submitted">
-                <strong>Submitted</strong>
-                {{if .Values}}
-                  <dl class="action-submitted-values">
-                    {{range .Values}}
-                      <dt>{{.Key}}</dt>
-                      <dd>{{.Value}}</dd>
-                    {{end}}
-                  </dl>
-                {{end}}
-                {{if .Attachments}}
-                  <ul class="action-submitted-attachments">
-                    {{range .Attachments}}
-                      <li>
-                        <a href="{{.URL}}">{{.Filename}}</a>
-                        {{if .SHA256}}<code>{{.SHA256}}</code>{{end}}
-                      </li>
-                    {{end}}
-                  </ul>
-                {{end}}
-                {{if .DoneAt}}
-                  <p class="muted">Completed at: {{.DoneAt}}{{if .DoneBy}} by {{.DoneBy}}{{if .DoneRole}} ({{.DoneRole}}){{end}}{{end}}</p>
-                {{end}}
-              </div>
-            {{end}}
-            <p class="muted">Status: {{.Status}}{{if .Reason}} - {{.Reason}}{{end}}</p>
-          </div>
+                </dl>
+              {{end}}
+              {{if .Attachments}}
+                <ul class="action-submitted-attachments">
+                  {{range .Attachments}}
+                    <li>
+                      <a href="{{.URL}}">{{.Filename}}</a>
+                      {{if .SHA256}}<code>{{.SHA256}}</code>{{end}}
+                    </li>
+                  {{end}}
+                </ul>
+              {{end}}
+              {{if .DoneAt}}
+                <p class="muted">Completed at: {{.DoneAt}}{{if .DoneBy}} by {{.DoneBy}}{{if .DoneRole}} ({{.DoneRole}}){{end}}{{end}}</p>
+              {{end}}
+            </div>
+          {{end}}
         {{end}}
       {{else}}
         <p class="muted">Select a substep from the timeline to view details.</p>
       {{end}}
-    </div>
   {{else}}
     <p class="muted">No actions available for this department yet.</p>
   {{end}}

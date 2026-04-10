@@ -36,8 +36,8 @@ func TestActionListTemplateLockedFormataHooks(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, "action-card action-locked") {
-		t.Fatalf("expected locked action class hook, got body: %s", body)
+	if !strings.Contains(body, "locked - Locked by sequence") {
+		t.Fatalf("expected locked status text, got body: %s", body)
 	}
 	if !strings.Contains(body, `data-formata-disabled="true"`) {
 		t.Fatalf("expected disabled formata data hook, got body: %s", body)

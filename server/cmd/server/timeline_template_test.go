@@ -26,13 +26,16 @@ func TestTimelineTemplateRendersStepSummaryLayout(t *testing.T) {
 	if !strings.Contains(body, `class="timeline-step-summary-main"`) {
 		t.Fatalf("expected summary main layout, got: %s", body)
 	}
+	if !strings.Contains(body, `class="timeline-step-chevron"`) {
+		t.Fatalf("expected accordion chevron, got: %s", body)
+	}
 	if !strings.Contains(body, `class="timeline-step-org-mark"`) {
 		t.Fatalf("expected org mark, got: %s", body)
 	}
 	if !strings.Contains(body, `src="/organization/logo/acme"`) {
 		t.Fatalf("expected org logo url, got: %s", body)
 	}
-	if !strings.Contains(body, `class="pill"`) || !strings.Contains(body, ">Step 1</span>") {
+	if !strings.Contains(body, `class="pill pill-step-number"`) || !strings.Contains(body, ">1</span>") {
 		t.Fatalf("expected step number pill copy, got: %s", body)
 	}
 	if !strings.Contains(body, "Acme Org") || !strings.Contains(body, "Review batch") {

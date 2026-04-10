@@ -35,7 +35,7 @@ func TestActionListTemplateLockedFormataBuilderHint(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, "Status: locked - Locked by sequence") {
+	if !strings.Contains(body, "locked - Locked by sequence") {
 		t.Fatalf("expected locked helper text, got body: %s", body)
 	}
 }

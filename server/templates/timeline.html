@@ -6,6 +6,7 @@
       <details class="timeline-step" {{if .Expanded}}open{{end}}>
         <summary class="timeline-step-summary" aria-label="Open stream step">
           <div class="timeline-step-summary-main">
+            <span class="pill pill-step-number" style="--pill-bg: var(--panel); --border: var(--ink); ">{{.StepID}}</span>
             {{if .OrgLogoURL}}
               <img src="{{.OrgLogoURL}}" alt="" class="timeline-step-org-mark"/>
             {{else}}
@@ -21,11 +22,15 @@
               </span>
             {{end}}
             <span class="timeline-step-copy">
-              <span class="timeline-step-org">{{if .OrgName}}{{.OrgName}}{{else}}No organization{{end}}</span>
               <span class="timeline-step-title">{{.Title}}</span>
+              <span class="timeline-step-org">{{if .OrgName}}{{.OrgName}}{{else}}No organization{{end}}</span>
             </span>
           </div>
-          <span class="pill" style="--pill-bg: var(--panel); --border: var(--ink);">Step {{.StepID}}</span>
+          <span class="timeline-step-chevron" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" class="icon-svg">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </span>
         </summary>
         <ul class="timeline-substeps">
           {{range .Substeps}}
@@ -38,35 +43,38 @@
             >
               <div class="substep-head">
                 <span class="pill" style="--pill-bg: var(--panel); --border: var(--ink);">{{.SubstepID}}</span>
+                <span class="timeline-step-title" style="margin-left: 8px;">{{.Title}}</span>
+                <span class="status">{{.Status}}</span>
+              </div>
+              <div style="padding-left: 48px;">
                 {{if .RoleBadges}}
-                  {{range .RoleBadges}}
-                    <span
-                      class="pill role-pill"
-                      style="--pill-bg: {{.Color}}; --border: {{.Border}};"
-                    >{{.Label}}</span>
-                  {{end}}
+                  <div style="display: flex; gap: 8px;">
+                    {{range .RoleBadges}}
+                      <span
+                        class="pill role-pill"
+                        style="--pill-bg: {{.Color}}; --border: {{.Border}};"
+                      >{{.Label}}</span>
+                    {{end}}
+                  </div>
                 {{else}}
                   <span
                     class="pill role-pill"
                     style="--pill-bg: {{.RoleColor}}; --border: {{.RoleBorder}};"
                   >{{.RoleLabel}}</span>
                 {{end}}
-                <span class="status">{{.Status}}</span>
+                {{if eq .Status "done"}}
+                  <div class="substep-meta">
+                    {{if .DoneBy}}
+                      <span class="actor">by {{.DoneBy}}</span>
+                    {{else}}
+                      <span class="actor">completed</span>
+                    {{end}}
+                    {{if .DoneAt}}
+                      <span class="time">{{.DoneAt}}</span>
+                    {{end}}
+                  </div>
+                {{end}}
               </div>
-              {{.Title}}
-              {{if eq .Status "done"}}
-                <hr style="margin: 0;">
-                <div class="substep-meta">
-                  {{if .DoneBy}}
-                    <span class="actor">by {{.DoneBy}}</span>
-                  {{else}}
-                    <span class="actor">completed</span>
-                  {{end}}
-                  {{if .DoneAt}}
-                    <span class="time">{{.DoneAt}}</span>
-                  {{end}}
-                </div>
-              {{end}}
             </li>
           {{end}}
         </ul>
