@@ -25,7 +25,7 @@
       ></script>
     </head>
     <body>
-      <header class="topbar">
+      <header class="topbar{{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
         <div class="topbar-content mx-auto max-w-7xl">
           <div>
             <a class="brand" href="/">

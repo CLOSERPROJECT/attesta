@@ -322,15 +322,16 @@ type RoleMeta struct {
 }
 
 type PageBase struct {
-	Body          string
-	ViteDevServer string
-	WorkflowKey   string
-	WorkflowName  string
-	WorkflowPath  string
-	UserEmail     string
-	ShowOrgsLink  bool
-	ShowMyOrgLink bool
-	ShowLogout    bool
+	Body            string
+	ViteDevServer   string
+	WorkflowKey     string
+	WorkflowName    string
+	WorkflowPath    string
+	UserEmail       string
+	IsPlatformAdmin bool
+	ShowOrgsLink    bool
+	ShowMyOrgLink   bool
+	ShowLogout      bool
 }
 
 type WorkflowOption struct {
@@ -1386,6 +1387,7 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 		return base
 	}
 	base.UserEmail = strings.TrimSpace(user.Email)
+	base.IsPlatformAdmin = user.IsPlatformAdmin
 	base.ShowLogout = s.enforceAuth
 	showOrgsLink, err := s.canAccessPlatformAdminConsole(context.Background(), user)
 	if err != nil {
