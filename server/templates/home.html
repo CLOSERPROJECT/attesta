@@ -167,105 +167,104 @@
         </div>
         <div class="error">{{ .Error }}</div>
       {{ else }}
-        <form
-          method="get"
-          action="{{ .WorkflowPath }}/"
-          class="process-toolbar"
-        >
-          <label class="process-control">
-            <span class="muted">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="icon-svg icon-svg-md"
-              >
-                <path d="m3 16 4 4 4-4" />
-                <path d="M7 20V4" />
-                <path d="m21 8-4-4-4 4" />
-                <path d="M17 4v16" />
-              </svg>
-            </span>
-            <select id="sort" name="sort" onchange="this.form.submit()">
-              <option
-                value="time_desc"
-                {{ if eq .Sort "time_desc" }}selected{{ end }}
-              >
-                Newest
-              </option>
-              <option
-                value="time_asc"
-                {{ if eq .Sort "time_asc" }}selected{{ end }}
-              >
-                Oldest
-              </option>
-              <option
-                value="progress_desc"
-                {{ if eq .Sort "progress_desc" }}selected{{ end }}
-              >
-                Most advanced
-              </option>
-              <option
-                value="progress_asc"
-                {{ if eq .Sort "progress_asc" }}selected{{ end }}
-              >
-                Least advanced
-              </option>
-              <option
-                value="status"
-                {{ if eq .Sort "status" }}selected{{ end }}
-              >
-                Status
-              </option>
-            </select>
-          </label>
-          <label class="process-control">
-            <span class="muted">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="icon-svg icon-svg-md"
-              >
-                <path
-                  d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"
-                />
-              </svg>
-            </span>
-            <select id="filter" name="filter" onchange="this.form.submit()">
-              <option
-                value="all"
-                {{ if eq .StatusFilter "all" }}selected{{ end }}
-              >
-                All
-              </option>
-              <option
-                value="done"
-                {{ if eq .StatusFilter "done" }}selected{{ end }}
-              >
-                Done
-              </option>
-              <option
-                value="active"
-                {{ if eq .StatusFilter "active" }}selected{{ end }}
-              >
-                Active
-              </option>
-            </select>
-          </label>
-        </form>
-
         {{ if .Processes }}
+          <form
+            method="get"
+            action="{{ .WorkflowPath }}/"
+            class="process-toolbar"
+          >
+            <label class="process-control">
+              <span class="muted">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="icon-svg icon-svg-md"
+                >
+                  <path d="m3 16 4 4 4-4" />
+                  <path d="M7 20V4" />
+                  <path d="m21 8-4-4-4 4" />
+                  <path d="M17 4v16" />
+                </svg>
+              </span>
+              <select id="sort" name="sort" onchange="this.form.submit()">
+                <option
+                  value="time_desc"
+                  {{ if eq .Sort "time_desc" }}selected{{ end }}
+                >
+                  Newest
+                </option>
+                <option
+                  value="time_asc"
+                  {{ if eq .Sort "time_asc" }}selected{{ end }}
+                >
+                  Oldest
+                </option>
+                <option
+                  value="progress_desc"
+                  {{ if eq .Sort "progress_desc" }}selected{{ end }}
+                >
+                  Most advanced
+                </option>
+                <option
+                  value="progress_asc"
+                  {{ if eq .Sort "progress_asc" }}selected{{ end }}
+                >
+                  Least advanced
+                </option>
+                <option
+                  value="status"
+                  {{ if eq .Sort "status" }}selected{{ end }}
+                >
+                  Status
+                </option>
+              </select>
+            </label>
+            <label class="process-control">
+              <span class="muted">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="icon-svg icon-svg-md"
+                >
+                  <path
+                    d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"
+                  />
+                </svg>
+              </span>
+              <select id="filter" name="filter" onchange="this.form.submit()">
+                <option
+                  value="all"
+                  {{ if eq .StatusFilter "all" }}selected{{ end }}
+                >
+                  All
+                </option>
+                <option
+                  value="done"
+                  {{ if eq .StatusFilter "done" }}selected{{ end }}
+                >
+                  Done
+                </option>
+                <option
+                  value="active"
+                  {{ if eq .StatusFilter "active" }}selected{{ end }}
+                >
+                  Active
+                </option>
+              </select>
+            </label>
+          </form>
           <ul class="process-list">
             {{ range .Processes }}
               <li class="process-item">
@@ -305,7 +304,9 @@
             {{ end }}
           </ul>
         {{ else }}
-          <p class="muted" style="margin: 12px 0 0;">No instances yet.</p>
+          <div class="process-item no-process-item">
+            <p class="muted">No stream instances yet</p>
+          </div>
         {{ end }}
       {{ end }}
     </section>
