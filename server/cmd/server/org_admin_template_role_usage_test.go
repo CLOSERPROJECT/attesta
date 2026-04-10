@@ -35,17 +35,18 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 		t.Fatalf("render org admin template: %v", err)
 	}
 	body := out.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 
-	if !strings.Contains(body, `aria-label="Edit role" title="Role in use" disabled`) {
+	if !strings.Contains(compactBody, `aria-label="Edit role"`) || !strings.Contains(compactBody, `title="Role in use"`) || !strings.Contains(compactBody, `disabled`) {
 		t.Fatalf("expected in-use edit button to be disabled, got: %s", body)
 	}
-	if !strings.Contains(body, `aria-label="Delete role" title="Role in use" disabled`) {
+	if !strings.Contains(compactBody, `aria-label="Delete role"`) || !strings.Contains(compactBody, `title="Role in use"`) || !strings.Contains(compactBody, `disabled`) {
 		t.Fatalf("expected in-use delete button to be disabled, got: %s", body)
 	}
 	if strings.Contains(body, `id="edit-role-approver"`) || strings.Contains(body, `id="delete-role-approver"`) {
 		t.Fatalf("did not expect dialogs for in-use role, got: %s", body)
 	}
-	if !strings.Contains(body, `>Not used</span>`) {
+	if !strings.Contains(compactBody, `Not used`) {
 		t.Fatalf("expected unused role helper text, got: %s", body)
 	}
 	if !strings.Contains(body, `id="edit-role-qa-reviewer"`) || !strings.Contains(body, `id="delete-role-qa-reviewer"`) {

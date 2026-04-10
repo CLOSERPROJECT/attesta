@@ -25,7 +25,8 @@ func TestHandleAboutRendersMovedFooterContent(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Project information, licensing, and funding acknowledgements for Attesta.") {
+	compactBody := strings.Join(strings.Fields(body), " ")
+	if !strings.Contains(compactBody, "Project information, licensing, and funding acknowledgements for Attesta.") {
 		t.Fatalf("expected about intro, got %q", body)
 	}
 	if !strings.Contains(body, "Forkbomb bv") {

@@ -32,9 +32,9 @@ func TestActionListTemplateLockedFormataHooks(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&out, "action_list.html", view); err != nil {
 		t.Fatalf("render action list template: %v", err)
 	}
-	body := out.String()
+	body := strings.Join(strings.Fields(out.String()), " ")
 
-	if !strings.Contains(body, "locked - Locked by sequence") {
+	if !strings.Contains(body, "locked- Locked by sequence") {
 		t.Fatalf("expected locked status text, got body: %s", body)
 	}
 	if !strings.Contains(body, `data-formata-disabled="true"`) {

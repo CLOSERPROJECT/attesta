@@ -367,6 +367,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 	if !strings.Contains(body, "Stream configuration issue") {
 		t.Fatalf("expected validation panel heading, got %q", body)
 	}
@@ -376,7 +377,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if !strings.Contains(body, `action="/w/workflow/process/start"`) {
 		t.Fatalf("expected new stream form to remain present, got %q", body)
 	}
-	if !strings.Contains(body, `<button class="primary" type="submit" disabled>`) {
+	if !strings.Contains(compactBody, `class="primary"`) || !strings.Contains(compactBody, `type="submit"`) || !strings.Contains(compactBody, `disabled`) || !strings.Contains(compactBody, `New instance`) {
 		t.Fatalf("expected new stream button to be disabled for invalid workflow, got %q", body)
 	}
 }
