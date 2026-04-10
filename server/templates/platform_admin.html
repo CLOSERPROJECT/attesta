@@ -563,24 +563,24 @@
             style="padding: 10px 8px; {{ if not .HasPreviousPage }}
               pointer-events: none; opacity: 0.5;
             {{ end }}"
-            href="/admin/orgs{{ if or .SearchQuery (gt .PreviousPage 1) }}
-              ?{{ if .SearchQuery }}
-                q={{ .SearchQuery | urlquery }}{{ if gt .PreviousPage 1 }}
+            href="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
                   &
-                {{ end }}
-              {{ end }}{{ if gt .PreviousPage 1 }}
+                {{- end -}}
+              {{- end -}}{{- if gt .PreviousPage 1 -}}
                 page={{ .PreviousPage }}
-              {{ end }}
-            {{ end }}"
-            hx-get="/admin/orgs{{ if or .SearchQuery (gt .PreviousPage 1) }}
-              ?{{ if .SearchQuery }}
-                q={{ .SearchQuery | urlquery }}{{ if gt .PreviousPage 1 }}
+              {{- end -}}
+            {{- end -}}"
+            hx-get="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
                   &
-                {{ end }}
-              {{ end }}{{ if gt .PreviousPage 1 }}
+                {{- end -}}
+              {{- end -}}{{- if gt .PreviousPage 1 -}}
                 page={{ .PreviousPage }}
-              {{ end }}
-            {{ end }}"
+              {{- end -}}
+            {{- end -}}"
             hx-target="#platform-admin-results"
             hx-select="#platform-admin-results"
             hx-swap="outerHTML"
@@ -606,16 +606,16 @@
               {{ else }}
                 secondary
               {{ end }}"
-              href="/admin/orgs{{ if or $.SearchQuery (gt . 1) }}
-                ?{{ if $.SearchQuery }}
-                  q={{ $.SearchQuery | urlquery }}{{ if gt . 1 }}&{{ end }}
-                {{ end }}{{ if gt . 1 }}page={{ . }}{{ end }}
-              {{ end }}"
-              hx-get="/admin/orgs{{ if or $.SearchQuery (gt . 1) }}
-                ?{{ if $.SearchQuery }}
-                  q={{ $.SearchQuery | urlquery }}{{ if gt . 1 }}&{{ end }}
-                {{ end }}{{ if gt . 1 }}page={{ . }}{{ end }}
-              {{ end }}"
+              href="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
+                ?{{- if $.SearchQuery -}}
+                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+              {{- end -}}"
+              hx-get="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
+                ?{{- if $.SearchQuery -}}
+                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+              {{- end -}}"
               hx-target="#platform-admin-results"
               hx-select="#platform-admin-results"
               hx-swap="outerHTML"
@@ -628,16 +628,20 @@
             style="padding: 10px 8px; {{ if not .HasNextPage }}
               pointer-events: none; opacity: 0.5;
             {{ end }}"
-            href="/admin/orgs{{ if or .SearchQuery (gt .NextPage 1) }}
-              ?{{ if .SearchQuery }}
-                q={{ .SearchQuery | urlquery }}{{ if gt .NextPage 1 }}&{{ end }}
-              {{ end }}{{ if gt .NextPage 1 }}page={{ .NextPage }}{{ end }}
-            {{ end }}"
-            hx-get="/admin/orgs{{ if or .SearchQuery (gt .NextPage 1) }}
-              ?{{ if .SearchQuery }}
-                q={{ .SearchQuery | urlquery }}{{ if gt .NextPage 1 }}&{{ end }}
-              {{ end }}{{ if gt .NextPage 1 }}page={{ .NextPage }}{{ end }}
-            {{ end }}"
+            href="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                  &
+                {{ end }}
+              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+            {{- end -}}"
+            hx-get="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                  &
+                {{ end }}
+              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+            {{- end -}}"
             hx-target="#platform-admin-results"
             hx-select="#platform-admin-results"
             hx-swap="outerHTML"
