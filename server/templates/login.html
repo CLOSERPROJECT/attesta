@@ -33,13 +33,13 @@
             </svg>
           </button>
         </div>
+        <a href="/reset" class="forgot-password">Forgot password?</a>
       </div>
       {{if .Error}}
         <p class="error">{{.Error}}</p>
       {{end}}
       <div class="form-actions">
         <button class="primary" type="submit">Login</button>
-        <button class="secondary" type="button" onclick="window.location.href='/reset'">Forgot password?</button>
       </div>
     </form>
     {{if .ShowSignup}}

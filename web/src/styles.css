@@ -1322,6 +1322,12 @@ button.secondary {
   align-items: flex-end;
 }
 
+.forgot-password {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 13px;
+}
+
 .password-field {
   position: relative;
   display: flex;
