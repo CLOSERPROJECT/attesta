@@ -722,6 +722,52 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 	})
 }
 
+func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	store := NewMemoryStore()
+	createdAt := time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)
+	doneAt := time.Date(2026, 2, 3, 11, 30, 0, 0, time.UTC)
+
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   createdAt,
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(doneAt), Data: map[string]interface{}{"note": "alpha"}},
+		},
+	})
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       tmpl,
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Created: 3 Feb 2026 at 10:00 UTC") {
+		t.Fatalf("expected human readable created date, got %q", body)
+	}
+	if !strings.Contains(body, "Last notarized: 3 Feb 2026 at 11:30 UTC") {
+		t.Fatalf("expected human readable last notarized date, got %q", body)
+	}
+}
+
 func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}

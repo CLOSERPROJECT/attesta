@@ -1727,7 +1727,7 @@ func processProgressStats(def WorkflowDef, process *Process) (doneCount int, las
 		}
 	}
 	if !first {
-		lastAt = latest.Format(time.RFC3339)
+		lastAt = humanReadableTraceabilityTime(latest)
 	}
 	return doneCount, lastAt, lastDigestShort
 }
@@ -4446,7 +4446,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		item := ProcessListItem{
 			ID:              process.ID.Hex(),
 			Status:          status,
-			CreatedAt:       process.CreatedAt.Format(time.RFC3339),
+			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtTime:   process.CreatedAt,
 			DoneSubsteps:    doneCount,
 			TotalSubsteps:   totalSubsteps,
