@@ -461,11 +461,11 @@
                       id="edit-org-name-{{ .Slug }}"
                       name="name"
                       type="text"
-                      value="{{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationDialogName }}
-                        {{ $.OrganizationDialogName }}
+                      {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationDialogName }}
+                        value="{{ $.OrganizationDialogName }}"
                       {{ else }}
-                        {{ .Name }}
-                      {{ end }}"
+                        value="{{ .Name }}"
+                      {{ end }}
                       required
                     />
                   </div>
