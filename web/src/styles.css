@@ -1179,7 +1179,7 @@ button.secondary {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: color-mix(in srgb, black 5%, var(--surface-2));
+  background: color-mix(in srgb, var(--ink) 10%, var(--surface-2));
   display: flex;
   align-items: center;
   justify-content: center;
