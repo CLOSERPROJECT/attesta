@@ -58,6 +58,9 @@
   --tag-bg-available: #eef7f1;
   --error-bg: #ffe5e1;
   --error-ink: #821a12;
+  --confirmation-bg: #e6f4ea;
+  --confirmation-border: #1e6f5c;
+  --confirmation-ink: #1e6f5c;
   --button-contrast: #0b0f0d;
 }
 
@@ -119,6 +122,9 @@
   --tag-bg-available: rgba(87, 194, 166, 0.1);
   --error-bg: rgba(255, 107, 95, 0.14);
   --error-ink: #ffd1cc;
+  --confirmation-bg: rgba(87, 194, 166, 0.12);
+  --confirmation-border: rgba(87, 194, 166, 0.24);
+  --confirmation-ink: #57c2a6;
   --button-contrast: #0b0f0d;
 }
 
@@ -1290,6 +1296,17 @@ button.secondary {
   background: var(--error-bg);
   border: 1px solid var(--danger);
   color: var(--error-ink);
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-block-start: 0;
+  margin-block-end: 0;
+  white-space: pre-line;
+}
+
+.confirmation {
+  background: var(--confirmation-bg);
+  border: 1px solid var(--confirmation-border);
+  color: var(--confirmation-ink);
   padding: 10px 12px;
   border-radius: 10px;
   margin-block-start: 0;

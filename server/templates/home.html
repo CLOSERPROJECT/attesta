@@ -10,7 +10,7 @@
       <p>Select a stream to start or continue process tracking.</p>
     </div>
     {{ if .Confirmation }}
-      <p class="muted">{{ .Confirmation }}</p>
+      <p class="confirmation">{{ .Confirmation }}</p>
     {{ end }}
     {{ template "error_banner.html" . }}
     {{ if .Workflows }}

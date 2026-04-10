@@ -68,6 +68,9 @@
         {{ if .Error }}
           <p class="error">{{ .Error }}</p>
         {{ end }}
+        {{ if .Confirmation }}
+          <p class="confirmation">{{ .Confirmation }}</p>
+        {{ end }}
         <div class="form-actions">
           <button class="primary" type="submit">Login</button>
         </div>

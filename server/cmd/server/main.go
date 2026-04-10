@@ -419,10 +419,11 @@ type HomeView struct {
 
 type LoginView struct {
 	PageBase
-	Next       string
-	Email      string
-	Error      string
-	ShowSignup bool
+	Next         string
+	Email        string
+	Error        string
+	Confirmation string
+	ShowSignup   bool
 }
 
 type SignupView struct {
@@ -445,6 +446,7 @@ type ResetRequestView struct {
 	Email        string
 	ResetLink    string
 	Confirmation string
+	Error        string
 }
 
 type ResetSetView struct {
@@ -864,6 +866,49 @@ func shouldSecureCookie(r *http.Request) bool {
 		return true
 	}
 	return r.TLS != nil
+}
+
+const (
+	noticePasswordResetSuccess = "password_reset_success"
+	noticeResetRequestSent     = "reset_request_sent"
+)
+
+func clearCookie(w http.ResponseWriter, r *http.Request, name string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     strings.TrimSpace(name),
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   shouldSecureCookie(r),
+	})
+}
+
+func requestNotice(r *http.Request) string {
+	if r == nil || r.URL == nil {
+		return ""
+	}
+	return strings.TrimSpace(r.URL.Query().Get("notice"))
+}
+
+func loginNoticeMessage(code string) string {
+	switch strings.TrimSpace(code) {
+	case noticePasswordResetSuccess:
+		return "Password reset successfully. Now you can enter with your new credentials."
+	default:
+		return ""
+	}
+}
+
+func resetRequestNoticeMessage(code string) string {
+	switch strings.TrimSpace(code) {
+	case noticeResetRequestSent:
+		return "If the account exists, a reset link has been sent."
+	default:
+		return ""
+	}
 }
 
 func anyoneCanCreateAccount() bool {
@@ -2058,9 +2103,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		view := LoginView{
-			PageBase:   s.pageBase("login_body", "", ""),
-			Next:       safeNextPath(r, "/"),
-			ShowSignup: anyoneCanCreateAccount(),
+			PageBase:     s.pageBase("login_body", "", ""),
+			Next:         safeNextPath(r, "/"),
+			Confirmation: loginNoticeMessage(requestNotice(r)),
+			ShowSignup:   anyoneCanCreateAccount(),
 		}
 		if err := s.tmpl.ExecuteTemplate(w, "login.html", view); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2212,16 +2258,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "attesta_session",
-		Value:    "",
-		Path:     "/",
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   shouldSecureCookie(r),
-	})
+	clearCookie(w, r, "attesta_session")
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -2391,7 +2428,10 @@ func resetConfirmParams(r *http.Request) (string, string) {
 func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		view := ResetRequestView{PageBase: s.pageBase("reset_request_body", "", "")}
+		view := ResetRequestView{
+			PageBase:     s.pageBase("reset_request_body", "", ""),
+			Confirmation: resetRequestNoticeMessage(requestNotice(r)),
+		}
 		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -2402,22 +2442,20 @@ func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-		view := ResetRequestView{
-			PageBase:     s.pageBase("reset_request_body", "", ""),
-			Email:        email,
-			Confirmation: "If the account exists, a reset link has been created.",
-			ResetLink:    "",
-		}
 
 		if s.identity != nil {
 			if err := s.identity.CreateRecovery(r.Context(), email, resetRedirectURL(r)); err != nil {
 				logRequestError(r, err, "failed to create password recovery for %s", email)
+				w.WriteHeader(http.StatusBadGateway)
+				_ = s.tmpl.ExecuteTemplate(w, "reset_request.html", ResetRequestView{
+					PageBase: s.pageBase("reset_request_body", "", ""),
+					Email:    email,
+					Error:    "Unable to send reset email right now. Please try again.",
+				})
+				return
 			}
 		}
-
-		if err := s.tmpl.ExecuteTemplate(w, "reset_request.html", view); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		http.Redirect(w, r, "/reset?notice="+url.QueryEscape(noticeResetRequestSent), http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2487,7 +2525,7 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to reset password", err, "failed to complete password recovery for user %s", userID)
 			return
 		}
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?notice="+url.QueryEscape(noticePasswordResetSuccess), http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

@@ -18,13 +18,16 @@
             required
           />
         </div>
+        {{ if .Confirmation }}
+          <p class="confirmation">{{ .Confirmation }}</p>
+        {{ end }}
+        {{ if .Error }}
+          <p class="error">{{ .Error }}</p>
+        {{ end }}
         <div class="form-actions">
-          <button class="primary" type="submit">Create reset link</button>
+          <button class="primary" type="submit">Request reset link</button>
         </div>
       </form>
-      {{ if .Confirmation }}
-        <p class="muted">{{ .Confirmation }}</p>
-      {{ end }}
     </section>
   </div>
 {{ end }}

@@ -243,6 +243,22 @@ func TestHandleLoginPageShowsSignupWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestHandleLoginPageShowsNoticeConfirmation(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{tmpl: tmpl}
+
+	req := httptest.NewRequest(http.MethodGet, "/login?notice=password_reset_success", nil)
+	rec := httptest.NewRecorder()
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "Password reset successfully. Now you can enter with your new credentials.") {
+		t.Fatalf("expected notice confirmation, got %q", rec.Body.String())
+	}
+}
+
 func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 	server := &Server{
