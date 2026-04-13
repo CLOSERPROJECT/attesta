@@ -1868,24 +1868,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/about" {
-		http.NotFound(w, r)
-		return
-	}
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	base := s.pageBase("about_body", "", "")
-	if s.enforceAuth {
-		if user, _, err := s.currentUser(r); err == nil {
-			base = s.pageBaseForUser(user, "about_body", "", "")
-		}
-	}
-	view := AboutView{PageBase: base}
-	if err := s.tmpl.ExecuteTemplate(w, "about.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	http.NotFound(w, r)
 }
 
 const swaggerUIPage = `<!doctype html>
