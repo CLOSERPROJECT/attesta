@@ -569,6 +569,21 @@ document.addEventListener("DOMContentLoaded", () => {
   focusNextActionInput();
 });
 
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  const openDropdowns = document.querySelectorAll(
+    ".account-menu[open], .workflow-card-menu[open]"
+  );
+  for (const dropdown of openDropdowns) {
+    if (!dropdown.contains(target)) {
+      dropdown.removeAttribute("open");
+    }
+  }
+});
+
 document.body.addEventListener("htmx:afterSwap", (event) => {
   if (event.target && event.target.id === "action-area") {
     void initializeFormataForms(event.target);
