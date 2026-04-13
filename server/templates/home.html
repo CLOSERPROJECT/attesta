@@ -88,10 +88,10 @@
         {{ template "icon-back" . }}
         Back
       </button>
-      <div class="hero-center">
-        <h1 class="hero-title">{{ .WorkflowName }}</h1>
+      <div class="hero-body">
+        <h1>{{ .WorkflowName }}</h1>
         {{ if .WorkflowDescription }}
-          <p class="hero-description">{{ .WorkflowDescription }}</p>
+          <p>{{ .WorkflowDescription }}</p>
         {{ end }}
       </div>
     </section>
