@@ -21,7 +21,7 @@
         <dt>Status</dt>
         <dd>{{ .Status }}{{ if .Reason }}- {{ .Reason }}{{ end }}</dd>
         <dt>Roles</dt>
-        <dd>
+        <dd class="role-pill-row">
           {{ if .RoleBadges }}
             {{ range .RoleBadges }}
               <span

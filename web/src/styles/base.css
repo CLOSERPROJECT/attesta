@@ -814,6 +814,13 @@ button.secondary-small {
   border-color: var(--pill-bg);
 }
 
+.role-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  column-gap: 4px;
+}
+
 .action-head {
   display: flex;
   align-items: center;
@@ -1589,6 +1596,14 @@ button.secondary-small {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+
+  button {
+    flex-shrink: 0;
+  }
+
+  form {
+    flex-shrink: 0;
+  }
 }
 
 .panel-head-actions .panel-heading {

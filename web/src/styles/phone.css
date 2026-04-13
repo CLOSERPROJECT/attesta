@@ -25,18 +25,4 @@
     gap: 4px;
     margin-top: 8px;
   }
-
-  .panel-head-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .platform-admin-item {
-    grid-template-columns: 1fr;
-    align-items: flex-start;
-  }
-
-  .platform-admin-pagination {
-    justify-content: flex-start;
-  }
 }
