@@ -534,6 +534,11 @@ button.secondary {
   color: var(--accent);
 }
 
+button.secondary-small {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
 .hash-copy {
   padding: 4px 8px;
   font-size: 11px;
