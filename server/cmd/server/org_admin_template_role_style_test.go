@@ -107,22 +107,13 @@ func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
 	if strings.Contains(body, "All invites") {
 		t.Fatalf("invites modal should not render, got body: %s", body)
 	}
-	if !strings.Contains(compactBody, `class="secondary js-invite-copy"`) || !strings.Contains(compactBody, `data-copy-invite-link="/invite/token-pending"`) {
-		t.Fatalf("expected last invite copy button with invite link, got body: %s", body)
+	if strings.Contains(compactBody, `class="secondary js-invite-copy"`) || strings.Contains(compactBody, `data-copy-invite-link="/invite/token-pending"`) {
+		t.Fatalf("did not expect invite copy button markup, got body: %s", body)
+	}
+	if !strings.Contains(compactBody, `if (addUserDialog && true && !addUserDialog.open)`) {
+		t.Fatalf("expected add-user dialog reopen script when invite link is present, got body: %s", body)
 	}
 	if strings.Contains(body, "Last invite:") {
 		t.Fatalf("last invite text should be hidden, got body: %s", body)
-	}
-	if !strings.Contains(compactBody, `data-copy-icon-default style="display: inline-block;"`) {
-		t.Fatalf("expected default copy icon visible by default, got body: %s", body)
-	}
-	if !strings.Contains(compactBody, `data-copy-icon-done style="display: none;"`) {
-		t.Fatalf("expected done copy icon hidden by default, got body: %s", body)
-	}
-	if !strings.Contains(body, `<span data-copy-label>`) {
-		t.Fatalf("expected copy label span, got body: %s", body)
-	}
-	if !strings.Contains(body, "data-copy-icon-default") || !strings.Contains(body, "data-copy-icon-done") {
-		t.Fatalf("expected copy state icons in invite copy button, got body: %s", body)
 	}
 }

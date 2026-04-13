@@ -623,8 +623,8 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
-			t.Fatalf("expected workflow actions menu trigger without builder access, got %q", body)
+		if strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
 		}
 		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("did not expect clone action without builder access, got %q", body)
@@ -632,8 +632,8 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect edit action without builder access, got %q", body)
 		}
-		if !strings.Contains(body, `class="workflow-card-menu-item workflow-card-menu-item-danger workflow-card-menu-item-disabled"`) {
-			t.Fatalf("expected disabled delete action without builder access, got %q", body)
+		if strings.Contains(body, `workflow-card-menu-item-danger workflow-card-menu-item-disabled`) {
+			t.Fatalf("did not expect delete action without builder access, got %q", body)
 		}
 	})
 }
