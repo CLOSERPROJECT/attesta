@@ -1,0 +1,35 @@
+@media (max-width: 640px) {
+  .dpp-history-card-head {
+    flex-direction: column;
+  }
+
+  .dpp-history-item::before {
+    left: 9px;
+  }
+
+  .dpp-history-summary,
+  .dpp-history-details {
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 16px;
+  }
+
+  .panel-head-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .platform-admin-item {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .platform-admin-pagination {
+    justify-content: flex-start;
+  }
+}
