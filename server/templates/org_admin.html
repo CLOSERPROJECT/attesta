@@ -5,17 +5,7 @@
   <div class="stack max-w-7xl mx-auto">
     <section class="hero">
       <button class="secondary" onclick="location.href='/'">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="currentColor"
-          class="icon-svg icon-svg-md"
-          viewBox="0 0 16 16"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"
-          />
-        </svg>
+        {{ template "icon-back" . }}
         Back
       </button>
       <div class="hero-center">
@@ -77,25 +67,7 @@
               />
             {{ else }}
               <span class="org-profile-logo-placeholder">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="icon-svg icon-svg-lg"
-                >
-                  <line x1="2" x2="22" y1="2" y2="22" />
-                  <path d="M10.41 10.41a2 2 0 1 1-2.83-2.83" />
-                  <line x1="13.5" x2="6" y1="13.5" y2="21" />
-                  <line x1="18" x2="21" y1="12" y2="15" />
-                  <path
-                    d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"
-                  />
-                  <path d="M21 15V5a2 2 0 0 0-2-2H9" />
-                </svg>
+                {{ template "icon-no-org" . }}
               </span>
             {{ end }}
             <div class="org-profile-meta">
@@ -157,19 +129,7 @@
                 type="button"
                 onclick="document.getElementById('add-role-dialog').showModal()"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="icon-svg icon-svg-md"
-                >
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
+                {{ template "icon-plus" . }}
                 Add role
               </button>
             </div>
@@ -192,21 +152,7 @@
                           title="Role in use"
                           disabled
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--muted)"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            class="icon-svg icon-svg-md"
-                          >
-                            <path
-                              d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
-                            />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
+                          {{ template "icon-settings-muted" . }}
                         </button>
                         <button
                           type="button"
@@ -215,20 +161,7 @@
                           title="Role in use"
                           disabled
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 16 16"
-                            fill="var(--muted)"
-                            class="icon-svg icon-svg-md"
-                            aria-hidden="true"
-                          >
-                            <path
-                              d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"
-                            />
-                            <path
-                              d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"
-                            />
-                          </svg>
+                          {{ template "icon-trash-muted" . }}
                         </button>
                       {{ else }}
                         <span class="muted" style="font-size: 12px;"
@@ -240,21 +173,7 @@
                           aria-label="Edit role"
                           onclick="document.getElementById('edit-role-{{ .Slug }}').showModal()"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            class="icon-svg icon-svg-md"
-                          >
-                            <path
-                              d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
-                            />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
+                          {{ template "icon-settings" . }}
                         </button>
                         <button
                           type="button"
@@ -262,20 +181,7 @@
                           aria-label="Delete role"
                           onclick="document.getElementById('delete-role-{{ .Slug }}').showModal()"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 16 16"
-                            fill="currentColor"
-                            class="icon-svg icon-svg-md"
-                            aria-hidden="true"
-                          >
-                            <path
-                              d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"
-                            />
-                            <path
-                              d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"
-                            />
-                          </svg>
+                          {{ template "icon-trash" . }}
                         </button>
                       {{ end }}
                     </div>
@@ -297,19 +203,7 @@
                               class="secondary"
                               onclick="document.getElementById('edit-role-{{ .Slug }}').close()"
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                class="icon-svg icon-svg-md"
-                              >
-                                <path d="M18 6 6 18" />
-                                <path d="m6 6 12 12" />
-                              </svg>
+                              {{ template "icon-close" . }}
                             </button>
                           </header>
                           <div class="manage-dialog-role-pill">
@@ -577,19 +471,7 @@
                               class="secondary"
                               onclick="document.getElementById('delete-role-{{ .Slug }}').close()"
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                class="icon-svg icon-svg-md"
-                              >
-                                <path d="M18 6 6 18" />
-                                <path d="m6 6 12 12" />
-                              </svg>
+                              {{ template "icon-close" . }}
                             </button>
                           </header>
                           <div class="manage-dialog-role-pill">
@@ -652,19 +534,7 @@
                 type="button"
                 onclick="document.getElementById('add-user-dialog').showModal()"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="icon-svg icon-svg-md"
-                >
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
+                {{ template "icon-plus" . }}
                 Add user
               </button>
             </div>
@@ -676,44 +546,9 @@
                     <div class="user-main">
                       <span class="user-email">
                         {{ if .IsOrgAdmin }}
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--{{ if .Activated }}
-                              accent
-                            {{ else }}
-                              accent-2
-                            {{ end }})"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            class="icon-svg icon-svg-md"
-                          >
-                            <path
-                              d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
-                            />
-                            <path d="M6.376 18.91a6 6 0 0 1 11.249.003" />
-                            <circle cx="12" cy="11" r="4" />
-                          </svg>
+                          {{ template "icon-user-org-admin" . }}
                         {{ else }}
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--{{ if .Activated }}
-                              accent
-                            {{ else }}
-                              accent-2
-                            {{ end }})"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            class="icon-svg icon-svg-md"
-                          >
-                            <circle cx="12" cy="8" r="5" />
-                            <path d="M20 21a8 8 0 0 0-16 0" />
-                          </svg>
+                          {{ template "icon-user-member" . }}
                         {{ end }}
                         {{ .Email }}
                         {{ if not .Activated }}
@@ -744,21 +579,7 @@
                         aria-label="Edit user"
                         onclick="document.getElementById('manage-user-{{ .UserID }}').showModal()"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          class="icon-svg icon-svg-md"
-                        >
-                          <path
-                            d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
-                          />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
+                        {{ template "icon-settings" . }}
                       </button>
                       <button
                         type="button"
@@ -766,20 +587,7 @@
                         aria-label="Delete user"
                         onclick="document.getElementById('delete-user-{{ .UserID }}').showModal()"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 16 16"
-                          fill="currentColor"
-                          class="icon-svg icon-svg-md"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"
-                          />
-                          <path
-                            d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"
-                          />
-                        </svg>
+                        {{ template "icon-trash" . }}
                       </button>
                     </div>
                     <dialog
@@ -797,19 +605,7 @@
                             class="secondary"
                             onclick="document.getElementById('manage-user-{{ .UserID }}').close()"
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              class="icon-svg icon-svg-md"
-                            >
-                              <path d="M18 6 6 18" />
-                              <path d="m6 6 12 12" />
-                            </svg>
+                            {{ template "icon-close" . }}
                           </button>
                         </header>
 
@@ -911,19 +707,7 @@
                             class="secondary"
                             onclick="document.getElementById('delete-user-{{ .UserID }}').close()"
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              class="icon-svg icon-svg-md"
-                            >
-                              <path d="M18 6 6 18" />
-                              <path d="m6 6 12 12" />
-                            </svg>
+                            {{ template "icon-close" . }}
                           </button>
                         </header>
                         <p style="margin: 0 0 20px;">
@@ -981,19 +765,7 @@
                   class="secondary"
                   onclick="document.getElementById('add-role-dialog').close()"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="icon-svg icon-svg-md"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
+                  {{ template "icon-close" . }}
                 </button>
               </header>
 
@@ -1197,19 +969,7 @@
                   class="secondary"
                   onclick="document.getElementById('add-user-dialog').close()"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="icon-svg icon-svg-md"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
+                  {{ template "icon-close" . }}
                 </button>
               </header>
 
@@ -1279,55 +1039,8 @@
                       class="secondary js-invite-copy"
                       data-copy-invite-link="{{ .InviteLink }}"
                     >
-                      <svg
-                        data-copy-icon-default
-                        style="display: inline-block;"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        class="icon-svg icon-svg-md"
-                      >
-                        <rect
-                          width="14"
-                          height="14"
-                          x="8"
-                          y="8"
-                          rx="2"
-                          ry="2"
-                        />
-                        <path
-                          d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                        />
-                      </svg>
-                      <svg
-                        data-copy-icon-done
-                        style="display: none;"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        class="icon-svg icon-svg-md"
-                      >
-                        <path d="m12 15 2 2 4-4" />
-                        <rect
-                          width="14"
-                          height="14"
-                          x="8"
-                          y="8"
-                          rx="2"
-                          ry="2"
-                        />
-                        <path
-                          d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                        />
-                      </svg>
+                      {{ template "icon-copy-default" . }}
+                      {{ template "icon-copy-done" . }}
                       <span data-copy-label>Copy invite link</span>
                     </button>
                   {{ end }}
