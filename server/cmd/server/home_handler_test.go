@@ -423,8 +423,15 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if !strings.Contains(rec.Body.String(), `action="/w/`+stream.ID.Hex()+`/delete"`) {
-			t.Fatalf("expected delete button for creator, got %q", rec.Body.String())
+		body := rec.Body.String()
+		if !strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected delete dialog for creator, got %q", body)
+		}
+		if !strings.Contains(body, `onclick="document.getElementById('delete-workflow-`+stream.ID.Hex()+`').showModal()"`) {
+			t.Fatalf("expected delete dialog trigger for creator, got %q", body)
+		}
+		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+			t.Fatalf("expected delete form action for creator, got %q", body)
 		}
 	})
 
@@ -472,8 +479,12 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if strings.Contains(rec.Body.String(), `action="/w/`+stream.ID.Hex()+`/delete"`) {
-			t.Fatalf("did not expect delete button for started stream, got %q", rec.Body.String())
+		body := rec.Body.String()
+		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
+			t.Fatalf("did not expect delete dialog for started stream, got %q", body)
+		}
+		if strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+			t.Fatalf("did not expect delete button for started stream, got %q", body)
 		}
 	})
 
@@ -517,8 +528,15 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if !strings.Contains(rec.Body.String(), `action="/w/`+stream.ID.Hex()+`/delete"`) {
-			t.Fatalf("expected delete button for platform admin, got %q", rec.Body.String())
+		body := rec.Body.String()
+		if !strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected delete dialog for platform admin, got %q", body)
+		}
+		if !strings.Contains(body, `onclick="document.getElementById('delete-workflow-`+stream.ID.Hex()+`').showModal()"`) {
+			t.Fatalf("expected delete dialog trigger for platform admin, got %q", body)
+		}
+		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+			t.Fatalf("expected delete form action for platform admin, got %q", body)
 		}
 	})
 }
