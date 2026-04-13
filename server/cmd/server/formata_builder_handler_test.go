@@ -16,6 +16,9 @@ import (
 )
 
 func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "platform-admin-builder@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
 	store := NewMemoryStore()
 	orgID := stableOrgObjectID("builder-org")
 	orgAdmin := AccountUser{
@@ -237,6 +240,48 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if payload["editable"] != false {
 			t.Fatalf("editable = %#v, want false", payload["editable"])
 		}
+		if payload["editableRequiresPurge"] != false {
+			t.Fatalf("editableRequiresPurge = %#v, want false", payload["editableRequiresPurge"])
+		}
+	})
+
+	t.Run("stream json marks platform admin started stream as editable with purge warning", func(t *testing.T) {
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Platform editable"),
+			CreatedByUserID: "another-owner",
+			UpdatedByUserID: "another-owner",
+			UpdatedAt:       time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream error: %v", err)
+		}
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: saved.ID.Hex(),
+			CreatedAt:   time.Now().UTC(),
+			Status:      "done",
+			Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+saved.ID.Hex(), nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminFormataBuilder(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+
+		var payload map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("json.Unmarshal error: %v", err)
+		}
+		if payload["editable"] != true {
+			t.Fatalf("editable = %#v, want true", payload["editable"])
+		}
+		if payload["editableRequiresPurge"] != true {
+			t.Fatalf("editableRequiresPurge = %#v, want true", payload["editableRequiresPurge"])
+		}
 	})
 
 	t.Run("stream json rejects invalid id", func(t *testing.T) {
@@ -298,6 +343,9 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 }
 
 func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "platform-admin-builder-post@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
 	store := NewMemoryStore()
 	orgID := stableOrgObjectID("builder-post-org")
 	orgAdmin := AccountUser{
@@ -452,6 +500,48 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("platform admin can rewrite started stream and purge workflow data", func(t *testing.T) {
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Platform stale stream"),
+			CreatedByUserID: "another-owner",
+			UpdatedByUserID: "another-owner",
+			UpdatedAt:       time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream error: %v", err)
+		}
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: saved.ID.Hex(),
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress:    map[string]ProcessStep{},
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Platform updated stream")))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminFormataBuilder(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+		}
+
+		got, err := store.LoadFormataBuilderStreamByID(t.Context(), saved.ID)
+		if err != nil {
+			t.Fatalf("LoadFormataBuilderStreamByID error: %v", err)
+		}
+		if !strings.Contains(got.Stream, "Platform updated stream") {
+			t.Fatalf("stream = %q, want updated yaml", got.Stream)
+		}
+		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
+		if err != nil {
+			t.Fatalf("HasProcessesByWorkflow error: %v", err)
+		}
+		if hasProcesses {
+			t.Fatal("expected workflow data to be purged")
 		}
 	})
 
@@ -632,14 +722,17 @@ func TestFormataBuilderHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("stream editable is false without user", func(t *testing.T) {
+	t.Run("stream edit state is false without user", func(t *testing.T) {
 		server := &Server{store: NewMemoryStore()}
-		editable, err := server.formataBuilderStreamEditable(t.Context(), nil, FormataBuilderStream{ID: primitive.NewObjectID()})
+		editable, requiresPurge, err := server.formataBuilderStreamEditState(t.Context(), nil, FormataBuilderStream{ID: primitive.NewObjectID()})
 		if err != nil {
-			t.Fatalf("formataBuilderStreamEditable error: %v", err)
+			t.Fatalf("formataBuilderStreamEditState error: %v", err)
 		}
 		if editable {
 			t.Fatal("expected editable to be false")
+		}
+		if requiresPurge {
+			t.Fatal("expected requiresPurge to be false")
 		}
 	})
 }

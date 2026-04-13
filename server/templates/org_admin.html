@@ -1033,17 +1033,6 @@
                   class="org-admin-form-actions org-admin-form-actions-stack"
                 >
                   <button class="primary" type="submit">Create invite</button>
-                  {{ if .InviteLink }}
-                    <button
-                      type="button"
-                      class="secondary js-invite-copy"
-                      data-copy-invite-link="{{ .InviteLink }}"
-                    >
-                      {{ template "icon-copy-default" . }}
-                      {{ template "icon-copy-done" . }}
-                      <span data-copy-label>Copy invite link</span>
-                    </button>
-                  {{ end }}
                 </div>
               </form>
             </div>

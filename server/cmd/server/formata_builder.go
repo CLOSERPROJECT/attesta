@@ -131,18 +131,29 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			http.Error(w, "failed to load stream", http.StatusInternalServerError)
 			return
 		}
-		if strings.TrimSpace(formataStreamCreatorID(*existing)) != strings.TrimSpace(formataStreamUserID(user)) {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
 		hasProcesses, err := s.store.HasProcessesByWorkflow(r.Context(), streamID.Hex())
 		if err != nil {
 			http.Error(w, "failed to check stream instances", http.StatusInternalServerError)
 			return
 		}
-		if hasProcesses {
-			http.Error(w, "stream is no longer editable", http.StatusConflict)
+		editable, requiresPurge, err := s.formataBuilderStreamEditState(r.Context(), user, *existing)
+		if err != nil {
+			http.Error(w, "failed to check stream instances", http.StatusInternalServerError)
 			return
+		}
+		if !editable {
+			if strings.TrimSpace(formataStreamCreatorID(*existing)) == strings.TrimSpace(formataStreamUserID(user)) && hasProcesses {
+				http.Error(w, "stream is no longer editable", http.StatusConflict)
+				return
+			}
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		if requiresPurge {
+			if err := s.store.DeleteWorkflowData(r.Context(), streamID.Hex()); err != nil {
+				http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
+				return
+			}
 		}
 		if _, err := s.store.UpdateFormataBuilderStream(r.Context(), FormataBuilderStream{
 			ID:              existing.ID,
@@ -193,30 +204,32 @@ func (s *Server) handleOrgAdminFormataBuilderStream(w http.ResponseWriter, r *ht
 	if !ok {
 		root = map[string]interface{}{"stream": payload}
 	}
-	editable, err := s.formataBuilderStreamEditable(r.Context(), user, *stream)
+	editable, requiresPurge, err := s.formataBuilderStreamEditState(r.Context(), user, *stream)
 	if err != nil {
 		http.Error(w, "failed to check stream instances", http.StatusInternalServerError)
 		return
 	}
 	root["editable"] = editable
+	root["editableRequiresPurge"] = requiresPurge
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(root); err != nil {
 		http.Error(w, "failed to encode stream", http.StatusInternalServerError)
 	}
 }
 
-func (s *Server) formataBuilderStreamEditable(ctx context.Context, user *AccountUser, stream FormataBuilderStream) (bool, error) {
+func (s *Server) formataBuilderStreamEditState(ctx context.Context, user *AccountUser, stream FormataBuilderStream) (bool, bool, error) {
 	if s.store == nil || user == nil || stream.ID.IsZero() {
-		return false, nil
-	}
-	if strings.TrimSpace(formataStreamCreatorID(stream)) != strings.TrimSpace(formataStreamUserID(user)) {
-		return false, nil
+		return false, false, nil
 	}
 	hasProcesses, err := s.store.HasProcessesByWorkflow(ctx, stream.ID.Hex())
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-	return !hasProcesses, nil
+	editable, err := s.canEditStream(ctx, user, stream.ID.Hex(), formataStreamCreatorID(stream), hasProcesses)
+	if err != nil {
+		return false, false, err
+	}
+	return editable, editable && hasProcesses, nil
 }
 
 func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Request, isRootPath bool) {

@@ -335,14 +335,16 @@ type PageBase struct {
 }
 
 type WorkflowOption struct {
-	Key          string
-	Name         string
-	Description  string
-	Counts       WorkflowProcessCounts
-	CanEdit      bool
-	EditAction   string
-	CanDelete    bool
-	DeleteAction string
+	Key               string
+	Name              string
+	Description       string
+	Counts            WorkflowProcessCounts
+	CanClone          bool
+	CanEdit           bool
+	EditAction        string
+	EditRequiresPurge bool
+	CanDelete         bool
+	DeleteAction      string
 }
 
 type WorkflowProcessCounts struct {
@@ -1378,6 +1380,7 @@ const (
 	cerbosResourcePlatformAdminConsole = "platform_admin_console"
 
 	cerbosActionAccess = "access"
+	cerbosActionEdit   = "edit"
 	cerbosActionPurge  = "purge_history"
 	cerbosActionSave   = "save"
 	cerbosActionView   = "view"
@@ -1413,6 +1416,14 @@ func (s *Server) canViewFormataBuilder(ctx context.Context, user *AccountUser) (
 
 func (s *Server) canSaveFormataBuilder(ctx context.Context, user *AccountUser) (bool, error) {
 	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, cerbosActionSave)
+}
+
+func (s *Server) canEditStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+	return s.authorizeUserAction(ctx, user, "stream", strings.TrimSpace(workflowKey), map[string]interface{}{
+		"workflowKey":     strings.TrimSpace(workflowKey),
+		"createdByUserId": strings.TrimSpace(createdByUserID),
+		"hasProcesses":    hasProcesses,
+	}, cerbosActionEdit)
 }
 
 func (s *Server) canPurgeWorkflowData(ctx context.Context, user *AccountUser, workflowKey string) (bool, error) {
@@ -1542,8 +1553,16 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
 		stream, ok := streamsByKey[key]
 		if ok && s.authorizer != nil && user != nil {
-			option.CanEdit = canEditSavedStreams
-			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0)
+			hasProcesses := option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0
+			option.CanClone = canEditSavedStreams
+			if canEditSavedStreams {
+				allowed, err := s.canEditStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
+				if err == nil {
+					option.CanEdit = allowed
+					option.EditRequiresPurge = allowed && hasProcesses
+				}
+			}
+			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
 			if err == nil {
 				option.CanDelete = allowed
 			}
