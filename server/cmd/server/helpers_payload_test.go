@@ -6,28 +6,6 @@ import (
 )
 
 func TestNormalizePayload(t *testing.T) {
-	numberSub := WorkflowSub{InputType: "number", InputKey: "value"}
-	payload, err := normalizePayload(numberSub, "10.5")
-	if err != nil {
-		t.Fatalf("expected number payload to parse, got error: %v", err)
-	}
-	if got, ok := payload["value"].(float64); !ok || got != 10.5 {
-		t.Fatalf("expected parsed float 10.5, got %#v", payload["value"])
-	}
-
-	if _, err := normalizePayload(numberSub, "not-a-number"); err == nil {
-		t.Fatal("expected number payload parse failure")
-	}
-
-	textSub := WorkflowSub{InputType: "text", InputKey: "note"}
-	textPayload, err := normalizePayload(textSub, "ok")
-	if err != nil {
-		t.Fatalf("expected text payload to pass, got error: %v", err)
-	}
-	if got := textPayload["note"]; got != "ok" {
-		t.Fatalf("expected text payload value "+`"ok"`+", got %#v", got)
-	}
-
 	formataSub := WorkflowSub{InputType: "formata", InputKey: "details"}
 	formataPayload, err := normalizePayload(formataSub, `{"status":"ok","weight":42}`)
 	if err != nil {
@@ -42,6 +20,9 @@ func TestNormalizePayload(t *testing.T) {
 	}
 	if _, err := normalizePayload(formataSub, "[]"); err == nil {
 		t.Fatal("expected formata payload parse failure for non-object JSON")
+	}
+	if _, err := normalizePayload(WorkflowSub{InputType: "string", InputKey: "note"}, `"ok"`); err == nil {
+		t.Fatal("expected non-formata payload parse failure")
 	}
 }
 

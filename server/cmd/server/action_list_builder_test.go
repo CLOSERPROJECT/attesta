@@ -124,8 +124,8 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 
 	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
 	action := findAction(t, actions, "1.1")
-	if action.DoneAt != doneAt.Format(time.RFC3339) {
-		t.Fatalf("expected doneAt %q, got %q", doneAt.Format(time.RFC3339), action.DoneAt)
+	if action.DoneAt != "19 Feb 2026 at 09:00 UTC" {
+		t.Fatalf("expected doneAt %q, got %q", "19 Feb 2026 at 09:00 UTC", action.DoneAt)
 	}
 	if action.DoneBy != "u1" || action.DoneRole != "dep1" {
 		t.Fatalf("unexpected done actor: %q/%q", action.DoneBy, action.DoneRole)
@@ -193,6 +193,48 @@ func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 	}
 	if action.Reason != "Locked by sequence" {
 		t.Fatalf("expected lock reason, got %q", action.Reason)
+	}
+}
+
+func TestBuildActionListDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID:           "1",
+				OrganizationSlug: "org-a",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Org-scoped step",
+						Order:     1,
+						Role:      "dep1",
+						InputKey:  "value",
+						InputType: "text",
+					},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID:       primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{},
+	}
+
+	actions := buildActionList(def, process, "workflow", Actor{
+		OrgSlug:   "org-b",
+		Role:      "dep1",
+		RoleSlugs: []string{"dep1"},
+	}, true, map[string]RoleMeta{})
+	action := findAction(t, actions, "1.1")
+
+	if action.Status != "available" {
+		t.Fatalf("expected status available, got %q", action.Status)
+	}
+	if !action.Disabled {
+		t.Fatal("expected wrong-org action to be disabled")
+	}
+	if action.Reason != "Not authorized for organization" {
+		t.Fatalf("expected org authorization reason, got %q", action.Reason)
 	}
 }
 

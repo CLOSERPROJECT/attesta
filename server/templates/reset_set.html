@@ -1,19 +1,80 @@
 {{/* Used on /reset/.Token to render password reset form (NOT USED YET!) */}}
 
-{{define "reset_set_body"}}
-<section class="panel landing" style="max-width: 520px;">
-  <h1>Set New Password</h1>
-  {{if .Error}}
-    <p class="muted" style="color: #a91919;">{{.Error}}</p>
-  {{end}}
-  <form method="post" action="/reset/{{.Token}}" class="stack" style="gap: 12px;">
-    <label class="muted" for="password">New password</label>
-    <input id="password" name="password" type="password" required />
-    <button class="primary" type="submit">Update password</button>
-  </form>
-</section>
-{{end}}
+{{ define "reset_set_body" }}
+  <div class="login-wrapper">
+    <section class="panel login">
+      <div class="panel-heading">
+        <h1>{{ .Title }}</h1>
+      </div>
+      <form method="post" action="/reset/{{ .Token }}" class="input-form">
+        <div class="form-field">
+          <label class="muted" for="password">New password</label>
+          <div class="password-field">
+            <input id="password" name="password" type="password" required />
+            <button
+              type="button"
+              class="toggle-password"
+              data-target="password"
+              aria-label="Toggle new password visibility"
+            >
+              {{ template "icon-eye" . }}
+              {{ template "icon-eye-off" . }}
+            </button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="confirm-password">Confirm password</label>
+          <div class="password-field">
+            <input
+              id="confirm-password"
+              name="confirm_password"
+              type="password"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              data-target="confirm-password"
+              aria-label="Toggle confirm password visibility"
+            >
+              {{ template "icon-eye" . }}
+              {{ template "icon-eye-off" . }}
+            </button>
+          </div>
+        </div>
+        {{ if .Error }}
+          <p class="error">{{ .Error }}</p>
+        {{ end }}
+        <div class="form-actions">
+          <button class="primary" type="submit">{{ .SubmitLabel }}</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  <script>
+    document.querySelectorAll(".toggle-password").forEach((toggle) => {
+      const inputId = toggle.getAttribute("data-target");
+      const input = inputId ? document.getElementById(inputId) : null;
+      if (!input) {
+        return;
+      }
+      toggle.addEventListener("click", () => {
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
 
-{{define "reset_set.html"}}
-  {{template "layout.html" .}}
-{{end}}
+        const eye = toggle.querySelector(".icon-eye");
+        const eyeOff = toggle.querySelector(".icon-eye-off");
+        if (eye) {
+          eye.style.display = isPassword ? "none" : "block";
+        }
+        if (eyeOff) {
+          eyeOff.style.display = isPassword ? "block" : "none";
+        }
+      });
+    });
+  </script>
+{{ end }}
+
+{{ define "reset_set.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

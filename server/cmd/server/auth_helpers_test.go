@@ -148,6 +148,16 @@ func TestRequestURLsAndCookieHelpers(t *testing.T) {
 	if got := requestBaseURL(hostlessReq); got != "http://localhost:3000" {
 		t.Fatalf("hostless requestBaseURL = %q", got)
 	}
+	noticeReq := httptest.NewRequest(http.MethodGet, "http://attesta.local/login?notice=password_reset_success", nil)
+	if got := requestNotice(noticeReq); got != noticePasswordResetSuccess {
+		t.Fatalf("requestNotice = %q", got)
+	}
+	if got := loginNoticeMessage(noticePasswordResetSuccess); got == "" {
+		t.Fatal("expected login notice message")
+	}
+	if got := resetRequestNoticeMessage(noticeResetRequestSent); got == "" {
+		t.Fatal("expected reset notice message")
+	}
 }
 
 func TestSessionSecretFromRequest(t *testing.T) {
@@ -443,7 +453,7 @@ func TestWorkflowValidationAndRoleStyleHelpers(t *testing.T) {
 		t.Fatalf("empty workflow validation error = %q", got)
 	}
 	errText := (&WorkflowRefValidationError{Messages: []string{"missing org", "missing role"}}).Error()
-	if errText != "workflow references are invalid: missing org; missing role" {
+	if errText != "workflow references are invalid:\n- missing org\n- missing role" {
 		t.Fatalf("workflow validation error = %q", errText)
 	}
 

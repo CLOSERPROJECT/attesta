@@ -46,7 +46,7 @@ func TestIntegrationCompleteSubstepWithMongoAndCerbos(t *testing.T) {
 		processID := seedIntegrationProcess(t, db, store)
 		server := integrationServer(store, authorizer)
 
-		req := httptest.NewRequest(http.MethodPost, "/process/"+processID.Hex()+"/substep/1.1/complete", strings.NewReader("value=10"))
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID.Hex()+"/substep/1.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("HX-Request", "true")
 		req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
@@ -80,7 +80,7 @@ func TestIntegrationCompleteSubstepWithMongoAndCerbos(t *testing.T) {
 		processID := seedIntegrationProcess(t, db, store)
 		server := integrationServer(store, authorizer)
 
-		req := httptest.NewRequest(http.MethodPost, "/process/"+processID.Hex()+"/substep/1.1/complete", strings.NewReader("value=10"))
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID.Hex()+"/substep/1.1/complete", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("HX-Request", "true")
 		req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u2|dep2"})
@@ -177,7 +177,7 @@ func integrationServer(store Store, authorizer Authorizer) *Server {
 		authorizer: authorizer,
 		sse:        newSSEHub(),
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			return testFormataRuntimeConfig(), nil
 		},
 	}
 }

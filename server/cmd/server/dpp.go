@@ -137,7 +137,7 @@ func gs1ElementString(gtin, lot, serial string) string {
 	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
 }
 
-func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta) []DPPTraceabilityStep {
+func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta, orgNames map[string]string) []DPPTraceabilityStep {
 	steps := make([]DPPTraceabilityStep, 0, len(def.Steps))
 	if process == nil {
 		return steps
@@ -145,9 +145,13 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 	availableMap := computeAvailability(def, process)
 	for _, step := range sortedSteps(def) {
 		stepView := DPPTraceabilityStep{
-			StepID: step.StepID,
-			Title:  step.Title,
+			StepID:           step.StepID,
+			Title:            step.Title,
+			OrganizationName: organizationDisplayName(step.OrganizationSlug, orgNames),
+			DetailsDialogID:  "dpp-step-dialog-" + dppDialogIDFragment(step.StepID),
 		}
+		allDone := len(step.Substep) > 0
+		var latestDoneAt time.Time
 		for _, sub := range sortedSubsteps(step) {
 			allowedRoles := substepRoles(sub)
 			primaryRole := strings.TrimSpace(sub.Role)
@@ -182,7 +186,11 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 			if done && progress.State == "done" {
 				subView.Status = "done"
 				if progress.DoneAt != nil {
-					subView.DoneAt = progress.DoneAt.Format(time.RFC3339)
+					subView.DoneAt = progress.DoneAt.UTC().Format(time.RFC3339)
+					subView.DoneAtHuman = humanReadableTraceabilityTime(*progress.DoneAt)
+					if progress.DoneAt.After(latestDoneAt) {
+						latestDoneAt = *progress.DoneAt
+					}
 				}
 				if progress.DoneBy != nil {
 					subView.DoneBy = progress.DoneBy.ID
@@ -212,12 +220,59 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				}
 			} else if availableMap[sub.SubstepID] {
 				subView.Status = "available"
+				allDone = false
+			} else {
+				allDone = false
 			}
 			stepView.Substeps = append(stepView.Substeps, subView)
+		}
+		if allDone && !latestDoneAt.IsZero() {
+			stepView.CompletedAt = latestDoneAt.UTC().Format(time.RFC3339)
+			stepView.CompletedAtHuman = humanReadableTraceabilityTime(latestDoneAt)
 		}
 		steps = append(steps, stepView)
 	}
 	return steps
+}
+
+func humanReadableTraceabilityTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format("2 Jan 2006 at 15:04 MST")
+}
+
+func dppDialogIDFragment(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "step"
+	}
+	var builder strings.Builder
+	builder.Grow(len(value))
+	lastDash := false
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			builder.WriteRune(r)
+			lastDash = false
+		case r >= 'A' && r <= 'Z':
+			builder.WriteRune(r + ('a' - 'A'))
+			lastDash = false
+		case r >= '0' && r <= '9':
+			builder.WriteRune(r)
+			lastDash = false
+		default:
+			if !lastDash {
+				builder.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	out := strings.Trim(builder.String(), "-")
+	if out == "" {
+		return "step"
+	}
+	return out
 }
 
 func dppTraceValues(sub WorkflowSub, data map[string]interface{}) []DPPTraceabilityValue {

@@ -68,8 +68,8 @@ const timeline = document.getElementById("timeline");
 const actionArea = document.getElementById("action-area");
 
 const focusNextActionInput = () => {
-  const nextInput = document.querySelector(
-    ".action-card.action-available:not(.action-other) input:not([disabled]):not([type='hidden']), .action-card.action-available:not(.action-other) textarea:not([disabled]), .action-card.action-available:not(.action-other) select:not([disabled])"
+  const nextInput = actionArea?.querySelector(
+    "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])"
   );
   if (nextInput) {
     nextInput.focus();

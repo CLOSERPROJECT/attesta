@@ -3,182 +3,243 @@
   * list of processes within a stream (home_body)
 */}}
 
-{{define "home_picker_body"}}
-<section class="panel landing landing-wide">
-  <h1>Choose a stream</h1>
-  <p class="muted">Select a stream to start or continue process tracking.</p>
-  {{if .Confirmation}}
-    <p class="muted">{{.Confirmation}}</p>
-  {{end}}
-  {{template "error_banner.html" .}}
-  {{if .Workflows}}
-    <div class="workflow-grid">
-      {{range .Workflows}}
-        <div class="workflow-card-shell">
-          <a class="workflow-card" href="/w/{{.Key}}/">
-            <h2 class="workflow-card-title">{{.Name}}</h2>
-            <p class="workflow-card-description{{if not .Description}} is-empty{{end}}">
-              {{if .Description}}{{.Description}}{{else}}&nbsp;{{end}}
-            </p>
-            <dl class="workflow-card-stats">
-              <div>
-                <dt>Not started</dt>
-                <dd>{{.Counts.NotStarted}}</dd>
+{{ define "home_picker_body" }}
+  <section class="panel max-w-7xl mx-auto">
+    <div class="panel-heading">
+      <h1>Choose a stream</h1>
+      <p>Select a stream to start or continue process tracking.</p>
+    </div>
+    {{ if .Confirmation }}
+      <p class="confirmation">{{ .Confirmation }}</p>
+    {{ end }}
+    {{ template "error_banner.html" . }}
+    {{ if .Workflows }}
+      <div class="workflow-grid">
+        {{ range .Workflows }}
+          <div class="workflow-card-shell">
+            <a class="workflow-card" href="/w/{{ .Key }}/">
+              <h2 class="workflow-card-title">{{ .Name }}</h2>
+              <p
+                class="workflow-card-description{{ if not .Description }}
+                  is-empty
+                {{ end }}"
+              >
+                {{ if .Description }}{{ .Description }}{{ else }}&nbsp;{{ end }}
+              </p>
+              <div
+                style="margin: auto 0 0; padding-top: 6px; border-top: 1px solid var(--border);"
+              >
+                <table class="workflow-card-stats">
+                  <tr>
+                    <th>Not started</th>
+                    <td>{{ .Counts.NotStarted }}</td>
+                  </tr>
+                  <tr>
+                    <th>In progress</th>
+                    <td>{{ .Counts.Started }}</td>
+                  </tr>
+                  <tr>
+                    <th>Completed</th>
+                    <td>{{ .Counts.Terminated }}</td>
+                  </tr>
+                </table>
               </div>
-              <div>
-                <dt>Started</dt>
-                <dd>{{.Counts.Started}}</dd>
-              </div>
-              <div>
-                <dt>Terminated</dt>
-                <dd>{{.Counts.Terminated}}</dd>
-              </div>
-            </dl>
+            </a>
+            {{ if .CanDelete }}
+              <form
+                method="post"
+                action="{{ .DeleteAction }}"
+                class="workflow-card-delete"
+              >
+                <button
+                  type="submit"
+                  class="workflow-card-delete-button"
+                  aria-label="Delete {{ .Name }}"
+                  title="Delete {{ .Name }}"
+                >
+                  {{ template "icon-trash" . }}
+                </button>
+              </form>
+            {{ end }}
+          </div>
+        {{ end }}
+        {{ if .ShowCreateStreamCard }}
+          <a
+            class="workflow-card workflow-card-create"
+            href="/org-admin/formata-builder"
+          >
+            <span class="workflow-card-cta">
+              {{ template "icon-plus" . }}
+              <span style="margin-left: 4px;">Create new stream</span>
+            </span>
           </a>
-          {{if .CanDelete}}
-            <form method="post" action="{{.DeleteAction}}" class="workflow-card-delete">
-              <button type="submit" class="workflow-card-delete-button" aria-label="Delete {{.Name}}" title="Delete {{.Name}}">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon-svg icon-svg-md" aria-hidden="true">
-                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0A.5.5 0 0 1 8.5 6v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
-                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 1 1 0-2H5V1.5A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5V2h2.5a1 1 0 0 1 1 1M6 2h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5zM4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z"/>
-                </svg>
-              </button>
-            </form>
-          {{end}}
-        </div>
-      {{end}}
-      {{if .ShowCreateStreamCard}}
-        <a class="workflow-card workflow-card-create" href="/org-admin/formata-builder">
-          <h2 class="workflow-card-title">Create new stream</h2>
-          <p class="workflow-card-description">Click to create new stream</p>
-          <span class="workflow-card-cta">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md">
-              <path d="M5 12h14"/>
-              <path d="M12 5v14"/>
-            </svg>
-            Create new stream
-          </span>
-        </a>
-      {{end}}
-    </div>
-  {{else}}
-    <p class="muted">No streams configured.</p>
-  {{end}}
-</section>
-{{end}}
-
-{{define "home_body"}}
-<div class="stack">
-  <section class="hero">
-    <button class="secondary" onclick="location.href='/'">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
-      </svg>
-      Back
-    </button>
-    <div class="hero-center">
-      <h1 class="hero-title">{{.WorkflowName}}</h1>
-      {{if .WorkflowDescription}}
-        <p class="hero-description">{{.WorkflowDescription}}</p>
-      {{end}}
-    </div>
-    {{if .CanStartProcess}}
-      <form method="post" action="{{.WorkflowPath}}/process/start">
-        <button class="primary" type="submit">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-            <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
-          </svg>
-          New stream
-        </button>
-      </form>
-    {{end}}
+        {{ end }}
+      </div>
+    {{ else }}
+      <p class="muted">No streams configured.</p>
+    {{ end }}
   </section>
+{{ end }}
 
-  {{if .Error}}
-    <section class="panel">
-      <h2 style="margin-top: 0;">Stream configuration issue</h2>
-      <p class="muted">This stream cannot start new processes until its organization and role references are fixed.</p>
-      <div class="error" style="margin-bottom: 0;">{{.Error}}</div>
+{{ define "home_body" }}
+  <div class="stack max-w-7xl mx-auto">
+    <section class="hero">
+      <button class="secondary" onclick="location.href='/'">
+        {{ template "icon-back" . }}
+        Back
+      </button>
+      <div class="hero-body">
+        <h1>{{ .WorkflowName }}</h1>
+        {{ if .WorkflowDescription }}
+          <p>{{ .WorkflowDescription }}</p>
+        {{ end }}
+      </div>
     </section>
-  {{end}}
+    <section class="panel">
+      <div class="panel-head-actions">
+        <div class="panel-heading">
+          <h2>Stream instances</h2>
+          <p>View and manage all instances of this stream.</p>
+        </div>
+        <form method="post" action="{{ .WorkflowPath }}/process/start">
+          <button
+            class="primary"
+            type="submit"
+            {{ if .Error }}disabled{{ end }}
+          >
+            {{ template "icon-play" . }}
+            New instance
+          </button>
+        </form>
+      </div>
+      <hr style="margin-bottom: 20px;" />
+      {{ if .Error }}
+        <div class="panel-heading">
+          <h3>Stream configuration issue</h3>
+          <p>
+            This stream cannot start new processes until its organization and
+            role references are fixed.
+          </p>
+        </div>
+        <div class="error">{{ .Error }}</div>
+      {{ else }}
+        {{ if .Processes }}
+          <form
+            method="get"
+            action="{{ .WorkflowPath }}/"
+            class="process-toolbar"
+          >
+            <label class="process-control">
+              <span class="muted">
+                {{ template "icon-sort" . }}
+              </span>
+              <select id="sort" name="sort" onchange="this.form.submit()">
+                <option
+                  value="time_desc"
+                  {{ if eq .Sort "time_desc" }}selected{{ end }}
+                >
+                  Newest
+                </option>
+                <option
+                  value="time_asc"
+                  {{ if eq .Sort "time_asc" }}selected{{ end }}
+                >
+                  Oldest
+                </option>
+                <option
+                  value="progress_desc"
+                  {{ if eq .Sort "progress_desc" }}selected{{ end }}
+                >
+                  Most advanced
+                </option>
+                <option
+                  value="progress_asc"
+                  {{ if eq .Sort "progress_asc" }}selected{{ end }}
+                >
+                  Least advanced
+                </option>
+                <option
+                  value="status"
+                  {{ if eq .Sort "status" }}selected{{ end }}
+                >
+                  Status
+                </option>
+              </select>
+            </label>
+            <label class="process-control">
+              <span class="muted">
+                {{ template "icon-filter" . }}
+              </span>
+              <select id="filter" name="filter" onchange="this.form.submit()">
+                <option
+                  value="all"
+                  {{ if eq .StatusFilter "all" }}selected{{ end }}
+                >
+                  All
+                </option>
+                <option
+                  value="done"
+                  {{ if eq .StatusFilter "done" }}selected{{ end }}
+                >
+                  Done
+                </option>
+                <option
+                  value="active"
+                  {{ if eq .StatusFilter "active" }}selected{{ end }}
+                >
+                  Active
+                </option>
+              </select>
+            </label>
+          </form>
+          <ul class="process-list">
+            {{ range .Processes }}
+              <li class="process-item">
+                <div class="process-head">
+                  <a href="{{ $.WorkflowPath }}/process/{{ .ID }}">{{ .ID }}</a>
+                  <span
+                    class="status-tag status-tag-compact status-{{ .Status }}"
+                    >{{ .Status }}</span
+                  >
+                </div>
+                <div
+                  class="process-progress-line"
+                  role="progressbar"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="{{ .Percent }}"
+                >
+                  <div
+                    class="process-progress-fill"
+                    style="width: {{ .Percent }}%;"
+                  ></div>
+                </div>
+                <div class="process-meta">
+                  <span class="process-meta-primary"
+                    >{{ .DoneSubsteps }} / {{ .TotalSubsteps }} complete
+                    ({{ .Percent }}%)</span
+                  >
+                  <span>Created: {{ .CreatedAt }}</span>
+                  {{ if .LastNotarizedAt }}
+                    <span>Last notarized: {{ .LastNotarizedAt }}</span>
+                  {{ end }}
+                  {{ if .LastDigestShort }}
+                    <span class="pill">sha256 {{ .LastDigestShort }}</span>
+                  {{ end }}
+                </div>
+              </li>
+            {{ end }}
+          </ul>
+        {{ else }}
+          <div class="no-process-item">
+            <p class="muted">No stream instances yet</p>
+          </div>
+        {{ end }}
+      {{ end }}
+    </section>
+  </div>
+{{ end }}
 
-  <section class="panel">
-    <div class="process-toolbar">
-      <h2 style="margin: 0;">All streams</h2>
-      <form method="get" action="{{.WorkflowPath}}/" class="process-sort">
-        <label class="muted" for="sort" style="font-size: 13px;">Sort</label>
-        <select id="sort" name="sort" onchange="this.form.submit()">
-          <option value="time_desc" {{if eq .Sort "time_desc"}}selected{{end}}>Newest</option>
-          <option value="time_asc" {{if eq .Sort "time_asc"}}selected{{end}}>Oldest</option>
-          <option value="progress_desc" {{if eq .Sort "progress_desc"}}selected{{end}}>Most advanced</option>
-          <option value="progress_asc" {{if eq .Sort "progress_asc"}}selected{{end}}>Least advanced</option>
-          <option value="status" {{if eq .Sort "status"}}selected{{end}}>Status</option>
-        </select>
-      </form>
-    </div>
-
-    {{if .Processes}}
-      <ul class="process-list">
-        {{range .Processes}}
-          <li class="process-item">
-            <div class="process-head">
-              <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
-            </div>
-            <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
-              <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
-            </div>
-            <div class="substep-meta" style="margin-top: 10px;">
-              <span>{{.DoneSubsteps}} / {{.TotalSubsteps}} ({{.Percent}}%)</span>
-              <span>Created: {{.CreatedAt}}</span>
-              {{if .LastNotarizedAt}}
-                <span>Last notarized: {{.LastNotarizedAt}}</span>
-              {{end}}
-              {{if .LastDigestShort}}
-                <span class="pill">sha256 {{.LastDigestShort}}</span>
-              {{end}}
-            </div>
-          </li>
-        {{end}}
-      </ul>
-    {{else}}
-      <p class="muted" style="margin: 12px 0 0;">No streams yet.</p>
-    {{end}}
-  </section>
-
-  <section class="panel">
-    <h2 style="margin-top: 0;">History</h2>
-    {{if .History}}
-      <ul class="process-list">
-        {{range .History}}
-          <li class="process-item">
-            <div class="process-head">
-              <a href="{{$.WorkflowPath}}/process/{{.ID}}">{{.ID}}</a>
-              <span class="status-tag status-{{.Status}}">{{.Status}}</span>
-            </div>
-            <div class="process-progress-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}">
-              <div class="process-progress-fill" style="width: {{.Percent}}%;"></div>
-            </div>
-            <div class="substep-meta" style="margin-top: 10px;">
-              <span>{{.DoneSubsteps}} / {{.TotalSubsteps}} ({{.Percent}}%)</span>
-              <span>Created: {{.CreatedAt}}</span>
-              {{if .LastNotarizedAt}}
-                <span>Last notarized: {{.LastNotarizedAt}}</span>
-              {{end}}
-              {{if .LastDigestShort}}
-                <span class="pill">sha256 {{.LastDigestShort}}</span>
-              {{end}}
-            </div>
-          </li>
-        {{end}}
-      </ul>
-    {{else}}
-      <p class="muted" style="margin: 12px 0 0;">No finished streams yet.</p>
-    {{end}}
-  </section>
-</div>
-{{end}}
-
-{{define "home.html"}}
-  {{template "layout.html" .}}
-{{end}}
+{{ define "home.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

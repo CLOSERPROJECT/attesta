@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
+func TestHandleHomeListsProcesses(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
 
@@ -81,8 +81,8 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "PROC 2 HIST 1") {
-		t.Fatalf("expected processes and history counts, got %q", body)
+	if !strings.Contains(body, "PROC 2 SORT time_desc FILTER all") {
+		t.Fatalf("expected processes count and default controls, got %q", body)
 	}
 	if !strings.Contains(body, activeID.Hex()+":active:28") {
 		t.Fatalf("expected active process stats, got %q", body)
@@ -96,8 +96,70 @@ func TestHandleHomeListsProcessesAndHistory(t *testing.T) {
 	if !strings.Contains(body, "DESC Demo workflow description") {
 		t.Fatalf("expected workflow description, got %q", body)
 	}
-	if !strings.Contains(body, "HISTORY "+doneID.Hex()+":done") {
-		t.Fatalf("expected history to include only done process, got %q", body)
+}
+
+func TestHandleHomeFiltersProcessesByStatus(t *testing.T) {
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+
+	activeID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          activeID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-110 * time.Minute))},
+		},
+	})
+
+	doneID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          doneID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-70 * time.Minute))},
+			"1_2": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
+			"1_3": {State: "done", DoneAt: ptrTime(now.Add(-50 * time.Minute))},
+			"2_1": {State: "done", DoneAt: ptrTime(now.Add(-40 * time.Minute))},
+			"2_2": {State: "done", DoneAt: ptrTime(now.Add(-30 * time.Minute))},
+			"3_1": {State: "done", DoneAt: ptrTime(now.Add(-20 * time.Minute))},
+			"3_2": {State: "done", DoneAt: ptrTime(now.Add(-10 * time.Minute))},
+		},
+	})
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER done") {
+		t.Fatalf("expected done filter selection, got %q", body)
+	}
+	if !strings.Contains(body, doneID.Hex()+":done:100") {
+		t.Fatalf("expected done process in filtered list, got %q", body)
+	}
+	if strings.Contains(body, activeID.Hex()+":active") {
+		t.Fatalf("did not expect active process in done filter, got %q", body)
 	}
 }
 
@@ -151,8 +213,8 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `class="panel landing landing-wide"`) {
-		t.Fatalf("expected home picker section to include landing-wide class, got %q", body)
+	if !strings.Contains(body, `class="panel max-w-7xl mx-auto"`) {
+		t.Fatalf("expected home picker panel wrapper, got %q", body)
 	}
 	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
 		t.Fatalf("expected workflow card grid markup, got %q", body)
@@ -166,7 +228,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	if !strings.Contains(body, "Main workflow description") {
 		t.Fatalf("expected description content in cards, got %q", body)
 	}
-	if !strings.Contains(body, "Not started") || !strings.Contains(body, "Started") || !strings.Contains(body, "Terminated") {
+	if !strings.Contains(body, "Not started") || !strings.Contains(body, "In progress") || !strings.Contains(body, "Completed") {
 		t.Fatalf("expected status labels in cards, got %q", body)
 	}
 }
@@ -208,9 +270,6 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		body := rec.Body.String()
 		if !strings.Contains(body, `href="/org-admin/formata-builder"`) {
 			t.Fatalf("expected create stream card for org admin, got %q", body)
-		}
-		if !strings.Contains(body, "Click to create new stream") {
-			t.Fatalf("expected create stream card copy for org admin, got %q", body)
 		}
 		if !strings.Contains(body, "workflow-card-cta") || !strings.Contains(body, "Create new stream") {
 			t.Fatalf("expected create stream card cta for org admin, got %q", body)
@@ -308,14 +367,18 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 	if !strings.Contains(body, "Stream configuration issue") {
 		t.Fatalf("expected validation panel heading, got %q", body)
 	}
 	if !strings.Contains(body, "workflow references are invalid") {
 		t.Fatalf("expected validation error details, got %q", body)
 	}
-	if strings.Contains(body, `action="/w/workflow/process/start"`) {
-		t.Fatalf("did not expect new stream action for invalid workflow, got %q", body)
+	if !strings.Contains(body, `action="/w/workflow/process/start"`) {
+		t.Fatalf("expected new stream form to remain present, got %q", body)
+	}
+	if !strings.Contains(compactBody, `class="primary"`) || !strings.Contains(compactBody, `type="submit"`) || !strings.Contains(compactBody, `disabled`) || !strings.Contains(compactBody, `New instance`) {
+		t.Fatalf("expected new stream button to be disabled for invalid workflow, got %q", body)
 	}
 }
 
@@ -557,6 +620,18 @@ func TestNormalizeHomeSortKey(t *testing.T) {
 	}
 }
 
+func TestNormalizeHomeStatusFilter(t *testing.T) {
+	if got := normalizeHomeStatusFilter("done"); got != "done" {
+		t.Fatalf("expected done, got %q", got)
+	}
+	if got := normalizeHomeStatusFilter("ACTIVE"); got != "active" {
+		t.Fatalf("expected active, got %q", got)
+	}
+	if got := normalizeHomeStatusFilter("unknown"); got != "all" {
+		t.Fatalf("expected all for unknown, got %q", got)
+	}
+}
+
 func TestSortHomeProcessListByStatus(t *testing.T) {
 	items := []ProcessListItem{
 		{ID: "a", Status: "done", Percent: 100, CreatedAtTime: time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)},
@@ -647,13 +722,58 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 	})
 }
 
+func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	store := NewMemoryStore()
+	createdAt := time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)
+	doneAt := time.Date(2026, 2, 3, 11, 30, 0, 0, time.UTC)
+
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   createdAt,
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(doneAt), Data: map[string]interface{}{"note": "alpha"}},
+		},
+	})
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       tmpl,
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Created: 3 Feb 2026 at 10:00 UTC") {
+		t.Fatalf("expected human readable created date, got %q", body)
+	}
+	if !strings.Contains(body, "Last notarized: 3 Feb 2026 at 11:30 UTC") {
+		t.Fatalf("expected human readable last notarized date, got %q", body)
+	}
+}
+
 func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
-PROC {{len .Processes}} HIST {{len .History}} SORT {{.Sort}} DESC {{.WorkflowDescription}}
+PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} DESC {{.WorkflowDescription}}
 PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
-HISTORY {{range .History}}{{.ID}}:{{.Status}}|{{end}}
 {{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))

@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"errors"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"net/textproto"
 	"net/url"
 	"strings"
 	"testing"
@@ -137,68 +133,6 @@ func TestAttachmentMetaFromPayload(t *testing.T) {
 	}
 }
 
-func TestParseFilePayloadDetectsContentTypeWhenMissingHeader(t *testing.T) {
-	server := &Server{store: NewMemoryStore()}
-	processID := primitive.NewObjectID()
-	substep := WorkflowSub{SubstepID: "1.3", InputKey: "attachment", InputType: "file"}
-	now := time.Date(2026, 2, 4, 13, 0, 0, 0, time.UTC)
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	header := textproto.MIMEHeader{}
-	header.Set("Content-Disposition", `form-data; name="attachment"; filename="proof.txt"`)
-	part, err := writer.CreatePart(header)
-	if err != nil {
-		t.Fatalf("create part: %v", err)
-	}
-	if _, err := part.Write([]byte("hello")); err != nil {
-		t.Fatalf("write part: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart writer: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/complete", &body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	rec := httptest.NewRecorder()
-
-	payload, err := server.parseFilePayload(rec, req, processID, substep, now)
-	if err != nil {
-		t.Fatalf("parseFilePayload returned error: %v", err)
-	}
-	attachment, ok := readAttachmentPayload(payload, "attachment")
-	if !ok {
-		t.Fatalf("expected attachment payload, got %#v", payload)
-	}
-	if !strings.HasPrefix(attachment.ContentType, "text/plain") {
-		t.Fatalf("content-type = %q, want text/plain prefix", attachment.ContentType)
-	}
-	if attachment.Size != 5 {
-		t.Fatalf("size = %d, want 5", attachment.Size)
-	}
-}
-
-func TestParseFilePayloadRequiresSingleFile(t *testing.T) {
-	server := &Server{store: NewMemoryStore()}
-	processID := primitive.NewObjectID()
-	substep := WorkflowSub{SubstepID: "1.3", InputKey: "attachment", InputType: "file"}
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart writer: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/complete", &body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	rec := httptest.NewRecorder()
-
-	_, err := server.parseFilePayload(rec, req, processID, substep, time.Now().UTC())
-	if err != errFileRequired {
-		t.Fatalf("parseFilePayload error = %v, want errFileRequired", err)
-	}
-}
-
 func TestParseFormataPayloadStoresDataURLAttachment(t *testing.T) {
 	store := NewMemoryStore()
 	server := &Server{store: store}
@@ -280,65 +214,6 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 	if root["outcome"] != "accepted" {
 		t.Fatalf("outcome = %#v, want %q", root["outcome"], "accepted")
 	}
-}
-
-func TestParseFilePayloadAdditionalBranches(t *testing.T) {
-	t.Run("request too large", func(t *testing.T) {
-		t.Setenv("ATTACHMENT_MAX_BYTES", "4")
-		server := &Server{store: NewMemoryStore()}
-		processID := primitive.NewObjectID()
-		substep := WorkflowSub{SubstepID: "1.3", InputKey: "attachment", InputType: "file"}
-
-		var body bytes.Buffer
-		writer := multipart.NewWriter(&body)
-		part, err := writer.CreateFormFile("attachment", "proof.txt")
-		if err != nil {
-			t.Fatalf("CreateFormFile: %v", err)
-		}
-		if _, err := part.Write([]byte("hello world")); err != nil {
-			t.Fatalf("part.Write: %v", err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatalf("writer.Close: %v", err)
-		}
-
-		req := httptest.NewRequest(http.MethodPost, "/complete", &body)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-		rec := httptest.NewRecorder()
-
-		_, err = server.parseFilePayload(rec, req, processID, substep, time.Now().UTC())
-		if !errors.Is(err, ErrAttachmentTooLarge) {
-			t.Fatalf("parseFilePayload error = %v, want %v", err, ErrAttachmentTooLarge)
-		}
-	})
-
-	t.Run("save attachment error", func(t *testing.T) {
-		server := &Server{store: &failingSaveAttachmentStore{Store: NewMemoryStore(), err: errors.New("boom")}}
-		processID := primitive.NewObjectID()
-		substep := WorkflowSub{SubstepID: "1.3", InputKey: "attachment", InputType: "file"}
-
-		var body bytes.Buffer
-		writer := multipart.NewWriter(&body)
-		part, err := writer.CreateFormFile("attachment", "proof.txt")
-		if err != nil {
-			t.Fatalf("CreateFormFile: %v", err)
-		}
-		if _, err := part.Write([]byte("hello")); err != nil {
-			t.Fatalf("part.Write: %v", err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatalf("writer.Close: %v", err)
-		}
-
-		req := httptest.NewRequest(http.MethodPost, "/complete", &body)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-		rec := httptest.NewRecorder()
-
-		_, err = server.parseFilePayload(rec, req, processID, substep, time.Now().UTC())
-		if err == nil || !strings.Contains(err.Error(), "boom") {
-			t.Fatalf("parseFilePayload error = %v, want boom", err)
-		}
-	})
 }
 
 func TestParseFormataScalarPayloadDefaultsToEmptyObject(t *testing.T) {

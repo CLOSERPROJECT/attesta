@@ -284,6 +284,270 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			t.Fatalf("LoadFormataBuilderStreamByID error = %v, want mongo.ErrNoDocuments", err)
 		}
 	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		server := &Server{
+			store:       NewMemoryStore(),
+			identity:    workflowDeleteIdentity(now, "session-method", AccountUser{Email: "user@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}),
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodGet, "/delete", nil)
+		rec := httptest.NewRecorder()
+
+		server.handleDeleteWorkflow(rec, req)
+
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		}
+	})
+
+	t.Run("invalid stream id redirects with saved streams message", func(t *testing.T) {
+		user := AccountUser{Email: "user@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		server := &Server{
+			store:       NewMemoryStore(),
+			identity:    workflowDeleteIdentity(now, "session-invalid-id", user),
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/delete", nil).WithContext(context.WithValue(context.Background(), workflowContextKey{}, workflowContextValue{
+			Key: "demo-workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-invalid-id"})
+		rec := httptest.NewRecorder()
+
+		server.handleDeleteWorkflow(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if location := rec.Header().Get("Location"); !strings.Contains(location, "Only+saved+streams+can+be+deleted.") {
+			t.Fatalf("location = %q", location)
+		}
+	})
+
+	t.Run("missing stream redirects not found", func(t *testing.T) {
+		user := AccountUser{Email: "user@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		server := &Server{
+			store:       NewMemoryStore(),
+			identity:    workflowDeleteIdentity(now, "session-missing-stream", user),
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		missingID := primitive.NewObjectID()
+		req := httptest.NewRequest(http.MethodPost, "/delete", nil).WithContext(context.WithValue(context.Background(), workflowContextKey{}, workflowContextValue{
+			Key: missingID.Hex(),
+			Cfg: testRuntimeConfig(),
+		}))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-missing-stream"})
+		rec := httptest.NewRecorder()
+
+		server.handleDeleteWorkflow(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if location := rec.Header().Get("Location"); !strings.Contains(location, "error=Stream+not+found.") {
+			t.Fatalf("location = %q", location)
+		}
+	})
+
+	t.Run("missing store returns internal server error", func(t *testing.T) {
+		user := AccountUser{Email: "user@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		server := &Server{
+			identity:    workflowDeleteIdentity(now, "session-no-store", user),
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/delete", nil).WithContext(context.WithValue(context.Background(), workflowContextKey{}, workflowContextValue{
+			Key: primitive.NewObjectID().Hex(),
+			Cfg: testRuntimeConfig(),
+		}))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-no-store"})
+		rec := httptest.NewRecorder()
+
+		server.handleDeleteWorkflow(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("has processes error returns internal server error", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{IdentityUserID: "creator-user", Email: "creator@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Has process error"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		server := &Server{
+			store: &deleteWorkflowFailStore{
+				MemoryStore: store,
+				hasErr:      errors.New("boom"),
+			},
+			identity:    workflowDeleteIdentity(now, "session-has-err", user),
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-has-err"})
+		rec := httptest.NewRecorder()
+
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("missing authorizer returns bad gateway", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{IdentityUserID: "creator-user", Email: "creator@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("No authorizer"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		server := &Server{
+			store:       store,
+			identity:    workflowDeleteIdentity(now, "session-no-authorizer", user),
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-no-authorizer"})
+		rec := httptest.NewRecorder()
+
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
+		}
+	})
+
+	t.Run("delete workflow data failure returns internal server error", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "secret")
+
+		store := NewMemoryStore()
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Delete data error"),
+			CreatedByUserID: "someone-else",
+			UpdatedByUserID: "someone-else",
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: saved.ID.Hex(),
+			CreatedAt:   now,
+			Status:      "done",
+			Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
+		})
+		server := &Server{
+			store: &deleteWorkflowFailStore{
+				MemoryStore:   store,
+				deleteDataErr: errors.New("boom"),
+			},
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("non creator cannot delete stream without platform access", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{IdentityUserID: "other-user", Email: "other@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Protected stream"),
+			CreatedByUserID: "creator-user",
+			UpdatedByUserID: "creator-user",
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		server := &Server{
+			store:    store,
+			identity: workflowDeleteIdentity(now, "session-non-creator", user),
+			authorizer: fakeAuthorizer{deleteDecide: func(user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+				return false, nil
+			}},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-non-creator"})
+		rec := httptest.NewRecorder()
+
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if location := rec.Header().Get("Location"); !strings.Contains(location, "Only+the+stream+creator+or+a+platform+admin+can+delete+Protected+stream.") {
+			t.Fatalf("location = %q", location)
+		}
+	})
+
+	t.Run("delete stream failure returns internal server error", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{IdentityUserID: "creator-user", Email: "creator@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Delete stream error"),
+			CreatedByUserID: user.IdentityUserID,
+			UpdatedByUserID: user.IdentityUserID,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+		server := &Server{
+			store: &deleteWorkflowFailStore{
+				MemoryStore:     store,
+				deleteStreamErr: errors.New("boom"),
+			},
+			identity:    workflowDeleteIdentity(now, "session-delete-stream-err", user),
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-delete-stream-err"})
+		rec := httptest.NewRecorder()
+
+		server.handleWorkflowRoutes(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
 }
 
 func workflowStreamYAML(name string) string {
@@ -330,4 +594,32 @@ func workflowDeleteIdentity(now time.Time, sessionID string, user AccountUser) *
 		}, nil
 	}
 	return identity
+}
+
+type deleteWorkflowFailStore struct {
+	*MemoryStore
+	hasErr          error
+	deleteDataErr   error
+	deleteStreamErr error
+}
+
+func (s *deleteWorkflowFailStore) HasProcessesByWorkflow(ctx context.Context, workflowKey string) (bool, error) {
+	if s.hasErr != nil {
+		return false, s.hasErr
+	}
+	return s.MemoryStore.HasProcessesByWorkflow(ctx, workflowKey)
+}
+
+func (s *deleteWorkflowFailStore) DeleteWorkflowData(ctx context.Context, workflowKey string) error {
+	if s.deleteDataErr != nil {
+		return s.deleteDataErr
+	}
+	return s.MemoryStore.DeleteWorkflowData(ctx, workflowKey)
+}
+
+func (s *deleteWorkflowFailStore) DeleteFormataBuilderStream(ctx context.Context, id primitive.ObjectID) error {
+	if s.deleteStreamErr != nil {
+		return s.deleteStreamErr
+	}
+	return s.MemoryStore.DeleteFormataBuilderStream(ctx, id)
 }

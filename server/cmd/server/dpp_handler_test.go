@@ -132,11 +132,20 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "GTIN:") || !strings.Contains(body, "LOT:") || !strings.Contains(body, "SERIAL:") {
+	if !strings.Contains(body, "GTIN|") || !strings.Contains(body, "Lot|") || !strings.Contains(body, "Serial|") {
 		t.Fatalf("expected identifiers in body, got %q", body)
 	}
 	if !strings.Contains(body, "Merkle root:") {
 		t.Fatalf("expected merkle marker in body, got %q", body)
+	}
+	if !strings.Contains(body, "Organization 1") {
+		t.Fatalf("expected step organization in body, got %q", body)
+	}
+	if !strings.Contains(body, "5 Mar 2026 at 14:30 UTC") {
+		t.Fatalf("expected human-readable completion time in body, got %q", body)
+	}
+	if !strings.Contains(body, "Show details") {
+		t.Fatalf("expected show details button in body, got %q", body)
 	}
 	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(body, "<dd>1</dd>") {
 		t.Fatalf("expected inline traceability value in body, got %q", body)
@@ -203,13 +212,19 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 }
 
 func seedDPPProcess(store *MemoryStore) Process {
+	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
 	process := Process{
 		ID:          primitive.NewObjectID(),
 		WorkflowKey: "workflow",
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
-			"1_1": {State: "done", Data: map[string]interface{}{"value": float64(1)}},
+			"1_1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				DoneBy: &Actor{ID: "u1", Role: "dep1"},
+				Data:   map[string]interface{}{"value": float64(1)},
+			},
 		},
 		DPP: &ProcessDPP{
 			GTIN:        "09506000134352",

@@ -208,6 +208,7 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	var createFileContentType string
 	var createFileBody []byte
 	var deleteFilePath string
+	var deleteTeamPath string
 	var updateLabelsBody map[string]interface{}
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -271,6 +272,10 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 			_, _ = w.Write([]byte("PNG"))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/storage/buckets/org-assets/files/logo-1":
 			deleteFilePath = r.URL.Path
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/teams/fresh-org":
+			deleteTeamPath = r.URL.Path
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{}`))
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/storage/buckets/org-assets/files/"):
@@ -406,6 +411,13 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	}
 	if updateNameSessionHeader != "" {
 		t.Fatalf("update admin team session header = %q, want empty", updateNameSessionHeader)
+	}
+
+	if err := identity.DeleteOrganizationAsAdmin(context.Background(), "fresh-org"); err != nil {
+		t.Fatalf("DeleteOrganizationAsAdmin error: %v", err)
+	}
+	if deleteTeamPath != "/v1/teams/fresh-org" {
+		t.Fatalf("delete team path = %q", deleteTeamPath)
 	}
 }
 

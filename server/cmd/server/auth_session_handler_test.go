@@ -13,6 +13,18 @@ import (
 	"time"
 )
 
+type loginStatusError struct {
+	status int
+}
+
+func (e loginStatusError) Error() string {
+	return "login status error"
+}
+
+func (e loginStatusError) GetStatusCode() int {
+	return e.status
+}
+
 func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 	server := &Server{
 		store:       NewMemoryStore(),
@@ -231,6 +243,22 @@ func TestHandleLoginPageShowsSignupWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestHandleLoginPageShowsNoticeConfirmation(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{tmpl: tmpl}
+
+	req := httptest.NewRequest(http.MethodGet, "/login?notice=password_reset_success", nil)
+	rec := httptest.NewRecorder()
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "Password reset successfully. Now you can enter with your new credentials.") {
+		t.Fatalf("expected notice confirmation, got %q", rec.Body.String())
+	}
+}
+
 func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 	server := &Server{
@@ -287,6 +315,34 @@ func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
 	}
 	if !strings.Contains(rec.Body.String(), "Invalid email or password.") {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestHandleLoginBadRequestIdentityErrorRendersFormError(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{
+		identity: &fakeIdentityStore{
+			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+				return IdentitySession{}, loginStatusError{status: http.StatusBadRequest}
+			},
+		},
+		tmpl: tmpl,
+		now:  time.Now,
+	}
+	form := url.Values{}
+	form.Set("email", "u1@example.com")
+	form.Set("password", "short")
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleLogin(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if !strings.Contains(rec.Body.String(), `<p class="error">Invalid email or password.</p>`) {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }

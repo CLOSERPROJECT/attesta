@@ -509,6 +509,18 @@ func (a *appwriteIdentity) UpdateOrganizationAsAdmin(ctx context.Context, curren
 	return a.updateOrganizationWithClient(ctx, a.adminClient, currentSlug, name, logoFileID, roles)
 }
 
+func (a *appwriteIdentity) DeleteOrganizationAsAdmin(ctx context.Context, orgSlug string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return err
+	}
+	_, err = teams.New(a.adminClient).Delete(strings.TrimSpace(org.ID))
+	return normalizeIdentityError(err)
+}
+
 func (a *appwriteIdentity) UpdateOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
 	if err := ctx.Err(); err != nil {
 		return IdentityMembership{}, err

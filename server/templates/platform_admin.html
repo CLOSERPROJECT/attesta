@@ -1,56 +1,525 @@
 {{/* Used on /admin/orgs to render platform administration page */}}
 
-{{define "platform_admin_body"}}
+{{ define "platform_admin_body" }}
 
-<div class="stack">
-  <section class="hero">
-    <button class="secondary" onclick="location.href='/'">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon-svg icon-svg-md" viewBox="0 0 16 16">
-        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
-      </svg>
-      Back
-    </button>
-    <div class="hero-center">
-      <h1 class="hero-title">Platform admin dashboard</h1>
-      <p class="hero-description">Create and manage organizations</p>
+  <div class="stack max-w-7xl mx-auto">
+    <section class="hero">
+      <button class="secondary" onclick="location.href='/'">
+        {{ template "icon-back" . }}
+        Back
+      </button>
+      <div class="hero-body">
+        <h1>Platform admin dashboard</h1>
+        <p>Create and manage organizations</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head-actions">
+        <div class="panel-heading">
+          <h2>Organizations</h2>
+        </div>
+        <button
+          class="primary"
+          type="button"
+          onclick="document.getElementById('create-org-dialog').showModal()"
+        >
+          {{ template "icon-plus" . }}
+          Add organization
+        </button>
+      </div>
+
+      <form
+        method="get"
+        action="/admin/orgs"
+        class="platform-admin-search"
+        id="platform-admin-search"
+      >
+        <input type="hidden" name="page" value="1" />
+        <label
+          class="platform-admin-search-field"
+          for="platform-admin-search-input"
+        >
+          {{ template "icon-search" . }}
+          <input
+            id="platform-admin-search-input"
+            type="search"
+            name="q"
+            value="{{ .SearchQuery }}"
+            placeholder="Search organizations by name"
+            autocomplete="off"
+            hx-get="/admin/orgs"
+            hx-target="#platform-admin-results"
+            hx-select="#platform-admin-results"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+            hx-include="#platform-admin-search"
+            hx-trigger="input changed delay:200ms, search"
+          />
+        </label>
+      </form>
+
+      {{ template "platform_admin_results" . }}
+    </section>
+  </div>
+
+  <dialog id="create-org-dialog" class="manage-dialog">
+    <div class="manage-dialog-card">
+      <header class="manage-dialog-head">
+        <div>
+          <h3 class="manage-dialog-title">New organization</h3>
+          <p class="manage-dialog-subtitle">
+            Add a new organization to the platform.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="secondary secondary-small"
+          onclick="document.getElementById('create-org-dialog').close()"
+        >
+          {{ template "icon-close" . }}
+        </button>
+      </header>
+      <form
+        method="post"
+        action="/admin/orgs"
+        class="input-form"
+        enctype="multipart/form-data"
+      >
+        <input type="hidden" name="intent" value="create_org" />
+        <input type="hidden" name="q" value="{{ .SearchQuery }}" />
+        <input type="hidden" name="page" value="{{ .CurrentPage }}" />
+        <div class="form-field">
+          <label for="org-name">Organization name *</label>
+          <input
+            id="org-name"
+            name="name"
+            type="text"
+            value="{{ if eq .OrganizationDialogAction "create" }}
+              {{ .OrganizationDialogName }}
+            {{ end }}"
+            required
+          />
+        </div>
+        <div class="form-field">
+          <label for="org-logo">Organization logo</label>
+          <input
+            id="org-logo"
+            name="logo"
+            type="file"
+            accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+          />
+        </div>
+        <div class="form-field">
+          <label for="org-admin-email">Organization admin email</label>
+          <input
+            id="org-admin-email"
+            name="invite_email"
+            type="email"
+            value="{{ if eq .OrganizationDialogAction "create" }}
+              {{ .InviteDialogEmail }}
+            {{ end }}"
+          />
+          <small class="muted">
+            Invite the first org admin now, or add more org admins later from
+            the organization invite action.
+          </small>
+        </div>
+        {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}
+          <p class="error">{{ .OrganizationError }}</p>
+        {{ end }}
+        <div class="form-actions form-actions-end">
+          <button class="primary" type="submit">Create organization</button>
+        </div>
+      </form>
     </div>
-  </section>
+  </dialog>
 
-  <section class="panel">
-    <h2>New organization</h2>
-    <p class="muted">Add a new organization to the platform</p>
-    <form method="post" action="/admin/orgs" class="input-form" enctype="multipart/form-data">
-      <label for="org-name">Organization name</label>
-      <input id="org-name" name="name" type="text" required />
-      <label for="org-logo">Organization logo</label>
-      <input id="org-logo" name="logo" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
-      {{if .OrganizationError}}<p class="error">{{.OrganizationError}}</p>{{end}}
-      <button class="primary" type="submit">Create organization</button>
-    </form>
-  </section>
+<script>
+  (function () {
+    const createDialog = document.getElementById("create-org-dialog");
+    if (createDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "create")}}true{{else}}false{{end}} && !createDialog.open) {
+      createDialog.showModal();
+    }
+  })();
+</script>
+{{ end }}
 
-  <section class="panel">
-    <h2>Invite organization admin</h2>
-    <p class="muted">Invite an organization admin as an Appwrite team owner.</p>
-    <form method="post" action="/admin/orgs" class="input-form">
-      <input type="hidden" name="intent" value="invite_org_admin" />
-      <label for="org-admin-email">Org admin email</label>
-      <input id="org-admin-email" name="email" type="email" required />
-      <label for="org">Organization</label>
-      <select id="org" name="org_slug" required>
-        <option value="">Select organization</option>
-        {{range .Organizations}}
-          <option value="{{.Slug}}">{{.Name}}</option>
-        {{end}}
-      </select>
-      {{if .InviteError}}<p class="error">{{.InviteError}}</p>{{end}}
-      {{if .Confirmation}}<p class="muted">{{.Confirmation}}</p>{{end}}
-      <button class="primary" type="submit">Create org admin invite</button>
-    </form>
-  </section>
-</div>
-{{end}}
+{{ define "platform_admin_results" }}
+  <div id="platform-admin-results">
+    <p class="muted">
+      {{ .MatchedOrganizations }}
+      organization{{ if ne .MatchedOrganizations 1 }}s{{ end }} found.
+    </p>
+    {{ if and .Error (eq .OrganizationDialogAction "") }}
+      <p class="error">{{ .Error }}</p>
+    {{ end }}
+    {{ if .Organizations }}
+      <ul class="platform-admin-list">
+        {{ range .Organizations }}
+          <li class="platform-admin-item">
+            <div class="platform-admin-item-main">
+              {{ if .LogoAttachmentID }}
+                <img
+                  src="/admin/orgs/logo/{{ .LogoAttachmentID }}"
+                  alt="{{ .Name }} logo"
+                  class="org-profile-logo org-profile-logo-sm"
+                />
+              {{ else }}
+                <span
+                  class="org-profile-logo-placeholder org-profile-logo-placeholder-sm"
+                >
+                  {{ template "icon-no-org" . }}
+                </span>
+              {{ end }}
+              <div class="platform-admin-item-copy">
+                <p class="platform-admin-item-name">{{ .Name }}</p>
+                <p
+                  class="platform-admin-item-status platform-admin-item-status-{{ .OrgAdminStatusClassName }}"
+                >
+                  {{ .OrgAdminStatus }}
+                </p>
+              </div>
+            </div>
+            <div class="user-actions">
+              <button
+                type="button"
+                class="platform-admin-invite-button"
+                onclick="document.getElementById('invite-org-{{ .Slug }}').showModal()"
+              >
+                {{ template "icon-invite-org-admin" . }}
+              </button>
+              <button
+                type="button"
+                class="user-action-button"
+                aria-label="Edit organization"
+                onclick="document.getElementById('edit-org-{{ .Slug }}').showModal()"
+              >
+                {{ template "icon-settings" . }}
+              </button>
+              <button
+                type="button"
+                class="user-action-button user-action-button-danger"
+                aria-label="Delete organization"
+                onclick="document.getElementById('delete-org-{{ .Slug }}').showModal()"
+              >
+                {{ template "icon-trash" . }}
+              </button>
+            </div>
 
-{{define "platform_admin.html"}}
-  {{template "layout.html" .}}
-{{end}}
+            <dialog id="invite-org-{{ .Slug }}" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">
+                      Invite organization admin
+                    </h3>
+                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="secondary secondary-small"
+                    onclick="document.getElementById('invite-org-{{ .Slug }}').close()"
+                  >
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+                <form method="post" action="/admin/orgs" class="input-form">
+                  <input type="hidden" name="intent" value="invite_org_admin" />
+                  <input type="hidden" name="org_slug" value="{{ .Slug }}" />
+                  <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                  <input
+                    type="hidden"
+                    name="page"
+                    value="{{ $.CurrentPage }}"
+                  />
+                  <div class="form-field">
+                    <label for="invite-email-{{ .Slug }}"
+                      >Org admin email</label
+                    >
+                    <input
+                      id="invite-email-{{ .Slug }}"
+                      name="email"
+                      type="email"
+                      value="{{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) }}
+                        {{ $.InviteDialogEmail }}
+                      {{ end }}"
+                      required
+                    />
+                  </div>
+                  {{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) $.InviteError }}
+                    <p class="error">{{ $.InviteError }}</p>
+                  {{ end }}
+                  <div class="form-actions form-actions-end">
+                    <button class="primary" type="submit">
+                      Create org admin invite
+                    </button>
+                  </div>
+                </form>
+                <hr style="margin: 20px 0;" />
+                <div class="platform-admin-admin-summary">
+                  <div>
+                    <h4 class="muted" style="margin-bottom: 10px;">
+                      Current org admins
+                    </h4>
+                    {{ if .OrgAdminEmails }}
+                      <ul class="platform-admin-admin-list">
+                        {{ range .OrgAdminEmails }}
+                          <li>{{ . }}</li>
+                        {{ end }}
+                      </ul>
+                    {{ else }}
+                      <p style="font-size: 13px; margin: 0;">
+                        No accepted org admins yet.
+                      </p>
+                    {{ end }}
+                  </div>
+                  <div>
+                    <h4 class="muted" style="margin-bottom: 10px;">
+                      Pending invites
+                    </h4>
+                    {{ if .PendingOrgAdminEmails }}
+                      <ul class="platform-admin-admin-list">
+                        {{ range .PendingOrgAdminEmails }}
+                          <li>{{ . }}</li>
+                        {{ end }}
+                      </ul>
+                    {{ else }}
+                      <p style="font-size: 13px; margin: 0;">
+                        No pending org admin invites.
+                      </p>
+                    {{ end }}
+                  </div>
+                </div>
+              </div>
+            </dialog>
+
+            <dialog id="edit-org-{{ .Slug }}" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">Edit organization</h3>
+                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="secondary secondary-small"
+                    onclick="document.getElementById('edit-org-{{ .Slug }}').close()"
+                  >
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+                <form
+                  method="post"
+                  action="/admin/orgs"
+                  class="input-form"
+                  enctype="multipart/form-data"
+                >
+                  <input type="hidden" name="intent" value="set_org" />
+                  <input type="hidden" name="org_slug" value="{{ .Slug }}" />
+                  <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                  <input
+                    type="hidden"
+                    name="page"
+                    value="{{ $.CurrentPage }}"
+                  />
+                  <div class="form-field">
+                    <label for="edit-org-name-{{ .Slug }}"
+                      >Organization name</label
+                    >
+                    <input
+                      id="edit-org-name-{{ .Slug }}"
+                      name="name"
+                      type="text"
+                      {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationDialogName }}
+                        value="{{ $.OrganizationDialogName }}"
+                      {{ else }}
+                        value="{{ .Name }}"
+                      {{ end }}
+                      required
+                    />
+                  </div>
+                  <div class="form-field">
+                    <label for="edit-org-logo-{{ .Slug }}"
+                      >Organization logo</label
+                    >
+                    <input
+                      id="edit-org-logo-{{ .Slug }}"
+                      name="logo"
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+                    />
+                  </div>
+                  {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError }}
+                    <p class="error">{{ $.OrganizationError }}</p>
+                  {{ end }}
+                  <div class="form-actions form-actions-end">
+                    <button class="primary" type="submit">
+                      Save organization
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+
+            <dialog id="delete-org-{{ .Slug }}" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title manage-dialog-danger-title">
+                      Danger zone - Delete organization
+                    </h3>
+                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="secondary secondary-small"
+                    onclick="document.getElementById('delete-org-{{ .Slug }}').close()"
+                  >
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+                <p style="margin: 0 0 20px;">
+                  This will permanently remove the organization and its
+                  memberships. Confirm only if you want to continue.
+                </p>
+                {{ if and (eq $.OrganizationDialogAction "delete") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError }}
+                  <p class="error">{{ $.OrganizationError }}</p>
+                {{ end }}
+                <form method="post" action="/admin/orgs" class="input-form">
+                  <input type="hidden" name="intent" value="delete_org" />
+                  <input type="hidden" name="org_slug" value="{{ .Slug }}" />
+                  <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                  <input
+                    type="hidden"
+                    name="page"
+                    value="{{ $.CurrentPage }}"
+                  />
+                  <div class="form-actions form-actions-end">
+                    <button type="submit" class="danger">
+                      Delete organization
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+          </li>
+        {{ end }}
+      </ul>
+    {{ else }}
+      <p class="muted">No organizations match your search.</p>
+    {{ end }}
+
+    {{ if gt .TotalPages 1 }}
+      <nav
+        class="platform-admin-pagination"
+        aria-label="Organizations pagination"
+      >
+        <div class="platform-admin-pagination-pages">
+          <a
+            class="secondary"
+            style="padding: 10px 8px; {{ if not .HasPreviousPage }}
+              pointer-events: none; opacity: 0.5;
+            {{ end }}"
+            href="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
+                  &
+                {{- end -}}
+              {{- end -}}{{- if gt .PreviousPage 1 -}}
+                page={{ .PreviousPage }}
+              {{- end -}}
+            {{- end -}}"
+            hx-get="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
+                  &
+                {{- end -}}
+              {{- end -}}{{- if gt .PreviousPage 1 -}}
+                page={{ .PreviousPage }}
+              {{- end -}}
+            {{- end -}}"
+            hx-target="#platform-admin-results"
+            hx-select="#platform-admin-results"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+            {{ template "icon-chevron-left" . }}
+          </a>
+          {{ range .PageNumbers }}
+            <a
+              class="{{ if eq . $.CurrentPage }}
+                primary
+              {{ else }}
+                secondary
+              {{ end }}"
+              href="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
+                ?{{- if $.SearchQuery -}}
+                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+              {{- end -}}"
+              hx-get="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
+                ?{{- if $.SearchQuery -}}
+                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+              {{- end -}}"
+              hx-target="#platform-admin-results"
+              hx-select="#platform-admin-results"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              >{{ . }}</a
+            >
+          {{ end }}
+          <a
+            class="secondary"
+            style="padding: 10px 8px; {{ if not .HasNextPage }}
+              pointer-events: none; opacity: 0.5;
+            {{ end }}"
+            href="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                  &
+                {{ end }}
+              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+            {{- end -}}"
+            hx-get="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
+              ?{{- if .SearchQuery -}}
+                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                  &
+                {{ end }}
+              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+            {{- end -}}"
+            hx-target="#platform-admin-results"
+            hx-select="#platform-admin-results"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+            {{ template "icon-chevron-right" . }}
+          </a>
+        </div>
+      </nav>
+    {{ end }}
+  </div>
+<script>
+  (function () {
+    const inviteDialog = document.getElementById("invite-org-{{.OrganizationDialogSlug}}");
+    if (inviteDialog && {{if and .InviteError (eq .OrganizationDialogAction "invite") .OrganizationDialogSlug}}true{{else}}false{{end}} && !inviteDialog.open) {
+      inviteDialog.showModal();
+    }
+
+    const editDialog = document.getElementById("edit-org-{{.OrganizationDialogSlug}}");
+    if (editDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "edit") .OrganizationDialogSlug}}true{{else}}false{{end}} && !editDialog.open) {
+      editDialog.showModal();
+    }
+
+    const deleteDialog = document.getElementById("delete-org-{{.OrganizationDialogSlug}}");
+    if (deleteDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "delete") .OrganizationDialogSlug}}true{{else}}false{{end}} && !deleteDialog.open) {
+      deleteDialog.showModal();
+    }
+  })();
+</script>
+{{ end }}
+
+{{ define "platform_admin.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

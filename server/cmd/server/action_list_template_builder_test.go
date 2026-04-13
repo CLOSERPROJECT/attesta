@@ -14,18 +14,16 @@ func TestActionListTemplateLockedFormataBuilderHint(t *testing.T) {
 	view := ActionListView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
-		Actions: []ActionView{
-			{
-				ProcessID:  "process-1",
-				SubstepID:  "1.2",
-				Title:      "Formata",
-				InputKey:   "payload",
-				InputType:  "formata",
-				FormSchema: `{"type":"object"}`,
-				Status:     "locked",
-				Disabled:   true,
-				Reason:     "Locked by sequence",
-			},
+		Action: &ActionView{
+			ProcessID:  "process-1",
+			SubstepID:  "1.2",
+			Title:      "Formata",
+			InputKey:   "payload",
+			InputType:  "formata",
+			FormSchema: `{"type":"object"}`,
+			Status:     "locked",
+			Disabled:   true,
+			Reason:     "Locked by sequence",
 		},
 	}
 
@@ -33,9 +31,9 @@ func TestActionListTemplateLockedFormataBuilderHint(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&out, "action_list.html", view); err != nil {
 		t.Fatalf("render action list template: %v", err)
 	}
-	body := out.String()
+	body := strings.Join(strings.Fields(out.String()), " ")
 
-	if !strings.Contains(body, "Status: locked - Locked by sequence") {
+	if !strings.Contains(body, "locked- Locked by sequence") {
 		t.Fatalf("expected locked helper text, got body: %s", body)
 	}
 }

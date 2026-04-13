@@ -56,6 +56,18 @@ func testRuntimeConfig() RuntimeConfig {
 	}
 }
 
+func testFormataRuntimeConfig() RuntimeConfig {
+	cfg := testRuntimeConfig()
+	for stepIndex := range cfg.Workflow.Steps {
+		for substepIndex := range cfg.Workflow.Steps[stepIndex].Substep {
+			substep := &cfg.Workflow.Steps[stepIndex].Substep[substepIndex]
+			substep.InputType = "formata"
+			substep.Schema = map[string]interface{}{"type": "object"}
+		}
+	}
+	return cfg
+}
+
 func testTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 	{{define "layout.html"}}
@@ -68,6 +80,7 @@ func testTemplates() *template.Template {
 	  {{else if eq .Body "home_body"}}{{template "home_body" .}}
 	  {{else if eq .Body "process_body"}}{{template "process_body" .}}
   {{else if eq .Body "dpp_body"}}{{template "dpp_body" .}}
+  {{else if eq .Body "about_body"}}{{template "about_body" .}}
   {{else if eq .Body "backoffice_picker_body"}}{{template "backoffice_picker_body" .}}
   {{else if eq .Body "backoffice_landing_body"}}{{template "backoffice_landing_body" .}}
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
@@ -77,6 +90,7 @@ func testTemplates() *template.Template {
 	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}
 	{{define "signup.html"}}{{template "layout.html" .}}{{end}}
 	{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.Confirmation}}{{if .Error}} {{.Error}}{{end}}{{end}}
+	{{define "platform_admin_results"}}PLATFORM_ADMIN_RESULTS ORGS {{len .Organizations}} {{.Confirmation}}{{if .Error}} {{.Error}}{{end}}{{end}}
 	{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 	{{define "home_body"}}HOME{{end}}
 	{{define "home.html"}}{{template "layout.html" .}}{{end}}
@@ -90,6 +104,8 @@ func testTemplates() *template.Template {
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
 {{define "dpp.html"}}{{template "layout.html" .}}{{end}}
+{{define "about_body"}}ABOUT{{end}}
+{{define "about.html"}}{{template "layout.html" .}}{{end}}
 {{define "timeline.html"}}TIMELINE {{range .}}{{.StepID}} {{end}}{{end}}
 {{define "backoffice_picker_body"}}BACKOFFICE_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "backoffice_landing_body"}}BACKOFFICE{{end}}

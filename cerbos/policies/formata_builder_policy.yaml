@@ -5,12 +5,12 @@ resourcePolicy:
   rules:
     - actions: ["view"]
       effect: EFFECT_ALLOW
-      roles: ["org_admin"]
+      roles:
+        - "org_admin"
+        - "platform_admin"
 
     - actions: ["save"]
       effect: EFFECT_ALLOW
-      roles: ["platform_admin"]
-
-    - actions: ["save"]
-      effect: EFFECT_ALLOW
-      roles: ["org_admin"]
+      roles:
+        - "org_admin"
+        - "platform_admin"

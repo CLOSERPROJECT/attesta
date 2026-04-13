@@ -15,7 +15,7 @@ import (
 func resetTemplates() *template.Template {
 	return template.Must(template.New("reset-test").Parse(`
 {{define "layout.html"}}{{if eq .Body "reset_request_body"}}{{template "reset_request_body" .}}{{else if eq .Body "reset_set_body"}}{{template "reset_set_body" .}}{{end}}{{end}}
-{{define "reset_request_body"}}RESET_REQUEST{{if .Confirmation}} {{.Confirmation}}{{end}}{{end}}
+{{define "reset_request_body"}}RESET_REQUEST{{if .Confirmation}} {{.Confirmation}}{{end}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "reset_request.html"}}{{template "layout.html" .}}{{end}}
 {{define "reset_set_body"}}RESET_SET{{if .Title}} {{.Title}}{{end}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "reset_set.html"}}{{template "layout.html" .}}{{end}}
@@ -51,8 +51,8 @@ func TestHandleResetRequestTriggersRecovery(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.handleResetRequest(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	if recoveryEmail != "user@example.com" {
 		t.Fatalf("recovery email = %q", recoveryEmail)
@@ -60,7 +60,25 @@ func TestHandleResetRequestTriggersRecovery(t *testing.T) {
 	if recoveryURL != "http://attesta.local/reset/confirm" {
 		t.Fatalf("recovery url = %q, want http://attesta.local/reset/confirm", recoveryURL)
 	}
-	if !strings.Contains(rec.Body.String(), "If the account exists") {
+	if rec.Header().Get("Location") != "/reset?notice=reset_request_sent" {
+		t.Fatalf("location = %q, want reset notice redirect", rec.Header().Get("Location"))
+	}
+}
+
+func TestHandleResetRequestGetShowsConfirmation(t *testing.T) {
+	server := &Server{
+		tmpl: resetTemplates(),
+		now:  time.Now,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/reset?notice=reset_request_sent", nil)
+	rec := httptest.NewRecorder()
+	server.handleResetRequest(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "If the account exists, a reset link has been sent.") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
@@ -264,7 +282,7 @@ func TestHandleResetConfirmCompletesRecovery(t *testing.T) {
 		now:  time.Now,
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough"))
+	req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	server.handleResetSet(rec, req)
@@ -272,8 +290,8 @@ func TestHandleResetConfirmCompletesRecovery(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/login" {
-		t.Fatalf("location = %q, want /login", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/login?notice=password_reset_success" {
+		t.Fatalf("location = %q, want login notice redirect", rec.Header().Get("Location"))
 	}
 	if completedUserID != "user-1" || completedSecret != "secret-1" || completedPassword != "this-is-strong-enough" {
 		t.Fatalf("completed = %q/%q/%q", completedUserID, completedSecret, completedPassword)
@@ -306,12 +324,23 @@ func TestHandleResetSetBranches(t *testing.T) {
 
 	t.Run("short password", func(t *testing.T) {
 		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
-		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=short"))
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=short&confirm_password=short"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		server.handleResetSet(rec, req)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("password mismatch", func(t *testing.T) {
+		server := &Server{identity: &fakeIdentityStore{}, tmpl: resetTemplates(), now: time.Now}
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=one&confirm_password=two"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "passwords do not match") {
+			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
 		}
 	})
 
@@ -335,7 +364,7 @@ func TestHandleResetSetBranches(t *testing.T) {
 			tmpl: resetTemplates(),
 			now:  time.Now,
 		}
-		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough"))
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		server.handleResetSet(rec, req)
@@ -399,7 +428,7 @@ func TestHandleResetRequestInvalidForm(t *testing.T) {
 }
 
 func TestHandleResetRequestAdditionalBranches(t *testing.T) {
-	t.Run("recovery failure still renders confirmation", func(t *testing.T) {
+	t.Run("recovery failure renders error", func(t *testing.T) {
 		server := &Server{
 			identity: &fakeIdentityStore{
 				createRecoveryFunc: func(ctx context.Context, email, redirectURL string) error {
@@ -415,10 +444,10 @@ func TestHandleResetRequestAdditionalBranches(t *testing.T) {
 
 		server.handleResetRequest(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
 		}
-		if !strings.Contains(rec.Body.String(), "If the account exists") {
+		if !strings.Contains(rec.Body.String(), "Unable to send reset email right now. Please try again.") {
 			t.Fatalf("body = %q", rec.Body.String())
 		}
 	})

@@ -23,7 +23,7 @@ func TestRenderActionListDoesNotFilterByCurrentActiveRole(t *testing.T) {
 		},
 	}
 	server := &Server{
-		tmpl: template.Must(template.New("test").Parse(`{{define "action_list.html"}}{{range .Actions}}{{.SubstepID}}|{{end}}{{end}}`)),
+		tmpl: template.Must(template.New("test").Parse(`{{define "action_list.html"}}{{with .Action}}{{.SubstepID}}|{{end}}{{end}}`)),
 		configProvider: func() (RuntimeConfig, error) {
 			return testRuntimeConfig(), nil
 		},
