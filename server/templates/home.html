@@ -17,6 +17,71 @@
       <div class="workflow-grid">
         {{ range .Workflows }}
           <div class="workflow-card-shell">
+            {{ if or .CanEdit .CanDelete }}
+              <div class="workflow-card-actions">
+                {{ if .CanEdit }}
+                  <a
+                    href="{{ .EditAction }}"
+                    class="workflow-card-action-link"
+                    aria-label="Edit {{ .Name }}"
+                    title="Edit {{ .Name }}"
+                  >
+                    {{ template "icon-pencil" . }}
+                  </a>
+                {{ end }}
+                {{ if .CanDelete }}
+                  <div class="workflow-card-delete">
+                    <button
+                      type="button"
+                      class="workflow-card-delete-button"
+                      aria-label="Delete {{ .Name }}"
+                      title="Delete {{ .Name }}"
+                      onclick="document.getElementById('delete-workflow-{{ .Key }}').showModal()"
+                    >
+                      {{ template "icon-trash" . }}
+                    </button>
+                  </div>
+                  <dialog id="delete-workflow-{{ .Key }}" class="manage-dialog">
+                    <div class="manage-dialog-card">
+                      <header class="manage-dialog-head">
+                        <div>
+                          <h3
+                            class="manage-dialog-title manage-dialog-danger-title"
+                          >
+                            Danger zone - Delete stream
+                          </h3>
+                          <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                        </div>
+                        <button
+                          type="button"
+                          class="secondary secondary-small"
+                          onclick="document.getElementById('delete-workflow-{{ .Key }}').close()"
+                        >
+                          {{ template "icon-close" . }}
+                        </button>
+                      </header>
+                      <p style="margin: 0 0 20px;">
+                        This will permanently delete the stream and its workflow
+                        data. Confirm only if you want to continue.
+                      </p>
+                      <form
+                        method="post"
+                        action="{{ .DeleteAction }}"
+                        class="input-form"
+                      >
+                        <div
+                          class="manage-dialog-actions manage-dialog-actions-end"
+                        >
+                          <button type="submit" class="danger">
+                            Delete stream
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </dialog>
+                {{ end }}
+              </div>
+            {{ end }}
             <a class="workflow-card" href="/w/{{ .Key }}/">
               <h2 class="workflow-card-title">{{ .Name }}</h2>
               <p
@@ -45,60 +110,6 @@
                 </table>
               </div>
             </a>
-            {{ if .CanDelete }}
-              <div class="workflow-card-delete">
-                <button
-                  type="button"
-                  class="workflow-card-delete-button"
-                  aria-label="Delete {{ .Name }}"
-                  title="Delete {{ .Name }}"
-                  onclick="document.getElementById('delete-workflow-{{ .Key }}').showModal()"
-                >
-                  {{ template "icon-trash" . }}
-                </button>
-              </div>
-              <dialog
-                id="delete-workflow-{{ .Key }}"
-                class="manage-dialog"
-              >
-                <div class="manage-dialog-card">
-                  <header class="manage-dialog-head">
-                    <div>
-                      <h3
-                        class="manage-dialog-title manage-dialog-danger-title"
-                      >
-                        Danger zone - Delete stream
-                      </h3>
-                      <p class="manage-dialog-subtitle">{{ .Name }}</p>
-                    </div>
-                    <button
-                      type="button"
-                      class="secondary secondary-small"
-                      onclick="document.getElementById('delete-workflow-{{ .Key }}').close()"
-                    >
-                      {{ template "icon-close" . }}
-                    </button>
-                  </header>
-                  <p style="margin: 0 0 20px;">
-                    This will permanently delete the stream and its workflow
-                    data. Confirm only if you want to continue.
-                  </p>
-                  <form
-                    method="post"
-                    action="{{ .DeleteAction }}"
-                    class="input-form"
-                  >
-                    <div
-                      class="manage-dialog-actions manage-dialog-actions-end"
-                    >
-                      <button type="submit" class="danger">
-                        Delete stream
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </dialog>
-            {{ end }}
           </div>
         {{ end }}
         {{ if .ShowCreateStreamCard }}

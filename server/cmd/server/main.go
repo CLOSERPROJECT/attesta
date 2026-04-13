@@ -339,6 +339,8 @@ type WorkflowOption struct {
 	Name         string
 	Description  string
 	Counts       WorkflowProcessCounts
+	CanEdit      bool
+	EditAction   string
 	CanDelete    bool
 	DeleteAction string
 }
@@ -1498,6 +1500,12 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 	if err != nil {
 		return nil, err
 	}
+	canEditSavedStreams := false
+	if user != nil {
+		if allowed, err := s.canViewFormataBuilder(ctx, user); err == nil {
+			canEditSavedStreams = allowed
+		}
+	}
 	streamsByKey := map[string]FormataBuilderStream{}
 	if s.store != nil {
 		streams, err := s.store.ListFormataBuilderStreams(ctx)
@@ -1520,6 +1528,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			Name:         cfg.Workflow.Name,
 			Description:  strings.TrimSpace(cfg.Workflow.Description),
 			Counts:       WorkflowProcessCounts{},
+			EditAction:   "/org-admin/formata-builder?stream=" + key,
 			DeleteAction: workflowPath(key) + "/delete",
 		}
 		if s.store == nil {
@@ -1533,6 +1542,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
 		stream, ok := streamsByKey[key]
 		if ok && s.authorizer != nil && user != nil {
+			option.CanEdit = canEditSavedStreams
 			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0)
 			if err == nil {
 				option.CanDelete = allowed

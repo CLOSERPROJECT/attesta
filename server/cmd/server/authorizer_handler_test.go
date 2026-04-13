@@ -187,7 +187,7 @@ func fakeCanAccessDecision(user *AccountUser, resourceKind, action string) bool 
 	case resourceKind == cerbosResourceCatalog && action == cerbosActionView:
 		return user.IsPlatformAdmin || userIsOrgAdmin(user)
 	case resourceKind == cerbosResourceFormataBuilder && action == cerbosActionView:
-		return userIsOrgAdmin(user)
+		return user.IsPlatformAdmin || userIsOrgAdmin(user)
 	case resourceKind == cerbosResourceFormataBuilder && action == cerbosActionSave:
 		return user.IsPlatformAdmin || userIsOrgAdmin(user)
 	case resourceKind == "stream" && action == cerbosActionPurge:

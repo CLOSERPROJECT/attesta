@@ -433,6 +433,9 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for creator, got %q", body)
 		}
+		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit button for creator, got %q", rec.Body.String())
+		}
 	})
 
 	t.Run("hidden for creator after process start", func(t *testing.T) {
@@ -486,6 +489,9 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("did not expect delete button for started stream, got %q", body)
 		}
+		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit button for started stream, got %q", rec.Body.String())
+		}
 	})
 
 	t.Run("visible for platform admin even with processes", func(t *testing.T) {
@@ -537,6 +543,51 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		}
 		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for platform admin, got %q", body)
+		}
+		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit button for platform admin, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("hidden for user without builder access", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{
+			ID:             primitive.NewObjectID(),
+			IdentityUserID: "member-home-user",
+			Email:          "member-home@example.com",
+			RoleSlugs:      []string{"inspector"},
+			Status:         "active",
+		}
+		sessionID := "session-home-member"
+		stream, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Member hidden"),
+			CreatedByUserID: "creator-user",
+			UpdatedByUserID: "creator-user",
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+
+		server := &Server{
+			store:       store,
+			identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
+			tmpl:        tmpl,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("did not expect edit button without builder access, got %q", rec.Body.String())
 		}
 	})
 }
