@@ -15,21 +15,14 @@ type publicCatalogIdentity struct {
 	failListOrganizations bool
 }
 
-type failingCatalogStore struct {
-	*MemoryStore
-	err error
-}
-
 func (s *publicCatalogIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg, error) {
 	if s.failListOrganizations {
-		return nil, errors.New("list organizations failed")
+		return nil, errCatalogListOrganizations
 	}
 	return s.fakeIdentityStore.ListOrganizations(ctx)
 }
 
-func (s *failingCatalogStore) LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error) {
-	return nil, s.err
-}
+var errCatalogListOrganizations = errors.New("list organizations failed")
 
 func catalogServer(now time.Time, identity *publicCatalogIdentity) *Server {
 	return &Server{
@@ -83,15 +76,7 @@ func TestHandlePublicCatalog(t *testing.T) {
 		}, nil
 	}
 
-	store := NewMemoryStore()
-	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
-		Stream:    `{"stream":"from-db"}`,
-		UpdatedAt: now,
-	}); err != nil {
-		t.Fatalf("SaveFormataBuilderStream: %v", err)
-	}
 	server := catalogServer(now, identity)
-	server.store = store
 
 	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -113,9 +98,6 @@ func TestHandlePublicCatalog(t *testing.T) {
 		if role.Slug == "org-admin" {
 			t.Fatalf("unexpected org-admin role in response: %#v", role)
 		}
-	}
-	if got.Stream != `{"stream":"from-db"}` {
-		t.Fatalf("stream = %q", got.Stream)
 	}
 }
 
@@ -184,33 +166,4 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 		}
 	})
 
-	t.Run("load stream", func(t *testing.T) {
-		identity := catalogAuthIdentity(now, true)
-		identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }
-		server := catalogServer(now, identity)
-		server.store = &failingCatalogStore{MemoryStore: NewMemoryStore(), err: errors.New("boom")}
-		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
-		rec := httptest.NewRecorder()
-		server.handlePublicCatalog(rec, req)
-		if rec.Code != http.StatusInternalServerError {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
-		}
-	})
-
-	t.Run("not configured", func(t *testing.T) {
-		server := &Server{
-			authorizer:  fakeAuthorizer{},
-			identity:    catalogAuthIdentity(now, true),
-			enforceAuth: true,
-			now:         func() time.Time { return now },
-		}
-		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
-		rec := httptest.NewRecorder()
-		server.handlePublicCatalog(rec, req)
-		if rec.Code != http.StatusInternalServerError {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
-		}
-	})
 }

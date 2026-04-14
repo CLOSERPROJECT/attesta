@@ -356,7 +356,6 @@ type WorkflowProcessCounts struct {
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
-	Stream        string                      `json:"stream,omitempty"`
 }
 
 type PublicCatalogOrganization struct {
@@ -1953,7 +1952,7 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireCatalogAccessAPI(w, r); !ok {
 		return
 	}
-	if s == nil || s.identity == nil || s.store == nil {
+	if s == nil || s.identity == nil {
 		http.Error(w, "catalog not configured", http.StatusInternalServerError)
 		return
 	}
@@ -1991,16 +1990,6 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	stream, streamErr := s.store.LoadFormataBuilderStream(r.Context())
-	switch {
-	case streamErr == nil && stream != nil:
-		response.Stream = stream.Stream
-	case streamErr == nil || errors.Is(streamErr, mongo.ErrNoDocuments):
-	default:
-		http.Error(w, "failed to load stream", http.StatusInternalServerError)
-		return
-	}
-
 	sort.Slice(response.Organizations, func(i, j int) bool {
 		if response.Organizations[i].Name == response.Organizations[j].Name {
 			return response.Organizations[i].Slug < response.Organizations[j].Slug
