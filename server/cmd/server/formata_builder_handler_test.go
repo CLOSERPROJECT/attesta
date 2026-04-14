@@ -451,6 +451,69 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		}
 	})
 
+	t.Run("new=true creates new stream instead of rewriting existing one", func(t *testing.T) {
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Template stream"),
+			CreatedByUserID: formataStreamUserID(&orgAdmin),
+			UpdatedByUserID: formataStreamUserID(&orgAdmin),
+			UpdatedAt:       time.Now().UTC().Add(-time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream error: %v", err)
+		}
+		store.SeedProcess(Process{
+			ID:          primitive.NewObjectID(),
+			WorkflowKey: saved.ID.Hex(),
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress:    map[string]ProcessStep{},
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex()+"&new=true", strings.NewReader(workflowStreamYAML("Cloned stream")))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminFormataBuilder(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+		}
+
+		original, err := store.LoadFormataBuilderStreamByID(t.Context(), saved.ID)
+		if err != nil {
+			t.Fatalf("LoadFormataBuilderStreamByID error: %v", err)
+		}
+		if !strings.Contains(original.Stream, "Template stream") {
+			t.Fatalf("original stream = %q, want unchanged yaml", original.Stream)
+		}
+
+		streams, err := store.ListFormataBuilderStreams(t.Context())
+		if err != nil {
+			t.Fatalf("ListFormataBuilderStreams error: %v", err)
+		}
+		if len(streams) < 2 {
+			t.Fatalf("stream count = %d, want at least 2", len(streams))
+		}
+
+		var created *FormataBuilderStream
+		for i := range streams {
+			if streams[i].ID == saved.ID {
+				continue
+			}
+			if strings.Contains(streams[i].Stream, "Cloned stream") {
+				created = &streams[i]
+				break
+			}
+		}
+		if created == nil {
+			t.Fatalf("did not find created stream in %#v", streams)
+		}
+		if created.CreatedByUserID != formataStreamUserID(&orgAdmin) {
+			t.Fatalf("createdByUserID = %q, want %q", created.CreatedByUserID, formataStreamUserID(&orgAdmin))
+		}
+		if created.ID == saved.ID {
+			t.Fatal("expected created stream to have a new id")
+		}
+	})
+
 	t.Run("rewrite fails when stream has started instances", func(t *testing.T) {
 		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
 			Stream:          workflowStreamYAML("Stale stream"),

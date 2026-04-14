@@ -103,7 +103,8 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 		}
 
 		streamIDValue := strings.TrimSpace(r.URL.Query().Get("stream"))
-		if streamIDValue == "" {
+		createNew := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("new")), "true")
+		if streamIDValue == "" || createNew {
 			if _, err := s.store.SaveFormataBuilderStream(r.Context(), FormataBuilderStream{
 				Stream:          stream,
 				UpdatedAt:       s.nowUTC(),
