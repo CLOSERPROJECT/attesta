@@ -75,6 +75,85 @@ func TestMongoStoreSaveFormataBuilderStreamErrors(t *testing.T) {
 	})
 }
 
+func TestMongoStoreUpdateFormataBuilderStream(t *testing.T) {
+	streamID := primitive.NewObjectID()
+	updatedAt := time.Date(2026, 3, 6, 10, 30, 0, 0, time.UTC)
+	collection := &fakeMongoCollection{
+		updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+			return &mongo.UpdateResult{MatchedCount: 1, ModifiedCount: 1}, nil
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
+	store := &MongoStore{dbPort: db}
+
+	saved, err := store.UpdateFormataBuilderStream(t.Context(), FormataBuilderStream{
+		ID:              streamID,
+		Stream:          "stream-v2",
+		UpdatedAt:       updatedAt,
+		CreatedByUserID: "creator-2",
+		UpdatedByUserID: "updater-2",
+	})
+	if err != nil {
+		t.Fatalf("UpdateFormataBuilderStream error: %v", err)
+	}
+	if saved.ID != streamID {
+		t.Fatalf("saved id = %s, want %s", saved.ID.Hex(), streamID.Hex())
+	}
+	if len(collection.updateOneFilters) != 1 || !reflect.DeepEqual(collection.updateOneFilters[0], bson.M{"_id": streamID}) {
+		t.Fatalf("updateOne filter = %#v, want stream id filter", collection.updateOneFilters)
+	}
+	if len(collection.updateOneUpdates) != 1 {
+		t.Fatalf("expected one update call, got %d", len(collection.updateOneUpdates))
+	}
+	updateDoc, ok := collection.updateOneUpdates[0].(bson.M)
+	if !ok {
+		t.Fatalf("update document type = %T, want bson.M", collection.updateOneUpdates[0])
+	}
+	setDoc, ok := updateDoc["$set"].(bson.M)
+	if !ok {
+		t.Fatalf("update $set type = %T, want bson.M", updateDoc["$set"])
+	}
+	if setDoc["stream"] != "stream-v2" {
+		t.Fatalf("updated stream = %#v, want %q", setDoc["stream"], "stream-v2")
+	}
+}
+
+func TestMongoStoreUpdateFormataBuilderStreamErrors(t *testing.T) {
+	t.Run("update failure", func(t *testing.T) {
+		updateErr := errors.New("update failed")
+		collection := &fakeMongoCollection{
+			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+				return nil, updateErr
+			},
+		}
+		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
+		store := &MongoStore{dbPort: db}
+		if _, err := store.UpdateFormataBuilderStream(t.Context(), FormataBuilderStream{ID: primitive.NewObjectID(), Stream: "x"}); !errors.Is(err, updateErr) {
+			t.Fatalf("UpdateFormataBuilderStream error = %v, want %v", err, updateErr)
+		}
+	})
+
+	t.Run("missing stream id", func(t *testing.T) {
+		store := &MongoStore{dbPort: &fakeMongoDatabase{}}
+		if _, err := store.UpdateFormataBuilderStream(t.Context(), FormataBuilderStream{Stream: "x"}); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("UpdateFormataBuilderStream error = %v, want mongo.ErrNoDocuments", err)
+		}
+	})
+
+	t.Run("stream not found", func(t *testing.T) {
+		collection := &fakeMongoCollection{
+			updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+				return &mongo.UpdateResult{}, nil
+			},
+		}
+		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{collectionFormataStream: collection}}
+		store := &MongoStore{dbPort: db}
+		if _, err := store.UpdateFormataBuilderStream(t.Context(), FormataBuilderStream{ID: primitive.NewObjectID(), Stream: "x"}); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("UpdateFormataBuilderStream error = %v, want mongo.ErrNoDocuments", err)
+		}
+	})
+}
+
 func TestMongoStoreLoadFormataBuilderStream(t *testing.T) {
 	want := FormataBuilderStream{
 		ID:              primitive.NewObjectID(),

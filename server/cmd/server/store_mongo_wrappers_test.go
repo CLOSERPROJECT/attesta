@@ -65,10 +65,19 @@ func TestMongoDriverAdaptersExecuteWrapperMethods(t *testing.T) {
 		_, _ = (mongoDriverCollection{}).UpdateOne(context.Background(), bson.M{}, bson.M{})
 	})
 	runAndRecover(func() {
+		_, _ = (mongoDriverCollection{}).DeleteOne(context.Background(), bson.M{})
+	})
+	runAndRecover(func() {
+		_, _ = (mongoDriverCollection{}).DeleteMany(context.Background(), bson.M{})
+	})
+	runAndRecover(func() {
 		_ = (mongoDriverCollection{}).FindOneAndUpdate(context.Background(), bson.M{}, bson.M{})
 	})
 	runAndRecover(func() {
 		_ = (mongoDriverCollection{}).CreateIndexes(context.Background(), []mongo.IndexModel{})
+	})
+	runAndRecover(func() {
+		_ = (mongoDriverCollection{}).DropIndex(context.Background(), "idx")
 	})
 
 	runAndRecover(func() {

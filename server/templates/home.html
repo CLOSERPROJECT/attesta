@@ -17,50 +17,143 @@
       <div class="workflow-grid">
         {{ range .Workflows }}
           <div class="workflow-card-shell">
-            <a class="workflow-card" href="/w/{{ .Key }}/">
-              <h2 class="workflow-card-title">{{ .Name }}</h2>
-              <p
-                class="workflow-card-description{{ if not .Description }}
-                  is-empty
-                {{ end }}"
-              >
-                {{ if .Description }}{{ .Description }}{{ else }}&nbsp;{{ end }}
-              </p>
-              <div
-                style="margin: auto 0 0; padding-top: 6px; border-top: 1px solid var(--border);"
-              >
-                <table class="workflow-card-stats">
-                  <tr>
-                    <th>Not started</th>
-                    <td>{{ .Counts.NotStarted }}</td>
-                  </tr>
-                  <tr>
-                    <th>In progress</th>
-                    <td>{{ .Counts.Started }}</td>
-                  </tr>
-                  <tr>
-                    <th>Completed</th>
-                    <td>{{ .Counts.Terminated }}</td>
-                  </tr>
-                </table>
+            <div class="workflow-card">
+              <div class="workflow-card-head">
+                <a class="workflow-card-title-link" href="/w/{{ .Key }}/">
+                  <h2 class="workflow-card-title">{{ .Name }}</h2>
+                </a>
+                {{ if .CanClone }}
+                  <details class="workflow-card-menu">
+                    <summary
+                      class="workflow-card-menu-trigger"
+                      aria-label="Open actions for {{ .Name }}"
+                      title="Open actions for {{ .Name }}"
+                    >
+                      {{ template "icon-ellipsis-vertical" . }}
+                    </summary>
+                    <div class="workflow-card-dropdown">
+                      <a
+                        href="{{ .EditAction }}&new=true"
+                        class="workflow-card-menu-item"
+                      >
+                        {{ template "icon-clone" . }} Clone
+                      </a>
+                      {{ if .CanEdit }}
+                        {{ if .EditRequiresPurge }}
+                          <button
+                            type="button"
+                            class="workflow-card-menu-item"
+                            onclick="document.getElementById('edit-workflow-{{ .Key }}').showModal()"
+                          >
+                            {{ template "icon-pencil" . }} Edit
+                          </button>
+                        {{ else }}
+                          <a
+                            href="{{ .EditAction }}"
+                            class="workflow-card-menu-item"
+                          >
+                            {{ template "icon-pencil" . }} Edit
+                          </a>
+                        {{ end }}
+                      {{ else }}
+                        <button
+                          type="button"
+                          class="workflow-card-menu-item workflow-card-menu-item-disabled"
+                          disabled
+                        >
+                          {{ template "icon-pencil" . }} Edit
+                        </button>
+                      {{ end }}
+                      {{ if .CanDelete }}
+                        <button
+                          type="button"
+                          class="workflow-card-menu-item workflow-card-menu-item-danger"
+                          onclick="document.getElementById('delete-workflow-{{ .Key }}').showModal()"
+                        >
+                          {{ template "icon-trash" . }} Delete
+                        </button>
+                      {{ else }}
+                        <button
+                          type="button"
+                          class="workflow-card-menu-item workflow-card-menu-item-danger workflow-card-menu-item-disabled"
+                          disabled
+                        >
+                          {{ template "icon-trash" . }} Delete
+                        </button>
+                      {{ end }}
+                    </div>
+                  </details>
+                {{ end }}
               </div>
-            </a>
-            {{ if .CanDelete }}
-              <div class="workflow-card-delete">
-                <button
-                  type="button"
-                  class="workflow-card-delete-button"
-                  aria-label="Delete {{ .Name }}"
-                  title="Delete {{ .Name }}"
-                  onclick="document.getElementById('delete-workflow-{{ .Key }}').showModal()"
+              <a class="workflow-card-body" href="/w/{{ .Key }}/">
+                <p
+                  class="workflow-card-description{{ if not .Description }}
+                    is-empty
+                  {{ end }}"
                 >
-                  {{ template "icon-trash" . }}
-                </button>
-              </div>
-              <dialog
-                id="delete-workflow-{{ .Key }}"
-                class="manage-dialog"
-              >
+                  {{ if .Description }}
+                    {{ .Description }}
+                  {{ else }}
+                    &nbsp;
+                  {{ end }}
+                </p>
+                <div
+                  style="margin: auto 0 0; padding-top: 6px; border-top: 1px solid var(--border);"
+                >
+                  <table class="workflow-card-stats">
+                    <tr>
+                      <th>Not started</th>
+                      <td>{{ .Counts.NotStarted }}</td>
+                    </tr>
+                    <tr>
+                      <th>In progress</th>
+                      <td>{{ .Counts.Started }}</td>
+                    </tr>
+                    <tr>
+                      <th>Completed</th>
+                      <td>{{ .Counts.Terminated }}</td>
+                    </tr>
+                  </table>
+                </div>
+              </a>
+            </div>
+            {{ if .EditRequiresPurge }}
+              <dialog id="edit-workflow-{{ .Key }}" class="manage-dialog">
+                <div class="manage-dialog-card">
+                  <header class="manage-dialog-head">
+                    <div>
+                      <h3
+                        class="manage-dialog-title manage-dialog-danger-title"
+                      >
+                        Danger zone - Edit stream
+                      </h3>
+                      <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="secondary secondary-small"
+                      onclick="document.getElementById('edit-workflow-{{ .Key }}').close()"
+                    >
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <p style="margin: 0 0 20px;">
+                    Saving changes to this stream will permanently delete all
+                    existing instances and their collected workflow data.
+                    Continue only if you want to proceed.
+                  </p>
+                  <div class="manage-dialog-actions manage-dialog-actions-end">
+                    <a href="{{ .EditAction }}">
+                      <button type="button" class="danger">
+                        Continue to editor
+                      </button>
+                    </a>
+                  </div>
+                </div>
+              </dialog>
+            {{ end }}
+            {{ if .CanDelete }}
+              <dialog id="delete-workflow-{{ .Key }}" class="manage-dialog">
                 <div class="manage-dialog-card">
                   <header class="manage-dialog-head">
                     <div>

@@ -80,6 +80,20 @@ tasks:
     cmds:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
+      - |
+          sh -c '
+          repo_root="$PWD"
+          for pid in $(pgrep -f "air -c \\.air\\.toml" || true); do
+            cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+            if [ "$cwd" = "$repo_root/server" ]; then
+              kill "$pid" >/dev/null 2>&1 || true
+            fi
+          done
+          for pid in $(pgrep -f "$repo_root/server/tmp/attesta-server" || true); do
+            kill "$pid" >/dev/null 2>&1 || true
+          done
+          sleep 1
+          '
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
       - sh -c 'export $(grep -v "^#" .env | xargs) && cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
 

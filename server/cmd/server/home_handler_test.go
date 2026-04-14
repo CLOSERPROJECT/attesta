@@ -424,6 +424,18 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
+		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+			t.Fatalf("expected workflow actions menu trigger for creator, got %q", body)
+		}
+		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+			t.Fatalf("expected clone action for creator, got %q", body)
+		}
+		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit action for creator, got %q", body)
+		}
+		if strings.Contains(body, `id="edit-workflow-`+stream.ID.Hex()+`"`) {
+			t.Fatalf("did not expect edit warning dialog for creator, got %q", body)
+		}
 		if !strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected delete dialog for creator, got %q", body)
 		}
@@ -432,6 +444,9 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		}
 		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for creator, got %q", body)
+		}
+		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit button for creator, got %q", rec.Body.String())
 		}
 	})
 
@@ -480,11 +495,26 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
+		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+			t.Fatalf("expected workflow actions menu trigger for started stream, got %q", body)
+		}
 		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect delete dialog for started stream, got %q", body)
 		}
 		if strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("did not expect delete button for started stream, got %q", body)
+		}
+		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+			t.Fatalf("expected clone action for started stream, got %q", body)
+		}
+		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("did not expect direct edit action for started stream, got %q", body)
+		}
+		if !strings.Contains(body, `class="workflow-card-menu-item workflow-card-menu-item-disabled"`) {
+			t.Fatalf("expected disabled edit action for started stream, got %q", body)
+		}
+		if !strings.Contains(body, `class="workflow-card-menu-item workflow-card-menu-item-danger workflow-card-menu-item-disabled"`) {
+			t.Fatalf("expected disabled delete action for started stream, got %q", body)
 		}
 	})
 
@@ -529,6 +559,21 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
+		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+			t.Fatalf("expected workflow actions menu trigger for platform admin, got %q", body)
+		}
+		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+			t.Fatalf("expected clone action for platform admin, got %q", body)
+		}
+		if !strings.Contains(body, `id="edit-workflow-`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit warning dialog for platform admin, got %q", body)
+		}
+		if !strings.Contains(body, `onclick="document.getElementById('edit-workflow-`+stream.ID.Hex()+`').showModal()"`) {
+			t.Fatalf("expected edit warning dialog trigger for platform admin, got %q", body)
+		}
+		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("expected edit dialog continue action for platform admin, got %q", body)
+		}
 		if !strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected delete dialog for platform admin, got %q", body)
 		}
@@ -537,6 +582,58 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		}
 		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for platform admin, got %q", body)
+		}
+	})
+
+	t.Run("hidden for user without builder access", func(t *testing.T) {
+		store := NewMemoryStore()
+		user := AccountUser{
+			ID:             primitive.NewObjectID(),
+			IdentityUserID: "member-home-user",
+			Email:          "member-home@example.com",
+			RoleSlugs:      []string{"inspector"},
+			Status:         "active",
+		}
+		sessionID := "session-home-member"
+		stream, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Member hidden"),
+			CreatedByUserID: "creator-user",
+			UpdatedByUserID: "creator-user",
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream: %v", err)
+		}
+
+		server := &Server{
+			store:       store,
+			identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+			authorizer:  fakeAuthorizer{deleteDecide: workflowDeleteDecision},
+			tmpl:        tmpl,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		body := rec.Body.String()
+		if strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
+		}
+		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+			t.Fatalf("did not expect clone action without builder access, got %q", body)
+		}
+		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+			t.Fatalf("did not expect edit action without builder access, got %q", body)
+		}
+		if strings.Contains(body, `workflow-card-menu-item-danger workflow-card-menu-item-disabled`) {
+			t.Fatalf("did not expect delete action without builder access, got %q", body)
 		}
 	})
 }

@@ -37,6 +37,7 @@ type Store interface {
 	LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error)
 	OpenAttachmentDownload(ctx context.Context, id primitive.ObjectID) (io.ReadCloser, error)
 	SaveFormataBuilderStream(ctx context.Context, stream FormataBuilderStream) (FormataBuilderStream, error)
+	UpdateFormataBuilderStream(ctx context.Context, stream FormataBuilderStream) (FormataBuilderStream, error)
 	LoadFormataBuilderStream(ctx context.Context) (*FormataBuilderStream, error)
 	LoadFormataBuilderStreamByID(ctx context.Context, id primitive.ObjectID) (*FormataBuilderStream, error)
 	ListFormataBuilderStreams(ctx context.Context) ([]FormataBuilderStream, error)
@@ -825,6 +826,25 @@ func (s *MemoryStore) SaveFormataBuilderStream(_ context.Context, stream Formata
 	return stream, nil
 }
 
+func (s *MemoryStore) UpdateFormataBuilderStream(_ context.Context, stream FormataBuilderStream) (FormataBuilderStream, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if stream.ID.IsZero() {
+		return FormataBuilderStream{}, mongo.ErrNoDocuments
+	}
+	if _, exists := s.formataStreams[stream.ID]; !exists {
+		return FormataBuilderStream{}, mongo.ErrNoDocuments
+	}
+	if stream.UpdatedAt.IsZero() {
+		stream.UpdatedAt = time.Now().UTC()
+	}
+	if strings.TrimSpace(stream.CreatedByUserID) == "" {
+		stream.CreatedByUserID = strings.TrimSpace(stream.UpdatedByUserID)
+	}
+	s.formataStreams[stream.ID] = stream
+	return stream, nil
+}
+
 func (s *MemoryStore) LoadFormataBuilderStream(_ context.Context) (*FormataBuilderStream, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1072,6 +1092,35 @@ func (s *MongoStore) SaveFormataBuilderStream(ctx context.Context, stream Format
 	}
 	if _, err := s.database().Collection(collectionFormataStream).InsertOne(ctx, stream); err != nil {
 		return FormataBuilderStream{}, err
+	}
+	return stream, nil
+}
+
+func (s *MongoStore) UpdateFormataBuilderStream(ctx context.Context, stream FormataBuilderStream) (FormataBuilderStream, error) {
+	if stream.ID.IsZero() {
+		return FormataBuilderStream{}, mongo.ErrNoDocuments
+	}
+	if stream.UpdatedAt.IsZero() {
+		stream.UpdatedAt = time.Now().UTC()
+	}
+	if strings.TrimSpace(stream.CreatedByUserID) == "" {
+		stream.CreatedByUserID = strings.TrimSpace(stream.UpdatedByUserID)
+	}
+	result, err := s.database().Collection(collectionFormataStream).UpdateOne(
+		ctx,
+		bson.M{"_id": stream.ID},
+		bson.M{"$set": bson.M{
+			"stream":          stream.Stream,
+			"updatedAt":       stream.UpdatedAt,
+			"createdByUserId": stream.CreatedByUserID,
+			"updatedByUserId": stream.UpdatedByUserID,
+		}},
+	)
+	if err != nil {
+		return FormataBuilderStream{}, err
+	}
+	if result != nil && result.MatchedCount == 0 {
+		return FormataBuilderStream{}, mongo.ErrNoDocuments
 	}
 	return stream, nil
 }

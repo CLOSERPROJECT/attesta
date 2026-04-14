@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestHelperCoverageBranches(t *testing.T) {
@@ -153,7 +152,6 @@ func TestHandlePublicCatalogAdditionalOrderingAndStreamBranches(t *testing.T) {
 		}, nil
 	}
 	server := catalogServer(now, identity)
-	server.store = &failingCatalogStore{MemoryStore: NewMemoryStore(), err: mongo.ErrNoDocuments}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})

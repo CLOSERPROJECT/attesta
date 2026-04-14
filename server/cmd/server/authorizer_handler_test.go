@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -170,12 +171,12 @@ func (f fakeAuthorizer) CanDeleteStream(ctx context.Context, user *AccountUser, 
 
 func (f fakeAuthorizer) CanAccess(ctx context.Context, user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error) {
 	if f.accessDecide == nil {
-		return fakeCanAccessDecision(user, resourceKind, action), nil
+		return fakeCanAccessDecision(user, resourceKind, resourceAttr, action), nil
 	}
 	return f.accessDecide(user, resourceKind, resourceID, resourceAttr, action)
 }
 
-func fakeCanAccessDecision(user *AccountUser, resourceKind, action string) bool {
+func fakeCanAccessDecision(user *AccountUser, resourceKind string, resourceAttr map[string]interface{}, action string) bool {
 	if user == nil {
 		return false
 	}
@@ -187,9 +188,18 @@ func fakeCanAccessDecision(user *AccountUser, resourceKind, action string) bool 
 	case resourceKind == cerbosResourceCatalog && action == cerbosActionView:
 		return user.IsPlatformAdmin || userIsOrgAdmin(user)
 	case resourceKind == cerbosResourceFormataBuilder && action == cerbosActionView:
-		return userIsOrgAdmin(user)
+		return user.IsPlatformAdmin || userIsOrgAdmin(user)
 	case resourceKind == cerbosResourceFormataBuilder && action == cerbosActionSave:
 		return user.IsPlatformAdmin || userIsOrgAdmin(user)
+	case resourceKind == "stream" && action == cerbosActionEdit:
+		if user.IsPlatformAdmin {
+			return true
+		}
+		if strings.TrimSpace(formataStreamUserID(user)) != strings.TrimSpace(fmt.Sprint(resourceAttr["createdByUserId"])) {
+			return false
+		}
+		hasProcesses, _ := resourceAttr["hasProcesses"].(bool)
+		return !hasProcesses
 	case resourceKind == "stream" && action == cerbosActionPurge:
 		return user.IsPlatformAdmin
 	default:

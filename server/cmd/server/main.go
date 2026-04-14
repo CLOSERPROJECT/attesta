@@ -18,6 +18,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -335,12 +336,16 @@ type PageBase struct {
 }
 
 type WorkflowOption struct {
-	Key          string
-	Name         string
-	Description  string
-	Counts       WorkflowProcessCounts
-	CanDelete    bool
-	DeleteAction string
+	Key               string
+	Name              string
+	Description       string
+	Counts            WorkflowProcessCounts
+	CanClone          bool
+	CanEdit           bool
+	EditAction        string
+	EditRequiresPurge bool
+	CanDelete         bool
+	DeleteAction      string
 }
 
 type WorkflowProcessCounts struct {
@@ -352,7 +357,6 @@ type WorkflowProcessCounts struct {
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
-	Stream        string                      `json:"stream,omitempty"`
 }
 
 type PublicCatalogOrganization struct {
@@ -796,8 +800,12 @@ func main() {
 	mux := server.newMux()
 
 	addr := ":3000"
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("server listening on %s", addr)
-	if err := http.ListenAndServe(addr, logRequests(mux)); err != nil {
+	if err := http.Serve(listener, logRequests(mux)); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -1376,6 +1384,7 @@ const (
 	cerbosResourcePlatformAdminConsole = "platform_admin_console"
 
 	cerbosActionAccess = "access"
+	cerbosActionEdit   = "edit"
 	cerbosActionPurge  = "purge_history"
 	cerbosActionSave   = "save"
 	cerbosActionView   = "view"
@@ -1411,6 +1420,14 @@ func (s *Server) canViewFormataBuilder(ctx context.Context, user *AccountUser) (
 
 func (s *Server) canSaveFormataBuilder(ctx context.Context, user *AccountUser) (bool, error) {
 	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, cerbosActionSave)
+}
+
+func (s *Server) canEditStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
+	return s.authorizeUserAction(ctx, user, "stream", strings.TrimSpace(workflowKey), map[string]interface{}{
+		"workflowKey":     strings.TrimSpace(workflowKey),
+		"createdByUserId": strings.TrimSpace(createdByUserID),
+		"hasProcesses":    hasProcesses,
+	}, cerbosActionEdit)
 }
 
 func (s *Server) canPurgeWorkflowData(ctx context.Context, user *AccountUser, workflowKey string) (bool, error) {
@@ -1498,6 +1515,12 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 	if err != nil {
 		return nil, err
 	}
+	canEditSavedStreams := false
+	if user != nil {
+		if allowed, err := s.canViewFormataBuilder(ctx, user); err == nil {
+			canEditSavedStreams = allowed
+		}
+	}
 	streamsByKey := map[string]FormataBuilderStream{}
 	if s.store != nil {
 		streams, err := s.store.ListFormataBuilderStreams(ctx)
@@ -1520,6 +1543,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			Name:         cfg.Workflow.Name,
 			Description:  strings.TrimSpace(cfg.Workflow.Description),
 			Counts:       WorkflowProcessCounts{},
+			EditAction:   "/org-admin/formata-builder?stream=" + key,
 			DeleteAction: workflowPath(key) + "/delete",
 		}
 		if s.store == nil {
@@ -1533,7 +1557,16 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
 		stream, ok := streamsByKey[key]
 		if ok && s.authorizer != nil && user != nil {
-			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0)
+			hasProcesses := option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0
+			option.CanClone = canEditSavedStreams
+			if canEditSavedStreams {
+				allowed, err := s.canEditStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
+				if err == nil {
+					option.CanEdit = allowed
+					option.EditRequiresPurge = allowed && hasProcesses
+				}
+			}
+			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
 			if err == nil {
 				option.CanDelete = allowed
 			}
@@ -1924,7 +1957,7 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireCatalogAccessAPI(w, r); !ok {
 		return
 	}
-	if s == nil || s.identity == nil || s.store == nil {
+	if s == nil || s.identity == nil {
 		http.Error(w, "catalog not configured", http.StatusInternalServerError)
 		return
 	}
@@ -1962,16 +1995,6 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	stream, streamErr := s.store.LoadFormataBuilderStream(r.Context())
-	switch {
-	case streamErr == nil && stream != nil:
-		response.Stream = stream.Stream
-	case streamErr == nil || errors.Is(streamErr, mongo.ErrNoDocuments):
-	default:
-		http.Error(w, "failed to load stream", http.StatusInternalServerError)
-		return
-	}
-
 	sort.Slice(response.Organizations, func(i, j int) bool {
 		if response.Organizations[i].Name == response.Organizations[j].Name {
 			return response.Organizations[i].Slug < response.Organizations[j].Slug
