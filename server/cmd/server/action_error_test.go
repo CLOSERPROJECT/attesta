@@ -29,12 +29,14 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 		name   string
 		status int
 		htmx   bool
+		target string
 	}{
 		{name: "bad request htmx", status: http.StatusBadRequest, htmx: true},
 		{name: "forbidden htmx", status: http.StatusForbidden, htmx: true},
 		{name: "conflict htmx", status: http.StatusConflict, htmx: true},
 		{name: "bad gateway htmx", status: http.StatusBadGateway, htmx: true},
 		{name: "internal server error htmx", status: http.StatusInternalServerError, htmx: true},
+		{name: "bad request process content htmx", status: http.StatusBadRequest, htmx: true, target: "process-page-content"},
 		{name: "bad request full", status: http.StatusBadRequest},
 		{name: "forbidden full", status: http.StatusForbidden},
 		{name: "conflict full", status: http.StatusConflict},
@@ -47,6 +49,9 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/process/"+process.ID.Hex()+"/substep/1.1/complete", nil)
 			if tc.htmx {
 				req.Header.Set("HX-Request", "true")
+				if tc.target != "" {
+					req.Header.Set("HX-Target", tc.target)
+				}
 			}
 			rec := httptest.NewRecorder()
 			server.renderActionErrorForRequest(rec, req, tc.status, "rendered error", process, actor)
@@ -55,7 +60,11 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 				t.Fatalf("status = %d, want %d", rec.Code, tc.status)
 			}
 			body := rec.Body.String()
-			if tc.htmx {
+			if tc.target == "process-page-content" {
+				if !strings.Contains(body, "PROCESS_CONTENT ") {
+					t.Fatalf("expected process content partial, got %q", body)
+				}
+			} else if tc.htmx {
 				if strings.Contains(body, "PROCESS ") {
 					t.Fatalf("expected HTMX partial, got full page body %q", body)
 				}
@@ -91,5 +100,11 @@ func TestRenderActionViewsReturn500WhenConfigFails(t *testing.T) {
 	server.renderDepartmentProcessPage(pageRec, nil, process, actor, "error")
 	if pageRec.Code != http.StatusInternalServerError {
 		t.Fatalf("renderDepartmentProcessPage status = %d, want %d", pageRec.Code, http.StatusInternalServerError)
+	}
+
+	contentRec := httptest.NewRecorder()
+	server.renderProcessContent(contentRec, nil, process, actor, "error")
+	if contentRec.Code != http.StatusInternalServerError {
+		t.Fatalf("renderProcessContent status = %d, want %d", contentRec.Code, http.StatusInternalServerError)
 	}
 }

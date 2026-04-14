@@ -138,37 +138,6 @@ func TestProcessExportHandlersReturn404OnWorkflowMismatch(t *testing.T) {
 	}
 }
 
-func TestHandleTimelinePartialReturns404OnWorkflowMismatch(t *testing.T) {
-	store := NewMemoryStore()
-	processID := store.SeedProcess(Process{
-		ID:          primitive.NewObjectID(),
-		WorkflowKey: "secondary",
-		CreatedAt:   time.Now().UTC(),
-		Status:      "active",
-		Progress: map[string]ProcessStep{
-			"1_1": {State: "pending"},
-		},
-	})
-	server := &Server{
-		store: store,
-		tmpl:  testTemplates(),
-		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
-		},
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/timeline", nil)
-	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
-		Key: "workflow",
-		Cfg: testRuntimeConfig(),
-	}))
-	rec := httptest.NewRecorder()
-	server.handleProcessRoutes(rec, req)
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
-	}
-}
-
 func TestHandleEventsReturns400OnWorkflowQueryMismatch(t *testing.T) {
 	server := &Server{
 		sse: newSSEHub(),

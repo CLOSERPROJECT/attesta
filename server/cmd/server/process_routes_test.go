@@ -50,7 +50,7 @@ func TestHandleProcessRoutesDispatchesEndpoints(t *testing.T) {
 		wantBody   string
 	}{
 		{name: "process page", method: http.MethodGet, path: "/process/" + process.ID.Hex(), wantStatus: http.StatusOK, wantBody: "PROCESS"},
-		{name: "timeline", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/timeline", wantStatus: http.StatusOK, wantBody: "TIMELINE"},
+		{name: "process content", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/content", wantStatus: http.StatusOK, wantBody: "PROCESS_CONTENT"},
 		{name: "notarized export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/notarized.json", wantStatus: http.StatusOK},
 		{name: "merkle export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/merkle.json", wantStatus: http.StatusOK},
 		{name: "all files zip", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/files.zip", wantStatus: http.StatusOK},

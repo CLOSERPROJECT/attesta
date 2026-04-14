@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"html/template"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,28 @@ func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 	process, _ := store.SnapshotProcess(id)
 	if process.Progress["1_1"].DoneBy == nil || process.Progress["1_1"].DoneBy.ID != "legacy-user" {
 		t.Fatalf("expected fallback actor legacy-user|dep1, got %#v", process.Progress["1_1"].DoneBy)
+	}
+}
+
+func TestHandleCompleteSubstepProcessContentSelectsNextAvailable(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}SEL {{.ActionList.SelectedSubstepID}}{{end}}`))
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete?substep=1.1", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "process-page-content")
+	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "SEL 1.2") {
+		t.Fatalf("expected next available substep selection, got %q", rr.Body.String())
 	}
 }
 

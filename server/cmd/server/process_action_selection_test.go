@@ -51,6 +51,30 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	}
 }
 
+func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
+	timeline := []TimelineStep{{
+		StepID: "1",
+		Substeps: []TimelineSubstep{
+			{SubstepID: "1.1"},
+			{SubstepID: "1.2"},
+		},
+	}}
+	actions := []ActionView{
+		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow"},
+	}
+
+	got := decorateTimelineActions(timeline, actions)
+	if got[0].Substeps[0].Action != nil {
+		t.Fatal("expected unrelated substep action to stay nil")
+	}
+	if got[0].Substeps[1].Action == nil {
+		t.Fatal("expected matching substep action to be attached")
+	}
+	if got[0].Substeps[1].Action.SubstepID != "1.2" || got[0].Substeps[1].Action.Title != "Inspect lot" {
+		t.Fatalf("attached action = %#v", got[0].Substeps[1].Action)
+	}
+}
+
 func TestHandleProcessActionsPartialSelectsRequestedSubstep(t *testing.T) {
 	store := NewMemoryStore()
 	processID := store.SeedProcess(Process{

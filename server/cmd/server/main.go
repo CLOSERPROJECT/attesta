@@ -146,6 +146,7 @@ type TimelineSubstep struct {
 	Title        string
 	Role         string
 	Selected     bool
+	Action       *ActionView
 	RoleBadges   []TimelineRoleBadge
 	RoleLabel    string
 	RoleColor    template.CSS
@@ -224,6 +225,7 @@ type NotarizedProcessExport struct {
 }
 
 type ActionView struct {
+	WorkflowKey   string
 	ProcessID     string
 	SubstepID     string
 	Title         string
@@ -606,7 +608,6 @@ func (e *WorkflowRefValidationError) Error() string {
 type ProcessPageView struct {
 	PageBase
 	ProcessID   string
-	Timeline    []TimelineStep
 	ActionList  ActionListView
 	DPPURL      string
 	DPPGS1      string
@@ -4318,6 +4319,26 @@ func cloneRequestWithPath(r *http.Request, path string) *http.Request {
 	return clone
 }
 
+func cloneRequestWithSelectedSubstep(r *http.Request, substepID string) *http.Request {
+	clone := r.Clone(r.Context())
+	if clone.URL != nil {
+		copied := *clone.URL
+		query := copied.Query()
+		substepID = strings.TrimSpace(substepID)
+		if substepID == "" {
+			query.Del("substep")
+		} else {
+			query.Set("substep", substepID)
+		}
+		copied.RawQuery = query.Encode()
+		clone.URL = &copied
+	}
+	if clone.URL != nil {
+		clone.RequestURI = clone.URL.RequestURI()
+	}
+	return clone
+}
+
 func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
 		return
@@ -4604,8 +4625,8 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleMerkleJSON(w, r, processID)
 		return
 	}
-	if len(parts) == 2 && parts[1] == "timeline" && r.Method == http.MethodGet {
-		s.handleTimelinePartial(w, r, processID)
+	if len(parts) == 2 && parts[1] == "content" && r.Method == http.MethodGet {
+		s.handleProcessContentPartial(w, r, processID)
 		return
 	}
 	if len(parts) == 2 && parts[1] == "actions" && r.Method == http.MethodGet {
@@ -4664,16 +4685,17 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		actor.Role = actor.RoleSlugs[0]
 	}
 	selectedSubstepID := strings.TrimSpace(r.URL.Query().Get("substep"))
-	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, "", false)
-	view := ProcessPageView{
-		PageBase:    s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
-		ProcessID:   process.ID.Hex(),
-		Timeline:    actionList.Timeline,
-		ActionList:  actionList,
-		DPPURL:      actionList.DPPURL,
-		DPPGS1:      actionList.DPPGS1,
-		Attachments: actionList.Attachments,
-	}
+	view := s.buildProcessPageView(
+		ctx,
+		s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
+		cfg,
+		workflowKey,
+		process,
+		actor,
+		selectedSubstepID,
+		"",
+		false,
+	)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -4685,6 +4707,8 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selected)
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
+	actions = s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, actions)
+	timeline = decorateTimelineActions(timeline, actions)
 
 	view := ActionListView{
 		WorkflowKey:       workflowKey,
@@ -4708,11 +4732,27 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 		}
 	}
 	if view.Action != nil {
-		actionsWithIdentity := s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, []ActionView{*view.Action})
-		view.Action = &actionsWithIdentity[0]
+		action := *view.Action
+		view.Action = &action
 	}
 	view.Timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, actor, view.Timeline)
 	return view
+}
+
+func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
+	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
+	processID := ""
+	if process != nil {
+		processID = process.ID.Hex()
+	}
+	return ProcessPageView{
+		PageBase:    pageBase,
+		ProcessID:   processID,
+		ActionList:  actionList,
+		DPPURL:      actionList.DPPURL,
+		DPPGS1:      actionList.DPPGS1,
+		Attachments: actionList.Attachments,
+	}
 }
 
 func actorFromAccountUser(user *AccountUser, workflowKey string) Actor {
@@ -4912,7 +4952,11 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, processID string) {
+func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Request, processID string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
 	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
 	if !ok {
 		return
@@ -4927,17 +4971,31 @@ func (s *Server) handleTimelinePartial(w http.ResponseWriter, r *http.Request, p
 		http.Error(w, "process not found", http.StatusNotFound)
 		return
 	}
-	actions := buildActionList(cfg.Workflow, process, workflowKey, Actor{WorkflowKey: workflowKey}, false, s.roleMetaMap(cfg))
-	processDone := process != nil && isProcessDone(cfg.Workflow, process)
-	selectedSubstepID := resolveSelectedSubstepID(actions, strings.TrimSpace(r.URL.Query().Get("substep")), processDone)
-	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selectedSubstepID)
-	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
-	viewer := Actor{WorkflowKey: workflowKey}
-	if user, _, userErr := s.currentUser(r); userErr == nil && user != nil {
-		viewer = actorFromAccountUser(user, workflowKey)
+	process = s.ensureProcessCompletionArtifacts(ctx, cfg, workflowKey, process)
+	actor := Actor{
+		ID:          accountActorID(user),
+		OrgSlug:     user.OrgSlug,
+		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
+		WorkflowKey: workflowKey,
 	}
-	timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, viewer, timeline)
-	if err := s.tmpl.ExecuteTemplate(w, "timeline.html", timeline); err != nil {
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+	}
+	if len(actor.RoleSlugs) > 0 {
+		actor.Role = actor.RoleSlugs[0]
+	}
+	view := s.buildProcessPageView(
+		ctx,
+		s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
+		cfg,
+		workflowKey,
+		process,
+		actor,
+		strings.TrimSpace(r.URL.Query().Get("substep")),
+		"",
+		false,
+	)
+	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -5321,11 +5379,16 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	if !sequenceOK {
 		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && containsRole(allowedRoles, actor.Role) {
-			if isHTMXRequest(r) {
-				s.renderActionList(w, r, process, actor, "")
+			nextReq := cloneRequestWithSelectedSubstep(r, "")
+			if isProcessContentTargetRequest(r) {
+				s.renderProcessContent(w, nextReq, process, actor, "")
 				return
 			}
-			s.renderDepartmentProcessPage(w, r, process, actor, "")
+			if isHTMXRequest(r) {
+				s.renderActionList(w, nextReq, process, actor, "")
+				return
+			}
+			s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
 			return
 		}
 		s.renderActionErrorForRequest(w, r, http.StatusConflict, "Step is locked: complete previous steps first.", process, actor)
@@ -5398,11 +5461,16 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	for _, role := range s.roles(cfg) {
 		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
-	if isHTMXRequest(r) {
-		s.renderActionList(w, r, process, actor, "")
+	nextReq := cloneRequestWithSelectedSubstep(r, "")
+	if isProcessContentTargetRequest(r) {
+		s.renderProcessContent(w, nextReq, process, actor, "")
 		return
 	}
-	s.renderDepartmentProcessPage(w, r, process, actor, "")
+	if isHTMXRequest(r) {
+		s.renderActionList(w, nextReq, process, actor, "")
+		return
+	}
+	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
 }
 
 var (
@@ -6665,6 +6733,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			formUISchema = marshalJSONCompact(sub.UISchema)
 		}
 		actions = append(actions, ActionView{
+			WorkflowKey:   workflowKey,
 			ProcessID:     processIDString(process),
 			SubstepID:     sub.SubstepID,
 			Title:         sub.Title,
@@ -6743,6 +6812,28 @@ func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string
 			}
 		}
 		timeline[stepIndex].Expanded = expanded
+	}
+	return timeline
+}
+
+func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []TimelineStep {
+	if len(timeline) == 0 || len(actions) == 0 {
+		return timeline
+	}
+	actionsBySubstep := make(map[string]ActionView, len(actions))
+	for _, action := range actions {
+		actionsBySubstep[strings.TrimSpace(action.SubstepID)] = action
+	}
+	for stepIndex := range timeline {
+		for substepIndex := range timeline[stepIndex].Substeps {
+			substepID := strings.TrimSpace(timeline[stepIndex].Substeps[substepIndex].SubstepID)
+			action, ok := actionsBySubstep[substepID]
+			if !ok {
+				continue
+			}
+			actionCopy := action
+			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+		}
 	}
 	return timeline
 }
@@ -7129,11 +7220,22 @@ func (s *Server) nowUTC() time.Time {
 
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {
 	w.WriteHeader(status)
+	if isProcessContentTargetRequest(r) {
+		s.renderProcessContent(w, r, process, actor, message)
+		return
+	}
 	if isHTMXRequest(r) {
 		s.renderActionList(w, r, process, actor, message)
 		return
 	}
 	s.renderDepartmentProcessPage(w, r, process, actor, message)
+}
+
+func isProcessContentTargetRequest(r *http.Request) bool {
+	if r == nil || !isHTMXRequest(r) {
+		return false
+	}
+	return strings.TrimSpace(r.Header.Get("HX-Target")) == "process-page-content"
 }
 
 func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
@@ -7180,21 +7282,53 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 	if r != nil {
 		ctx = r.Context()
 	}
-	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, true)
-	processID := ""
-	if process != nil {
-		processID = process.ID.Hex()
-	}
-	view := ProcessPageView{
-		PageBase:    s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
-		ProcessID:   processID,
-		Timeline:    actionList.Timeline,
-		ActionList:  actionList,
-		DPPURL:      actionList.DPPURL,
-		DPPGS1:      actionList.DPPGS1,
-		Attachments: actionList.Attachments,
-	}
+	view := s.buildProcessPageView(
+		ctx,
+		s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
+		cfg,
+		workflowKey,
+		process,
+		actor,
+		selectedSubstepID,
+		message,
+		false,
+	)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	workflowKey := s.defaultWorkflowKey()
+	cfg := RuntimeConfig{}
+	var err error
+	selectedSubstepID := ""
+	if r != nil {
+		workflowKey, cfg, err = s.selectedWorkflow(r)
+		selectedSubstepID = strings.TrimSpace(r.URL.Query().Get("substep"))
+	} else {
+		cfg, err = s.runtimeConfig()
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := context.Background()
+	if r != nil {
+		ctx = r.Context()
+	}
+	view := s.buildProcessPageView(
+		ctx,
+		s.pageBase("process_body", workflowKey, cfg.Workflow.Name),
+		cfg,
+		workflowKey,
+		process,
+		actor,
+		selectedSubstepID,
+		message,
+		false,
+	)
+	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
