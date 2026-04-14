@@ -18,6 +18,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -799,8 +800,12 @@ func main() {
 	mux := server.newMux()
 
 	addr := ":3000"
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("server listening on %s", addr)
-	if err := http.ListenAndServe(addr, logRequests(mux)); err != nil {
+	if err := http.Serve(listener, logRequests(mux)); err != nil {
 		log.Fatal(err)
 	}
 }
