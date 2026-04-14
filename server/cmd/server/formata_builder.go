@@ -204,13 +204,6 @@ func (s *Server) handleOrgAdminFormataBuilderStream(w http.ResponseWriter, r *ht
 	if !ok {
 		root = map[string]interface{}{"stream": payload}
 	}
-	editable, requiresPurge, err := s.formataBuilderStreamEditState(r.Context(), user, *stream)
-	if err != nil {
-		http.Error(w, "failed to check stream instances", http.StatusInternalServerError)
-		return
-	}
-	root["editable"] = editable
-	root["editableRequiresPurge"] = requiresPurge
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(root); err != nil {
 		http.Error(w, "failed to encode stream", http.StatusInternalServerError)

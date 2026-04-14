@@ -170,7 +170,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		}
 	})
 
-	t.Run("stream json marks owner without instances as editable", func(t *testing.T) {
+	t.Run("stream json omits edit state fields", func(t *testing.T) {
 		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
 			Stream:          workflowStreamYAML("Editable stream"),
 			CreatedByUserID: formataStreamUserID(&orgAdmin),
@@ -197,8 +197,11 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("json.Unmarshal error: %v", err)
 		}
-		if payload["editable"] != true {
-			t.Fatalf("editable = %#v, want true", payload["editable"])
+		if _, ok := payload["editable"]; ok {
+			t.Fatalf("editable present in payload: %#v", payload["editable"])
+		}
+		if _, ok := payload["editableRequiresPurge"]; ok {
+			t.Fatalf("editableRequiresPurge present in payload: %#v", payload["editableRequiresPurge"])
 		}
 		workflow, ok := payload["workflow"].(map[string]interface{})
 		if !ok || workflow["name"] != "Editable stream" {
@@ -237,11 +240,11 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("json.Unmarshal error: %v", err)
 		}
-		if payload["editable"] != false {
-			t.Fatalf("editable = %#v, want false", payload["editable"])
+		if _, ok := payload["editable"]; ok {
+			t.Fatalf("editable present in payload: %#v", payload["editable"])
 		}
-		if payload["editableRequiresPurge"] != false {
-			t.Fatalf("editableRequiresPurge = %#v, want false", payload["editableRequiresPurge"])
+		if _, ok := payload["editableRequiresPurge"]; ok {
+			t.Fatalf("editableRequiresPurge present in payload: %#v", payload["editableRequiresPurge"])
 		}
 	})
 
@@ -276,11 +279,11 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("json.Unmarshal error: %v", err)
 		}
-		if payload["editable"] != true {
-			t.Fatalf("editable = %#v, want true", payload["editable"])
+		if _, ok := payload["editable"]; ok {
+			t.Fatalf("editable present in payload: %#v", payload["editable"])
 		}
-		if payload["editableRequiresPurge"] != true {
-			t.Fatalf("editableRequiresPurge = %#v, want true", payload["editableRequiresPurge"])
+		if _, ok := payload["editableRequiresPurge"]; ok {
+			t.Fatalf("editableRequiresPurge present in payload: %#v", payload["editableRequiresPurge"])
 		}
 	})
 
