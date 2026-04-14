@@ -62,6 +62,8 @@
   --confirmation-border: #1e6f5c;
   --confirmation-ink: #1e6f5c;
   --button-contrast: #0b0f0d;
+  --tobar-pa-bg: #000;
+  --ink-pa: #fff;
 }
 
 [data-theme="dark"] {
@@ -126,6 +128,8 @@
   --confirmation-border: rgba(87, 194, 166, 0.24);
   --confirmation-ink: #57c2a6;
   --button-contrast: #0b0f0d;
+  --tobar-pa-bg: #fff;
+  --ink-pa: #000;
 }
 
 * {
@@ -181,7 +185,7 @@ svg.bi {
 }
 
 .topbar-pa {
-  background: color-mix(in srgb, var(--muted) 50%, var(--chrome-bg));
+  background: var(--tobar-pa-bg);
 }
 
 .topbar-content {

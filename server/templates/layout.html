@@ -27,7 +27,7 @@
     <body>
       <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
         <div class="topbar-content mx-auto max-w-7xl">
-          <div>
+          <div style="display: flex; align-items: center; gap: 12px;">
             <a class="brand" href="/">
               {{ if .ViteDevServer }}
                 <img
@@ -46,11 +46,17 @@
               {{ end }}
               <span>ATTESTA</span>
             </a>
+            {{ if .IsPlatformAdmin }}
+              <span style="color: var(--ink-pa);">Platform Admin</span>
+            {{ end }}
           </div>
           <nav class="nav">
             <button
               type="button"
               class="nav-action theme-toggle"
+              {{ if .IsPlatformAdmin }}
+                style="color: var(--ink-pa); border-color: var(--ink-pa);"
+              {{ end }}
               id="theme-toggle"
               aria-label="Toggle theme"
               title="Toggle theme"
@@ -63,6 +69,9 @@
                 <summary
                   class="nav-action account-trigger"
                   aria-label="Open account menu"
+                  {{ if .IsPlatformAdmin }}
+                    style="color: var(--ink-pa); border-color: var(--ink-pa);"
+                  {{ end }}
                 >
                   {{ template "icon-account" . }}
                 </summary>
