@@ -51,6 +51,43 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	}
 }
 
+func TestCloneRequestWithSelectedSubstepUpdatesQuery(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/process/123/content?substep=1.1&filter=active", nil)
+
+	cleared := cloneRequestWithSelectedSubstep(req, "")
+	if got := cleared.URL.Query().Get("substep"); got != "" {
+		t.Fatalf("cleared substep = %q, want empty", got)
+	}
+	if got := cleared.URL.Query().Get("filter"); got != "active" {
+		t.Fatalf("filter query = %q, want %q", got, "active")
+	}
+	if strings.Contains(cleared.RequestURI, "substep=") {
+		t.Fatalf("request uri = %q, want substep removed", cleared.RequestURI)
+	}
+
+	selected := cloneRequestWithSelectedSubstep(req, "2.1")
+	if got := selected.URL.Query().Get("substep"); got != "2.1" {
+		t.Fatalf("selected substep = %q, want %q", got, "2.1")
+	}
+	if !strings.Contains(selected.RequestURI, "substep=2.1") {
+		t.Fatalf("request uri = %q, want updated substep", selected.RequestURI)
+	}
+}
+
+func TestCloneRequestWithSelectedSubstepHandlesNilURL(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/process/123/content", nil)
+	req.URL = nil
+	req.RequestURI = ""
+
+	clone := cloneRequestWithSelectedSubstep(req, "1.2")
+	if clone.URL != nil {
+		t.Fatalf("clone url = %#v, want nil", clone.URL)
+	}
+	if clone.RequestURI != "" {
+		t.Fatalf("request uri = %q, want empty", clone.RequestURI)
+	}
+}
+
 func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 	timeline := []TimelineStep{{
 		StepID: "1",
