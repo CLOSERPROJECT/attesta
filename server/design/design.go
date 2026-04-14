@@ -55,20 +55,6 @@ var _ = Service("workflow", func() {
 		})
 	})
 
-	Method("readTimeline", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "process_id", String)
-			Required("workflow_key", "process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/timeline")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
 	Method("readDownloads", func() {
 		Payload(func() {
 			Field(1, "workflow_key", String)
@@ -259,19 +245,6 @@ var _ = Service("legacy", func() {
 		HTTP(func() {
 			GET("/process/{process_id}")
 			Response(StatusSeeOther)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyTimeline", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Required("process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/process/{process_id}/timeline")
-			Response(StatusOK)
 			Response(StatusNotFound)
 		})
 	})

@@ -229,7 +229,7 @@ svg.bi {
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 4px;
   background: transparent;
   color: var(--ink);
   cursor: pointer;
@@ -280,7 +280,7 @@ svg.bi {
   right: 0;
   min-width: 220px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 4px;
   background: var(--panel);
   box-shadow: 0 10px 26px var(--shadow);
   z-index: 40;
@@ -330,7 +330,7 @@ svg.bi {
   text-align: left;
   margin-left: 0;
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: 4px;
 }
 
 .nav .account-menu-item .icon-svg {
@@ -428,13 +428,6 @@ svg.bi {
   }
 }
 
-.two-col {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  align-items: start;
-  gap: 24px;
-}
-
 .stack {
   display: grid;
   gap: 24px;
@@ -443,7 +436,7 @@ svg.bi {
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 4px;
   padding: 20px;
   box-shadow: 0 10px 26px var(--shadow);
   min-width: 0;
@@ -500,7 +493,7 @@ button {
   background: var(--accent);
   color: #fff;
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: 4px;
   cursor: pointer;
   font-weight: 600;
 }
@@ -528,7 +521,7 @@ button.danger {
   display: inline-block;
   padding: 10px 16px;
   border: 1px solid var(--accent);
-  border-radius: 10px;
+  border-radius: 4px;
   font-weight: 600;
 }
 
@@ -554,10 +547,14 @@ button.secondary-small {
   min-width: 0;
 }
 
+.process-page {
+  min-width: 0;
+}
+
 .timeline-step {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-2);
+  border-radius: 4px;
+  background: var(--panel);
   overflow: hidden;
 }
 
@@ -587,7 +584,8 @@ button.secondary-small {
   min-width: 0;
 }
 
-.timeline-step-chevron {
+.timeline-step-chevron,
+.substep-accordion-chevron {
   width: 32px;
   height: 32px;
   color: var(--muted);
@@ -603,7 +601,8 @@ button.secondary-small {
   color: var(--ink);
 }
 
-.timeline-step-chevron .icon-svg {
+.timeline-step-chevron .icon-svg,
+.substep-accordion-chevron .icon-svg {
   width: 18px;
   height: 18px;
 }
@@ -611,7 +610,7 @@ button.secondary-small {
 .timeline-step-org-mark {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   display: inline-flex;
@@ -640,6 +639,8 @@ button.secondary-small {
   line-height: 1.2;
   font-weight: 700;
   color: var(--ink);
+  overflow-wrap: anywhere;
+  flex-wrap: wrap;
 }
 
 .timeline-step-org {
@@ -651,7 +652,7 @@ button.secondary-small {
 
 .timeline-substeps {
   list-style: none;
-  padding: 16px 12px 12px 48px;
+  padding: 16px 12px 12px;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -661,7 +662,7 @@ button.secondary-small {
 
 .substep {
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   border-left: 6px solid;
   background: var(--substep-bg);
@@ -679,12 +680,39 @@ button.secondary-small {
 }
 
 .substep:hover {
-  transform: translateY(-2px);
   opacity: 1;
 }
 
+.substep-accordion {
+  display: grid;
+  gap: 0;
+}
+
+.substep-accordion-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.substep-accordion-summary::marker,
+.substep-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.substep-summary-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.substep-accordion[open] .substep-accordion-chevron {
+  transform: rotate(180deg);
+  color: var(--ink);
+}
+
 .substep.substep-selected {
-  border-color: var(--accent);
   box-shadow: inset 0 0 0 1px rgba(30, 111, 92, 0.2);
 }
 
@@ -693,10 +721,18 @@ button.secondary-small {
   box-shadow: inset 0 0 0 1px rgba(30, 111, 92, 0.2);
 }
 
+.substep-available.substep-selected {
+  border-color: var(--accent);
+}
+
 .substep-done {
   opacity: 0.5;
   border-color: var(--accent-2);
   background: var(--warning-bg);
+}
+
+.substep-done.substep-selected {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 35%, transparent);
 }
 
 .substep-locked {
@@ -714,13 +750,18 @@ button.secondary-small {
   line-height: 1.2;
 }
 
+.substep-title {
+  margin-left: 8px;
+}
+
 .substep-head .status {
   margin-left: auto;
+  margin-right: 40px;
   font-weight: 600;
   text-transform: uppercase;
   font-size: 10px;
   letter-spacing: 0.04em;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--tag-bg);
   padding: 2px 8px;
@@ -743,13 +784,9 @@ button.secondary-small {
   color: var(--muted);
 }
 
-.substep-available .substep-head,
-.substep-locked .substep-head {
-  padding-right: 82px;
-}
-
 .substep-available .substep-head .status,
-.substep-locked .substep-head .status {
+.substep-locked .substep-head .status,
+.substep-done .substep-head .status {
   position: absolute;
   top: 10px;
   right: 12px;
@@ -769,6 +806,18 @@ button.secondary-small {
 .substep-meta > * {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.substep-summary-supporting {
+  padding-top: 6px;
+}
+
+.substep-details {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 .data-hash {
@@ -793,13 +842,13 @@ button.secondary-small {
   font-size: 12px;
   padding: 2px 6px;
   background: var(--pill-bg);
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--border);
 }
 
 .pill-step-number {
   padding: none;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 13px;
   width: 24px;
   height: 24px;
@@ -825,11 +874,8 @@ button.secondary-small {
   column-gap: 4px;
 }
 
-.action-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+.process-resources {
+  gap: 16px;
 }
 
 .role-badge {
@@ -837,7 +883,7 @@ button.secondary-small {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--role-border, var(--border));
   background: var(--role-color, var(--role-fallback));
   color: var(--role-ink);
@@ -868,7 +914,7 @@ button.secondary-small {
 
 .action-form input {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   min-width: 160px;
   background: var(--panel);
@@ -878,7 +924,7 @@ button.secondary-small {
 .action-form select {
   min-width: 220px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
@@ -893,11 +939,12 @@ button.secondary-small {
   display: block;
   width: 100%;
   min-width: 0;
-  max-width: 980px;
+  max-width: 1219px;
   background: var(--panel);
   color: var(--ink);
-  border-radius: 12px;
+  border-radius: 4px;
   overflow: visible;
+  padding: 12px;
 }
 
 .action-form .js-formata-host[data-formata-disabled="true"] {
@@ -960,7 +1007,7 @@ button.secondary-small {
   margin: 0;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   display: grid;
   gap: 6px;
 }
@@ -1004,7 +1051,7 @@ button.secondary-small {
   gap: 12px;
   padding: 14px;
   min-height: 200px;
-  border-radius: 14px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: linear-gradient(160deg, var(--panel), var(--surface-2));
   box-shadow: 0 8px 18px var(--shadow);
@@ -1153,7 +1200,7 @@ button.secondary-small {
   height: 36px;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  border-radius: 10px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--panel) 88%, white);
   color: var(--text);
   cursor: pointer;
@@ -1182,7 +1229,7 @@ button.secondary-small {
   min-width: 160px;
   padding: 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 4px;
   background: var(--panel);
   box-shadow: 0 10px 26px var(--shadow);
   z-index: 40;
@@ -1198,7 +1245,7 @@ button.secondary-small {
   gap: 8px;
   margin: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: 4px;
   background: transparent;
   color: var(--ink);
   text-decoration: none;
@@ -1245,7 +1292,7 @@ button.secondary-small {
   justify-content: center;
   min-width: 150px;
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--accent);
   color: #fff;
   font-weight: 600;
@@ -1275,7 +1322,7 @@ button.secondary-small {
 
 .dpp-process-panel {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 12px;
   background: var(--surface-2);
 }
@@ -1296,7 +1343,7 @@ button.secondary-small {
 
 .process-item {
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   display: grid;
@@ -1305,7 +1352,7 @@ button.secondary-small {
 
 .no-process-item {
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--ink) 10%, var(--surface-2));
   display: flex;
@@ -1340,7 +1387,7 @@ button.secondary-small {
   font-family: inherit;
   font-size: 13px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
@@ -1348,7 +1395,7 @@ button.secondary-small {
 
 .process-progress-line {
   height: 4px;
-  border-radius: 999px;
+  border-radius: 4px;
   background: #e8eedf;
   border: 1px solid var(--border);
   overflow: hidden;
@@ -1362,7 +1409,7 @@ button.secondary-small {
 
 .status-tag {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -1415,7 +1462,7 @@ button.secondary-small {
   border: 1px solid var(--danger);
   color: var(--error-ink);
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 4px;
   margin-block-start: 0;
   margin-block-end: 0;
   white-space: pre-line;
@@ -1426,7 +1473,7 @@ button.secondary-small {
   border: 1px solid var(--confirmation-border);
   color: var(--confirmation-ink);
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 4px;
   margin-block-start: 0;
   margin-block-end: 0;
   white-space: pre-line;
@@ -1459,7 +1506,7 @@ button.secondary-small {
 
 .input-form input {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
@@ -1519,7 +1566,7 @@ button.secondary-small {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   width: 60px;
   height: 40px;
   padding: 0;
@@ -1533,12 +1580,12 @@ button.secondary-small {
 
 .input-form input[type="color"]::-webkit-color-swatch {
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .input-form select {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
@@ -1553,7 +1600,7 @@ button.secondary-small {
   width: 100%;
   text-align: left;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
@@ -1578,7 +1625,7 @@ button.secondary-small {
   right: 0;
   z-index: 20;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--panel);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
   padding: 8px;
@@ -1593,7 +1640,7 @@ button.secondary-small {
 .roles-picker-search {
   width: 100%;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
@@ -1615,7 +1662,7 @@ button.secondary-small {
   text-align: left;
   border: 1px solid transparent;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 8px 10px;
   color: var(--ink);
   font: inherit;
@@ -1666,7 +1713,7 @@ button.secondary-small {
 .role-palette-preview {
   width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: 4px;
   background: var(--swatch-bg, var(--role-fallback));
   border: 2px solid var(--swatch-border, var(--border));
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -1733,7 +1780,7 @@ button.secondary-small {
   width: 64px;
   height: 64px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   object-fit: contain;
   background: #fff;
   padding: 4px;
@@ -1753,7 +1800,7 @@ button.secondary-small {
   justify-content: center;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--pill-bg);
   color: var(--muted);
   font-size: 12px;
@@ -1810,7 +1857,7 @@ button.secondary-small {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   gap: 16px;
@@ -1829,7 +1876,7 @@ button.secondary-small {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--surface-2), var(--panel));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1871,7 +1918,7 @@ button.secondary-small {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   gap: 16px;
@@ -1966,7 +2013,7 @@ button.secondary-small {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   gap: 16px;
@@ -2052,7 +2099,7 @@ button.secondary-small {
 .manage-dialog-card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 4px;
   box-shadow: 0 16px 34px var(--shadow);
   padding: 16px;
   display: grid;
@@ -2176,7 +2223,7 @@ hr {
   z-index: 1;
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  border-radius: 4px;
   margin-top: 6px;
   background: var(--accent);
   border: 3px solid var(--panel);
@@ -2185,7 +2232,7 @@ hr {
 
 .dpp-history-card {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 4px;
   background: linear-gradient(180deg, var(--panel), var(--surface-2));
   box-shadow: 0 10px 28px var(--shadow);
   padding: 16px;
@@ -2236,7 +2283,7 @@ hr {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 84%, var(--surface-2));
   color: var(--ink);
@@ -2294,7 +2341,7 @@ hr {
 
 .dpp-history-accordion {
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--panel) 88%, var(--surface-2));
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--panel) 78%, white);
   padding: 18px;

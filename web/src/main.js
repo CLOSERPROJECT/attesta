@@ -64,16 +64,67 @@ if (themeToggle) {
 const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
 const workflowKey = root?.dataset?.workflowKey;
-const timeline = document.getElementById("timeline");
+const processPageContent = document.getElementById("process-page-content");
 const actionArea = document.getElementById("action-area");
+let skipNextProcessUpdatedEvent = false;
+let skipNextProcessUpdatedEventTimer = 0;
 
 const focusNextActionInput = () => {
-  const nextInput = actionArea?.querySelector(
+  const container = processPageContent || actionArea || document;
+  const nextInput = container.querySelector(
     "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])"
   );
   if (nextInput) {
     nextInput.focus();
   }
+};
+
+const syncSelectedSubstepURL = (substepId = "") => {
+  try {
+    const url = new URL(window.location.href);
+    if (substepId) {
+      url.searchParams.set("substep", substepId);
+    } else {
+      url.searchParams.delete("substep");
+    }
+    window.history.replaceState({}, "", url);
+  } catch (_err) {
+  }
+};
+
+const currentSelectedSubstep = () => {
+  const selectedPanel = document.querySelector(".js-process-substep-panel[open]");
+  if (selectedPanel instanceof HTMLElement) {
+    return (selectedPanel.dataset.substepId || "").trim();
+  }
+  const selected = (root?.dataset?.selectedSubstep || "").trim();
+  if (selected) {
+    return selected;
+  }
+  return "";
+};
+
+const markSelectedSubstep = (substepId = "") => {
+  const selected = substepId.trim();
+  if (root instanceof HTMLElement) {
+    root.dataset.selectedSubstep = selected;
+  }
+  for (const node of document.querySelectorAll("[data-substep-id]")) {
+    if (!(node instanceof HTMLElement)) {
+      continue;
+    }
+    const container = node.classList.contains("substep")
+      ? node
+      : node.closest(".substep");
+    if (!(container instanceof HTMLElement)) {
+      continue;
+    }
+    container.classList.toggle(
+      "substep-selected",
+      selected !== "" && node.dataset.substepId === selected
+    );
+  }
+  syncSelectedSubstepURL(selected);
 };
 
 const resolveAbsoluteURL = (value) => {
@@ -84,15 +135,15 @@ const resolveAbsoluteURL = (value) => {
   }
 };
 
-const loadProcessActionArea = async (substepId = "") => {
-  if (!processId || !workflowKey || !actionArea) {
+const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
+  if (!processId || !workflowKey || !processPageContent) {
     return;
   }
   const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
-  const url = `/w/${workflowKey}/process/${processId}/actions${query}`;
+  const url = `/w/${workflowKey}/process/${processId}/content${query}`;
   if (window.htmx?.ajax) {
     window.htmx.ajax("GET", url, {
-      target: "#action-area",
+      target: "#process-page-content",
       swap: "innerHTML",
     });
     return;
@@ -103,31 +154,10 @@ const loadProcessActionArea = async (substepId = "") => {
       return;
     }
     const html = await response.text();
-    actionArea.innerHTML = html;
-  } catch (_err) {
-  }
-};
-
-const loadProcessTimeline = async (substepId = "") => {
-  if (!processId || !workflowKey || !timeline) {
-    return;
-  }
-  const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
-  const url = `/w/${workflowKey}/process/${processId}/timeline${query}`;
-  if (window.htmx?.ajax) {
-    window.htmx.ajax("GET", url, {
-      target: "#timeline",
-      swap: "innerHTML",
-    });
-    return;
-  }
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return;
-    }
-    const html = await response.text();
-    timeline.innerHTML = html;
+    processPageContent.innerHTML = html;
+    await initializeFormataForms(processPageContent);
+    markSelectedSubstep(currentSelectedSubstep());
+    focusNextActionInput();
   } catch (_err) {
   }
 };
@@ -446,17 +476,31 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
   form.dataset.formataSubmitState = "inflight";
 
   const url = form.dataset.formataPost || form.getAttribute("hx-post") || form.getAttribute("action");
+  const target =
+    form.dataset.formataTarget ||
+    (form.closest("#process-page-content") ? "#process-page-content" : "#action-area");
   const htmxApi = window.htmx;
-  if (!url || !htmxApi || typeof htmxApi.ajax !== "function") {
+  if (url && htmxApi && typeof htmxApi.ajax === "function" && document.querySelector(target)) {
+    if (target === "#process-page-content") {
+      skipNextProcessUpdatedEvent = true;
+      window.clearTimeout(skipNextProcessUpdatedEventTimer);
+      skipNextProcessUpdatedEventTimer = window.setTimeout(() => {
+        skipNextProcessUpdatedEvent = false;
+      }, 2000);
+    }
+    htmxApi.ajax("POST", url, {
+      source: form,
+      target,
+      swap: "innerHTML",
+      values: { value: serialized }
+    });
+    return true;
+  }
+  if (!url) {
     form.dataset.formataSubmitState = "idle";
     return false;
   }
-  htmxApi.ajax("POST", url, {
-    source: form,
-    target: "#action-area",
-    swap: "innerHTML",
-    values: { value: serialized }
-  });
+  HTMLFormElement.prototype.submit.call(form);
   return true;
 };
 
@@ -554,18 +598,23 @@ const initializeFormataForms = async (container = document) => {
   }
 };
 
-if (processId && workflowKey && timeline) {
+if (processId && workflowKey && processPageContent) {
   const source = new EventSource(
     `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`
   );
   source.addEventListener("process-updated", () => {
-    void loadProcessTimeline();
-    void loadProcessActionArea();
+    if (skipNextProcessUpdatedEvent) {
+      skipNextProcessUpdatedEvent = false;
+      window.clearTimeout(skipNextProcessUpdatedEventTimer);
+      return;
+    }
+    void loadProcessContent();
   });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   void initializeFormataForms(document);
+  markSelectedSubstep(currentSelectedSubstep());
   focusNextActionInput();
 });
 
@@ -585,9 +634,38 @@ document.addEventListener("click", (event) => {
 });
 
 document.body.addEventListener("htmx:afterSwap", (event) => {
-  if (event.target && event.target.id === "action-area") {
+  if (event.target && (event.target.id === "action-area" || event.target.id === "process-page-content")) {
     void initializeFormataForms(event.target);
+    markSelectedSubstep(currentSelectedSubstep());
     focusNextActionInput();
+  }
+});
+
+document.body.addEventListener("toggle", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLDetailsElement)) {
+    return;
+  }
+  if (!target.classList.contains("js-process-substep-panel")) {
+    return;
+  }
+  const substepID = (target.dataset.substepId || "").trim();
+  if (!substepID) {
+    return;
+  }
+  if (target.open) {
+    for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
+      if (!(panel instanceof HTMLDetailsElement) || panel === target) {
+        continue;
+      }
+      panel.open = false;
+    }
+    markSelectedSubstep(substepID);
+    focusNextActionInput();
+    return;
+  }
+  if (currentSelectedSubstep() === substepID) {
+    markSelectedSubstep("");
   }
 });
 
@@ -604,46 +682,10 @@ document.body.addEventListener("click", (event) => {
   }
   const shareButton = target.closest(".js-share-link");
   if (!(shareButton instanceof HTMLButtonElement)) {
-    const substepNav = target.closest(".js-substep-nav");
-    if (!(substepNav instanceof HTMLElement) || !processId || !workflowKey) {
-      return;
-    }
-    if (target.closest("a, button, input, select, textarea")) {
-      return;
-    }
-    const substepID = (substepNav.dataset.substepId || "").trim();
-    if (!substepID) {
-      return;
-    }
-    event.preventDefault();
-    void loadProcessActionArea(substepID);
     return;
   }
   event.preventDefault();
   void shareLink(shareButton);
-});
-
-document.body.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) {
-    return;
-  }
-  const substepNav = target.closest(".js-substep-nav");
-  if (!(substepNav instanceof HTMLElement) || !processId || !workflowKey) {
-    return;
-  }
-  if (target.closest("a, button, input, select, textarea")) {
-    return;
-  }
-  const substepID = (substepNav.dataset.substepId || "").trim();
-  if (!substepID) {
-    return;
-  }
-  event.preventDefault();
-  void loadProcessActionArea(substepID);
 });
 
 const deptRoot = document.querySelector("[data-dept-role]");

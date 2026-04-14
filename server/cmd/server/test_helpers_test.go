@@ -99,14 +99,14 @@ func testTemplates() *template.Template {
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.RoleColor}} {{.RoleBorder}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
-{{define "process_body"}}PROCESS {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{template "timeline.html" .Timeline}}{{end}}
+{{define "process_body"}}PROCESS {{.ProcessID}} {{template "process_content.html" .}}{{end}}
+{{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
 {{define "dpp.html"}}{{template "layout.html" .}}{{end}}
 {{define "about_body"}}ABOUT{{end}}
 {{define "about.html"}}{{template "layout.html" .}}{{end}}
-{{define "timeline.html"}}TIMELINE {{range .}}{{.StepID}} {{end}}{{end}}
 {{define "backoffice_picker_body"}}BACKOFFICE_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
 {{define "backoffice_landing_body"}}BACKOFFICE{{end}}
 {{define "backoffice.html"}}{{template "layout.html" .}}{{end}}

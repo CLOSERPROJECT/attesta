@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestHandleProcessPageAndTimelineSuccess(t *testing.T) {
+func TestHandleProcessPageAndContentSuccess(t *testing.T) {
 	store := NewMemoryStore()
 	id := seedProcessWithPending(store)
 	server := &Server{
@@ -37,14 +37,14 @@ func TestHandleProcessPageAndTimelineSuccess(t *testing.T) {
 		t.Fatalf("expected action list in page response, got %q", pageRec.Body.String())
 	}
 
-	timelineReq := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/timeline", nil)
-	timelineRec := httptest.NewRecorder()
-	server.handleProcessRoutes(timelineRec, timelineReq)
-	if timelineRec.Code != http.StatusOK {
-		t.Fatalf("expected timeline status %d, got %d", http.StatusOK, timelineRec.Code)
+	contentReq := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/content", nil)
+	contentRec := httptest.NewRecorder()
+	server.handleProcessRoutes(contentRec, contentReq)
+	if contentRec.Code != http.StatusOK {
+		t.Fatalf("expected process content status %d, got %d", http.StatusOK, contentRec.Code)
 	}
-	if !strings.Contains(timelineRec.Body.String(), "TIMELINE") {
-		t.Fatalf("expected timeline marker in response, got %q", timelineRec.Body.String())
+	if !strings.Contains(contentRec.Body.String(), "PROCESS_CONTENT "+id.Hex()) {
+		t.Fatalf("expected process content marker in response, got %q", contentRec.Body.String())
 	}
 }
 
@@ -73,7 +73,7 @@ func TestHandleProcessPageNotFoundCases(t *testing.T) {
 	}
 }
 
-func TestHandleTimelineNotFoundCases(t *testing.T) {
+func TestHandleProcessContentNotFoundCases(t *testing.T) {
 	server := &Server{
 		store: NewMemoryStore(),
 		tmpl:  testTemplates(),
@@ -82,7 +82,7 @@ func TestHandleTimelineNotFoundCases(t *testing.T) {
 		},
 	}
 
-	badIDReq := httptest.NewRequest(http.MethodGet, "/process/not-an-id/timeline", nil)
+	badIDReq := httptest.NewRequest(http.MethodGet, "/process/not-an-id/content", nil)
 	badIDRec := httptest.NewRecorder()
 	server.handleProcessRoutes(badIDRec, badIDReq)
 	if badIDRec.Code != http.StatusNotFound {
@@ -90,7 +90,7 @@ func TestHandleTimelineNotFoundCases(t *testing.T) {
 	}
 
 	missingID := primitive.NewObjectID().Hex()
-	missingReq := httptest.NewRequest(http.MethodGet, "/process/"+missingID+"/timeline", nil)
+	missingReq := httptest.NewRequest(http.MethodGet, "/process/"+missingID+"/content", nil)
 	missingRec := httptest.NewRecorder()
 	server.handleProcessRoutes(missingRec, missingReq)
 	if missingRec.Code != http.StatusNotFound {
@@ -119,10 +119,10 @@ func TestHandleProcessPageTemplateErrorReturns500(t *testing.T) {
 	}
 }
 
-func TestHandleTimelineTemplateErrorReturns500(t *testing.T) {
+func TestHandleProcessContentTemplateErrorReturns500(t *testing.T) {
 	store := NewMemoryStore()
 	id := seedProcessWithPending(store)
-	tmpl := template.Must(template.New("broken").Parse(`{{define "timeline.html"}}{{template "missing" .}}{{end}}`))
+	tmpl := template.Must(template.New("broken").Parse(`{{define "process_content.html"}}{{template "missing" .}}{{end}}`))
 	server := &Server{
 		store: store,
 		tmpl:  tmpl,
@@ -131,7 +131,7 @@ func TestHandleTimelineTemplateErrorReturns500(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/timeline", nil)
+	req := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/content", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 

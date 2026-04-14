@@ -51,6 +51,67 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	}
 }
 
+func TestCloneRequestWithSelectedSubstepUpdatesQuery(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/process/123/content?substep=1.1&filter=active", nil)
+
+	cleared := cloneRequestWithSelectedSubstep(req, "")
+	if got := cleared.URL.Query().Get("substep"); got != "" {
+		t.Fatalf("cleared substep = %q, want empty", got)
+	}
+	if got := cleared.URL.Query().Get("filter"); got != "active" {
+		t.Fatalf("filter query = %q, want %q", got, "active")
+	}
+	if strings.Contains(cleared.RequestURI, "substep=") {
+		t.Fatalf("request uri = %q, want substep removed", cleared.RequestURI)
+	}
+
+	selected := cloneRequestWithSelectedSubstep(req, "2.1")
+	if got := selected.URL.Query().Get("substep"); got != "2.1" {
+		t.Fatalf("selected substep = %q, want %q", got, "2.1")
+	}
+	if !strings.Contains(selected.RequestURI, "substep=2.1") {
+		t.Fatalf("request uri = %q, want updated substep", selected.RequestURI)
+	}
+}
+
+func TestCloneRequestWithSelectedSubstepHandlesNilURL(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/process/123/content", nil)
+	req.URL = nil
+	req.RequestURI = ""
+
+	clone := cloneRequestWithSelectedSubstep(req, "1.2")
+	if clone.URL != nil {
+		t.Fatalf("clone url = %#v, want nil", clone.URL)
+	}
+	if clone.RequestURI != "" {
+		t.Fatalf("request uri = %q, want empty", clone.RequestURI)
+	}
+}
+
+func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
+	timeline := []TimelineStep{{
+		StepID: "1",
+		Substeps: []TimelineSubstep{
+			{SubstepID: "1.1"},
+			{SubstepID: "1.2"},
+		},
+	}}
+	actions := []ActionView{
+		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow"},
+	}
+
+	got := decorateTimelineActions(timeline, actions)
+	if got[0].Substeps[0].Action != nil {
+		t.Fatal("expected unrelated substep action to stay nil")
+	}
+	if got[0].Substeps[1].Action == nil {
+		t.Fatal("expected matching substep action to be attached")
+	}
+	if got[0].Substeps[1].Action.SubstepID != "1.2" || got[0].Substeps[1].Action.Title != "Inspect lot" {
+		t.Fatalf("attached action = %#v", got[0].Substeps[1].Action)
+	}
+}
+
 func TestHandleProcessActionsPartialSelectsRequestedSubstep(t *testing.T) {
 	store := NewMemoryStore()
 	processID := store.SeedProcess(Process{

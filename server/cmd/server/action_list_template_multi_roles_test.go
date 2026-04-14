@@ -35,7 +35,13 @@ func TestActionListTemplateShowsAllRoleBadges(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, "Department 1") || !strings.Contains(body, "Department 2") {
-		t.Fatalf("expected both role labels in template, got body: %s", body)
+	if !strings.Contains(body, `name="activeRole"`) {
+		t.Fatalf("expected role selector in template, got body: %s", body)
+	}
+	if !strings.Contains(body, `value="dep1"`) || !strings.Contains(body, `value="dep2"`) {
+		t.Fatalf("expected matching role options in template, got body: %s", body)
+	}
+	if strings.Contains(body, "Department 1") || strings.Contains(body, "Department 2") {
+		t.Fatalf("expected role badges to stay out of action detail, got body: %s", body)
 	}
 }
