@@ -15,6 +15,16 @@
 }
 
 @media (max-width: 720px) {
+  .panel-head-actions {
+    flex-direction: column;
+    button {
+      width: 100%;
+    };
+    form {
+      width: 100%;
+    };
+  }
+
   .page {
     padding: 16px 16px 32px;
   }
