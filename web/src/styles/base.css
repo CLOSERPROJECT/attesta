@@ -1409,6 +1409,14 @@ button.secondary-small {
   gap: 24px;
 }
 
+.preview-panel {
+  scroll-margin-top: 44px;
+}
+
+.instances-panel {
+  scroll-margin-top: 140px;
+}
+
 .process-progress-line {
   height: 4px;
   border-radius: 4px;
