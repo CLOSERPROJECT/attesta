@@ -191,46 +191,47 @@
           </details>
         {{ end }}
       </div>
-    </section>
 
-    <section class="panel dpp-integrity">
-      <h2>Integrity</h2>
-      <div class="dpp-integrity-root">
-        <strong>Merkle root:</strong>
-        <code class="dpp-integrity-hash dpp-integrity-hash-full"
-          >{{ .Integrity.Root.Full }}</code
-        >
-        <button
-          type="button"
-          class="dpp-integrity-hash-button js-copy-text"
-          data-copy-text="{{ .Integrity.Root.Full }}"
-          data-copy-label="merkle root"
-          aria-label="Copy full merkle root hash"
-          title="{{ .Integrity.Root.Full }}"
-        >
-          {{ .Integrity.Root.Short }}
-        </button>
+      <hr style="margin: 24px 0;" />
+      <div class="dpp-integrity">
+        <h2>Integrity</h2>
+        <div class="dpp-integrity-root">
+          <strong>Merkle root:</strong>
+          <code class="dpp-integrity-hash dpp-integrity-hash-full"
+            >{{ .Integrity.Root.Full }}</code
+          >
+          <button
+            type="button"
+            class="dpp-integrity-hash-button js-copy-text"
+            data-copy-text="{{ .Integrity.Root.Full }}"
+            data-copy-label="merkle root"
+            aria-label="Copy full merkle root hash"
+            title="{{ .Integrity.Root.Full }}"
+          >
+            {{ .Integrity.Root.Short }}
+          </button>
+        </div>
+        <ul class="dpp-integrity-list">
+          {{ range .Integrity.Leaves }}
+            <li class="dpp-integrity-item">
+              <code>{{ .SubstepID }}</code>
+              <code class="dpp-integrity-hash dpp-integrity-hash-full"
+                >{{ .Hash.Full }}</code
+              >
+              <button
+                type="button"
+                class="dpp-integrity-hash-button js-copy-text"
+                data-copy-text="{{ .Hash.Full }}"
+                data-copy-label="substep hash"
+                aria-label="Copy full hash for substep {{ .SubstepID }}"
+                title="{{ .Hash.Full }}"
+              >
+                {{ .Hash.Short }}
+              </button>
+            </li>
+          {{ end }}
+        </ul>
       </div>
-      <ul class="dpp-integrity-list">
-        {{ range .Integrity.Leaves }}
-          <li class="dpp-integrity-item">
-            <code>{{ .SubstepID }}</code>
-            <code class="dpp-integrity-hash dpp-integrity-hash-full"
-              >{{ .Hash.Full }}</code
-            >
-            <button
-              type="button"
-              class="dpp-integrity-hash-button js-copy-text"
-              data-copy-text="{{ .Hash.Full }}"
-              data-copy-label="substep hash"
-              aria-label="Copy full hash for substep {{ .SubstepID }}"
-              title="{{ .Hash.Full }}"
-            >
-              {{ .Hash.Short }}
-            </button>
-          </li>
-        {{ end }}
-      </ul>
     </section>
   </div>
 {{ end }}
