@@ -163,6 +163,57 @@ func TestHandleHomeFiltersProcessesByStatus(t *testing.T) {
 	}
 }
 
+func TestHandleHomePaginatesProcesses(t *testing.T) {
+	store := NewMemoryStore()
+	base := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+	expectedPageTwoID := ""
+
+	for i := 0; i < homeProcessesPerPage+1; i++ {
+		processID := primitive.NewObjectID()
+		if i == homeProcessesPerPage {
+			expectedPageTwoID = processID.Hex()
+		}
+		store.SeedProcess(Process{
+			ID:          processID,
+			WorkflowKey: "workflow",
+			CreatedAt:   base.Add(-time.Duration(i) * time.Minute),
+			Status:      "active",
+			Progress: map[string]ProcessStep{
+				"1_1": {State: "done", DoneAt: ptrTime(base.Add(-time.Duration(i) * time.Minute))},
+			},
+		})
+	}
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?page=2", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER all PAGE 2/2") {
+		t.Fatalf("expected second page with one process, got %q", body)
+	}
+	if !strings.Contains(body, expectedPageTwoID+":active") {
+		t.Fatalf("expected last process on page 2, got %q", body)
+	}
+}
+
 func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string", "Main workflow description")
@@ -747,6 +798,18 @@ func TestNormalizeHomeStatusFilter(t *testing.T) {
 	}
 }
 
+func TestNormalizeHomePage(t *testing.T) {
+	if got := normalizeHomePage(0, 0); got != 1 {
+		t.Fatalf("expected page 1 for empty result set, got %d", got)
+	}
+	if got := normalizeHomePage(99, 13); got != 2 {
+		t.Fatalf("expected last page for overflow, got %d", got)
+	}
+	if got := normalizeHomePage(2, 24); got != 2 {
+		t.Fatalf("expected page 2, got %d", got)
+	}
+}
+
 func TestSortHomeProcessListByStatus(t *testing.T) {
 	items := []ProcessListItem{
 		{ID: "a", Status: "done", Percent: 100, CreatedAtTime: time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)},
@@ -887,7 +950,7 @@ func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
-PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} DESC {{.WorkflowDescription}}
+PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} PAGE {{.CurrentPage}}/{{.TotalPages}} DESC {{.WorkflowDescription}}
 PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
 {{end}}
 {{define "stream.html"}}{{template "layout.html" .}}{{end}}

@@ -421,6 +421,13 @@ type HomeView struct {
 	CanStartProcess     bool
 	Sort                string
 	StatusFilter        string
+	CurrentPage         int
+	TotalPages          int
+	PageNumbers         []int
+	HasPreviousPage     bool
+	HasNextPage         bool
+	PreviousPage        int
+	NextPage            int
 	Processes           []ProcessListItem
 	Preview             ActionListView
 }
@@ -2850,6 +2857,7 @@ func (s *Server) platformOrganizations(ctx context.Context) []Organization {
 }
 
 const platformAdminOrganizationsPerPage = 12
+const homeProcessesPerPage = 10
 
 func filterPlatformOrganizations(organizations []Organization, query string) []Organization {
 	trimmedQuery := strings.ToLower(strings.TrimSpace(query))
@@ -2870,6 +2878,20 @@ func normalizePlatformAdminPage(raw int, totalItems int) int {
 	totalPages := 1
 	if totalItems > 0 {
 		totalPages = (totalItems + platformAdminOrganizationsPerPage - 1) / platformAdminOrganizationsPerPage
+	}
+	if raw < 1 {
+		return 1
+	}
+	if raw > totalPages {
+		return totalPages
+	}
+	return raw
+}
+
+func normalizeHomePage(raw int, totalItems int) int {
+	totalPages := 1
+	if totalItems > 0 {
+		totalPages = (totalItems + homeProcessesPerPage - 1) / homeProcessesPerPage
 	}
 	if raw < 1 {
 		return 1
@@ -4491,6 +4513,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	}
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
 	statusFilter := normalizeHomeStatusFilter(r.URL.Query().Get("filter"))
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
 	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
 		logRequestError(r, err, "failed to list recent processes for workflow %s", workflowKey)
@@ -4525,6 +4548,23 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sortHomeProcessList(processes, sortKey)
+	currentPage := normalizeHomePage(page, len(processes))
+	start := (currentPage - 1) * homeProcessesPerPage
+	end := min(start+homeProcessesPerPage, len(processes))
+	pagedProcesses := processes
+	if start < len(processes) {
+		pagedProcesses = processes[start:end]
+	} else if len(processes) > 0 {
+		pagedProcesses = processes[:0]
+	}
+	totalPages := 1
+	if len(processes) > 0 {
+		totalPages = (len(processes) + homeProcessesPerPage - 1) / homeProcessesPerPage
+	}
+	pageNumbers := make([]int, 0, totalPages)
+	for current := 1; current <= totalPages; current++ {
+		pageNumbers = append(pageNumbers, current)
+	}
 
 	actor := actorFromAccountUser(user, workflowKey)
 	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
@@ -4545,7 +4585,14 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		CanStartProcess:     workflowError == "",
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
-		Processes:           processes,
+		CurrentPage:         currentPage,
+		TotalPages:          totalPages,
+		PageNumbers:         pageNumbers,
+		HasPreviousPage:     currentPage > 1,
+		HasNextPage:         currentPage < totalPages,
+		PreviousPage:        max(currentPage-1, 1),
+		NextPage:            min(currentPage+1, totalPages),
+		Processes:           pagedProcesses,
 		Preview:             preview,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "stream.html", view); err != nil {

@@ -1406,6 +1406,7 @@ button.secondary-small {
 
 .home-workflow-panel-main {
   display: grid;
+  gap: 24px;
 }
 
 .process-progress-line {

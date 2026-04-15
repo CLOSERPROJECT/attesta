@@ -17,18 +17,12 @@
     <div
       class="home-workflow-grid"
       data-home-root
-      data-home-default-panel="{{ if .Processes }}
-        instances
-      {{ else }}
-        preview
-      {{ end }}"
+      data-home-default-panel="instances"
     >
       <section class="panel org-admin-sidebar">
         <div class="panel-heading">
           <h2>Stream workspace</h2>
-          <p>
-            Switch between live instances and the read-only workflow preview.
-          </p>
+          <p>Jump between live instances and the read-only stream preview.</p>
         </div>
         <nav
           class="org-admin-sidebar-nav"
@@ -53,7 +47,7 @@
           >
             <span class="org-admin-sidebar-link-title">Preview</span>
             <span class="org-admin-sidebar-link-copy"
-              >Inspect the workflow timeline without entering data.</span
+              >Inspect the stream timeline without entering data.</span
             >
           </button>
         </nav>
@@ -64,6 +58,7 @@
           class="panel"
           id="home-panel-instances"
           data-home-panel="instances"
+          style="scroll-margin-top: 88px;"
         >
           <div class="panel-head-actions">
             <div class="panel-heading">
@@ -98,6 +93,7 @@
                 action="{{ .WorkflowPath }}/"
                 class="process-toolbar"
               >
+                <input type="hidden" name="page" value="1" />
                 <label class="process-control">
                   <span class="muted">
                     {{ template "icon-sort" . }}
@@ -205,6 +201,78 @@
                   </li>
                 {{ end }}
               </ul>
+              {{ if gt .TotalPages 1 }}
+                <nav
+                  class="platform-admin-pagination"
+                  aria-label="Stream instances pagination"
+                >
+                  <div class="platform-admin-pagination-pages">
+                    <a
+                      class="secondary"
+                      style="padding: 10px 8px; {{ if not .HasPreviousPage }}
+                        pointer-events: none; opacity: 0.5;
+                      {{ end }}"
+                      href="{{ .WorkflowPath }}/{{- if or (ne .Sort "time_desc") (ne .StatusFilter "all") (gt .PreviousPage 1) -}}
+                        ?{{- if ne .Sort "time_desc" -}}
+                          sort={{ .Sort | urlquery }}{{- if or (ne .StatusFilter "all") (gt .PreviousPage 1) -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if ne .StatusFilter "all" -}}
+                          filter={{ .StatusFilter | urlquery }}{{- if gt .PreviousPage 1 -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if gt .PreviousPage 1 -}}
+                          page={{ .PreviousPage }}
+                        {{- end -}}
+                      {{- end -}}#home-panel-instances"
+                    >
+                      {{ template "icon-chevron-left" . }}
+                    </a>
+                    {{ range .PageNumbers }}
+                      <a
+                        class="{{ if eq . $.CurrentPage }}
+                          primary
+                        {{ else }}
+                          secondary
+                        {{ end }}"
+                        href="{{ $.WorkflowPath }}/{{- if or (ne $.Sort "time_desc") (ne $.StatusFilter "all") (gt . 1) -}}
+                          ?{{- if ne $.Sort "time_desc" -}}
+                            sort={{ $.Sort | urlquery }}{{- if or (ne $.StatusFilter "all") (gt . 1) -}}
+                              &
+                            {{- end -}}
+                          {{- end -}}{{- if ne $.StatusFilter "all" -}}
+                            filter={{ $.StatusFilter | urlquery }}{{- if gt . 1 -}}
+                              &
+                            {{- end -}}
+                          {{- end -}}{{- if gt . 1 -}}page={{ . }}{{- end -}}
+                        {{- end -}}#home-panel-instances"
+                        >{{ . }}</a
+                      >
+                    {{ end }}
+                    <a
+                      class="secondary"
+                      style="padding: 10px 8px; {{ if not .HasNextPage }}
+                        pointer-events: none; opacity: 0.5;
+                      {{ end }}"
+                      href="{{ .WorkflowPath }}/{{- if or (ne .Sort "time_desc") (ne .StatusFilter "all") (gt .NextPage 1) -}}
+                        ?{{- if ne .Sort "time_desc" -}}
+                          sort={{ .Sort | urlquery }}{{- if or (ne .StatusFilter "all") (gt .NextPage 1) -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if ne .StatusFilter "all" -}}
+                          filter={{ .StatusFilter | urlquery }}{{- if gt .NextPage 1 -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if gt .NextPage 1 -}}
+                          page={{ .NextPage }}
+                        {{- end -}}
+                      {{- end -}}#home-panel-instances"
+                    >
+                      {{ template "icon-chevron-right" . }}
+                    </a>
+                  </div>
+                </nav>
+              {{ end }}
             {{ else }}
               <div class="no-process-item">
                 <p class="muted">No stream instances yet</p>
@@ -212,12 +280,11 @@
             {{ end }}
           {{ end }}
         </section>
-
         <section
           class="panel"
           id="home-panel-preview"
           data-home-panel="preview"
-          hidden
+          style="scroll-margin-top: 88px;"
         >
           <div class="panel-heading" style="margin-bottom: 20px;">
             <h2>Stream preview</h2>
@@ -245,13 +312,6 @@
         if (!allowedPanels.has(panelName)) {
           return;
         }
-        const panels = Array.from(
-          homeRoot.querySelectorAll("[data-home-panel]"),
-        );
-        panels.forEach((panel) => {
-          const currentName = panel.getAttribute("data-home-panel");
-          panel.hidden = currentName !== panelName;
-        });
         const buttons = Array.from(
           homeRoot.querySelectorAll("[data-home-nav]"),
         );
@@ -280,6 +340,18 @@
               button.getAttribute("data-home-nav") || ""
             ).trim();
             setPanel(panelName);
+            const panel = homeRoot.querySelector(
+              `[data-home-panel="${panelName}"]`,
+            );
+            if (!panel) {
+              return;
+            }
+            const behavior = window.matchMedia(
+              "(prefers-reduced-motion: reduce)",
+            ).matches
+              ? "auto"
+              : "smooth";
+            panel.scrollIntoView({ behavior, block: "start" });
           });
         },
       );
