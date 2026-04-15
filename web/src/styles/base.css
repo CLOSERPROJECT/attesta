@@ -64,6 +64,7 @@
   --button-contrast: #0b0f0d;
   --tobar-pa-bg: #000;
   --ink-pa: #fff;
+  --brand-pa: #57c2a6;
 }
 
 [data-theme="dark"] {
@@ -130,6 +131,7 @@
   --button-contrast: #0b0f0d;
   --tobar-pa-bg: #fff;
   --ink-pa: #000;
+  --brand-pa: #1e6f5c;
 }
 
 * {
@@ -186,6 +188,9 @@ svg.bi {
 
 .topbar-pa {
   background: var(--tobar-pa-bg);
+  .brand {
+    color: var(--brand-pa);
+  }
 }
 
 .topbar-content {
