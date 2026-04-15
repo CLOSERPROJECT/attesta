@@ -30,123 +30,7 @@
         <p>{{ .ProcessID }}</p>
       </div>
     </section>
-    <div class="timeline-list">
-      {{ range .ActionList.Timeline }}
-        <details
-          class="timeline-step"
-          {{ if .Expanded }}open{{ end }}
-        >
-          <summary class="timeline-step-summary" aria-label="Open stream step">
-            <div class="timeline-step-summary-main">
-              <span
-                class="pill pill-step-number"
-                style="--pill-bg: var(--panel); --border: var(--ink); "
-                >{{ .StepID }}</span
-              >
-              {{ if .OrgLogoURL }}
-                <img
-                  src="{{ .OrgLogoURL }}"
-                  alt=""
-                  class="timeline-step-org-mark"
-                />
-              {{ else }}
-                <span class="timeline-step-org-mark">
-                  {{ template "icon-no-org" . }}
-                </span>
-              {{ end }}
-              <span class="timeline-step-copy">
-                <span class="timeline-step-title">{{ .Title }}</span>
-                <span class="timeline-step-org"
-                  >{{ if .OrgName }}
-                    {{ .OrgName }}
-                  {{ else }}
-                    No organization
-                  {{ end }}</span
-                >
-              </span>
-            </div>
-            <span class="timeline-step-chevron" aria-hidden="true">
-              {{ template "icon-chevron-down" . }}
-            </span>
-          </summary>
-          <ul class="timeline-substeps">
-            {{ range .Substeps }}
-              <li
-                class="substep substep-{{ .Status }}{{ if .Selected }}
-                  substep-selected
-                {{ end }}"
-                style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
-              >
-                <details
-                  class="substep-accordion js-process-substep-panel"
-                  data-substep-id="{{ .SubstepID }}"
-                  {{ if .Selected }}open{{ end }}
-                >
-                  <summary class="substep-accordion-summary">
-                    <div class="substep-summary-main">
-                      <div class="substep-head">
-                        <span
-                          class="pill"
-                          style="--pill-bg: var(--panel); --border: var(--ink);"
-                          >{{ .SubstepID }}</span
-                        >
-                        <span class="timeline-step-title substep-title"
-                          >{{ .Title }}</span
-                        >
-                        <span class="status">{{ .Status }}</span>
-                      </div>
-                      <div class="substep-summary-supporting">
-                        {{ if .RoleBadges }}
-                          <div class="role-pill-row">
-                            {{ range .RoleBadges }}
-                              <span
-                                class="pill role-pill"
-                                style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
-                                >{{ .Label }}</span
-                              >
-                            {{ end }}
-                          </div>
-                        {{ else }}
-                          <span
-                            class="pill role-pill"
-                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
-                            >{{ .RoleLabel }}</span
-                          >
-                        {{ end }}
-                        {{ if eq .Status "done" }}
-                          <div class="substep-meta">
-                            {{ if .DoneBy }}
-                              <span class="actor">by {{ .DoneBy }}</span>
-                            {{ else }}
-                              <span class="actor">completed</span>
-                            {{ end }}
-                            {{ if .DoneAt }}
-                              <span class="time">{{ .DoneAt }}</span>
-                            {{ end }}
-                          </div>
-                        {{ end }}
-                      </div>
-                    </div>
-                    <span class="substep-accordion-chevron" aria-hidden="true">
-                      {{ template "icon-chevron-down" . }}
-                    </span>
-                  </summary>
-                  <div class="substep-details">
-                    {{ with .Action }}
-                      {{ template "action_detail_content.html" . }}
-                    {{ else }}
-                      <p class="muted">
-                        No data form configured for this substep.
-                      </p>
-                    {{ end }}
-                  </div>
-                </details>
-              </li>
-            {{ end }}
-          </ul>
-        </details>
-      {{ end }}
-    </div>
+    {{ template "workflow_timeline" .ActionList }}
     {{ if .ActionList.ProcessDone }}
       <div class="stack process-resources">
         {{ template "process_dpp" . }}
@@ -225,4 +109,124 @@
 
 {{ define "process.html" }}
   {{ template "layout.html" . }}
+{{ end }}
+
+{{ define "workflow_timeline" }}
+  <div class="timeline-list">
+    {{ range .Timeline }}
+      <details
+        class="timeline-step"
+        {{ if .Expanded }}open{{ end }}
+      >
+        <summary class="timeline-step-summary" aria-label="Open stream step">
+          <div class="timeline-step-summary-main">
+            <span
+              class="pill pill-step-number"
+              style="--pill-bg: var(--panel); --border: var(--ink); "
+              >{{ .StepID }}</span
+            >
+            {{ if .OrgLogoURL }}
+              <img
+                src="{{ .OrgLogoURL }}"
+                alt=""
+                class="timeline-step-org-mark"
+              />
+            {{ else }}
+              <span class="timeline-step-org-mark">
+                {{ template "icon-no-org" . }}
+              </span>
+            {{ end }}
+            <span class="timeline-step-copy">
+              <span class="timeline-step-title">{{ .Title }}</span>
+              <span class="timeline-step-org"
+                >{{ if .OrgName }}
+                  {{ .OrgName }}
+                {{ else }}
+                  No organization
+                {{ end }}</span
+              >
+            </span>
+          </div>
+          <span class="timeline-step-chevron" aria-hidden="true">
+            {{ template "icon-chevron-down" . }}
+          </span>
+        </summary>
+        <ul class="timeline-substeps">
+          {{ range .Substeps }}
+            <li
+              class="substep substep-{{ .Status }}{{ if .Selected }}
+                substep-selected
+              {{ end }}"
+              style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
+            >
+              <details
+                class="substep-accordion js-process-substep-panel"
+                data-substep-id="{{ .SubstepID }}"
+                {{ if .Selected }}open{{ end }}
+              >
+                <summary class="substep-accordion-summary">
+                  <div class="substep-summary-main">
+                    <div class="substep-head">
+                      <span
+                        class="pill"
+                        style="--pill-bg: var(--panel); --border: var(--ink);"
+                        >{{ .SubstepID }}</span
+                      >
+                      <span class="timeline-step-title substep-title"
+                        >{{ .Title }}</span
+                      >
+                      <span class="status">{{ .Status }}</span>
+                    </div>
+                    <div class="substep-summary-supporting">
+                      {{ if .RoleBadges }}
+                        <div class="role-pill-row">
+                          {{ range .RoleBadges }}
+                            <span
+                              class="pill role-pill"
+                              style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
+                              >{{ .Label }}</span
+                            >
+                          {{ end }}
+                        </div>
+                      {{ else }}
+                        <span
+                          class="pill role-pill"
+                          style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
+                          >{{ .RoleLabel }}</span
+                        >
+                      {{ end }}
+                      {{ if eq .Status "done" }}
+                        <div class="substep-meta">
+                          {{ if .DoneBy }}
+                            <span class="actor">by {{ .DoneBy }}</span>
+                          {{ else }}
+                            <span class="actor">completed</span>
+                          {{ end }}
+                          {{ if .DoneAt }}
+                            <span class="time">{{ .DoneAt }}</span>
+                          {{ end }}
+                        </div>
+                      {{ end }}
+                    </div>
+                  </div>
+                  <span class="substep-accordion-chevron" aria-hidden="true">
+                    {{ template "icon-chevron-down" . }}
+                  </span>
+                </summary>
+                <div class="substep-details">
+                  {{ with .Action }}
+                    {{ template "action_detail_content.html" . }}
+                  {{ else }}
+                    <p class="muted">
+                      No data form configured for this substep.
+                    </p>
+                  {{ end }}
+                </div>
+              </details>
+            </li>
+          {{ end }}
+        </ul>
+      </details>
+    {{ end }}
+  </div>
 {{ end }}

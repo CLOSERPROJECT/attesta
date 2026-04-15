@@ -94,6 +94,7 @@ func testTemplates() *template.Template {
 	{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 	{{define "home_body"}}HOME{{end}}
 	{{define "home.html"}}{{template "layout.html" .}}{{end}}
+	{{define "stream.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_body"}}DASHBOARD_ME {{.ID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}

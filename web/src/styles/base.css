@@ -1398,6 +1398,16 @@ button.secondary-small {
   color: var(--ink);
 }
 
+.home-workflow-grid {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+
+.home-workflow-panel-main {
+  display: grid;
+}
+
 .process-progress-line {
   height: 4px;
   border-radius: 4px;
@@ -1755,7 +1765,7 @@ button.secondary-small {
   gap: 2px;
   padding: 12px 14px;
   text-align: left;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: inherit;

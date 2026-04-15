@@ -890,7 +890,7 @@ func homeTestTemplates() *template.Template {
 PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} DESC {{.WorkflowDescription}}
 PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
 {{end}}
-{{define "home.html"}}{{template "layout.html" .}}{{end}}
+{{define "stream.html"}}{{template "layout.html" .}}{{end}}
 `))
 }
 

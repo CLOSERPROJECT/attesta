@@ -247,6 +247,7 @@ type ActionView struct {
 	Values        []ActionKV
 	Attachments   []ActionAttachmentView
 	Disabled      bool
+	ReadOnly      bool
 	Reason        string
 }
 
@@ -421,6 +422,7 @@ type HomeView struct {
 	Sort                string
 	StatusFilter        string
 	Processes           []ProcessListItem
+	Preview             ActionListView
 }
 
 type LoginView struct {
@@ -4524,6 +4526,18 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 
 	sortHomeProcessList(processes, sortKey)
 
+	actor := actorFromAccountUser(user, workflowKey)
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+		if len(actor.RoleSlugs) > 0 {
+			actor.Role = actor.RoleSlugs[0]
+		}
+	}
+	preview := makeActionListReadOnly(
+		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
+		"Preview only. Start an instance to submit data.",
+	)
+
 	view := HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
@@ -4532,8 +4546,9 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
 		Processes:           processes,
+		Preview:             preview,
 	}
-	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
+	if err := s.tmpl.ExecuteTemplate(w, "stream.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -4753,6 +4768,43 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		DPPGS1:      actionList.DPPGS1,
 		Attachments: actionList.Attachments,
 	}
+}
+
+func buildWorkflowPreviewProcess(def WorkflowDef, workflowKey string) *Process {
+	process := &Process{
+		WorkflowKey: workflowKey,
+		Status:      "active",
+		Progress:    map[string]ProcessStep{},
+	}
+	for _, step := range sortedSteps(def) {
+		for _, sub := range sortedSubsteps(step) {
+			process.Progress[sub.SubstepID] = ProcessStep{State: "pending"}
+		}
+	}
+	return process
+}
+
+func makeActionListReadOnly(view ActionListView, reason string) ActionListView {
+	reason = strings.TrimSpace(reason)
+	if view.Action != nil {
+		action := *view.Action
+		action.ReadOnly = true
+		action.Reason = reason
+		view.Action = &action
+	}
+	for stepIndex := range view.Timeline {
+		for substepIndex := range view.Timeline[stepIndex].Substeps {
+			action := view.Timeline[stepIndex].Substeps[substepIndex].Action
+			if action == nil {
+				continue
+			}
+			actionCopy := *action
+			actionCopy.ReadOnly = true
+			actionCopy.Reason = reason
+			view.Timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+		}
+	}
+	return view
 }
 
 func actorFromAccountUser(user *AccountUser, workflowKey string) Actor {
