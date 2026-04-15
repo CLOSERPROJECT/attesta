@@ -16,4 +16,9 @@
   .home-workflow-grid {
     grid-template-columns: 1fr;
   }
+
+  .preview-panel,
+  .instances-panel {
+    scroll-margin-top: 12px;
+  }
 }
