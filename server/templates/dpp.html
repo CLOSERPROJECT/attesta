@@ -60,43 +60,39 @@
                 <span class="dpp-history-dot"></span>
               </div>
               <div class="dpp-history-card">
-                <div class="dpp-history-card-head">
-                  <div class="dpp-history-card-copy">
+                <div class="dpp-history-card-copy">
+                  <span
+                    class="pill"
+                    style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
+                    >Step {{ .StepID }}</span
+                  >
+                  <h3>{{ .Title }}</h3>
+                  <div class="dpp-history-meta">
                     <span
-                      class="pill"
-                      style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
-                      >Step {{ .StepID }}</span
+                      ><strong>Completed:</strong> {{ if .CompletedAtHuman }}
+                        <time datetime="{{ .CompletedAt }}"
+                          >{{ .CompletedAtHuman }}</time
+                        >
+                      {{ else }}
+                        Not completed
+                      {{ end }}</span
                     >
-                    <h3>{{ .Title }}</h3>
-                    <div class="dpp-history-meta">
-                      <span
-                        ><strong>Completed:</strong> {{ if .CompletedAtHuman }}
-                          <time datetime="{{ .CompletedAt }}"
-                            >{{ .CompletedAtHuman }}</time
-                          >
-                        {{ else }}
-                          Not completed
-                        {{ end }}</span
-                      >
-                      <span
-                        ><strong>Organization:</strong>
-                        {{ if .OrganizationName }}
-                          {{ .OrganizationName }}
-                        {{ else }}
-                          No organization
-                        {{ end }}</span
-                      >
-                    </div>
+                    <span
+                      ><strong>Organization:</strong> {{ if .OrganizationName }}
+                        {{ .OrganizationName }}
+                      {{ else }}
+                        No organization
+                      {{ end }}</span
+                    >
                   </div>
-                  <span class="dpp-history-toggle">
-                    <span class="dpp-history-toggle-open">Show details</span>
-                    <span class="dpp-history-toggle-close">Hide details</span>
-                  </span>
+                  <div class="dpp-history-status">
+                    {{ len .Substeps }}
+                    substep{{ if ne (len .Substeps) 1 }}s{{ end }} recorded
+                  </div>
                 </div>
-                <div class="dpp-history-status">
-                  {{ len .Substeps }}
-                  substep{{ if ne (len .Substeps) 1 }}s{{ end }} recorded
-                </div>
+                <span class="dpp-accordion-chevron" aria-hidden="true">
+                  {{ template "icon-chevron-down" . }}
+                </span>
               </div>
             </summary>
 
@@ -105,6 +101,7 @@
               <div class="dpp-history-details-wrap">
                 <div class="dpp-history-details-inner">
                   <div class="dpp-history-accordion">
+                    <hr style="margin: 0 0 4px;" />
                     {{ range .Substeps }}
                       <section class="substep substep-{{ .Status }}">
                         <div class="substep-head">

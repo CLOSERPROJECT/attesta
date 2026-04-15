@@ -1,8 +1,4 @@
 @media (max-width: 640px) {
-  .dpp-history-card-head {
-    flex-direction: column;
-  }
-
   .dpp-history-item::before {
     left: 9px;
   }
