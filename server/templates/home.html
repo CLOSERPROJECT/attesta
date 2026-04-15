@@ -42,7 +42,7 @@
                         {{ if .EditRequiresPurge }}
                           <button
                             type="button"
-                            class="workflow-card-menu-item"
+                            class="workflow-card-menu-item workflow-card-menu-item-danger"
                             onclick="document.getElementById('edit-workflow-{{ .Key }}').showModal()"
                           >
                             {{ template "icon-pencil" . }} Edit
@@ -125,7 +125,7 @@
                       <h3
                         class="manage-dialog-title manage-dialog-danger-title"
                       >
-                        Danger zone - Edit stream
+                        Danger zone - {{ template "icon-pencil" . }} Edit stream
                       </h3>
                       <p class="manage-dialog-subtitle">{{ .Name }}</p>
                     </div>
@@ -160,7 +160,8 @@
                       <h3
                         class="manage-dialog-title manage-dialog-danger-title"
                       >
-                        Danger zone - Delete stream
+                        Danger zone - {{ template "icon-trash" . }} Delete
+                        stream
                       </h3>
                       <p class="manage-dialog-subtitle">{{ .Name }}</p>
                     </div>
