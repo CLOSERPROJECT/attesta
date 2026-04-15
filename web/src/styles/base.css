@@ -1743,6 +1743,55 @@ button.secondary-small {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.org-admin-sidebar-nav {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.org-admin-sidebar-link {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  text-align: left;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.org-admin-sidebar-link:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.org-admin-sidebar-link.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+
+.org-admin-sidebar-link-title {
+  font-weight: 600;
+}
+
+.org-admin-sidebar-link-copy {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.org-admin-panel-main[data-org-admin-ready="true"] [data-org-admin-panel][hidden] {
+  display: none;
+}
+
 .org-admin-panel-main {
   grid-column: span 2;
   display: grid;

@@ -13,13 +13,16 @@
         <p>Create and manage roles and users</p>
       </div>
     </section>
-
     <div
       class="org-admin-grid{{ if not .NeedsOrganizationSetup }}
         org-admin-grid-ready
       {{ end }}"
     >
-      <section class="panel">
+      <section
+        class="panel{{ if not .NeedsOrganizationSetup }}
+          org-admin-sidebar
+        {{ end }}"
+      >
         <div class="panel-heading">
           <h2>Organization profile</h2>
           {{ if .NeedsOrganizationSetup }}
@@ -28,7 +31,7 @@
               Create one now to continue.
             </p>
           {{ else }}
-            <p>Review and update your organization details.</p>
+            <p>Switch between organization settings, roles, and members.</p>
           {{ end }}
         </div>
         {{ if .NeedsOrganizationSetup }}
@@ -80,45 +83,135 @@
               </p>
             </div>
           </div>
-          <form
-            method="post"
-            action="/org-admin/users"
-            class="input-form org-profile-form"
-            enctype="multipart/form-data"
+        {{ end }}
+        {{ if not .NeedsOrganizationSetup }}
+          <nav
+            class="org-admin-sidebar-nav"
+            aria-label="Organization admin sections"
           >
-            <input type="hidden" name="intent" value="update_org" />
-            <div class="form-field">
-              <label for="org-name">Organization name</label>
-              <input
-                id="org-name"
-                name="name"
-                type="text"
-                value="{{ .Organization.Name }}"
-                required
-              />
-            </div>
-            <div class="form-field">
-              <label for="org-logo">Organization logo (optional)</label>
-              <input
-                id="org-logo"
-                name="logo"
-                type="file"
-                accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
-              />
-            </div>
-            {{ if .OrganizationError }}
-              <p class="error">{{ .OrganizationError }}</p>
-            {{ end }}
-            <div class="org-admin-form-actions">
-              <button class="primary" type="submit">Save organization</button>
-            </div>
-          </form>
+            <button
+              type="button"
+              class="org-admin-sidebar-link"
+              data-org-admin-nav="profile"
+              aria-controls="org-admin-panel-profile"
+            >
+              <span class="org-admin-sidebar-link-title"
+                >Organization profile</span
+              >
+              <span class="org-admin-sidebar-link-copy"
+                >Update your organization name and logo.</span
+              >
+            </button>
+            <button
+              type="button"
+              class="org-admin-sidebar-link"
+              data-org-admin-nav="roles"
+              aria-controls="org-admin-panel-roles"
+            >
+              <span class="org-admin-sidebar-link-title">Roles</span>
+              <span class="org-admin-sidebar-link-copy"
+                >Manage the role catalog for your organization.</span
+              >
+            </button>
+            <button
+              type="button"
+              class="org-admin-sidebar-link"
+              data-org-admin-nav="members"
+              aria-controls="org-admin-panel-members"
+            >
+              <span class="org-admin-sidebar-link-title">Members</span>
+              <span class="org-admin-sidebar-link-copy"
+                >Invite people and update member access.</span
+              >
+            </button>
+          </nav>
         {{ end }}
       </section>
 
       {{ if not .NeedsOrganizationSetup }}
-        <section class="panel org-admin-panel-main">
-          <section class="org-admin-panel-section">
+        <section
+          class="panel org-admin-panel-main"
+          data-org-admin-shell
+          data-org-admin-default-panel="{{ if .RoleError }}
+            roles
+          {{ else if or .UsersError .InviteError .InviteLink }}
+            members
+          {{ else }}
+            profile
+          {{ end }}"
+        >
+          <section
+            class="org-admin-panel-section"
+            id="org-admin-panel-profile"
+            data-org-admin-panel="profile"
+          >
+            <div class="panel-heading">
+              <h2>Organization profile</h2>
+              <p>Review and update your organization details.</p>
+            </div>
+            <div class="org-profile-summary">
+              {{ if .OrganizationLogoURL }}
+                <img
+                  src="{{ .OrganizationLogoURL }}"
+                  alt="{{ .Organization.Name }} logo"
+                  class="org-profile-logo"
+                />
+              {{ else }}
+                <span class="org-profile-logo-placeholder">
+                  {{ template "icon-no-org" . }}
+                </span>
+              {{ end }}
+              <div class="org-profile-meta">
+                <p class="org-profile-name">
+                  <strong>{{ .Organization.Name }}</strong>
+                </p>
+                <p class="muted org-profile-slug">
+                  Slug:
+                  {{ .Organization.Slug }}
+                </p>
+              </div>
+            </div>
+            <form
+              method="post"
+              action="/org-admin/users"
+              class="input-form org-profile-form"
+              enctype="multipart/form-data"
+            >
+              <input type="hidden" name="intent" value="update_org" />
+              <div class="form-field">
+                <label for="org-name-profile">Organization name</label>
+                <input
+                  id="org-name-profile"
+                  name="name"
+                  type="text"
+                  value="{{ .Organization.Name }}"
+                  required
+                />
+              </div>
+              <div class="form-field">
+                <label for="org-logo-profile"
+                  >Organization logo (optional)</label
+                >
+                <input
+                  id="org-logo-profile"
+                  name="logo"
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+                />
+              </div>
+              {{ if .OrganizationError }}
+                <p class="error">{{ .OrganizationError }}</p>
+              {{ end }}
+              <div class="org-admin-form-actions">
+                <button class="primary" type="submit">Save organization</button>
+              </div>
+            </form>
+          </section>
+          <section
+            class="org-admin-panel-section"
+            id="org-admin-panel-roles"
+            data-org-admin-panel="roles"
+          >
             <div class="panel-head-actions">
               <div class="panel-heading">
                 <h2>Roles</h2>
@@ -522,8 +615,11 @@
               <p class="muted">No organization roles yet.</p>
             {{ end }}
           </section>
-          <hr />
-          <section class="org-admin-panel-section">
+          <section
+            class="org-admin-panel-section"
+            id="org-admin-panel-members"
+            data-org-admin-panel="members"
+          >
             <div class="panel-head-actions">
               <div class="panel-heading">
                 <h2>Users</h2>
@@ -1044,6 +1140,72 @@
 
 <script>
   (function () {
+    const orgAdminShell = document.querySelector("[data-org-admin-shell]");
+    const orgAdminStorageKey = "attesta_org_admin_panel";
+    const orgAdminPanels = new Set(["profile", "roles", "members"]);
+    let activeOrgAdminPanel = "profile";
+    const setOrgAdminPanel = (panelName, persist = true) => {
+      if (!orgAdminShell || !orgAdminPanels.has(panelName)) {
+        return;
+      }
+      activeOrgAdminPanel = panelName;
+      const panels = Array.from(orgAdminShell.querySelectorAll("[data-org-admin-panel]"));
+      panels.forEach((panel) => {
+        const currentName = panel.getAttribute("data-org-admin-panel");
+        panel.hidden = currentName !== panelName;
+      });
+      const navButtons = Array.from(document.querySelectorAll("[data-org-admin-nav]"));
+      navButtons.forEach((button) => {
+        const currentName = button.getAttribute("data-org-admin-nav");
+        const isActive = currentName === panelName;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-current", isActive ? "page" : "false");
+      });
+      orgAdminShell.setAttribute("data-org-admin-ready", "true");
+      if (!persist) {
+        return;
+      }
+      try {
+        window.sessionStorage.setItem(orgAdminStorageKey, panelName);
+      } catch (error) {
+      }
+    };
+
+    if (orgAdminShell) {
+      const preferredPanel = (() => {
+        try {
+          const storedPanel = window.sessionStorage.getItem(orgAdminStorageKey);
+          if (storedPanel && orgAdminPanels.has(storedPanel)) {
+            return storedPanel;
+          }
+        } catch (error) {
+        }
+        if (window.location.pathname === "/org-admin/roles") {
+          return "roles";
+        }
+        const defaultPanel = (orgAdminShell.getAttribute("data-org-admin-default-panel") || "").trim();
+        if (orgAdminPanels.has(defaultPanel)) {
+          return defaultPanel;
+        }
+        return "profile";
+      })();
+      Array.from(document.querySelectorAll("[data-org-admin-nav]")).forEach((button) => {
+        button.addEventListener("click", () => {
+          const panelName = (button.getAttribute("data-org-admin-nav") || "").trim();
+          setOrgAdminPanel(panelName);
+        });
+      });
+      Array.from(document.querySelectorAll("[data-org-admin-shell] form")).forEach((form) => {
+        form.addEventListener("submit", () => {
+          try {
+            window.sessionStorage.setItem(orgAdminStorageKey, activeOrgAdminPanel);
+          } catch (error) {
+          }
+        });
+      });
+      setOrgAdminPanel(preferredPanel, false);
+    }
+
     const rolePalettePickers = Array.from(document.querySelectorAll("[data-role-palette-picker]"));
     rolePalettePickers.forEach((picker) => {
       const paletteSelect = picker.querySelector("[data-role-palette-select]");
@@ -1109,21 +1271,25 @@
 
     const addRoleDialog = document.getElementById("add-role-dialog");
     if (addRoleDialog && {{if and .RoleError (eq .RoleDialogAction "create")}}true{{else}}false{{end}} && !addRoleDialog.open) {
+      setOrgAdminPanel("roles");
       addRoleDialog.showModal();
     }
 
     const editRoleDialog = document.getElementById("edit-role-{{.RoleDialogSlug}}");
     if (editRoleDialog && {{if and .RoleError (eq .RoleDialogAction "edit") .RoleDialogSlug}}true{{else}}false{{end}} && !editRoleDialog.open) {
+      setOrgAdminPanel("roles");
       editRoleDialog.showModal();
     }
 
     const deleteRoleDialog = document.getElementById("delete-role-{{.RoleDialogSlug}}");
     if (deleteRoleDialog && {{if and .RoleError (eq .RoleDialogAction "delete") .RoleDialogSlug}}true{{else}}false{{end}} && !deleteRoleDialog.open) {
+      setOrgAdminPanel("roles");
       deleteRoleDialog.showModal();
     }
 
     const addUserDialog = document.getElementById("add-user-dialog");
     if (addUserDialog && {{if or .InviteError .InviteLink}}true{{else}}false{{end}} && !addUserDialog.open) {
+      setOrgAdminPanel("members");
       addUserDialog.showModal();
     }
 
