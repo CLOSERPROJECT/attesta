@@ -1332,6 +1332,47 @@ button.secondary-small {
   background: var(--surface-2);
 }
 
+.dpp-integrity-root {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dpp-integrity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.dpp-integrity-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dpp-integrity-hash {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.dpp-integrity-hash-button {
+  display: none;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -33,6 +33,15 @@ func TestDPPDialogIDFragment(t *testing.T) {
 	}
 }
 
+func TestShortHashLabel(t *testing.T) {
+	if got := shortHashLabel("  abcdef12345  "); got != "abcdef1" {
+		t.Fatalf("shortHashLabel(long) = %q, want abcdef1", got)
+	}
+	if got := shortHashLabel(" abc "); got != "abc" {
+		t.Fatalf("shortHashLabel(short) = %q, want abc", got)
+	}
+}
+
 func TestFormataStreamCreatorID(t *testing.T) {
 	stream := FormataBuilderStream{
 		CreatedByUserID: " creator-1 ",

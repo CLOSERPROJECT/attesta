@@ -12,6 +12,19 @@
     grid-template-columns: 20px minmax(0, 1fr);
     gap: 14px;
   }
+
+  .dpp-integrity-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .dpp-integrity-hash-full {
+    display: none;
+  }
+
+  .dpp-integrity-hash-button {
+    display: inline;
+  }
 }
 
 @media (max-width: 720px) {

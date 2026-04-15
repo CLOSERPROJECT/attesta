@@ -630,7 +630,23 @@ type DPPPageView struct {
 	IssuedAt     string
 	Workflow     WorkflowDef
 	Traceability []DPPTraceabilityStep
+	Integrity    DPPIntegrityView
 	Export       NotarizedProcessExport
+}
+
+type DPPIntegrityView struct {
+	Root   DPPIntegrityHashView
+	Leaves []DPPIntegrityLeafView
+}
+
+type DPPIntegrityHashView struct {
+	Full  string
+	Short string
+}
+
+type DPPIntegrityLeafView struct {
+	SubstepID string
+	Hash      DPPIntegrityHashView
 }
 
 type DPPTraceabilityStep struct {
@@ -4945,6 +4961,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		IssuedAt:     issuedAt,
 		Workflow:     cfg.Workflow,
 		Traceability: traceability,
+		Integrity:    buildDPPIntegrityView(export.Merkle),
 		Export:       export,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
@@ -6904,6 +6921,35 @@ func truncateDisplayValue(value string) string {
 		return value
 	}
 	return value[:maxLen] + "..."
+}
+
+func buildDPPIntegrityView(tree MerkleTree) DPPIntegrityView {
+	view := DPPIntegrityView{
+		Root: DPPIntegrityHashView{
+			Full:  tree.Root,
+			Short: shortHashLabel(tree.Root),
+		},
+		Leaves: make([]DPPIntegrityLeafView, 0, len(tree.Leaves)),
+	}
+	for _, leaf := range tree.Leaves {
+		view.Leaves = append(view.Leaves, DPPIntegrityLeafView{
+			SubstepID: leaf.SubstepID,
+			Hash: DPPIntegrityHashView{
+				Full:  leaf.Hash,
+				Short: shortHashLabel(leaf.Hash),
+			},
+		})
+	}
+	return view
+}
+
+func shortHashLabel(hash string) string {
+	hash = strings.TrimSpace(hash)
+	const shortLen = 7
+	if len(hash) <= shortLen {
+		return hash
+	}
+	return hash[:shortLen]
 }
 
 func isAttachmentMetaValue(raw interface{}) bool {

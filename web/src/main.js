@@ -197,6 +197,31 @@ const shareLink = async (button) => {
   window.prompt(`Copy ${shareLabel}:`, absoluteURL);
 };
 
+const copyLinkValue = async (button) => {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  const rawURL = button.dataset.copyLink;
+  if (!rawURL) {
+    return;
+  }
+  const absoluteURL = resolveAbsoluteURL(rawURL);
+  const label = button.dataset.copyLabel || "link";
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(absoluteURL);
+      const originalText = button.textContent || "Copy";
+      button.textContent = "Copied";
+      window.setTimeout(() => {
+        button.textContent = originalText;
+      }, 1200);
+      return;
+    } catch (_err) {
+    }
+  }
+  window.prompt(`Copy ${label}:`, absoluteURL);
+};
+
 const copyTextValue = async (button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -672,6 +697,12 @@ document.body.addEventListener("toggle", (event) => {
 document.body.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) {
+    return;
+  }
+  const copyLinkButton = target.closest(".js-copy-link");
+  if (copyLinkButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    void copyLinkValue(copyLinkButton);
     return;
   }
   const copyButton = target.closest(".js-copy-text");
