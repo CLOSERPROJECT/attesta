@@ -115,7 +115,7 @@
                             >{{ .Role }}</span
                           >
                         </div>
-                        <div class="action-submitted">
+                        <div class="action-submitted" style="margin-top: 8px;">
                           {{ if .Values }}
                             <dl class="action-submitted-values">
                               {{ range .Values }}
@@ -168,7 +168,7 @@
                             {{ if .DoneAtHuman }}
                               <span class="time"
                                 ><time datetime="{{ .DoneAt }}"
-                                  >{{ .DoneAtHuman }}</time
+                                  >Completed at: {{ .DoneAtHuman }}</time
                                 ></span
                               >
                             {{ else if .DoneAt }}
