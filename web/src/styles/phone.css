@@ -34,6 +34,18 @@
     };
   }
 
+  .dpp-history-item::before,
+  .dpp-history-rail,
+  .dpp-history-details-offset {
+    display: none;
+  }
+
+  .dpp-history-summary,
+  .dpp-history-details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
   .substep-meta {
     padding-top: 8px;
     flex-direction: column;
