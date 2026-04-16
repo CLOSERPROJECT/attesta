@@ -652,7 +652,6 @@ button.secondary-small {
   font-weight: 700;
   color: var(--ink);
   overflow-wrap: anywhere;
-  flex-wrap: wrap;
 }
 
 .timeline-step-org {
@@ -681,7 +680,6 @@ button.secondary-small {
   cursor: pointer;
   transition: transform 300ms ease, opacity 300ms ease;
   min-width: 0;
-  display: grid;
   gap: 8px;
   position: relative;
 }
@@ -756,7 +754,6 @@ button.secondary-small {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
   min-width: 0;
   font-size: 12px;
   line-height: 1.2;

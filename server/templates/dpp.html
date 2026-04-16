@@ -106,10 +106,14 @@
                       <section class="substep substep-{{ .Status }}">
                         <div class="substep-head">
                           <span class="pill">{{ .SubstepID }}</span>
-                          <span class="title">{{ .Title }}</span>
+                          <span class="timeline-step-title substep-title"
+                            >{{ .Title }}</span
+                          >
+                        </div>
+                        <div class="substep-summary-supporting">
                           <span
                             class="pill role-pill"
-                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }}; margin-left: auto;"
+                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
                             >{{ .Role }}</span
                           >
                         </div>
