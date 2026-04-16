@@ -11,11 +11,20 @@
       </div>
     </section>
     <section class="panel">
-      <div class="panel-heading">
-        <h2>{{ .Workflow.Name }}</h2>
-        {{ if .Workflow.Description }}
-          <p>{{ .Workflow.Description }}</p>
-        {{ end }}
+      <div class="panel-head-actions">
+        <div class="panel-heading">
+          <h2>{{ .Workflow.Name }}</h2>
+          {{ if .Workflow.Description }}
+            <p>{{ .Workflow.Description }}</p>
+          {{ end }}
+        </div>
+        <button
+          type="button"
+          class="secondary js-copy-link "
+          data-copy-link="{{ .DigitalLink }}"
+        >
+          Copy DPP URL
+        </button>
       </div>
       <div
         style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;"
@@ -36,18 +45,7 @@
           >Serial|{{ .Serial }}</span
         >
       </div>
-      <div style="margin-bottom: 24px;">
-        <button
-          type="button"
-          class="secondary js-copy-link"
-          data-copy-link="{{ .DigitalLink }}"
-        >
-          Copy DPP URL
-        </button>
-      </div>
-
-      <hr style="margin-bottom: 24px;" />
-
+      <hr style="margin: 24px 0;" />
       <h2>History</h2>
       <div class="dpp-history-list">
         {{ range .Traceability }}
