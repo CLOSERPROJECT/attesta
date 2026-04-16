@@ -10,6 +10,7 @@
   }
 
   .org-admin-panel-main {
+    scroll-margin-top: 12px;
     grid-column: auto;
   }
 
