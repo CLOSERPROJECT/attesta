@@ -144,8 +144,8 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if !strings.Contains(body, "5 Mar 2026 at 14:30 UTC") {
 		t.Fatalf("expected human-readable completion time in body, got %q", body)
 	}
-	if !strings.Contains(body, "Show details") {
-		t.Fatalf("expected show details button in body, got %q", body)
+	if !strings.Contains(body, `aria-label="Toggle step details"`) {
+		t.Fatalf("expected accordion summary toggle in body, got %q", body)
 	}
 	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(body, "<dd>1</dd>") {
 		t.Fatalf("expected inline traceability value in body, got %q", body)
