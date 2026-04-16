@@ -197,13 +197,13 @@
                       {{ end }}
                       {{ if eq .Status "done" }}
                         <div class="substep-meta">
+                          {{ if .DoneAt }}
+                            <span class="time">Completed at {{ .DoneAt }}</span>
+                          {{ end }}
                           {{ if .DoneBy }}
                             <span class="actor">by {{ .DoneBy }}</span>
                           {{ else }}
                             <span class="actor">completed</span>
-                          {{ end }}
-                          {{ if .DoneAt }}
-                            <span class="time">{{ .DoneAt }}</span>
                           {{ end }}
                         </div>
                       {{ end }}

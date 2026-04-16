@@ -115,7 +115,7 @@
                             >{{ .Role }}</span
                           >
                         </div>
-                        <div class="action-submitted" style="margin-top: 8px;">
+                        <div class="action-submitted" style="margin-top: 20px;">
                           {{ if .Values }}
                             <dl class="action-submitted-values">
                               {{ range .Values }}
@@ -168,18 +168,43 @@
                             {{ if .DoneAtHuman }}
                               <span class="time"
                                 ><time datetime="{{ .DoneAt }}"
-                                  >Completed at: {{ .DoneAtHuman }}</time
+                                  >Completed at {{ .DoneAtHuman }}</time
                                 ></span
                               >
                             {{ else if .DoneAt }}
                               <span class="time">{{ .DoneAt }}</span>
                             {{ end }}
                             {{ if .DoneBy }}
-                              <span class="actor">by {{ .DoneBy }}</span>
+                              <span class="actor"
+                                >by
+                                {{ if and (ge (len .DoneBy) 9) (eq (slice .DoneBy 0 9) "appwrite:") }}
+                                  {{ slice .DoneBy 9 }}
+                                {{ else }}
+                                  {{ .DoneBy }}
+                                {{ end }}</span
+                              >
                             {{ end }}
                             {{ if .Digest }}
                               <span class="data"
-                                >digest: <code>{{ .Digest }}</code></span
+                                >digest
+                                <code
+                                  class="dpp-integrity-hash dpp-history-digest-full"
+                                  >{{ .Digest }}</code
+                                >
+                                <button
+                                  type="button"
+                                  class="dpp-integrity-hash-button dpp-history-digest-button js-copy-text"
+                                  data-copy-text="{{ .Digest }}"
+                                  data-copy-label="digest"
+                                  aria-label="Copy full digest for substep {{ .SubstepID }}"
+                                  title="{{ .Digest }}"
+                                >
+                                  {{ if gt (len .Digest) 7 }}
+                                    {{ slice .Digest 0 7 }}
+                                  {{ else }}
+                                    {{ .Digest }}
+                                  {{ end }}
+                                </button></span
                               >
                             {{ end }}
                           </div>

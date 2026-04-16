@@ -40,6 +40,14 @@
     gap: 4px;
   }
 
+  .dpp-history-digest-full {
+    display: none;
+  }
+
+  .dpp-history-digest-button {
+    display: inline;
+  }
+
   .page {
     padding: 16px 16px 32px;
   }
