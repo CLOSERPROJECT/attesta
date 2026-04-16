@@ -996,19 +996,18 @@ button.secondary-small {
   margin: 0;
   display: grid;
   grid-template-columns: minmax(120px, auto) 1fr;
-  gap: 6px 10px;
-  align-items: center;
+  gap: 6px 6px;
 }
 
 .action-submitted-values dt,
 .action-submitted-values dd {
   margin: 0;
+  font-size: 14px;
 }
 
 .action-submitted-values dt {
   color: var(--muted);
   font-family: "Source Code Pro", monospace;
-  font-size: 12px;
 }
 
 .action-submitted-attachments {
