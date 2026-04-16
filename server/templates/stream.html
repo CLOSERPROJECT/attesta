@@ -1,0 +1,364 @@
+{{/* Used on /w/.WorkflowKey to render the stream page (home_body). */}}
+
+{{ define "home_body" }}
+  <div class="stack max-w-7xl mx-auto">
+    <section class="hero">
+      <button class="secondary" onclick="location.href='/'">
+        {{ template "icon-back" . }}
+        Back
+      </button>
+      <div class="hero-body">
+        <h1>{{ .WorkflowName }}</h1>
+        {{ if .WorkflowDescription }}
+          <p>{{ .WorkflowDescription }}</p>
+        {{ end }}
+      </div>
+    </section>
+    <div
+      class="home-workflow-grid"
+      data-home-root
+      data-home-default-panel="instances"
+    >
+      <section class="panel org-admin-sidebar">
+        <div class="panel-heading">
+          <h2>Stream workspace</h2>
+          <p>Jump between live instances and the read-only stream preview.</p>
+        </div>
+        <nav
+          class="org-admin-sidebar-nav"
+          aria-label="Stream workspace sections"
+        >
+          <button
+            type="button"
+            class="org-admin-sidebar-link"
+            data-home-nav="instances"
+            aria-controls="home-panel-instances"
+          >
+            <span class="org-admin-sidebar-link-title">Instances</span>
+            <span class="org-admin-sidebar-link-copy"
+              >View and manage all instances of this stream.</span
+            >
+          </button>
+          <button
+            type="button"
+            class="org-admin-sidebar-link"
+            data-home-nav="preview"
+            aria-controls="home-panel-preview"
+          >
+            <span class="org-admin-sidebar-link-title">Preview</span>
+            <span class="org-admin-sidebar-link-copy"
+              >Inspect the stream timeline without entering data.</span
+            >
+          </button>
+        </nav>
+      </section>
+
+      <div class="home-workflow-panel-main">
+        <section
+          class="panel instances-panel"
+          id="home-panel-instances"
+          data-home-panel="instances"
+        >
+          <div class="panel-head-actions">
+            <div class="panel-heading">
+              <h2>Stream instances</h2>
+              <p>View and manage all instances of this stream.</p>
+            </div>
+            <form method="post" action="{{ .WorkflowPath }}/process/start">
+              <button
+                class="primary"
+                type="submit"
+                {{ if .Error }}disabled{{ end }}
+              >
+                {{ template "icon-play" . }}
+                New instance
+              </button>
+            </form>
+          </div>
+          <hr style="margin-bottom: 20px;" />
+          {{ if .Error }}
+            <div class="panel-heading">
+              <h3>Stream configuration issue</h3>
+              <p>
+                This stream cannot start new processes until its organization
+                and role references are fixed.
+              </p>
+            </div>
+            <div class="error">{{ .Error }}</div>
+          {{ else }}
+            {{ if .Processes }}
+              <form
+                method="get"
+                action="{{ .WorkflowPath }}/"
+                class="process-toolbar"
+              >
+                <input type="hidden" name="page" value="1" />
+                <label class="process-control">
+                  <span class="muted">
+                    {{ template "icon-sort" . }}
+                  </span>
+                  <select id="sort" name="sort" onchange="this.form.submit()">
+                    <option
+                      value="time_desc"
+                      {{ if eq .Sort "time_desc" }}selected{{ end }}
+                    >
+                      Newest
+                    </option>
+                    <option
+                      value="time_asc"
+                      {{ if eq .Sort "time_asc" }}selected{{ end }}
+                    >
+                      Oldest
+                    </option>
+                    <option
+                      value="progress_desc"
+                      {{ if eq .Sort "progress_desc" }}selected{{ end }}
+                    >
+                      Most advanced
+                    </option>
+                    <option
+                      value="progress_asc"
+                      {{ if eq .Sort "progress_asc" }}selected{{ end }}
+                    >
+                      Least advanced
+                    </option>
+                    <option
+                      value="status"
+                      {{ if eq .Sort "status" }}selected{{ end }}
+                    >
+                      Status
+                    </option>
+                  </select>
+                </label>
+                <label class="process-control">
+                  <span class="muted">
+                    {{ template "icon-filter" . }}
+                  </span>
+                  <select
+                    id="filter"
+                    name="filter"
+                    onchange="this.form.submit()"
+                  >
+                    <option
+                      value="all"
+                      {{ if eq .StatusFilter "all" }}selected{{ end }}
+                    >
+                      All
+                    </option>
+                    <option
+                      value="done"
+                      {{ if eq .StatusFilter "done" }}selected{{ end }}
+                    >
+                      Done
+                    </option>
+                    <option
+                      value="active"
+                      {{ if eq .StatusFilter "active" }}selected{{ end }}
+                    >
+                      Active
+                    </option>
+                  </select>
+                </label>
+              </form>
+              <ul class="process-list">
+                {{ range .Processes }}
+                  <li class="process-item">
+                    <div class="process-head">
+                      <a href="{{ $.WorkflowPath }}/process/{{ .ID }}"
+                        >{{ .ID }}</a
+                      >
+                      <span
+                        class="status-tag status-tag-compact status-{{ .Status }}"
+                        >{{ .Status }}</span
+                      >
+                    </div>
+                    <div
+                      class="process-progress-line"
+                      role="progressbar"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      aria-valuenow="{{ .Percent }}"
+                    >
+                      <div
+                        class="process-progress-fill"
+                        style="width: {{ .Percent }}%;"
+                      ></div>
+                    </div>
+                    <div class="process-meta">
+                      <span class="process-meta-primary"
+                        >{{ .DoneSubsteps }} / {{ .TotalSubsteps }} complete
+                        ({{ .Percent }}%)</span
+                      >
+                      <span>Created: {{ .CreatedAt }}</span>
+                      {{ if .LastNotarizedAt }}
+                        <span>Last notarized: {{ .LastNotarizedAt }}</span>
+                      {{ end }}
+                      {{ if .LastDigestShort }}
+                        <span class="pill">sha256 {{ .LastDigestShort }}</span>
+                      {{ end }}
+                    </div>
+                  </li>
+                {{ end }}
+              </ul>
+              {{ if gt .TotalPages 1 }}
+                <nav
+                  class="platform-admin-pagination"
+                  aria-label="Stream instances pagination"
+                >
+                  <div class="platform-admin-pagination-pages">
+                    <a
+                      class="secondary"
+                      style="padding: 10px 8px; {{ if not .HasPreviousPage }}
+                        pointer-events: none; opacity: 0.5;
+                      {{ end }}"
+                      href="{{ .WorkflowPath }}/{{- if or (ne .Sort "time_desc") (ne .StatusFilter "all") (gt .PreviousPage 1) -}}
+                        ?{{- if ne .Sort "time_desc" -}}
+                          sort={{ .Sort | urlquery }}{{- if or (ne .StatusFilter "all") (gt .PreviousPage 1) -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if ne .StatusFilter "all" -}}
+                          filter={{ .StatusFilter | urlquery }}{{- if gt .PreviousPage 1 -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if gt .PreviousPage 1 -}}
+                          page={{ .PreviousPage }}
+                        {{- end -}}
+                      {{- end -}}#home-panel-instances"
+                    >
+                      {{ template "icon-chevron-left" . }}
+                    </a>
+                    {{ range .PageNumbers }}
+                      <a
+                        class="{{ if eq . $.CurrentPage }}
+                          primary
+                        {{ else }}
+                          secondary
+                        {{ end }}"
+                        href="{{ $.WorkflowPath }}/{{- if or (ne $.Sort "time_desc") (ne $.StatusFilter "all") (gt . 1) -}}
+                          ?{{- if ne $.Sort "time_desc" -}}
+                            sort={{ $.Sort | urlquery }}{{- if or (ne $.StatusFilter "all") (gt . 1) -}}
+                              &
+                            {{- end -}}
+                          {{- end -}}{{- if ne $.StatusFilter "all" -}}
+                            filter={{ $.StatusFilter | urlquery }}{{- if gt . 1 -}}
+                              &
+                            {{- end -}}
+                          {{- end -}}{{- if gt . 1 -}}page={{ . }}{{- end -}}
+                        {{- end -}}#home-panel-instances"
+                        >{{ . }}</a
+                      >
+                    {{ end }}
+                    <a
+                      class="secondary"
+                      style="padding: 10px 8px; {{ if not .HasNextPage }}
+                        pointer-events: none; opacity: 0.5;
+                      {{ end }}"
+                      href="{{ .WorkflowPath }}/{{- if or (ne .Sort "time_desc") (ne .StatusFilter "all") (gt .NextPage 1) -}}
+                        ?{{- if ne .Sort "time_desc" -}}
+                          sort={{ .Sort | urlquery }}{{- if or (ne .StatusFilter "all") (gt .NextPage 1) -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if ne .StatusFilter "all" -}}
+                          filter={{ .StatusFilter | urlquery }}{{- if gt .NextPage 1 -}}
+                            &
+                          {{- end -}}
+                        {{- end -}}{{- if gt .NextPage 1 -}}
+                          page={{ .NextPage }}
+                        {{- end -}}
+                      {{- end -}}#home-panel-instances"
+                    >
+                      {{ template "icon-chevron-right" . }}
+                    </a>
+                  </div>
+                </nav>
+              {{ end }}
+            {{ else }}
+              <div class="no-process-item">
+                <p class="muted">No stream instances yet</p>
+              </div>
+            {{ end }}
+          {{ end }}
+        </section>
+        <section
+          class="panel preview-panel"
+          id="home-panel-preview"
+          data-home-panel="preview"
+        >
+          <div class="panel-heading" style="margin-bottom: 20px;">
+            <h2>Stream preview</h2>
+            <p>
+              Inspect the stream timeline and form structure in read-only mode.
+            </p>
+          </div>
+          <hr style="margin-bottom: 20px;" />
+          {{ template "workflow_timeline" .Preview }}
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const homeRoot = document.querySelector("[data-home-root]");
+      if (!homeRoot) {
+        return;
+      }
+
+      const allowedPanels = new Set(["instances", "preview"]);
+
+      const setPanel = (panelName) => {
+        if (!allowedPanels.has(panelName)) {
+          return;
+        }
+        const buttons = Array.from(
+          homeRoot.querySelectorAll("[data-home-nav]"),
+        );
+        buttons.forEach((button) => {
+          const currentName = button.getAttribute("data-home-nav");
+          const isActive = currentName === panelName;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-current", isActive ? "page" : "false");
+        });
+      };
+
+      const preferredPanel = (() => {
+        const defaultPanel = (
+          homeRoot.getAttribute("data-home-default-panel") || ""
+        ).trim();
+        if (allowedPanels.has(defaultPanel)) {
+          return defaultPanel;
+        }
+        return "instances";
+      })();
+
+      Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
+        (button) => {
+          button.addEventListener("click", () => {
+            const panelName = (
+              button.getAttribute("data-home-nav") || ""
+            ).trim();
+            setPanel(panelName);
+            const panel = homeRoot.querySelector(
+              `[data-home-panel="${panelName}"]`,
+            );
+            if (!panel) {
+              return;
+            }
+            const behavior = window.matchMedia(
+              "(prefers-reduced-motion: reduce)",
+            ).matches
+              ? "auto"
+              : "smooth";
+            panel.scrollIntoView({ behavior, block: "start" });
+          });
+        },
+      );
+
+      setPanel(preferredPanel);
+    })();
+  </script>
+{{ end }}
+
+{{ define "stream.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

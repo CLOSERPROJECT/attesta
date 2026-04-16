@@ -9,3 +9,15 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+
+@media (min-width: 1200px) {
+  .home-workflow-grid {
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  }
+
+  .org-admin-sidebar {
+    position: sticky;
+    top: 44px;
+  }
+}

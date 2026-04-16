@@ -247,6 +247,7 @@ type ActionView struct {
 	Values        []ActionKV
 	Attachments   []ActionAttachmentView
 	Disabled      bool
+	ReadOnly      bool
 	Reason        string
 }
 
@@ -420,7 +421,15 @@ type HomeView struct {
 	CanStartProcess     bool
 	Sort                string
 	StatusFilter        string
+	CurrentPage         int
+	TotalPages          int
+	PageNumbers         []int
+	HasPreviousPage     bool
+	HasNextPage         bool
+	PreviousPage        int
+	NextPage            int
 	Processes           []ProcessListItem
+	Preview             ActionListView
 }
 
 type LoginView struct {
@@ -2864,6 +2873,7 @@ func (s *Server) platformOrganizations(ctx context.Context) []Organization {
 }
 
 const platformAdminOrganizationsPerPage = 12
+const homeProcessesPerPage = 10
 
 func filterPlatformOrganizations(organizations []Organization, query string) []Organization {
 	trimmedQuery := strings.ToLower(strings.TrimSpace(query))
@@ -2884,6 +2894,20 @@ func normalizePlatformAdminPage(raw int, totalItems int) int {
 	totalPages := 1
 	if totalItems > 0 {
 		totalPages = (totalItems + platformAdminOrganizationsPerPage - 1) / platformAdminOrganizationsPerPage
+	}
+	if raw < 1 {
+		return 1
+	}
+	if raw > totalPages {
+		return totalPages
+	}
+	return raw
+}
+
+func normalizeHomePage(raw int, totalItems int) int {
+	totalPages := 1
+	if totalItems > 0 {
+		totalPages = (totalItems + homeProcessesPerPage - 1) / homeProcessesPerPage
 	}
 	if raw < 1 {
 		return 1
@@ -4505,6 +4529,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	}
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
 	statusFilter := normalizeHomeStatusFilter(r.URL.Query().Get("filter"))
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
 	processesRaw, err := s.store.ListRecentProcessesByWorkflow(ctx, workflowKey, 0)
 	if err != nil {
 		logRequestError(r, err, "failed to list recent processes for workflow %s", workflowKey)
@@ -4539,6 +4564,35 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sortHomeProcessList(processes, sortKey)
+	currentPage := normalizeHomePage(page, len(processes))
+	start := (currentPage - 1) * homeProcessesPerPage
+	end := min(start+homeProcessesPerPage, len(processes))
+	pagedProcesses := processes
+	if start < len(processes) {
+		pagedProcesses = processes[start:end]
+	} else if len(processes) > 0 {
+		pagedProcesses = processes[:0]
+	}
+	totalPages := 1
+	if len(processes) > 0 {
+		totalPages = (len(processes) + homeProcessesPerPage - 1) / homeProcessesPerPage
+	}
+	pageNumbers := make([]int, 0, totalPages)
+	for current := 1; current <= totalPages; current++ {
+		pageNumbers = append(pageNumbers, current)
+	}
+
+	actor := actorFromAccountUser(user, workflowKey)
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+		if len(actor.RoleSlugs) > 0 {
+			actor.Role = actor.RoleSlugs[0]
+		}
+	}
+	preview := makeActionListReadOnly(
+		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
+		"Preview only. Start an instance to submit data.",
+	)
 
 	view := HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
@@ -4547,9 +4601,17 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		CanStartProcess:     workflowError == "",
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
-		Processes:           processes,
+		CurrentPage:         currentPage,
+		TotalPages:          totalPages,
+		PageNumbers:         pageNumbers,
+		HasPreviousPage:     currentPage > 1,
+		HasNextPage:         currentPage < totalPages,
+		PreviousPage:        max(currentPage-1, 1),
+		NextPage:            min(currentPage+1, totalPages),
+		Processes:           pagedProcesses,
+		Preview:             preview,
 	}
-	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
+	if err := s.tmpl.ExecuteTemplate(w, "stream.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -4769,6 +4831,43 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		DPPGS1:      actionList.DPPGS1,
 		Attachments: actionList.Attachments,
 	}
+}
+
+func buildWorkflowPreviewProcess(def WorkflowDef, workflowKey string) *Process {
+	process := &Process{
+		WorkflowKey: workflowKey,
+		Status:      "active",
+		Progress:    map[string]ProcessStep{},
+	}
+	for _, step := range sortedSteps(def) {
+		for _, sub := range sortedSubsteps(step) {
+			process.Progress[sub.SubstepID] = ProcessStep{State: "pending"}
+		}
+	}
+	return process
+}
+
+func makeActionListReadOnly(view ActionListView, reason string) ActionListView {
+	reason = strings.TrimSpace(reason)
+	if view.Action != nil {
+		action := *view.Action
+		action.ReadOnly = true
+		action.Reason = reason
+		view.Action = &action
+	}
+	for stepIndex := range view.Timeline {
+		for substepIndex := range view.Timeline[stepIndex].Substeps {
+			action := view.Timeline[stepIndex].Substeps[substepIndex].Action
+			if action == nil {
+				continue
+			}
+			actionCopy := *action
+			actionCopy.ReadOnly = true
+			actionCopy.Reason = reason
+			view.Timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+		}
+	}
+	return view
 }
 
 func actorFromAccountUser(user *AccountUser, workflowKey string) Actor {

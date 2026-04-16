@@ -554,7 +554,9 @@ const initializeFormataForms = async (container = document) => {
 
     const component = document.createElement("formata-form");
     component.className = "js-formata-form";
-    component.setAttribute("prevent-page-reload", "");
+    if (host.dataset.formataDisabled !== "true") {
+      component.setAttribute("prevent-page-reload", "");
+    }
     if (document.documentElement.dataset.theme === "dark") {
       component.setAttribute("dark-mode", "");
     }
