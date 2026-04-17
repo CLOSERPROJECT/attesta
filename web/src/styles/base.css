@@ -1064,7 +1064,7 @@ button.secondary-small {
   min-height: 200px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background:  var(--surface-2);
+  background:  var(--panel);
   color: var(--ink);
   text-decoration: none;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
@@ -1209,9 +1209,8 @@ button.secondary-small {
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  border-radius: 4px;
-  background: var(--surface-2);
+  background: var(--panel);
+  transform: translateY(-6px) translateX(6px);
   color: var(--text);
   cursor: pointer;
   list-style: none;
@@ -1233,7 +1232,7 @@ button.secondary-small {
 
 .workflow-card-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% );
   right: 0;
   min-width: 160px;
   padding: 8px;
@@ -1244,6 +1243,7 @@ button.secondary-small {
   z-index: 40;
   display: grid;
   gap: 4px;
+  transform: translateX(6px) translateY(-6px);
 }
 
 .workflow-card-menu-item {
