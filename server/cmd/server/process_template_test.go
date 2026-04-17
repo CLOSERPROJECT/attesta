@@ -22,6 +22,7 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 		ActionList: ActionListView{
 			WorkflowKey: "workflow",
 			ProcessID:   "process-1",
+			ProcessDone: true,
 			Action: &ActionView{
 				WorkflowKey: "workflow",
 				ProcessID:   "process-1",
@@ -72,8 +73,11 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 	if !strings.Contains(compactBody, `class="substep-accordion js-process-substep-panel" data-substep-id="1.1" open`) {
 		t.Fatalf("expected selected accordion substep to render open, got: %s", body)
 	}
-	if !strings.Contains(body, `data-formata-post="/w/workflow/process/process-1/substep/1.1/complete?substep=1.1"`) {
-		t.Fatalf("expected embedded action form in accordion, got: %s", body)
+	if !strings.Contains(body, `class="process-resources-grid"`) || !strings.Contains(body, `class="timeline-list"`) {
+		t.Fatalf("expected process resources grid with timeline, got: %s", body)
+	}
+	if !strings.Contains(body, `class="substep-details"`) {
+		t.Fatalf("expected embedded accordion substep details, got: %s", body)
 	}
 	if strings.Contains(body, `id="timeline"`) || strings.Contains(body, `id="action-area"`) {
 		t.Fatalf("expected legacy split-panel targets to be removed, got: %s", body)
