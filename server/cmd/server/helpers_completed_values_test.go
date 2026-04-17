@@ -150,11 +150,11 @@ func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
 	if len(attachments) != 2 {
 		t.Fatalf("expected 2 deduplicated attachments, got %#v", attachments)
 	}
-	if attachments[0].Filename != ".._zeta.pdf" {
-		t.Fatalf("expected sorted attachments by filename, got %#v", attachments)
+	if attachments[0].Key != "[0]" || attachments[0].Filename != ".._zeta.pdf" {
+		t.Fatalf("expected sorted attachments with key, got %#v", attachments)
 	}
-	if attachments[1].Filename != "alpha.pdf" {
-		t.Fatalf("expected sanitized filename, got %#v", attachments[1])
+	if attachments[1].Key != "[3]" || attachments[1].Filename != "alpha.pdf" {
+		t.Fatalf("expected sanitized filename and key, got %#v", attachments[1])
 	}
 	if !strings.Contains(attachments[0].URL, "/w/workflow/process/"+processID.Hex()+"/attachment/") {
 		t.Fatalf("unexpected attachment url: %q", attachments[0].URL)

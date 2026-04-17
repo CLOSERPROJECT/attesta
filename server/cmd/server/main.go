@@ -264,9 +264,12 @@ type ActionKV struct {
 }
 
 type ActionAttachmentView struct {
-	Filename string
-	URL      string
-	SHA256   string
+	Key         string
+	Filename    string
+	URL         string
+	PreviewURL  string
+	PreviewKind string
+	SHA256      string
 }
 
 type Department struct {
@@ -5365,7 +5368,11 @@ func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Reques
 	}
 	filename := sanitizeAttachmentFilename(attachment.Filename)
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	disposition := "attachment"
+	if strings.TrimSpace(r.URL.Query().Get("inline")) != "" {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, filename))
 	if _, err := io.Copy(w, download); err != nil {
 		return
 	}
@@ -5412,7 +5419,11 @@ func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.
 	}
 	filename := sanitizeAttachmentFilename(attachment.Filename)
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	disposition := "attachment"
+	if strings.TrimSpace(r.URL.Query().Get("inline")) != "" {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, filename))
 	if _, err := io.Copy(w, download); err != nil {
 		return
 	}
@@ -6539,6 +6550,73 @@ func attachmentsFromValue(raw interface{}) []NotarizedAttachment {
 	return files
 }
 
+type keyedAttachmentView struct {
+	Key  string
+	Meta NotarizedAttachment
+}
+
+func attachmentViewsFromValue(raw interface{}) []keyedAttachmentView {
+	if typed, ok := raw.(map[string]interface{}); ok {
+		var files []keyedAttachmentView
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			value := typed[key]
+			if isAttachmentMetaValue(value) {
+				collectAttachmentViews(key, value, &files)
+				continue
+			}
+			collectAttachmentViews("", value, &files)
+		}
+		return files
+	}
+	if typed, ok := raw.(primitive.M); ok {
+		return attachmentViewsFromValue(map[string]interface{}(typed))
+	}
+	var files []keyedAttachmentView
+	collectAttachmentViews("", raw, &files)
+	return files
+}
+
+func collectAttachmentViews(path string, raw interface{}, files *[]keyedAttachmentView) {
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		if meta := attachmentMetaFromMap(typed); meta != nil {
+			key := strings.TrimSpace(path)
+			if key == "" {
+				key = "value"
+			}
+			*files = append(*files, keyedAttachmentView{Key: key, Meta: *meta})
+			return
+		}
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			nextPath := key
+			if strings.TrimSpace(path) != "" {
+				nextPath = path + "." + key
+			}
+			collectAttachmentViews(nextPath, typed[key], files)
+		}
+	case primitive.M:
+		collectAttachmentViews(path, map[string]interface{}(typed), files)
+	case []interface{}:
+		for idx, nested := range typed {
+			nextPath := fmt.Sprintf("[%d]", idx)
+			if strings.TrimSpace(path) != "" {
+				nextPath = fmt.Sprintf("%s[%d]", path, idx)
+			}
+			collectAttachmentViews(nextPath, nested, files)
+		}
+	}
+}
+
 func collectAttachmentsFromValue(raw interface{}, files *[]NotarizedAttachment) {
 	switch typed := raw.(type) {
 	case map[string]interface{}:
@@ -7069,7 +7147,8 @@ func buildActionAttachments(workflowKey string, process *Process, data map[strin
 	}
 	seen := map[string]struct{}{}
 	attachments := make([]ActionAttachmentView, 0)
-	for _, meta := range attachmentsFromValue(data) {
+	for _, item := range attachmentViewsFromValue(data) {
+		meta := item.Meta
 		id := strings.TrimSpace(meta.AttachmentID)
 		if id == "" {
 			continue
@@ -7078,19 +7157,57 @@ func buildActionAttachments(workflowKey string, process *Process, data map[strin
 			continue
 		}
 		seen[id] = struct{}{}
+		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
+		previewKind := actionAttachmentPreviewKind(meta)
 		attachments = append(attachments, ActionAttachmentView{
-			Filename: sanitizeAttachmentFilename(meta.Filename),
-			URL:      fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id),
-			SHA256:   strings.TrimSpace(meta.SHA256),
+			Key:         item.Key,
+			Filename:    sanitizeAttachmentFilename(meta.Filename),
+			URL:         downloadURL,
+			PreviewURL:  actionAttachmentPreviewURL(downloadURL, previewKind),
+			PreviewKind: previewKind,
+			SHA256:      strings.TrimSpace(meta.SHA256),
 		})
 	}
 	sort.Slice(attachments, func(i, j int) bool {
+		if attachments[i].Key != attachments[j].Key {
+			return attachments[i].Key < attachments[j].Key
+		}
 		if attachments[i].Filename != attachments[j].Filename {
 			return attachments[i].Filename < attachments[j].Filename
 		}
 		return attachments[i].URL < attachments[j].URL
 	})
 	return attachments
+}
+
+func actionAttachmentPreviewKind(meta NotarizedAttachment) string {
+	contentType := strings.ToLower(strings.TrimSpace(meta.ContentType))
+	filename := strings.ToLower(strings.TrimSpace(meta.Filename))
+	switch {
+	case strings.HasPrefix(contentType, "image/"):
+		return "image"
+	case contentType == "application/pdf":
+		return "document"
+	}
+	switch filepath.Ext(filename) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg":
+		return "image"
+	case ".pdf":
+		return "document"
+	default:
+		return ""
+	}
+}
+
+func actionAttachmentPreviewURL(downloadURL, previewKind string) string {
+	if previewKind == "" {
+		return ""
+	}
+	inlineURL := downloadURL + "?inline=1"
+	if previewKind == "document" {
+		return inlineURL + "#page=1&toolbar=0&navpanes=0&view=FitH"
+	}
+	return inlineURL
 }
 
 func marshalJSONCompact(value interface{}) string {

@@ -1,0 +1,87 @@
+{{ define "attachment_carousel" }}
+  {{ $total := len . }}
+  {{ if gt $total 0 }}
+    <div class="action-submitted-attachments js-attachment-carousel">
+      <div class="action-submitted-attachments-track">
+        {{ range $index, $attachment := . }}
+          <article
+            class="action-submitted-attachment"
+            data-carousel-slide
+            {{ if ne $index 0 }}hidden{{ end }}
+          >
+            <div class="action-submitted-attachment-meta">
+              <div class="action-submitted-attachment-copy">
+                <h4>{{ $attachment.Key }}</h4>
+              </div>
+              <a class="secondary" href="{{ $attachment.URL }}">
+                {{ template "icon-download" $attachment }}
+                Download
+              </a>
+            </div>
+            <div class="action-submitted-attachment-preview">
+              {{ if gt $total 1 }}
+                <div
+                  class="action-submitted-attachment-gesture"
+                  data-carousel-swipe
+                ></div>
+              {{ end }}
+              {{ if eq $attachment.PreviewKind "image" }}
+                <img
+                  src="{{ $attachment.PreviewURL }}"
+                  alt="Preview of {{ $attachment.Filename }}"
+                  loading="lazy"
+                />
+              {{ else if eq $attachment.PreviewKind "document" }}
+                <iframe
+                  src="{{ $attachment.PreviewURL }}"
+                  title="Preview of {{ $attachment.Filename }}"
+                  loading="lazy"
+                ></iframe>
+              {{ else }}
+                <div class="action-submitted-attachment-preview-fallback">
+                  <strong>Preview unavailable</strong>
+                  <span>Use download to open {{ $attachment.Filename }}.</span>
+                </div>
+              {{ end }}
+            </div>
+          </article>
+        {{ end }}
+        {{ if gt $total 1 }}
+          <button
+            type="button"
+            class="secondary action-submitted-attachments-nav action-submitted-attachments-nav-prev"
+            data-carousel-prev
+            aria-label="Previous attachment preview"
+            disabled
+          >
+            {{ template "icon-chevron-left" . }}
+          </button>
+          <button
+            type="button"
+            class="secondary action-submitted-attachments-nav action-submitted-attachments-nav-next"
+            data-carousel-next
+            aria-label="Next attachment preview"
+          >
+            {{ template "icon-chevron-right" . }}
+          </button>
+        {{ end }}
+      </div>
+      {{ if gt $total 1 }}
+        <div
+          class="action-submitted-attachments-dots"
+          aria-label="Attachment preview position"
+        >
+          {{ range $index, $attachment := . }}
+            <button
+              type="button"
+              class="action-submitted-attachments-dot"
+              data-carousel-dot="{{ $index }}"
+              aria-label="Show preview for {{ $attachment.Filename }}"
+              {{ if eq $index 0 }}aria-current="true"{{ end }}
+            ></button>
+          {{ end }}
+        </div>
+      {{ end }}
+    </div>
+  {{ end }}
+{{ end }}

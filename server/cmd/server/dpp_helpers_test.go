@@ -184,7 +184,10 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 				}
 			}
 			if sub.SubstepID == "1.3" {
-				if len(sub.Attachments) == 1 && sub.Attachments[0].Filename == "cert.pdf" && sub.Attachments[0].URL != "" {
+				if len(sub.Attachments) == 1 &&
+					sub.Attachments[0].Filename == "cert.pdf" &&
+					sub.Attachments[0].URL != "" &&
+					sub.Attachments[0].PreviewKind == "document" {
 					foundFile = true
 				}
 			}

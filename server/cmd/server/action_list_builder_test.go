@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +71,12 @@ func TestBuildActionListDoneFileAttachments(t *testing.T) {
 	}
 	if got.Filename != "coa.pdf" {
 		t.Fatalf("expected filename coa.pdf, got %q", got.Filename)
+	}
+	if got.Key != "attachment" {
+		t.Fatalf("expected key attachment, got %q", got.Key)
+	}
+	if got.PreviewKind != "document" || !strings.Contains(got.PreviewURL, "?inline=1") {
+		t.Fatalf("expected document preview metadata, got %#v", got)
 	}
 	if got.SHA256 != "abc123" {
 		t.Fatalf("expected sha abc123, got %q", got.SHA256)
@@ -145,6 +152,9 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 	wantURL := "/w/workflow/process/" + processID.Hex() + "/attachment/" + attachmentID + "/file"
 	if action.Attachments[0].URL != wantURL {
 		t.Fatalf("expected URL %q, got %q", wantURL, action.Attachments[0].URL)
+	}
+	if action.Attachments[0].Key != "docs[0]" {
+		t.Fatalf("expected key %q, got %q", "docs[0]", action.Attachments[0].Key)
 	}
 }
 

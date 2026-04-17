@@ -215,6 +215,83 @@ const triggerDownload = (button) => {
   link.remove();
 };
 
+const updateAttachmentCarousel = (carousel, nextIndex) => {
+  if (!(carousel instanceof HTMLElement)) {
+    return;
+  }
+  const slides = Array.from(carousel.querySelectorAll("[data-carousel-slide]"));
+  if (slides.length === 0) {
+    return;
+  }
+  const maxIndex = slides.length - 1;
+  const safeIndex = Math.min(Math.max(nextIndex, 0), maxIndex);
+  const currentIndex = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+  const currentSlide = slides[currentIndex];
+  const nextSlide = slides[safeIndex];
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+  if (
+    currentSlide instanceof HTMLElement &&
+    nextSlide instanceof HTMLElement &&
+    currentIndex !== safeIndex &&
+    !prefersReducedMotion
+  ) {
+    const direction = safeIndex > currentIndex ? 1 : -1;
+    nextSlide.hidden = false;
+    currentSlide.animate(
+      [
+        { opacity: 1, transform: "translateX(0)" },
+        { opacity: 0, transform: `translateX(${direction * -18}px)` }
+      ],
+      { duration: 220, easing: "ease" }
+    );
+    nextSlide.animate(
+      [
+        { opacity: 0, transform: `translateX(${direction * 18}px)` },
+        { opacity: 1, transform: "translateX(0)" }
+      ],
+      { duration: 220, easing: "ease" }
+    );
+  }
+
+  slides.forEach((slide, index) => {
+    if (!(slide instanceof HTMLElement)) {
+      return;
+    }
+    slide.hidden = index !== safeIndex;
+  });
+
+  const dots = Array.from(carousel.querySelectorAll("[data-carousel-dot]"));
+  dots.forEach((dot, index) => {
+    if (!(dot instanceof HTMLButtonElement)) {
+      return;
+    }
+    const active = index === safeIndex;
+    if (active) {
+      dot.setAttribute("aria-current", "true");
+    } else {
+      dot.removeAttribute("aria-current");
+    }
+  });
+  const prevButton = carousel.querySelector("[data-carousel-prev]");
+  if (prevButton instanceof HTMLButtonElement) {
+    prevButton.disabled = safeIndex === 0;
+  }
+  const nextButton = carousel.querySelector("[data-carousel-next]");
+  if (nextButton instanceof HTMLButtonElement) {
+    nextButton.disabled = safeIndex === maxIndex;
+  }
+  carousel.dataset.carouselIndex = String(safeIndex);
+};
+
+const clearAttachmentSwipe = (carousel) => {
+  if (!(carousel instanceof HTMLElement)) {
+    return;
+  }
+  delete carousel.dataset.touchStartX;
+  delete carousel.dataset.touchStartY;
+};
+
 const copyLinkValue = async (button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -719,6 +796,36 @@ document.body.addEventListener("click", (event) => {
   if (!(target instanceof Element)) {
     return;
   }
+  const prevCarouselButton = target.closest("[data-carousel-prev]");
+  if (prevCarouselButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const carousel = prevCarouselButton.closest(".js-attachment-carousel");
+    if (carousel instanceof HTMLElement) {
+      const current = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+      updateAttachmentCarousel(carousel, current - 1);
+    }
+    return;
+  }
+  const nextCarouselButton = target.closest("[data-carousel-next]");
+  if (nextCarouselButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const carousel = nextCarouselButton.closest(".js-attachment-carousel");
+    if (carousel instanceof HTMLElement) {
+      const current = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+      updateAttachmentCarousel(carousel, current + 1);
+    }
+    return;
+  }
+  const dotButton = target.closest("[data-carousel-dot]");
+  if (dotButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const carousel = dotButton.closest(".js-attachment-carousel");
+    if (carousel instanceof HTMLElement) {
+      const index = Number.parseInt(dotButton.dataset.carouselDot || "0", 10) || 0;
+      updateAttachmentCarousel(carousel, index);
+    }
+    return;
+  }
   const downloadButton = target.closest(".js-download-link");
   if (downloadButton instanceof HTMLButtonElement) {
     event.preventDefault();
@@ -744,6 +851,71 @@ document.body.addEventListener("click", (event) => {
   event.preventDefault();
   void shareLink(shareButton);
 });
+
+document.body.addEventListener("touchstart", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  const swipeSurface = target.closest("[data-carousel-swipe]");
+  if (!(swipeSurface instanceof HTMLElement)) {
+    return;
+  }
+  const carousel = swipeSurface.closest(".js-attachment-carousel");
+  if (!(carousel instanceof HTMLElement)) {
+    return;
+  }
+  const touch = event.touches?.[0];
+  if (!touch) {
+    return;
+  }
+  carousel.dataset.touchStartX = String(touch.clientX);
+  carousel.dataset.touchStartY = String(touch.clientY);
+}, { passive: true });
+
+document.body.addEventListener("touchcancel", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  const carousel = target.closest(".js-attachment-carousel");
+  if (!(carousel instanceof HTMLElement)) {
+    return;
+  }
+  clearAttachmentSwipe(carousel);
+}, { passive: true });
+
+document.body.addEventListener("touchend", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  const swipeSurface = target.closest("[data-carousel-swipe]");
+  if (!(swipeSurface instanceof HTMLElement)) {
+    return;
+  }
+  const carousel = swipeSurface.closest(".js-attachment-carousel");
+  if (!(carousel instanceof HTMLElement)) {
+    return;
+  }
+  const startX = Number.parseFloat(carousel.dataset.touchStartX || "");
+  const startY = Number.parseFloat(carousel.dataset.touchStartY || "");
+  clearAttachmentSwipe(carousel);
+  if (!Number.isFinite(startX) || !Number.isFinite(startY)) {
+    return;
+  }
+  const touch = event.changedTouches?.[0];
+  if (!touch) {
+    return;
+  }
+  const deltaX = touch.clientX - startX;
+  const deltaY = touch.clientY - startY;
+  if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+    return;
+  }
+  const current = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+  updateAttachmentCarousel(carousel, deltaX < 0 ? current + 1 : current - 1);
+}, { passive: true });
 
 const deptRoot = document.querySelector("[data-dept-role]");
 if (deptRoot) {

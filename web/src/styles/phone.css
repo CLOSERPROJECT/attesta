@@ -74,4 +74,30 @@
     gap: 4px;
     margin-top: 8px;
   }
+
+  .action-submitted-attachment-meta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .action-submitted-attachments-nav {
+    display: none;
+  }
+
+  .action-submitted-attachment {
+    width: 100%;
+  }
+
+  .action-submitted-attachment-preview {
+    min-height: 220px;
+    max-height: 360px;
+  }
+
+  .action-submitted-attachment-gesture {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    touch-action: pan-y;
+  }
 }

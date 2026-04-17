@@ -120,30 +120,27 @@
                           >
                         </div>
                         <div class="action-submitted" style="margin-top: 20px;">
-                          {{ if .Values }}
-                            <dl class="action-submitted-values">
+                          <dl class="action-submitted-values">
+                            {{ if .Values }}
                               {{ range .Values }}
                                 <dt>{{ .Key }}</dt>
                                 <dd>{{ .Value }}</dd>
                               {{ end }}
-                            </dl>
-                          {{ end }}
-                          {{ if .Attachments }}
-                            <ul class="action-submitted-attachments">
+                            {{ end }}
+                            {{ if .Attachments }}
                               {{ range .Attachments }}
-                                <li>
+                                <dt>{{ .Key }}</dt>
+                                <dd>
                                   <a href="{{ .URL }}"
-                                    >{{ template "icon-download" . }}{{ .Filename }}</a
+                                    >{{ template "icon-download" . }} File</a
                                   >
-                                  {{ if .SHA256 }}
-                                    <code
-                                      class="dpp-integrity-hash dpp-history-digest-full"
-                                      >{{ .SHA256 }}</code
-                                    >
-                                  {{ end }}
-                                </li>
+                                </dd>
                               {{ end }}
-                            </ul>
+                            {{ end }}
+                          </dl>
+                          {{ if .Attachments }}
+                            <h3 style="margin: 4px 0;">Attachments preview</h3>
+                            {{ template "attachment_carousel" .Attachments }}
                           {{ end }}
                           <div class="substep-meta">
                             {{ if .DoneAtHuman }}
