@@ -30,11 +30,13 @@
         <p>{{ .ProcessID }}</p>
       </div>
     </section>
-    {{ template "workflow_timeline" .ActionList }}
     {{ if .ActionList.ProcessDone }}
       <div class="process-resources-grid">
-        {{ template "process_downloads" . }}
-        {{ template "process_dpp" . }}
+        {{ template "workflow_timeline" .ActionList }}
+        <div class="stack tablet-seprator" style="gap: 16px;">
+          {{ template "process_dpp" . }}
+          {{ template "process_downloads" . }}
+        </div>
       </div>
     {{ end }}
   </div>
@@ -82,7 +84,7 @@
     <section class="panel dpp-downloads-section">
       <div class="panel-head-actions">
         <div class="panel-heading">
-          <h2>DPP</h2>
+          <h2>Digital Product Passport</h2>
           <p>GS1 Digital Link and DPP data for this stream.</p>
         </div>
         <button

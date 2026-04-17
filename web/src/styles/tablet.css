@@ -20,4 +20,12 @@
   .instances-panel {
     scroll-margin-top: 12px;
   }
+
+  .process-resources-grid {
+    gap: 24px;
+  }
+  .tablet-seprator {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
 }
