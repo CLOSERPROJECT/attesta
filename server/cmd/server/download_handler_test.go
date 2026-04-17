@@ -168,6 +168,51 @@ func TestHandleDownloadProcessAttachmentReturns404ForProcessMismatch(t *testing.
 	}
 }
 
+func TestHandleDownloadProcessAttachmentSupportsInlinePreview(t *testing.T) {
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	fileBytes := []byte("%PDF-1.4 preview")
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   "1.3",
+		Filename:    "qa-evidence.pdf",
+		ContentType: "application/pdf",
+		MaxBytes:    1024,
+		UploadedAt:  time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC),
+	}, bytes.NewReader(fileBytes))
+	if err != nil {
+		t.Fatalf("save attachment: %v", err)
+	}
+
+	store.SeedProcess(Process{
+		ID:        processID,
+		CreatedAt: time.Now().UTC(),
+		Status:    "active",
+		Progress: map[string]ProcessStep{
+			"1_3": {State: "done"},
+		},
+	})
+
+	server := &Server{
+		store: store,
+		tmpl:  testTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file?inline=1", nil)
+	rr := httptest.NewRecorder()
+	server.handleProcessRoutes(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Disposition"); !strings.HasPrefix(got, "inline;") {
+		t.Fatalf("expected inline content disposition, got %q", got)
+	}
+}
+
 func TestHandleDownloadSubstepFileReturns404WhenNotDone(t *testing.T) {
 	store := NewMemoryStore()
 	processID := store.SeedProcess(Process{

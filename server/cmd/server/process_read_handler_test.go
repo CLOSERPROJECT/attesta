@@ -254,14 +254,14 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, ">DPP<") {
-		t.Fatalf("expected DPP link label in response, got %q", body)
+	if !strings.Contains(body, "Digital Product Passport") {
+		t.Fatalf("expected DPP section heading in response, got %q", body)
 	}
 	if !strings.Contains(body, "(01)09506000134352(10)LOT-001(21)SERIAL-001") {
 		t.Fatalf("expected GS1 element string in response, got %q", body)
 	}
-	if !strings.Contains(body, "Share DPP link") {
-		t.Fatalf("expected DPP share button in response, got %q", body)
+	if !strings.Contains(body, "View DPP data") {
+		t.Fatalf("expected DPP action button in response, got %q", body)
 	}
 }
 

@@ -11,43 +11,41 @@
       </div>
     </section>
     <section class="panel">
-      <div class="panel-heading">
-        <h2>{{ .Workflow.Name }}</h2>
-        {{ if .Workflow.Description }}
-          <p>{{ .Workflow.Description }}</p>
-        {{ end }}
+      <div class="panel-head-actions">
+        <div class="panel-heading">
+          <h2>{{ .Workflow.Name }}</h2>
+          {{ if .Workflow.Description }}
+            <p>{{ .Workflow.Description }}</p>
+          {{ end }}
+        </div>
+        <button
+          type="button"
+          class="primary js-share-link"
+          data-share-url="{{ .DigitalLink }}"
+          data-share-label="DPP link"
+        >
+          {{ template "icon-share" . }}
+          Share DPP link
+        </button>
       </div>
-      <div
-        style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;"
-      >
+      <div class="role-pill-row" style="margin-bottom: 16px;">
         <span
           class="pill"
-          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
           >GTIN|{{ .GTIN }}</span
         >
         <span
           class="pill"
-          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
           >Lot|{{ .Lot }}</span
         >
         <span
           class="pill"
-          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
           >Serial|{{ .Serial }}</span
         >
       </div>
-      <div style="margin-bottom: 24px;">
-        <button
-          type="button"
-          class="secondary js-copy-link"
-          data-copy-link="{{ .DigitalLink }}"
-        >
-          Copy DPP URL
-        </button>
-      </div>
-
-      <hr style="margin-bottom: 24px;" />
-
+      <hr style="margin: 24px 0;" />
       <h2>History</h2>
       <div class="dpp-history-list">
         {{ range .Traceability }}
@@ -61,12 +59,16 @@
               </div>
               <div class="dpp-history-card">
                 <div class="dpp-history-card-copy">
-                  <span
-                    class="pill"
-                    style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
-                    >Step {{ .StepID }}</span
+                  <div
+                    style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;"
                   >
-                  <h3>{{ .Title }}</h3>
+                    <span
+                      class="pill"
+                      style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
+                      >Step {{ .StepID }}</span
+                    >
+                    <h3>{{ .Title }}</h3>
+                  </div>
                   <div class="dpp-history-meta">
                     <span
                       ><strong>Completed:</strong> {{ if .CompletedAtHuman }}
@@ -106,78 +108,81 @@
                       <section class="substep substep-{{ .Status }}">
                         <div class="substep-head">
                           <span class="pill">{{ .SubstepID }}</span>
-                          <span class="title">{{ .Title }}</span>
+                          <span class="timeline-step-title substep-title"
+                            >{{ .Title }}</span
+                          >
+                        </div>
+                        <div class="substep-summary-supporting">
                           <span
                             class="pill role-pill"
-                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }}; margin-left: auto;"
+                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
                             >{{ .Role }}</span
                           >
                         </div>
-                        <div class="action-submitted">
-                          {{ if .Values }}
-                            <dl class="action-submitted-values">
+                        <div class="action-submitted" style="margin-top: 20px;">
+                          <dl class="action-submitted-values">
+                            {{ if .Values }}
                               {{ range .Values }}
                                 <dt>{{ .Key }}</dt>
                                 <dd>{{ .Value }}</dd>
                               {{ end }}
-                            </dl>
-                          {{ end }}
-                          {{ if .Attachments }}
-                            <ul class="action-submitted-attachments">
+                            {{ end }}
+                            {{ if .Attachments }}
                               {{ range .Attachments }}
-                                <li>
-                                  <a href="{{ .URL }}">{{ .Filename }}</a>
-                                  {{ if .SHA256 }}
-                                    <code>{{ .SHA256 }}</code>
-                                    <button
-                                      type="button"
-                                      class="secondary hash-copy js-copy-text"
-                                      data-copy-text="{{ .SHA256 }}"
-                                      data-copy-label="sha256"
-                                    >
-                                      Copy
-                                    </button>
-                                  {{ end }}
-                                </li>
-                              {{ end }}
-                            </ul>
-                          {{ else if .FileURL }}
-                            <ul class="action-submitted-attachments">
-                              <li>
-                                <a href="{{ .FileURL }}">{{ .FileName }}</a>
-                                <a class="secondary" href="{{ .FileURL }}"
-                                  >Download</a
-                                >
-                                {{ if .FileSHA256 }}
-                                  <code>{{ .FileSHA256 }}</code>
-                                  <button
-                                    type="button"
-                                    class="secondary hash-copy js-copy-text"
-                                    data-copy-text="{{ .FileSHA256 }}"
-                                    data-copy-label="sha256"
+                                <dt>{{ .Key }}</dt>
+                                <dd>
+                                  <a href="{{ .URL }}"
+                                    >{{ template "icon-download" . }} File</a
                                   >
-                                    Copy
-                                  </button>
-                                {{ end }}
-                              </li>
-                            </ul>
+                                </dd>
+                              {{ end }}
+                            {{ end }}
+                          </dl>
+                          {{ if .Attachments }}
+                            <h3 style="margin: 4px 0;">Attachments preview</h3>
+                            {{ template "attachment_carousel" .Attachments }}
                           {{ end }}
                           <div class="substep-meta">
                             {{ if .DoneAtHuman }}
                               <span class="time"
                                 ><time datetime="{{ .DoneAt }}"
-                                  >{{ .DoneAtHuman }}</time
+                                  >Completed at {{ .DoneAtHuman }}</time
                                 ></span
                               >
                             {{ else if .DoneAt }}
                               <span class="time">{{ .DoneAt }}</span>
                             {{ end }}
                             {{ if .DoneBy }}
-                              <span class="actor">by {{ .DoneBy }}</span>
+                              <span class="actor"
+                                >by
+                                {{ if and (ge (len .DoneBy) 9) (eq (slice .DoneBy 0 9) "appwrite:") }}
+                                  {{ slice .DoneBy 9 }}
+                                {{ else }}
+                                  {{ .DoneBy }}
+                                {{ end }}</span
+                              >
                             {{ end }}
                             {{ if .Digest }}
                               <span class="data"
-                                >digest: <code>{{ .Digest }}</code></span
+                                >digest
+                                <code
+                                  class="dpp-integrity-hash dpp-history-digest-full"
+                                  >{{ .Digest }}</code
+                                >
+                                <button
+                                  type="button"
+                                  class="dpp-integrity-hash-button dpp-history-digest-button js-copy-text"
+                                  data-copy-text="{{ .Digest }}"
+                                  data-copy-label="digest"
+                                  aria-label="Copy full digest for substep {{ .SubstepID }}"
+                                  title="{{ .Digest }}"
+                                >
+                                  {{ if gt (len .Digest) 7 }}
+                                    {{ slice .Digest 0 7 }}
+                                  {{ else }}
+                                    {{ .Digest }}
+                                  {{ end }}
+                                </button></span
                               >
                             {{ end }}
                           </div>

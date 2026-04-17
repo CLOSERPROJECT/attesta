@@ -2,136 +2,97 @@
 
 {{ define "action_detail_content.html" }}
   {{ if .InputKey }}
-    <p class="muted" style="margin: 0;">{{ .InputKey }}</p>
+    <p class="muted" style="margin: 8px 0 0; white-space: pre-line;">
+      {{- .InputKey -}}
+    </p>
+    <hr />
   {{ end }}
   {{ if ne .Status "done" }}
-    {{ if .ReadOnly }}
-      <div class="action-form">
-        {{ if .MatchingRoles }}
-          {{ if eq (len .MatchingRoles) 1 }}
-            <input
-              type="hidden"
-              name="activeRole"
-              value="{{ index .MatchingRoles 0 }}"
-              disabled
-            />
-          {{ else }}
-            <hr />
-            <div>
-              <h3>Active Role</h3>
-              <label
-                style="display: flex; align-items: center; flex-direction: row; gap: 8px;"
-              >
-                <span style="font-size: 13px;">Complete action as:</span>
-                <select name="activeRole" required disabled>
-                  <option value="">Select role</option>
-                  {{ range .MatchingRoles }}
-                    <option value="{{ . }}">{{ . }}</option>
-                  {{ end }}
-                </select>
-              </label>
-            </div>
-          {{ end }}
-        {{ end }}
-        <hr />
-        <label class="action-field-formata">
-          <div
-            class="js-formata-host"
-            data-formata-schema="{{ .FormSchema }}"
-            {{ if .FormUISchema }}
-              data-formata-uischema='{{ .FormUISchema }}'
-            {{ end }}
-            data-formata-disabled="true"
-          ></div>
-          <input
-            class="js-formata-value"
-            type="hidden"
-            name="value"
-            disabled
-          />
-        </label>
-        {{ if .Reason }}
-          <p class="muted" style="margin: 12px 0 0;">{{ .Reason }}</p>
-        {{ end }}
-      </div>
-    {{ else }}
-      <form
-        class="action-form"
+    {{ $formataDisabled := or .ReadOnly .Disabled }}
+    <form
+      class="action-form"
+      {{ if not .ReadOnly }}
         method="post"
         action="/w/{{ .WorkflowKey }}/process/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
         data-formata-substep="true"
         data-formata-post="/w/{{ .WorkflowKey }}/process/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
-      >
-        {{ if .MatchingRoles }}
-          {{ if eq (len .MatchingRoles) 1 }}
-            <input
-              type="hidden"
-              name="activeRole"
-              value="{{ index .MatchingRoles 0 }}"
-            />
-          {{ else }}
-            <hr />
-            <div>
-              <h3>Active Role</h3>
-              <label
-                style="display: flex; align-items: center; flex-direction: row; gap: 8px;"
-              >
-                <span style="font-size: 13px;">Complete action as:</span>
-                <select
-                  name="activeRole"
-                  required
-                  {{ if .Disabled }}disabled{{ end }}
-                >
-                  <option value="">Select role</option>
-                  {{ range .MatchingRoles }}
-                    <option value="{{ . }}">{{ . }}</option>
-                  {{ end }}
-                </select>
-              </label>
-            </div>
-          {{ end }}
-        {{ end }}
-        <hr />
-        <label class="action-field-formata">
-          <div
-            class="js-formata-host"
-            data-formata-schema="{{ .FormSchema }}"
-            {{ if .FormUISchema }}
-              data-formata-uischema='{{ .FormUISchema }}'
-            {{ end }}
-            {{ if .Disabled }}data-formata-disabled="true"{{ end }}
-          ></div>
+      {{ end }}
+    >
+      {{ if .MatchingRoles }}
+        {{ if eq (len .MatchingRoles) 1 }}
           <input
-            class="js-formata-value"
             type="hidden"
-            name="value"
-            {{ if .Disabled }}disabled{{ end }}
+            name="activeRole"
+            value="{{ index .MatchingRoles 0 }}"
+            {{ if .ReadOnly }}disabled{{ end }}
           />
-        </label>
-      </form>
-    {{ end }}
+        {{ else }}
+          <div class="active-role-selector">
+            <h3>Active Role</h3>
+            <label>
+              <span>Complete action as:</span>
+              <select
+                name="activeRole"
+                required
+                {{ if $formataDisabled }}disabled{{ end }}
+              >
+                <option value="">Select role</option>
+                {{ range .MatchingRoles }}
+                  <option value="{{ . }}">{{ . }}</option>
+                {{ end }}
+              </select>
+            </label>
+          </div>
+          <hr />
+        {{ end }}
+      {{ end }}
+      <label class="action-field-formata">
+        <div
+          class="js-formata-host"
+          data-formata-schema="{{ .FormSchema }}"
+          {{ if .FormUISchema }}
+            data-formata-uischema='{{ .FormUISchema }}'
+          {{ end }}
+          {{ if $formataDisabled }}data-formata-disabled="true"{{ end }}
+        ></div>
+        <input
+          class="js-formata-value"
+          type="hidden"
+          name="value"
+          {{ if $formataDisabled }}disabled{{ end }}
+        />
+      </label>
+      {{ if .ReadOnly }}
+        {{ if .Reason }}
+          <p class="muted" style="margin: 12px 0 0;">{{ .Reason }}</p>
+        {{ end }}
+      {{ end }}
+    </form>
   {{ else }}
     <div class="action-submitted">
-      <hr />
-      <h3>Submitted</h3>
-      {{ if .Values }}
+      <h3 style="margin-bottom: 0;">Submitted</h3>
+      <div class="action-submitted">
         <dl class="action-submitted-values">
-          {{ range .Values }}
-            <dt>{{ .Key }}</dt>
-            <dd>{{ .Value }}</dd>
+          {{ if .Values }}
+            {{ range .Values }}
+              <dt>{{ .Key }}</dt>
+              <dd>{{ .Value }}</dd>
+            {{ end }}
+          {{ end }}
+          {{ if .Attachments }}
+            {{ range .Attachments }}
+              <dt>{{ .Key }}</dt>
+              <dd>
+                <a href="{{ .URL }}">{{ template "icon-download" . }} File</a>
+              </dd>
+            {{ end }}
           {{ end }}
         </dl>
-      {{ end }}
-      {{ if .Attachments }}
-        <ul class="action-submitted-attachments">
-          {{ range .Attachments }}
-            <li>
-              <a href="{{ .URL }}">{{ .Filename }}</a>
-              {{ if .SHA256 }}<code>{{ .SHA256 }}</code>{{ end }}
-            </li>
-          {{ end }}
-        </ul>
-      {{ end }}
+        {{ if .Attachments }}
+          <h3 style="margin: 10px 0;">Attachments</h3>
+          {{ template "attachment_carousel" .Attachments }}
+        {{ end }}
+      </div>
     </div>
   {{ end }}
 {{ end }}

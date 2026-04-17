@@ -184,7 +184,10 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 				}
 			}
 			if sub.SubstepID == "1.3" {
-				if sub.FileName == "cert.pdf" && sub.FileURL != "" {
+				if len(sub.Attachments) == 1 &&
+					sub.Attachments[0].Filename == "cert.pdf" &&
+					sub.Attachments[0].URL != "" &&
+					sub.Attachments[0].PreviewKind == "document" {
 					foundFile = true
 				}
 			}
@@ -368,9 +371,6 @@ func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
 	}
 	if substep.Attachments[0].URL == "" {
 		t.Fatalf("expected attachment URL, got %#v", substep.Attachments[0])
-	}
-	if substep.FileURL == "" || substep.FileName != "proof.pdf" {
-		t.Fatalf("expected backward-compatible single file fields, got file=%q url=%q", substep.FileName, substep.FileURL)
 	}
 }
 

@@ -150,11 +150,11 @@ func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
 	if len(attachments) != 2 {
 		t.Fatalf("expected 2 deduplicated attachments, got %#v", attachments)
 	}
-	if attachments[0].Filename != ".._zeta.pdf" {
-		t.Fatalf("expected sorted attachments by filename, got %#v", attachments)
+	if attachments[0].Key != "[0]" || attachments[0].Filename != ".._zeta.pdf" {
+		t.Fatalf("expected sorted attachments with key, got %#v", attachments)
 	}
-	if attachments[1].Filename != "alpha.pdf" {
-		t.Fatalf("expected sanitized filename, got %#v", attachments[1])
+	if attachments[1].Key != "[3]" || attachments[1].Filename != "alpha.pdf" {
+		t.Fatalf("expected sanitized filename and key, got %#v", attachments[1])
 	}
 	if !strings.Contains(attachments[0].URL, "/w/workflow/process/"+processID.Hex()+"/attachment/") {
 		t.Fatalf("unexpected attachment url: %q", attachments[0].URL)
@@ -180,6 +180,89 @@ func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
 	}
 	if views[1].Filename != ".._b.pdf" {
 		t.Fatalf("expected sanitized filename, got %#v", views[1])
+	}
+}
+
+func TestActionAttachmentPreviewKindAndURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		meta       NotarizedAttachment
+		wantKind   string
+		wantSuffix string
+	}{
+		{
+			name:       "image content type",
+			meta:       NotarizedAttachment{Filename: "ignored.bin", ContentType: "image/jpeg"},
+			wantKind:   "image",
+			wantSuffix: "?inline=1",
+		},
+		{
+			name:       "pdf content type",
+			meta:       NotarizedAttachment{Filename: "ignored.bin", ContentType: "application/pdf"},
+			wantKind:   "document",
+			wantSuffix: "?inline=1#page=1&toolbar=0&navpanes=0&view=FitH",
+		},
+		{
+			name:       "image extension fallback",
+			meta:       NotarizedAttachment{Filename: "photo.PNG"},
+			wantKind:   "image",
+			wantSuffix: "?inline=1",
+		},
+		{
+			name:       "pdf extension fallback",
+			meta:       NotarizedAttachment{Filename: "report.PDF"},
+			wantKind:   "document",
+			wantSuffix: "?inline=1#page=1&toolbar=0&navpanes=0&view=FitH",
+		},
+		{
+			name:       "unsupported attachment",
+			meta:       NotarizedAttachment{Filename: "archive.zip", ContentType: "application/zip"},
+			wantKind:   "",
+			wantSuffix: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotKind := actionAttachmentPreviewKind(tc.meta)
+			if gotKind != tc.wantKind {
+				t.Fatalf("preview kind = %q, want %q", gotKind, tc.wantKind)
+			}
+			gotURL := actionAttachmentPreviewURL("/download/file", gotKind)
+			if tc.wantSuffix == "" {
+				if gotURL != "" {
+					t.Fatalf("preview url = %q, want empty", gotURL)
+				}
+				return
+			}
+			if gotURL != "/download/file"+tc.wantSuffix {
+				t.Fatalf("preview url = %q, want %q", gotURL, "/download/file"+tc.wantSuffix)
+			}
+		})
+	}
+}
+
+func TestAttachmentViewsFromValueTopLevelKeys(t *testing.T) {
+	views := attachmentViewsFromValue(primitive.M{
+		"payload": map[string]interface{}{
+			"docs": []interface{}{
+				map[string]interface{}{"attachmentId": "att-1", "filename": "nested.pdf"},
+			},
+		},
+		"attachment": map[string]interface{}{
+			"attachmentId": "att-2",
+			"filename":     "root.pdf",
+		},
+	})
+
+	if len(views) != 2 {
+		t.Fatalf("expected 2 attachment views, got %#v", views)
+	}
+	if views[0].Key != "attachment" || views[0].Meta.AttachmentID != "att-2" {
+		t.Fatalf("unexpected first attachment view: %#v", views[0])
+	}
+	if views[1].Key != "docs[0]" || views[1].Meta.AttachmentID != "att-1" {
+		t.Fatalf("unexpected second attachment view: %#v", views[1])
 	}
 }
 
