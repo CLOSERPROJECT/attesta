@@ -264,7 +264,9 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `class="stack max-w-7xl mx-auto"`) || !strings.Contains(body, `class="panel"`) {
+	if !strings.Contains(body, `class="stack max-w-7xl mx-auto"`) ||
+		!strings.Contains(body, `class="hero"`) ||
+		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
 	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
