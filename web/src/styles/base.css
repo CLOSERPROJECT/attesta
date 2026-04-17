@@ -8,6 +8,7 @@
   --panel: #ffffff;
   --accent: #1e6f5c;
   --accent-2: #d2a106;
+  --accent-2-opposite: #f2c64f;
   --danger: #c0392b;
   --border: #d9e0d0;
   --shadow: rgba(16, 26, 20, 0.08);
@@ -75,6 +76,7 @@
   --panel: #151c17;
   --accent: #57c2a6;
   --accent-2: #f2c64f;
+  --accent-2-opposite: #d2a106;
   --danger: #ff6b5f;
   --border: rgba(236, 241, 235, 0.14);
   --shadow: rgba(0, 0, 0, 0.4);
@@ -883,8 +885,13 @@ button.secondary-small {
   column-gap: 4px;
 }
 
-.process-resources {
-  gap: 16px;
+.process-resources-grid {
+  gap: 12px;
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: start;
+  align-items: start;
 }
 
 .role-badge {
@@ -1323,13 +1330,6 @@ button.secondary-small {
 
 .dpp-downloads-section code {
   word-break: break-all;
-}
-
-.dpp-process-panel {
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 12px;
-  background: var(--surface-2);
 }
 
 .dpp-integrity-root {

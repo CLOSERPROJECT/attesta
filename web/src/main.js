@@ -197,6 +197,24 @@ const shareLink = async (button) => {
   window.prompt(`Copy ${shareLabel}:`, absoluteURL);
 };
 
+const triggerDownload = (button) => {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  const rawURL = button.dataset.downloadUrl;
+  if (!rawURL) {
+    return;
+  }
+  const absoluteURL = resolveAbsoluteURL(rawURL);
+  const link = document.createElement("a");
+  link.href = absoluteURL;
+  link.download = "";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
 const copyLinkValue = async (button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -699,6 +717,12 @@ document.body.addEventListener("toggle", (event) => {
 document.body.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) {
+    return;
+  }
+  const downloadButton = target.closest(".js-download-link");
+  if (downloadButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    triggerDownload(downloadButton);
     return;
   }
   const copyLinkButton = target.closest(".js-copy-link");

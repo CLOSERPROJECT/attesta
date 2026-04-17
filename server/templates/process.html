@@ -32,9 +32,9 @@
     </section>
     {{ template "workflow_timeline" .ActionList }}
     {{ if .ActionList.ProcessDone }}
-      <div class="stack process-resources">
-        {{ template "process_dpp" . }}
+      <div class="process-resources-grid">
         {{ template "process_downloads" . }}
+        {{ template "process_dpp" . }}
       </div>
     {{ end }}
   </div>
@@ -42,9 +42,24 @@
 
 {{ define "process_downloads" }}
   <section class="panel" id="process-downloads">
-    <div class="panel-heading">
-      <h2>Downloads</h2>
-      <p>Export attachments and notarized data for this stream.</p>
+    <div class="panel-head-actions">
+      <div class="panel-heading">
+        <h2>Downloads</h2>
+        <p>Export attachments and notarized data for this stream.</p>
+      </div>
+      <button
+        type="button"
+        class="secondary js-download-link"
+        data-download-url="{{ .WorkflowPath }}/process/{{ .ProcessID }}/files.zip"
+      >
+        {{ template "icon-download" . }}
+        Download all files
+      </button>
+    </div>
+    <div>
+      <a href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/notarized.json"
+        >Notarized stream data</a
+      >
     </div>
     {{ if .Attachments }}
       <div class="panel-block" style="margin-bottom: 12px;">
@@ -59,30 +74,26 @@
         </ul>
       </div>
     {{ end }}
-    <div class="stack" style="gap: 10px;">
-      <a
-        class="primary"
-        href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/files.zip"
-        >Download all files (zip)</a
-      >
-      <a
-        class="secondary"
-        href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/notarized.json"
-        >Download notarized JSON</a
-      >
-      <a
-        class="secondary"
-        href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/merkle.json"
-        >Download Merkle tree</a
-      >
-    </div>
   </section>
 {{ end }}
 
 {{ define "process_dpp" }}
   {{ if .DPPURL }}
-    <section class="panel dpp-downloads-section dpp-process-panel">
-      <h2>DPP</h2>
+    <section class="panel dpp-downloads-section">
+      <div class="panel-head-actions">
+        <div class="panel-heading">
+          <h2>DPP</h2>
+          <p>GS1 Digital Link and DPP data for this stream.</p>
+        </div>
+        <button
+          type="button"
+          class="primary"
+          onclick="window.open('{{ .DPPURL }}', '_blank')"
+        >
+          {{ template "icon-external-link" . }}
+          View DPP data
+        </button>
+      </div>
       <div class="stack" style="gap: 8px;">
         <div>
           <strong>GS1 Digital Link:</strong>
@@ -94,14 +105,7 @@
             <code>{{ .DPPGS1 }}</code>
           </div>
         {{ end }}
-        <button
-          type="button"
-          class="secondary js-share-link"
-          data-share-url="{{ .DPPURL }}"
-          data-share-label="DPP link"
-        >
-          Share DPP link
-        </button>
+
       </div>
     </section>
   {{ end }}

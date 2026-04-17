@@ -20,28 +20,28 @@
         </div>
         <button
           type="button"
-          class="secondary js-copy-link "
-          data-copy-link="{{ .DigitalLink }}"
+          class="primary js-share-link"
+          data-share-url="{{ .DigitalLink }}"
+          data-share-label="DPP link"
         >
-          Copy DPP URL
+          {{ template "icon-share" . }}
+          Share DPP link
         </button>
       </div>
-      <div
-        style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;"
-      >
+      <div class="role-pill-row" style="margin-bottom: 16px;">
         <span
           class="pill"
-          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
           >GTIN|{{ .GTIN }}</span
         >
         <span
           class="pill"
-          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
           >Lot|{{ .Lot }}</span
         >
         <span
           class="pill"
-          style="--pill-bg: var(--accent-2); --border: var(--border); color: var(--panel);"
+          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
           >Serial|{{ .Serial }}</span
         >
       </div>
@@ -59,12 +59,16 @@
               </div>
               <div class="dpp-history-card">
                 <div class="dpp-history-card-copy">
-                  <span
-                    class="pill"
-                    style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
-                    >Step {{ .StepID }}</span
+                  <div
+                    style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;"
                   >
-                  <h3>{{ .Title }}</h3>
+                    <span
+                      class="pill"
+                      style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
+                      >Step {{ .StepID }}</span
+                    >
+                    <h3>{{ .Title }}</h3>
+                  </div>
                   <div class="dpp-history-meta">
                     <span
                       ><strong>Completed:</strong> {{ if .CompletedAtHuman }}
@@ -128,17 +132,14 @@
                             <ul class="action-submitted-attachments">
                               {{ range .Attachments }}
                                 <li>
-                                  <a href="{{ .URL }}">{{ .Filename }}</a>
+                                  <a href="{{ .URL }}"
+                                    >{{ template "icon-download" . }}{{ .Filename }}</a
+                                  >
                                   {{ if .SHA256 }}
-                                    <code>{{ .SHA256 }}</code>
-                                    <button
-                                      type="button"
-                                      class="secondary hash-copy js-copy-text"
-                                      data-copy-text="{{ .SHA256 }}"
-                                      data-copy-label="sha256"
+                                    <code
+                                      class="dpp-integrity-hash dpp-history-digest-full"
+                                      >{{ .SHA256 }}</code
                                     >
-                                      Copy
-                                    </button>
                                   {{ end }}
                                 </li>
                               {{ end }}
@@ -151,14 +152,13 @@
                                   >Download</a
                                 >
                                 {{ if .FileSHA256 }}
-                                  <code>{{ .FileSHA256 }}</code>
                                   <button
                                     type="button"
                                     class="secondary hash-copy js-copy-text"
                                     data-copy-text="{{ .FileSHA256 }}"
                                     data-copy-label="sha256"
                                   >
-                                    Copy
+                                    {{ .FileSHA256 }}
                                   </button>
                                 {{ end }}
                               </li>

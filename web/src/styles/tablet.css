@@ -5,17 +5,15 @@
 }
 
 @media (max-width: 1199px) {
-  .org-admin-grid-ready {
+  .org-admin-grid-ready,
+  .home-workflow-grid,
+  .process-resources-grid {
     grid-template-columns: 1fr;
   }
 
   .org-admin-panel-main {
     scroll-margin-top: 12px;
     grid-column: auto;
-  }
-
-  .home-workflow-grid {
-    grid-template-columns: 1fr;
   }
 
   .preview-panel,
