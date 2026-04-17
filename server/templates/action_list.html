@@ -2,7 +2,10 @@
 
 {{ define "action_detail_content.html" }}
   {{ if .InputKey }}
-    <p class="muted" style="margin: 0;">{{ .InputKey }}</p>
+    <p class="muted" style="margin: 8px 0 0; white-space: pre-line;">
+      {{- .InputKey -}}
+    </p>
+    <hr />
   {{ end }}
   {{ if ne .Status "done" }}
     {{ if .ReadOnly }}
@@ -16,9 +19,8 @@
               disabled
             />
           {{ else }}
-            <hr />
             <div>
-              <h3>Active Role</h3>
+              <h3 style="margin-bottom: 0px;">Active Role</h3>
               <label
                 style="display: flex; align-items: center; flex-direction: row; gap: 8px;"
               >
@@ -31,9 +33,9 @@
                 </select>
               </label>
             </div>
+            <hr />
           {{ end }}
         {{ end }}
-        <hr />
         <label class="action-field-formata">
           <div
             class="js-formata-host"
@@ -65,9 +67,8 @@
               value="{{ index .MatchingRoles 0 }}"
             />
           {{ else }}
-            <hr />
             <div>
-              <h3>Active Role</h3>
+              <h3 style="margin-bottom: 0px;">Active Role</h3>
               <label
                 style="display: flex; align-items: center; flex-direction: row; gap: 8px;"
               >
@@ -84,9 +85,9 @@
                 </select>
               </label>
             </div>
+            <hr />
           {{ end }}
         {{ end }}
-        <hr />
         <label class="action-field-formata">
           <div
             class="js-formata-host"
