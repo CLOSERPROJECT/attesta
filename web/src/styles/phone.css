@@ -100,4 +100,23 @@
     display: block;
     touch-action: pan-y;
   }
+
+  .substep-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .active-role-selector {
+    width: 100%;
+    h3 {
+      margin-bottom: 6px;
+    };
+    label {
+      flex-direction: column;
+      align-items: flex-start;
+      select {
+        width: 100%;
+      };
+    };
+  }
 }
