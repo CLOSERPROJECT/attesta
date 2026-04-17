@@ -682,9 +682,6 @@ type DPPTraceabilitySubstep struct {
 	Digest      string
 	Values      []DPPTraceabilityValue
 	Attachments []ActionAttachmentView
-	FileName    string
-	FileSHA256  string
-	FileURL     string
 }
 
 type DPPTraceabilityRoleBadge struct {

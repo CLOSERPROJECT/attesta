@@ -144,25 +144,6 @@
                                 </li>
                               {{ end }}
                             </ul>
-                          {{ else if .FileURL }}
-                            <ul class="action-submitted-attachments">
-                              <li>
-                                <a href="{{ .FileURL }}">{{ .FileName }}</a>
-                                <a class="secondary" href="{{ .FileURL }}"
-                                  >Download</a
-                                >
-                                {{ if .FileSHA256 }}
-                                  <button
-                                    type="button"
-                                    class="secondary hash-copy js-copy-text"
-                                    data-copy-text="{{ .FileSHA256 }}"
-                                    data-copy-label="sha256"
-                                  >
-                                    {{ .FileSHA256 }}
-                                  </button>
-                                {{ end }}
-                              </li>
-                            </ul>
                           {{ end }}
                           <div class="substep-meta">
                             {{ if .DoneAtHuman }}

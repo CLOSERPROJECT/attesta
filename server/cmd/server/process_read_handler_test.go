@@ -260,8 +260,8 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 	if !strings.Contains(body, "(01)09506000134352(10)LOT-001(21)SERIAL-001") {
 		t.Fatalf("expected GS1 element string in response, got %q", body)
 	}
-	if !strings.Contains(body, "Share DPP link") {
-		t.Fatalf("expected DPP share button in response, got %q", body)
+	if !strings.Contains(body, "View DPP data") {
+		t.Fatalf("expected DPP action button in response, got %q", body)
 	}
 }
 
