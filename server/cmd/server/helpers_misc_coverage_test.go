@@ -81,6 +81,9 @@ func TestHelperCoverageBranches(t *testing.T) {
 		if got := formataAttachmentFilename("1.2", []string{"nested", "field"}, "text/plain"); got != "1_2-nested_field.asc" {
 			t.Fatalf("formataAttachmentFilename nested = %q", got)
 		}
+		if got := formataAttachmentFilename("1.1", []string{"payload", "key", "Load 3 files[]", "0"}, "image/png"); got != "1_1-payload_key_Load 3 files_0.png" {
+			t.Fatalf("formataAttachmentFilename multifile = %q", got)
+		}
 		if _, err := dppSerialFromStrategy("unsupported", primitive.NewObjectID()); err == nil {
 			t.Fatal("expected unsupported strategy error")
 		}

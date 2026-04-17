@@ -266,6 +266,41 @@ func TestAttachmentViewsFromValueTopLevelKeys(t *testing.T) {
 	}
 }
 
+func TestAttachmentViewsFromValueSupportsPrimitiveAMultiFilePayload(t *testing.T) {
+	views := attachmentViewsFromValue(primitive.M{
+		"payload": primitive.M{
+			"key": primitive.M{
+				"Load 3 files[]": primitive.A{
+					primitive.M{
+						"attachmentId": "69e1eae885154fb8e72da7fa",
+						"contentType":  "image/png",
+						"filename":     "1_1-Load 3 files[]_0.png",
+						"sha256":       "dc064140d25e2c820ecac8708b341c9aa09c64d64cff59004a64279a09ceee16",
+						"size":         6196,
+					},
+					primitive.M{
+						"attachmentId": "69e1eae885154fb8e72da7fc",
+						"contentType":  "image/png",
+						"filename":     "1_1-Load 3 files[]_1.png",
+						"sha256":       "dc064140d25e2c820ecac8708b341c9aa09c64d64cff59004a64279a09ceee16",
+						"size":         6196,
+					},
+				},
+			},
+		},
+	})
+
+	if len(views) != 2 {
+		t.Fatalf("expected 2 attachment views, got %#v", views)
+	}
+	if views[0].Key != "key.Load 3 files[0]" || views[0].Meta.AttachmentID != "69e1eae885154fb8e72da7fa" {
+		t.Fatalf("unexpected first attachment view: %#v", views[0])
+	}
+	if views[1].Key != "key.Load 3 files[1]" || views[1].Meta.AttachmentID != "69e1eae885154fb8e72da7fc" {
+		t.Fatalf("unexpected second attachment view: %#v", views[1])
+	}
+}
+
 func TestPersistFormataAttachmentsRecursesAndStoresUploads(t *testing.T) {
 	store := NewMemoryStore()
 	server := &Server{store: store}

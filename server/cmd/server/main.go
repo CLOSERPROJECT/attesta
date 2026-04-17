@@ -5784,7 +5784,11 @@ func decodeDataURL(raw string) (decodedDataURL, bool) {
 }
 
 func formataAttachmentFilename(substepID string, path []string, contentType string) string {
-	fieldPath := strings.TrimSpace(strings.Join(path, "_"))
+	normalizedPath := make([]string, 0, len(path))
+	for _, segment := range path {
+		normalizedPath = append(normalizedPath, normalizeFormataPathSegment(segment))
+	}
+	fieldPath := strings.TrimSpace(strings.Join(normalizedPath, "_"))
 	fieldPath = strings.Trim(strings.ReplaceAll(fieldPath, ".", "_"), "_")
 	if fieldPath == "" {
 		fieldPath = "attachment"
@@ -5802,6 +5806,11 @@ func formataAttachmentFilename(substepID string, path []string, contentType stri
 		return fieldPath
 	}
 	return prefix + "-" + fieldPath
+}
+
+func normalizeFormataPathSegment(value string) string {
+	trimmed := strings.TrimSpace(value)
+	return strings.TrimSuffix(trimmed, "[]")
 }
 
 func isRequestTooLarge(err error) bool {
@@ -6566,7 +6575,7 @@ func attachmentViewsFromValue(raw interface{}) []keyedAttachmentView {
 		for _, key := range keys {
 			value := typed[key]
 			if isAttachmentMetaValue(value) {
-				collectAttachmentViews(key, value, &files)
+				collectAttachmentViews(normalizeFormataPathSegment(key), value, &files)
 				continue
 			}
 			collectAttachmentViews("", value, &files)
@@ -6598,15 +6607,23 @@ func collectAttachmentViews(path string, raw interface{}, files *[]keyedAttachme
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			nextPath := key
+			nextPath := normalizeFormataPathSegment(key)
 			if strings.TrimSpace(path) != "" {
-				nextPath = path + "." + key
+				nextPath = path + "." + normalizeFormataPathSegment(key)
 			}
 			collectAttachmentViews(nextPath, typed[key], files)
 		}
 	case primitive.M:
 		collectAttachmentViews(path, map[string]interface{}(typed), files)
 	case []interface{}:
+		for idx, nested := range typed {
+			nextPath := fmt.Sprintf("[%d]", idx)
+			if strings.TrimSpace(path) != "" {
+				nextPath = fmt.Sprintf("%s[%d]", path, idx)
+			}
+			collectAttachmentViews(nextPath, nested, files)
+		}
+	case primitive.A:
 		for idx, nested := range typed {
 			nextPath := fmt.Sprintf("[%d]", idx)
 			if strings.TrimSpace(path) != "" {
@@ -6629,6 +6646,10 @@ func collectAttachmentsFromValue(raw interface{}, files *[]NotarizedAttachment) 
 	case primitive.M:
 		collectAttachmentsFromValue(map[string]interface{}(typed), files)
 	case []interface{}:
+		for _, nested := range typed {
+			collectAttachmentsFromValue(nested, files)
+		}
+	case primitive.A:
 		for _, nested := range typed {
 			collectAttachmentsFromValue(nested, files)
 		}
@@ -7063,15 +7084,23 @@ func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			nextPath := key
+			nextPath := normalizeFormataPathSegment(key)
 			if strings.TrimSpace(path) != "" {
-				nextPath = path + "." + key
+				nextPath = path + "." + normalizeFormataPathSegment(key)
 			}
 			collectDisplayValues(nextPath, typed[key], out)
 		}
 	case primitive.M:
 		collectDisplayValues(path, map[string]interface{}(typed), out)
 	case []interface{}:
+		for idx, nested := range typed {
+			nextPath := fmt.Sprintf("[%d]", idx)
+			if strings.TrimSpace(path) != "" {
+				nextPath = fmt.Sprintf("%s[%d]", path, idx)
+			}
+			collectDisplayValues(nextPath, nested, out)
+		}
+	case primitive.A:
 		for idx, nested := range typed {
 			nextPath := fmt.Sprintf("[%d]", idx)
 			if strings.TrimSpace(path) != "" {

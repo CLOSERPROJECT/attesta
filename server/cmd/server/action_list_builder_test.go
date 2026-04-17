@@ -158,6 +158,68 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 	}
 }
 
+func TestBuildActionListDoneFormataPrimitiveAMultiFileAttachments(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{
+						SubstepID: "1.1",
+						Title:     "Form",
+						Order:     1,
+						Role:      "dep1",
+						InputKey:  "payload",
+						InputType: "formata",
+					},
+				},
+			},
+		},
+	}
+	processID := primitive.NewObjectID()
+	process := &Process{
+		ID: processID,
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"payload": primitive.M{
+						"key": primitive.M{
+							"Load 3 files[]": primitive.A{
+								primitive.M{
+									"attachmentId": "69e1eae885154fb8e72da7fa",
+									"contentType":  "image/png",
+									"filename":     "1_1-Load 3 files[]_0.png",
+								},
+								primitive.M{
+									"attachmentId": "69e1eae885154fb8e72da7fc",
+									"contentType":  "image/png",
+									"filename":     "1_1-Load 3 files[]_1.png",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	action := findAction(t, actions, "1.1")
+	if len(action.Values) != 0 {
+		t.Fatalf("expected no scalar values for multi-file formata payload, got %#v", action.Values)
+	}
+	if len(action.Attachments) != 2 {
+		t.Fatalf("expected two attachments, got %#v", action.Attachments)
+	}
+	if action.Attachments[0].Key != "key.Load 3 files[0]" || action.Attachments[0].Filename != "1_1-Load 3 files[]_0.png" {
+		t.Fatalf("unexpected first attachment: %#v", action.Attachments[0])
+	}
+	if action.Attachments[1].Key != "key.Load 3 files[1]" || action.Attachments[1].Filename != "1_1-Load 3 files[]_1.png" {
+		t.Fatalf("unexpected second attachment: %#v", action.Attachments[1])
+	}
+}
+
 func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
