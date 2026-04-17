@@ -1,11 +1,13 @@
 {{/* Used on / to render the stream picker (home_picker_body). */}}
 
 {{ define "home_picker_body" }}
-  <section class="panel max-w-7xl mx-auto">
-    <div class="panel-heading">
-      <h1>Choose a stream</h1>
-      <p>Select a stream to start or continue process tracking.</p>
-    </div>
+  <section class="stack max-w-7xl mx-auto">
+    <section class="hero">
+      <div class="hero-body">
+        <h1>Choose a stream</h1>
+        <p>Select a stream to start or continue process tracking.</p>
+      </div>
+    </section>
     {{ if .Confirmation }}
       <p class="confirmation">{{ .Confirmation }}</p>
     {{ end }}
