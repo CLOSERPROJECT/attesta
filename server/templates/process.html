@@ -38,6 +38,8 @@
           {{ template "process_downloads" . }}
         </div>
       </div>
+    {{ else }}
+      {{ template "workflow_timeline" .ActionList }}
     {{ end }}
   </div>
 {{ end }}
