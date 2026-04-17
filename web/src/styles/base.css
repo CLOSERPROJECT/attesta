@@ -1595,11 +1595,6 @@ button.secondary-small {
   color: var(--accent);
 }
 
-.status-tag.status-done {
-  border-color: var(--accent-2);
-  color: #7a6200;
-}
-
 .status-tag.status-available {
   border-color: var(--accent);
   color: var(--accent);
