@@ -75,6 +75,15 @@
     margin-top: 8px;
   }
 
+  .action-submitted-values {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  .action-submitted-values dt {
+    margin-top: 8px;
+  }
+
   .action-submitted-attachment-meta {
     align-items: stretch;
     flex-direction: column;
