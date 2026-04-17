@@ -183,6 +183,89 @@ func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
 	}
 }
 
+func TestActionAttachmentPreviewKindAndURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		meta       NotarizedAttachment
+		wantKind   string
+		wantSuffix string
+	}{
+		{
+			name:       "image content type",
+			meta:       NotarizedAttachment{Filename: "ignored.bin", ContentType: "image/jpeg"},
+			wantKind:   "image",
+			wantSuffix: "?inline=1",
+		},
+		{
+			name:       "pdf content type",
+			meta:       NotarizedAttachment{Filename: "ignored.bin", ContentType: "application/pdf"},
+			wantKind:   "document",
+			wantSuffix: "?inline=1#page=1&toolbar=0&navpanes=0&view=FitH",
+		},
+		{
+			name:       "image extension fallback",
+			meta:       NotarizedAttachment{Filename: "photo.PNG"},
+			wantKind:   "image",
+			wantSuffix: "?inline=1",
+		},
+		{
+			name:       "pdf extension fallback",
+			meta:       NotarizedAttachment{Filename: "report.PDF"},
+			wantKind:   "document",
+			wantSuffix: "?inline=1#page=1&toolbar=0&navpanes=0&view=FitH",
+		},
+		{
+			name:       "unsupported attachment",
+			meta:       NotarizedAttachment{Filename: "archive.zip", ContentType: "application/zip"},
+			wantKind:   "",
+			wantSuffix: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotKind := actionAttachmentPreviewKind(tc.meta)
+			if gotKind != tc.wantKind {
+				t.Fatalf("preview kind = %q, want %q", gotKind, tc.wantKind)
+			}
+			gotURL := actionAttachmentPreviewURL("/download/file", gotKind)
+			if tc.wantSuffix == "" {
+				if gotURL != "" {
+					t.Fatalf("preview url = %q, want empty", gotURL)
+				}
+				return
+			}
+			if gotURL != "/download/file"+tc.wantSuffix {
+				t.Fatalf("preview url = %q, want %q", gotURL, "/download/file"+tc.wantSuffix)
+			}
+		})
+	}
+}
+
+func TestAttachmentViewsFromValueTopLevelKeys(t *testing.T) {
+	views := attachmentViewsFromValue(primitive.M{
+		"payload": map[string]interface{}{
+			"docs": []interface{}{
+				map[string]interface{}{"attachmentId": "att-1", "filename": "nested.pdf"},
+			},
+		},
+		"attachment": map[string]interface{}{
+			"attachmentId": "att-2",
+			"filename":     "root.pdf",
+		},
+	})
+
+	if len(views) != 2 {
+		t.Fatalf("expected 2 attachment views, got %#v", views)
+	}
+	if views[0].Key != "attachment" || views[0].Meta.AttachmentID != "att-2" {
+		t.Fatalf("unexpected first attachment view: %#v", views[0])
+	}
+	if views[1].Key != "docs[0]" || views[1].Meta.AttachmentID != "att-1" {
+		t.Fatalf("unexpected second attachment view: %#v", views[1])
+	}
+}
+
 func TestPersistFormataAttachmentsRecursesAndStoresUploads(t *testing.T) {
 	store := NewMemoryStore()
 	server := &Server{store: store}
