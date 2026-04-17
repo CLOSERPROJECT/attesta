@@ -15,6 +15,66 @@ const syncFormataDarkMode = (theme) => {
   }
 };
 
+const formataShadowOverrides = `
+  [data-slot="field-group"] {
+    gap: 12px;
+  }
+  [data-slot="field"] {
+    gap: 6px;
+  }
+  [data-slot="field-legend"] {
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-weight: bold;
+    font-size: 18.72px;
+    margin-bottom: 0;
+  }
+  [data-slot="field-description"] {
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    color: var(--formata-muted) !important;
+    font-size: 13px;
+  }
+  [data-slot="button"] {
+    background: var(--formata-accent) !important;
+    color: var(--panel) !important;
+    border-color: var(--formata-accent) !important;
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13.3333px  ;
+  }
+  [data-slot="input"],
+  [data-slot="select-trigger"],
+  [data-slot="select-content"],
+  button,
+  input,
+  select,
+  textarea {
+    background: var(--panel) !important;
+  }
+`;
+
+const applyFormataShadowOverrides = (component, attempt = 0) => {
+  const shadowRoot = component.shadowRoot;
+  if (!shadowRoot) {
+    if (attempt < 10) {
+      window.requestAnimationFrame(() => {
+        applyFormataShadowOverrides(component, attempt + 1);
+      });
+    }
+    return;
+  }
+
+  let style = shadowRoot.querySelector("style[data-attesta-formata-overrides]");
+  if (!(style instanceof HTMLStyleElement)) {
+    style = document.createElement("style");
+    style.dataset.attestaFormataOverrides = "true";
+    shadowRoot.appendChild(style);
+  }
+
+  style.textContent = formataShadowOverrides;
+};
+
 const getPreferredTheme = () => {
   try {
     const stored = localStorage.getItem(themeStorageKey);
@@ -661,6 +721,7 @@ const initializeFormataForms = async (container = document) => {
     component.schema = schema;
     component.uiSchema = uiSchema;
     host.appendChild(component);
+    applyFormataShadowOverrides(component);
 
     const form = component.closest("form");
     if (!form) {

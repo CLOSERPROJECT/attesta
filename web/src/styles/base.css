@@ -68,6 +68,8 @@
   --brand-pa: #57c2a6;
   --substep-done: #f7f7f7;
   --substep-done-border: #d4d4d4;
+  --formata-muted: var(--muted);
+  --formata-accent: var(--accent);
 }
 
 [data-theme="dark"] {
