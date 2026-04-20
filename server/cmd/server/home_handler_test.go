@@ -281,8 +281,8 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 		CreatedAt:   now,
 		Status:      "active",
 		Progress: map[string]ProcessStep{
-			"1_1": {State: "pending"},
-			"2_1": {State: "pending"},
+			"1.1": {State: "pending"},
+			"2.1": {State: "pending"},
 		},
 	}
 	otherOrg := Process{
@@ -291,8 +291,8 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 		CreatedAt:   now.Add(-1 * time.Hour),
 		Status:      "active",
 		Progress: map[string]ProcessStep{
-			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-30 * time.Minute))},
-			"2_1": {State: "pending"},
+			"1.1": {State: "done", DoneAt: ptrTime(now.Add(-30 * time.Minute))},
+			"2.1": {State: "pending"},
 		},
 	}
 	done := Process{
@@ -301,8 +301,8 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 		CreatedAt:   now.Add(-2 * time.Hour),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
-			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-90 * time.Minute))},
-			"2_1": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
+			"1.1": {State: "done", DoneAt: ptrTime(now.Add(-90 * time.Minute))},
+			"2.1": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
 		},
 	}
 

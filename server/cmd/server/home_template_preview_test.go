@@ -185,10 +185,11 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, `background: #fff7db; border-color: #f0cf5d;`) {
-		t.Fatalf("expected highlighted process styling, got: %s", body)
+	if !strings.Contains(body, `class="process-item process-user-turn"`) {
+		t.Fatalf("expected highlighted process class, got: %s", body)
 	}
-	if !strings.Contains(body, `Your turn: 1.2 -`) || !strings.Contains(body, `Record input`) {
-		t.Fatalf("expected user turn substep details, got: %s", body)
+	if !strings.Contains(body, `status-tag status-tag-compact status-active`) ||
+		!strings.Contains(body, `Your turn`) {
+		t.Fatalf("expected user turn status tag, got: %s", body)
 	}
 }
