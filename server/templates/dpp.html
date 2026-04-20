@@ -106,85 +106,92 @@
                     <hr style="margin: 0 0 4px;" />
                     {{ range .Substeps }}
                       <section class="substep substep-{{ .Status }}">
-                        <div class="substep-head">
-                          <span class="pill">{{ .SubstepID }}</span>
-                          <span class="timeline-step-title substep-title"
-                            >{{ .Title }}</span
+                        <div style="padding: 12px;">
+                          <div class="substep-head">
+                            <span class="pill">{{ .SubstepID }}</span>
+                            <span class="timeline-step-title substep-title"
+                              >{{ .Title }}</span
+                            >
+                          </div>
+                          <div class="substep-summary-supporting">
+                            <span
+                              class="pill role-pill"
+                              style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
+                              >{{ .Role }}</span
+                            >
+                          </div>
+                          <div
+                            class="action-submitted"
+                            style="margin-top: 20px;"
                           >
-                        </div>
-                        <div class="substep-summary-supporting">
-                          <span
-                            class="pill role-pill"
-                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
-                            >{{ .Role }}</span
-                          >
-                        </div>
-                        <div class="action-submitted" style="margin-top: 20px;">
-                          <dl class="action-submitted-values">
-                            {{ if .Values }}
-                              {{ range .Values }}
-                                <dt>{{ .Key }}</dt>
-                                <dd>{{ .Value }}</dd>
+                            <dl class="action-submitted-values">
+                              {{ if .Values }}
+                                {{ range .Values }}
+                                  <dt>{{ .Key }}</dt>
+                                  <dd>{{ .Value }}</dd>
+                                {{ end }}
                               {{ end }}
-                            {{ end }}
+                              {{ if .Attachments }}
+                                {{ range .Attachments }}
+                                  <dt>{{ .Key }}</dt>
+                                  <dd>
+                                    <a href="{{ .URL }}"
+                                      >{{ template "icon-download" . }} File</a
+                                    >
+                                  </dd>
+                                {{ end }}
+                              {{ end }}
+                            </dl>
                             {{ if .Attachments }}
-                              {{ range .Attachments }}
-                                <dt>{{ .Key }}</dt>
-                                <dd>
-                                  <a href="{{ .URL }}"
-                                    >{{ template "icon-download" . }} File</a
-                                  >
-                                </dd>
+                              <h3 style="margin: 4px 0;">
+                                Attachments preview
+                              </h3>
+                              {{ template "attachment_carousel" .Attachments }}
+                            {{ end }}
+                            <div class="substep-meta">
+                              {{ if .DoneAtHuman }}
+                                <span class="time"
+                                  ><time datetime="{{ .DoneAt }}"
+                                    >Completed at {{ .DoneAtHuman }}</time
+                                  ></span
+                                >
+                              {{ else if .DoneAt }}
+                                <span class="time">{{ .DoneAt }}</span>
                               {{ end }}
-                            {{ end }}
-                          </dl>
-                          {{ if .Attachments }}
-                            <h3 style="margin: 4px 0;">Attachments preview</h3>
-                            {{ template "attachment_carousel" .Attachments }}
-                          {{ end }}
-                          <div class="substep-meta">
-                            {{ if .DoneAtHuman }}
-                              <span class="time"
-                                ><time datetime="{{ .DoneAt }}"
-                                  >Completed at {{ .DoneAtHuman }}</time
-                                ></span
-                              >
-                            {{ else if .DoneAt }}
-                              <span class="time">{{ .DoneAt }}</span>
-                            {{ end }}
-                            {{ if .DoneBy }}
-                              <span class="actor"
-                                >by
-                                {{ if and (ge (len .DoneBy) 9) (eq (slice .DoneBy 0 9) "appwrite:") }}
-                                  {{ slice .DoneBy 9 }}
-                                {{ else }}
-                                  {{ .DoneBy }}
-                                {{ end }}</span
-                              >
-                            {{ end }}
-                            {{ if .Digest }}
-                              <span class="data"
-                                >digest
-                                <code
-                                  class="dpp-integrity-hash dpp-history-digest-full"
-                                  >{{ .Digest }}</code
-                                >
-                                <button
-                                  type="button"
-                                  class="dpp-integrity-hash-button dpp-history-digest-button js-copy-text"
-                                  data-copy-text="{{ .Digest }}"
-                                  data-copy-label="digest"
-                                  aria-label="Copy full digest for substep {{ .SubstepID }}"
-                                  title="{{ .Digest }}"
-                                >
-                                  {{ if gt (len .Digest) 7 }}
-                                    {{ slice .Digest 0 7 }}
+                              {{ if .DoneBy }}
+                                <span class="actor"
+                                  >by
+                                  {{ if and (ge (len .DoneBy) 9) (eq (slice .DoneBy 0 9) "appwrite:") }}
+                                    {{ slice .DoneBy 9 }}
                                   {{ else }}
-                                    {{ .Digest }}
-                                  {{ end }}
-                                </button></span
-                              >
-                            {{ end }}
+                                    {{ .DoneBy }}
+                                  {{ end }}</span
+                                >
+                              {{ end }}
+                              {{ if .Digest }}
+                                <span class="data"
+                                  >digest
+                                  <code
+                                    class="dpp-integrity-hash dpp-history-digest-full"
+                                    >{{ .Digest }}</code
+                                  >
+                                  <button
+                                    type="button"
+                                    class="dpp-integrity-hash-button dpp-history-digest-button js-copy-text"
+                                    data-copy-text="{{ .Digest }}"
+                                    data-copy-label="digest"
+                                    aria-label="Copy full digest for substep {{ .SubstepID }}"
+                                    title="{{ .Digest }}"
+                                  >
+                                    {{ if gt (len .Digest) 7 }}
+                                      {{ slice .Digest 0 7 }}
+                                    {{ else }}
+                                      {{ .Digest }}
+                                    {{ end }}
+                                  </button></span
+                                >
+                              {{ end }}
+                            </div>
                           </div>
                         </div>
                       </section>
