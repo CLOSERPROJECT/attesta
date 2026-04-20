@@ -154,3 +154,41 @@ func TestHomeTemplateRendersInstancesPagination(t *testing.T) {
 		t.Fatalf("expected next page link, got: %s", body)
 	}
 }
+
+func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+
+	view := HomeView{
+		PageBase: PageBase{
+			WorkflowKey:  "workflow",
+			WorkflowPath: "/w/workflow",
+			WorkflowName: "Demo workflow",
+		},
+		Processes: []ProcessListItem{
+			{
+				ID:              "process-1",
+				Status:          "active",
+				Percent:         25,
+				DoneSubsteps:    1,
+				TotalSubsteps:   4,
+				CreatedAt:       "1 Mar 2026 at 10:00 UTC",
+				HasUserTurn:     true,
+				UserTurnSubstep: "1.2",
+				UserTurnTitle:   "Record input",
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
+		t.Fatalf("render home template: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, `background: #fff7db; border-color: #f0cf5d;`) {
+		t.Fatalf("expected highlighted process styling, got: %s", body)
+	}
+	if !strings.Contains(body, `Your turn: 1.2 -`) || !strings.Contains(body, `Record input`) {
+		t.Fatalf("expected user turn substep details, got: %s", body)
+	}
+}

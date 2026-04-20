@@ -346,6 +346,7 @@ type WorkflowOption struct {
 	Name              string
 	Description       string
 	Counts            WorkflowProcessCounts
+	HasUserTurn       bool
 	CanClone          bool
 	CanEdit           bool
 	EditAction        string
@@ -415,6 +416,9 @@ type ProcessListItem struct {
 	Percent         int
 	LastNotarizedAt string
 	LastDigestShort string
+	HasUserTurn     bool
+	UserTurnSubstep string
+	UserTurnTitle   string
 }
 
 type HomeView struct {
@@ -1581,6 +1585,24 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			return nil, listErr
 		}
 		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
+		actor := actorFromAccountUser(user, key)
+		if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+			actor.RoleSlugs = s.roles(cfg)
+			if len(actor.RoleSlugs) > 0 {
+				actor.Role = actor.RoleSlugs[0]
+			}
+		}
+		roleMeta := s.roleMetaMap(cfg)
+		for _, process := range processes {
+			process.Progress = normalizeProgressKeys(process.Progress)
+			if deriveProcessStatus(cfg.Workflow, &process) != "active" {
+				continue
+			}
+			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, key, actor, roleMeta); ok {
+				option.HasUserTurn = true
+				break
+			}
+		}
 		stream, ok := streamsByKey[key]
 		if ok && s.authorizer != nil && user != nil {
 			hasProcesses := option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0
@@ -4535,6 +4557,14 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		logRequestError(r, err, "failed to list recent processes for workflow %s", workflowKey)
 		processesRaw = nil
 	}
+	actor := actorFromAccountUser(user, workflowKey)
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+		if len(actor.RoleSlugs) > 0 {
+			actor.Role = actor.RoleSlugs[0]
+		}
+	}
+	roleMeta := s.roleMetaMap(cfg)
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []ProcessListItem
@@ -4560,6 +4590,11 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			LastNotarizedAt: lastAt,
 			LastDigestShort: lastDigest,
 		}
+		if action, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta); ok {
+			item.HasUserTurn = true
+			item.UserTurnSubstep = action.SubstepID
+			item.UserTurnTitle = action.Title
+		}
 		processes = append(processes, item)
 	}
 
@@ -4582,13 +4617,6 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		pageNumbers = append(pageNumbers, current)
 	}
 
-	actor := actorFromAccountUser(user, workflowKey)
-	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
-		actor.RoleSlugs = s.roles(cfg)
-		if len(actor.RoleSlugs) > 0 {
-			actor.Role = actor.RoleSlugs[0]
-		}
-	}
 	preview := makeActionListReadOnly(
 		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
 		"Preview only. Start an instance to submit data.",
@@ -6361,6 +6389,15 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 		out[slug] = name
 	}
 	return out
+}
+
+func nextAvailableAuthorizedAction(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleMeta map[string]RoleMeta) (ActionView, bool) {
+	for _, action := range buildActionList(def, process, workflowKey, actor, false, roleMeta) {
+		if action.Status == "available" && !action.Disabled {
+			return action, true
+		}
+	}
+	return ActionView{}, false
 }
 
 func organizationLogoURLMap(ctx context.Context, identity IdentityStore) map[string]string {

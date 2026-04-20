@@ -97,7 +97,7 @@
                   {{ end }}
                 </p>
                 <div
-                  style="margin: auto 0 0; padding-top: 6px; border-top: 1px solid var(--border);"
+                  style="margin: auto 0 0; padding-top: 6px; border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-end; justify-content: space-between;"
                 >
                   <table class="workflow-card-stats">
                     <tr>
@@ -113,6 +113,15 @@
                       <td>{{ .Counts.Terminated }}</td>
                     </tr>
                   </table>
+                  {{ if .HasUserTurn }}
+                    <span
+                      class="workflow-card-turn-indicator"
+                      aria-label="Your turn pending in {{ .Name }}"
+                      title="Your turn pending"
+                    >
+                      {{ template "icon-bell" . }}
+                    </span>
+                  {{ end }}
                 </div>
               </a>
             </div>

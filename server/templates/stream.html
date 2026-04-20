@@ -162,14 +162,27 @@
               </form>
               <ul class="process-list">
                 {{ range .Processes }}
-                  <li class="process-item">
+                  <li
+                    class="process-item {{ if .HasUserTurn -}}
+                      process-user-turn
+                    {{- end -}}"
+                  >
                     <div class="process-head">
                       <a href="{{ $.WorkflowPath }}/process/{{ .ID }}"
                         >{{ .ID }}</a
                       >
                       <span
                         class="status-tag status-tag-compact status-{{ .Status }}"
-                        >{{ .Status }}</span
+                        {{ if .HasUserTurn }}
+                          style="background: var(--accent); color:
+                          var(--panel);"
+                        {{ end }}
+                      >
+                        {{ if .HasUserTurn }}
+                          Your turn
+                        {{ else }}
+                          {{ .Status }}
+                        {{ end }}</span
                       >
                     </div>
                     <div
