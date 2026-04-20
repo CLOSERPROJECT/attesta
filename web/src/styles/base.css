@@ -712,7 +712,7 @@ button.secondary-small {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 12px;
+  padding: 12px;
 }
 
 .substep-accordion-summary::marker,
@@ -727,8 +727,7 @@ button.secondary-small {
 
 .substep-accordion[open] {
   .substep-accordion-summary {
-    margin: 0 12px 12px;
-    padding: 12px 0;
+    margin: 0 0 12px;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   }
   .substep-accordion-chevron {
