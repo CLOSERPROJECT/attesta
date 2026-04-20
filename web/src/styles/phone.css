@@ -128,4 +128,36 @@
       };
     };
   }
+
+  .timeline-step[open] > summary {
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 10;
+  }
+
+  .substep.substep-done .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-done);
+  }
+
+  .substep.substep-available .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-available-border);
+    background: var(--substep-available);
+  }
+
+  .substep.substep-locked .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-done);
+  }
+
+  .substep-accordion[open] > summary {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .timeline-step[open]:has(.substep-accordion[open]) > summary {
+    position: static;
+  }
 }

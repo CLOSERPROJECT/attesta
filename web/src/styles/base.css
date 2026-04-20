@@ -68,6 +68,8 @@
   --brand-pa: #57c2a6;
   --substep-done: #f7f7f7;
   --substep-done-border: #d4d4d4;
+  --substep-available: #e9f1ef;
+  --substep-available-border: #d4dbd9;
   --formata-muted: var(--muted);
   --formata-accent: var(--accent);
 }
@@ -566,7 +568,7 @@ button.secondary-small {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--panel);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .timeline-step:hover {
@@ -723,9 +725,16 @@ button.secondary-small {
   flex: 1 1 auto;
 }
 
-.substep-accordion[open] .substep-accordion-chevron {
-  transform: rotate(180deg);
-  color: var(--ink);
+.substep-accordion[open] {
+  .substep-accordion-summary {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .substep-accordion-chevron {
+    transform: rotate(180deg);
+    color: var(--ink);
+  };
 }
 
 .substep.substep-selected {
@@ -734,7 +743,7 @@ button.secondary-small {
 
 .substep-available {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--substep-available);
   box-shadow: inset 0 0 0 1px rgba(30, 111, 92, 0.2);
 }
 
@@ -822,9 +831,6 @@ button.secondary-small {
 .substep-details {
   display: grid;
   gap: 12px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 .data-hash {
