@@ -760,10 +760,6 @@ button.secondary-small {
   background: var(--substep-done);
 }
 
-.substep-done.substep-selected {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 35%, transparent);
-}
-
 .substep-locked {
   opacity: 0.3;
   border-color: var(--substep-done-border);

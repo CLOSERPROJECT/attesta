@@ -41,7 +41,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 								FormSchema:    `{"type":"object","properties":{"value":{"type":"string"}}}`,
 								ReadOnly:      true,
 								Reason:        "Preview only. Start an instance to submit data.",
-								MatchingRoles: []string{"dep1"},
+								MatchingRoles: []ActionRoleOption{{Slug: "dep1", Label: "Department 1"}},
 							},
 						},
 					},
@@ -183,8 +183,8 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	body := out.String()
 	compactBody := strings.Join(strings.Fields(body), " ")
 
-	if !strings.Contains(body, `class="process-item process-user-turn"`) {
-		t.Fatalf("expected highlighted process class, got: %s", body)
+	if !strings.Contains(body, `class="process-item process-available"`) {
+		t.Fatalf("expected available process class, got: %s", body)
 	}
 	if !strings.Contains(compactBody, `status-tag status-tag-compact status-available`) ||
 		!strings.Contains(compactBody, `available`) {

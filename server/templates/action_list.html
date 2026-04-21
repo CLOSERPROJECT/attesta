@@ -32,7 +32,7 @@
           <input
             type="hidden"
             name="activeRole"
-            value="{{ index .MatchingRoles 0 }}"
+            value="{{ (index .MatchingRoles 0).Slug }}"
             {{ if .ReadOnly }}disabled{{ end }}
           />
         {{ else }}
@@ -47,7 +47,7 @@
               >
                 <option value="">Select role</option>
                 {{ range .MatchingRoles }}
-                  <option value="{{ . }}">{{ . }}</option>
+                  <option value="{{ .Slug }}">{{ .Label }}</option>
                 {{ end }}
               </select>
             </label>

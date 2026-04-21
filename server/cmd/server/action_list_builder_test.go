@@ -342,6 +342,9 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 	if len(action.RoleBadges) != 2 {
 		t.Fatalf("role badge count = %d, want 2", len(action.RoleBadges))
 	}
+	if len(action.MatchingRoles) != 2 || action.MatchingRoles[0].Slug != "dep1" || action.MatchingRoles[0].Label != "Department 1" || action.MatchingRoles[1].Slug != "dep2" || action.MatchingRoles[1].Label != "Department 2" {
+		t.Fatalf("unexpected matching roles: %#v", action.MatchingRoles)
+	}
 	if action.RoleBadges[0].ID != "dep1" || action.RoleBadges[1].ID != "dep2" {
 		t.Fatalf("unexpected badge ids: %#v", action.RoleBadges)
 	}

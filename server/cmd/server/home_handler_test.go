@@ -84,8 +84,8 @@ func TestHandleHomeListsProcesses(t *testing.T) {
 	if !strings.Contains(body, "PROC 2 SORT time_desc FILTER all") {
 		t.Fatalf("expected processes count and default controls, got %q", body)
 	}
-	if !strings.Contains(body, activeID.Hex()+":active:28") {
-		t.Fatalf("expected active process stats, got %q", body)
+	if !strings.Contains(body, activeID.Hex()+":available:28") {
+		t.Fatalf("expected available process stats, got %q", body)
 	}
 	if !strings.Contains(body, doneID.Hex()+":done:100") {
 		t.Fatalf("expected done process stats, got %q", body)
@@ -209,7 +209,7 @@ func TestHandleHomePaginatesProcesses(t *testing.T) {
 	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER all PAGE 2/2") {
 		t.Fatalf("expected second page with one process, got %q", body)
 	}
-	if !strings.Contains(body, expectedPageTwoID+":active") {
+	if !strings.Contains(body, expectedPageTwoID+":available") {
 		t.Fatalf("expected last process on page 2, got %q", body)
 	}
 }
@@ -316,8 +316,8 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 	if action.SubstepID != "1.1" {
 		t.Fatalf("substep id = %q, want 1.1", action.SubstepID)
 	}
-	if got := strings.Join(action.MatchingRoles, ","); got != "dep1" {
-		t.Fatalf("matching roles = %q, want dep1", got)
+	if len(action.MatchingRoles) != 1 || action.MatchingRoles[0].Slug != "dep1" || action.MatchingRoles[0].Label != "Department 1" {
+		t.Fatalf("matching roles = %#v, want dep1/Department 1", action.MatchingRoles)
 	}
 
 	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &otherOrg, "workflow", Actor{

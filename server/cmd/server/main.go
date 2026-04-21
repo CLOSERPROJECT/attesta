@@ -144,11 +144,8 @@ type SSEHub struct {
 type TimelineSubstep struct {
 	SubstepID    string
 	Title        string
-	Role         string
 	Selected     bool
 	Action       *ActionView
-	RoleBadges   []TimelineRoleBadge
-	RoleLabel    string
 	RoleColor    template.CSS
 	RoleBorder   template.CSS
 	Status       string
@@ -159,13 +156,6 @@ type TimelineSubstep struct {
 	FileName     string
 	FileSHA256   string
 	FileURL      string
-}
-
-type TimelineRoleBadge struct {
-	ID     string
-	Label  string
-	Color  template.CSS
-	Border template.CSS
 }
 
 type TimelineStep struct {
@@ -230,9 +220,8 @@ type ActionView struct {
 	SubstepID     string
 	Title         string
 	Role          string
-	AllowedRoles  []string
 	RoleBadges    []ActionRoleBadge
-	MatchingRoles []string
+	MatchingRoles []ActionRoleOption
 	RoleLabel     string
 	RoleColor     template.CSS
 	RoleBorder    template.CSS
@@ -256,6 +245,11 @@ type ActionRoleBadge struct {
 	Label  string
 	Color  template.CSS
 	Border template.CSS
+}
+
+type ActionRoleOption struct {
+	Slug  string
+	Label string
 }
 
 type ActionKV struct {
@@ -6456,22 +6450,9 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 				primaryRole = allowedRoles[0]
 			}
 			meta := roleMetaFor(primaryRole, roleMeta)
-			roleBadges := make([]TimelineRoleBadge, 0, len(allowedRoles))
-			for _, role := range allowedRoles {
-				badgeMeta := roleMetaFor(role, roleMeta)
-				roleBadges = append(roleBadges, TimelineRoleBadge{
-					ID:     role,
-					Label:  badgeMeta.Label,
-					Color:  cssValue(badgeMeta.Color, "var(--role-fallback)"),
-					Border: cssValue(badgeMeta.Border, "var(--border)"),
-				})
-			}
 			entry := TimelineSubstep{
 				SubstepID:  sub.SubstepID,
 				Title:      sub.Title,
-				Role:       strings.Join(allowedRoles, ", "),
-				RoleBadges: roleBadges,
-				RoleLabel:  meta.Label,
 				RoleColor:  cssValue(meta.Color, "var(--role-fallback)"),
 				RoleBorder: cssValue(meta.Border, "var(--border)"),
 			}
@@ -6484,16 +6465,6 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 						selectedRole := strings.TrimSpace(progress.DoneBy.Role)
 						if selectedRole != "" {
 							selectedMeta := roleMetaFor(selectedRole, roleMeta)
-							entry.Role = selectedRole
-							entry.RoleBadges = []TimelineRoleBadge{
-								{
-									ID:     selectedRole,
-									Label:  selectedMeta.Label,
-									Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
-									Border: cssValue(selectedMeta.Border, "var(--border)"),
-								},
-							}
-							entry.RoleLabel = selectedMeta.Label
 							entry.RoleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
 							entry.RoleBorder = cssValue(selectedMeta.Border, "var(--border)")
 						}
@@ -6901,7 +6872,19 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
 			ownedRoles = []string{strings.TrimSpace(actor.Role)}
 		}
-		matchingRoles := intersectRoles(allowedRoles, ownedRoles)
+		matchingRoleSlugs := intersectRoles(allowedRoles, ownedRoles)
+		matchingRoles := make([]ActionRoleOption, 0, len(matchingRoleSlugs))
+		for _, role := range matchingRoleSlugs {
+			meta := roleMetaFor(role, roleMeta)
+			label := strings.TrimSpace(meta.Label)
+			if label == "" {
+				label = role
+			}
+			matchingRoles = append(matchingRoles, ActionRoleOption{
+				Slug:  role,
+				Label: label,
+			})
+		}
 		primaryRole := sub.Role
 		if primaryRole == "" && len(allowedRoles) > 0 {
 			primaryRole = allowedRoles[0]
@@ -6994,7 +6977,6 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			SubstepID:     sub.SubstepID,
 			Title:         sub.Title,
 			Role:          role,
-			AllowedRoles:  allowedRoles,
 			RoleBadges:    roleBadges,
 			MatchingRoles: matchingRoles,
 			RoleLabel:     roleLabel,
