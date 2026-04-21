@@ -166,15 +166,12 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 		},
 		Processes: []ProcessListItem{
 			{
-				ID:              "process-1",
-				Status:          "active",
-				Percent:         25,
-				DoneSubsteps:    1,
-				TotalSubsteps:   4,
-				CreatedAt:       "1 Mar 2026 at 10:00 UTC",
-				HasUserTurn:     true,
-				UserTurnSubstep: "1.2",
-				UserTurnTitle:   "Record input",
+				ID:            "process-1",
+				Status:        "available",
+				Percent:       25,
+				DoneSubsteps:  1,
+				TotalSubsteps: 4,
+				CreatedAt:     "1 Mar 2026 at 10:00 UTC",
 			},
 		},
 	}
@@ -184,12 +181,13 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 		t.Fatalf("render home template: %v", err)
 	}
 	body := out.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 
 	if !strings.Contains(body, `class="process-item process-user-turn"`) {
 		t.Fatalf("expected highlighted process class, got: %s", body)
 	}
-	if !strings.Contains(body, `status-tag status-tag-compact status-active`) ||
-		!strings.Contains(body, `Your turn`) {
-		t.Fatalf("expected user turn status tag, got: %s", body)
+	if !strings.Contains(compactBody, `status-tag status-tag-compact status-available`) ||
+		!strings.Contains(compactBody, `available`) {
+		t.Fatalf("expected available status tag, got: %s", body)
 	}
 }

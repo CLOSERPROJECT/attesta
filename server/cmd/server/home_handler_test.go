@@ -515,8 +515,8 @@ func TestHandleWorkflowHomeMarksProcessesWithMyTurn(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, processID.Hex()+":active:0:turn:1.1:A") {
-		t.Fatalf("expected process turn marker, got %q", body)
+	if !strings.Contains(body, processID.Hex()+":available:0|") {
+		t.Fatalf("expected process to surface available status, got %q", body)
 	}
 }
 
@@ -1187,7 +1187,7 @@ func homeTestTemplates() *template.Template {
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
 PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} PAGE {{.CurrentPage}}/{{.TotalPages}} DESC {{.WorkflowDescription}}
-PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}{{if .HasUserTurn}}:turn:{{.UserTurnSubstep}}:{{.UserTurnTitle}}{{end}}|{{end}}
+PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
 {{end}}
 {{define "stream.html"}}{{template "layout.html" .}}{{end}}
 `))

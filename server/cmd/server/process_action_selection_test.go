@@ -92,12 +92,12 @@ func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 	timeline := []TimelineStep{{
 		StepID: "1",
 		Substeps: []TimelineSubstep{
-			{SubstepID: "1.1"},
-			{SubstepID: "1.2"},
+			{SubstepID: "1.1", Status: "available"},
+			{SubstepID: "1.2", Status: "available"},
 		},
 	}}
 	actions := []ActionView{
-		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow"},
+		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow", Status: "available"},
 	}
 
 	got := decorateTimelineActions(timeline, actions)
@@ -109,6 +109,26 @@ func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 	}
 	if got[0].Substeps[1].Action.SubstepID != "1.2" || got[0].Substeps[1].Action.Title != "Inspect lot" {
 		t.Fatalf("attached action = %#v", got[0].Substeps[1].Action)
+	}
+	if got[0].Substeps[1].Status != "available" {
+		t.Fatalf("status = %q, want available", got[0].Substeps[1].Status)
+	}
+}
+
+func TestDecorateTimelineActionsMapsUnauthorizedAvailableToActive(t *testing.T) {
+	timeline := []TimelineStep{{
+		StepID: "1",
+		Substeps: []TimelineSubstep{
+			{SubstepID: "1.1", Status: "available"},
+		},
+	}}
+	actions := []ActionView{
+		{SubstepID: "1.1", Status: "available", Disabled: true},
+	}
+
+	got := decorateTimelineActions(timeline, actions)
+	if got[0].Substeps[0].Status != "active" {
+		t.Fatalf("status = %q, want active", got[0].Substeps[0].Status)
 	}
 }
 

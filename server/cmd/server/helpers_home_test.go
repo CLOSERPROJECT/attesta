@@ -65,6 +65,16 @@ func TestSortHomeProcessList(t *testing.T) {
 			wantIDs: []string{"b", "c", "a"},
 		},
 		{
+			name:    "status ordering puts available before active",
+			sortKey: "status",
+			items: []ProcessListItem{
+				{ID: "a", Status: "done", Percent: 100, CreatedAtTime: base},
+				{ID: "b", Status: "active", Percent: 20, CreatedAtTime: base.Add(-1 * time.Hour)},
+				{ID: "c", Status: "available", Percent: 10, CreatedAtTime: base.Add(1 * time.Hour)},
+			},
+			wantIDs: []string{"c", "b", "a"},
+		},
+		{
 			name:    "status tie uses percent then time",
 			sortKey: "status",
 			items: []ProcessListItem{

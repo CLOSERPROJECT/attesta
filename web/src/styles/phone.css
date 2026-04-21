@@ -146,6 +146,11 @@
     background: var(--substep-available);
   }
 
+  .substep.substep-active .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-available-border);
+    background: var(--substep-bg);
+  }
+
   .substep.substep-locked .substep-accordion[open] > .substep-accordion-summary {
     border-color: var(--substep-done-border);
     background: var(--substep-done);

@@ -416,9 +416,6 @@ type ProcessListItem struct {
 	Percent         int
 	LastNotarizedAt string
 	LastDigestShort string
-	HasUserTurn     bool
-	UserTurnSubstep string
-	UserTurnTitle   string
 }
 
 type HomeView struct {
@@ -1884,16 +1881,26 @@ func sortHomeProcessList(items []ProcessListItem, sortKey string) {
 				}
 				return items[i].Percent > items[j].Percent
 			}
-			if items[i].Status == "active" {
-				return true
-			}
-			if items[j].Status == "active" {
-				return false
+			leftRank := homeProcessStatusRank(items[i].Status)
+			rightRank := homeProcessStatusRank(items[j].Status)
+			if leftRank != rightRank {
+				return leftRank < rightRank
 			}
 			return items[i].Status < items[j].Status
 		})
 	default:
 		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.After(items[j].CreatedAtTime) })
+	}
+}
+
+func homeProcessStatusRank(status string) int {
+	switch strings.TrimSpace(status) {
+	case "available":
+		return 0
+	case "active":
+		return 1
+	default:
+		return 2
 	}
 }
 
@@ -4590,10 +4597,10 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			LastNotarizedAt: lastAt,
 			LastDigestShort: lastDigest,
 		}
-		if action, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta); ok {
-			item.HasUserTurn = true
-			item.UserTurnSubstep = action.SubstepID
-			item.UserTurnTitle = action.Title
+		if item.Status == "active" {
+			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta); ok {
+				item.Status = "available"
+			}
 		}
 		processes = append(processes, item)
 	}
@@ -7082,6 +7089,16 @@ func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []Ti
 			}
 			actionCopy := action
 			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+			switch action.Status {
+			case "done", "locked":
+				timeline[stepIndex].Substeps[substepIndex].Status = action.Status
+			case "available":
+				if action.Disabled {
+					timeline[stepIndex].Substeps[substepIndex].Status = "active"
+				} else {
+					timeline[stepIndex].Substeps[substepIndex].Status = "available"
+				}
+			}
 		}
 	}
 	return timeline
