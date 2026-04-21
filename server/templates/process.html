@@ -182,23 +182,6 @@
                       >
                       <div class="substep-title">
                         <span class="timeline-step-title">{{ .Title }}</span>
-                        {{ if .RoleBadges }}
-                          <div class="role-pill-row">
-                            {{ range .RoleBadges }}
-                              <span
-                                class="pill role-pill"
-                                style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
-                                >{{ .Label }}</span
-                              >
-                            {{ end }}
-                          </div>
-                        {{ else }}
-                          <span
-                            class="pill role-pill"
-                            style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
-                            >{{ .RoleLabel }}</span
-                          >
-                        {{ end }}
                       </div>
                       <span class="status">{{ .Status }}</span>
                     </div>
