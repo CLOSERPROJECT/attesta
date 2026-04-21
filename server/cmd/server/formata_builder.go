@@ -19,6 +19,209 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const formataBuilderChromeOverrides = `
+:root {
+	--attesta-ink: #12210c;
+	--attesta-muted: #4f5d47;
+	--attesta-bg: #f3f4ef;
+	--attesta-panel: #ffffff;
+	--attesta-accent: #1e6f5c;
+	--attesta-accent-2: #d2a106;
+	--attesta-danger: #c0392b;
+	--attesta-border: #d9e0d0;
+	--attesta-shadow: rgba(16, 26, 20, 0.08);
+	--attesta-page-bg: linear-gradient(135deg, #f3f4ef 0%, #e9efe2 100%);
+	--attesta-chrome-bg: #fffaf2;
+	--attesta-surface-2: #f8f9f4;
+	--attesta-pill-bg: #eff4e9;
+
+	--font-sans: "Space Grotesk", system-ui, sans-serif;
+	--background: var(--attesta-bg);
+	--foreground: var(--attesta-ink);
+	--card: var(--attesta-panel);
+	--card-foreground: var(--attesta-ink);
+	--popover: var(--attesta-panel);
+	--popover-foreground: var(--attesta-ink);
+	--primary: var(--attesta-accent);
+	--primary-foreground: var(--attesta-panel);
+	--secondary: var(--attesta-surface-2);
+	--secondary-foreground: var(--attesta-ink);
+	--muted: var(--attesta-surface-2);
+	--muted-foreground: var(--attesta-muted);
+	--accent: var(--attesta-pill-bg);
+	--accent-foreground: var(--attesta-ink);
+	--destructive: var(--attesta-danger);
+	--border: var(--attesta-border);
+	--global-border: var(--attesta-border);
+	--input: var(--attesta-panel);
+	--ring: var(--attesta-accent);
+	--sidebar: var(--attesta-chrome-bg);
+	--sidebar-foreground: var(--attesta-ink);
+	--sidebar-primary: var(--attesta-accent);
+	--sidebar-primary-foreground: var(--attesta-panel);
+	--sidebar-accent: var(--attesta-surface-2);
+	--sidebar-accent-foreground: var(--attesta-ink);
+	--sidebar-border: var(--attesta-border);
+	--sidebar-ring: var(--attesta-accent);
+	--warning: var(--attesta-accent-2);
+}
+
+.dark {
+	--attesta-ink: #ecf1eb;
+	--attesta-muted: #a6b2a2;
+	--attesta-bg: #101411;
+	--attesta-panel: #151c17;
+	--attesta-accent: #57c2a6;
+	--attesta-accent-2: #f2c64f;
+	--attesta-danger: #ff6b5f;
+	--attesta-border: rgba(236, 241, 235, 0.14);
+	--attesta-shadow: rgba(0, 0, 0, 0.4);
+	--attesta-page-bg: linear-gradient(135deg, #0b0f0d 0%, #121915 100%);
+	--attesta-chrome-bg: #0f1411;
+	--attesta-surface-2: rgba(255, 255, 255, 0.04);
+	--attesta-pill-bg: rgba(255, 255, 255, 0.06);
+
+	--background: var(--attesta-bg);
+	--foreground: var(--attesta-ink);
+	--card: var(--attesta-panel);
+	--card-foreground: var(--attesta-ink);
+	--popover: var(--attesta-panel);
+	--popover-foreground: var(--attesta-ink);
+	--primary: var(--attesta-accent);
+	--primary-foreground: var(--attesta-panel);
+	--secondary: var(--attesta-surface-2);
+	--secondary-foreground: var(--attesta-ink);
+	--muted: var(--attesta-surface-2);
+	--muted-foreground: var(--attesta-muted);
+	--accent: var(--attesta-pill-bg);
+	--accent-foreground: var(--attesta-ink);
+	--destructive: var(--attesta-danger);
+	--border: var(--attesta-border);
+	--global-border: var(--attesta-border);
+	--input: var(--attesta-panel);
+	--ring: var(--attesta-accent);
+	--sidebar: var(--attesta-chrome-bg);
+	--sidebar-foreground: var(--attesta-ink);
+	--sidebar-primary: var(--attesta-accent);
+	--sidebar-primary-foreground: var(--attesta-panel);
+	--sidebar-accent: var(--attesta-surface-2);
+	--sidebar-accent-foreground: var(--attesta-ink);
+	--sidebar-border: var(--attesta-border);
+	--sidebar-ring: var(--attesta-accent);
+	--warning: var(--attesta-accent-2);
+}
+
+html,
+body,
+#app {
+	font-family: "Space Grotesk", system-ui, sans-serif;
+}
+
+html,
+body {
+	background: var(--attesta-page-bg);
+	color: var(--attesta-ink);
+}
+
+body,
+#app {
+	min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+	font-family: "Space Grotesk", system-ui, sans-serif;
+}
+
+input,
+textarea,
+[data-slot="select-trigger"],
+[data-slot="dialog-trigger"] {
+	background: var(--attesta-panel);
+}
+
+formata-form {
+	--attesta-formata-muted: var(--attesta-muted);
+	--attesta-formata-accent: var(--attesta-accent);
+	--attesta-formata-panel: var(--attesta-panel);
+	--attesta-formata-ink: var(--attesta-ink);
+	--attesta-formata-border: var(--attesta-border);
+	--attesta-formata-button-contrast: var(--attesta-panel);
+}
+`
+
+const formataBuilderPreviewShadowOverrides = `
+:host {
+	--formata-muted: var(--attesta-formata-muted);
+	--formata-accent: var(--attesta-formata-accent);
+}
+
+[data-slot="field-group"] {
+	gap: 12px;
+}
+
+[data-slot="field"] {
+	gap: 6px;
+}
+
+[data-slot="field-legend"] {
+	color: var(--attesta-formata-ink) !important;
+	font-family: "Space Grotesk", system-ui, sans-serif;
+	font-size: 18.72px;
+	font-weight: 700;
+	margin-bottom: 0;
+}
+
+[data-slot="field-description"] {
+	color: var(--attesta-formata-muted) !important;
+	font-family: "Space Grotesk", system-ui, sans-serif;
+	font-size: 13px;
+}
+
+[data-slot="input"]::file-selector-button {
+	background: var(--attesta-formata-panel) !important;
+	color: var(--attesta-formata-accent) !important;
+	border: 1px solid var(--attesta-formata-accent) !important;
+}
+
+[data-slot="slider-range"],
+[data-slot="button"] {
+	background: var(--attesta-formata-accent) !important;
+	border-color: var(--attesta-formata-accent) !important;
+	border-radius: 4px;
+	color: var(--attesta-panel) !important;
+	cursor: pointer;
+	font-family: "Space Grotesk", system-ui, sans-serif;
+	font-size: 13.3333px;
+	font-weight: 600;
+}
+
+[data-slot="slider-track"] {
+	background: var(--attesta-formata-panel) !important;
+}
+
+[data-slot="input"],
+[data-slot="select-trigger"],
+[data-slot="select-content"],
+[data-slot="checkbox"],
+input,
+select,
+textarea {
+	background: var(--attesta-formata-panel) !important;
+	border-color: var(--attesta-formata-border) !important;
+	color: var(--attesta-formata-ink) !important;
+	font-family: "Space Grotesk", system-ui, sans-serif !important;
+}
+`
+
+var formataBuilderOverrideSnippet = []byte(fmt.Sprintf(
+	`<style data-attesta-formata-builder-overrides>%s</style><script>(function(){const selector="formata-form";const styleContent=%q;const styleSelector="style[data-attesta-formata-builder-overrides]";const apply=(component,attempt=0)=>{if(!(component instanceof HTMLElement)){return}const shadowRoot=component.shadowRoot;if(!shadowRoot){if(attempt<10){window.requestAnimationFrame(()=>apply(component,attempt+1))}return}let style=shadowRoot.querySelector(styleSelector);if(!(style instanceof HTMLStyleElement)){style=document.createElement("style");style.dataset.attestaFormataBuilderOverrides="true";shadowRoot.appendChild(style)}style.textContent=styleContent};const scan=()=>{document.querySelectorAll(selector).forEach((component)=>apply(component))};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",scan,{once:true})}else{scan()}new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true})})();</script>`,
+	formataBuilderChromeOverrides,
+	formataBuilderPreviewShadowOverrides,
+))
+
 // formataBuilderAssets contains the Formata builder frontend.
 //
 //go:embed formata-arch/attesta/index.html formata-arch/attesta/assets/* formata-arch/public/*
@@ -256,8 +459,18 @@ func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Requ
 	}
 	if shouldRewriteFormataAssetContent(cleaned, contentType) {
 		data = bytes.ReplaceAll(data, []byte("/formata-arch/"), []byte("/org-admin/formata-builder/"))
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") || strings.EqualFold(path.Ext(cleaned), ".html") {
+			data = injectFormataBuilderOverrides(data)
+		}
 	}
 	_, _ = w.Write(data)
+}
+
+func injectFormataBuilderOverrides(data []byte) []byte {
+	if bytes.Contains(data, []byte("data-attesta-formata-builder-overrides")) {
+		return data
+	}
+	return bytes.Replace(data, []byte("</head>"), append(formataBuilderOverrideSnippet, []byte("</head>")...), 1)
 }
 
 func readFormataBuilderAsset(relativePath string) ([]byte, string, error) {
