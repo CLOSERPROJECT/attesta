@@ -1513,6 +1513,15 @@ button.secondary-small {
   border-color: var(--accent);
 }
 
+.process-active {
+  background: var(--substep-done);
+}
+
+.process-done {
+  background: var(--substep-done);
+  border-color: var(--substep-done-border);
+}
+
 .no-process-item {
   padding: 10px 12px;
   border-radius: 4px;
@@ -1585,7 +1594,7 @@ button.secondary-small {
 
 .process-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background: var(--accent);
   width: 0;
 }
 
@@ -1612,6 +1621,10 @@ button.secondary-small {
 .status-tag.status-available {
   color: var(--panel);
   background: var(--accent);
+}
+
+.status-tag.status-done {
+  background: var(--substep-done);
 }
 
 .process-meta {
