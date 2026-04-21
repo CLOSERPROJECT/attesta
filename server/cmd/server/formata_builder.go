@@ -40,7 +40,7 @@ const formataBuilderChromeOverrides = `
 	--foreground: var(--attesta-ink);
 	--card: var(--attesta-panel);
 	--card-foreground: var(--attesta-ink);
-	--popover: var(--attesta-panel);
+	--popover: var(--attesta-bg);
 	--popover-foreground: var(--attesta-ink);
 	--primary: var(--attesta-accent);
 	--primary-foreground: var(--attesta-panel);
@@ -55,7 +55,7 @@ const formataBuilderChromeOverrides = `
 	--global-border: var(--attesta-border);
 	--input: var(--attesta-panel);
 	--ring: var(--attesta-accent);
-	--sidebar: var(--attesta-chrome-bg);
+	--sidebar: var(--attesta-bg);
 	--sidebar-foreground: var(--attesta-ink);
 	--sidebar-primary: var(--attesta-accent);
 	--sidebar-primary-foreground: var(--attesta-panel);
@@ -85,7 +85,7 @@ const formataBuilderChromeOverrides = `
 	--foreground: var(--attesta-ink);
 	--card: var(--attesta-panel);
 	--card-foreground: var(--attesta-ink);
-	--popover: var(--attesta-panel);
+	--popover: var(--attesta-bg);
 	--popover-foreground: var(--attesta-ink);
 	--primary: var(--attesta-accent);
 	--primary-foreground: var(--attesta-panel);
@@ -135,11 +135,29 @@ textarea {
 	font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
+[data-slot="dialog-trigger"] {
+	background: var(--attesta-accent);
+	color: var(--attesta-panel);
+}
+
 input,
 textarea,
 [data-slot="select-trigger"],
-[data-slot="dialog-trigger"] {
-	background: var(--attesta-panel);
+[data-slot="checkbox"][data-state="unchecked"],
+[data-slot="select-content"] {
+  background: var(--attesta-panel) !important;
+  border-color: var(--attesta-border) !important;
+}
+
+[data-slot="dialog-close"] {
+  background: var(--attesta-danger) !important;
+  color: var(--attesta-panel) !important;
+}
+
+[data-slot="field-set"] [data-slot="button"] {
+  background: var(--attesta-panel) !important;
+  border-color: var(--attesta-accent) !important;
+  color: var(--attesta-accent) !important;
 }
 
 formata-form {
@@ -158,20 +176,9 @@ const formataBuilderPreviewShadowOverrides = `
 	--formata-accent: var(--attesta-formata-accent);
 }
 
-[data-slot="field-group"] {
-	gap: 12px;
-}
-
-[data-slot="field"] {
-	gap: 6px;
-}
-
 [data-slot="field-legend"] {
 	color: var(--attesta-formata-ink) !important;
 	font-family: "Space Grotesk", system-ui, sans-serif;
-	font-size: 18.72px;
-	font-weight: 700;
-	margin-bottom: 0;
 }
 
 [data-slot="field-description"] {
@@ -213,6 +220,10 @@ textarea {
 	border-color: var(--attesta-formata-border) !important;
 	color: var(--attesta-formata-ink) !important;
 	font-family: "Space Grotesk", system-ui, sans-serif !important;
+}
+
+button[type="submit"] {
+	display: none;
 }
 `
 
