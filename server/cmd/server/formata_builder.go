@@ -187,22 +187,17 @@ const formataBuilderPreviewShadowOverrides = `
 	font-size: 13px;
 }
 
-[data-slot="input"]::file-selector-button {
+[data-slot="input"]::file-selector-button,
+[data-slot="button"] {
 	background: var(--attesta-formata-panel) !important;
 	color: var(--attesta-formata-accent) !important;
 	border: 1px solid var(--attesta-formata-accent) !important;
+	cursor: pointer;
+	border-radius: 4px;
 }
 
-[data-slot="slider-range"],
-[data-slot="button"] {
+[data-slot="slider-range"] {
 	background: var(--attesta-formata-accent) !important;
-	border-color: var(--attesta-formata-accent) !important;
-	border-radius: 4px;
-	color: var(--attesta-panel) !important;
-	cursor: pointer;
-	font-family: "Space Grotesk", system-ui, sans-serif;
-	font-size: 13.3333px;
-	font-weight: 600;
 }
 
 [data-slot="slider-track"] {
