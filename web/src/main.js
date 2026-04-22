@@ -24,7 +24,15 @@ const formataShadowOverrides = `
     color: var(--formata-muted) !important;
     font-size: 13px;
   }
+  [data-slot="input"]::file-selector-button,
   [data-slot="button"] {
+    background: var(---panel) !important;
+    color: var(--formata-accent) !important;
+    border: 1px solid var(--formata-accent) !important;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  [data-slot="button"][type="submit"] {
     background: var(--formata-accent) !important;
     color: var(--panel) !important;
     border-color: var(--formata-accent) !important;
@@ -33,14 +41,24 @@ const formataShadowOverrides = `
     border-radius: 4px;
     cursor: pointer;
   }
+  [data-slot="slider-range"] {
+    background: var(--formata-accent) !important;
+  }
+  [data-slot="slider-track"] {
+    background: var(--panel) !important;
+  }
   [data-slot="input"],
   [data-slot="select-trigger"],
   [data-slot="select-content"],
-  button,
+  [data-slot="checkbox"],
+  [data-slot="radio-group-item"],
   input,
   select,
   textarea {
     background: var(--panel) !important;
+    border-color: var(--border) !important;
+    color: var(--ink) !important;
+	  font-family: "Space Grotesk", system-ui, sans-serif !important;
   }
 `;
 
