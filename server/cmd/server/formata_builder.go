@@ -213,6 +213,7 @@ const formataBuilderPreviewShadowOverrides = `
 [data-slot="select-trigger"],
 [data-slot="select-content"],
 [data-slot="checkbox"],
+[data-slot="radio-group-item"],
 input,
 select,
 textarea {
