@@ -64,6 +64,9 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if !strings.Contains(body, "/org-admin/formata-builder/assets/") {
 			t.Fatalf("expected rewritten asset prefix in html, got %q", body)
 		}
+		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
+			t.Fatalf("expected attesta builder overrides in html, got %q", body)
+		}
 		if got := rec.Header().Get("Cache-Control"); !strings.Contains(got, "no-store") {
 			t.Fatalf("cache-control = %q, want no-store", got)
 		}
@@ -83,6 +86,9 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		}
 		if !strings.Contains(body, "/org-admin/formata-builder/assets/") {
 			t.Fatalf("expected rewritten asset prefix in fallback html, got %q", body)
+		}
+		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
+			t.Fatalf("expected attesta builder overrides in fallback html, got %q", body)
 		}
 	})
 

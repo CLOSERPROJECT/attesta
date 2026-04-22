@@ -16,17 +16,8 @@ const syncFormataDarkMode = (theme) => {
 };
 
 const formataShadowOverrides = `
-  [data-slot="field-group"] {
-    gap: 12px;
-  }
-  [data-slot="field"] {
-    gap: 6px;
-  }
   [data-slot="field-legend"] {
     font-family: "Space Grotesk", system-ui, sans-serif;
-    font-weight: bold;
-    font-size: 18.72px;
-    margin-bottom: 0;
   }
   [data-slot="field-description"] {
     font-family: "Space Grotesk", system-ui, sans-serif;
@@ -41,7 +32,6 @@ const formataShadowOverrides = `
     font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 13.3333px  ;
   }
   [data-slot="input"],
   [data-slot="select-trigger"],
