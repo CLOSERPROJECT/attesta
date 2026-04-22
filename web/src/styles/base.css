@@ -746,17 +746,9 @@ button.secondary-small {
 }
 
 .substep-active {
-  border-color: var(--accent);
+  border-color: var(--border);
   background: var(--substep-available);
   opacity: 0.7;
-}
-
-.substep-available.substep-selected {
-  border-color: var(--accent);
-}
-
-.substep-active.substep-selected {
-  border-color: var(--accent);
 }
 
 .substep-done {

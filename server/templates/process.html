@@ -162,9 +162,7 @@
         <ul class="timeline-substeps">
           {{ range .Substeps }}
             <li
-              class="substep substep-{{ .Status }}{{ if .Selected }}
-                substep-selected
-              {{ end }}"
+              class="substep substep-{{ .Status }}"
               style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
             >
               <details
