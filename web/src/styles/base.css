@@ -131,6 +131,10 @@
   --warning-bg: rgba(242, 198, 79, 0.12);
   --tag-bg: rgba(255, 255, 255, 0.05);
   --tag-bg-available: rgba(87, 194, 166, 0.1);
+  --substep-done: rgba(255, 255, 255, 0.06);
+  --substep-done-border: rgba(255, 255, 255, 0.14);
+  --substep-available: rgba(87, 194, 166, 0.12);
+  --substep-available-border: rgba(87, 194, 166, 0.22);
   --error-bg: rgba(255, 107, 95, 0.14);
   --error-ink: #ffd1cc;
   --confirmation-bg: rgba(87, 194, 166, 0.12);
@@ -504,7 +508,7 @@ button {
   font-family: "Space Grotesk", system-ui, sans-serif;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--panel);
   padding: 10px 16px;
   border-radius: 4px;
   cursor: pointer;
@@ -527,7 +531,7 @@ button[disabled] {
 button.danger {
   background: var(--danger);
   border: none;
-  color: #fff;
+  color: var(--panel);
 }
 
 .secondary {
@@ -741,17 +745,15 @@ button.secondary-small {
   background: var(--substep-available);
 }
 
-.substep-available.substep-selected {
-  border-color: var(--accent);
+.substep-active {
+  border-color: var(--border);
+  background: var(--substep-available);
+  opacity: 0.7;
 }
 
 .substep-done {
   border-color: var(--substep-done-border);
   background: var(--substep-done);
-}
-
-.substep-done.substep-selected {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 35%, transparent);
 }
 
 .substep-locked {
@@ -791,6 +793,11 @@ button.secondary-small {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--panel);
+}
+
+.substep-active .substep-head .status {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .substep-done .substep-head .status {
@@ -1279,16 +1286,11 @@ button.secondary-small {
   text-align: right;
 }
 
-.workflow-card-media {
-  margin-top: auto;
-  min-height: 58px;
-  color: var(--accent);
-}
-
-.workflow-card-media.workflow-card-media-center {
-  display: flex;
+.workflow-card-turn-indicator {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--accent);
 }
 
 .workflow-card-create {
@@ -1304,6 +1306,7 @@ button.secondary-small {
 .workflow-card-create:hover {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  text-decoration: none;
 }
 
 .workflow-card-menu {
@@ -1412,7 +1415,7 @@ button.secondary-small {
   padding: 10px 16px;
   border-radius: 4px;
   background: var(--accent);
-  color: #fff;
+  color: var(--panel);
   font-weight: 600;
 }
 
@@ -1502,6 +1505,20 @@ button.secondary-small {
   gap: 10px;
 }
 
+.process-available {
+  background: var(--substep-available);
+  border-color: var(--accent);
+}
+
+.process-active {
+  background: var(--substep-done);
+}
+
+.process-done {
+  background: var(--substep-done);
+  border-color: var(--substep-done-border);
+}
+
 .no-process-item {
   padding: 10px 12px;
   border-radius: 4px;
@@ -1567,14 +1584,13 @@ button.secondary-small {
 .process-progress-line {
   height: 4px;
   border-radius: 4px;
-  background: #e8eedf;
   border: 1px solid var(--border);
   overflow: hidden;
 }
 
 .process-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background: var(--accent);
   width: 0;
 }
 
@@ -1599,9 +1615,12 @@ button.secondary-small {
 }
 
 .status-tag.status-available {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--tag-bg-available);
+  color: var(--panel);
+  background: var(--accent);
+}
+
+.status-tag.status-done {
+  background: var(--substep-done);
 }
 
 .process-meta {
@@ -1997,7 +2016,7 @@ button.secondary-small {
   border: 1px solid var(--border);
   border-radius: 4px;
   object-fit: contain;
-  background: #fff;
+  background: var(--panel);
   padding: 4px;
 }
 

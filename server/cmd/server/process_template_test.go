@@ -41,7 +41,6 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 					Title:      "Capture batch data",
 					Status:     "available",
 					Selected:   true,
-					RoleLabel:  "QA",
 					RoleColor:  template.CSS("#004466"),
 					RoleBorder: template.CSS("#003355"),
 					Action: &ActionView{

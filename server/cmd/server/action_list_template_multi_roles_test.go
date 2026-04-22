@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestActionListTemplateShowsAllRoleBadges(t *testing.T) {
+func TestActionListTemplateShowsRoleSelectorLabelsWhilePostingSlugs(t *testing.T) {
 	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
 
 	view := ActionListView{
@@ -25,7 +25,10 @@ func TestActionListTemplateShowsAllRoleBadges(t *testing.T) {
 				{ID: "dep1", Label: "Department 1", Color: template.CSS("#aaaaaa"), Border: template.CSS("#111111")},
 				{ID: "dep2", Label: "Department 2", Color: template.CSS("#bbbbbb"), Border: template.CSS("#222222")},
 			},
-			MatchingRoles: []string{"dep1", "dep2"},
+			MatchingRoles: []ActionRoleOption{
+				{Slug: "dep1", Label: "Department 1"},
+				{Slug: "dep2", Label: "Department 2"},
+			},
 		},
 	}
 
@@ -41,7 +44,7 @@ func TestActionListTemplateShowsAllRoleBadges(t *testing.T) {
 	if !strings.Contains(body, `value="dep1"`) || !strings.Contains(body, `value="dep2"`) {
 		t.Fatalf("expected matching role options in template, got body: %s", body)
 	}
-	if strings.Contains(body, "Department 1") || strings.Contains(body, "Department 2") {
-		t.Fatalf("expected role badges to stay out of action detail, got body: %s", body)
+	if !strings.Contains(body, `>Department 1</option>`) || !strings.Contains(body, `>Department 2</option>`) {
+		t.Fatalf("expected selector labels to use role names, got body: %s", body)
 	}
 }

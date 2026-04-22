@@ -41,7 +41,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 								FormSchema:    `{"type":"object","properties":{"value":{"type":"string"}}}`,
 								ReadOnly:      true,
 								Reason:        "Preview only. Start an instance to submit data.",
-								MatchingRoles: []string{"dep1"},
+								MatchingRoles: []ActionRoleOption{{Slug: "dep1", Label: "Department 1"}},
 							},
 						},
 					},
@@ -152,5 +152,42 @@ func TestHomeTemplateRendersInstancesPagination(t *testing.T) {
 	}
 	if !strings.Contains(compactBody, `page=3`) {
 		t.Fatalf("expected next page link, got: %s", body)
+	}
+}
+
+func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+
+	view := HomeView{
+		PageBase: PageBase{
+			WorkflowKey:  "workflow",
+			WorkflowPath: "/w/workflow",
+			WorkflowName: "Demo workflow",
+		},
+		Processes: []ProcessListItem{
+			{
+				ID:            "process-1",
+				Status:        "available",
+				Percent:       25,
+				DoneSubsteps:  1,
+				TotalSubsteps: 4,
+				CreatedAt:     "1 Mar 2026 at 10:00 UTC",
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
+		t.Fatalf("render home template: %v", err)
+	}
+	body := out.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
+
+	if !strings.Contains(body, `class="process-item process-available"`) {
+		t.Fatalf("expected available process class, got: %s", body)
+	}
+	if !strings.Contains(compactBody, `status-tag status-tag-compact status-available`) ||
+		!strings.Contains(compactBody, `available`) {
+		t.Fatalf("expected available status tag, got: %s", body)
 	}
 }

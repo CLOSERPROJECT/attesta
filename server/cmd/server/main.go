@@ -144,11 +144,8 @@ type SSEHub struct {
 type TimelineSubstep struct {
 	SubstepID    string
 	Title        string
-	Role         string
 	Selected     bool
 	Action       *ActionView
-	RoleBadges   []TimelineRoleBadge
-	RoleLabel    string
 	RoleColor    template.CSS
 	RoleBorder   template.CSS
 	Status       string
@@ -159,13 +156,6 @@ type TimelineSubstep struct {
 	FileName     string
 	FileSHA256   string
 	FileURL      string
-}
-
-type TimelineRoleBadge struct {
-	ID     string
-	Label  string
-	Color  template.CSS
-	Border template.CSS
 }
 
 type TimelineStep struct {
@@ -230,9 +220,8 @@ type ActionView struct {
 	SubstepID     string
 	Title         string
 	Role          string
-	AllowedRoles  []string
 	RoleBadges    []ActionRoleBadge
-	MatchingRoles []string
+	MatchingRoles []ActionRoleOption
 	RoleLabel     string
 	RoleColor     template.CSS
 	RoleBorder    template.CSS
@@ -256,6 +245,11 @@ type ActionRoleBadge struct {
 	Label  string
 	Color  template.CSS
 	Border template.CSS
+}
+
+type ActionRoleOption struct {
+	Slug  string
+	Label string
 }
 
 type ActionKV struct {
@@ -346,6 +340,7 @@ type WorkflowOption struct {
 	Name              string
 	Description       string
 	Counts            WorkflowProcessCounts
+	HasUserTurn       bool
 	CanClone          bool
 	CanEdit           bool
 	EditAction        string
@@ -1581,6 +1576,24 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			return nil, listErr
 		}
 		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
+		actor := actorFromAccountUser(user, key)
+		if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+			actor.RoleSlugs = s.roles(cfg)
+			if len(actor.RoleSlugs) > 0 {
+				actor.Role = actor.RoleSlugs[0]
+			}
+		}
+		roleMeta := s.roleMetaMap(cfg)
+		for _, process := range processes {
+			process.Progress = normalizeProgressKeys(process.Progress)
+			if deriveProcessStatus(cfg.Workflow, &process) != "active" {
+				continue
+			}
+			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, key, actor, roleMeta); ok {
+				option.HasUserTurn = true
+				break
+			}
+		}
 		stream, ok := streamsByKey[key]
 		if ok && s.authorizer != nil && user != nil {
 			hasProcesses := option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0
@@ -1862,16 +1875,26 @@ func sortHomeProcessList(items []ProcessListItem, sortKey string) {
 				}
 				return items[i].Percent > items[j].Percent
 			}
-			if items[i].Status == "active" {
-				return true
-			}
-			if items[j].Status == "active" {
-				return false
+			leftRank := homeProcessStatusRank(items[i].Status)
+			rightRank := homeProcessStatusRank(items[j].Status)
+			if leftRank != rightRank {
+				return leftRank < rightRank
 			}
 			return items[i].Status < items[j].Status
 		})
 	default:
 		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.After(items[j].CreatedAtTime) })
+	}
+}
+
+func homeProcessStatusRank(status string) int {
+	switch strings.TrimSpace(status) {
+	case "available":
+		return 0
+	case "active":
+		return 1
+	default:
+		return 2
 	}
 }
 
@@ -4535,6 +4558,14 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		logRequestError(r, err, "failed to list recent processes for workflow %s", workflowKey)
 		processesRaw = nil
 	}
+	actor := actorFromAccountUser(user, workflowKey)
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+		if len(actor.RoleSlugs) > 0 {
+			actor.Role = actor.RoleSlugs[0]
+		}
+	}
+	roleMeta := s.roleMetaMap(cfg)
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []ProcessListItem
@@ -4560,6 +4591,11 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			LastNotarizedAt: lastAt,
 			LastDigestShort: lastDigest,
 		}
+		if item.Status == "active" {
+			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta); ok {
+				item.Status = "available"
+			}
+		}
 		processes = append(processes, item)
 	}
 
@@ -4582,13 +4618,6 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		pageNumbers = append(pageNumbers, current)
 	}
 
-	actor := actorFromAccountUser(user, workflowKey)
-	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
-		actor.RoleSlugs = s.roles(cfg)
-		if len(actor.RoleSlugs) > 0 {
-			actor.Role = actor.RoleSlugs[0]
-		}
-	}
 	preview := makeActionListReadOnly(
 		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
 		"Preview only. Start an instance to submit data.",
@@ -6363,6 +6392,15 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 	return out
 }
 
+func nextAvailableAuthorizedAction(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleMeta map[string]RoleMeta) (ActionView, bool) {
+	for _, action := range buildActionList(def, process, workflowKey, actor, false, roleMeta) {
+		if action.Status == "available" && !action.Disabled {
+			return action, true
+		}
+	}
+	return ActionView{}, false
+}
+
 func organizationLogoURLMap(ctx context.Context, identity IdentityStore) map[string]string {
 	if identity == nil {
 		return map[string]string{}
@@ -6412,22 +6450,9 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 				primaryRole = allowedRoles[0]
 			}
 			meta := roleMetaFor(primaryRole, roleMeta)
-			roleBadges := make([]TimelineRoleBadge, 0, len(allowedRoles))
-			for _, role := range allowedRoles {
-				badgeMeta := roleMetaFor(role, roleMeta)
-				roleBadges = append(roleBadges, TimelineRoleBadge{
-					ID:     role,
-					Label:  badgeMeta.Label,
-					Color:  cssValue(badgeMeta.Color, "var(--role-fallback)"),
-					Border: cssValue(badgeMeta.Border, "var(--border)"),
-				})
-			}
 			entry := TimelineSubstep{
 				SubstepID:  sub.SubstepID,
 				Title:      sub.Title,
-				Role:       strings.Join(allowedRoles, ", "),
-				RoleBadges: roleBadges,
-				RoleLabel:  meta.Label,
 				RoleColor:  cssValue(meta.Color, "var(--role-fallback)"),
 				RoleBorder: cssValue(meta.Border, "var(--border)"),
 			}
@@ -6440,16 +6465,6 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 						selectedRole := strings.TrimSpace(progress.DoneBy.Role)
 						if selectedRole != "" {
 							selectedMeta := roleMetaFor(selectedRole, roleMeta)
-							entry.Role = selectedRole
-							entry.RoleBadges = []TimelineRoleBadge{
-								{
-									ID:     selectedRole,
-									Label:  selectedMeta.Label,
-									Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
-									Border: cssValue(selectedMeta.Border, "var(--border)"),
-								},
-							}
-							entry.RoleLabel = selectedMeta.Label
 							entry.RoleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
 							entry.RoleBorder = cssValue(selectedMeta.Border, "var(--border)")
 						}
@@ -6857,7 +6872,19 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
 			ownedRoles = []string{strings.TrimSpace(actor.Role)}
 		}
-		matchingRoles := intersectRoles(allowedRoles, ownedRoles)
+		matchingRoleSlugs := intersectRoles(allowedRoles, ownedRoles)
+		matchingRoles := make([]ActionRoleOption, 0, len(matchingRoleSlugs))
+		for _, role := range matchingRoleSlugs {
+			meta := roleMetaFor(role, roleMeta)
+			label := strings.TrimSpace(meta.Label)
+			if label == "" {
+				label = role
+			}
+			matchingRoles = append(matchingRoles, ActionRoleOption{
+				Slug:  role,
+				Label: label,
+			})
+		}
 		primaryRole := sub.Role
 		if primaryRole == "" && len(allowedRoles) > 0 {
 			primaryRole = allowedRoles[0]
@@ -6950,7 +6977,6 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			SubstepID:     sub.SubstepID,
 			Title:         sub.Title,
 			Role:          role,
-			AllowedRoles:  allowedRoles,
 			RoleBadges:    roleBadges,
 			MatchingRoles: matchingRoles,
 			RoleLabel:     roleLabel,
@@ -7045,6 +7071,16 @@ func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []Ti
 			}
 			actionCopy := action
 			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+			switch action.Status {
+			case "done", "locked":
+				timeline[stepIndex].Substeps[substepIndex].Status = action.Status
+			case "available":
+				if action.Disabled {
+					timeline[stepIndex].Substeps[substepIndex].Status = "active"
+				} else {
+					timeline[stepIndex].Substeps[substepIndex].Status = "available"
+				}
+			}
 		}
 	}
 	return timeline

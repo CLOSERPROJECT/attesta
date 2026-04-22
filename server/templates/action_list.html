@@ -1,8 +1,17 @@
 {{/* Used on /w/.WorkflowKey/process/.ProcessID to render list of actions */}}
 
 {{ define "action_detail_content.html" }}
+  <div class="role-pill-row" style="margin: 8px 0 0;">
+    {{ range .RoleBadges }}
+      <span
+        class="pill role-pill"
+        style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
+        >{{ .Label }}</span
+      >
+    {{ end }}
+  </div>
   {{ if .InputKey }}
-    <p class="muted" style="margin: 8px 0 0; white-space: pre-line;">
+    <p class="muted" style="white-space: pre-line; margin: 0;">
       {{- .InputKey -}}
     </p>
     <hr />
@@ -23,7 +32,7 @@
           <input
             type="hidden"
             name="activeRole"
-            value="{{ index .MatchingRoles 0 }}"
+            value="{{ (index .MatchingRoles 0).Slug }}"
             {{ if .ReadOnly }}disabled{{ end }}
           />
         {{ else }}
@@ -38,7 +47,7 @@
               >
                 <option value="">Select role</option>
                 {{ range .MatchingRoles }}
-                  <option value="{{ . }}">{{ . }}</option>
+                  <option value="{{ .Slug }}">{{ .Label }}</option>
                 {{ end }}
               </select>
             </label>

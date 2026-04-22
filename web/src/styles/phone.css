@@ -137,12 +137,14 @@
   }
 
   .substep.substep-done .substep-accordion[open] > .substep-accordion-summary {
-    border-color: var(--substep-done-border);
     background: var(--substep-done);
   }
 
   .substep.substep-available .substep-accordion[open] > .substep-accordion-summary {
-    border-color: var(--substep-available-border);
+    background: var(--substep-available);
+  }
+
+  .substep.substep-active .substep-accordion[open] > .substep-accordion-summary {
     background: var(--substep-available);
   }
 

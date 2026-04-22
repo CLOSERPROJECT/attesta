@@ -162,7 +162,7 @@
               </form>
               <ul class="process-list">
                 {{ range .Processes }}
-                  <li class="process-item">
+                  <li class="process-item process-{{ .Status }}">
                     <div class="process-head">
                       <a href="{{ $.WorkflowPath }}/process/{{ .ID }}"
                         >{{ .ID }}</a

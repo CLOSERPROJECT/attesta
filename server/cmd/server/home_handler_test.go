@@ -84,8 +84,8 @@ func TestHandleHomeListsProcesses(t *testing.T) {
 	if !strings.Contains(body, "PROC 2 SORT time_desc FILTER all") {
 		t.Fatalf("expected processes count and default controls, got %q", body)
 	}
-	if !strings.Contains(body, activeID.Hex()+":active:28") {
-		t.Fatalf("expected active process stats, got %q", body)
+	if !strings.Contains(body, activeID.Hex()+":available:28") {
+		t.Fatalf("expected available process stats, got %q", body)
 	}
 	if !strings.Contains(body, doneID.Hex()+":done:100") {
 		t.Fatalf("expected done process stats, got %q", body)
@@ -209,7 +209,7 @@ func TestHandleHomePaginatesProcesses(t *testing.T) {
 	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER all PAGE 2/2") {
 		t.Fatalf("expected second page with one process, got %q", body)
 	}
-	if !strings.Contains(body, expectedPageTwoID+":active") {
+	if !strings.Contains(body, expectedPageTwoID+":available") {
 		t.Fatalf("expected last process on page 2, got %q", body)
 	}
 }
@@ -241,6 +241,199 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	}
 	if strings.Contains(body, "secondary:Secondary workflow:Secondary workflow description:") {
 		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
+	}
+}
+
+func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *testing.T) {
+	cfg := RuntimeConfig{
+		Workflow: WorkflowDef{
+			Name: "Org workflow",
+			Steps: []WorkflowStep{
+				{
+					StepID:           "1",
+					Title:            "Org 1 step",
+					Order:            1,
+					OrganizationSlug: "org1",
+					Substep:          []WorkflowSub{{SubstepID: "1.1", Title: "Org 1 input", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "string"}},
+				},
+				{
+					StepID:           "2",
+					Title:            "Org 2 step",
+					Order:            2,
+					OrganizationSlug: "org2",
+					Substep:          []WorkflowSub{{SubstepID: "2.1", Title: "Org 2 input", Order: 1, Roles: []string{"dep2"}, InputKey: "value", InputType: "string"}},
+				},
+			},
+		},
+		Organizations: []WorkflowOrganization{
+			{Slug: "org1", Name: "Organization 1"},
+			{Slug: "org2", Name: "Organization 2"},
+		},
+		Roles: []WorkflowRole{
+			{OrgSlug: "org1", Slug: "dep1", Name: "Department 1"},
+			{OrgSlug: "org2", Slug: "dep2", Name: "Department 2"},
+		},
+	}
+	now := time.Date(2026, 2, 4, 12, 0, 0, 0, time.UTC)
+	matching := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   now,
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "pending"},
+			"2.1": {State: "pending"},
+		},
+	}
+	otherOrg := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done", DoneAt: ptrTime(now.Add(-30 * time.Minute))},
+			"2.1": {State: "pending"},
+		},
+	}
+	done := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done", DoneAt: ptrTime(now.Add(-90 * time.Minute))},
+			"2.1": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
+		},
+	}
+
+	action, ok := nextAvailableAuthorizedAction(cfg.Workflow, &matching, "workflow", Actor{
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+	}, (&Server{}).roleMetaMap(cfg))
+	if !ok {
+		t.Fatalf("expected available authorized action")
+	}
+	if action.SubstepID != "1.1" {
+		t.Fatalf("substep id = %q, want 1.1", action.SubstepID)
+	}
+	if len(action.MatchingRoles) != 1 || action.MatchingRoles[0].Slug != "dep1" || action.MatchingRoles[0].Label != "Department 1" {
+		t.Fatalf("matching roles = %#v, want dep1/Department 1", action.MatchingRoles)
+	}
+
+	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &otherOrg, "workflow", Actor{
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+	}, (&Server{}).roleMetaMap(cfg)); ok {
+		t.Fatalf("did not expect authorized action for step in another organization")
+	}
+
+	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &done, "workflow", Actor{
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+	}, (&Server{}).roleMetaMap(cfg)); ok {
+		t.Fatalf("did not expect authorized action for done process")
+	}
+}
+
+func TestHandleHomePickerMarksWorkflowCardsWithMyTurn(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
+
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          processID,
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Date(2026, 2, 5, 10, 0, 0, 0, time.UTC),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+
+	user := AccountUser{
+		ID:        primitive.NewObjectID(),
+		Email:     "member@example.com",
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	}
+	sessionID := "session-home-turn"
+
+	server := &Server{
+		authorizer:  fakeAuthorizer{},
+		store:       store,
+		identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
+		tmpl:        homePickerTemplates(),
+		configDir:   tempDir,
+		enforceAuth: true,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	expected := "workflow:Main workflow:Main workflow description:1/0/0:turn"
+	if !strings.Contains(body, expected) {
+		t.Fatalf("expected workflow turn marker %q, got %q", expected, body)
+	}
+}
+
+func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
+
+	store := NewMemoryStore()
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Date(2026, 2, 5, 10, 0, 0, 0, time.UTC),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+
+	user := AccountUser{
+		ID:        primitive.NewObjectID(),
+		Email:     "member-indicator@example.com",
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+		Status:    "active",
+		CreatedAt: time.Now().UTC(),
+	}
+	sessionID := "session-home-indicator"
+
+	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	server := &Server{
+		authorizer:  fakeAuthorizer{},
+		store:       store,
+		identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
+		tmpl:        tmpl,
+		configDir:   tempDir,
+		enforceAuth: true,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `workflow-card-turn-indicator`) {
+		t.Fatalf("expected workflow turn indicator markup, got %q", body)
+	}
+	if !strings.Contains(body, `aria-label="Your turn pending in Main workflow"`) {
+		t.Fatalf("expected accessible turn indicator label, got %q", body)
 	}
 }
 
@@ -283,6 +476,47 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	}
 	if !strings.Contains(body, "Not started") || !strings.Contains(body, "In progress") || !strings.Contains(body, "Completed") {
 		t.Fatalf("expected status labels in cards, got %q", body)
+	}
+}
+
+func TestHandleWorkflowHomeMarksProcessesWithMyTurn(t *testing.T) {
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+
+	processID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          processID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "pending"},
+		},
+	})
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, processID.Hex()+":available:0|") {
+		t.Fatalf("expected process to surface available status, got %q", body)
 	}
 }
 
@@ -962,7 +1196,7 @@ PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
 func homePickerTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_picker_body" .}}{{end}}
-{{define "home_picker_body"}}PICK {{len .Workflows}} {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
+{{define "home_picker_body"}}PICK {{len .Workflows}} {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}{{if .HasUserTurn}}:turn{{end}}|{{end}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))
 }

@@ -84,7 +84,7 @@ func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 	}
 }
 
-func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {
+func TestBuildTimelineUsesRoleStyleForAvailableSubsteps(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -118,18 +118,12 @@ func TestBuildTimelineIncludesAllAllowedRoleBadges(t *testing.T) {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
 	entry := timeline[0].Substeps[0]
-	if len(entry.RoleBadges) != 2 {
-		t.Fatalf("role badge count = %d, want 2", len(entry.RoleBadges))
-	}
-	if entry.RoleBadges[0].ID != "dep1" || entry.RoleBadges[1].ID != "dep2" {
-		t.Fatalf("unexpected role badges: %#v", entry.RoleBadges)
-	}
-	if entry.Role != "dep1, dep2" {
-		t.Fatalf("role summary = %q, want %q", entry.Role, "dep1, dep2")
+	if string(entry.RoleColor) != "#aaaaaa" || string(entry.RoleBorder) != "#111111" {
+		t.Fatalf("unexpected role style values: color=%q border=%q", entry.RoleColor, entry.RoleBorder)
 	}
 }
 
-func TestBuildTimelineDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
+func TestBuildTimelineDoneSubstepUsesSelectedRoleStyle(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -174,14 +168,8 @@ func TestBuildTimelineDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 	if entry.Status != "done" {
 		t.Fatalf("status = %q, want done", entry.Status)
 	}
-	if entry.Role != "dep2" {
-		t.Fatalf("role summary = %q, want dep2", entry.Role)
-	}
-	if len(entry.RoleBadges) != 1 {
-		t.Fatalf("role badge count = %d, want 1", len(entry.RoleBadges))
-	}
-	if entry.RoleBadges[0].ID != "dep2" {
-		t.Fatalf("badge id = %q, want dep2", entry.RoleBadges[0].ID)
+	if string(entry.RoleColor) != "#bbbbbb" || string(entry.RoleBorder) != "#222222" {
+		t.Fatalf("unexpected role style values: color=%q border=%q", entry.RoleColor, entry.RoleBorder)
 	}
 }
 
