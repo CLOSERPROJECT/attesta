@@ -428,6 +428,30 @@ func TestHandleResetRequestInvalidForm(t *testing.T) {
 }
 
 func TestHandleResetRequestAdditionalBranches(t *testing.T) {
+	t.Run("missing identity redirects to neutral notice", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createRecoveryFunc: func(ctx context.Context, email, redirectURL string) error {
+					return ErrIdentityNotFound
+				},
+			},
+			tmpl: resetTemplates(),
+			now:  time.Now,
+		}
+		req := httptest.NewRequest(http.MethodPost, "/reset", strings.NewReader("email=missing%40example.com"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleResetRequest(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if rec.Header().Get("Location") != "/reset?notice=reset_request_sent" {
+			t.Fatalf("location = %q, want reset notice redirect", rec.Header().Get("Location"))
+		}
+	})
+
 	t.Run("recovery failure renders error", func(t *testing.T) {
 		server := &Server{
 			identity: &fakeIdentityStore{
