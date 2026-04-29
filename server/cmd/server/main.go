@@ -2500,6 +2500,10 @@ func (s *Server) handleResetRequest(w http.ResponseWriter, r *http.Request) {
 
 		if s.identity != nil {
 			if err := s.identity.CreateRecovery(r.Context(), email, resetRedirectURL(r)); err != nil {
+				if errors.Is(err, ErrIdentityNotFound) {
+					http.Redirect(w, r, "/reset?notice="+url.QueryEscape(noticeResetRequestSent), http.StatusSeeOther)
+					return
+				}
 				logRequestError(r, err, "failed to create password recovery for %s", email)
 				w.WriteHeader(http.StatusBadGateway)
 				_ = s.tmpl.ExecuteTemplate(w, "reset_request.html", ResetRequestView{
