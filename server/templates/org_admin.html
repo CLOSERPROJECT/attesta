@@ -282,7 +282,10 @@
                       <p class="error">{{ $.RoleError }}</p>
                     {{ end }}
                     {{ if not .InUse }}
-                      <dialog id="edit-role-{{ .Slug }}" class="manage-dialog">
+                      <dialog
+                        id="edit-role-{{ .Slug }}"
+                        class="manage-dialog manage-dialog-overflow"
+                      >
                         <div class="manage-dialog-card">
                           <header class="manage-dialog-head">
                             <div>
@@ -346,183 +349,41 @@
                                 class="role-palette-picker"
                                 data-role-palette-picker
                               >
-                                <select
-                                  id="edit-role-palette-{{ .Slug }}"
-                                  name="palette"
-                                  required
-                                  data-role-palette-select
-                                >
-                                  <option
-                                    value="red"
-                                    data-role-color="var(--role-red-bg)"
-                                    data-role-border="var(--role-red-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "red" }}
-                                      selected
-                                    {{ end }}
+                                <div class="role-palette-select-wrap">
+                                  <select
+                                    id="edit-role-palette-{{ .Slug }}"
+                                    name="palette"
+                                    required
+                                    class="role-palette-native-select"
+                                    data-role-palette-select
                                   >
-                                    Red
-                                  </option>
-                                  <option
-                                    value="orange"
-                                    data-role-color="var(--role-orange-bg)"
-                                    data-role-border="var(--role-orange-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "orange" }}
-                                      selected
-                                    {{ end }}
+                                    {{ template "role-palette-options" (or $.RoleDialogPalette .Palette) }}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    class="roles-picker-toggle role-palette-toggle"
+                                    data-role-palette-toggle
+                                    aria-expanded="false"
                                   >
-                                    Orange
-                                  </option>
-                                  <option
-                                    value="amber"
-                                    data-role-color="var(--role-amber-bg)"
-                                    data-role-border="var(--role-amber-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "amber" }}
-                                      selected
-                                    {{ end }}
+                                    <span data-role-palette-toggle-label></span>
+                                    <span
+                                      class="roles-picker-toggle-icon"
+                                      aria-hidden="true"
+                                    >
+                                      {{ template "icon-chevron-down" . }}
+                                    </span>
+                                  </button>
+                                  <div
+                                    class="roles-picker-menu role-palette-menu"
+                                    data-role-palette-menu
+                                    hidden
                                   >
-                                    Amber
-                                  </option>
-                                  <option
-                                    value="yellow"
-                                    data-role-color="var(--role-yellow-bg)"
-                                    data-role-border="var(--role-yellow-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "yellow" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Yellow
-                                  </option>
-                                  <option
-                                    value="lime"
-                                    data-role-color="var(--role-lime-bg)"
-                                    data-role-border="var(--role-lime-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "lime" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Lime
-                                  </option>
-                                  <option
-                                    value="green"
-                                    data-role-color="var(--role-green-bg)"
-                                    data-role-border="var(--role-green-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "green" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Green
-                                  </option>
-                                  <option
-                                    value="emerald"
-                                    data-role-color="var(--role-emerald-bg)"
-                                    data-role-border="var(--role-emerald-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "emerald" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Emerald
-                                  </option>
-                                  <option
-                                    value="teal"
-                                    data-role-color="var(--role-teal-bg)"
-                                    data-role-border="var(--role-teal-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "teal" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Teal
-                                  </option>
-                                  <option
-                                    value="cyan"
-                                    data-role-color="var(--role-cyan-bg)"
-                                    data-role-border="var(--role-cyan-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "cyan" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Cyan
-                                  </option>
-                                  <option
-                                    value="sky"
-                                    data-role-color="var(--role-sky-bg)"
-                                    data-role-border="var(--role-sky-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "sky" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Sky
-                                  </option>
-                                  <option
-                                    value="blue"
-                                    data-role-color="var(--role-blue-bg)"
-                                    data-role-border="var(--role-blue-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "blue" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Blue
-                                  </option>
-                                  <option
-                                    value="indigo"
-                                    data-role-color="var(--role-indigo-bg)"
-                                    data-role-border="var(--role-indigo-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "indigo" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Indigo
-                                  </option>
-                                  <option
-                                    value="violet"
-                                    data-role-color="var(--role-violet-bg)"
-                                    data-role-border="var(--role-violet-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "violet" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Violet
-                                  </option>
-                                  <option
-                                    value="purple"
-                                    data-role-color="var(--role-purple-bg)"
-                                    data-role-border="var(--role-purple-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "purple" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Purple
-                                  </option>
-                                  <option
-                                    value="fuchsia"
-                                    data-role-color="var(--role-fuchsia-bg)"
-                                    data-role-border="var(--role-fuchsia-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "fuchsia" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Fuchsia
-                                  </option>
-                                  <option
-                                    value="pink"
-                                    data-role-color="var(--role-pink-bg)"
-                                    data-role-border="var(--role-pink-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "pink" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Pink
-                                  </option>
-                                  <option
-                                    value="rose"
-                                    data-role-color="var(--role-rose-bg)"
-                                    data-role-border="var(--role-rose-border)"
-                                    {{ if eq (or $.RoleDialogPalette .Palette) "rose" }}
-                                      selected
-                                    {{ end }}
-                                  >
-                                    Rose
-                                  </option>
-                                </select>
+                                    <ul
+                                      class="roles-picker-options"
+                                      data-role-palette-options
+                                    ></ul>
+                                  </div>
+                                </div>
                                 <span
                                   class="role-palette-preview"
                                   aria-hidden="true"
@@ -890,155 +751,41 @@
                 <div class="form-field">
                   <label for="role-palette">Role color palette</label>
                   <div class="role-palette-picker" data-role-palette-picker>
-                    <select
-                      id="role-palette"
-                      name="palette"
-                      required
-                      data-role-palette-select
-                    >
-                      <option
-                        value="red"
-                        data-role-color="var(--role-red-bg)"
-                        data-role-border="var(--role-red-border)"
-                        {{ if or (eq .RoleDialogPalette "red") (eq .RoleDialogPalette "") }}
-                          selected
-                        {{ end }}
+                    <div class="role-palette-select-wrap">
+                      <select
+                        id="role-palette"
+                        name="palette"
+                        required
+                        class="role-palette-native-select"
+                        data-role-palette-select
                       >
-                        Red
-                      </option>
-                      <option
-                        value="orange"
-                        data-role-color="var(--role-orange-bg)"
-                        data-role-border="var(--role-orange-border)"
-                        {{ if eq .RoleDialogPalette "orange" }}selected{{ end }}
+                        {{ template "role-palette-options" (or .RoleDialogPalette "red") }}
+                      </select>
+                      <button
+                        type="button"
+                        class="roles-picker-toggle role-palette-toggle"
+                        data-role-palette-toggle
+                        aria-expanded="false"
                       >
-                        Orange
-                      </option>
-                      <option
-                        value="amber"
-                        data-role-color="var(--role-amber-bg)"
-                        data-role-border="var(--role-amber-border)"
-                        {{ if eq .RoleDialogPalette "amber" }}selected{{ end }}
+                        <span data-role-palette-toggle-label></span>
+                        <span
+                          class="roles-picker-toggle-icon"
+                          aria-hidden="true"
+                        >
+                          {{ template "icon-chevron-down" . }}
+                        </span>
+                      </button>
+                      <div
+                        class="roles-picker-menu role-palette-menu"
+                        data-role-palette-menu
+                        hidden
                       >
-                        Amber
-                      </option>
-                      <option
-                        value="yellow"
-                        data-role-color="var(--role-yellow-bg)"
-                        data-role-border="var(--role-yellow-border)"
-                        {{ if eq .RoleDialogPalette "yellow" }}selected{{ end }}
-                      >
-                        Yellow
-                      </option>
-                      <option
-                        value="lime"
-                        data-role-color="var(--role-lime-bg)"
-                        data-role-border="var(--role-lime-border)"
-                        {{ if eq .RoleDialogPalette "lime" }}selected{{ end }}
-                      >
-                        Lime
-                      </option>
-                      <option
-                        value="green"
-                        data-role-color="var(--role-green-bg)"
-                        data-role-border="var(--role-green-border)"
-                        {{ if eq .RoleDialogPalette "green" }}selected{{ end }}
-                      >
-                        Green
-                      </option>
-                      <option
-                        value="emerald"
-                        data-role-color="var(--role-emerald-bg)"
-                        data-role-border="var(--role-emerald-border)"
-                        {{ if eq .RoleDialogPalette "emerald" }}
-                          selected
-                        {{ end }}
-                      >
-                        Emerald
-                      </option>
-                      <option
-                        value="teal"
-                        data-role-color="var(--role-teal-bg)"
-                        data-role-border="var(--role-teal-border)"
-                        {{ if eq .RoleDialogPalette "teal" }}selected{{ end }}
-                      >
-                        Teal
-                      </option>
-                      <option
-                        value="cyan"
-                        data-role-color="var(--role-cyan-bg)"
-                        data-role-border="var(--role-cyan-border)"
-                        {{ if eq .RoleDialogPalette "cyan" }}selected{{ end }}
-                      >
-                        Cyan
-                      </option>
-                      <option
-                        value="sky"
-                        data-role-color="var(--role-sky-bg)"
-                        data-role-border="var(--role-sky-border)"
-                        {{ if eq .RoleDialogPalette "sky" }}selected{{ end }}
-                      >
-                        Sky
-                      </option>
-                      <option
-                        value="blue"
-                        data-role-color="var(--role-blue-bg)"
-                        data-role-border="var(--role-blue-border)"
-                        {{ if eq .RoleDialogPalette "blue" }}selected{{ end }}
-                      >
-                        Blue
-                      </option>
-                      <option
-                        value="indigo"
-                        data-role-color="var(--role-indigo-bg)"
-                        data-role-border="var(--role-indigo-border)"
-                        {{ if eq .RoleDialogPalette "indigo" }}selected{{ end }}
-                      >
-                        Indigo
-                      </option>
-                      <option
-                        value="violet"
-                        data-role-color="var(--role-violet-bg)"
-                        data-role-border="var(--role-violet-border)"
-                        {{ if eq .RoleDialogPalette "violet" }}selected{{ end }}
-                      >
-                        Violet
-                      </option>
-                      <option
-                        value="purple"
-                        data-role-color="var(--role-purple-bg)"
-                        data-role-border="var(--role-purple-border)"
-                        {{ if eq .RoleDialogPalette "purple" }}selected{{ end }}
-                      >
-                        Purple
-                      </option>
-                      <option
-                        value="fuchsia"
-                        data-role-color="var(--role-fuchsia-bg)"
-                        data-role-border="var(--role-fuchsia-border)"
-                        {{ if eq .RoleDialogPalette "fuchsia" }}
-                          selected
-                        {{ end }}
-                      >
-                        Fuchsia
-                      </option>
-                      <option
-                        value="pink"
-                        data-role-color="var(--role-pink-bg)"
-                        data-role-border="var(--role-pink-border)"
-                        {{ if eq .RoleDialogPalette "pink" }}selected{{ end }}
-                      >
-                        Pink
-                      </option>
-                      <option
-                        value="rose"
-                        data-role-color="var(--role-rose-bg)"
-                        data-role-border="var(--role-rose-border)"
-                        {{ if eq .RoleDialogPalette "rose" }}selected{{ end }}
-                      >
-                        Rose
-                      </option>
-                    </select>
+                        <ul
+                          class="roles-picker-options"
+                          data-role-palette-options
+                        ></ul>
+                      </div>
+                    </div>
                     <span
                       class="role-palette-preview"
                       aria-hidden="true"
@@ -1235,11 +982,29 @@
     }
 
     const rolePalettePickers = Array.from(document.querySelectorAll("[data-role-palette-picker]"));
+    const closeAllPalettePickers = (except) => {
+      rolePalettePickers.forEach((picker) => {
+        if (picker === except) {
+          return;
+        }
+        const menu = picker.querySelector("[data-role-palette-menu]");
+        const toggle = picker.querySelector("[data-role-palette-toggle]");
+        if (!menu || !toggle) {
+          return;
+        }
+        menu.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+      });
+    };
     rolePalettePickers.forEach((picker) => {
       const paletteSelect = picker.querySelector("[data-role-palette-select]");
       const palettePreview = picker.querySelector("[data-role-palette-preview]");
+      const paletteToggle = picker.querySelector("[data-role-palette-toggle]");
+      const paletteToggleLabel = picker.querySelector("[data-role-palette-toggle-label]");
+      const paletteMenu = picker.querySelector("[data-role-palette-menu]");
+      const paletteOptions = picker.querySelector("[data-role-palette-options]");
       const roleNameInput = picker.closest("form")?.querySelector('input[name="name"]');
-      if (!paletteSelect || !palettePreview) {
+      if (!paletteSelect || !palettePreview || !paletteToggle || !paletteToggleLabel || !paletteMenu || !paletteOptions) {
         return;
       }
 
@@ -1267,7 +1032,18 @@
         const border = option ? option.getAttribute("data-role-border") : "";
         palettePreview.style.setProperty("--swatch-bg", color || "var(--role-fallback)");
         palettePreview.style.setProperty("--swatch-border", border || "var(--border)");
-        palettePreview.title = option ? option.text : "";
+        const label = option ? option.text.trim() : "";
+        palettePreview.title = label;
+        paletteToggleLabel.textContent = label || "Select palette";
+        Array.from(paletteOptions.querySelectorAll("[data-role-palette-option]")).forEach((button) => {
+          const isSelected = button.getAttribute("data-value") === paletteSelect.value;
+          button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+          if (isSelected) {
+            button.classList.add("is-selected");
+          } else {
+            button.classList.remove("is-selected");
+          }
+        });
       };
       const applySuggestedPalette = () => {
         if (!roleNameInput) {
@@ -1281,6 +1057,59 @@
         updatePalettePreview();
       };
 
+      Array.from(paletteSelect.options).forEach((option) => {
+        if (!option.value) {
+          return;
+        }
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        const swatch = document.createElement("span");
+        const label = document.createElement("span");
+        const check = document.createElement("span");
+        button.type = "button";
+        button.className = "roles-picker-option role-palette-option";
+        button.setAttribute("data-role-palette-option", "");
+        button.setAttribute("data-value", option.value);
+        swatch.className = "role-palette-option-swatch";
+        swatch.style.setProperty("--swatch-bg", option.getAttribute("data-role-color") || "var(--role-fallback)");
+        swatch.style.setProperty("--swatch-border", option.getAttribute("data-role-border") || "var(--border)");
+        label.textContent = option.text.trim();
+        check.className = "roles-picker-option-check";
+        check.textContent = "Selected";
+        button.appendChild(swatch);
+        button.appendChild(label);
+        button.appendChild(check);
+        item.appendChild(button);
+        paletteOptions.appendChild(item);
+        button.addEventListener("click", () => {
+          paletteSelect.value = option.value;
+          autoPaletteEnabled = false;
+          updatePalettePreview();
+          paletteMenu.hidden = true;
+          paletteToggle.setAttribute("aria-expanded", "false");
+        });
+      });
+
+      paletteToggle.addEventListener("click", () => {
+        const isOpen = !paletteMenu.hidden;
+        closeAllPalettePickers(picker);
+        paletteMenu.hidden = isOpen;
+        paletteToggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      });
+      paletteToggle.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          paletteMenu.hidden = true;
+          paletteToggle.setAttribute("aria-expanded", "false");
+          return;
+        }
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          closeAllPalettePickers(picker);
+          paletteMenu.hidden = false;
+          paletteToggle.setAttribute("aria-expanded", "true");
+          paletteMenu.querySelector("[data-role-palette-option]")?.focus();
+        }
+      });
       paletteSelect.addEventListener("change", () => {
         autoPaletteEnabled = false;
         updatePalettePreview();
@@ -1518,6 +1347,17 @@
     });
 
     document.addEventListener("click", (event) => {
+      rolePalettePickers.forEach((picker) => {
+        if (!picker.contains(event.target)) {
+          const menu = picker.querySelector("[data-role-palette-menu]");
+          const toggle = picker.querySelector("[data-role-palette-toggle]");
+          if (!menu || !toggle) {
+            return;
+          }
+          menu.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      });
       rolePickers.forEach((picker) => {
         if (!picker.contains(event.target)) {
           const menu = picker.querySelector("[data-role-picker-menu]");

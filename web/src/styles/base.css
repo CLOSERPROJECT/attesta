@@ -1797,7 +1797,8 @@ button.secondary-small {
   text-align: left;
 }
 
-.roles-picker-toggle [data-role-picker-toggle-label] {
+.roles-picker-toggle [data-role-picker-toggle-label],
+.roles-picker-toggle [data-role-palette-toggle-label] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1918,8 +1919,37 @@ button.secondary-small {
   gap: 10px;
 }
 
-.role-palette-picker select {
+.role-palette-select-wrap {
+  position: relative;
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.role-palette-native-select {
+  display: none;
+}
+
+.role-palette-menu {
+  min-width: 100%;
+}
+
+.role-palette-option {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.role-palette-option .roles-picker-option-check {
+  margin-left: auto;
+}
+
+.role-palette-option-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--swatch-bg, var(--role-fallback));
+  border: 2px solid var(--swatch-border, var(--border));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  flex: 0 0 auto;
 }
 
 .role-palette-preview {
