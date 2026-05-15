@@ -729,7 +729,15 @@
                                 data-role-picker-toggle
                                 aria-expanded="false"
                               >
-                                Select roles
+                                <span data-role-picker-toggle-label
+                                  >Select roles</span
+                                >
+                                <span
+                                  class="roles-picker-toggle-icon"
+                                  aria-hidden="true"
+                                >
+                                  {{ template "icon-chevron-down" . }}
+                                </span>
                               </button>
                               <div
                                 class="roles-picker-menu"
@@ -1084,7 +1092,13 @@
                       data-role-picker-toggle
                       aria-expanded="false"
                     >
-                      Select roles
+                      <span data-role-picker-toggle-label>Select roles</span>
+                      <span
+                        class="roles-picker-toggle-icon"
+                        aria-hidden="true"
+                      >
+                        {{ template "icon-chevron-down" . }}
+                      </span>
                     </button>
                     <div class="roles-picker-menu" data-role-picker-menu hidden>
                       <input
@@ -1325,12 +1339,13 @@
 
     rolePickers.forEach((picker) => {
       const toggle = picker.querySelector("[data-role-picker-toggle]");
+      const toggleLabel = picker.querySelector("[data-role-picker-toggle-label]");
       const menu = picker.querySelector("[data-role-picker-menu]");
       const search = picker.querySelector("[data-role-picker-search]");
       const empty = picker.querySelector("[data-role-picker-empty]");
       const hiddenInputs = picker.querySelector("[data-role-picker-hidden-inputs]");
       const optionButtons = Array.from(picker.querySelectorAll("[data-role-picker-option]"));
-      if (!toggle || !menu || !hiddenInputs) {
+      if (!toggle || !toggleLabel || !menu || !hiddenInputs) {
         return;
       }
 
@@ -1358,7 +1373,7 @@
 
       const updateToggleLabel = () => {
         if (selected.size === 0) {
-          toggle.textContent = "Select roles";
+          toggleLabel.textContent = "Select roles";
           return;
         }
         if (selected.size === 1) {
@@ -1366,10 +1381,10 @@
             const value = button.getAttribute("data-value");
             return value && selected.has(value);
           });
-          toggle.textContent = selectedButton ? selectedButton.getAttribute("data-label") || "1 role selected" : "1 role selected";
+          toggleLabel.textContent = selectedButton ? selectedButton.getAttribute("data-label") || "1 role selected" : "1 role selected";
           return;
         }
-        toggle.textContent = [...selected].join(", ");
+        toggleLabel.textContent = [...selected].join(", ");
       };
 
       const updateOptionState = () => {
@@ -1405,7 +1420,7 @@
       };
 
       if (optionButtons.length === 0) {
-        toggle.textContent = "No roles available";
+        toggleLabel.textContent = "No roles available";
         toggle.disabled = true;
         menu.hidden = true;
         return;
