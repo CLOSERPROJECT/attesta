@@ -1,4 +1,3 @@
-
 # Closer demo (Gallium Recycling Notarization)
 
 Small end-to-end demo with Go + HTMX + SSE + MongoDB + Cerbos.
