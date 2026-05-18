@@ -685,9 +685,9 @@ button.secondary-small {
 
 .substep {
   border-radius: 4px;
-  border: 1px solid var(--border);
-  border-left: 6px solid;
-  background: var(--substep-bg);
+  border: 1px solid var(--substep-done-border);
+  border-left: 6px solid var(--substep-done-border);
+  background: var(--substep-done);
   cursor: pointer;
   transition: transform 300ms ease, opacity 300ms ease;
   min-width: 0;
