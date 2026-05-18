@@ -395,6 +395,7 @@ type ActionListView struct {
 	Action            *ActionView
 	Error             string
 	Timeline          []TimelineStep
+	HideStatus        bool
 	DPPURL            string
 	DPPGS1            string
 	Attachments       []ProcessDownloadAttachment
@@ -4626,6 +4627,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
 		"Preview only. Start an instance to submit data.",
 	)
+	preview.HideStatus = true
 
 	view := HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),

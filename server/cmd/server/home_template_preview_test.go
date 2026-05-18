@@ -22,6 +22,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			{ID: "process-1", Status: "active", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"},
 		},
 		Preview: ActionListView{
+			HideStatus: true,
 			Timeline: []TimelineStep{
 				{
 					StepID:   "1",
@@ -83,6 +84,12 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 
 	if strings.Contains(body, `/process//substep/1.1/complete`) {
 		t.Fatalf("did not expect preview to render a submit form action, got: %s", body)
+	}
+	if strings.Contains(body, `<span class="status">available</span>`) {
+		t.Fatalf("did not expect preview to render substep status, got: %s", body)
+	}
+	if strings.Contains(body, `class="substep substep-available"`) {
+		t.Fatalf("did not expect preview to render status-colored substep class, got: %s", body)
 	}
 }
 

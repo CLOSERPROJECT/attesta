@@ -162,7 +162,7 @@
         <ul class="timeline-substeps">
           {{ range .Substeps }}
             <li
-              class="substep substep-{{ .Status }}"
+              class="substep{{ if not $.HideStatus }} substep-{{ .Status }}{{ end }}"
               style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
             >
               <details
@@ -181,7 +181,9 @@
                       <div class="substep-title">
                         <span class="timeline-step-title">{{ .Title }}</span>
                       </div>
-                      <span class="status">{{ .Status }}</span>
+                      {{ if not $.HideStatus }}
+                        <span class="status">{{ .Status }}</span>
+                      {{ end }}
                     </div>
                     <div class="substep-summary-supporting">
                       {{ if eq .Status "done" }}
