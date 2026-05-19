@@ -821,7 +821,7 @@ func main() {
 
 	mux := server.newMux()
 
-	addr := ":3000"
+	addr := listenAddrFromEnv()
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
@@ -837,6 +837,21 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func listenAddrFromEnv() string {
+	addr := strings.TrimSpace(os.Getenv("ADDR"))
+	if addr != "" {
+		return addr
+	}
+	port := strings.TrimSpace(os.Getenv("PORT"))
+	if port == "" {
+		port = "3000"
+	}
+	if strings.HasPrefix(port, ":") {
+		return port
+	}
+	return ":" + port
 }
 
 func boolEnvOr(key string, fallback bool) bool {
@@ -2117,6 +2132,91 @@ func openAPIDocCandidates(filename string) []string {
 	}
 }
 
+func openAPIRequestOrigin(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	proto := firstForwardedHeaderValue(r.Header.Get("X-Forwarded-Proto"))
+	if proto == "" {
+		proto = forwardedHeaderParam(r.Header.Get("Forwarded"), "proto")
+	}
+	if proto == "" {
+		if r.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+	host := firstForwardedHeaderValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = forwardedHeaderParam(r.Header.Get("Forwarded"), "host")
+	}
+	if host == "" {
+		host = r.Host
+	}
+	proto = strings.ToLower(strings.TrimSpace(proto))
+	host = strings.TrimSpace(host)
+	if proto == "" || host == "" {
+		return ""
+	}
+	if proto != "http" && proto != "https" {
+		proto = "https"
+	}
+	return proto + "://" + host
+}
+
+func firstForwardedHeaderValue(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if idx := strings.Index(value, ","); idx >= 0 {
+		value = value[:idx]
+	}
+	return strings.TrimSpace(value)
+}
+
+func forwardedHeaderParam(value, key string) string {
+	value = firstForwardedHeaderValue(value)
+	if value == "" || key == "" {
+		return ""
+	}
+	for _, part := range strings.Split(value, ";") {
+		name, raw, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(name), key) {
+			continue
+		}
+		return strings.Trim(strings.TrimSpace(raw), `"`)
+	}
+	return ""
+}
+
+func rewriteOpenAPIServers(data []byte, filename, origin string) ([]byte, error) {
+	origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+	if origin == "" {
+		return data, nil
+	}
+	server := []map[string]string{{"url": origin}}
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".json":
+		var doc map[string]interface{}
+		if err := json.Unmarshal(data, &doc); err != nil {
+			return nil, err
+		}
+		doc["servers"] = server
+		return json.MarshalIndent(doc, "", "  ")
+	case ".yaml", ".yml":
+		var doc map[string]interface{}
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return nil, err
+		}
+		doc["servers"] = server
+		return yaml.Marshal(doc)
+	default:
+		return data, nil
+	}
+}
+
 func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filename, contentType string) {
 	var foundPath string
 	for _, candidate := range openAPIDocCandidates(filename) {
@@ -2129,8 +2229,18 @@ func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filena
 		http.Error(w, "OpenAPI spec not found. Run `task goa:generate`.", http.StatusNotFound)
 		return
 	}
+	data, err := os.ReadFile(foundPath)
+	if err != nil {
+		http.Error(w, "failed to read OpenAPI spec", http.StatusInternalServerError)
+		return
+	}
+	data, err = rewriteOpenAPIServers(data, filename, openAPIRequestOrigin(r))
+	if err != nil {
+		http.Error(w, "failed to render OpenAPI spec", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", contentType)
-	http.ServeFile(w, r, foundPath)
+	_, _ = w.Write(data)
 }
 
 func (s *Server) writeSessionCookie(w http.ResponseWriter, r *http.Request, session IdentitySession) error {
