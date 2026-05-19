@@ -163,40 +163,45 @@
               <ul class="process-list">
                 {{ range .Processes }}
                   <li class="process-item process-{{ .Status }}">
-                    <div class="process-head">
-                      <a href="{{ $.WorkflowPath }}/process/{{ .ID }}"
-                        >{{ .ID }}</a
-                      >
-                      <span
-                        class="status-tag status-tag-compact status-{{ .Status }}"
-                        >{{ .Status }}</span
-                      >
-                    </div>
-                    <div
-                      class="process-progress-line"
-                      role="progressbar"
-                      aria-valuemin="0"
-                      aria-valuemax="100"
-                      aria-valuenow="{{ .Percent }}"
+                    <a
+                      class="process-item-link"
+                      href="{{ $.WorkflowPath }}/process/{{ .ID }}"
                     >
+                      <div class="process-head">
+                        <span>{{ .ID }}</span>
+                        <span
+                          class="status-tag status-tag-compact status-{{ .Status }}"
+                          >{{ .Status }}</span
+                        >
+                      </div>
                       <div
-                        class="process-progress-fill"
-                        style="width: {{ .Percent }}%;"
-                      ></div>
-                    </div>
-                    <div class="process-meta">
-                      <span class="process-meta-primary"
-                        >{{ .DoneSubsteps }} / {{ .TotalSubsteps }} complete
-                        ({{ .Percent }}%)</span
+                        class="process-progress-line"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="{{ .Percent }}"
                       >
-                      <span>Created: {{ .CreatedAt }}</span>
-                      {{ if .LastNotarizedAt }}
-                        <span>Last notarized: {{ .LastNotarizedAt }}</span>
-                      {{ end }}
-                      {{ if .LastDigestShort }}
-                        <span class="pill">sha256 {{ .LastDigestShort }}</span>
-                      {{ end }}
-                    </div>
+                        <div
+                          class="process-progress-fill"
+                          style="width: {{ .Percent }}%;"
+                        ></div>
+                      </div>
+                      <div class="process-meta">
+                        <span class="process-meta-primary"
+                          >{{ .DoneSubsteps }} / {{ .TotalSubsteps }} complete
+                          ({{ .Percent }}%)</span
+                        >
+                        <span>Created: {{ .CreatedAt }}</span>
+                        {{ if .LastNotarizedAt }}
+                          <span>Last notarized: {{ .LastNotarizedAt }}</span>
+                        {{ end }}
+                        {{ if .LastDigestShort }}
+                          <span class="pill"
+                            >sha256 {{ .LastDigestShort }}</span
+                          >
+                        {{ end }}
+                      </div>
+                    </a>
                   </li>
                 {{ end }}
               </ul>
