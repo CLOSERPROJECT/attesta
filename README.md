@@ -1,215 +1,266 @@
-# Closer demo (Gallium Recycling Notarization)
+<div align="center">
 
-Small end-to-end demo with Go + HTMX + SSE + MongoDB + Cerbos.
+<img
+    src="https://raw.githubusercontent.com/CLOSERPROJECT/attesta/refs/heads/master/web/public/favicon.png"
+    alt="Attesta logo"
+    height="90"/>
 
-## Requirements
+# Attesta <!-- omit in toc -->
 
-You can run the project in one of two ways:
-### Manual toolchain
+## Authenticated, role-gated stream traceability with evidence capture, policy checks, and Digital Product Passport publishing. <!-- omit in toc -->
+
+</div>
+
+<br>
+
+Attesta turns regulated, multi-party streams into verifiable digital records.
+Each organization sees the actions it is allowed to complete, submits structured
+data or file evidence, and follows a live timeline from intake to final
+notarization.
+
+It is built for traceability demos where accountability matters: policy checks
+enforce roles and step order, MongoDB stores process state and attachments,
+Appwrite manages organizations and users, and completed streams can publish a
+GS1 Digital Link / Digital Product Passport for external verification.
+
+- 🔐 Appwrite-backed sessions, organizations, roles, invites, and user labels.
+- 🧾 YAML or Formata Builder streams.
+- 🛡️ Cerbos authorization for role and sequence-gated actions.
+- 📎 MongoDB and GridFS storage for evidence and attachments.
+- ⚡ HTMX pages with SSE updates for live process views.
+- 🪪 Optional DPP landing pages and JSON exports under `/01/...`.
+- 📡 OpenAPI documentation served at `/docs`.
+
+<br>
+
+---
+
+<div id="toc">
+
+## 🚩 Table of Contents <!-- omit in toc -->
+
+- [🧱 Stack](#-stack)
+- [✅ Requirements](#-requirements)
+- [⚡ Quick Start](#-quick-start)
+- [⚙️ Configuration](#️-configuration)
+- [🪪 Digital Product Passport](#-digital-product-passport)
+- [🗂️ Project Layout](#️-project-layout)
+- [🚢 Deployment Notes](#-deployment-notes)
+- [💼 License](#-license)
+- [💶 Funding](#-funding)
+- [📖 More Documentation](#-more-documentation)
+
+</div>
+
+## 🧱 Stack
+
+- Go 1.25+, `net/http`, `html/template`
+- MongoDB 7 and GridFS
+- Appwrite for accounts, sessions, teams, memberships, labels, and org assets
+- Cerbos PDP for authorization
+- Vite, JavaScript, CSS, HTMX, SSE
+- Docker Compose for local infrastructure
+
+**[🔝 back to top](#toc)**
+
+---
+
+## ✅ Requirements
+
+Use either the manual toolchain:
+
 - Go 1.25+
-- Node.js 18+ (with npm)
+- Node.js 18+ with npm
 - [Task](https://taskfile.dev)
-- Docker + Docker Compose
+- Docker and Docker Compose
 
-### Using mise (recommended)
-- [mise](https://mise.jdx.dev/installing-mise.html)
-- Docker + Docker Compose
-
-## Quick start
-
-You can run the project in one of two ways:
-Make sure you have installed **either**:
-- The full manual toolchain (Go, Node, Task, Docker), or
-- mise + Docker
-
-If you are using the manual toolchain, skip the `mise` commands below.
+Or use [mise](https://mise.jdx.dev/installing-mise.html) plus Docker:
 
 ```bash
-# Clone the repository
-git clone https://github.com/CLOSERPROJECT/attesta
-cd attesta
-
-# If using mise:
 mise trust
 mise install
+```
 
-# create .env
+**[🔝 back to top](#toc)**
+
+---
+
+## ⚡ Quick Start
+
+Clone the repo and create local environment settings:
+
+```bash
+git clone https://github.com/CLOSERPROJECT/attesta
+cd attesta
 cp .env.example .env
+```
 
-# Start the backend services
+Start local infrastructure:
+
+```bash
 task start
 ```
 
-Now visit http://localhost/console/register and create the admin account, once logged in:
-* Create a new project and copy the project id inside the .env (APPWRITE_PROJECT_ID)
-* Create a new API key with Auth permission (all) and Storage permissions (files.read and files,write) and copy it inside the .env (APPWRITE_API_KEY)
-* Visit storage page and create a new bucket with **Bucket ID** `org-assets`
+Bootstrap Appwrite:
 
-Now beck to the terminal run:
+1. Open `http://localhost/console/register`.
+2. Create the first Appwrite console account.
+3. Create an Appwrite project.
+4. Copy the project ID into `.env` as `APPWRITE_PROJECT_ID`.
+5. Create an API key with Auth permissions and Storage file read/write permissions.
+6. Copy the API key into `.env` as `APPWRITE_API_KEY`.
+7. Create a storage bucket with bucket ID `org-assets`.
+
+Run the app in development mode:
 
 ```bash
 task dev
 ```
 
-Open http://localhost:3000 to your local running attesta software.
+Open:
 
-## Add new streams
+- Attesta: `http://localhost:3000`
+- API docs: `http://localhost:3000/docs`
+- Appwrite Console: `http://localhost`
+- Mailpit: `http://localhost:8025`
 
-1. Create a stream using the Attesta Stream Composer: https://closerproject.github.io/formata-arch/#/
-2. Click **Export** to download the YAML file.
-3. Copy the file into: `./server/config/`
-4. Give it a unique name.
+To run the backend on another port:
 
-Attesta reads this folder live — no restart required.
-Your new stream will appear immediately on: http://localhost:3000
-
-## What it does
-- Seeds a workflow definition on first run.
-- Starts a process instance with sequential substeps.
-- Uses authenticated users with session cookies.
-- Cerbos enforces role + sequence gating.
-- Mongo stores process progress + notarizations.
-- SSE broadcasts realtime updates to timelines.
-
-## Curl examples
-Start a process in a selected workflow (`workflow`):
 ```bash
-curl -X POST http://localhost:3000/w/workflow/process/start -i
+PORT=3001 task dev
 ```
 
-Login and capture the session cookie:
-```bash
-curl -X POST http://localhost:3000/login \
-  -d 'email=admin@example.com' -d 'password=change-me' -i
-```
+**[🔝 back to top](#toc)**
 
-Complete substep 1.1 (dep1):
-```bash
-curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/1.1/complete \
-  -H 'Cookie: attesta_session=SESSION_ID' \
-  -d 'value=10&activeRole=dep1'
-```
+---
 
-Attempt out-of-sequence (should fail):
-```bash
-curl -X POST http://localhost:3000/w/workflow/process/PROCESS_ID/substep/2.1/complete \
-  -H 'Cookie: attesta_session=SESSION_ID' \
-  -d 'value=5&activeRole=dep2'
-```
+## ⚙️ Configuration
 
-## Notes
-- Cerbos PDP is expected at `http://localhost:3592`.
-- MongoDB is expected at `mongodb://localhost:27017`.
-- Timeline updates pull `/w/:workflow/process/:id/timeline` when SSE events arrive.
-- Existing processes without `workflowKey` remain visible under the default `workflow` key and are backfilled on first update.
+Common environment variables:
 
-## Deployment Checklist
-1. Set Attesta auth env vars:
-   - `ANYONE_CAN_CREATE_ACCOUNT` (recommended `false` in production)
-   - `SESSION_TTL_DAYS`
-   - `COOKIE_SECURE=true` behind HTTPS
-2. Set Attesta Appwrite env vars:
-   - `APPWRITE_ENDPOINT`
-   - `APPWRITE_PROJECT_ID`
-   - `APPWRITE_API_KEY`
-   - `APPWRITE_INVITE_REDIRECT_URL`
-   - `APPWRITE_RESET_REDIRECT_URL`
-   - `APPWRITE_ORG_ASSETS_BUCKET`
-3. Start services and verify Mongo + Cerbos health.
-4. Bootstrap Appwrite from the Console:
-   - create the first console account
-   - create the Attesta project
-   - create the Attesta API key
-   - create the org assets storage bucket
-5. Create organizations and first org-admin memberships in Appwrite, then manage roles and users from Attesta `/org-admin/*`.
-6. Ensure workflow YAML org/role slugs match Appwrite teams and role catalogs.
-7. Keep DPP route `/01/...` public only if intended; keep authenticated downloads protected unless explicitly opened.
+- `PORT` or `ADDR` - backend listen address, default `:3000`
+- `MONGODB_URI` - default `mongodb://localhost:27017`
+- `CERBOS_URL` - default `http://localhost:3592`
+- `APPWRITE_ENDPOINT` - default `http://appwrite/v1`
+- `APPWRITE_PROJECT_ID`
+- `APPWRITE_API_KEY`
+- `APPWRITE_INVITE_REDIRECT_URL`
+- `APPWRITE_RESET_REDIRECT_URL`
+- `APPWRITE_ORG_ASSETS_BUCKET` - default `org-assets`
+- `WORKFLOW_CONFIG` - default `config/workflow.yaml`
+- `ATTACHMENT_MAX_BYTES` - default 25 MiB
+- `ANYONE_CAN_CREATE_ACCOUNT`
+- `SESSION_TTL_DAYS`
+- `COOKIE_SECURE`
 
-## Appwrite Cutover
-Migration prerequisites:
-1. Provision the Appwrite project, platform entries, email templates, and the `org-assets` storage bucket.
-2. Export Mongo organizations, roles, and active users into Appwrite teams, team prefs, memberships, and labels.
-3. Manually bootstrap the first org-admin owner for each Appwrite team from the Appwrite Console.
-4. Deploy Attesta with `APPWRITE_*` env vars configured and the internal `/admin/orgs` flow removed.
-5. Invalidate old Mongo-backed sessions so users authenticate again through Appwrite.
-6. Expire old pending invite and password-reset tokens and re-issue them through Appwrite.
+See `.env.example` for local defaults.
 
-Rollback note:
-- Rollback is only application-safe before Attesta starts writing auth and org mutations into Appwrite.
-- After cutover, rolling back Attesta code does not restore Mongo as the source of truth for users, invites, or memberships.
+**[🔝 back to top](#toc)**
 
-Staging rehearsal:
-1. invited user acceptance
-2. self-signup when enabled
-3. org creation by an unassigned user
-4. org-admin invite from Attesta
-5. role edit and user removal
+---
 
-## Org admin edge cases
-- `Delete user` removes the Appwrite team membership and clears Attesta role labels, but does not delete the global Appwrite account.
-- Invite status is derived from Appwrite memberships:
-  - `accepted` when the membership is active
-  - `expired` when the membership is no longer usable before acceptance
-  - `pending` otherwise
-- Inviting an email that already belongs to another organization is rejected.
+## 🪪 Digital Product Passport
 
-## DPP Digital Link configuration
-Configure GS1 Digital Link generation per workflow YAML (`server/config/*.yaml`):
+DPP generation is configured per stream:
 
 ```yaml
 dpp:
   enabled: true
   gtin: "09506000134352"
   lotInputKey: "batchId"
-  lotDefault: "defaultProduct"
-  serialInputKey: "serialCode"
+  lotDefault: ""
+  serialInputKey: ""
   serialStrategy: "process_id_hex"
 ```
 
-- Generated links follow `/01/{GTIN}/10/{LOT}/21/{SERIAL}` and resolve to a public DPP page.
-- DPP identifiers are generated only when a process first reaches `done`.
-- Default rollout behavior is minimal: already-completed processes are not automatically backfilled.
-- Recommended backfill approach: add a small admin-only CLI/endpoint that scans `status=done` + missing `dpp`, computes identifiers, and updates `process.dpp`.
+When a process first reaches `done`, Attesta stores stable DPP identifiers on
+the process and exposes a public Digital Link page:
 
-## File inputs
-```yaml
-inputKey: "Gallium certification"
-inputType: "file"
-```
-- File steps use multipart upload from backoffice and expose a process/substep download URL.
-- Upload size is controlled by `ATTACHMENT_MAX_BYTES` (default `26214400`, i.e. 25 MiB).
-- Files are stored in Mongo GridFS bucket `attachments` (`attachments.files` + `attachments.chunks`).
-
-## Tests
-Unit tests:
-```bash
-task test
-# or: cd server && go test ./...
+```text
+/01/{GTIN}/10/{LOT}/21/{SERIAL}
 ```
 
-Coverage with 90% unit-test gate:
-```bash
-task cover
-# or: cd server && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out
+Use `Accept: application/json` or `?format=json` to retrieve the JSON export.
+
+**[🔝 back to top](#toc)**
+
+---
+
+## 🗂️ Project Layout
+
+```text
+server/       Go server, templates, generated API docs, stream config
+web/          Vite frontend bundle source and build output
+cerbos/       Cerbos config and policies
+deployment/   Dockerfiles and Docker Compose files
+Taskfile.yml  Common local development commands
 ```
-`task cover` only runs the unit suite (`go test ./...`) and enforces `>= 90.0%` total coverage.
 
-Optional integration test command (Docker-backed):
-```bash
-docker compose -f deployment/docker-compose.local.yaml up -d
-cd server
-go test -tags=integration ./...
+**[🔝 back to top](#toc)**
+
+---
+
+## 🚢 Deployment Notes
+
+Before deploying:
+
+1. Set Appwrite project, API key, invite URL, reset URL, and org assets bucket.
+2. Set `COOKIE_SECURE=true` behind HTTPS.
+3. Keep `ANYONE_CAN_CREATE_ACCOUNT=false` unless public signup is intended.
+4. Verify MongoDB and Cerbos connectivity.
+5. Bootstrap initial organizations and org-admin users in Appwrite.
+6. Confirm stream YAML organization and role slugs match Appwrite state.
+7. Decide whether public DPP Digital Link routes should be exposed.
+
+Docker and Coolify details live in [DOCKER.md](DOCKER.md).
+
+**[🔝 back to top](#toc)**
+
+---
+
+## 💼 License
+
+```
+Attesta
+Copyright 2025-2026 Forkbomb bv (forkbomb.eu), The Forkbomb Company.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ```
 
-## License
-© 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company.
+**[🔝 back to top](#toc)**
 
-Licensed under the GNU AGPLv3 (see `LICENSE`).
+---
 
-## Funding
-CLOSER (Circular raw materiaLs for european Open Strategic autonomy on chips and microElectronics pRoduction, Project No. 101161109) is funded by the European Union under the Interregional Innovation Investments (I3) Instrument of the European Regional Development Fund, managed by the European Innovation Council and SMEs Executive Agency (EISMEA).
+## 💶 Funding
 
-This repository/website is part of the CLOSER project and has received funding from the European Union. Views and opinions expressed are those of the author(s) only and do not necessarily reflect those of the European Union or EISMEA. Neither the European Union nor the granting authority can be held responsible for them.
+CLOSER (Circular raw materiaLs for european Open Strategic autonomy on chips and
+microElectronics pRoduction, Project No. 101161109) is funded by the European
+Union under the Interregional Innovation Investments (I3) Instrument of the
+European Regional Development Fund, managed by the European Innovation Council
+and SMEs Executive Agency (EISMEA).
 
-## Troubleshooting
-- `open Dockerfile.local`: you’re on an old checkout — `deployment/Dockerfile.local` is required by `deployment/docker-compose.local.yaml`.
+This repository is part of the CLOSER project and has received funding from the
+European Union. Views and opinions expressed are those of the author(s) only and
+do not necessarily reflect those of the European Union or EISMEA. Neither the
+European Union nor the granting authority can be held responsible for them.
+
+**[🔝 back to top](#toc)**
+
+---
+
+## 📖 More Documentation
+
+- [QUICKSTART.md](QUICKSTART.md) - step-by-step local setup.
+- [DOCKER.md](DOCKER.md) - Docker Compose, Coolify, and preview deployment notes.
+- [Taskfile.yml](Taskfile.yml) - available local commands.
