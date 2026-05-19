@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/cookiejar"
@@ -20,6 +22,8 @@ import (
 	"github.com/appwrite/sdk-for-go/teams"
 	"github.com/appwrite/sdk-for-go/users"
 )
+
+const appwriteTeamIDMaxLen = 36
 
 type appwriteTeamPrefs struct {
 	SchemaVersion int            `json:"schemaVersion,omitempty"`
@@ -470,13 +474,15 @@ func (a *appwriteIdentity) GetOrganizationBySlug(ctx context.Context, slug strin
 	if slug == "" {
 		return nil, ErrIdentityNotFound
 	}
-	team, err := teams.New(a.adminClient).Get(slug)
-	if err == nil {
-		org := decodeIdentityOrg(team)
-		return &org, nil
-	}
-	if !errors.Is(normalizeIdentityError(err), ErrIdentityNotFound) {
-		return nil, normalizeIdentityError(err)
+	if len(slug) <= appwriteTeamIDMaxLen {
+		team, err := teams.New(a.adminClient).Get(slug)
+		if err == nil {
+			org := decodeIdentityOrg(team)
+			return &org, nil
+		}
+		if !errors.Is(normalizeIdentityError(err), ErrIdentityNotFound) {
+			return nil, normalizeIdentityError(err)
+		}
 	}
 	orgs, listErr := a.ListOrganizations(ctx)
 	if listErr != nil {
@@ -656,7 +662,8 @@ func (a *appwriteIdentity) GetOrganizationLogo(ctx context.Context, fileID strin
 func (a *appwriteIdentity) createOrganizationWithClient(ctx context.Context, client appwriteclient.Client, name string) (IdentityOrg, error) {
 	name = strings.TrimSpace(name)
 	slug := canonifySlug(name)
-	team, err := teams.New(client).Create(slug, name)
+	teamID := appwriteTeamIDFromSlug(slug)
+	team, err := teams.New(client).Create(teamID, name)
 	if err != nil {
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}
@@ -666,6 +673,21 @@ func (a *appwriteIdentity) createOrganizationWithClient(ctx context.Context, cli
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}
 	return decodeIdentityOrgFromTeam(team.Id, team.Name, encodeIdentityOrgPrefs(org)), nil
+}
+
+func appwriteTeamIDFromSlug(slug string) string {
+	slug = canonifySlug(slug)
+	if len(slug) <= appwriteTeamIDMaxLen {
+		return slug
+	}
+	sum := sha1.Sum([]byte(slug))
+	hash := hex.EncodeToString(sum[:])[:8]
+	prefixLen := appwriteTeamIDMaxLen - len(hash) - 1
+	prefix := strings.Trim(slug[:prefixLen], "-")
+	if prefix == "" {
+		prefix = "org"
+	}
+	return prefix + "-" + hash
 }
 
 func (a *appwriteIdentity) updateOrganizationWithClient(ctx context.Context, client appwriteclient.Client, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error) {

@@ -421,6 +421,103 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityCreateOrganizationShortensLongTeamID(t *testing.T) {
+	longName := "Very Long Organization Name That Exceeds Appwrite Team ID Limit"
+	fullSlug := canonifySlug(longName)
+	shortTeamID := appwriteTeamIDFromSlug(fullSlug)
+	var createTeamBody map[string]interface{}
+	var updatePrefsBody map[string]interface{}
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/teams":
+			if err := json.NewDecoder(r.Body).Decode(&createTeamBody); err != nil {
+				t.Fatalf("decode create team: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"` + shortTeamID + `","name":"` + longName + `"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/"+shortTeamID+"/prefs":
+			if err := json.NewDecoder(r.Body).Decode(&updatePrefsBody); err != nil {
+				t.Fatalf("decode update prefs: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"` + shortTeamID + `","name":"` + longName + `"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	createdOrg, err := identity.CreateOrganizationAsAdmin(context.Background(), longName)
+	if err != nil {
+		t.Fatalf("CreateOrganizationAsAdmin error: %v", err)
+	}
+	if len(shortTeamID) > appwriteTeamIDMaxLen {
+		t.Fatalf("shortTeamID length = %d, want <= %d", len(shortTeamID), appwriteTeamIDMaxLen)
+	}
+	if createTeamBody["teamId"] != shortTeamID || createTeamBody["name"] != longName {
+		t.Fatalf("create team body = %#v", createTeamBody)
+	}
+	prefs, _ := updatePrefsBody["prefs"].(map[string]interface{})
+	if prefs["slug"] != fullSlug {
+		t.Fatalf("prefs slug = %#v, want %q", prefs["slug"], fullSlug)
+	}
+	if createdOrg.ID != shortTeamID || createdOrg.Slug != fullSlug || createdOrg.Name != longName {
+		t.Fatalf("created org = %#v", createdOrg)
+	}
+}
+
+func TestAppwriteIdentityUpdateOrganizationFindsLongSlugByPrefs(t *testing.T) {
+	currentName := "Current Long Organization Name Above Appwrite Team ID Limit"
+	currentSlug := canonifySlug(currentName)
+	teamID := appwriteTeamIDFromSlug(currentSlug)
+	newName := "Renamed Long Organization Name Above Appwrite Team ID Limit"
+	newSlug := canonifySlug(newName)
+	var updateNameBody map[string]interface{}
+	var updatePrefsBody map[string]interface{}
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams":
+			_, _ = w.Write([]byte(`{"total":1,"teams":[{"$id":"` + teamID + `","name":"` + currentName + `","prefs":{"schemaVersion":1,"slug":"` + currentSlug + `"}}]}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/"+teamID:
+			if err := json.NewDecoder(r.Body).Decode(&updateNameBody); err != nil {
+				t.Fatalf("decode update name: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"` + teamID + `","name":"` + newName + `"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/teams/"+teamID+"/prefs":
+			if err := json.NewDecoder(r.Body).Decode(&updatePrefsBody); err != nil {
+				t.Fatalf("decode update prefs: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"` + teamID + `","name":"` + newName + `"}`))
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/teams/"):
+			t.Fatalf("unexpected direct team lookup for long slug: %s", r.URL.Path)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	updatedOrg, err := identity.UpdateOrganizationAsAdmin(context.Background(), currentSlug, newName, "", nil)
+	if err != nil {
+		t.Fatalf("UpdateOrganizationAsAdmin error: %v", err)
+	}
+	if updateNameBody["name"] != newName {
+		t.Fatalf("update name body = %#v", updateNameBody)
+	}
+	prefs, _ := updatePrefsBody["prefs"].(map[string]interface{})
+	if prefs["slug"] != newSlug {
+		t.Fatalf("prefs slug = %#v, want %q", prefs["slug"], newSlug)
+	}
+	if updatedOrg.ID != teamID || updatedOrg.Slug != newSlug || updatedOrg.Name != newName {
+		t.Fatalf("updated org = %#v", updatedOrg)
+	}
+}
+
 func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	var inviteSessionHeader string
 	var inviteKeyHeader string
