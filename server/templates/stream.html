@@ -64,16 +64,56 @@
               <h2>Stream instances</h2>
               <p>View and manage all instances of this stream.</p>
             </div>
-            <form method="post" action="{{ .WorkflowPath }}/process/start">
-              <button
-                class="primary"
-                type="submit"
-                {{ if .Error }}disabled{{ end }}
-              >
-                {{ template "icon-play" . }}
-                New instance
-              </button>
-            </form>
+            <button
+              class="primary"
+              type="button"
+              onclick="document.getElementById('new-instance-dialog').showModal()"
+              {{ if .Error }}disabled{{ end }}
+            >
+              {{ template "icon-play" . }}
+              New instance
+            </button>
+            <dialog id="new-instance-dialog" class="manage-dialog">
+              <div class="manage-dialog-card">
+                <header class="manage-dialog-head">
+                  <div>
+                    <h3 class="manage-dialog-title">New instance</h3>
+                    <p class="manage-dialog-subtitle">
+                      Give this stream instance a brief name.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="secondary secondary-small"
+                    onclick="document.getElementById('new-instance-dialog').close()"
+                  >
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+                <form
+                  method="post"
+                  action="{{ .WorkflowPath }}/process/start"
+                  class="input-form"
+                >
+                  <div class="form-field">
+                    <label for="instance-name">Instance name</label>
+                    <input
+                      id="instance-name"
+                      name="name"
+                      type="text"
+                      maxlength="80"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="manage-dialog-actions manage-dialog-actions-end">
+                    <button class="primary" type="submit">
+                      {{ template "icon-play" . }}
+                      Start instance
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
           </div>
           <hr style="margin-bottom: 20px;" />
           {{ if .Error }}
@@ -168,7 +208,12 @@
                       href="{{ $.WorkflowPath }}/process/{{ .ID }}"
                     >
                       <div class="process-head">
-                        <span>{{ .ID }}</span>
+                        <span class="process-title">
+                          {{ if .Name }}
+                            <span class="process-name">{{ .Name }}</span>
+                          {{ end }}
+                          <span class="process-id">{{ .ID }}</span>
+                        </span>
                         <span
                           class="status-tag status-tag-compact status-{{ .Status }}"
                           >{{ .Status }}</span

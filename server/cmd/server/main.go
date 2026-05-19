@@ -66,6 +66,7 @@ type Process struct {
 	ID            primitive.ObjectID     `bson:"_id,omitempty"`
 	WorkflowDefID primitive.ObjectID     `bson:"workflowDefId"`
 	WorkflowKey   string                 `bson:"workflowKey,omitempty"`
+	Name          string                 `bson:"name,omitempty"`
 	CreatedAt     time.Time              `bson:"createdAt"`
 	CreatedBy     string                 `bson:"createdBy"`
 	Status        string                 `bson:"status"`
@@ -403,6 +404,7 @@ type ActionListView struct {
 
 type ProcessListItem struct {
 	ID              string
+	Name            string
 	Status          string
 	CreatedAt       string
 	CreatedAtTime   time.Time
@@ -615,11 +617,12 @@ func (e *WorkflowRefValidationError) Error() string {
 
 type ProcessPageView struct {
 	PageBase
-	ProcessID   string
-	ActionList  ActionListView
-	DPPURL      string
-	DPPGS1      string
-	Attachments []ProcessDownloadAttachment
+	ProcessID    string
+	InstanceName string
+	ActionList   ActionListView
+	DPPURL       string
+	DPPGS1       string
+	Attachments  []ProcessDownloadAttachment
 }
 
 type ProcessDownloadAttachment struct {
@@ -4697,6 +4700,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		}
 		item := ProcessListItem{
 			ID:              process.ID.Hex(),
+			Name:            strings.TrimSpace(process.Name),
 			Status:          status,
 			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtTime:   process.CreatedAt,
@@ -4774,6 +4778,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	process := Process{
 		WorkflowDefID: s.workflowDefID,
 		WorkflowKey:   workflowKey,
+		Name:          normalizeProcessName(r.FormValue("name")),
 		CreatedAt:     s.nowUTC(),
 		CreatedBy:     "demo",
 		Status:        "active",
@@ -4793,6 +4798,20 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
 	http.Redirect(w, r, fmt.Sprintf("%s/process/%s", workflowPath(workflowKey), id.Hex()), http.StatusSeeOther)
+}
+
+const maxProcessNameRunes = 80
+
+func normalizeProcessName(input string) string {
+	name := strings.Join(strings.Fields(input), " ")
+	if name == "" {
+		return ""
+	}
+	runes := []rune(name)
+	if len(runes) > maxProcessNameRunes {
+		return string(runes[:maxProcessNameRunes])
+	}
+	return name
 }
 
 func (s *Server) defaultWorkflowKey() string {
@@ -4965,16 +4984,19 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
 	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
 	processID := ""
+	instanceName := ""
 	if process != nil {
 		processID = process.ID.Hex()
+		instanceName = strings.TrimSpace(process.Name)
 	}
 	return ProcessPageView{
-		PageBase:    pageBase,
-		ProcessID:   processID,
-		ActionList:  actionList,
-		DPPURL:      actionList.DPPURL,
-		DPPGS1:      actionList.DPPGS1,
-		Attachments: actionList.Attachments,
+		PageBase:     pageBase,
+		ProcessID:    processID,
+		InstanceName: instanceName,
+		ActionList:   actionList,
+		DPPURL:       actionList.DPPURL,
+		DPPGS1:       actionList.DPPGS1,
+		Attachments:  actionList.Attachments,
 	}
 }
 

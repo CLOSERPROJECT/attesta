@@ -1553,6 +1553,31 @@ button.secondary-small {
   font-size: 13px;
 }
 
+.process-title,
+.process-page-title {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.process-name {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.process-id {
+  font-family: Source Code Pro, monospace;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.process-title .process-id {
+  font-size: 12px;
+}
+
 .process-toolbar {
   display: flex;
   justify-content: flex-end;

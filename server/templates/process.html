@@ -27,7 +27,12 @@
       </button>
       <div class="hero-body">
         <h1>{{ .WorkflowName }}</h1>
-        <p>{{ .ProcessID }}</p>
+        <p class="process-page-title">
+          {{ if .InstanceName }}
+            <span class="process-name">{{ .InstanceName }}</span>
+          {{ end }}
+          <span class="process-id">{{ .ProcessID }}</span>
+        </p>
       </div>
     </section>
     {{ if .ActionList.ProcessDone }}
