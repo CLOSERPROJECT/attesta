@@ -22,6 +22,7 @@ func TestHandleHomeListsProcesses(t *testing.T) {
 	active := Process{
 		ID:          activeID,
 		WorkflowKey: "workflow",
+		Name:        "Pilot batch",
 		CreatedAt:   now.Add(-2 * time.Hour),
 		Status:      "",
 		Progress: map[string]ProcessStep{
@@ -84,10 +85,10 @@ func TestHandleHomeListsProcesses(t *testing.T) {
 	if !strings.Contains(body, "PROC 2 SORT time_desc FILTER all") {
 		t.Fatalf("expected processes count and default controls, got %q", body)
 	}
-	if !strings.Contains(body, activeID.Hex()+":available:28") {
-		t.Fatalf("expected available process stats, got %q", body)
+	if !strings.Contains(body, activeID.Hex()+":Pilot batch:available:28") {
+		t.Fatalf("expected process name in process list item, got %q", body)
 	}
-	if !strings.Contains(body, doneID.Hex()+":done:100") {
+	if !strings.Contains(body, doneID.Hex()+"::done:100") {
 		t.Fatalf("expected done process stats, got %q", body)
 	}
 	if !strings.Contains(body, "SORT time_desc") {
@@ -155,10 +156,10 @@ func TestHandleHomeFiltersProcessesByStatus(t *testing.T) {
 	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER done") {
 		t.Fatalf("expected done filter selection, got %q", body)
 	}
-	if !strings.Contains(body, doneID.Hex()+":done:100") {
+	if !strings.Contains(body, doneID.Hex()+"::done:100") {
 		t.Fatalf("expected done process in filtered list, got %q", body)
 	}
-	if strings.Contains(body, activeID.Hex()+":active") {
+	if strings.Contains(body, activeID.Hex()+"::active") {
 		t.Fatalf("did not expect active process in done filter, got %q", body)
 	}
 }
@@ -209,7 +210,7 @@ func TestHandleHomePaginatesProcesses(t *testing.T) {
 	if !strings.Contains(body, "PROC 1 SORT time_desc FILTER all PAGE 2/2") {
 		t.Fatalf("expected second page with one process, got %q", body)
 	}
-	if !strings.Contains(body, expectedPageTwoID+":available") {
+	if !strings.Contains(body, expectedPageTwoID+"::available") {
 		t.Fatalf("expected last process on page 2, got %q", body)
 	}
 }
@@ -515,7 +516,7 @@ func TestHandleWorkflowHomeMarksProcessesWithMyTurn(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, processID.Hex()+":available:0|") {
+	if !strings.Contains(body, processID.Hex()+"::available:0|") {
 		t.Fatalf("expected process to surface available status, got %q", body)
 	}
 }
@@ -1187,7 +1188,7 @@ func homeTestTemplates() *template.Template {
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
 PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} PAGE {{.CurrentPage}}/{{.TotalPages}} DESC {{.WorkflowDescription}}
-PROCESSES {{range .Processes}}{{.ID}}:{{.Status}}:{{.Percent}}|{{end}}
+PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}
 {{end}}
 {{define "stream.html"}}{{template "layout.html" .}}{{end}}
 `))

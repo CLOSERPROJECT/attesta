@@ -77,6 +77,38 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 	}
 }
 
+func TestHandleStartProcessStoresInstanceName(t *testing.T) {
+	store := NewMemoryStore()
+	server := &Server{
+		store:         store,
+		sse:           newSSEHub(),
+		now:           func() time.Time { return time.Date(2026, 2, 2, 13, 0, 0, 0, time.UTC) },
+		workflowDefID: primitive.NewObjectID(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/process/start", strings.NewReader("name=+Pilot++batch++42+"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	server.handleStartProcess(rr, req)
+
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, rr.Code)
+	}
+	processes, err := store.ListRecentProcessesByWorkflow(t.Context(), "workflow", 10)
+	if err != nil {
+		t.Fatalf("list processes: %v", err)
+	}
+	if len(processes) != 1 {
+		t.Fatalf("expected one process, got %d", len(processes))
+	}
+	if processes[0].Name != "Pilot batch 42" {
+		t.Fatalf("process name = %q, want %q", processes[0].Name, "Pilot batch 42")
+	}
+}
+
 func TestMemoryStoreAttachmentRoundTrip(t *testing.T) {
 	store := NewMemoryStore()
 	processID := primitive.NewObjectID()

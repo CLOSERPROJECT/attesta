@@ -18,7 +18,8 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 			WorkflowName: "Main Workflow",
 			WorkflowPath: "/w/workflow",
 		},
-		ProcessID: "process-1",
+		ProcessID:    "process-1",
+		InstanceName: "Pilot batch",
 		ActionList: ActionListView{
 			WorkflowKey: "workflow",
 			ProcessID:   "process-1",
@@ -65,6 +66,9 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 	if !strings.Contains(body, `id="process-page"`) || !strings.Contains(body, `id="process-page-content"`) {
 		t.Fatalf("expected process page wrapper and content target, got: %s", body)
+	}
+	if !strings.Contains(body, `Pilot batch`) || !strings.Contains(body, `process-1`) {
+		t.Fatalf("expected instance name and process id, got: %s", body)
 	}
 	if !strings.Contains(body, `class="substep-accordion js-process-substep-panel"`) {
 		t.Fatalf("expected process accordion substep panel, got: %s", body)

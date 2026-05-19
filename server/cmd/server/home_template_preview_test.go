@@ -19,7 +19,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		},
 		WorkflowDescription: "Previewable workflow",
 		Processes: []ProcessListItem{
-			{ID: "process-1", Status: "active", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"},
+			{ID: "process-1", Name: "Pilot batch", Status: "active", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"},
 		},
 		Preview: ActionListView{
 			HideStatus: true,
@@ -63,6 +63,9 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		`data-home-nav="preview"`,
 		`id="home-panel-instances"`,
 		`id="home-panel-preview"`,
+		`id="new-instance-dialog"`,
+		`name="name"`,
+		`Pilot batch`,
 		`data-home-root`,
 		`data-formata-disabled="true"`,
 		`Preview only. Start an instance to submit data.`,
