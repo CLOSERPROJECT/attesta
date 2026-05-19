@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -93,6 +94,146 @@ func TestOpenAPIDocCandidates(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("candidate[%d] = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func TestOpenAPIRequestOriginUsesForwardedHeaders(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://internal:3000/docs/openapi3.json", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-Host", "attesta.example.com")
+
+	if got := openAPIRequestOrigin(req); got != "https://attesta.example.com" {
+		t.Fatalf("origin = %q, want %q", got, "https://attesta.example.com")
+	}
+}
+
+func TestOpenAPIRequestOriginFallbacks(t *testing.T) {
+	t.Run("forwarded header", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://internal:3000/docs/openapi3.json", nil)
+		req.Header.Set("Forwarded", `for=192.0.2.1;proto=https;host="attesta.example.com"`)
+
+		if got := openAPIRequestOrigin(req); got != "https://attesta.example.com" {
+			t.Fatalf("origin = %q, want %q", got, "https://attesta.example.com")
+		}
+	})
+
+	t.Run("request host", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://localhost:3001/docs/openapi3.json", nil)
+
+		if got := openAPIRequestOrigin(req); got != "http://localhost:3001" {
+			t.Fatalf("origin = %q, want %q", got, "http://localhost:3001")
+		}
+	})
+
+	t.Run("invalid proto falls back to https", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://internal:3000/docs/openapi3.json", nil)
+		req.Header.Set("X-Forwarded-Proto", "ftp")
+		req.Header.Set("X-Forwarded-Host", "attesta.example.com")
+
+		if got := openAPIRequestOrigin(req); got != "https://attesta.example.com" {
+			t.Fatalf("origin = %q, want %q", got, "https://attesta.example.com")
+		}
+	})
+}
+
+func TestListenAddrFromEnv(t *testing.T) {
+	t.Setenv("ADDR", "")
+	t.Setenv("PORT", "3001")
+	if got := listenAddrFromEnv(); got != ":3001" {
+		t.Fatalf("listenAddrFromEnv() = %q, want %q", got, ":3001")
+	}
+
+	t.Setenv("PORT", ":3003")
+	if got := listenAddrFromEnv(); got != ":3003" {
+		t.Fatalf("listenAddrFromEnv() = %q, want %q", got, ":3003")
+	}
+
+	t.Setenv("ADDR", "127.0.0.1:3002")
+	if got := listenAddrFromEnv(); got != "127.0.0.1:3002" {
+		t.Fatalf("listenAddrFromEnv() = %q, want %q", got, "127.0.0.1:3002")
+	}
+
+	t.Setenv("ADDR", "")
+	t.Setenv("PORT", "")
+	if got := listenAddrFromEnv(); got != ":3000" {
+		t.Fatalf("listenAddrFromEnv() = %q, want %q", got, ":3000")
+	}
+}
+
+func TestRewriteOpenAPIServersJSON(t *testing.T) {
+	data, err := rewriteOpenAPIServers([]byte(`{"openapi":"3.0.3","servers":[{"url":"http://localhost:3000"}]}`), "openapi3.json", "https://attesta.example.com")
+	if err != nil {
+		t.Fatalf("rewriteOpenAPIServers: %v", err)
+	}
+	var doc struct {
+		Servers []struct {
+			URL string `json:"url"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if len(doc.Servers) != 1 || doc.Servers[0].URL != "https://attesta.example.com" {
+		t.Fatalf("servers = %+v, want deployed origin", doc.Servers)
+	}
+}
+
+func TestRewriteOpenAPIServersYAML(t *testing.T) {
+	data, err := rewriteOpenAPIServers([]byte("openapi: 3.0.3\nservers:\n  - url: http://localhost:3000\n"), "openapi3.yaml", "https://attesta.example.com/")
+	if err != nil {
+		t.Fatalf("rewriteOpenAPIServers: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, "url: https://attesta.example.com") {
+		t.Fatalf("rewritten yaml missing deployed origin: %s", body)
+	}
+	if strings.Contains(body, "http://localhost:3000") {
+		t.Fatalf("rewritten yaml still contains localhost: %s", body)
+	}
+}
+
+func TestRewriteOpenAPIServersNoOriginLeavesData(t *testing.T) {
+	input := []byte(`{"openapi":"3.0.3"}`)
+	data, err := rewriteOpenAPIServers(input, "openapi3.json", "")
+	if err != nil {
+		t.Fatalf("rewriteOpenAPIServers: %v", err)
+	}
+	if string(data) != string(input) {
+		t.Fatalf("data changed for empty origin: %s", string(data))
+	}
+}
+
+func TestRewriteOpenAPIServersErrors(t *testing.T) {
+	if _, err := rewriteOpenAPIServers([]byte(`{`), "openapi3.json", "https://attesta.example.com"); err == nil {
+		t.Fatal("expected invalid JSON error")
+	}
+	if _, err := rewriteOpenAPIServers([]byte("openapi: ["), "openapi3.yaml", "https://attesta.example.com"); err == nil {
+		t.Fatal("expected invalid YAML error")
+	}
+}
+
+func TestServeOpenAPIFileRewritesServerToRequestOrigin(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodGet, "http://internal:3000/docs/openapi3.json", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-Host", "attesta.example.com")
+	rec := httptest.NewRecorder()
+
+	server.serveOpenAPIFile(rec, req, "openapi3.json", "application/json; charset=utf-8")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var doc struct {
+		Servers []struct {
+			URL string `json:"url"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if len(doc.Servers) != 1 || doc.Servers[0].URL != "https://attesta.example.com" {
+		t.Fatalf("servers = %+v, want forwarded origin", doc.Servers)
 	}
 }
 

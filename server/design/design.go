@@ -4,7 +4,7 @@ import . "goa.design/goa/v3/dsl"
 
 var _ = API("attesta", func() {
 	Title("Attesta")
-	Description("Design-first contract for Attesta workflow, process, backoffice, and DPP endpoints.")
+	Description("Design-first contract for Attesta workflow, admin, auth, catalog, Formata Builder, and DPP endpoints.")
 	Server("attesta", func() {
 		Host("development", func() {
 			URI("http://localhost:3000")
@@ -13,7 +13,15 @@ var _ = API("attesta", func() {
 })
 
 var _ = Service("workflow", func() {
-	Description("Workflow-scoped process, backoffice, impersonation, and event endpoints.")
+	Description("Workflow-scoped process, workflow management, and event endpoints.")
+
+	Method("home", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/")
+			Response(StatusOK)
+		})
+	})
 
 	Method("workflowHome", func() {
 		Payload(func() {
@@ -41,6 +49,21 @@ var _ = Service("workflow", func() {
 		})
 	})
 
+	Method("deleteWorkflow", func() {
+		Payload(func() {
+			Field(1, "workflow_key", String)
+			Required("workflow_key")
+		})
+		Result(Empty)
+		HTTP(func() {
+			POST("/w/{workflow_key}/delete")
+			Response(StatusSeeOther)
+			Response(StatusForbidden)
+			Response(StatusNotFound)
+			Response(StatusInternalServerError)
+		})
+	})
+
 	Method("readProcess", func() {
 		Payload(func() {
 			Field(1, "workflow_key", String)
@@ -50,6 +73,38 @@ var _ = Service("workflow", func() {
 		Result(Empty)
 		HTTP(func() {
 			GET("/w/{workflow_key}/process/{process_id}")
+			Response(StatusOK)
+			Response(StatusNotFound)
+		})
+	})
+
+	Method("readProcessContent", func() {
+		Payload(func() {
+			Field(1, "workflow_key", String)
+			Field(2, "process_id", String)
+			Field(3, "substep", String)
+			Required("workflow_key", "process_id")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/w/{workflow_key}/process/{process_id}/content")
+			Param("substep")
+			Response(StatusOK)
+			Response(StatusNotFound)
+		})
+	})
+
+	Method("readProcessActions", func() {
+		Payload(func() {
+			Field(1, "workflow_key", String)
+			Field(2, "process_id", String)
+			Field(3, "substep", String)
+			Required("workflow_key", "process_id")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/w/{workflow_key}/process/{process_id}/actions")
+			Param("substep")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
@@ -143,71 +198,20 @@ var _ = Service("workflow", func() {
 		})
 	})
 
-	Method("backofficeLanding", func() {
+	Method("downloadAttachmentFile", func() {
 		Payload(func() {
 			Field(1, "workflow_key", String)
-			Required("workflow_key")
+			Field(2, "process_id", String)
+			Field(3, "attachment_id", String)
+			Field(4, "inline", String)
+			Required("workflow_key", "process_id", "attachment_id")
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/backoffice")
-			Response(StatusOK)
-		})
-	})
-
-	Method("backofficeRole", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "role", String)
-			Required("workflow_key", "role")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/w/{workflow_key}/backoffice/{role}")
+			GET("/w/{workflow_key}/process/{process_id}/attachment/{attachment_id}/file")
+			Param("inline")
 			Response(StatusOK)
 			Response(StatusNotFound)
-		})
-	})
-
-	Method("backofficeRolePartial", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "role", String)
-			Required("workflow_key", "role")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/w/{workflow_key}/backoffice/{role}/partial")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("backofficeRoleProcess", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "role", String)
-			Field(3, "process_id", String)
-			Required("workflow_key", "role", "process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/w/{workflow_key}/backoffice/{role}/process/{process_id}")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("impersonate", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Required("workflow_key")
-		})
-		Result(Empty)
-		HTTP(func() {
-			POST("/w/{workflow_key}/impersonate")
-			Response(StatusSeeOther)
-			Response(StatusBadRequest)
 		})
 	})
 
@@ -225,171 +229,393 @@ var _ = Service("workflow", func() {
 	})
 })
 
-var _ = Service("legacy", func() {
-	Description("Legacy compatibility endpoints.")
+var CatalogResponse = Type("CatalogResponse", func() {
+	Field(1, "organizations", ArrayOf(CatalogOrganization))
+	Field(2, "roles", ArrayOf(CatalogRole))
+	Required("organizations", "roles")
+})
 
-	Method("legacyStart", func() {
+var CatalogOrganization = Type("CatalogOrganization", func() {
+	Field(1, "name", String)
+	Field(2, "slug", String)
+	Required("name", "slug")
+})
+
+var CatalogRole = Type("CatalogRole", func() {
+	Field(1, "orgSlug", String)
+	Field(2, "name", String)
+	Field(3, "slug", String)
+	Field(4, "color", String)
+	Field(5, "border", String)
+	Required("orgSlug", "name", "slug", "color", "border")
+})
+
+var _ = Service("catalog", func() {
+	Description("Authenticated API endpoints used by the Formata Builder and other admin clients.")
+
+	Method("publicCatalog", func() {
+		Result(CatalogResponse)
+		HTTP(func() {
+			GET("/api/catalog")
+			Response(StatusOK)
+			Response(StatusForbidden)
+			Response(StatusUnauthorized)
+			Response(StatusInternalServerError)
+			Response(StatusBadGateway)
+		})
+	})
+})
+
+var _ = Service("auth", func() {
+	Description("Account, session, invite, and password recovery pages.")
+
+	Method("loginPage", func() {
 		Result(Empty)
 		HTTP(func() {
-			POST("/process/start")
-			Response(StatusBadRequest)
+			GET("/login")
+			Response(StatusOK)
+			Response(StatusSeeOther)
 		})
 	})
 
-	Method("legacyProcess", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Required("process_id")
-		})
+	Method("login", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/process/{process_id}")
+			POST("/login")
+			Response(StatusSeeOther)
+			Response(StatusUnauthorized)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("signupPage", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/signup")
+			Response(StatusOK)
 			Response(StatusSeeOther)
 			Response(StatusNotFound)
 		})
 	})
 
-	Method("legacyDownloads", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Required("process_id")
-		})
+	Method("signup", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/process/{process_id}/downloads")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyFilesZip", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Required("process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/process/{process_id}/files.zip")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyNotarized", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Required("process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/process/{process_id}/notarized.json")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyMerkle", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Required("process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/process/{process_id}/merkle.json")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyCompleteSubstep", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Field(2, "substep_id", String)
-			Required("process_id", "substep_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			POST("/process/{process_id}/substep/{substep_id}/complete")
-			Response(StatusBadRequest)
-		})
-	})
-
-	Method("legacySubstepFile", func() {
-		Payload(func() {
-			Field(1, "process_id", String)
-			Field(2, "substep_id", String)
-			Required("process_id", "substep_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/process/{process_id}/substep/{substep_id}/file")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyBackoffice", func() {
-		Result(Empty)
-		HTTP(func() {
-			GET("/backoffice")
-			Response(StatusOK)
-		})
-	})
-
-	Method("legacyBackofficeRole", func() {
-		Payload(func() {
-			Field(1, "role", String)
-			Required("role")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/backoffice/{role}")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyBackofficeRolePartial", func() {
-		Payload(func() {
-			Field(1, "role", String)
-			Required("role")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/backoffice/{role}/partial")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyBackofficeRoleProcess", func() {
-		Payload(func() {
-			Field(1, "role", String)
-			Field(2, "process_id", String)
-			Required("role", "process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/backoffice/{role}/process/{process_id}")
+			POST("/signup")
 			Response(StatusSeeOther)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("legacyImpersonate", func() {
-		Result(Empty)
-		HTTP(func() {
-			POST("/impersonate")
 			Response(StatusBadRequest)
+			Response(StatusNotFound)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
 		})
 	})
 
-	Method("legacyEvents", func() {
+	Method("logout", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/events")
+			POST("/logout")
+			Response(StatusSeeOther)
+			Response(StatusMethodNotAllowed)
+		})
+	})
+
+	Method("acceptInvite", func() {
+		Payload(func() {
+			Field(1, "teamId", String)
+			Field(2, "membershipId", String)
+			Field(3, "userId", String)
+			Field(4, "secret", String)
+			Required("teamId", "membershipId", "userId", "secret")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/invite/accept")
+			Param("teamId")
+			Param("membershipId")
+			Param("userId")
+			Param("secret")
+			Response(StatusSeeOther)
+			Response(StatusBadRequest)
+			Response(StatusNotFound)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("invitePasswordPage", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/invite/password")
+			Response(StatusOK)
+			Response(StatusNotFound)
+			Response(StatusUnauthorized)
+		})
+	})
+
+	Method("setInvitePassword", func() {
+		Result(Empty)
+		HTTP(func() {
+			POST("/invite/password")
+			Response(StatusSeeOther)
+			Response(StatusBadRequest)
+			Response(StatusNotFound)
+			Response(StatusUnauthorized)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("resetPage", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/reset")
+			Response(StatusOK)
+		})
+	})
+
+	Method("requestReset", func() {
+		Result(Empty)
+		HTTP(func() {
+			POST("/reset")
 			Response(StatusOK)
 			Response(StatusBadRequest)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("resetConfirmPage", func() {
+		Payload(func() {
+			Field(1, "userId", String)
+			Field(2, "secret", String)
+			Required("userId", "secret")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/reset/confirm")
+			Param("userId")
+			Param("secret")
+			Response(StatusOK)
+			Response(StatusBadRequest)
+		})
+	})
+
+	Method("confirmReset", func() {
+		Payload(func() {
+			Field(1, "userId", String)
+			Field(2, "secret", String)
+			Required("userId", "secret")
+		})
+		Result(Empty)
+		HTTP(func() {
+			POST("/reset/confirm")
+			Param("userId")
+			Param("secret")
+			Response(StatusSeeOther)
+			Response(StatusBadRequest)
+			Response(StatusInternalServerError)
+		})
+	})
+})
+
+var _ = Service("admin", func() {
+	Description("Platform and organization administration endpoints.")
+
+	Method("platformOrgs", func() {
+		Payload(func() {
+			Field(1, "q", String)
+			Field(2, "page", Int)
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/admin/orgs")
+			Param("q")
+			Param("page")
+			Response(StatusOK)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("platformOrgAction", func() {
+		Result(Empty)
+		HTTP(func() {
+			POST("/admin/orgs")
+			Response(StatusOK)
+			Response(StatusSeeOther)
+			Response(StatusBadRequest)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("platformOrgLogo", func() {
+		Payload(func() {
+			Field(1, "logo_id", String)
+			Required("logo_id")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/admin/orgs/logo/{logo_id}")
+			Response(StatusOK)
+			Response(StatusNotFound)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+		})
+	})
+
+	Method("orgAdminUsers", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/users")
+			Response(StatusOK)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("orgAdminUserAction", func() {
+		Result(Empty)
+		HTTP(func() {
+			POST("/org-admin/users")
+			Response(StatusOK)
+			Response(StatusSeeOther)
+			Response(StatusBadRequest)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("orgAdminRoles", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/roles")
+			Response(StatusOK)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("orgAdminRoleAction", func() {
+		Result(Empty)
+		HTTP(func() {
+			POST("/org-admin/roles")
+			Response(StatusSeeOther)
+			Response(StatusBadRequest)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("orgAdminLogo", func() {
+		Payload(func() {
+			Field(1, "logo_id", String)
+			Required("logo_id")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/logo/{logo_id}")
+			Response(StatusOK)
+			Response(StatusNotFound)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+		})
+	})
+
+	Method("organizationLogo", func() {
+		Payload(func() {
+			Field(1, "org_slug", String)
+			Required("org_slug")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/organization/logo/{org_slug}")
+			Response(StatusOK)
+			Response(StatusNotFound)
+			Response(StatusUnauthorized)
+		})
+	})
+})
+
+var _ = Service("formata_builder", func() {
+	Description("Embedded Formata Builder UI and stream persistence endpoints.")
+
+	Method("builderApp", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/formata-builder")
+			Response(StatusOK)
+			Response(StatusForbidden)
+			Response(StatusUnauthorized)
+			Response(StatusBadGateway)
+			Response(StatusNotFound)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("builderAsset", func() {
+		Payload(func() {
+			Field(1, "asset_path", String)
+			Required("asset_path")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/formata-builder/{asset_path}")
+			Response(StatusOK)
+			Response(StatusForbidden)
+			Response(StatusUnauthorized)
+			Response(StatusBadGateway)
+			Response(StatusNotFound)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("loadStream", func() {
+		Payload(func() {
+			Field(1, "stream_id", String)
+			Required("stream_id")
+		})
+		Result(Any)
+		HTTP(func() {
+			GET("/org-admin/formata-builder/stream/{stream_id}")
+			Response(StatusOK)
+			Response(StatusForbidden)
+			Response(StatusUnauthorized)
+			Response(StatusBadGateway)
+			Response(StatusNotFound)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("saveStream", func() {
+		Payload(func() {
+			Field(1, "body", String)
+			Field(2, "new", Boolean)
+			Field(3, "stream", String)
+			Required("body")
+		})
+		Result(Empty)
+		HTTP(func() {
+			POST("/org-admin/formata-builder")
+			Param("stream")
+			Param("new")
+			Body("body")
+			Response(StatusNoContent)
+			Response(StatusBadRequest)
+			Response(StatusForbidden)
+			Response(StatusUnauthorized)
+			Response(StatusConflict)
+			Response(StatusRequestEntityTooLarge)
+			Response(StatusBadGateway)
+			Response(StatusInternalServerError)
 		})
 	})
 })

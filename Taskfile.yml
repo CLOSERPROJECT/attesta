@@ -95,7 +95,17 @@ tasks:
           sleep 1
           '
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
-      - sh -c 'export $(grep -v "^#" .env | xargs) && cd server && bin="$(go env GOBIN)"; if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi; VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml'
+      - |
+          sh -c '
+          export $(grep -v "^#" .env | xargs)
+          port="${PORT:-3000}"
+          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:${port}/invite/accept}"
+          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:${port}/reset/confirm}"
+          cd server
+          bin="$(go env GOBIN)"
+          if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi
+          VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml
+          '
 
   dev:web:
     desc: Vite dev server (HMR).
