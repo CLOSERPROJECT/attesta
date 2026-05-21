@@ -94,22 +94,6 @@ var _ = Service("workflow", func() {
 		})
 	})
 
-	Method("readProcessActions", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "process_id", String)
-			Field(3, "substep", String)
-			Required("workflow_key", "process_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/actions")
-			Param("substep")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
 	Method("readDownloads", func() {
 		Payload(func() {
 			Field(1, "workflow_key", String)
