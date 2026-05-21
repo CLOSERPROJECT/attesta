@@ -46,14 +46,15 @@
         >
       </div>
       {{ if .Termination }}
-        <div
-          class="panel-block"
-          style="border-color: var(--danger); margin-bottom: 16px;"
-        >
-          <h2 style="color: var(--danger);">Stream ended early</h2>
-          <p style="margin: 0 0 12px;">
+        <hr style="margin: 24px 0;" />
+        <div class="panel-block">
+          <h2 style="color: var(--danger); margin-bottom: 0px;">
+            Stream ended early
+          </h2>
+          <p style="margin: 3px 0 20px;">
             {{ if .Termination.EndedAtHuman }}
-              Ended at {{ .Termination.EndedAtHuman }}
+              Ended at
+              {{ .Termination.EndedAtHuman }}
             {{ end }}
             {{ if .Termination.EndedBy }}
               by
@@ -72,6 +73,8 @@
               <dt>Reason</dt>
               <dd>{{ .Termination.Reason }}</dd>
             </dl>
+          {{ else }}
+            <span class="muted">No reason provided.</span>
           {{ end }}
         </div>
       {{ end }}
