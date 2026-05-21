@@ -67,10 +67,12 @@
               while substep {{ .Termination.SubstepID }} was available
             {{ end }}
           </p>
-          <dl class="action-submitted-values">
-            <dt>Reason</dt>
-            <dd>{{ .Termination.Reason }}</dd>
-          </dl>
+          {{ if .Termination.Reason }}
+            <dl class="action-submitted-values">
+              <dt>Reason</dt>
+              <dd>{{ .Termination.Reason }}</dd>
+            </dl>
+          {{ end }}
         </div>
       {{ end }}
       <hr style="margin: 24px 0;" />

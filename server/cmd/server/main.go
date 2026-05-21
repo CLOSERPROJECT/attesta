@@ -4910,10 +4910,6 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleProcessContentPartial(w, r, processID)
 		return
 	}
-	if len(parts) == 2 && parts[1] == "actions" && r.Method == http.MethodGet {
-		s.handleProcessActionsPartial(w, r, processID)
-		return
-	}
 	if len(parts) == 2 && parts[1] == "downloads" && r.Method == http.MethodGet {
 		s.handleProcessDownloadsPartial(w, r, processID)
 		return
@@ -5362,43 +5358,6 @@ func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (s *Server) handleProcessActionsPartial(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
-	if !ok {
-		return
-	}
-	process, err := s.loadProcess(r.Context(), processID)
-	if err != nil {
-		http.Error(w, "process not found", http.StatusNotFound)
-		return
-	}
-	if !s.processBelongsToWorkflow(process, workflowKey) {
-		http.Error(w, "process not found", http.StatusNotFound)
-		return
-	}
-	process = s.ensureProcessCompletionArtifacts(r.Context(), cfg, workflowKey, process)
-	actor := Actor{
-		ID:          accountActorID(user),
-		OrgSlug:     user.OrgSlug,
-		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
-		WorkflowKey: workflowKey,
-	}
-	if len(actor.RoleSlugs) > 0 {
-		actor.Role = actor.RoleSlugs[0]
-	}
-	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
-		actor.RoleSlugs = s.roles(cfg)
-	}
-	view := s.buildProcessActionListView(r.Context(), cfg, workflowKey, process, actor, strings.TrimSpace(r.URL.Query().Get("substep")), "", false)
-	if err := s.tmpl.ExecuteTemplate(w, "action_list.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
 func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Request, processID string) {
 	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
 	if !ok {
@@ -5755,7 +5714,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 				return
 			}
 			if isHTMXRequest(r) {
-				s.renderActionList(w, nextReq, process, actor, "")
+				s.renderProcessContent(w, nextReq, process, actor, "")
 				return
 			}
 			s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
@@ -5837,7 +5796,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	if isHTMXRequest(r) {
-		s.renderActionList(w, nextReq, process, actor, "")
+		s.renderProcessContent(w, nextReq, process, actor, "")
 		return
 	}
 	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
@@ -5876,10 +5835,6 @@ func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, 
 
 	_ = r.ParseForm()
 	reason := strings.TrimSpace(r.FormValue("reason"))
-	if reason == "" {
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Reason is required.", process, actor)
-		return
-	}
 	if len([]rune(reason)) > 1000 {
 		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Reason is too long.", process, actor)
 		return
@@ -5958,7 +5913,7 @@ func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	if isHTMXRequest(r) {
-		s.renderActionList(w, nextReq, process, actor, "")
+		s.renderProcessContent(w, nextReq, process, actor, "")
 		return
 	}
 	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
@@ -7931,7 +7886,7 @@ func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if isHTMXRequest(r) {
-		s.renderActionList(w, r, process, actor, message)
+		s.renderProcessContent(w, r, process, actor, message)
 		return
 	}
 	s.renderDepartmentProcessPage(w, r, process, actor, message)
@@ -7942,31 +7897,6 @@ func isProcessContentTargetRequest(r *http.Request) bool {
 		return false
 	}
 	return strings.TrimSpace(r.Header.Get("HX-Target")) == "process-page-content"
-}
-
-func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
-	workflowKey := s.defaultWorkflowKey()
-	cfg := RuntimeConfig{}
-	var err error
-	selectedSubstepID := ""
-	if r != nil {
-		workflowKey, cfg, err = s.selectedWorkflow(r)
-		selectedSubstepID = strings.TrimSpace(r.URL.Query().Get("substep"))
-	} else {
-		cfg, err = s.runtimeConfig()
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ctx := context.Background()
-	if r != nil {
-		ctx = r.Context()
-	}
-	view := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, false)
-	if err := s.tmpl.ExecuteTemplate(w, "action_list.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 }
 
 func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {

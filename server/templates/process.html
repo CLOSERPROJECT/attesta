@@ -39,35 +39,7 @@
       <div class="process-resources-grid">
         {{ template "workflow_timeline" .ActionList }}
         <div class="stack tablet-seprator" style="gap: 16px;">
-          {{ if .ActionList.Termination }}
-            <section class="panel">
-              <div class="panel-heading">
-                <h2>Stream ended early</h2>
-                <p>
-                  {{ if .ActionList.Termination.EndedAtHuman }}
-                    Ended at
-                    {{ .ActionList.Termination.EndedAtHuman }}
-                  {{ end }}
-                  {{ if .ActionList.Termination.EndedBy }}
-                    by
-                    {{ if and (ge (len .ActionList.Termination.EndedBy) 9) (eq (slice .ActionList.Termination.EndedBy 0 9) "appwrite:") }}
-                      {{ slice .ActionList.Termination.EndedBy 9 }}
-                    {{ else }}
-                      {{ .ActionList.Termination.EndedBy }}
-                    {{ end }}
-                  {{ end }}
-                  {{ if .ActionList.Termination.SubstepID }}
-                    while substep {{ .ActionList.Termination.SubstepID }} was
-                    available
-                  {{ end }}
-                </p>
-              </div>
-              <dl class="action-submitted-values">
-                <dt>Reason</dt>
-                <dd>{{ .ActionList.Termination.Reason }}</dd>
-              </dl>
-            </section>
-          {{ end }}
+          {{ template "process_termination_details" .ActionList }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}
         </div>
@@ -221,6 +193,41 @@
         {{ end }}
 
       </div>
+    </section>
+  {{ end }}
+{{ end }}
+
+{{ define "process_termination_details" }}
+  {{ if .Termination }}
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>Stream ended early</h2>
+        <p>
+          {{ if .Termination.EndedAtHuman }}
+            Ended at
+            {{ .Termination.EndedAtHuman }}
+          {{ end }}
+          {{ if .Termination.EndedBy }}
+            by
+            {{ if and (ge (len .Termination.EndedBy) 9) (eq (slice .Termination.EndedBy 0 9) "appwrite:") }}
+              {{ slice .Termination.EndedBy 9 }}
+            {{ else }}
+              {{ .Termination.EndedBy }}
+            {{ end }}
+          {{ end }}
+          {{ if .Termination.SubstepID }}
+            while substep {{ .Termination.SubstepID }} was available
+          {{ end }}
+        </p>
+      </div>
+      {{ if .Termination.Reason }}
+        <dl class="action-submitted-values">
+          <dt>Reason</dt>
+          <dd>{{ .Termination.Reason }}</dd>
+        </dl>
+      {{ else }}
+        <span class="muted">No reason provided.</span>
+      {{ end }}
     </section>
   {{ end }}
 {{ end }}

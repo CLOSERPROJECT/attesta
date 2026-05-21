@@ -281,24 +281,57 @@ func TestMongoStoreDeleteFormataBuilderStream(t *testing.T) {
 }
 
 func TestMongoStoreHasProcessesByWorkflow(t *testing.T) {
-	collection := &fakeMongoCollection{
-		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
-			return fakeSingleResult{}
-		},
-	}
-	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
-	store := &MongoStore{dbPort: db}
+	t.Run("found", func(t *testing.T) {
+		collection := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{}
+			},
+		}
+		db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}
+		store := &MongoStore{dbPort: db}
 
-	hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), "workflow-1")
-	if err != nil {
-		t.Fatalf("HasProcessesByWorkflow error: %v", err)
-	}
-	if !hasProcesses {
-		t.Fatal("expected workflow to have processes")
-	}
-	if len(collection.findOneFilters) != 1 || !reflect.DeepEqual(collection.findOneFilters[0], bson.M{"workflowKey": "workflow-1"}) {
-		t.Fatalf("findOne filter = %#v, want workflow filter", collection.findOneFilters)
-	}
+		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), "workflow-1")
+		if err != nil {
+			t.Fatalf("HasProcessesByWorkflow error: %v", err)
+		}
+		if !hasProcesses {
+			t.Fatal("expected workflow to have processes")
+		}
+		if len(collection.findOneFilters) != 1 || !reflect.DeepEqual(collection.findOneFilters[0], bson.M{"workflowKey": "workflow-1"}) {
+			t.Fatalf("findOne filter = %#v, want workflow filter", collection.findOneFilters)
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		collection := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: mongo.ErrNoDocuments}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}}
+
+		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), "workflow-1")
+		if err != nil {
+			t.Fatalf("HasProcessesByWorkflow error: %v", err)
+		}
+		if hasProcesses {
+			t.Fatal("expected workflow to have no processes")
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		findErr := errors.New("find failed")
+		collection := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: findErr}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{"processes": collection}}}
+
+		if _, err := store.HasProcessesByWorkflow(t.Context(), "workflow-1"); !errors.Is(err, findErr) {
+			t.Fatalf("HasProcessesByWorkflow error = %v, want %v", err, findErr)
+		}
+	})
 }
 
 func TestMongoStoreDeleteWorkflowData(t *testing.T) {

@@ -133,12 +133,11 @@ const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
 const workflowKey = root?.dataset?.workflowKey;
 const processPageContent = document.getElementById("process-page-content");
-const actionArea = document.getElementById("action-area");
 let skipNextProcessUpdatedEvent = false;
 let skipNextProcessUpdatedEventTimer = 0;
 
 const focusNextActionInput = () => {
-  const container = processPageContent || actionArea || document;
+  const container = processPageContent || document;
   const nextInput = container.querySelector(
     "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])"
   );
@@ -666,7 +665,7 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
   const url = form.dataset.formataPost || form.getAttribute("hx-post") || form.getAttribute("action");
   const target =
     form.dataset.formataTarget ||
-    (form.closest("#process-page-content") ? "#process-page-content" : "#action-area");
+    "#process-page-content";
   const htmxApi = window.htmx;
   if (url && htmxApi && typeof htmxApi.ajax === "function" && document.querySelector(target)) {
     if (target === "#process-page-content") {
@@ -825,7 +824,7 @@ document.addEventListener("click", (event) => {
 });
 
 document.body.addEventListener("htmx:afterSwap", (event) => {
-  if (event.target && (event.target.id === "action-area" || event.target.id === "process-page-content")) {
+  if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
     markSelectedSubstep(currentSelectedSubstep());
     focusNextActionInput();

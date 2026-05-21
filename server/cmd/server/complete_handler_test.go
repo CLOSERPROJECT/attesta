@@ -143,7 +143,7 @@ func TestHandleTerminateProcessRequiresCurrentActorAuthorization(t *testing.T) {
 }
 
 func TestHandleTerminateProcessErrorPaths(t *testing.T) {
-	t.Run("missing reason", func(t *testing.T) {
+	t.Run("empty reason", func(t *testing.T) {
 		store := NewMemoryStore()
 		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 
@@ -154,8 +154,16 @@ func TestHandleTerminateProcessErrorPaths(t *testing.T) {
 
 		server.handleTerminateProcess(rr, req, processID)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+		}
+		id, _ := primitive.ObjectIDFromHex(processID)
+		process, _ := store.SnapshotProcess(id)
+		if process.Termination == nil {
+			t.Fatal("expected termination metadata")
+		}
+		if process.Termination.Reason != "" {
+			t.Fatalf("reason = %q, want empty", process.Termination.Reason)
 		}
 	})
 
@@ -396,6 +404,16 @@ func TestHandleCompleteSubstepRejectsInvalidFormataJSON(t *testing.T) {
 	}
 	if !strings.Contains(invalidJSONRec.Body.String(), "Value must be a valid JSON object.") {
 		t.Fatalf("expected parse error message in body, got %q", invalidJSONRec.Body.String())
+	}
+}
+
+func TestParseCompletionPayloadRejectsNonFormataSubstep(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodPost, "/process/p/substep/1.1/complete", strings.NewReader("value=1"))
+
+	_, err := server.parseCompletionPayload(req, primitive.NewObjectID(), WorkflowSub{InputType: "string"}, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "Only formata substeps are supported") {
+		t.Fatalf("error = %v, want formata-only error", err)
 	}
 }
 
