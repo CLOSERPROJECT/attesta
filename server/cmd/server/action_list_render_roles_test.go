@@ -1,15 +1,12 @@
 package main
 
 import (
-	"html/template"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestRenderActionListDoesNotFilterByCurrentActiveRole(t *testing.T) {
+func TestBuildProcessActionListViewDoesNotFilterByCurrentActiveRole(t *testing.T) {
 	process := &Process{
 		ID: primitive.NewObjectID(),
 		Progress: map[string]ProcessStep{
@@ -22,24 +19,14 @@ func TestRenderActionListDoesNotFilterByCurrentActiveRole(t *testing.T) {
 			"3.2": {State: "pending"},
 		},
 	}
-	server := &Server{
-		tmpl: template.Must(template.New("test").Parse(`{{define "action_list.html"}}{{with .Action}}{{.SubstepID}}|{{end}}{{end}}`)),
-		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
-		},
-	}
+	server := &Server{}
 	actor := Actor{
 		Role:      "dep2",
 		RoleSlugs: []string{"dep1", "dep2"},
 	}
-	rec := httptest.NewRecorder()
+	view := server.buildProcessActionListView(t.Context(), testRuntimeConfig(), "workflow", process, actor, "", "", false)
 
-	server.renderActionList(rec, nil, process, actor, "")
-
-	if rec.Code != 200 {
-		t.Fatalf("status = %d, want %d", rec.Code, 200)
-	}
-	if !strings.Contains(rec.Body.String(), "1.1|") {
-		t.Fatalf("expected dep1 step to remain visible after dep2 completion context, got %q", rec.Body.String())
+	if view.Action == nil || view.Action.SubstepID != "1.1" {
+		t.Fatalf("expected dep1 step to remain visible after dep2 completion context, got %#v", view.Action)
 	}
 }

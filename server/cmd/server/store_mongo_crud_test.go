@@ -310,6 +310,46 @@ func TestMongoStoreUpdateProcessStatusAndInsertNotarization(t *testing.T) {
 	}
 }
 
+func TestMongoStoreUpdateProcessTermination(t *testing.T) {
+	processes := &fakeMongoCollection{}
+	db := &fakeMongoDatabase{
+		collections: map[string]*fakeMongoCollection{
+			"processes": processes,
+		},
+	}
+	store := &MongoStore{dbPort: db}
+	id := primitive.NewObjectID()
+	endedAt := time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC)
+	termination := ProcessTermination{
+		Reason:    "supplier cancelled",
+		EndedAt:   endedAt,
+		Actor:     &Actor{ID: "u1", Role: "dep1"},
+		SubstepID: "1.1",
+	}
+
+	if err := store.UpdateProcessTermination(t.Context(), id, "wf-a", termination); err != nil {
+		t.Fatalf("UpdateProcessTermination returned error: %v", err)
+	}
+	expected := bson.M{
+		"$set": bson.M{
+			"status":      processStatusTerminated,
+			"workflowKey": "wf-a",
+			"termination": termination,
+		},
+	}
+	if !reflect.DeepEqual(processes.updateOneUpdates[0], expected) {
+		t.Fatalf("termination update = %#v, want %#v", processes.updateOneUpdates[0], expected)
+	}
+
+	updateErr := errors.New("termination failed")
+	processes.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+		return nil, updateErr
+	}
+	if err := store.UpdateProcessTermination(t.Context(), id, "wf-a", termination); !errors.Is(err, updateErr) {
+		t.Fatalf("UpdateProcessTermination error = %v, want %v", err, updateErr)
+	}
+}
+
 func TestMongoStoreUpdateProcessDPP(t *testing.T) {
 	processes := &fakeMongoCollection{}
 	db := &fakeMongoDatabase{

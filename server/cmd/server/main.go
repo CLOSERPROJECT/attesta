@@ -35,6 +35,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	processStatusActive     = "active"
+	processStatusDone       = "done"
+	processStatusTerminated = "terminated"
+)
+
 type WorkflowDef struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
 	Name        string             `bson:"name" yaml:"name"`
@@ -72,6 +78,7 @@ type Process struct {
 	Status        string                 `bson:"status"`
 	Progress      map[string]ProcessStep `bson:"progress"`
 	DPP           *ProcessDPP            `bson:"dpp,omitempty"`
+	Termination   *ProcessTermination    `bson:"termination,omitempty"`
 }
 
 type ProcessDPP struct {
@@ -79,6 +86,13 @@ type ProcessDPP struct {
 	Lot         string    `bson:"lot"`
 	Serial      string    `bson:"serial"`
 	GeneratedAt time.Time `bson:"generatedAt"`
+}
+
+type ProcessTermination struct {
+	Reason    string    `bson:"reason"`
+	EndedAt   time.Time `bson:"endedAt"`
+	Actor     *Actor    `bson:"actor,omitempty"`
+	SubstepID string    `bson:"substepId,omitempty"`
 }
 
 type ProcessStep struct {
@@ -150,6 +164,7 @@ type TimelineSubstep struct {
 	RoleColor    template.CSS
 	RoleBorder   template.CSS
 	Status       string
+	StatusLabel  string
 	DoneBy       string
 	DoneRole     string
 	DoneAt       string
@@ -208,11 +223,20 @@ type MerkleTree struct {
 }
 
 type NotarizedProcessExport struct {
-	ProcessID string          `json:"process_id"`
-	CreatedAt string          `json:"created_at"`
-	Status    string          `json:"status"`
-	Steps     []NotarizedStep `json:"steps"`
-	Merkle    MerkleTree      `json:"merkle"`
+	ProcessID   string                       `json:"process_id"`
+	CreatedAt   string                       `json:"created_at"`
+	Status      string                       `json:"status"`
+	Termination *NotarizedProcessTermination `json:"termination,omitempty"`
+	Steps       []NotarizedStep              `json:"steps"`
+	Merkle      MerkleTree                   `json:"merkle"`
+}
+
+type NotarizedProcessTermination struct {
+	Reason    string `json:"reason"`
+	EndedAt   string `json:"ended_at"`
+	EndedBy   string `json:"ended_by,omitempty"`
+	EndedRole string `json:"ended_role,omitempty"`
+	SubstepID string `json:"substep_id,omitempty"`
 }
 
 type ActionView struct {
@@ -239,6 +263,7 @@ type ActionView struct {
 	Disabled      bool
 	ReadOnly      bool
 	Reason        string
+	DetailMessage string
 }
 
 type ActionRoleBadge struct {
@@ -400,12 +425,18 @@ type ActionListView struct {
 	DPPURL            string
 	DPPGS1            string
 	Attachments       []ProcessDownloadAttachment
+	CanTerminate      bool
+	TerminateAction   string
+	TerminateSubstep  string
+	TerminateRoles    []ActionRoleOption
+	Termination       *ProcessTerminationView
 }
 
 type ProcessListItem struct {
 	ID              string
 	Name            string
 	Status          string
+	StatusLabel     string
 	CreatedAt       string
 	CreatedAtTime   time.Time
 	DoneSubsteps    int
@@ -619,6 +650,8 @@ type ProcessPageView struct {
 	PageBase
 	ProcessID    string
 	InstanceName string
+	Status       string
+	StatusLabel  string
 	ActionList   ActionListView
 	DPPURL       string
 	DPPGS1       string
@@ -643,6 +676,16 @@ type DPPPageView struct {
 	Traceability []DPPTraceabilityStep
 	Integrity    DPPIntegrityView
 	Export       NotarizedProcessExport
+	Termination  *ProcessTerminationView
+}
+
+type ProcessTerminationView struct {
+	Reason       string
+	EndedAt      string
+	EndedAtHuman string
+	EndedBy      string
+	EndedRole    string
+	SubstepID    string
 }
 
 type DPPIntegrityView struct {
@@ -671,19 +714,21 @@ type DPPTraceabilityStep struct {
 }
 
 type DPPTraceabilitySubstep struct {
-	SubstepID   string
-	Title       string
-	Role        string
-	RoleBadges  []DPPTraceabilityRoleBadge
-	RoleColor   template.CSS
-	RoleBorder  template.CSS
-	Status      string
-	DoneAt      string
-	DoneAtHuman string
-	DoneBy      string
-	Digest      string
-	Values      []DPPTraceabilityValue
-	Attachments []ActionAttachmentView
+	SubstepID     string
+	Title         string
+	Role          string
+	RoleBadges    []DPPTraceabilityRoleBadge
+	RoleColor     template.CSS
+	RoleBorder    template.CSS
+	Status        string
+	Reason        string
+	DetailMessage string
+	DoneAt        string
+	DoneAtHuman   string
+	DoneBy        string
+	Digest        string
+	Values        []DPPTraceabilityValue
+	Attachments   []ActionAttachmentView
 }
 
 type DPPTraceabilityRoleBadge struct {
@@ -1506,16 +1551,39 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 
 func deriveProcessStatus(def WorkflowDef, process *Process) string {
 	if process == nil {
-		return "active"
+		return processStatusActive
+	}
+	if process.Termination != nil {
+		return processStatusTerminated
 	}
 	status := strings.TrimSpace(process.Status)
 	if status == "" {
-		status = "active"
+		status = processStatusActive
 	}
-	if status != "done" && isProcessDone(def, process) {
-		status = "done"
+	if status == processStatusTerminated {
+		return processStatusTerminated
+	}
+	if status != processStatusDone && isProcessDone(def, process) {
+		status = processStatusDone
 	}
 	return status
+}
+
+func isProcessClosed(def WorkflowDef, process *Process) bool {
+	if process == nil {
+		return false
+	}
+	status := strings.TrimSpace(process.Status)
+	return status == processStatusDone || status == processStatusTerminated || process.Termination != nil || isProcessDone(def, process)
+}
+
+func processStatusLabel(status string) string {
+	switch strings.TrimSpace(status) {
+	case processStatusTerminated:
+		return "TERMINATED"
+	default:
+		return strings.TrimSpace(status)
+	}
 }
 
 func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcessCounts {
@@ -1525,7 +1593,7 @@ func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcess
 		status := deriveProcessStatus(def, &process)
 		doneCount, _, _ := processProgressStats(def, &process)
 		switch {
-		case status == "done":
+		case status == processStatusDone || status == processStatusTerminated:
 			counts.Terminated++
 		case doneCount == 0:
 			counts.NotStarted++
@@ -1819,7 +1887,7 @@ func normalizeHomeSortKey(value string) string {
 
 func normalizeHomeStatusFilter(value string) string {
 	switch strings.TrimSpace(strings.ToLower(value)) {
-	case "active", "done":
+	case processStatusActive, processStatusDone, processStatusTerminated:
 		return strings.TrimSpace(strings.ToLower(value))
 	default:
 		return "all"
@@ -4702,6 +4770,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			ID:              process.ID.Hex(),
 			Name:            strings.TrimSpace(process.Name),
 			Status:          status,
+			StatusLabel:     processStatusLabel(status),
 			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtTime:   process.CreatedAt,
 			DoneSubsteps:    doneCount,
@@ -4713,6 +4782,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		if item.Status == "active" {
 			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta); ok {
 				item.Status = "available"
+				item.StatusLabel = processStatusLabel(item.Status)
 			}
 		}
 		processes = append(processes, item)
@@ -4871,12 +4941,12 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleProcessContentPartial(w, r, processID)
 		return
 	}
-	if len(parts) == 2 && parts[1] == "actions" && r.Method == http.MethodGet {
-		s.handleProcessActionsPartial(w, r, processID)
-		return
-	}
 	if len(parts) == 2 && parts[1] == "downloads" && r.Method == http.MethodGet {
 		s.handleProcessDownloadsPartial(w, r, processID)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "terminate" && r.Method == http.MethodPost {
+		s.handleTerminateProcess(w, r, processID)
 		return
 	}
 	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "complete" && r.Method == http.MethodPost {
@@ -4945,7 +5015,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 
 func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ActionListView {
 	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, onlyRole, s.roleMetaMap(cfg))
-	processDone := process != nil && isProcessDone(cfg.Workflow, process)
+	processDone := process != nil && isProcessClosed(cfg.Workflow, process)
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg)), selected)
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
@@ -4962,8 +5032,20 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 		Error:             message,
 		Timeline:          timeline,
 	}
+	if process != nil && !processDone {
+		if action, ok := nextAvailableAuthorizedAction(cfg.Workflow, process, workflowKey, actor, s.roleMetaMap(cfg)); ok {
+			view.CanTerminate = true
+			view.TerminateAction = fmt.Sprintf("%s/process/%s/terminate", workflowPath(workflowKey), process.ID.Hex())
+			view.TerminateSubstep = action.SubstepID
+			view.TerminateRoles = append([]ActionRoleOption(nil), action.MatchingRoles...)
+		}
+	}
 	if action, ok := selectedActionBySubstep(actions, selected, processDone); ok {
 		view.Action = &action
+	}
+	if process != nil && process.Termination != nil {
+		view.Termination = processTerminationView(process.Termination)
+		view.Termination = s.applyDoneByEmailToTermination(ctx, cfg.Workflow, actor, view.Termination)
 	}
 
 	if processDone {
@@ -4985,14 +5067,18 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
 	processID := ""
 	instanceName := ""
+	status := processStatusActive
 	if process != nil {
 		processID = process.ID.Hex()
 		instanceName = strings.TrimSpace(process.Name)
+		status = deriveProcessStatus(cfg.Workflow, process)
 	}
 	return ProcessPageView{
 		PageBase:     pageBase,
 		ProcessID:    processID,
 		InstanceName: instanceName,
+		Status:       status,
+		StatusLabel:  processStatusLabel(status),
 		ActionList:   actionList,
 		DPPURL:       actionList.DPPURL,
 		DPPGS1:       actionList.DPPGS1,
@@ -5016,6 +5102,10 @@ func buildWorkflowPreviewProcess(def WorkflowDef, workflowKey string) *Process {
 
 func makeActionListReadOnly(view ActionListView, reason string) ActionListView {
 	reason = strings.TrimSpace(reason)
+	view.CanTerminate = false
+	view.TerminateAction = ""
+	view.TerminateSubstep = ""
+	view.TerminateRoles = nil
 	if view.Action != nil {
 		action := *view.Action
 		action.ReadOnly = true
@@ -5154,6 +5244,25 @@ func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef
 	return timeline
 }
 
+func (s *Server) applyDoneByEmailToTermination(ctx context.Context, def WorkflowDef, viewer Actor, termination *ProcessTerminationView) *ProcessTerminationView {
+	if termination == nil {
+		return nil
+	}
+	identity, ok := s.lookupUserIdentityByActorID(ctx, termination.EndedBy, map[string]userIdentityView{})
+	if !ok {
+		return termination
+	}
+	mapped := *termination
+	if viewerCanSeeDoneByEmail(def, viewer) && strings.TrimSpace(identity.email) != "" {
+		mapped.EndedBy = identity.email
+		return &mapped
+	}
+	if strings.TrimSpace(identity.fallbackID) != "" {
+		mapped.EndedBy = identity.fallbackID
+	}
+	return &mapped
+}
+
 func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
 	if len(traceability) == 0 {
 		return traceability
@@ -5229,6 +5338,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		Traceability: traceability,
 		Integrity:    buildDPPIntegrityView(export.Merkle),
 		Export:       export,
+		Termination:  processTerminationView(process.Termination),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -5283,43 +5393,6 @@ func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (s *Server) handleProcessActionsPartial(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
-	if !ok {
-		return
-	}
-	process, err := s.loadProcess(r.Context(), processID)
-	if err != nil {
-		http.Error(w, "process not found", http.StatusNotFound)
-		return
-	}
-	if !s.processBelongsToWorkflow(process, workflowKey) {
-		http.Error(w, "process not found", http.StatusNotFound)
-		return
-	}
-	process = s.ensureProcessCompletionArtifacts(r.Context(), cfg, workflowKey, process)
-	actor := Actor{
-		ID:          accountActorID(user),
-		OrgSlug:     user.OrgSlug,
-		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
-		WorkflowKey: workflowKey,
-	}
-	if len(actor.RoleSlugs) > 0 {
-		actor.Role = actor.RoleSlugs[0]
-	}
-	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
-		actor.RoleSlugs = s.roles(cfg)
-	}
-	view := s.buildProcessActionListView(r.Context(), cfg, workflowKey, process, actor, strings.TrimSpace(r.URL.Query().Get("substep")), "", false)
-	if err := s.tmpl.ExecuteTemplate(w, "action_list.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
 func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Request, processID string) {
 	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
 	if !ok {
@@ -5350,12 +5423,12 @@ func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) ensureProcessCompletionArtifacts(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process) *Process {
-	if process == nil || !isProcessDone(cfg.Workflow, process) {
+	if process == nil || !isProcessClosed(cfg.Workflow, process) {
 		return process
 	}
 
 	updated := false
-	if strings.TrimSpace(process.Status) != "done" {
+	if process.Termination == nil && strings.TrimSpace(process.Status) != "done" && isProcessDone(cfg.Workflow, process) {
 		if err := s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done"); err != nil {
 			log.Printf("failed to persist process status for %s: %v", process.ID.Hex(), err)
 		} else {
@@ -5676,7 +5749,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 				return
 			}
 			if isHTMXRequest(r) {
-				s.renderActionList(w, nextReq, process, actor, "")
+				s.renderProcessContent(w, nextReq, process, actor, "")
 				return
 			}
 			s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
@@ -5758,7 +5831,124 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	if isHTMXRequest(r) {
-		s.renderActionList(w, nextReq, process, actor, "")
+		s.renderProcessContent(w, nextReq, process, actor, "")
+		return
+	}
+	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
+}
+
+func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, processID string) {
+	user, _, ok := s.requireAuthenticatedPost(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, selected := s.selectedWorkflowOrRedirectHome(w, r)
+	if !selected {
+		return
+	}
+	actor := actorFromAccountUser(user, workflowKey)
+	if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
+		actor.RoleSlugs = s.roles(cfg)
+	}
+
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			logRequestError(r, err, "failed to load process %s for termination", processID)
+		}
+		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
+		return
+	}
+	if isProcessClosed(cfg.Workflow, process) {
+		s.renderActionErrorForRequest(w, r, http.StatusConflict, "Stream is already ended.", process, actor)
+		return
+	}
+
+	_ = r.ParseForm()
+	reason := strings.TrimSpace(r.FormValue("reason"))
+	if len([]rune(reason)) > 1000 {
+		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Reason is too long.", process, actor)
+		return
+	}
+
+	action, ok := nextAvailableAuthorizedAction(cfg.Workflow, process, workflowKey, actor, s.roleMetaMap(cfg))
+	if !ok {
+		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
+		return
+	}
+	substep, step, err := findSubstep(cfg.Workflow, action.SubstepID)
+	if err != nil {
+		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Substep not found.", process, actor)
+		return
+	}
+	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
+	if activeRole == "" && len(action.MatchingRoles) == 1 {
+		activeRole = action.MatchingRoles[0].Slug
+	}
+	allowedRoles := substepRoles(substep)
+	if !s.enforceAuth && activeRole == "" && len(allowedRoles) > 0 {
+		activeRole = allowedRoles[0]
+		actor.RoleSlugs = append([]string(nil), allowedRoles...)
+	}
+	if activeRole == "" || !containsRole(actor.RoleSlugs, activeRole) || !containsRole(allowedRoles, activeRole) {
+		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
+		return
+	}
+	actor.Role = activeRole
+
+	if s.authorizer == nil {
+		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
+		return
+	}
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, step.OrganizationSlug, true)
+	if err != nil {
+		logRequestError(r, err, "cerbos check failed for process %s termination at substep %s", processID, substep.SubstepID)
+		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
+		return
+	}
+	if !allowed {
+		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
+		return
+	}
+
+	now := s.nowUTC()
+	termination := ProcessTermination{
+		Reason:    reason,
+		EndedAt:   now,
+		Actor:     &actor,
+		SubstepID: substep.SubstepID,
+	}
+	if err := s.store.UpdateProcessTermination(r.Context(), process.ID, workflowKey, termination); err != nil {
+		logRequestError(r, err, "failed to terminate process %s", process.ID.Hex())
+		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to end stream.", process, actor)
+		return
+	}
+	process, _ = s.loadProcess(r.Context(), processID)
+	if process != nil && cfg.DPP.Enabled && process.DPP == nil {
+		dpp, dppErr := buildProcessDPP(cfg.Workflow, cfg.DPP, process, now)
+		if dppErr != nil {
+			log.Printf("failed to build dpp for terminated process %s: %v", process.ID.Hex(), dppErr)
+		} else if updateErr := s.store.UpdateProcessDPP(r.Context(), process.ID, workflowKey, dpp); updateErr != nil {
+			log.Printf("failed to persist dpp for terminated process %s: %v", process.ID.Hex(), updateErr)
+		}
+		process, _ = s.loadProcess(r.Context(), processID)
+	}
+
+	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
+	for _, role := range s.roles(cfg) {
+		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
+	}
+	nextReq := cloneRequestWithSelectedSubstep(r, "")
+	if isProcessContentTargetRequest(r) {
+		s.renderProcessContent(w, nextReq, process, actor, "")
+		return
+	}
+	if isHTMXRequest(r) {
+		s.renderProcessContent(w, nextReq, process, actor, "")
 		return
 	}
 	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
@@ -6572,6 +6762,12 @@ func organizationDisplayName(slug string, orgNames map[string]string) string {
 func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta, orgNames map[string]string) []TimelineStep {
 	steps := sortedSteps(def)
 	availableMap := computeAvailability(def, process)
+	terminated := process != nil && process.Termination != nil
+	terminationSubstepID := ""
+	if terminated {
+		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
+	}
+	pastTermination := false
 
 	var timeline []TimelineStep
 	for _, step := range steps {
@@ -6621,6 +6817,10 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 							entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
 						}
 					}
+				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+					entry.Status = processStatusTerminated
+				} else if terminated && (pastTermination || terminationSubstepID == "") {
+					entry.Status = "skipped"
 				} else if availableMap[sub.SubstepID] {
 					entry.Status = "available"
 				} else {
@@ -6629,7 +6829,11 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 			} else {
 				entry.Status = "locked"
 			}
+			entry.StatusLabel = processStatusLabel(entry.Status)
 			row.Substeps = append(row.Substeps, entry)
+			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+				pastTermination = true
+			}
 		}
 		timeline = append(timeline, row)
 	}
@@ -6858,16 +7062,13 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 	if process == nil {
 		return export
 	}
-	status := strings.TrimSpace(process.Status)
-	if status == "" {
-		status = "active"
-	}
-	if status != "done" && isProcessDone(def, process) {
-		status = "done"
-	}
+	status := deriveProcessStatus(def, process)
 	export.ProcessID = process.ID.Hex()
 	export.CreatedAt = process.CreatedAt.Format(time.RFC3339)
 	export.Status = status
+	if process.Termination != nil {
+		export.Termination = notarizedProcessTermination(process.Termination)
+	}
 
 	availableMap := computeAvailability(def, process)
 	var leaves []MerkleLeaf
@@ -6907,6 +7108,41 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 	}
 	export.Merkle = buildMerkleTree(leaves)
 	return export
+}
+
+func notarizedProcessTermination(termination *ProcessTermination) *NotarizedProcessTermination {
+	if termination == nil {
+		return nil
+	}
+	view := &NotarizedProcessTermination{
+		Reason:    strings.TrimSpace(termination.Reason),
+		EndedAt:   termination.EndedAt.UTC().Format(time.RFC3339),
+		SubstepID: strings.TrimSpace(termination.SubstepID),
+	}
+	if termination.Actor != nil {
+		view.EndedBy = strings.TrimSpace(termination.Actor.ID)
+		view.EndedRole = strings.TrimSpace(termination.Actor.Role)
+	}
+	return view
+}
+
+func processTerminationView(termination *ProcessTermination) *ProcessTerminationView {
+	if termination == nil {
+		return nil
+	}
+	view := &ProcessTerminationView{
+		Reason:    strings.TrimSpace(termination.Reason),
+		SubstepID: strings.TrimSpace(termination.SubstepID),
+	}
+	if !termination.EndedAt.IsZero() {
+		view.EndedAt = termination.EndedAt.UTC().Format(time.RFC3339)
+		view.EndedAtHuman = humanReadableTraceabilityTime(termination.EndedAt)
+	}
+	if termination.Actor != nil {
+		view.EndedBy = strings.TrimSpace(termination.Actor.ID)
+		view.EndedRole = strings.TrimSpace(termination.Actor.Role)
+	}
+	return view
 }
 
 func hashMerkleLeaf(substepID string, entry NotarizedSubstep) string {
@@ -7004,6 +7240,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
 	substepOrgs := substepOrganizationMap(def)
+	terminated := process != nil && process.Termination != nil
+	terminationSubstepID := ""
+	terminationReason := ""
+	if terminated {
+		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
+		terminationReason = strings.TrimSpace(process.Termination.Reason)
+	}
+	pastTermination := false
 	for _, sub := range ordered {
 		allowedRoles := substepRoles(sub)
 		ownedRoles := append([]string(nil), actor.RoleSlugs...)
@@ -7049,6 +7293,10 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if process != nil {
 			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
 				status = "done"
+			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+				status = processStatusTerminated
+			} else if terminated && (pastTermination || terminationSubstepID == "") {
+				status = "skipped"
 			} else if availMap[sub.SubstepID] {
 				status = "available"
 			}
@@ -7057,10 +7305,20 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		orgAuthorized := stepOrgSlug == "" || strings.TrimSpace(actor.OrgSlug) == stepOrgSlug
 		disabled := status != "available" || len(matchingRoles) == 0 || !orgAuthorized
 		reason := ""
+		detailMessage := ""
 		if status == "locked" {
 			reason = "Locked by sequence"
 		} else if status == "done" {
 			reason = "Already completed"
+		} else if status == processStatusTerminated {
+			reason = "Stream ended early"
+			detailMessage = terminationReason
+			if detailMessage == "" {
+				detailMessage = "No reason provided."
+			}
+		} else if status == "skipped" {
+			reason = "Stream ended early"
+			detailMessage = "Step not completed because the stream was ended before this."
 		} else if !orgAuthorized {
 			reason = "Not authorized for organization"
 		} else if len(matchingRoles) == 0 {
@@ -7132,7 +7390,11 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			Attachments:   attachments,
 			Disabled:      disabled,
 			Reason:        reason,
+			DetailMessage: detailMessage,
 		})
+		if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+			pastTermination = true
+		}
 	}
 	return actions
 }
@@ -7210,13 +7472,16 @@ func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []Ti
 			actionCopy := action
 			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
 			switch action.Status {
-			case "done", "locked":
+			case "done", "locked", processStatusTerminated, "skipped":
 				timeline[stepIndex].Substeps[substepIndex].Status = action.Status
+				timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel(action.Status)
 			case "available":
 				if action.Disabled {
 					timeline[stepIndex].Substeps[substepIndex].Status = "active"
+					timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel("active")
 				} else {
 					timeline[stepIndex].Substeps[substepIndex].Status = "available"
+					timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel("available")
 				}
 			}
 		}
@@ -7473,6 +7738,12 @@ func cssValue(value, fallback string) template.CSS {
 
 func computeAvailability(def WorkflowDef, process *Process) map[string]bool {
 	available := map[string]bool{}
+	if isProcessClosed(def, process) {
+		for _, sub := range orderedSubsteps(def) {
+			available[sub.SubstepID] = false
+		}
+		return available
+	}
 	ordered := orderedSubsteps(def)
 	allPrevDone := true
 	for _, sub := range ordered {
@@ -7687,7 +7958,7 @@ func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if isHTMXRequest(r) {
-		s.renderActionList(w, r, process, actor, message)
+		s.renderProcessContent(w, r, process, actor, message)
 		return
 	}
 	s.renderDepartmentProcessPage(w, r, process, actor, message)
@@ -7698,31 +7969,6 @@ func isProcessContentTargetRequest(r *http.Request) bool {
 		return false
 	}
 	return strings.TrimSpace(r.Header.Get("HX-Target")) == "process-page-content"
-}
-
-func (s *Server) renderActionList(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
-	workflowKey := s.defaultWorkflowKey()
-	cfg := RuntimeConfig{}
-	var err error
-	selectedSubstepID := ""
-	if r != nil {
-		workflowKey, cfg, err = s.selectedWorkflow(r)
-		selectedSubstepID = strings.TrimSpace(r.URL.Query().Get("substep"))
-	} else {
-		cfg, err = s.runtimeConfig()
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ctx := context.Background()
-	if r != nil {
-		ctx = r.Context()
-	}
-	view := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, false)
-	if err := s.tmpl.ExecuteTemplate(w, "action_list.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 }
 
 func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {

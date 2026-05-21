@@ -76,6 +76,252 @@ func TestHandleCompleteSubstepProcessContentSelectsNextAvailable(t *testing.T) {
 	}
 }
 
+func TestHandleTerminateProcessEndsActiveStream(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, fixedNow := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=supplier+cancelled"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	rr := httptest.NewRecorder()
+
+	server.handleTerminateProcess(rr, req, processID)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	id, _ := primitive.ObjectIDFromHex(processID)
+	process, _ := store.SnapshotProcess(id)
+	if process.Status != processStatusTerminated {
+		t.Fatalf("status = %q, want %s", process.Status, processStatusTerminated)
+	}
+	if process.Termination == nil {
+		t.Fatal("expected termination metadata")
+	}
+	if process.Termination.Reason != "supplier cancelled" {
+		t.Fatalf("reason = %q", process.Termination.Reason)
+	}
+	if process.Termination.SubstepID != "1.1" {
+		t.Fatalf("substep = %q, want 1.1", process.Termination.SubstepID)
+	}
+	if !process.Termination.EndedAt.Equal(fixedNow) {
+		t.Fatalf("endedAt = %s, want %s", process.Termination.EndedAt, fixedNow)
+	}
+	if process.Progress["1_1"].State != "pending" {
+		t.Fatalf("expected current substep to remain pending, got %q", process.Progress["1_1"].State)
+	}
+}
+
+func TestHandleTerminateProcessRequiresCurrentActorAuthorization(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+	server.enforceAuth = true
+	server.identity = testIdentityForSessions(time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC), map[string]AccountUser{
+		"session": {
+			Email:     "dep2@example.com",
+			RoleSlugs: []string{"dep2"},
+			Status:    "active",
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=nope"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session"})
+	rr := httptest.NewRecorder()
+
+	server.handleTerminateProcess(rr, req, processID)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, rr.Code)
+	}
+	id, _ := primitive.ObjectIDFromHex(processID)
+	process, _ := store.SnapshotProcess(id)
+	if process.Termination != nil || process.Status == processStatusTerminated {
+		t.Fatalf("expected process to remain active, got status=%q termination=%#v", process.Status, process.Termination)
+	}
+}
+
+func TestHandleTerminateProcessErrorPaths(t *testing.T) {
+	t.Run("empty reason", func(t *testing.T) {
+		store := NewMemoryStore()
+		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason="))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+		}
+		id, _ := primitive.ObjectIDFromHex(processID)
+		process, _ := store.SnapshotProcess(id)
+		if process.Termination == nil {
+			t.Fatal("expected termination metadata")
+		}
+		if process.Termination.Reason != "" {
+			t.Fatalf("reason = %q, want empty", process.Termination.Reason)
+		}
+	})
+
+	t.Run("already ended", func(t *testing.T) {
+		store := NewMemoryStore()
+		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+		id, _ := primitive.ObjectIDFromHex(processID)
+		process, _ := store.SnapshotProcess(id)
+		process.Status = "done"
+		store.SeedProcess(process)
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=done"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusConflict {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusConflict)
+		}
+	})
+
+	t.Run("cerbos denied", func(t *testing.T) {
+		store := NewMemoryStore()
+		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
+			decide: func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
+				return false, nil
+			},
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=blocked"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("store failure", func(t *testing.T) {
+		store := NewMemoryStore()
+		store.UpdateStatusErr = assertErr("status failed")
+		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=write+failed"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("cerbos error", func(t *testing.T) {
+		store := NewMemoryStore()
+		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{
+			decide: func(actor Actor, processID string, workflowKey string, sub WorkflowSub, stepOrder int, stepOrgSlug string, sequenceOK bool) (bool, error) {
+				return false, assertErr("cerbos unavailable")
+			},
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=check"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadGateway)
+		}
+	})
+
+	t.Run("missing authorizer", func(t *testing.T) {
+		store := NewMemoryStore()
+		server, processID, _ := newServerForCompleteTests(t, store, nil)
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=no+cerbos"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadGateway)
+		}
+	})
+
+	t.Run("workflow mismatch", func(t *testing.T) {
+		store := NewMemoryStore()
+		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+		id, _ := primitive.ObjectIDFromHex(processID)
+		process, _ := store.SnapshotProcess(id)
+		process.WorkflowKey = "other"
+		store.SeedProcess(process)
+
+		req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=wrong+workflow"))
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testFormataRuntimeConfig(),
+		}))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		rr := httptest.NewRecorder()
+
+		server.handleTerminateProcess(rr, req, processID)
+
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+		}
+	})
+}
+
+func TestHandleTerminateProcessBuildsDPPAndRendersProcessContent(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}DONE {{.ActionList.ProcessDone}} {{.DPPURL}}{{end}}`))
+	cfg := testFormataRuntimeConfig()
+	cfg.DPP = DPPConfig{
+		Enabled:        true,
+		GTIN:           "09506000134352",
+		LotDefault:     "LOT-001",
+		SerialStrategy: "process_id_hex",
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/terminate", strings.NewReader("reason=dpp"))
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: cfg,
+	}))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "process-page-content")
+	rr := httptest.NewRecorder()
+
+	server.handleTerminateProcess(rr, req, processID)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if !strings.Contains(rr.Body.String(), "DONE true /01/09506000134352/10/LOT-001/21/") {
+		t.Fatalf("expected process content with DPP link, got %q", rr.Body.String())
+	}
+	id, _ := primitive.ObjectIDFromHex(processID)
+	process, _ := store.SnapshotProcess(id)
+	if process.DPP == nil {
+		t.Fatal("expected DPP to be persisted")
+	}
+}
+
 func TestHandleCompleteSubstepProcessNotFoundPaths(t *testing.T) {
 	missingID := primitive.NewObjectID().Hex()
 	server := &Server{
@@ -158,6 +404,16 @@ func TestHandleCompleteSubstepRejectsInvalidFormataJSON(t *testing.T) {
 	}
 	if !strings.Contains(invalidJSONRec.Body.String(), "Value must be a valid JSON object.") {
 		t.Fatalf("expected parse error message in body, got %q", invalidJSONRec.Body.String())
+	}
+}
+
+func TestParseCompletionPayloadRejectsNonFormataSubstep(t *testing.T) {
+	server := &Server{}
+	req := httptest.NewRequest(http.MethodPost, "/process/p/substep/1.1/complete", strings.NewReader("value=1"))
+
+	_, err := server.parseCompletionPayload(req, primitive.NewObjectID(), WorkflowSub{InputType: "string"}, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "Only formata substeps are supported") {
+		t.Fatalf("error = %v, want formata-only error", err)
 	}
 }
 

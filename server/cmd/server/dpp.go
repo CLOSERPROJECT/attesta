@@ -143,6 +143,14 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 		return steps
 	}
 	availableMap := computeAvailability(def, process)
+	terminated := process.Termination != nil
+	terminationSubstepID := ""
+	terminationReason := ""
+	if terminated {
+		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
+		terminationReason = strings.TrimSpace(process.Termination.Reason)
+	}
+	pastTermination := false
 	for _, step := range sortedSteps(def) {
 		stepView := DPPTraceabilityStep{
 			StepID:           step.StepID,
@@ -213,6 +221,19 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				subView.Digest = digestPayload(progress.Data)
 				subView.Values = dppTraceValues(sub, progress.Data)
 				subView.Attachments = buildActionAttachments(workflowKey, process, progress.Data)
+			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+				subView.Status = processStatusTerminated
+				subView.Reason = "Stream ended early"
+				subView.DetailMessage = terminationReason
+				if subView.DetailMessage == "" {
+					subView.DetailMessage = "No reason provided."
+				}
+				allDone = false
+			} else if terminated && (pastTermination || terminationSubstepID == "") {
+				subView.Status = "skipped"
+				subView.Reason = "Stream ended early"
+				subView.DetailMessage = "Step not completed because the stream was ended before this."
+				allDone = false
 			} else if availableMap[sub.SubstepID] {
 				subView.Status = "available"
 				allDone = false
@@ -220,6 +241,9 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				allDone = false
 			}
 			stepView.Substeps = append(stepView.Substeps, subView)
+			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+				pastTermination = true
+			}
 		}
 		if allDone && !latestDoneAt.IsZero() {
 			stepView.CompletedAt = latestDoneAt.UTC().Format(time.RFC3339)

@@ -31,6 +31,7 @@ type Store interface {
 	HasProcessesByWorkflow(ctx context.Context, workflowKey string) (bool, error)
 	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error
 	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error
+	UpdateProcessTermination(ctx context.Context, id primitive.ObjectID, workflowKey string, termination ProcessTermination) error
 	UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error
 	InsertNotarization(ctx context.Context, notarization Notarization) error
 	SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error)
@@ -390,6 +391,18 @@ func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.Objec
 	return err
 }
 
+func (s *MongoStore) UpdateProcessTermination(ctx context.Context, id primitive.ObjectID, workflowKey string, termination ProcessTermination) error {
+	update := bson.M{
+		"$set": bson.M{
+			"status":      processStatusTerminated,
+			"workflowKey": workflowKey,
+			"termination": termination,
+		},
+	}
+	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, update)
+	return err
+}
+
 func (s *MongoStore) UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error {
 	update := bson.M{
 		"$set": bson.M{
@@ -694,6 +707,23 @@ func (s *MemoryStore) UpdateProcessStatus(_ context.Context, id primitive.Object
 	return nil
 }
 
+func (s *MemoryStore) UpdateProcessTermination(_ context.Context, id primitive.ObjectID, workflowKey string, termination ProcessTermination) error {
+	if s.UpdateStatusErr != nil {
+		return s.UpdateStatusErr
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	process, ok := s.processes[id]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	process.WorkflowKey = strings.TrimSpace(workflowKey)
+	process.Status = processStatusTerminated
+	process.Termination = cloneProcessTermination(&termination)
+	s.processes[id] = process
+	return nil
+}
+
 func (s *MemoryStore) UpdateProcessDPP(_ context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -947,11 +977,24 @@ func cloneProcess(process Process) Process {
 		dpp := *process.DPP
 		cloned.DPP = &dpp
 	}
+	cloned.Termination = cloneProcessTermination(process.Termination)
 	cloned.Progress = make(map[string]ProcessStep, len(process.Progress))
 	for key, value := range process.Progress {
 		cloned.Progress[key] = cloneProcessStep(value)
 	}
 	return cloned
+}
+
+func cloneProcessTermination(termination *ProcessTermination) *ProcessTermination {
+	if termination == nil {
+		return nil
+	}
+	cloned := *termination
+	if termination.Actor != nil {
+		actor := *termination.Actor
+		cloned.Actor = &actor
+	}
+	return &cloned
 }
 
 func cloneProcessStep(step ProcessStep) ProcessStep {

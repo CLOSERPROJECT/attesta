@@ -444,3 +444,30 @@ func TestBuildProcessDownloadAttachmentsAdditionalOrdering(t *testing.T) {
 		t.Fatalf("views = %#v", views)
 	}
 }
+
+func TestAttachmentsFromValueCollectsNestedPrimitiveValues(t *testing.T) {
+	files := attachmentsFromValue(primitive.A{
+		primitive.M{
+			"attachmentId": "a1",
+			"filename":     "a.pdf",
+			"contentType":  "application/pdf",
+			"size":         int64(12),
+			"sha256":       "abc",
+		},
+		map[string]interface{}{
+			"nested": []interface{}{
+				map[string]interface{}{
+					"attachmentId": "a2",
+					"filename":     "b.pdf",
+				},
+			},
+		},
+	})
+
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %#v", files)
+	}
+	if files[0].AttachmentID != "a1" || files[1].AttachmentID != "a2" {
+		t.Fatalf("unexpected attachment ids: %#v", files)
+	}
+}

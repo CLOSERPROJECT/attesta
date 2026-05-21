@@ -101,7 +101,7 @@ func testTemplates() *template.Template {
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.RoleColor}} {{.RoleBorder}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{template "process_content.html" .}}{{end}}
-{{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}}{{template "action_list.html" .ActionList}}{{end}}
+{{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}} {{.ActionList.Error}}{{with .ActionList.Action}}{{.SubstepID}}{{end}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
@@ -116,9 +116,8 @@ func testTemplates() *template.Template {
 {{define "dept_dashboard_body"}}{{template "dept_dashboard_content" .}}{{end}}
 {{define "backoffice_department.html"}}{{template "layout.html" .}}{{end}}
 {{define "backoffice_department_partial.html"}}{{template "dept_dashboard_content" .}}{{end}}
-{{define "dept_process_body"}}PROCESS_PAGE {{template "action_list.html" .}}{{end}}
+{{define "dept_process_body"}}PROCESS_PAGE {{.Error}}{{end}}
 {{define "backoffice_process.html"}}{{template "layout.html" .}}{{end}}
-{{define "action_list.html"}}ACTION_LIST {{.Error}}{{end}}
 {{define "error_banner.html"}}{{if .Error}}ERROR {{.Error}}{{end}}{{end}}
 `))
 }

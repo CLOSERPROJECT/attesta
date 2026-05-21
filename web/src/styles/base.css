@@ -70,6 +70,12 @@
   --substep-done-border: #d4d4d4;
   --substep-available: #e9f1ef;
   --substep-available-border: #d4dbd9;
+  --substep-terminated: #dd8379;
+  --substep-skipped: #f2f0ed;
+  --stream-available: var(--accent);
+  --stream-active: #5385d1;
+  --stream-done: #b3b3b3;
+  --stream-terminated: #dd8379;
   --formata-muted: var(--muted);
   --formata-accent: var(--accent);
 }
@@ -135,6 +141,7 @@
   --substep-done-border: rgba(255, 255, 255, 0.14);
   --substep-available: rgba(87, 194, 166, 0.12);
   --substep-available-border: rgba(87, 194, 166, 0.22);
+  --substep-skipped: rgba(255, 255, 255, 0.04);
   --error-bg: rgba(255, 107, 95, 0.14);
   --error-ink: #ffd1cc;
   --confirmation-bg: rgba(87, 194, 166, 0.12);
@@ -762,6 +769,17 @@ button.secondary-small {
   background: var(--substep-done);
 }
 
+.substep-terminated {
+  border-color: var(--substep-terminated);
+  background: color-mix(in srgb, var(--substep-terminated) 5%, transparent);
+}
+
+.substep-skipped {
+  opacity: 0.55;
+  border-color: var(--substep-done-border);
+  background: var(--substep-skipped);
+}
+
 .substep-head {
   display: flex;
   align-items: start;
@@ -790,24 +808,38 @@ button.secondary-small {
 }
 
 .substep-available .substep-head .status {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--panel);
+  border-color: var(--stream-available);
+  color: var(--stream-available);
+  background-color: color-mix(in srgb, var(--stream-available) 5%, transparent);
 }
 
 .substep-active .substep-head .status {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--stream-active);
+  color: var(--stream-active);
+  background-color: color-mix(in srgb, var(--stream-active) 5%, transparent);
 }
 
 .substep-done .substep-head .status {
-  border-color: var(--substep-done-border);
-  background: var(--substep-done);
+  border-color: var(--stream-done);
+  color: var(--stream-done);
+  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
 }
 
 .substep-locked .substep-head .status {
+  border-color: var(--stream-done);
+  color: var(--stream-done);
+  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
+}
+
+.substep-terminated .substep-head .status {
+  border-color: var(--stream-terminated);
+  color: var(--stream-terminated);
+  background-color: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
+}
+
+.substep-skipped .substep-head .status {
   border-color: var(--substep-done-border);
-  background: var(--substep-done);
+  background: var(--substep-skipped);
 }
 
 .substep-meta {
@@ -1504,16 +1536,29 @@ button.secondary-small {
   padding: 10px 12px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: var(--panel);
   display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
   color: inherit;
   text-decoration: none;
 }
 
+.process-available .process-item-link {
+  padding-left: 7px;
+}
+
+.process-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0px 6px;
+}
+
 .process-item-link:hover,
 .process-item-link:focus-visible {
-  border-color: var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 10%, var(--panel));
   transform: translateY(-1px);
   text-decoration: none;
 }
@@ -1524,15 +1569,32 @@ button.secondary-small {
 }
 
 .process-available .process-item-link {
-  background: var(--substep-available);
+  border-left: 6px solid var(--stream-available);
+  border-color: var(--stream-available);
 }
 
-.process-active .process-item-link {
-  background: color-mix(in srgb, var(--substep-available) 30%, var(--panel));
+.process-item-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--stream-active);
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
-.process-done .process-item-link {
-  background: var(--substep-done);
+.process-item-icon.status-available {
+  color: var(--stream-available);
+}
+
+.process-item-icon.status-done {
+  color: var(--stream-done);
+}
+
+.process-item-icon.status-terminated {
+  color: var(--stream-terminated);
 }
 
 .no-process-item {
@@ -1635,6 +1697,24 @@ button.secondary-small {
   width: 0;
 }
 
+.process-active .process-progress-fill {
+  height: 100%;
+  background: var(--stream-active);
+  width: 0;
+}
+
+.process-done .process-progress-fill {
+  height: 100%;
+  background: var(--stream-done);
+  width: 0;
+}
+
+.process-terminated .process-progress-fill {
+  height: 100%;
+  background: var(--stream-terminated);
+  width: 0;
+}
+
 .status-tag {
   padding: 2px 8px;
   border-radius: 4px;
@@ -1642,7 +1722,6 @@ button.secondary-small {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   border: 1px solid var(--border);
-  background: var(--tag-bg);
 }
 
 .status-tag-compact {
@@ -1651,17 +1730,27 @@ button.secondary-small {
 }
 
 .status-tag.status-active {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--stream-active);
+  color: var(--stream-active);
+  background-color: color-mix(in srgb, var(--stream-active) 5%, transparent);
 }
 
 .status-tag.status-available {
-  color: var(--panel);
-  background: var(--accent);
+  color: var(--stream-available);
+  border-color: var(--stream-available);
+  background-color: color-mix(in srgb, var(--stream-available) 5%, transparent);
 }
 
 .status-tag.status-done {
-  background: var(--substep-done);
+  color: var(--stream-done);
+  border-color: var(--stream-done);
+  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
+}
+
+.status-tag.status-terminated {
+  color: var(--stream-terminated);
+  border-color: var(--stream-terminated);
+  background: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
 }
 
 .process-meta {

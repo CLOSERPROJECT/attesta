@@ -153,6 +153,16 @@
     background: var(--substep-done);
   }
 
+  .substep.substep-terminated .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-terminated-border);
+    background: var(--substep-terminated);
+  }
+
+  .substep.substep-skipped .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-skipped);
+  }
+
   .substep-accordion[open] > summary {
     position: sticky;
     top: 0;

@@ -84,6 +84,28 @@ func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 	}
 }
 
+func TestBuildTimelineTerminatedStreamStatuses(t *testing.T) {
+	cfg := testRuntimeConfig()
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done", Data: map[string]interface{}{"value": 10.0}},
+		},
+		Termination: &ProcessTermination{SubstepID: "1.2"},
+	}
+
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{}, nil)
+	if len(timeline) == 0 || len(timeline[0].Substeps) < 3 {
+		t.Fatalf("unexpected timeline shape: %#v", timeline)
+	}
+	if got := timeline[0].Substeps[1].Status; got != processStatusTerminated {
+		t.Fatalf("terminated status = %q, want %s", got, processStatusTerminated)
+	}
+	if got := timeline[0].Substeps[2].Status; got != "skipped" {
+		t.Fatalf("skipped status = %q, want skipped", got)
+	}
+}
+
 func TestBuildTimelineUsesRoleStyleForAvailableSubsteps(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{

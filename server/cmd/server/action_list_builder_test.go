@@ -83,6 +83,51 @@ func TestBuildActionListDoneFileAttachments(t *testing.T) {
 	}
 }
 
+func TestBuildActionListTerminatedStreamDetails(t *testing.T) {
+	cfg := testRuntimeConfig()
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done", Data: map[string]interface{}{"value": 10.0}},
+		},
+		Termination: &ProcessTermination{
+			Reason:    "supplier cancelled",
+			SubstepID: "1.2",
+		},
+	}
+
+	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, map[string]RoleMeta{})
+	terminated := findAction(t, actions, "1.2")
+	if terminated.Status != processStatusTerminated {
+		t.Fatalf("terminated status = %q, want %s", terminated.Status, processStatusTerminated)
+	}
+	if terminated.DetailMessage != "supplier cancelled" {
+		t.Fatalf("terminated detail = %q", terminated.DetailMessage)
+	}
+	skipped := findAction(t, actions, "1.3")
+	if skipped.Status != "skipped" {
+		t.Fatalf("skipped status = %q, want skipped", skipped.Status)
+	}
+	if skipped.DetailMessage != "Step not completed because the stream was ended before this." {
+		t.Fatalf("skipped detail = %q", skipped.DetailMessage)
+	}
+}
+
+func TestBuildActionListTerminatedStreamWithoutReason(t *testing.T) {
+	cfg := testRuntimeConfig()
+	process := &Process{
+		ID:          primitive.NewObjectID(),
+		Progress:    map[string]ProcessStep{},
+		Termination: &ProcessTermination{SubstepID: "1.1"},
+	}
+
+	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[string]RoleMeta{})
+	action := findAction(t, actions, "1.1")
+	if action.DetailMessage != "No reason provided." {
+		t.Fatalf("detail = %q, want no reason message", action.DetailMessage)
+	}
+}
+
 func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{

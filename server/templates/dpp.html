@@ -45,6 +45,39 @@
           >Serial|{{ .Serial }}</span
         >
       </div>
+      {{ if .Termination }}
+        <hr style="margin: 24px 0;" />
+        <div class="panel-block">
+          <h2 style="color: var(--danger); margin-bottom: 0px;">
+            Stream ended early
+          </h2>
+          <p style="margin: 3px 0 20px;">
+            {{ if .Termination.EndedAtHuman }}
+              Ended at
+              {{ .Termination.EndedAtHuman }}
+            {{ end }}
+            {{ if .Termination.EndedBy }}
+              by
+              {{ if and (ge (len .Termination.EndedBy) 9) (eq (slice .Termination.EndedBy 0 9) "appwrite:") }}
+                {{ slice .Termination.EndedBy 9 }}
+              {{ else }}
+                {{ .Termination.EndedBy }}
+              {{ end }}
+            {{ end }}
+            {{ if .Termination.SubstepID }}
+              while substep {{ .Termination.SubstepID }} was available
+            {{ end }}
+          </p>
+          {{ if .Termination.Reason }}
+            <dl class="action-submitted-values">
+              <dt>Reason</dt>
+              <dd>{{ .Termination.Reason }}</dd>
+            </dl>
+          {{ else }}
+            <span class="muted">No reason provided.</span>
+          {{ end }}
+        </div>
+      {{ end }}
       <hr style="margin: 24px 0;" />
       <h2>History</h2>
       <div class="dpp-history-list">
@@ -124,6 +157,14 @@
                             class="action-submitted"
                             style="margin-top: 20px;"
                           >
+                            {{ if .DetailMessage }}
+                              <p
+                                class="muted"
+                                style="white-space: pre-line; margin: 0;"
+                              >
+                                {{- .DetailMessage -}}
+                              </p>
+                            {{ end }}
                             <dl class="action-submitted-values">
                               {{ if .Values }}
                                 {{ range .Values }}

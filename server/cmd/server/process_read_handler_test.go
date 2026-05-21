@@ -33,8 +33,8 @@ func TestHandleProcessPageAndContentSuccess(t *testing.T) {
 	if !strings.Contains(pageRec.Body.String(), "PROCESS "+id.Hex()) {
 		t.Fatalf("expected process marker in page response, got %q", pageRec.Body.String())
 	}
-	if !strings.Contains(pageRec.Body.String(), "ACTION_LIST") {
-		t.Fatalf("expected action list in page response, got %q", pageRec.Body.String())
+	if !strings.Contains(pageRec.Body.String(), "PROCESS_CONTENT "+id.Hex()) {
+		t.Fatalf("expected process content in page response, got %q", pageRec.Body.String())
 	}
 
 	contentReq := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/content", nil)

@@ -90,12 +90,6 @@ func TestRenderActionViewsReturn500WhenConfigFails(t *testing.T) {
 	process := &Process{ID: primitive.NewObjectID(), Progress: map[string]ProcessStep{}}
 	actor := Actor{ID: "u1", Role: "dep1"}
 
-	listRec := httptest.NewRecorder()
-	server.renderActionList(listRec, nil, process, actor, "error")
-	if listRec.Code != http.StatusInternalServerError {
-		t.Fatalf("renderActionList status = %d, want %d", listRec.Code, http.StatusInternalServerError)
-	}
-
 	pageRec := httptest.NewRecorder()
 	server.renderDepartmentProcessPage(pageRec, nil, process, actor, "error")
 	if pageRec.Code != http.StatusInternalServerError {
