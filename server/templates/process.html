@@ -39,12 +39,117 @@
       <div class="process-resources-grid">
         {{ template "workflow_timeline" .ActionList }}
         <div class="stack tablet-seprator" style="gap: 16px;">
+          {{ if .ActionList.Termination }}
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Stream ended early</h2>
+                <p>
+                  {{ if .ActionList.Termination.EndedAtHuman }}
+                    Ended at
+                    {{ .ActionList.Termination.EndedAtHuman }}
+                  {{ end }}
+                  {{ if .ActionList.Termination.EndedBy }}
+                    by
+                    {{ if and (ge (len .ActionList.Termination.EndedBy) 9) (eq (slice .ActionList.Termination.EndedBy 0 9) "appwrite:") }}
+                      {{ slice .ActionList.Termination.EndedBy 9 }}
+                    {{ else }}
+                      {{ .ActionList.Termination.EndedBy }}
+                    {{ end }}
+                  {{ end }}
+                  {{ if .ActionList.Termination.SubstepID }}
+                    while substep {{ .ActionList.Termination.SubstepID }} was
+                    available
+                  {{ end }}
+                </p>
+              </div>
+              <dl class="action-submitted-values">
+                <dt>Reason</dt>
+                <dd>{{ .ActionList.Termination.Reason }}</dd>
+              </dl>
+            </section>
+          {{ end }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}
         </div>
       </div>
     {{ else }}
       {{ template "workflow_timeline" .ActionList }}
+      {{ if .ActionList.CanTerminate }}
+        <div class="manage-dialog-actions manage-dialog-actions-end">
+          <button
+            type="button"
+            class="danger"
+            onclick="document.getElementById('terminate-process-dialog').showModal()"
+          >
+            {{ template "icon-stop" . }} End stream
+          </button>
+        </div>
+        <dialog id="terminate-process-dialog" class="manage-dialog">
+          <div class="manage-dialog-card">
+            <header class="manage-dialog-head">
+              <div>
+                <h3 class="manage-dialog-title manage-dialog-danger-title">
+                  Danger zone - End stream early
+                </h3>
+                <p class="manage-dialog-subtitle">
+                  Available substep
+                  {{ .ActionList.TerminateSubstep }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="secondary secondary-small"
+                onclick="document.getElementById('terminate-process-dialog').close()"
+              >
+                {{ template "icon-close" . }}
+              </button>
+            </header>
+            <form
+              method="post"
+              action="{{ .ActionList.TerminateAction }}"
+              class="input-form"
+            >
+              {{ if .ActionList.TerminateRoles }}
+                {{ if eq (len .ActionList.TerminateRoles) 1 }}
+                  <input
+                    type="hidden"
+                    name="activeRole"
+                    value="{{ (index .ActionList.TerminateRoles 0).Slug }}"
+                  />
+                {{ else }}
+                  <label>
+                    <span>End stream as</span>
+                    <select name="activeRole" required>
+                      <option value="">Select role</option>
+                      {{ range .ActionList.TerminateRoles }}
+                        <option value="{{ .Slug }}">{{ .Label }}</option>
+                      {{ end }}
+                    </select>
+                  </label>
+                {{ end }}
+              {{ end }}
+              <label>
+                <span
+                  >This will permanently end this stream instance. Confirm only
+                  if you want to continue. Optionally you can enter a
+                  reason:</span
+                >
+                <textarea
+                  name="reason"
+                  rows="5"
+                  maxlength="1000"
+                  style="width: 100%; box-sizing: border-box; resize: vertical;"
+                ></textarea>
+              </label>
+              <div class="manage-dialog-actions manage-dialog-actions-end">
+                <button type="submit" class="danger">
+                  {{ template "icon-stop" . }} End stream
+                </button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      {{ end }}
     {{ end }}
   </div>
 {{ end }}
@@ -167,7 +272,9 @@
         <ul class="timeline-substeps">
           {{ range .Substeps }}
             <li
-              class="substep{{ if not $.HideStatus }} substep-{{ .Status }}{{ end }}"
+              class="substep{{ if not $.HideStatus }}
+                substep-{{ .Status }}
+              {{ end }}"
               style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
             >
               <details

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"html/template"
 	"net/http"
@@ -208,6 +209,51 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 	}
 	if strings.Contains(body, ">Documents<") {
 		t.Fatalf("expected no Documents section, got %q", body)
+	}
+}
+
+func TestHandleDigitalLinkDPPHTMLShowsPrematureTermination(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
+
+	store := NewMemoryStore()
+	process := seedDPPProcess(store)
+	endedAt := time.Date(2026, 3, 6, 9, 15, 0, 0, time.UTC)
+	process.Termination = &ProcessTermination{
+		Reason:    "supplier cancelled",
+		EndedAt:   endedAt,
+		Actor:     &Actor{ID: "appwrite:user-1", Role: "dep1"},
+		SubstepID: "1.2",
+	}
+	store.SeedProcess(process)
+	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	server := &Server{
+		store: store,
+		tmpl:  tmpl,
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "ended@example.com", Status: "active"}, nil
+			},
+		},
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "Stream ended early") || !strings.Contains(body, "supplier cancelled") {
+		t.Fatalf("expected premature termination in DPP body, got %q", body)
+	}
+	if strings.Contains(body, "ended@example.com") || !strings.Contains(body, "user-1") {
+		t.Fatalf("expected DPP termination to keep user id, got %q", body)
 	}
 }
 

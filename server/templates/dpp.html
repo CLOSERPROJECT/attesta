@@ -45,6 +45,34 @@
           >Serial|{{ .Serial }}</span
         >
       </div>
+      {{ if .Termination }}
+        <div
+          class="panel-block"
+          style="border-color: var(--danger); margin-bottom: 16px;"
+        >
+          <h2 style="color: var(--danger);">Stream ended early</h2>
+          <p style="margin: 0 0 12px;">
+            {{ if .Termination.EndedAtHuman }}
+              Ended at {{ .Termination.EndedAtHuman }}
+            {{ end }}
+            {{ if .Termination.EndedBy }}
+              by
+              {{ if and (ge (len .Termination.EndedBy) 9) (eq (slice .Termination.EndedBy 0 9) "appwrite:") }}
+                {{ slice .Termination.EndedBy 9 }}
+              {{ else }}
+                {{ .Termination.EndedBy }}
+              {{ end }}
+            {{ end }}
+            {{ if .Termination.SubstepID }}
+              while substep {{ .Termination.SubstepID }} was available
+            {{ end }}
+          </p>
+          <dl class="action-submitted-values">
+            <dt>Reason</dt>
+            <dd>{{ .Termination.Reason }}</dd>
+          </dl>
+        </div>
+      {{ end }}
       <hr style="margin: 24px 0;" />
       <h2>History</h2>
       <div class="dpp-history-list">

@@ -163,6 +163,19 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 	if allowedTimeline[0].Substeps[2].DoneBy != "legacy-user" {
 		t.Fatalf("legacy timeline doneBy = %q, want unchanged legacy-user", allowedTimeline[0].Substeps[2].DoneBy)
 	}
+
+	termination := &ProcessTerminationView{EndedBy: "appwrite:user-1"}
+	deniedTermination := server.applyDoneByEmailToTermination(context.Background(), def, Actor{OrgSlug: "org-z"}, termination)
+	if deniedTermination.EndedBy != "appwrite:user-1" {
+		t.Fatalf("denied termination endedBy = %q, want appwrite:user-1", deniedTermination.EndedBy)
+	}
+	allowedTermination := server.applyDoneByEmailToTermination(context.Background(), def, Actor{OrgSlug: "org-a"}, termination)
+	if allowedTermination.EndedBy != "appwrite@example.com" {
+		t.Fatalf("allowed termination endedBy = %q, want appwrite@example.com", allowedTermination.EndedBy)
+	}
+	if termination.EndedBy != "appwrite:user-1" {
+		t.Fatalf("original termination endedBy mutated to %q", termination.EndedBy)
+	}
 }
 
 func TestApplyDoneByIdentityFallbackToDPPTraceability(t *testing.T) {
