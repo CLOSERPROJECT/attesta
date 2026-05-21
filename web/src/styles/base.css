@@ -71,7 +71,6 @@
   --substep-available: #e9f1ef;
   --substep-available-border: #d4dbd9;
   --substep-terminated: #dd8379;
-  --substep-terminated-border: #ff7063;
   --substep-skipped: #f2f0ed;
   --stream-available: var(--accent);
   --stream-active: #5385d1;
@@ -142,8 +141,6 @@
   --substep-done-border: rgba(255, 255, 255, 0.14);
   --substep-available: rgba(87, 194, 166, 0.12);
   --substep-available-border: rgba(87, 194, 166, 0.22);
-  --substep-terminated: rgb(255, 165, 157);
-  --substep-terminated-border: rgb(255, 207, 203);
   --substep-skipped: rgba(255, 255, 255, 0.04);
   --error-bg: rgba(255, 107, 95, 0.14);
   --error-ink: #ffd1cc;
@@ -773,8 +770,8 @@ button.secondary-small {
 }
 
 .substep-terminated {
-  border-color: var(--substep-terminated-border);
-  background: var(--substep-terminated);
+  border-color: var(--substep-terminated);
+  background: color-mix(in srgb, var(--substep-terminated) 5%, transparent);
 }
 
 .substep-skipped {
@@ -811,30 +808,33 @@ button.secondary-small {
 }
 
 .substep-available .substep-head .status {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--panel);
+  border-color: var(--stream-available);
+  color: var(--stream-available);
+  background-color: color-mix(in srgb, var(--stream-available) 5%, transparent);
 }
 
 .substep-active .substep-head .status {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--stream-active);
+  color: var(--stream-active);
+  background-color: color-mix(in srgb, var(--stream-active) 5%, transparent);
 }
 
 .substep-done .substep-head .status {
-  border-color: var(--substep-done-border);
-  background: var(--substep-done);
+  border-color: var(--stream-done);
+  color: var(--stream-done);
+  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
 }
 
 .substep-locked .substep-head .status {
-  border-color: var(--substep-done-border);
-  background: var(--substep-done);
+  border-color: var(--stream-done);
+  color: var(--stream-done);
+  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
 }
 
 .substep-terminated .substep-head .status {
-  border-color: var(--substep-terminated-border);
-  background: var(--substep-terminated);
-  color: var(--panel);
+  border-color: var(--stream-terminated);
+  color: var(--stream-terminated);
+  background-color: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
 }
 
 .substep-skipped .substep-head .status {
@@ -1727,8 +1727,6 @@ button.secondary-small {
 .status-tag-compact {
   padding: 1px 6px;
   font-size: 10px;
-  min-width: 74px;
-  text-align: center;
 }
 
 .status-tag.status-active {

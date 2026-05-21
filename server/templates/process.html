@@ -32,13 +32,6 @@
             <span class="process-name">{{ .InstanceName }}</span>
           {{ end }}
           <span class="process-id">{{ .ProcessID }}</span>
-          <span class="status-tag status-{{ .Status }}">
-            {{ if .StatusLabel }}
-              {{ .StatusLabel }}
-            {{ else }}
-              {{ .Status }}
-            {{ end }}
-          </span>
         </p>
       </div>
     </section>
