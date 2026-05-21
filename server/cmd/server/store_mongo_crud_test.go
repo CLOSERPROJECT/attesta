@@ -332,7 +332,7 @@ func TestMongoStoreUpdateProcessTermination(t *testing.T) {
 	}
 	expected := bson.M{
 		"$set": bson.M{
-			"status":      "done",
+			"status":      processStatusTerminated,
 			"workflowKey": "wf-a",
 			"termination": termination,
 		},

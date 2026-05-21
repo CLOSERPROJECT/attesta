@@ -70,6 +70,9 @@
   --substep-done-border: #d4d4d4;
   --substep-available: #e9f1ef;
   --substep-available-border: #d4dbd9;
+  --substep-terminated: #f78d82;
+  --substep-terminated-border: #ff7063;
+  --substep-skipped: #f2f0ed;
   --formata-muted: var(--muted);
   --formata-accent: var(--accent);
 }
@@ -135,6 +138,9 @@
   --substep-done-border: rgba(255, 255, 255, 0.14);
   --substep-available: rgba(87, 194, 166, 0.12);
   --substep-available-border: rgba(87, 194, 166, 0.22);
+  --substep-terminated: rgb(255, 165, 157);
+  --substep-terminated-border: rgb(255, 207, 203);
+  --substep-skipped: rgba(255, 255, 255, 0.04);
   --error-bg: rgba(255, 107, 95, 0.14);
   --error-ink: #ffd1cc;
   --confirmation-bg: rgba(87, 194, 166, 0.12);
@@ -762,6 +768,17 @@ button.secondary-small {
   background: var(--substep-done);
 }
 
+.substep-terminated {
+  border-color: var(--substep-terminated-border);
+  background: var(--substep-terminated);
+}
+
+.substep-skipped {
+  opacity: 0.55;
+  border-color: var(--substep-done-border);
+  background: var(--substep-skipped);
+}
+
 .substep-head {
   display: flex;
   align-items: start;
@@ -808,6 +825,17 @@ button.secondary-small {
 .substep-locked .substep-head .status {
   border-color: var(--substep-done-border);
   background: var(--substep-done);
+}
+
+.substep-terminated .substep-head .status {
+  border-color: var(--substep-terminated-border);
+  background: var(--substep-terminated);
+  color: var(--panel);
+}
+
+.substep-skipped .substep-head .status {
+  border-color: var(--substep-done-border);
+  background: var(--substep-skipped);
 }
 
 .substep-meta {
@@ -1662,6 +1690,12 @@ button.secondary-small {
 
 .status-tag.status-done {
   background: var(--substep-done);
+}
+
+.status-tag.status-terminated {
+  border-color: var(--substep-terminated-border);
+  background: var(--substep-terminated);
+  color: var(--panel);
 }
 
 .process-meta {

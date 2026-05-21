@@ -192,6 +192,12 @@
                       Done
                     </option>
                     <option
+                      value="terminated"
+                      {{ if eq .StatusFilter "terminated" }}selected{{ end }}
+                    >
+                      Terminated
+                    </option>
+                    <option
                       value="active"
                       {{ if eq .StatusFilter "active" }}selected{{ end }}
                     >
@@ -216,7 +222,11 @@
                         </span>
                         <span
                           class="status-tag status-tag-compact status-{{ .Status }}"
-                          >{{ .Status }}</span
+                          >{{ if .StatusLabel }}
+                            {{ .StatusLabel }}
+                          {{ else }}
+                            {{ .Status }}
+                          {{ end }}</span
                         >
                       </div>
                       <div

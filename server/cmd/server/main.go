@@ -35,6 +35,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	processStatusActive     = "active"
+	processStatusDone       = "done"
+	processStatusTerminated = "terminated"
+)
+
 type WorkflowDef struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
 	Name        string             `bson:"name" yaml:"name"`
@@ -158,6 +164,7 @@ type TimelineSubstep struct {
 	RoleColor    template.CSS
 	RoleBorder   template.CSS
 	Status       string
+	StatusLabel  string
 	DoneBy       string
 	DoneRole     string
 	DoneAt       string
@@ -256,6 +263,7 @@ type ActionView struct {
 	Disabled      bool
 	ReadOnly      bool
 	Reason        string
+	DetailMessage string
 }
 
 type ActionRoleBadge struct {
@@ -428,6 +436,7 @@ type ProcessListItem struct {
 	ID              string
 	Name            string
 	Status          string
+	StatusLabel     string
 	CreatedAt       string
 	CreatedAtTime   time.Time
 	DoneSubsteps    int
@@ -641,6 +650,8 @@ type ProcessPageView struct {
 	PageBase
 	ProcessID    string
 	InstanceName string
+	Status       string
+	StatusLabel  string
 	ActionList   ActionListView
 	DPPURL       string
 	DPPGS1       string
@@ -1538,14 +1549,20 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 
 func deriveProcessStatus(def WorkflowDef, process *Process) string {
 	if process == nil {
-		return "active"
+		return processStatusActive
+	}
+	if process.Termination != nil {
+		return processStatusTerminated
 	}
 	status := strings.TrimSpace(process.Status)
 	if status == "" {
-		status = "active"
+		status = processStatusActive
 	}
-	if status != "done" && isProcessDone(def, process) {
-		status = "done"
+	if status == processStatusTerminated {
+		return processStatusTerminated
+	}
+	if status != processStatusDone && isProcessDone(def, process) {
+		status = processStatusDone
 	}
 	return status
 }
@@ -1554,7 +1571,17 @@ func isProcessClosed(def WorkflowDef, process *Process) bool {
 	if process == nil {
 		return false
 	}
-	return strings.TrimSpace(process.Status) == "done" || isProcessDone(def, process)
+	status := strings.TrimSpace(process.Status)
+	return status == processStatusDone || status == processStatusTerminated || process.Termination != nil || isProcessDone(def, process)
+}
+
+func processStatusLabel(status string) string {
+	switch strings.TrimSpace(status) {
+	case processStatusTerminated:
+		return "TERMINATED"
+	default:
+		return strings.TrimSpace(status)
+	}
 }
 
 func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcessCounts {
@@ -1564,7 +1591,7 @@ func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcess
 		status := deriveProcessStatus(def, &process)
 		doneCount, _, _ := processProgressStats(def, &process)
 		switch {
-		case status == "done":
+		case status == processStatusDone || status == processStatusTerminated:
 			counts.Terminated++
 		case doneCount == 0:
 			counts.NotStarted++
@@ -1858,7 +1885,7 @@ func normalizeHomeSortKey(value string) string {
 
 func normalizeHomeStatusFilter(value string) string {
 	switch strings.TrimSpace(strings.ToLower(value)) {
-	case "active", "done":
+	case processStatusActive, processStatusDone, processStatusTerminated:
 		return strings.TrimSpace(strings.ToLower(value))
 	default:
 		return "all"
@@ -4741,6 +4768,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			ID:              process.ID.Hex(),
 			Name:            strings.TrimSpace(process.Name),
 			Status:          status,
+			StatusLabel:     processStatusLabel(status),
 			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtTime:   process.CreatedAt,
 			DoneSubsteps:    doneCount,
@@ -4752,6 +4780,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		if item.Status == "active" {
 			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta); ok {
 				item.Status = "available"
+				item.StatusLabel = processStatusLabel(item.Status)
 			}
 		}
 		processes = append(processes, item)
@@ -5036,14 +5065,18 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
 	processID := ""
 	instanceName := ""
+	status := processStatusActive
 	if process != nil {
 		processID = process.ID.Hex()
 		instanceName = strings.TrimSpace(process.Name)
+		status = deriveProcessStatus(cfg.Workflow, process)
 	}
 	return ProcessPageView{
 		PageBase:     pageBase,
 		ProcessID:    processID,
 		InstanceName: instanceName,
+		Status:       status,
+		StatusLabel:  processStatusLabel(status),
 		ActionList:   actionList,
 		DPPURL:       actionList.DPPURL,
 		DPPGS1:       actionList.DPPGS1,
@@ -6727,6 +6760,12 @@ func organizationDisplayName(slug string, orgNames map[string]string) string {
 func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta, orgNames map[string]string) []TimelineStep {
 	steps := sortedSteps(def)
 	availableMap := computeAvailability(def, process)
+	terminated := process != nil && process.Termination != nil
+	terminationSubstepID := ""
+	if terminated {
+		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
+	}
+	pastTermination := false
 
 	var timeline []TimelineStep
 	for _, step := range steps {
@@ -6776,6 +6815,10 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 							entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
 						}
 					}
+				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+					entry.Status = processStatusTerminated
+				} else if terminated && (pastTermination || terminationSubstepID == "") {
+					entry.Status = "skipped"
 				} else if availableMap[sub.SubstepID] {
 					entry.Status = "available"
 				} else {
@@ -6784,7 +6827,11 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 			} else {
 				entry.Status = "locked"
 			}
+			entry.StatusLabel = processStatusLabel(entry.Status)
 			row.Substeps = append(row.Substeps, entry)
+			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+				pastTermination = true
+			}
 		}
 		timeline = append(timeline, row)
 	}
@@ -7013,13 +7060,7 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 	if process == nil {
 		return export
 	}
-	status := strings.TrimSpace(process.Status)
-	if status == "" {
-		status = "active"
-	}
-	if status != "done" && isProcessDone(def, process) {
-		status = "done"
-	}
+	status := deriveProcessStatus(def, process)
 	export.ProcessID = process.ID.Hex()
 	export.CreatedAt = process.CreatedAt.Format(time.RFC3339)
 	export.Status = status
@@ -7197,6 +7238,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
 	substepOrgs := substepOrganizationMap(def)
+	terminated := process != nil && process.Termination != nil
+	terminationSubstepID := ""
+	terminationReason := ""
+	if terminated {
+		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
+		terminationReason = strings.TrimSpace(process.Termination.Reason)
+	}
+	pastTermination := false
 	for _, sub := range ordered {
 		allowedRoles := substepRoles(sub)
 		ownedRoles := append([]string(nil), actor.RoleSlugs...)
@@ -7242,6 +7291,10 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if process != nil {
 			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
 				status = "done"
+			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+				status = processStatusTerminated
+			} else if terminated && (pastTermination || terminationSubstepID == "") {
+				status = "skipped"
 			} else if availMap[sub.SubstepID] {
 				status = "available"
 			}
@@ -7250,10 +7303,20 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		orgAuthorized := stepOrgSlug == "" || strings.TrimSpace(actor.OrgSlug) == stepOrgSlug
 		disabled := status != "available" || len(matchingRoles) == 0 || !orgAuthorized
 		reason := ""
+		detailMessage := ""
 		if status == "locked" {
 			reason = "Locked by sequence"
 		} else if status == "done" {
 			reason = "Already completed"
+		} else if status == processStatusTerminated {
+			reason = "Stream ended early"
+			detailMessage = terminationReason
+			if detailMessage == "" {
+				detailMessage = "No reason provided."
+			}
+		} else if status == "skipped" {
+			reason = "Stream ended early"
+			detailMessage = "Step not completed because the stream was ended before this."
 		} else if !orgAuthorized {
 			reason = "Not authorized for organization"
 		} else if len(matchingRoles) == 0 {
@@ -7325,7 +7388,11 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			Attachments:   attachments,
 			Disabled:      disabled,
 			Reason:        reason,
+			DetailMessage: detailMessage,
 		})
+		if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
+			pastTermination = true
+		}
 	}
 	return actions
 }
@@ -7403,13 +7470,16 @@ func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []Ti
 			actionCopy := action
 			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
 			switch action.Status {
-			case "done", "locked":
+			case "done", "locked", processStatusTerminated, "skipped":
 				timeline[stepIndex].Substeps[substepIndex].Status = action.Status
+				timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel(action.Status)
 			case "available":
 				if action.Disabled {
 					timeline[stepIndex].Substeps[substepIndex].Status = "active"
+					timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel("active")
 				} else {
 					timeline[stepIndex].Substeps[substepIndex].Status = "available"
+					timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel("available")
 				}
 			}
 		}

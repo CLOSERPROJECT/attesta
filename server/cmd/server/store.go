@@ -394,7 +394,7 @@ func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.Objec
 func (s *MongoStore) UpdateProcessTermination(ctx context.Context, id primitive.ObjectID, workflowKey string, termination ProcessTermination) error {
 	update := bson.M{
 		"$set": bson.M{
-			"status":      "done",
+			"status":      processStatusTerminated,
 			"workflowKey": workflowKey,
 			"termination": termination,
 		},
@@ -718,7 +718,7 @@ func (s *MemoryStore) UpdateProcessTermination(_ context.Context, id primitive.O
 		return mongo.ErrNoDocuments
 	}
 	process.WorkflowKey = strings.TrimSpace(workflowKey)
-	process.Status = "done"
+	process.Status = processStatusTerminated
 	process.Termination = cloneProcessTermination(&termination)
 	s.processes[id] = process
 	return nil

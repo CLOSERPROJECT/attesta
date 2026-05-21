@@ -92,8 +92,8 @@ func TestHandleTerminateProcessEndsActiveStream(t *testing.T) {
 	}
 	id, _ := primitive.ObjectIDFromHex(processID)
 	process, _ := store.SnapshotProcess(id)
-	if process.Status != "done" {
-		t.Fatalf("status = %q, want done", process.Status)
+	if process.Status != processStatusTerminated {
+		t.Fatalf("status = %q, want %s", process.Status, processStatusTerminated)
 	}
 	if process.Termination == nil {
 		t.Fatal("expected termination metadata")
@@ -137,7 +137,7 @@ func TestHandleTerminateProcessRequiresCurrentActorAuthorization(t *testing.T) {
 	}
 	id, _ := primitive.ObjectIDFromHex(processID)
 	process, _ := store.SnapshotProcess(id)
-	if process.Termination != nil || process.Status == "done" {
+	if process.Termination != nil || process.Status == processStatusTerminated {
 		t.Fatalf("expected process to remain active, got status=%q termination=%#v", process.Status, process.Termination)
 	}
 }

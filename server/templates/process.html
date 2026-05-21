@@ -32,6 +32,13 @@
             <span class="process-name">{{ .InstanceName }}</span>
           {{ end }}
           <span class="process-id">{{ .ProcessID }}</span>
+          <span class="status-tag status-{{ .Status }}">
+            {{ if .StatusLabel }}
+              {{ .StatusLabel }}
+            {{ else }}
+              {{ .Status }}
+            {{ end }}
+          </span>
         </p>
       </div>
     </section>
@@ -301,7 +308,13 @@
                         <span class="timeline-step-title">{{ .Title }}</span>
                       </div>
                       {{ if not $.HideStatus }}
-                        <span class="status">{{ .Status }}</span>
+                        <span class="status">
+                          {{ if .StatusLabel }}
+                            {{ .StatusLabel }}
+                          {{ else }}
+                            {{ .Status }}
+                          {{ end }}
+                        </span>
                       {{ end }}
                     </div>
                     <div class="substep-summary-supporting">

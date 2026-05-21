@@ -16,7 +16,13 @@
     </p>
     <hr />
   {{ end }}
-  {{ if ne .Status "done" }}
+  {{ if .DetailMessage }}
+    <div class="action-submitted">
+      <p class="muted" style="white-space: pre-line; margin: 0;">
+        {{- .DetailMessage -}}
+      </p>
+    </div>
+  {{ else if ne .Status "done" }}
     {{ $formataDisabled := or .ReadOnly .Disabled }}
     <form
       class="action-form"
