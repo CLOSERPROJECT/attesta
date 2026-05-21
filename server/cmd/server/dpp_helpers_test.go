@@ -457,6 +457,46 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 	}
 }
 
+func TestBuildDPPTraceabilityViewTerminatedStreamMessages(t *testing.T) {
+	def := testRuntimeConfig().Workflow
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data:  map[string]interface{}{"value": float64(10)},
+			},
+		},
+		Termination: &ProcessTermination{
+			Reason:    "supplier cancelled",
+			SubstepID: "1.2",
+		},
+	}
+
+	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, nil)
+	if len(view) == 0 || len(view[0].Substeps) < 3 {
+		t.Fatalf("unexpected traceability shape: %#v", view)
+	}
+	terminatedSub := view[0].Substeps[1]
+	if terminatedSub.Status != processStatusTerminated {
+		t.Fatalf("terminated substep status = %q, want %s", terminatedSub.Status, processStatusTerminated)
+	}
+	if terminatedSub.Reason != "Stream ended early" {
+		t.Fatalf("terminated reason = %q", terminatedSub.Reason)
+	}
+	if terminatedSub.DetailMessage != "supplier cancelled" {
+		t.Fatalf("terminated detail = %q", terminatedSub.DetailMessage)
+	}
+
+	skippedSub := view[0].Substeps[2]
+	if skippedSub.Status != "skipped" {
+		t.Fatalf("skipped substep status = %q, want skipped", skippedSub.Status)
+	}
+	if skippedSub.DetailMessage != "Step not completed because the stream was ended before this." {
+		t.Fatalf("skipped detail = %q", skippedSub.DetailMessage)
+	}
+}
+
 func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
 	sub := WorkflowSub{
 		SubstepID: "1.1",

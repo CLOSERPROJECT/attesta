@@ -157,6 +157,14 @@
                             class="action-submitted"
                             style="margin-top: 20px;"
                           >
+                            {{ if .DetailMessage }}
+                              <p
+                                class="muted"
+                                style="white-space: pre-line; margin: 0;"
+                              >
+                                {{- .DetailMessage -}}
+                              </p>
+                            {{ end }}
                             <dl class="action-submitted-values">
                               {{ if .Values }}
                                 {{ range .Values }}
