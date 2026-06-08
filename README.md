@@ -255,7 +255,7 @@ Interregional Innovation Investments (I3) Instrument of the European Regional
 Development Fund, managed by the European Innovation Council and SMEs Executive
 Agency (EISMEA).
 
-This repository is part of the CLOSER project and has received funding from the
+This repository is part of CLOSER and Even Closer projects and has received funding from the
 European Union. Views and opinions expressed are those of the author(s) only and
 do not necessarily reflect those of the European Union or EISMEA. Neither the
 European Union nor the granting authority can be held responsible for them.
