@@ -250,6 +250,11 @@ Union under the Interregional Innovation Investments (I3) Instrument of the
 European Regional Development Fund, managed by the European Innovation Council
 and SMEs Executive Agency (EISMEA).
 
+Even Closer (Project No. 101228240) is funded by the European Union under the
+Interregional Innovation Investments (I3) Instrument of the European Regional
+Development Fund, managed by the European Innovation Council and SMEs Executive
+Agency (EISMEA).
+
 This repository is part of the CLOSER project and has received funding from the
 European Union. Views and opinions expressed are those of the author(s) only and
 do not necessarily reflect those of the European Union or EISMEA. Neither the
