@@ -10,13 +10,87 @@
         <script type="module" src="{{ .ViteDevServer }}/src/main.js"></script>
         <link
           rel="icon"
+          type="image/svg+xml"
+          href="{{ .ViteDevServer }}/attesta-favicon.svg"
+        />
+        <link
+          rel="icon"
           type="image/png"
-          href="{{ .ViteDevServer }}/favicon.png"
+          sizes="16x16"
+          href="{{ .ViteDevServer }}/attesta-favicon-16.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="{{ .ViteDevServer }}/attesta-favicon-32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="48x48"
+          href="{{ .ViteDevServer }}/attesta-favicon-48.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="{{ .ViteDevServer }}/attesta-favicon-180.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="192x192"
+          href="{{ .ViteDevServer }}/attesta-favicon-192.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="512x512"
+          href="{{ .ViteDevServer }}/attesta-favicon-512.png"
         />
       {{ else }}
         <link rel="stylesheet" href="/static/assets/main.css" />
         <script defer src="/static/assets/app.js"></script>
-        <link rel="icon" type="image/png" href="/static/favicon.png" />
+        <link
+          rel="icon"
+          type="image/svg+xml"
+          href="/static/attesta-favicon.svg"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/static/attesta-favicon-16.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/static/attesta-favicon-32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="48x48"
+          href="/static/attesta-favicon-48.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/static/attesta-favicon-180.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="192x192"
+          href="/static/attesta-favicon-192.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="512x512"
+          href="/static/attesta-favicon-512.png"
+        />
       {{ end }}
       <script
         src="https://unpkg.com/htmx.org@1.9.12"
@@ -28,23 +102,34 @@
       <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
         <div class="topbar-content mx-auto max-w-7xl">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <a class="brand" href="/">
+            <a class="brand" href="/" aria-label="Attesta">
               {{ if .ViteDevServer }}
                 <img
-                  class="brand-logo"
-                  src="{{ .ViteDevServer }}/favicon.png"
+                  class="brand-logo brand-logo-on-light"
+                  src="{{ .ViteDevServer }}/brand/attesta-lockup-on-light.svg"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <img
+                  class="brand-logo brand-logo-on-dark"
+                  src="{{ .ViteDevServer }}/brand/attesta-lockup-on-dark.svg"
                   alt=""
                   aria-hidden="true"
                 />
               {{ else }}
                 <img
-                  class="brand-logo"
-                  src="/static/favicon.png"
+                  class="brand-logo brand-logo-on-light"
+                  src="/static/brand/attesta-lockup-on-light.svg"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <img
+                  class="brand-logo brand-logo-on-dark"
+                  src="/static/brand/attesta-lockup-on-dark.svg"
                   alt=""
                   aria-hidden="true"
                 />
               {{ end }}
-              <span>ATTESTA</span>
             </a>
             {{ if .IsPlatformAdmin }}
               <span style="color: var(--ink-pa);">Platform Admin</span>
@@ -171,6 +256,19 @@
           Investments (I3) Instrument of the European Regional Development Fund,
           managed by the European Innovation Council and SMEs Executive Agency
           (EISMEA).
+        </p>
+        <p
+          style="
+          margin: 0 0 8px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.4;
+        "
+        >
+          Even Closer (Project No. 101228240) is funded by the European Union
+          under the Interregional Innovation Investments (I3) Instrument of the
+          European Regional Development Fund, managed by the European Innovation
+          Council and SMEs Executive Agency (EISMEA).
         </p>
         <p
           style="
