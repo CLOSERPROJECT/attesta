@@ -2288,6 +2288,380 @@ func rewriteOpenAPIServers(data []byte, filename, origin string) ([]byte, error)
 	}
 }
 
+func enhanceOpenAPIDocs(data []byte, filename string) ([]byte, error) {
+	if !isOpenAPIDoc(filename) {
+		return data, nil
+	}
+	var doc map[string]interface{}
+	if err := unmarshalOpenAPIDoc(data, filename, &doc); err != nil {
+		return nil, err
+	}
+	doc["security"] = []interface{}{}
+	addSessionSecurityScheme(doc)
+	paths, _ := doc["paths"].(map[string]interface{})
+	for path, rawPath := range paths {
+		pathItem, _ := rawPath.(map[string]interface{})
+		for method, rawOperation := range pathItem {
+			operation, ok := rawOperation.(map[string]interface{})
+			if !ok || !isOpenAPIOperation(method) {
+				continue
+			}
+			setDomainExamples(operation)
+			setPostRequestBody(operation)
+			if openAPIOperationRequiresSession(path) {
+				operation["security"] = []interface{}{map[string]interface{}{"attesta_session": []interface{}{}}}
+				responses, _ := operation["responses"].(map[string]interface{})
+				if responses == nil {
+					responses = map[string]interface{}{}
+					operation["responses"] = responses
+				}
+				if _, ok := responses["401"]; !ok {
+					responses["401"] = map[string]interface{}{"description": "Unauthorized response. Login through /login to receive the attesta_session cookie."}
+				}
+			}
+		}
+	}
+	setComponentExamples(doc)
+	return marshalOpenAPIDoc(doc, filename)
+}
+
+func isOpenAPIDoc(filename string) bool {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".json", ".yaml", ".yml":
+		return true
+	default:
+		return false
+	}
+}
+
+func unmarshalOpenAPIDoc(data []byte, filename string, out interface{}) error {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".json":
+		return json.Unmarshal(data, out)
+	case ".yaml", ".yml":
+		return yaml.Unmarshal(data, out)
+	default:
+		return nil
+	}
+}
+
+func marshalOpenAPIDoc(doc map[string]interface{}, filename string) ([]byte, error) {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".json":
+		return json.MarshalIndent(doc, "", "  ")
+	case ".yaml", ".yml":
+		return yaml.Marshal(doc)
+	default:
+		return nil, nil
+	}
+}
+
+func addSessionSecurityScheme(doc map[string]interface{}) {
+	components, _ := doc["components"].(map[string]interface{})
+	if components == nil {
+		components = map[string]interface{}{}
+		doc["components"] = components
+	}
+	schemes, _ := components["securitySchemes"].(map[string]interface{})
+	if schemes == nil {
+		schemes = map[string]interface{}{}
+		components["securitySchemes"] = schemes
+	}
+	schemes["attesta_session"] = map[string]interface{}{
+		"type":        "apiKey",
+		"in":          "cookie",
+		"name":        "attesta_session",
+		"description": "Authenticated Appwrite session cookie. Login through /login to receive it.",
+	}
+}
+
+func isOpenAPIOperation(method string) bool {
+	switch strings.ToLower(method) {
+	case "get", "post", "put", "patch", "delete", "head", "options", "trace":
+		return true
+	default:
+		return false
+	}
+}
+
+func openAPIOperationRequiresSession(path string) bool {
+	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/admin/") || strings.HasPrefix(path, "/org-admin/") || strings.HasPrefix(path, "/organization/") || strings.HasPrefix(path, "/w/") {
+		return true
+	}
+	switch path {
+	case "/dashboard", "/events", "/process/start":
+		return true
+	default:
+		return strings.HasPrefix(path, "/process/")
+	}
+}
+
+func setPostRequestBody(operation map[string]interface{}) {
+	methodBody, ok := openAPIRequestBodyForOperation(operation)
+	if !ok {
+		return
+	}
+	operation["requestBody"] = methodBody
+}
+
+func openAPIRequestBodyForOperation(operation map[string]interface{}) (map[string]interface{}, bool) {
+	operationID, _ := operation["operationId"].(string)
+	switch operationID {
+	case "auth#login":
+		return formURLEncodedRequestBody(true, "Login credentials. A successful login sets the attesta_session cookie.", []openAPIFormField{
+			{Name: "email", Type: "string", Required: true, Format: "email", Example: "user@example.com", Description: "Account email address."},
+			{Name: "password", Type: "string", Required: true, Format: "password", Example: "correct horse battery staple", Description: "Account password."},
+			{Name: "next", Type: "string", Example: "/dashboard", Description: "Optional local redirect path after login."},
+		}), true
+	case "auth#signup":
+		return formURLEncodedRequestBody(true, "Create an account and start a session. Enabled only when account creation is allowed.", []openAPIFormField{
+			{Name: "email", Type: "string", Required: true, Format: "email", Example: "new.user@example.com", Description: "New account email address."},
+			{Name: "password", Type: "string", Required: true, Format: "password", Example: "correct horse battery staple", Description: "Password. Must be at least 12 characters."},
+		}), true
+	case "auth#setInvitePassword":
+		return formURLEncodedRequestBody(true, "Set the password for an accepted invite. Requires the invite session cookie.", []openAPIFormField{
+			{Name: "password", Type: "string", Required: true, Format: "password", Example: "correct horse battery staple", Description: "New password. Must be at least 12 characters."},
+			{Name: "confirm_password", Type: "string", Required: true, Format: "password", Example: "correct horse battery staple", Description: "Must match password."},
+		}), true
+	case "auth#requestReset":
+		return formURLEncodedRequestBody(true, "Request a password recovery email.", []openAPIFormField{
+			{Name: "email", Type: "string", Required: true, Format: "email", Example: "user@example.com", Description: "Account email address."},
+		}), true
+	case "auth#confirmReset":
+		return formURLEncodedRequestBody(true, "Set a new password using the recovery userId and secret query parameters.", []openAPIFormField{
+			{Name: "password", Type: "string", Required: true, Format: "password", Example: "correct horse battery staple", Description: "New password. Must be at least 12 characters."},
+			{Name: "confirm_password", Type: "string", Required: true, Format: "password", Example: "correct horse battery staple", Description: "Must match password."},
+		}), true
+	case "admin#platformOrgAction":
+		return multipartRequestBody(false, "Platform-admin organization action. The required fields depend on intent.", []openAPIFormField{
+			{Name: "intent", Type: "string", Required: true, Enum: []string{"create_org", "invite_org_admin", "set_org", "delete_org"}, Example: "create_org", Description: "Action to perform. Defaults to create_org when omitted."},
+			{Name: "name", Type: "string", Example: "Acme Manufacturing", Description: "Organization name for create_org and set_org."},
+			{Name: "invite_email", Type: "string", Format: "email", Example: "owner@example.com", Description: "Optional first org-admin email when creating an organization."},
+			{Name: "org_slug", Type: "string", Example: "acme", Description: "Target organization slug for invite_org_admin, set_org, and delete_org."},
+			{Name: "email", Type: "string", Format: "email", Example: "owner@example.com", Description: "Org-admin invite email for invite_org_admin."},
+			{Name: "logo", Type: "string", Format: "binary", Description: "Optional organization logo file for create_org and set_org."},
+			{Name: "q", Type: "string", Example: "acme", Description: "Optional search state preserved when re-rendering."},
+			{Name: "page", Type: "integer", Example: 1, Description: "Optional page state preserved when re-rendering."},
+		}), true
+	case "admin#orgAdminRoleAction":
+		return formURLEncodedRequestBody(false, "Organization role action. The required fields depend on intent.", []openAPIFormField{
+			{Name: "intent", Type: "string", Required: true, Enum: []string{"create_role", "set_role", "delete_role"}, Example: "create_role", Description: "Action to perform. Defaults to create_role when omitted."},
+			{Name: "name", Type: "string", Example: "Quality Manager", Description: "Role display name for create_role and set_role."},
+			{Name: "palette", Type: "string", Example: "blue", Description: "Optional palette key. Defaults from the role name when omitted."},
+			{Name: "role_slug", Type: "string", Example: "quality-manager", Description: "Existing role slug for set_role and delete_role."},
+		}), true
+	case "admin#orgAdminUserAction":
+		return multipartRequestBody(false, "Organization user, invite, or organization profile action. The required fields depend on intent.", []openAPIFormField{
+			{Name: "intent", Type: "string", Required: true, Enum: []string{"create_org", "invite", "update_org", "set_roles", "delete_user"}, Example: "invite", Description: "Action to perform. Defaults to invite when omitted."},
+			{Name: "name", Type: "string", Example: "Acme Manufacturing", Description: "Organization name for create_org and update_org."},
+			{Name: "email", Type: "string", Format: "email", Example: "member@example.com", Description: "Invite email for intent=invite."},
+			{Name: "roles", Type: "array", ItemsType: "string", Example: []interface{}{"quality-manager"}, Description: "Zero or more role slugs for invite and set_roles. Use org-admin to grant org admin."},
+			{Name: "role", Type: "string", Example: "quality-manager", Description: "Legacy single-role field accepted when roles is absent."},
+			{Name: "userId", Type: "string", Example: "user-123", Description: "Target user or membership id for set_roles and delete_user."},
+			{Name: "logo", Type: "string", Format: "binary", Description: "Optional organization logo file for create_org and update_org."},
+		}), true
+	case "formata_builder#saveStream":
+		return rawJSONRequestBody(true, "Raw Formata stream JSON generated by the builder. The server stores the raw body string; use ?stream=<id> to update or ?new=true to force a new stream.", map[string]interface{}{
+			"id":    "default",
+			"title": "Default workflow",
+			"steps": []interface{}{},
+		}), true
+	case "workflow#startProcess":
+		return formURLEncodedRequestBody(false, "Start a process instance for the selected workflow.", []openAPIFormField{
+			{Name: "name", Type: "string", Example: "Batch LOT-2026-001", Description: "Optional process display name. A default name is generated when omitted."},
+		}), true
+	case "workflow#completeSubstep":
+		return formURLEncodedRequestBody(true, "Complete a Formata substep. The value field must be a JSON object string; it is stored under the workflow substep inputKey. The backend currently validates JSON object shape only, not the Formata schema.", []openAPIFormField{
+			{Name: "activeRole", Type: "string", Example: "quality-manager", Description: "Role slug used for this completion. Required when the user has multiple matching roles."},
+			{Name: "value", Type: "string", Required: true, Example: `{"status":"accepted","notes":"Ready for review"}`, Description: "JSON object string produced by the Formata form. Data URL strings are persisted as attachments."},
+		}), true
+	default:
+		return nil, false
+	}
+}
+
+type openAPIFormField struct {
+	Name        string
+	Type        string
+	Format      string
+	ItemsType   string
+	Description string
+	Required    bool
+	Enum        []string
+	Example     interface{}
+}
+
+func formURLEncodedRequestBody(required bool, description string, fields []openAPIFormField) map[string]interface{} {
+	return formRequestBody("application/x-www-form-urlencoded", required, description, fields)
+}
+
+func multipartRequestBody(required bool, description string, fields []openAPIFormField) map[string]interface{} {
+	return formRequestBody("multipart/form-data", required, description, fields)
+}
+
+func formRequestBody(contentType string, required bool, description string, fields []openAPIFormField) map[string]interface{} {
+	schema := map[string]interface{}{
+		"type":       "object",
+		"properties": map[string]interface{}{},
+	}
+	requiredFields := make([]interface{}, 0)
+	properties := schema["properties"].(map[string]interface{})
+	example := map[string]interface{}{}
+	for _, field := range fields {
+		prop := map[string]interface{}{"type": firstNonEmpty(field.Type, "string")}
+		if field.Format != "" {
+			prop["format"] = field.Format
+		}
+		if field.ItemsType != "" {
+			prop["items"] = map[string]interface{}{"type": field.ItemsType}
+		}
+		if field.Description != "" {
+			prop["description"] = field.Description
+		}
+		if len(field.Enum) > 0 {
+			enum := make([]interface{}, 0, len(field.Enum))
+			for _, item := range field.Enum {
+				enum = append(enum, item)
+			}
+			prop["enum"] = enum
+		}
+		if field.Example != nil {
+			prop["example"] = field.Example
+			example[field.Name] = field.Example
+		}
+		properties[field.Name] = prop
+		if field.Required {
+			requiredFields = append(requiredFields, field.Name)
+		}
+	}
+	if len(requiredFields) > 0 {
+		schema["required"] = requiredFields
+	}
+	body := map[string]interface{}{
+		"required":    required,
+		"description": description,
+		"content": map[string]interface{}{
+			contentType: map[string]interface{}{
+				"schema":  schema,
+				"example": example,
+			},
+		},
+	}
+	return body
+}
+
+func rawJSONRequestBody(required bool, description string, example interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"required":    required,
+		"description": description,
+		"content": map[string]interface{}{
+			"application/json": map[string]interface{}{
+				"schema": map[string]interface{}{
+					"type":                 "object",
+					"additionalProperties": true,
+				},
+				"example": example,
+			},
+		},
+	}
+}
+
+func setDomainExamples(operation map[string]interface{}) {
+	params, _ := operation["parameters"].([]interface{})
+	for _, raw := range params {
+		param, _ := raw.(map[string]interface{})
+		name, _ := param["name"].(string)
+		if example, ok := openAPIExampleForName(name); ok {
+			param["example"] = example
+			if schema, _ := param["schema"].(map[string]interface{}); schema != nil {
+				schema["example"] = example
+			}
+		}
+	}
+	if body, _ := operation["requestBody"].(map[string]interface{}); body != nil {
+		setRequestBodyExample(body)
+	}
+}
+
+func setRequestBodyExample(node map[string]interface{}) {
+	content, _ := node["content"].(map[string]interface{})
+	for _, rawMedia := range content {
+		media, _ := rawMedia.(map[string]interface{})
+		schema, _ := media["schema"].(map[string]interface{})
+		example := interface{}(map[string]interface{}{"name": "Release 2026", "slug": "release-2026"})
+		if schema != nil && schema["type"] == "string" {
+			example = `{"id":"default","title":"Default workflow"}`
+		}
+		media["example"] = example
+		if schema != nil {
+			schema["example"] = example
+		}
+	}
+}
+
+func setComponentExamples(doc map[string]interface{}) {
+	components, _ := doc["components"].(map[string]interface{})
+	schemas, _ := components["schemas"].(map[string]interface{})
+	if org, _ := schemas["CatalogOrganization"].(map[string]interface{}); org != nil {
+		org["example"] = map[string]interface{}{"name": "Acme Manufacturing", "slug": "acme"}
+		setSchemaPropertyExample(org, "name", "Acme Manufacturing")
+		setSchemaPropertyExample(org, "slug", "acme")
+	}
+	if role, _ := schemas["CatalogRole"].(map[string]interface{}); role != nil {
+		role["example"] = map[string]interface{}{"orgSlug": "acme", "name": "Quality Manager", "slug": "quality-manager", "color": "#2563eb", "border": "#1d4ed8"}
+		setSchemaPropertyExample(role, "orgSlug", "acme")
+		setSchemaPropertyExample(role, "name", "Quality Manager")
+		setSchemaPropertyExample(role, "slug", "quality-manager")
+		setSchemaPropertyExample(role, "color", "#2563eb")
+		setSchemaPropertyExample(role, "border", "#1d4ed8")
+	}
+}
+
+func setSchemaPropertyExample(schema map[string]interface{}, property string, example interface{}) {
+	properties, _ := schema["properties"].(map[string]interface{})
+	prop, _ := properties[property].(map[string]interface{})
+	if prop != nil {
+		prop["example"] = example
+	}
+}
+
+func openAPIExampleForName(name string) (interface{}, bool) {
+	switch name {
+	case "workflow_key", "stream":
+		return "default", true
+	case "process_id":
+		return "65f1c8f0e4b0a8a1f2d3c4b5", true
+	case "substep_id", "substep":
+		return "1.1", true
+	case "attachment_id", "logo_id", "stream_id":
+		return "65f1c8f0e4b0a8a1f2d3c4b6", true
+	case "org_slug":
+		return "acme", true
+	case "asset_path":
+		return "assets/index.js", true
+	case "gtin":
+		return "09506000134352", true
+	case "lot":
+		return "LOT-2026-001", true
+	case "serial":
+		return "SN-000001", true
+	case "format":
+		return "json", true
+	case "inline":
+		return "true", true
+	case "teamId", "membershipId", "userId":
+		return "appwrite-id", true
+	case "secret":
+		return "appwrite-secret", true
+	case "q":
+		return "acme", true
+	case "page":
+		return 1, true
+	default:
+		return nil, false
+	}
+}
+
 func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filename, contentType string) {
 	var foundPath string
 	for _, candidate := range openAPIDocCandidates(filename) {
@@ -2306,6 +2680,11 @@ func (s *Server) serveOpenAPIFile(w http.ResponseWriter, r *http.Request, filena
 		return
 	}
 	data, err = rewriteOpenAPIServers(data, filename, openAPIRequestOrigin(r))
+	if err != nil {
+		http.Error(w, "failed to render OpenAPI spec", http.StatusInternalServerError)
+		return
+	}
+	data, err = enhanceOpenAPIDocs(data, filename)
 	if err != nil {
 		http.Error(w, "failed to render OpenAPI spec", http.StatusInternalServerError)
 		return
