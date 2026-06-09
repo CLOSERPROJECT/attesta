@@ -24,7 +24,7 @@ func TestLayoutRendersFooterContent(t *testing.T) {
 	if !strings.Contains(body, "Forkbomb bv") {
 		t.Fatalf("expected footer content, got %q", body)
 	}
-	if !strings.Contains(compactBody, "This repository/website is part of the CLOSER project") {
+	if !strings.Contains(compactBody, "This repository/website is part of CLOSER and Even Closer projects") {
 		t.Fatalf("expected footer legal text, got %q", body)
 	}
 	if !strings.Contains(body, "site-footer") {
