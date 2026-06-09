@@ -96,10 +96,11 @@ type ProcessTermination struct {
 }
 
 type ProcessStep struct {
-	State  string                 `bson:"state"`
-	DoneAt *time.Time             `bson:"doneAt,omitempty"`
-	DoneBy *Actor                 `bson:"doneBy,omitempty"`
-	Data   map[string]interface{} `bson:"data,omitempty"`
+	State       string                 `bson:"state"`
+	Description *string                `bson:"description,omitempty"`
+	DoneAt      *time.Time             `bson:"doneAt,omitempty"`
+	DoneBy      *Actor                 `bson:"doneBy,omitempty"`
+	Data        map[string]interface{} `bson:"data,omitempty"`
 }
 
 type Actor struct {
@@ -159,6 +160,7 @@ type SSEHub struct {
 type TimelineSubstep struct {
 	SubstepID    string
 	Title        string
+	Description  string
 	Selected     bool
 	Action       *ActionView
 	RoleColor    template.CSS
@@ -193,16 +195,17 @@ type NotarizedAttachment struct {
 }
 
 type NotarizedSubstep struct {
-	SubstepID  string                 `json:"substep_id"`
-	Title      string                 `json:"title"`
-	Role       string                 `json:"role"`
-	Status     string                 `json:"status"`
-	DoneAt     string                 `json:"done_at,omitempty"`
-	DoneBy     string                 `json:"done_by,omitempty"`
-	DoneRole   string                 `json:"done_role,omitempty"`
-	Payload    map[string]interface{} `json:"payload,omitempty"`
-	Digest     string                 `json:"digest,omitempty"`
-	Attachment *NotarizedAttachment   `json:"attachment,omitempty"`
+	SubstepID   string                 `json:"substep_id"`
+	Title       string                 `json:"title"`
+	Description *string                `json:"description,omitempty"`
+	Role        string                 `json:"role"`
+	Status      string                 `json:"status"`
+	DoneAt      string                 `json:"done_at,omitempty"`
+	DoneBy      string                 `json:"done_by,omitempty"`
+	DoneRole    string                 `json:"done_role,omitempty"`
+	Payload     map[string]interface{} `json:"payload,omitempty"`
+	Digest      string                 `json:"digest,omitempty"`
+	Attachment  *NotarizedAttachment   `json:"attachment,omitempty"`
 }
 
 type NotarizedStep struct {
@@ -244,6 +247,7 @@ type ActionView struct {
 	ProcessID     string
 	SubstepID     string
 	Title         string
+	Description   string
 	Role          string
 	RoleBadges    []ActionRoleBadge
 	MatchingRoles []ActionRoleOption
@@ -716,6 +720,7 @@ type DPPTraceabilityStep struct {
 type DPPTraceabilitySubstep struct {
 	SubstepID     string
 	Title         string
+	Description   string
 	Role          string
 	RoleBadges    []DPPTraceabilityRoleBadge
 	RoleColor     template.CSS
@@ -5580,7 +5585,7 @@ func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Reques
 		http.NotFound(w, r)
 		return
 	}
-	attachmentPayload, ok := readAttachmentPayload(progress.Data, substep.InputKey)
+	attachmentPayload, ok := readSubstepAttachmentPayload(progress.Data, substep)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -5777,11 +5782,13 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
+	description := substep.InputKey
 	progressUpdate := ProcessStep{
-		State:  "done",
-		DoneAt: &now,
-		DoneBy: &actor,
-		Data:   payload,
+		State:       "done",
+		Description: &description,
+		DoneAt:      &now,
+		DoneBy:      &actor,
+		Data:        payload,
 	}
 
 	if err := s.store.UpdateProcessProgress(ctx, process.ID, workflowKey, substepID, progressUpdate); err != nil {
@@ -5975,13 +5982,15 @@ func (s *Server) parseFormataPayload(r *http.Request, processID primitive.Object
 	if err != nil {
 		return nil, err
 	}
-	raw := payload[substep.InputKey]
-	converted, err := s.persistFormataAttachments(r.Context(), processID, substep, raw, now, []string{substep.InputKey})
+	converted, err := s.persistFormataAttachments(r.Context(), processID, substep, payload, now, nil)
 	if err != nil {
 		return nil, err
 	}
-	payload[substep.InputKey] = converted
-	return payload, nil
+	convertedPayload, ok := converted.(map[string]interface{})
+	if !ok {
+		return nil, errInvalidForm
+	}
+	return convertedPayload, nil
 }
 
 func parseFormataScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
@@ -6212,6 +6221,15 @@ func readAttachmentPayload(data map[string]interface{}, inputKey string) (Attach
 		Size:         size,
 		SHA256:       sha256Digest,
 	}, true
+}
+
+func readSubstepAttachmentPayload(data map[string]interface{}, sub WorkflowSub) (AttachmentPayload, bool) {
+	for _, key := range substepDataKeys(sub) {
+		if attachment, ok := readAttachmentPayload(data, key); ok {
+			return attachment, true
+		}
+	}
+	return AttachmentPayload{}, false
 }
 
 func asString(value interface{}) (string, bool) {
@@ -6793,6 +6811,7 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 			if process != nil {
 				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
 					entry.Status = "done"
+					entry.Description = processStepDescription(progress, sub)
 					if progress.DoneBy != nil {
 						entry.DoneBy = progress.DoneBy.ID
 						entry.DoneRole = progress.DoneBy.Role
@@ -6807,13 +6826,13 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 					}
 					if sub.InputType == "file" {
-						if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
+						if attachment, ok := readSubstepAttachmentPayload(progress.Data, sub); ok {
 							entry.FileName = attachment.Filename
 							entry.FileSHA256 = attachment.SHA256
 							entry.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
 						}
 					} else {
-						if value, ok := progress.Data[sub.InputKey]; ok {
+						if value, ok := processStepDataValue(progress, sub); ok {
 							entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
 						}
 					}
@@ -7031,6 +7050,15 @@ func attachmentMetaFromPayload(data map[string]interface{}, inputKey string) *No
 	}
 }
 
+func attachmentMetaFromSubstepPayload(data map[string]interface{}, sub WorkflowSub) *NotarizedAttachment {
+	for _, key := range substepDataKeys(sub) {
+		if meta := attachmentMetaFromPayload(data, key); meta != nil {
+			return meta
+		}
+	}
+	return nil
+}
+
 func attachmentMetaFromMap(payload map[string]interface{}) *NotarizedAttachment {
 	if payload == nil {
 		return nil
@@ -7090,10 +7118,11 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 					entry.DoneBy = progress.DoneBy.ID
 					entry.DoneRole = progress.DoneBy.Role
 				}
+				entry.Description = progress.Description
 				entry.Payload = progress.Data
 				entry.Digest = digestPayload(progress.Data)
 				if sub.InputType == "file" {
-					entry.Attachment = attachmentMetaFromPayload(progress.Data, sub.InputKey)
+					entry.Attachment = attachmentMetaFromSubstepPayload(progress.Data, sub)
 				}
 			} else if availableMap[sub.SubstepID] {
 				state = "available"
@@ -7329,10 +7358,12 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		doneAt := ""
 		doneBy := ""
 		doneRole := ""
+		description := strings.TrimSpace(sub.InputKey)
 		var values []ActionKV
 		var attachments []ActionAttachmentView
 		if status == "done" && process != nil {
 			if progress, ok := process.Progress[sub.SubstepID]; ok {
+				description = processStepDescription(progress, sub)
 				if progress.DoneAt != nil {
 					doneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 				}
@@ -7356,8 +7387,10 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 					}
 				}
 				if sub.InputType == "formata" {
-					values = flattenDisplayValues("", progress.Data[sub.InputKey])
-				} else if value, ok := progress.Data[sub.InputKey]; ok && !isAttachmentMetaValue(value) {
+					if value, ok := processStepDataValue(progress, sub); ok {
+						values = flattenDisplayValues("", value)
+					}
+				} else if value, ok := processStepDataValue(progress, sub); ok && !isAttachmentMetaValue(value) {
 					values = flattenDisplayValues(sub.InputKey, value)
 				}
 				attachments = buildActionAttachments(workflowKey, process, progress.Data)
@@ -7379,6 +7412,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			RoleColor:     roleColor,
 			RoleBorder:    roleBorder,
 			InputKey:      sub.InputKey,
+			Description:   description,
 			InputType:     sub.InputType,
 			FormSchema:    formSchema,
 			FormUISchema:  formUISchema,
@@ -7915,6 +7949,79 @@ func normalizeDPPSerialStrategy(raw string) (string, error) {
 	}
 }
 
+func substepDataKey(sub WorkflowSub) string {
+	source := strings.TrimSpace(sub.Title)
+	if source == "" {
+		source = strings.TrimSpace(sub.InputKey)
+	}
+	if source == "" {
+		source = strings.TrimSpace(sub.SubstepID)
+	}
+	return canonifySlug(source)
+}
+
+func substepDataKeys(sub WorkflowSub) []string {
+	keys := []string{substepDataKey(sub)}
+	legacy := strings.TrimSpace(sub.InputKey)
+	if legacy != "" && legacy != keys[0] {
+		keys = append(keys, legacy)
+	}
+	return keys
+}
+
+func processStepDescription(progress ProcessStep, sub WorkflowSub) string {
+	if progress.Description != nil {
+		return *progress.Description
+	}
+	return strings.TrimSpace(sub.InputKey)
+}
+
+func processStepDataValue(progress ProcessStep, sub WorkflowSub) (interface{}, bool) {
+	if progress.Data == nil {
+		return nil, false
+	}
+	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") && progress.Description != nil {
+		return progress.Data, true
+	}
+	return substepDataValue(progress.Data, sub)
+}
+
+func substepDataValue(data map[string]interface{}, sub WorkflowSub) (interface{}, bool) {
+	if data == nil {
+		return nil, false
+	}
+	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") {
+		if value, ok := legacyWrappedSubstepDataValue(data, sub); ok {
+			return value, true
+		}
+		return data, true
+	}
+	for _, key := range substepDataKeys(sub) {
+		value, ok := data[key]
+		if ok {
+			return value, true
+		}
+	}
+	return nil, false
+}
+
+func legacyWrappedSubstepDataValue(data map[string]interface{}, sub WorkflowSub) (interface{}, bool) {
+	for _, key := range substepDataKeys(sub) {
+		value, ok := data[key]
+		if !ok {
+			continue
+		}
+		if isAttachmentMetaValue(value) {
+			continue
+		}
+		switch value.(type) {
+		case map[string]interface{}, primitive.M:
+			return value, true
+		}
+	}
+	return nil, false
+}
+
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
 	if sub.InputType != "formata" {
 		return nil, errors.New("Value must be a valid JSON object.")
@@ -7927,7 +8034,7 @@ func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, er
 	if !ok {
 		return nil, errors.New("Value must be a valid JSON object.")
 	}
-	return map[string]interface{}{sub.InputKey: valueObject}, nil
+	return valueObject, nil
 }
 
 func prefersJSONResponse(r *http.Request) bool {

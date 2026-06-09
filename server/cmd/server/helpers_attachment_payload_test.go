@@ -138,7 +138,7 @@ func TestParseFormataPayloadStoresDataURLAttachment(t *testing.T) {
 	server := &Server{store: store}
 	processID := primitive.NewObjectID()
 	now := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
-	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+	substep := WorkflowSub{SubstepID: "3.1", Title: "QA Checklist", InputKey: "qaChecklist", InputType: "formata"}
 
 	form := url.Values{}
 	form.Set("value", `{"notes":"ready","evidenceFile":"data:text/plain;base64,aGVsbG8="}`)
@@ -150,10 +150,7 @@ func TestParseFormataPayloadStoresDataURLAttachment(t *testing.T) {
 		t.Fatalf("parseFormataPayload returned error: %v", err)
 	}
 
-	root, ok := payload["qaChecklist"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected qaChecklist object, got %#v", payload["qaChecklist"])
-	}
+	root := payload
 	if root["notes"] != "ready" {
 		t.Fatalf("notes = %#v, want %q", root["notes"], "ready")
 	}
@@ -192,7 +189,7 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 	server := &Server{store: store}
 	processID := primitive.NewObjectID()
 	now := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
-	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+	substep := WorkflowSub{SubstepID: "3.1", Title: "QA Checklist", InputKey: "qaChecklist", InputType: "formata"}
 
 	form := url.Values{}
 	form.Set("inspector", "alice")
@@ -204,10 +201,7 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 	if err != nil {
 		t.Fatalf("parseFormataPayload returned error: %v", err)
 	}
-	root, ok := payload["qaChecklist"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected qaChecklist object, got %#v", payload["qaChecklist"])
-	}
+	root := payload
 	if root["inspector"] != "alice" {
 		t.Fatalf("inspector = %#v, want %q", root["inspector"], "alice")
 	}
@@ -217,7 +211,7 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 }
 
 func TestParseFormataScalarPayloadDefaultsToEmptyObject(t *testing.T) {
-	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+	substep := WorkflowSub{SubstepID: "3.1", Title: "QA Checklist", InputKey: "qaChecklist", InputType: "formata"}
 	req := httptest.NewRequest(http.MethodPost, "/complete", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -225,10 +219,7 @@ func TestParseFormataScalarPayloadDefaultsToEmptyObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseFormataScalarPayload error: %v", err)
 	}
-	root, ok := payload["qaChecklist"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("payload = %#v", payload)
-	}
+	root := payload
 	if len(root) != 0 {
 		t.Fatalf("root = %#v, want empty object", root)
 	}

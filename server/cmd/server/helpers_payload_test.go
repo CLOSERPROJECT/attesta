@@ -6,15 +6,12 @@ import (
 )
 
 func TestNormalizePayload(t *testing.T) {
-	formataSub := WorkflowSub{InputType: "formata", InputKey: "details"}
+	formataSub := WorkflowSub{Title: "Inspection Details", InputType: "formata", InputKey: "details"}
 	formataPayload, err := normalizePayload(formataSub, `{"status":"ok","weight":42}`)
 	if err != nil {
 		t.Fatalf("expected formata payload to parse, got error: %v", err)
 	}
-	value, ok := formataPayload["details"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected formata payload object, got %#v", formataPayload["details"])
-	}
+	value := formataPayload
 	if value["status"] != "ok" {
 		t.Fatalf("expected formata payload status %q, got %#v", "ok", value["status"])
 	}

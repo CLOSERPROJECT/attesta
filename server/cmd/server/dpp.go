@@ -75,20 +75,59 @@ func dppFirstStringValue(def WorkflowDef, process *Process, key string) string {
 		if !ok || entry.State != "done" || entry.Data == nil {
 			continue
 		}
-		raw, ok := entry.Data[trimKey]
-		if !ok {
-			continue
+		lookupKeys := []string{trimKey}
+		if entry.Description == nil {
+			lookupKeys = dppDataLookupKeys(substep, trimKey)
 		}
-		value, ok := raw.(string)
-		if !ok {
-			continue
-		}
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
+		for _, dataKey := range lookupKeys {
+			raw, ok := entry.Data[dataKey]
+			if !ok {
+				continue
+			}
+			value := dppStringValue(raw, trimKey)
+			if value != "" {
+				return value
+			}
 		}
 	}
 	return ""
+}
+
+func dppStringValue(raw interface{}, key string) string {
+	switch typed := raw.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case map[string]interface{}:
+		if nested, ok := typed[strings.TrimSpace(key)]; ok {
+			return dppStringValue(nested, "")
+		}
+	case primitive.M:
+		return dppStringValue(map[string]interface{}(typed), key)
+	}
+	return ""
+}
+
+func dppDataLookupKeys(sub WorkflowSub, key string) []string {
+	trimmed := strings.TrimSpace(key)
+	if trimmed == "" {
+		return nil
+	}
+	keys := []string{trimmed}
+	if trimmed == strings.TrimSpace(sub.InputKey) || trimmed == substepDataKey(sub) {
+		for _, dataKey := range substepDataKeys(sub) {
+			found := false
+			for _, existing := range keys {
+				if existing == dataKey {
+					found = true
+					break
+				}
+			}
+			if !found {
+				keys = append(keys, dataKey)
+			}
+		}
+	}
+	return keys
 }
 
 func parseDigitalLinkPath(path string) (string, string, string, error) {
@@ -219,7 +258,8 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 					}
 				}
 				subView.Digest = digestPayload(progress.Data)
-				subView.Values = dppTraceValues(sub, progress.Data)
+				subView.Description = processStepDescription(progress, sub)
+				subView.Values = dppTraceValues(sub, progress)
 				subView.Attachments = buildActionAttachments(workflowKey, process, progress.Data)
 			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 				subView.Status = processStatusTerminated
@@ -294,17 +334,18 @@ func dppDialogIDFragment(value string) string {
 	return out
 }
 
-func dppTraceValues(sub WorkflowSub, data map[string]interface{}) []DPPTraceabilityValue {
+func dppTraceValues(sub WorkflowSub, progress ProcessStep) []DPPTraceabilityValue {
+	data := progress.Data
 	if len(data) == 0 {
 		return nil
 	}
 
 	flattened := make([]ActionKV, 0)
 	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") {
-		if raw, ok := data[sub.InputKey]; ok {
+		if raw, ok := processStepDataValue(progress, sub); ok {
 			flattened = append(flattened, flattenDisplayValues("", raw)...)
 		}
-	} else if raw, ok := data[sub.InputKey]; ok && !isAttachmentMetaValue(raw) {
+	} else if raw, ok := substepDataValue(data, sub); ok && !isAttachmentMetaValue(raw) {
 		flattened = append(flattened, flattenDisplayValues(sub.InputKey, raw)...)
 	}
 	if len(flattened) == 0 {

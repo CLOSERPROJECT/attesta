@@ -52,6 +52,16 @@ func TestDPPFirstStringValueAndBuildProcessDPP(t *testing.T) {
 		t.Fatalf("dppFirstStringValue(missing) = %q, want empty", got)
 	}
 
+	nestedProcess := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.2": {State: "done", Data: map[string]interface{}{"b": map[string]interface{}{"note": "LOT-NESTED"}}},
+		},
+	}
+	if got := dppFirstStringValue(def, nestedProcess, "note"); got != "LOT-NESTED" {
+		t.Fatalf("dppFirstStringValue(note nested under title slug) = %q, want LOT-NESTED", got)
+	}
+
 	cfg := DPPConfig{
 		Enabled:        true,
 		GTIN:           "09506000134352",
@@ -503,7 +513,7 @@ func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
 		InputKey:  "value",
 		InputType: "string",
 	}
-	values := dppTraceValues(sub, map[string]interface{}{
+	values := dppTraceValues(sub, ProcessStep{Data: map[string]interface{}{
 		"other": map[string]interface{}{
 			"nested": "ok",
 		},
@@ -511,7 +521,7 @@ func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
 			"attachmentId": primitive.NewObjectID().Hex(),
 			"filename":     "proof.pdf",
 		},
-	})
+	}})
 	if len(values) != 1 {
 		t.Fatalf("expected one fallback flattened value, got %#v", values)
 	}
