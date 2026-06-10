@@ -126,14 +126,6 @@ type FakeNotary struct {
 	Digest string `bson:"digest"`
 }
 
-type AttachmentPayload struct {
-	AttachmentID string
-	Filename     string
-	ContentType  string
-	Size         int64
-	SHA256       string
-}
-
 type Server struct {
 	mongo          *mongo.Client
 	store          Store
@@ -5585,12 +5577,12 @@ func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Reques
 		http.NotFound(w, r)
 		return
 	}
-	attachmentPayload, ok := readSubstepAttachmentPayload(progress.Data, substep)
-	if !ok {
+	attachmentMeta := attachmentMetaFromSubstepPayload(progress.Data, substep)
+	if attachmentMeta == nil {
 		http.NotFound(w, r)
 		return
 	}
-	attachmentID, err := primitive.ObjectIDFromHex(attachmentPayload.AttachmentID)
+	attachmentID, err := primitive.ObjectIDFromHex(attachmentMeta.AttachmentID)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -6188,50 +6180,6 @@ func isRequestTooLarge(err error) bool {
 	return strings.Contains(msg, "request body too large") || strings.Contains(msg, "message too large")
 }
 
-func readAttachmentPayload(data map[string]interface{}, inputKey string) (AttachmentPayload, bool) {
-	if data == nil {
-		return AttachmentPayload{}, false
-	}
-	raw, ok := data[inputKey]
-	if !ok {
-		return AttachmentPayload{}, false
-	}
-
-	values, ok := raw.(map[string]interface{})
-	if !ok {
-		if typed, ok := raw.(primitive.M); ok {
-			values = map[string]interface{}(typed)
-		} else {
-			return AttachmentPayload{}, false
-		}
-	}
-
-	attachmentID, _ := asString(values["attachmentId"])
-	filename, _ := asString(values["filename"])
-	contentType, _ := asString(values["contentType"])
-	size, _ := asInt64(values["size"])
-	sha256Digest, _ := asString(values["sha256"])
-	if attachmentID == "" {
-		return AttachmentPayload{}, false
-	}
-	return AttachmentPayload{
-		AttachmentID: attachmentID,
-		Filename:     filename,
-		ContentType:  contentType,
-		Size:         size,
-		SHA256:       sha256Digest,
-	}, true
-}
-
-func readSubstepAttachmentPayload(data map[string]interface{}, sub WorkflowSub) (AttachmentPayload, bool) {
-	for _, key := range substepDataKeys(sub) {
-		if attachment, ok := readAttachmentPayload(data, key); ok {
-			return attachment, true
-		}
-	}
-	return AttachmentPayload{}, false
-}
-
 func asString(value interface{}) (string, bool) {
 	switch typed := value.(type) {
 	case string:
@@ -6826,7 +6774,7 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 					}
 					if sub.InputType == "file" {
-						if attachment, ok := readSubstepAttachmentPayload(progress.Data, sub); ok {
+						if attachment := attachmentMetaFromSubstepPayload(progress.Data, sub); attachment != nil {
 							entry.FileName = attachment.Filename
 							entry.FileSHA256 = attachment.SHA256
 							entry.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
