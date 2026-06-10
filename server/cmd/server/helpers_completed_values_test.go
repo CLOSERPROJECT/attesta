@@ -20,9 +20,8 @@ func TestParseFormataScalarPayloadFallbacks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse payload with value: %v", err)
 	}
-	root, ok := payload["payload"].(map[string]interface{})
-	if !ok || root["status"] != "ok" {
-		t.Fatalf("unexpected payload map: %#v", payload["payload"])
+	if payload["status"] != "ok" {
+		t.Fatalf("unexpected payload map: %#v", payload)
 	}
 
 	reqWithFallback := httptest.NewRequest("POST", "/x", strings.NewReader("status=+ok+&tags=a&tags=+b+"))
@@ -31,16 +30,12 @@ func TestParseFormataScalarPayloadFallbacks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse payload with fallback map: %v", err)
 	}
-	root, ok = payload["payload"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected payload object, got %#v", payload["payload"])
+	if payload["status"] != "ok" {
+		t.Fatalf("expected trimmed fallback value, got %#v", payload["status"])
 	}
-	if root["status"] != "ok" {
-		t.Fatalf("expected trimmed fallback value, got %#v", root["status"])
-	}
-	tags, ok := root["tags"].([]interface{})
+	tags, ok := payload["tags"].([]interface{})
 	if !ok || len(tags) != 2 || tags[0] != "a" || tags[1] != "b" {
-		t.Fatalf("expected fallback tags slice, got %#v", root["tags"])
+		t.Fatalf("expected fallback tags slice, got %#v", payload["tags"])
 	}
 
 	reqEmpty := httptest.NewRequest("POST", "/x", strings.NewReader(""))
@@ -49,9 +44,8 @@ func TestParseFormataScalarPayloadFallbacks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse payload with empty form: %v", err)
 	}
-	root, ok = payload["payload"].(map[string]interface{})
-	if !ok || len(root) != 0 {
-		t.Fatalf("expected empty object fallback, got %#v", payload["payload"])
+	if len(payload) != 0 {
+		t.Fatalf("expected empty object fallback, got %#v", payload)
 	}
 }
 
@@ -392,7 +386,7 @@ func TestEnsureProcessCompletionArtifactsUpdatesDoneStatus(t *testing.T) {
 			{
 				StepID: "1",
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
 				},
 			},
 		},
@@ -439,7 +433,7 @@ func TestEnsureProcessCompletionArtifactsNoopAndReloadFallback(t *testing.T) {
 			{
 				StepID: "1",
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
 				},
 			},
 		},
@@ -505,7 +499,7 @@ func TestEnsureProcessCompletionArtifactsGeneratesDPP(t *testing.T) {
 			{
 				StepID: "1",
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
 				},
 			},
 		},

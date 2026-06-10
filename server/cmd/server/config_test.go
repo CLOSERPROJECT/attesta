@@ -37,13 +37,13 @@ func TestNormalizeInputType(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "number", input: "number", want: "number"},
-		{name: "string", input: "string", want: "string"},
-		{name: "text alias", input: "text", want: "string"},
-		{name: "file", input: "file", want: "file"},
+		{name: "number", input: "number", wantErr: true},
+		{name: "string", input: "string", wantErr: true},
+		{name: "text alias", input: "text", wantErr: true},
+		{name: "file", input: "file", wantErr: true},
 		{name: "formata", input: "formata", want: "formata"},
 		{name: "schema alias", input: "schema", want: "formata"},
-		{name: "trim and case", input: "  TeXt  ", want: "string"},
+		{name: "trim and case", input: "  FoRmAtA  ", want: "formata"},
 		{name: "unsupported", input: "unsupported", wantErr: true},
 	}
 
@@ -71,10 +71,9 @@ func TestNormalizeInputTypes(t *testing.T) {
 		Steps: []WorkflowStep{
 			{
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", InputType: " text "},
-					{SubstepID: "1.2", InputType: "NUMBER"},
-					{SubstepID: "1.3", InputType: "file"},
-					{SubstepID: "1.4", InputType: "formata", Schema: map[string]interface{}{"type": "object"}},
+					{SubstepID: "1.1", InputType: " schema ", Schema: map[string]interface{}{"type": "object"}},
+					{SubstepID: "1.2", InputType: "JSONSCHEMA", Schema: map[string]interface{}{"type": "object"}},
+					{SubstepID: "1.3", InputType: "formata", Schema: map[string]interface{}{"type": "object"}},
 				},
 			},
 		},
@@ -83,17 +82,10 @@ func TestNormalizeInputTypes(t *testing.T) {
 	if err := normalizeInputTypes(&workflow); err != nil {
 		t.Fatalf("normalizeInputTypes(valid): %v", err)
 	}
-	if workflow.Steps[0].Substep[0].InputType != "string" {
-		t.Fatalf("substep 1.1 type = %q, want %q", workflow.Steps[0].Substep[0].InputType, "string")
-	}
-	if workflow.Steps[0].Substep[1].InputType != "number" {
-		t.Fatalf("substep 1.2 type = %q, want %q", workflow.Steps[0].Substep[1].InputType, "number")
-	}
-	if workflow.Steps[0].Substep[2].InputType != "file" {
-		t.Fatalf("substep 1.3 type = %q, want %q", workflow.Steps[0].Substep[2].InputType, "file")
-	}
-	if workflow.Steps[0].Substep[3].InputType != "formata" {
-		t.Fatalf("substep 1.4 type = %q, want %q", workflow.Steps[0].Substep[3].InputType, "formata")
+	for _, substep := range workflow.Steps[0].Substep {
+		if substep.InputType != "formata" {
+			t.Fatalf("substep %s type = %q, want formata", substep.SubstepID, substep.InputType)
+		}
 	}
 
 	invalid := WorkflowDef{
@@ -600,7 +592,7 @@ func TestValidateWorkflowRefsMissingOrganization(t *testing.T) {
 					Order:            1,
 					OrganizationSlug: "org1",
 					Substep: []WorkflowSub{
-						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "string"},
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "formata"},
 					},
 				},
 			},
@@ -638,7 +630,7 @@ func TestValidateWorkflowRefsMissingRole(t *testing.T) {
 					Order:            1,
 					OrganizationSlug: "organization-1",
 					Substep: []WorkflowSub{
-						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "string"},
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, Roles: []string{"dep1"}, InputKey: "value", InputType: "formata"},
 					},
 				},
 			},
@@ -686,7 +678,7 @@ func TestValidateWorkflowRefsAllowsDuplicateRoleSlugAcrossOrganizations(t *testi
 							Order:     1,
 							Roles:     []string{"operator"},
 							InputKey:  "value",
-							InputType: "string",
+							InputType: "formata",
 						},
 					},
 				},
@@ -766,7 +758,7 @@ func TestValidateWorkflowRefsReportsStepAndRoleMismatches(t *testing.T) {
 					Order:            1,
 					OrganizationSlug: "missing-org",
 					Substep: []WorkflowSub{
-						{SubstepID: "1.1", Title: "Sub 1", Order: 1, InputKey: "value", InputType: "string"},
+						{SubstepID: "1.1", Title: "Sub 1", Order: 1, InputKey: "value", InputType: "formata"},
 					},
 				},
 				{
@@ -775,8 +767,8 @@ func TestValidateWorkflowRefsReportsStepAndRoleMismatches(t *testing.T) {
 					Order:            2,
 					OrganizationSlug: "org1",
 					Substep: []WorkflowSub{
-						{SubstepID: "2.1", Title: "Sub 2", Order: 1, Roles: []string{"reviewer"}, InputKey: "value", InputType: "string"},
-						{SubstepID: "2.2", Title: "Sub 3", Order: 2, Roles: []string{"missing-role"}, InputKey: "value", InputType: "string"},
+						{SubstepID: "2.1", Title: "Sub 2", Order: 1, Roles: []string{"reviewer"}, InputKey: "value", InputType: "formata"},
+						{SubstepID: "2.2", Title: "Sub 3", Order: 2, Roles: []string{"missing-role"}, InputKey: "value", InputType: "formata"},
 					},
 				},
 			},
@@ -849,6 +841,16 @@ func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 
 func writeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {
 	t.Helper()
+	normalizedInputType := strings.TrimSpace(inputType)
+	switch strings.ToLower(normalizedInputType) {
+	case "string", "text", "number", "file":
+		normalizedInputType = "formata"
+	}
+	schema := ""
+	if strings.EqualFold(normalizedInputType, "formata") {
+		schema = "          schema:\n" +
+			"            type: object\n"
+	}
 	content := "workflow:\n" +
 		"  name: \"" + name + "\"\n" +
 		func() string {
@@ -868,7 +870,8 @@ func writeWorkflowConfig(t *testing.T, path, name, inputType string, description
 		"          order: 1\n" +
 		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value\"\n" +
-		"          inputType: \"" + inputType + "\"\n" +
+		"          inputType: \"" + normalizedInputType + "\"\n" +
+		schema +
 		"organizations:\n" +
 		"  - slug: \"org1\"\n" +
 		"    name: \"Organization 1\"\n" +
@@ -900,7 +903,9 @@ func writeWorkflowConfigWithDPP(t *testing.T, path, dppBlock string) {
 		"          order: 1\n" +
 		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value\"\n" +
-		"          inputType: \"string\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
 		"organizations:\n" +
 		"  - slug: \"org1\"\n" +
 		"    name: \"Organization 1\"\n" +

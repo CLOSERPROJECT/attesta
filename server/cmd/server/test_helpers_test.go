@@ -9,6 +9,7 @@ import (
 )
 
 func testRuntimeConfig() RuntimeConfig {
+	schema := map[string]interface{}{"type": "object"}
 	return RuntimeConfig{
 		Workflow: WorkflowDef{
 			Name: "Demo workflow",
@@ -18,9 +19,9 @@ func testRuntimeConfig() RuntimeConfig {
 					Title:  "Step 1",
 					Order:  1,
 					Substep: []WorkflowSub{
-						{SubstepID: "1.1", Title: "A", Order: 1, Role: "dep1", InputKey: "value", InputType: "number"},
-						{SubstepID: "1.2", Title: "B", Order: 2, Role: "dep1", InputKey: "note", InputType: "string"},
-						{SubstepID: "1.3", Title: "C", Order: 3, Role: "dep1", InputKey: "attachment", InputType: "file"},
+						{SubstepID: "1.1", Title: "A", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata", Schema: schema},
+						{SubstepID: "1.2", Title: "B", Order: 2, Role: "dep1", InputKey: "note", InputType: "formata", Schema: schema},
+						{SubstepID: "1.3", Title: "C", Order: 3, Role: "dep1", InputKey: "attachment", InputType: "formata", Schema: schema},
 					},
 				},
 				{
@@ -28,8 +29,8 @@ func testRuntimeConfig() RuntimeConfig {
 					Title:  "Step 2",
 					Order:  2,
 					Substep: []WorkflowSub{
-						{SubstepID: "2.1", Title: "D", Order: 1, Role: "dep2", InputKey: "value", InputType: "number"},
-						{SubstepID: "2.2", Title: "E", Order: 2, Role: "dep2", InputKey: "note", InputType: "string"},
+						{SubstepID: "2.1", Title: "D", Order: 1, Role: "dep2", InputKey: "value", InputType: "formata", Schema: schema},
+						{SubstepID: "2.2", Title: "E", Order: 2, Role: "dep2", InputKey: "note", InputType: "formata", Schema: schema},
 					},
 				},
 				{
@@ -37,8 +38,8 @@ func testRuntimeConfig() RuntimeConfig {
 					Title:  "Step 3",
 					Order:  3,
 					Substep: []WorkflowSub{
-						{SubstepID: "3.1", Title: "F", Order: 1, Role: "dep3", InputKey: "value", InputType: "number"},
-						{SubstepID: "3.2", Title: "G", Order: 2, Role: "dep3", InputKey: "note", InputType: "string"},
+						{SubstepID: "3.1", Title: "F", Order: 1, Role: "dep3", InputKey: "value", InputType: "formata", Schema: schema},
+						{SubstepID: "3.2", Title: "G", Order: 2, Role: "dep3", InputKey: "note", InputType: "formata", Schema: schema},
 					},
 				},
 			},
@@ -137,13 +138,17 @@ func writeTwoSubstepWorkflowConfig(t testHelperT, path, name string) {
 		"          order: 1\n" +
 		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value1\"\n" +
-		"          inputType: \"string\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
 		"        - id: \"1.2\"\n" +
 		"          title: \"Input 2\"\n" +
 		"          order: 2\n" +
 		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value2\"\n" +
-		"          inputType: \"string\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
 		"organizations:\n" +
 		"  - slug: \"org1\"\n" +
 		"    name: \"Organization 1\"\n" +
