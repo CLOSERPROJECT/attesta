@@ -27,6 +27,34 @@ func TestParseDigitalLinkPathValidAndInvalid(t *testing.T) {
 	}
 }
 
+func TestParseDigitalLinkAttachmentPath(t *testing.T) {
+	gtin, lot, serial, attachmentID, ok, err := parseDigitalLinkAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/file%201/file")
+	if err != nil {
+		t.Fatalf("parseDigitalLinkAttachmentPath(valid): %v", err)
+	}
+	if !ok {
+		t.Fatal("expected attachment path")
+	}
+	if gtin != "09506000134352" || lot != "LOT-001" || serial != "SERIAL-001" || attachmentID != "file 1" {
+		t.Fatalf("unexpected parsed values: gtin=%q lot=%q serial=%q attachmentID=%q", gtin, lot, serial, attachmentID)
+	}
+
+	_, _, _, _, ok, err = parseDigitalLinkAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001")
+	if ok || err != nil {
+		t.Fatalf("plain DPP path returned ok=%v err=%v, want ok=false err=nil", ok, err)
+	}
+
+	_, _, _, _, ok, err = parseDigitalLinkAttachmentPath("/01/not-digits/10/LOT-001/21/SERIAL-001/attachment/file/file")
+	if !ok || err == nil {
+		t.Fatalf("invalid attachment path returned ok=%v err=%v, want ok=true with error", ok, err)
+	}
+
+	_, _, _, _, ok, err = parseDigitalLinkAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/%20/file")
+	if !ok || err == nil {
+		t.Fatalf("blank attachment id returned ok=%v err=%v, want ok=true with error", ok, err)
+	}
+}
+
 func TestDigitalLinkURLPathEscapesValues(t *testing.T) {
 	url := digitalLinkURL("09506000134352", "LOT 001", "SERIAL/001")
 	if url != "/01/09506000134352/10/LOT%20001/21/SERIAL%2F001" {
@@ -381,6 +409,85 @@ func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
 	}
 	if substep.Attachments[0].URL == "" {
 		t.Fatalf("expected attachment URL, got %#v", substep.Attachments[0])
+	}
+}
+
+func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
+	traceability := []DPPTraceabilityStep{
+		{
+			Substeps: []DPPTraceabilitySubstep{
+				{
+					Attachments: []ActionAttachmentView{
+						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+						{Filename: "legacy.pdf", URL: "/w/workflow/process/p1/attachment/legacy/file"},
+					},
+				},
+			},
+		},
+	}
+
+	mapped := publicDPPTraceabilityAttachmentURLs(traceability, "/01/09506000134352/10/LOT-001/21/SERIAL-001")
+	attachment := mapped[0].Substeps[0].Attachments[0]
+	if attachment.URL != "/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/file%201/file" {
+		t.Fatalf("public URL = %q", attachment.URL)
+	}
+	if attachment.PreviewURL != attachment.URL+"?inline=1#page=1&toolbar=0&navpanes=0&view=FitH" {
+		t.Fatalf("preview URL = %q", attachment.PreviewURL)
+	}
+	if got := mapped[0].Substeps[0].Attachments[1].URL; got != "/w/workflow/process/p1/attachment/legacy/file" {
+		t.Fatalf("attachment without ID URL changed to %q", got)
+	}
+
+	unchanged := publicDPPTraceabilityAttachmentURLs([]DPPTraceabilityStep{
+		{
+			Substeps: []DPPTraceabilitySubstep{
+				{
+					Attachments: []ActionAttachmentView{
+						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+					},
+				},
+			},
+		},
+	}, " ")
+	if unchanged[0].Substeps[0].Attachments[0].URL != "/w/workflow/process/p1/attachment/file%201/file" {
+		t.Fatalf("blank digital link changed URL to %q", unchanged[0].Substeps[0].Attachments[0].URL)
+	}
+}
+
+func TestDPPProcessHasAttachment(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{SubstepID: "1.1", InputType: "formata"},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": "65f2a79b8e7f7d8f3c7c99aa",
+						"filename":     "cert.pdf",
+					},
+				},
+			},
+		},
+	}
+
+	if !dppProcessHasAttachment(def, process, "65f2a79b8e7f7d8f3c7c99aa") {
+		t.Fatal("expected process to expose its own attachment")
+	}
+	if dppProcessHasAttachment(def, process, primitive.NewObjectID().Hex()) {
+		t.Fatal("expected unrelated attachment to be rejected")
+	}
+	if dppProcessHasAttachment(def, nil, "65f2a79b8e7f7d8f3c7c99aa") {
+		t.Fatal("expected nil process to be rejected")
 	}
 }
 

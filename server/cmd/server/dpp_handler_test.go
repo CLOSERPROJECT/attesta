@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"html/template"
@@ -207,8 +208,196 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 	if !strings.Contains(body, "cert.pdf") {
 		t.Fatalf("expected inline file link in traceability, got %q", body)
 	}
+	wantPublicURL := digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial) + "/attachment/65f2a79b8e7f7d8f3c7c99aa/file"
+	if !strings.Contains(body, wantPublicURL) {
+		t.Fatalf("expected public dpp attachment URL %q, got %q", wantPublicURL, body)
+	}
+	if strings.Contains(body, "/w/workflow/process/") {
+		t.Fatalf("expected DPP attachment links not to use authenticated workflow route, got %q", body)
+	}
 	if strings.Contains(body, ">Documents<") {
 		t.Fatalf("expected no Documents section, got %q", body)
+	}
+}
+
+func TestHandleDigitalLinkDPPAttachmentAllowsPublicDownload(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   processID,
+		SubstepID:   "1.1",
+		Filename:    "cert.pdf",
+		ContentType: "application/pdf",
+		MaxBytes:    1024,
+		UploadedAt:  time.Now().UTC(),
+	}, bytes.NewReader([]byte("certificate")))
+	if err != nil {
+		t.Fatalf("SaveAttachment: %v", err)
+	}
+	process := Process{
+		ID:          processID,
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": attachment.ID.Hex(),
+						"filename":     attachment.Filename,
+						"contentType":  attachment.ContentType,
+						"size":         attachment.SizeBytes,
+						"sha256":       attachment.SHA256,
+					},
+				},
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+	server := &Server{
+		store:     store,
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)+"/attachment/"+attachment.ID.Hex()+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "application/pdf" {
+		t.Fatalf("content type = %q, want application/pdf", got)
+	}
+	if rr.Body.String() != "certificate" {
+		t.Fatalf("body = %q, want certificate", rr.Body.String())
+	}
+}
+
+func TestHandleDigitalLinkDPPAttachmentRejectsUnlistedAttachment(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	store := NewMemoryStore()
+	process := seedDPPFileProcess(store, primitive.NewObjectID(), "65f2a79b8e7f7d8f3c7c99aa")
+	server := &Server{
+		store:     store,
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)+"/attachment/"+primitive.NewObjectID().Hex()+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+	}
+}
+
+func TestHandleDigitalLinkDPPAttachmentRejectsUnknownDigitalLink(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/"+primitive.NewObjectID().Hex()+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+	}
+}
+
+func TestHandleDigitalLinkDPPAttachmentRejectsBadStoredAttachmentID(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	store := NewMemoryStore()
+	process := seedDPPFileProcess(store, primitive.NewObjectID(), "not-an-object-id")
+	server := &Server{
+		store:     store,
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)+"/attachment/not-an-object-id/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+	}
+}
+
+func TestHandleDigitalLinkDPPAttachmentRejectsMissingStoredAttachment(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	store := NewMemoryStore()
+	attachmentID := primitive.NewObjectID().Hex()
+	process := seedDPPFileProcess(store, primitive.NewObjectID(), attachmentID)
+	server := &Server{
+		store:     store,
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)+"/attachment/"+attachmentID+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+	}
+}
+
+func TestHandleDigitalLinkDPPAttachmentRejectsOtherProcessAttachment(t *testing.T) {
+	tempDir := t.TempDir()
+	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
+
+	store := NewMemoryStore()
+	processID := primitive.NewObjectID()
+	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
+		ProcessID:   primitive.NewObjectID(),
+		SubstepID:   "1.1",
+		Filename:    "cert.pdf",
+		ContentType: "application/pdf",
+		MaxBytes:    1024,
+		UploadedAt:  time.Now().UTC(),
+	}, bytes.NewReader([]byte("certificate")))
+	if err != nil {
+		t.Fatalf("SaveAttachment: %v", err)
+	}
+	process := seedDPPFileProcess(store, processID, attachment.ID.Hex())
+	server := &Server{
+		store:     store,
+		tmpl:      testTemplates(),
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)+"/attachment/"+attachment.ID.Hex()+"/file", nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
 	}
 }
 
@@ -270,6 +459,35 @@ func seedDPPProcess(store *MemoryStore) Process {
 				DoneAt: &doneAt,
 				DoneBy: &Actor{ID: "u1", Role: "dep1"},
 				Data:   map[string]interface{}{"value": float64(1)},
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+	return process
+}
+
+func seedDPPFileProcess(store *MemoryStore, processID primitive.ObjectID, attachmentID string) Process {
+	process := Process{
+		ID:          processID,
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": attachmentID,
+						"filename":     "cert.pdf",
+						"contentType":  "application/pdf",
+					},
+				},
 			},
 		},
 		DPP: &ProcessDPP{

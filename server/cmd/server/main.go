@@ -280,12 +280,13 @@ type ActionKV struct {
 }
 
 type ActionAttachmentView struct {
-	Key         string
-	Filename    string
-	URL         string
-	PreviewURL  string
-	PreviewKind string
-	SHA256      string
+	AttachmentID string
+	Key          string
+	Filename     string
+	URL          string
+	PreviewURL   string
+	PreviewKind  string
+	SHA256       string
 }
 
 type Department struct {
@@ -5285,6 +5286,14 @@ func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Contex
 }
 
 func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
+	if gtin, lot, serial, attachmentID, ok, err := parseDigitalLinkAttachmentPath(r.URL.Path); ok {
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		s.handleDigitalLinkDPPAttachment(w, r, gtin, lot, serial, attachmentID)
+		return
+	}
 	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
 	if err != nil {
 		http.NotFound(w, r)
@@ -5327,6 +5336,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg))
+	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
@@ -5345,6 +5355,66 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) handleDigitalLinkDPPAttachment(w http.ResponseWriter, r *http.Request, gtin, lot, serial, attachmentID string) {
+	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	process.Progress = normalizeProgressKeys(process.Progress)
+
+	workflowKey := strings.TrimSpace(process.WorkflowKey)
+	if workflowKey == "" {
+		workflowKey = s.defaultWorkflowKey()
+	}
+	cfg, err := s.workflowByKey(workflowKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !dppProcessHasAttachment(cfg.Workflow, process, attachmentID) {
+		http.NotFound(w, r)
+		return
+	}
+	s.streamProcessAttachment(w, r, process, attachmentID)
+}
+
+func publicDPPTraceabilityAttachmentURLs(traceability []DPPTraceabilityStep, digitalLink string) []DPPTraceabilityStep {
+	base := strings.TrimRight(strings.TrimSpace(digitalLink), "/")
+	if base == "" {
+		return traceability
+	}
+	for stepIndex := range traceability {
+		for substepIndex := range traceability[stepIndex].Substeps {
+			attachments := traceability[stepIndex].Substeps[substepIndex].Attachments
+			for attachmentIndex := range attachments {
+				attachmentID := strings.TrimSpace(attachments[attachmentIndex].AttachmentID)
+				if attachmentID == "" {
+					continue
+				}
+				downloadURL := base + "/attachment/" + url.PathEscape(attachmentID) + "/file"
+				attachments[attachmentIndex].URL = downloadURL
+				attachments[attachmentIndex].PreviewURL = actionAttachmentPreviewURL(downloadURL, attachments[attachmentIndex].PreviewKind)
+			}
+			traceability[stepIndex].Substeps[substepIndex].Attachments = attachments
+		}
+	}
+	return traceability
+}
+
+func dppProcessHasAttachment(def WorkflowDef, process *Process, attachmentID string) bool {
+	attachmentID = strings.TrimSpace(attachmentID)
+	if process == nil || attachmentID == "" {
+		return false
+	}
+	for _, file := range collectProcessAttachments(def, process) {
+		if strings.TrimSpace(file.AttachmentID) == attachmentID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Request, processID string) {
@@ -5569,6 +5639,14 @@ func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.
 		return
 	}
 	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.NotFound(w, r)
+		return
+	}
+	s.streamProcessAttachment(w, r, process, attachmentID)
+}
+
+func (s *Server) streamProcessAttachment(w http.ResponseWriter, r *http.Request, process *Process, attachmentID string) {
+	if process == nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -7514,12 +7592,13 @@ func buildActionAttachments(workflowKey string, process *Process, data map[strin
 		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
 		previewKind := actionAttachmentPreviewKind(meta)
 		attachments = append(attachments, ActionAttachmentView{
-			Key:         item.Key,
-			Filename:    sanitizeAttachmentFilename(meta.Filename),
-			URL:         downloadURL,
-			PreviewURL:  actionAttachmentPreviewURL(downloadURL, previewKind),
-			PreviewKind: previewKind,
-			SHA256:      strings.TrimSpace(meta.SHA256),
+			AttachmentID: id,
+			Key:          item.Key,
+			Filename:     sanitizeAttachmentFilename(meta.Filename),
+			URL:          downloadURL,
+			PreviewURL:   actionAttachmentPreviewURL(downloadURL, previewKind),
+			PreviewKind:  previewKind,
+			SHA256:       strings.TrimSpace(meta.SHA256),
 		})
 	}
 	sort.Slice(attachments, func(i, j int) bool {

@@ -135,6 +135,31 @@ func legacyDPPDataLookupKeys(sub WorkflowSub, key string) []string {
 func parseDigitalLinkPath(path string) (string, string, string, error) {
 	trimmed := strings.Trim(strings.TrimSpace(path), "/")
 	parts := strings.Split(trimmed, "/")
+	return parseDigitalLinkParts(parts)
+}
+
+func parseDigitalLinkAttachmentPath(path string) (string, string, string, string, bool, error) {
+	trimmed := strings.Trim(strings.TrimSpace(path), "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 9 || parts[6] != "attachment" || parts[8] != "file" {
+		return "", "", "", "", false, nil
+	}
+	gtin, lot, serial, err := parseDigitalLinkParts(parts[:6])
+	if err != nil {
+		return "", "", "", "", true, err
+	}
+	attachmentID, err := url.PathUnescape(parts[7])
+	if err != nil {
+		return "", "", "", "", true, err
+	}
+	attachmentID = strings.TrimSpace(attachmentID)
+	if attachmentID == "" {
+		return "", "", "", "", true, errors.New("missing attachment id")
+	}
+	return gtin, lot, serial, attachmentID, true, nil
+}
+
+func parseDigitalLinkParts(parts []string) (string, string, string, error) {
 	if len(parts) != 6 || parts[0] != "01" || parts[2] != "10" || parts[4] != "21" {
 		return "", "", "", errors.New("invalid digital link path")
 	}
