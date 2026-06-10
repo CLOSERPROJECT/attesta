@@ -1370,6 +1370,15 @@ func attachmentMaxBytes() int64 {
 	return value
 }
 
+func completionFormMaxBytes() int64 {
+	const overhead = int64(1 << 20)
+	maxAttachmentBytes := attachmentMaxBytes()
+	if maxAttachmentBytes > 1<<62 {
+		return maxAttachmentBytes
+	}
+	return maxAttachmentBytes*4 + overhead
+}
+
 func organizationLogoMaxBytes() int64 {
 	const defaultMaxBytes = int64(5 * 1024 * 1024)
 	raw := strings.TrimSpace(os.Getenv("ORG_LOGO_MAX_BYTES"))
@@ -5645,7 +5654,15 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
 		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
 	}
-	_ = r.ParseForm()
+	r.Body = http.MaxBytesReader(w, r.Body, completionFormMaxBytes())
+	if err := r.ParseForm(); err != nil {
+		if isRequestTooLarge(err) {
+			s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
+			return
+		}
+		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
+		return
+	}
 	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
 	if activeRole == "" && len(actor.RoleSlugs) == 1 {
 		activeRole = actor.RoleSlugs[0]

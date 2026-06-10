@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,35 @@ func TestHandleCompleteSubstepSuccessNonHTMX(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "PROCESS "+processID) {
 		t.Fatalf("expected non-HTMX process page marker, got %q", rr.Body.String())
+	}
+}
+
+func TestHandleCompleteSubstepLargeFormataAttachmentDoesNotLoseActiveRole(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+	server.enforceAuth = true
+	server.identity = testIdentityForSessions(time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC), map[string]AccountUser{
+		"session": {
+			IdentityUserID: "user-1",
+			Email:          "dep1@example.com",
+			RoleSlugs:      []string{"dep1"},
+			Status:         "active",
+		},
+	})
+
+	form := url.Values{}
+	form.Set("activeRole", "dep1")
+	form.Set("value", `{"evidence":"data:application/pdf;base64,`+strings.Repeat("A", 11<<20)+`"}`)
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%q", rr.Code, http.StatusOK, rr.Body.String())
 	}
 }
 
