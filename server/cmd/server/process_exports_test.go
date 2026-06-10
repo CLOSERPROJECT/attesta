@@ -398,8 +398,8 @@ func TestCollectProcessAttachmentsAdditionalBranches(t *testing.T) {
 				StepID: "1",
 				Order:  1,
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, InputKey: "attachment", InputType: "file"},
-					{SubstepID: "1.2", Order: 2, InputKey: "attachment", InputType: "file"},
+					{SubstepID: "1.1", Order: 1, InputKey: "attachment", InputType: "formata"},
+					{SubstepID: "1.2", Order: 2, InputKey: "attachment", InputType: "formata"},
 				},
 			},
 		},

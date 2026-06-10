@@ -565,7 +565,9 @@ func workflowStreamYAML(name string) string {
 		"          order: 1\n" +
 		"          roles: [\"dep1\"]\n" +
 		"          inputKey: \"value\"\n" +
-		"          inputType: \"string\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
 		"organizations:\n" +
 		"  - slug: \"org1\"\n" +
 		"    name: \"Org\"\n" +

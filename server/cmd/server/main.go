@@ -4954,10 +4954,6 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleDownloadProcessAttachment(w, r, processID, parts[2])
 		return
 	}
-	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "file" && r.Method == http.MethodGet {
-		s.handleDownloadSubstepFile(w, r, processID, parts[2])
-		return
-	}
 	http.NotFound(w, r)
 }
 
@@ -5553,68 +5549,6 @@ func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, proces
 	writeJSON(w, export.Merkle)
 }
 
-func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
-	if !ok {
-		return
-	}
-	process, err := s.loadProcess(r.Context(), processID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	if !s.processBelongsToWorkflow(process, workflowKey) {
-		http.NotFound(w, r)
-		return
-	}
-	substep, _, err := findSubstep(cfg.Workflow, substepID)
-	if err != nil || substep.InputType != "file" {
-		http.NotFound(w, r)
-		return
-	}
-	progress, ok := process.Progress[substepID]
-	if !ok || progress.State != "done" {
-		http.NotFound(w, r)
-		return
-	}
-	attachmentMeta := attachmentMetaFromSubstepPayload(progress.Data, substep)
-	if attachmentMeta == nil {
-		http.NotFound(w, r)
-		return
-	}
-	attachmentID, err := primitive.ObjectIDFromHex(attachmentMeta.AttachmentID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	attachment, err := s.store.LoadAttachmentByID(r.Context(), attachmentID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	download, err := s.store.OpenAttachmentDownload(r.Context(), attachmentID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer download.Close()
-
-	contentType := strings.TrimSpace(attachment.ContentType)
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-	filename := sanitizeAttachmentFilename(attachment.Filename)
-	w.Header().Set("Content-Type", contentType)
-	disposition := "attachment"
-	if strings.TrimSpace(r.URL.Query().Get("inline")) != "" {
-		disposition = "inline"
-	}
-	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, filename))
-	if _, err := io.Copy(w, download); err != nil {
-		return
-	}
-}
-
 func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.Request, processID, attachmentID string) {
 	workflowKey, _, ok := s.selectedWorkflowOrRedirectHome(w, r)
 	if !ok {
@@ -5958,9 +5892,6 @@ var (
 )
 
 func (s *Server) parseCompletionPayload(r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	if substep.InputType != "formata" {
-		return nil, errors.New("Only formata substeps are supported.")
-	}
 	return s.parseFormataPayload(r, processID, substep, now)
 }
 
@@ -6773,16 +6704,8 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 					if progress.DoneAt != nil {
 						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 					}
-					if sub.InputType == "file" {
-						if attachment := attachmentMetaFromSubstepPayload(progress.Data, sub); attachment != nil {
-							entry.FileName = attachment.Filename
-							entry.FileSHA256 = attachment.SHA256
-							entry.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
-						}
-					} else {
-						if value, ok := processStepDataValue(progress, sub); ok {
-							entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
-						}
+					if value, ok := processStepDataValue(progress, sub); ok {
+						entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
 					}
 				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 					entry.Status = processStatusTerminated
@@ -6980,33 +6903,6 @@ func collectAttachmentsFromValue(raw interface{}, files *[]NotarizedAttachment) 
 	}
 }
 
-func attachmentMetaFromPayload(data map[string]interface{}, inputKey string) *NotarizedAttachment {
-	if data == nil {
-		return nil
-	}
-	raw, ok := data[inputKey]
-	if !ok {
-		return nil
-	}
-	switch typed := raw.(type) {
-	case map[string]interface{}:
-		return attachmentMetaFromMap(typed)
-	case primitive.M:
-		return attachmentMetaFromMap(map[string]interface{}(typed))
-	default:
-		return nil
-	}
-}
-
-func attachmentMetaFromSubstepPayload(data map[string]interface{}, sub WorkflowSub) *NotarizedAttachment {
-	for _, key := range substepDataKeys(sub) {
-		if meta := attachmentMetaFromPayload(data, key); meta != nil {
-			return meta
-		}
-	}
-	return nil
-}
-
 func attachmentMetaFromMap(payload map[string]interface{}) *NotarizedAttachment {
 	if payload == nil {
 		return nil
@@ -7069,9 +6965,6 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 				entry.Description = progress.Description
 				entry.Payload = progress.Data
 				entry.Digest = digestPayload(progress.Data)
-				if sub.InputType == "file" {
-					entry.Attachment = attachmentMetaFromSubstepPayload(progress.Data, sub)
-				}
 			} else if availableMap[sub.SubstepID] {
 				state = "available"
 			}
@@ -7334,20 +7227,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 						roleBorder = cssValue(selectedMeta.Border, "var(--border)")
 					}
 				}
-				if sub.InputType == "formata" {
-					if value, ok := processStepDataValue(progress, sub); ok {
-						values = flattenDisplayValues("", value)
-					}
-				} else if value, ok := processStepDataValue(progress, sub); ok && !isAttachmentMetaValue(value) {
-					values = flattenDisplayValues(sub.InputKey, value)
+				if value, ok := processStepDataValue(progress, sub); ok {
+					values = flattenDisplayValues("", value)
 				}
 				attachments = buildActionAttachments(workflowKey, process, progress.Data)
 			}
 		}
-		if sub.InputType == "formata" {
-			formSchema = marshalJSONCompact(sub.Schema)
-			formUISchema = marshalJSONCompact(sub.UISchema)
-		}
+		formSchema = marshalJSONCompact(sub.Schema)
+		formUISchema = marshalJSONCompact(sub.UISchema)
 		actions = append(actions, ActionView{
 			WorkflowKey:   workflowKey,
 			ProcessID:     processIDString(process),
@@ -7805,23 +7692,14 @@ func normalizeInputTypes(workflow *WorkflowDef) error {
 
 func normalizeInputType(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "number":
-		return "number", nil
-	case "string", "text":
-		return "string", nil
-	case "file":
-		return "file", nil
 	case "formata", "schema", "jsonschema":
 		return "formata", nil
 	default:
-		return "", fmt.Errorf("unsupported value %q (allowed: number, string, text, file, formata)", value)
+		return "", fmt.Errorf("unsupported value %q (allowed: formata)", value)
 	}
 }
 
 func normalizeSubstepInputConfig(substep *WorkflowSub) error {
-	if substep.InputType != "formata" {
-		return nil
-	}
 	if len(substep.Schema) == 0 {
 		return errors.New("schema is required when inputType=formata")
 	}
@@ -7928,52 +7806,10 @@ func processStepDataValue(progress ProcessStep, sub WorkflowSub) (interface{}, b
 	if progress.Data == nil {
 		return nil, false
 	}
-	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") && progress.Description != nil {
-		return progress.Data, true
-	}
-	return substepDataValue(progress.Data, sub)
-}
-
-func substepDataValue(data map[string]interface{}, sub WorkflowSub) (interface{}, bool) {
-	if data == nil {
-		return nil, false
-	}
-	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") {
-		if value, ok := legacyWrappedSubstepDataValue(data, sub); ok {
-			return value, true
-		}
-		return data, true
-	}
-	for _, key := range substepDataKeys(sub) {
-		value, ok := data[key]
-		if ok {
-			return value, true
-		}
-	}
-	return nil, false
-}
-
-func legacyWrappedSubstepDataValue(data map[string]interface{}, sub WorkflowSub) (interface{}, bool) {
-	for _, key := range substepDataKeys(sub) {
-		value, ok := data[key]
-		if !ok {
-			continue
-		}
-		if isAttachmentMetaValue(value) {
-			continue
-		}
-		switch value.(type) {
-		case map[string]interface{}, primitive.M:
-			return value, true
-		}
-	}
-	return nil, false
+	return progress.Data, true
 }
 
 func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
-	if sub.InputType != "formata" {
-		return nil, errors.New("Value must be a valid JSON object.")
-	}
 	var decoded interface{}
 	if err := json.Unmarshal([]byte(value), &decoded); err != nil {
 		return nil, errors.New("Value must be a valid JSON object.")

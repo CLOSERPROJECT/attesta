@@ -18,8 +18,8 @@ func TestNormalizePayload(t *testing.T) {
 	if _, err := normalizePayload(formataSub, "[]"); err == nil {
 		t.Fatal("expected formata payload parse failure for non-object JSON")
 	}
-	if _, err := normalizePayload(WorkflowSub{InputType: "string", InputKey: "note"}, `"ok"`); err == nil {
-		t.Fatal("expected non-formata payload parse failure")
+	if _, err := normalizePayload(WorkflowSub{InputType: "formata", InputKey: "note"}, `"ok"`); err == nil {
+		t.Fatal("expected formata payload parse failure for scalar JSON")
 	}
 }
 

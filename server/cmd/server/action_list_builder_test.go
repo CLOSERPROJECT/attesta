@@ -185,10 +185,10 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 	if len(action.Values) != 2 {
 		t.Fatalf("expected 2 flattened values, got %#v", action.Values)
 	}
-	if action.Values[0].Key != "details.status" || action.Values[0].Value != "ok" {
+	if action.Values[0].Key != "payload.details.status" || action.Values[0].Value != "ok" {
 		t.Fatalf("unexpected first flattened value: %#v", action.Values[0])
 	}
-	if action.Values[1].Key != "details.weight" || action.Values[1].Value != "42" {
+	if action.Values[1].Key != "payload.details.weight" || action.Values[1].Value != "42" {
 		t.Fatalf("unexpected second flattened value: %#v", action.Values[1])
 	}
 	if len(action.Attachments) != 1 {
@@ -367,7 +367,7 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 						Order:     1,
 						Roles:     []string{"dep1", "dep2"},
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 				},
 			},
@@ -410,7 +410,7 @@ func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 						Order:     1,
 						Roles:     []string{"dep1", "dep2"},
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 				},
 			},

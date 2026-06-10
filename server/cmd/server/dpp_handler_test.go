@@ -297,7 +297,9 @@ func writeFileWorkflowConfig(t *testing.T, path string) {
 		"          order: 1\n" +
 		"          role: \"dep1\"\n" +
 		"          inputKey: \"attachment\"\n" +
-		"          inputType: \"file\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
 		"departments:\n" +
 		"  - id: \"dep1\"\n" +
 		"    name: \"Department 1\"\n" +

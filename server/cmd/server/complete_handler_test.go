@@ -407,16 +407,6 @@ func TestHandleCompleteSubstepRejectsInvalidFormataJSON(t *testing.T) {
 	}
 }
 
-func TestParseCompletionPayloadRejectsNonFormataSubstep(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodPost, "/process/p/substep/1.1/complete", strings.NewReader("value=1"))
-
-	_, err := server.parseCompletionPayload(req, primitive.NewObjectID(), WorkflowSub{InputType: "string"}, time.Now())
-	if err == nil || !strings.Contains(err.Error(), "Only formata substeps are supported") {
-		t.Fatalf("error = %v, want formata-only error", err)
-	}
-}
-
 func TestHandleCompleteSubstepReturns404ForWorkflowMismatch(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})

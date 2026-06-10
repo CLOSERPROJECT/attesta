@@ -12,47 +12,35 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestAttachmentMetaFromPayload(t *testing.T) {
+func TestAttachmentMetaFromMap(t *testing.T) {
 	tests := []struct {
 		name   string
 		data   map[string]interface{}
-		input  string
 		wantOK bool
 		wantID string
 		wantSz int64
 	}{
-		{name: "nil data", data: nil, input: "attachment"},
-		{name: "missing key", data: map[string]interface{}{}, input: "attachment"},
-		{name: "wrong type", data: map[string]interface{}{"attachment": "bad"}, input: "attachment"},
+		{name: "nil data", data: nil},
+		{name: "empty fields are ignored", data: map[string]interface{}{}},
 		{
 			name: "valid payload with float size",
 			data: map[string]interface{}{
-				"attachment": map[string]interface{}{
-					"attachmentId": "att-3",
-					"filename":     "proof.pdf",
-					"sha256":       "def",
-					"size":         float64(14),
-				},
+				"attachmentId": "att-3",
+				"filename":     "proof.pdf",
+				"sha256":       "def",
+				"size":         float64(14),
 			},
-			input:  "attachment",
 			wantOK: true,
 			wantID: "att-3",
 			wantSz: 14,
-		},
-		{
-			name: "empty fields are ignored",
-			data: map[string]interface{}{
-				"attachment": map[string]interface{}{},
-			},
-			input: "attachment",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			meta := attachmentMetaFromPayload(tc.data, tc.input)
+			meta := attachmentMetaFromMap(tc.data)
 			if (meta != nil) != tc.wantOK {
-				t.Fatalf("attachmentMetaFromPayload presence = %t, want %t", meta != nil, tc.wantOK)
+				t.Fatalf("attachmentMetaFromMap presence = %t, want %t", meta != nil, tc.wantOK)
 			}
 			if !tc.wantOK {
 				return

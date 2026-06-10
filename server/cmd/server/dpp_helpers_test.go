@@ -227,7 +227,7 @@ func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
 						Order:     1,
 						Role:      "qa",
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 				},
 			},
@@ -320,10 +320,10 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 	if len(substep.Values) != 2 {
 		t.Fatalf("expected flattened formata values, got %#v", substep.Values)
 	}
-	if substep.Values[0].Key != "details.status" || substep.Values[0].Value != "ok" {
+	if substep.Values[0].Key != "payload.details.status" || substep.Values[0].Value != "ok" {
 		t.Fatalf("unexpected first flattened value: %#v", substep.Values[0])
 	}
-	if substep.Values[1].Key != "details.weight" || substep.Values[1].Value != "42" {
+	if substep.Values[1].Key != "payload.details.weight" || substep.Values[1].Value != "42" {
 		t.Fatalf("unexpected second flattened value: %#v", substep.Values[1])
 	}
 }
@@ -398,7 +398,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 						Order:     1,
 						Roles:     []string{"qa", "manager"},
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 					{
 						SubstepID: "1.2",
@@ -406,7 +406,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 						Order:     2,
 						Role:      "qa",
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 					{
 						SubstepID: "1.3",
@@ -414,7 +414,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 						Order:     3,
 						Role:      "qa",
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 				},
 			},
@@ -511,7 +511,7 @@ func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
 	sub := WorkflowSub{
 		SubstepID: "1.1",
 		InputKey:  "value",
-		InputType: "string",
+		InputType: "formata",
 	}
 	values := dppTraceValues(sub, ProcessStep{Data: map[string]interface{}{
 		"other": map[string]interface{}{

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -119,16 +118,6 @@ func TestCompletedValueHelpers(t *testing.T) {
 	}
 	if isAttachmentMetaValue(123) {
 		t.Fatal("non-map should not be detected as attachment metadata")
-	}
-	flatFilePayload := map[string]interface{}{
-		"payload": map[string]interface{}{
-			"attachmentId": "abc",
-			"filename":     "file.txt",
-		},
-	}
-	value, ok := substepDataValue(flatFilePayload, WorkflowSub{InputType: "formata", InputKey: "payload"})
-	if !ok || !reflect.DeepEqual(value, flatFilePayload) {
-		t.Fatalf("flat attachment metadata should not be treated as legacy wrapper: %#v", value)
 	}
 	if got := marshalJSONCompact(make(chan int)); got != "" {
 		t.Fatalf("expected marshal error to return empty string, got %q", got)
@@ -397,7 +386,7 @@ func TestEnsureProcessCompletionArtifactsUpdatesDoneStatus(t *testing.T) {
 			{
 				StepID: "1",
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
 				},
 			},
 		},
@@ -444,7 +433,7 @@ func TestEnsureProcessCompletionArtifactsNoopAndReloadFallback(t *testing.T) {
 			{
 				StepID: "1",
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
 				},
 			},
 		},
@@ -510,7 +499,7 @@ func TestEnsureProcessCompletionArtifactsGeneratesDPP(t *testing.T) {
 			{
 				StepID: "1",
 				Substep: []WorkflowSub{
-					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "string"},
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
 				},
 			},
 		},

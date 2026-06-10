@@ -77,7 +77,7 @@ func dppFirstStringValue(def WorkflowDef, process *Process, key string) string {
 		}
 		lookupKeys := []string{trimKey}
 		if entry.Description == nil {
-			lookupKeys = dppDataLookupKeys(substep, trimKey)
+			lookupKeys = legacyDPPDataLookupKeys(substep, trimKey)
 		}
 		for _, dataKey := range lookupKeys {
 			raw, ok := entry.Data[dataKey]
@@ -107,7 +107,9 @@ func dppStringValue(raw interface{}, key string) string {
 	return ""
 }
 
-func dppDataLookupKeys(sub WorkflowSub, key string) []string {
+// legacyDPPDataLookupKeys supports completed steps stored before ProcessStep.Description
+// marked the current payload shape.
+func legacyDPPDataLookupKeys(sub WorkflowSub, key string) []string {
 	trimmed := strings.TrimSpace(key)
 	if trimmed == "" {
 		return nil
@@ -341,12 +343,8 @@ func dppTraceValues(sub WorkflowSub, progress ProcessStep) []DPPTraceabilityValu
 	}
 
 	flattened := make([]ActionKV, 0)
-	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") {
-		if raw, ok := processStepDataValue(progress, sub); ok {
-			flattened = append(flattened, flattenDisplayValues("", raw)...)
-		}
-	} else if raw, ok := substepDataValue(data, sub); ok && !isAttachmentMetaValue(raw) {
-		flattened = append(flattened, flattenDisplayValues(sub.InputKey, raw)...)
+	if raw, ok := processStepDataValue(progress, sub); ok {
+		flattened = append(flattened, flattenDisplayValues("", raw)...)
 	}
 	if len(flattened) == 0 {
 		keys := make([]string, 0, len(data))
