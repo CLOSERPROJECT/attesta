@@ -63,6 +63,39 @@ func TestHandleCompleteSubstepLargeFormataAttachmentDoesNotLoseActiveRole(t *tes
 	}
 }
 
+func TestHandleCompleteSubstepOversizedEncodedFormReturnsTooLarge(t *testing.T) {
+	t.Setenv("ATTACHMENT_MAX_BYTES", "1")
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+	server.enforceAuth = true
+	server.identity = testIdentityForSessions(time.Date(2026, 2, 2, 14, 0, 0, 0, time.UTC), map[string]AccountUser{
+		"session": {
+			IdentityUserID: "user-1",
+			Email:          "dep1@example.com",
+			RoleSlugs:      []string{"dep1"},
+			Status:         "active",
+		},
+	})
+
+	form := url.Values{}
+	form.Set("activeRole", "dep1")
+	form.Set("value", `{"evidence":"`+strings.Repeat("x", int(completionFormMaxBytes()))+`"}`)
+	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session"})
+	rr := httptest.NewRecorder()
+
+	server.handleCompleteSubstep(rr, req, processID, "1.1")
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d; body=%q", rr.Code, http.StatusRequestEntityTooLarge, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "Not authorized for this action.") {
+		t.Fatalf("oversized form should not be reported as auth failure: %q", rr.Body.String())
+	}
+}
+
 func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
