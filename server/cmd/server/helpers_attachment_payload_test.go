@@ -12,116 +12,35 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestReadAttachmentPayload(t *testing.T) {
-	tests := []struct {
-		name    string
-		data    map[string]interface{}
-		input   string
-		wantOK  bool
-		wantID  string
-		wantSz  int64
-		wantSHA string
-	}{
-		{name: "nil data", data: nil, input: "attachment"},
-		{name: "missing key", data: map[string]interface{}{}, input: "attachment"},
-		{name: "wrong payload type", data: map[string]interface{}{"attachment": "bad"}, input: "attachment"},
-		{
-			name: "map payload",
-			data: map[string]interface{}{
-				"attachment": map[string]interface{}{
-					"attachmentId": "att-1",
-					"filename":     "proof.pdf",
-					"contentType":  "application/pdf",
-					"size":         float64(11),
-					"sha256":       "abc",
-				},
-			},
-			input:   "attachment",
-			wantOK:  true,
-			wantID:  "att-1",
-			wantSz:  11,
-			wantSHA: "abc",
-		},
-		{
-			name: "primitive map payload",
-			data: map[string]interface{}{
-				"attachment": primitive.M{
-					"attachmentId": "att-2",
-					"filename":     "proof.txt",
-					"size":         "12",
-				},
-			},
-			input:  "attachment",
-			wantOK: true,
-			wantID: "att-2",
-			wantSz: 12,
-		},
-		{
-			name: "missing attachment id is invalid",
-			data: map[string]interface{}{
-				"attachment": map[string]interface{}{"filename": "proof.pdf"},
-			},
-			input: "attachment",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, ok := readAttachmentPayload(tc.data, tc.input)
-			if ok != tc.wantOK {
-				t.Fatalf("readAttachmentPayload ok = %t, want %t", ok, tc.wantOK)
-			}
-			if !tc.wantOK {
-				return
-			}
-			if got.AttachmentID != tc.wantID || got.Size != tc.wantSz || got.SHA256 != tc.wantSHA {
-				t.Fatalf("unexpected payload: %#v", got)
-			}
-		})
-	}
-}
-
-func TestAttachmentMetaFromPayload(t *testing.T) {
+func TestAttachmentMetaFromMap(t *testing.T) {
 	tests := []struct {
 		name   string
 		data   map[string]interface{}
-		input  string
 		wantOK bool
 		wantID string
 		wantSz int64
 	}{
-		{name: "nil data", data: nil, input: "attachment"},
-		{name: "missing key", data: map[string]interface{}{}, input: "attachment"},
-		{name: "wrong type", data: map[string]interface{}{"attachment": "bad"}, input: "attachment"},
+		{name: "nil data", data: nil},
+		{name: "empty fields are ignored", data: map[string]interface{}{}},
 		{
 			name: "valid payload with float size",
 			data: map[string]interface{}{
-				"attachment": map[string]interface{}{
-					"attachmentId": "att-3",
-					"filename":     "proof.pdf",
-					"sha256":       "def",
-					"size":         float64(14),
-				},
+				"attachmentId": "att-3",
+				"filename":     "proof.pdf",
+				"sha256":       "def",
+				"size":         float64(14),
 			},
-			input:  "attachment",
 			wantOK: true,
 			wantID: "att-3",
 			wantSz: 14,
-		},
-		{
-			name: "empty fields are ignored",
-			data: map[string]interface{}{
-				"attachment": map[string]interface{}{},
-			},
-			input: "attachment",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			meta := attachmentMetaFromPayload(tc.data, tc.input)
+			meta := attachmentMetaFromMap(tc.data)
 			if (meta != nil) != tc.wantOK {
-				t.Fatalf("attachmentMetaFromPayload presence = %t, want %t", meta != nil, tc.wantOK)
+				t.Fatalf("attachmentMetaFromMap presence = %t, want %t", meta != nil, tc.wantOK)
 			}
 			if !tc.wantOK {
 				return
@@ -138,7 +57,7 @@ func TestParseFormataPayloadStoresDataURLAttachment(t *testing.T) {
 	server := &Server{store: store}
 	processID := primitive.NewObjectID()
 	now := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
-	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+	substep := WorkflowSub{SubstepID: "3.1", Title: "QA Checklist", InputKey: "qaChecklist", InputType: "formata"}
 
 	form := url.Values{}
 	form.Set("value", `{"notes":"ready","evidenceFile":"data:text/plain;base64,aGVsbG8="}`)
@@ -150,10 +69,7 @@ func TestParseFormataPayloadStoresDataURLAttachment(t *testing.T) {
 		t.Fatalf("parseFormataPayload returned error: %v", err)
 	}
 
-	root, ok := payload["qaChecklist"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected qaChecklist object, got %#v", payload["qaChecklist"])
-	}
+	root := payload
 	if root["notes"] != "ready" {
 		t.Fatalf("notes = %#v, want %q", root["notes"], "ready")
 	}
@@ -192,7 +108,7 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 	server := &Server{store: store}
 	processID := primitive.NewObjectID()
 	now := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
-	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+	substep := WorkflowSub{SubstepID: "3.1", Title: "QA Checklist", InputKey: "qaChecklist", InputType: "formata"}
 
 	form := url.Values{}
 	form.Set("inspector", "alice")
@@ -204,10 +120,7 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 	if err != nil {
 		t.Fatalf("parseFormataPayload returned error: %v", err)
 	}
-	root, ok := payload["qaChecklist"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected qaChecklist object, got %#v", payload["qaChecklist"])
-	}
+	root := payload
 	if root["inspector"] != "alice" {
 		t.Fatalf("inspector = %#v, want %q", root["inspector"], "alice")
 	}
@@ -217,7 +130,7 @@ func TestParseFormataPayloadFallbacksToPostedFieldsWhenValueMissing(t *testing.T
 }
 
 func TestParseFormataScalarPayloadDefaultsToEmptyObject(t *testing.T) {
-	substep := WorkflowSub{SubstepID: "3.1", InputKey: "qaChecklist", InputType: "formata"}
+	substep := WorkflowSub{SubstepID: "3.1", Title: "QA Checklist", InputKey: "qaChecklist", InputType: "formata"}
 	req := httptest.NewRequest(http.MethodPost, "/complete", strings.NewReader(""))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -225,10 +138,7 @@ func TestParseFormataScalarPayloadDefaultsToEmptyObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseFormataScalarPayload error: %v", err)
 	}
-	root, ok := payload["qaChecklist"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("payload = %#v", payload)
-	}
+	root := payload
 	if len(root) != 0 {
 		t.Fatalf("root = %#v, want empty object", root)
 	}

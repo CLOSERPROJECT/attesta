@@ -75,25 +75,91 @@ func dppFirstStringValue(def WorkflowDef, process *Process, key string) string {
 		if !ok || entry.State != "done" || entry.Data == nil {
 			continue
 		}
-		raw, ok := entry.Data[trimKey]
-		if !ok {
-			continue
+		lookupKeys := []string{trimKey}
+		if entry.Description == nil {
+			lookupKeys = legacyDPPDataLookupKeys(substep, trimKey)
 		}
-		value, ok := raw.(string)
-		if !ok {
-			continue
-		}
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
+		for _, dataKey := range lookupKeys {
+			raw, ok := entry.Data[dataKey]
+			if !ok {
+				continue
+			}
+			value := dppStringValue(raw, trimKey)
+			if value != "" {
+				return value
+			}
 		}
 	}
 	return ""
 }
 
+func dppStringValue(raw interface{}, key string) string {
+	switch typed := raw.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case map[string]interface{}:
+		if nested, ok := typed[strings.TrimSpace(key)]; ok {
+			return dppStringValue(nested, "")
+		}
+	case primitive.M:
+		return dppStringValue(map[string]interface{}(typed), key)
+	}
+	return ""
+}
+
+// legacyDPPDataLookupKeys supports completed steps stored before ProcessStep.Description
+// marked the current payload shape.
+func legacyDPPDataLookupKeys(sub WorkflowSub, key string) []string {
+	trimmed := strings.TrimSpace(key)
+	if trimmed == "" {
+		return nil
+	}
+	keys := []string{trimmed}
+	if trimmed == strings.TrimSpace(sub.InputKey) || trimmed == substepDataKey(sub) {
+		for _, dataKey := range substepDataKeys(sub) {
+			found := false
+			for _, existing := range keys {
+				if existing == dataKey {
+					found = true
+					break
+				}
+			}
+			if !found {
+				keys = append(keys, dataKey)
+			}
+		}
+	}
+	return keys
+}
+
 func parseDigitalLinkPath(path string) (string, string, string, error) {
 	trimmed := strings.Trim(strings.TrimSpace(path), "/")
 	parts := strings.Split(trimmed, "/")
+	return parseDigitalLinkParts(parts)
+}
+
+func parseDigitalLinkAttachmentPath(path string) (string, string, string, string, bool, error) {
+	trimmed := strings.Trim(strings.TrimSpace(path), "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 9 || parts[6] != "attachment" || parts[8] != "file" {
+		return "", "", "", "", false, nil
+	}
+	gtin, lot, serial, err := parseDigitalLinkParts(parts[:6])
+	if err != nil {
+		return "", "", "", "", true, err
+	}
+	attachmentID, err := url.PathUnescape(parts[7])
+	if err != nil {
+		return "", "", "", "", true, err
+	}
+	attachmentID = strings.TrimSpace(attachmentID)
+	if attachmentID == "" {
+		return "", "", "", "", true, errors.New("missing attachment id")
+	}
+	return gtin, lot, serial, attachmentID, true, nil
+}
+
+func parseDigitalLinkParts(parts []string) (string, string, string, error) {
 	if len(parts) != 6 || parts[0] != "01" || parts[2] != "10" || parts[4] != "21" {
 		return "", "", "", errors.New("invalid digital link path")
 	}
@@ -219,7 +285,8 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 					}
 				}
 				subView.Digest = digestPayload(progress.Data)
-				subView.Values = dppTraceValues(sub, progress.Data)
+				subView.Description = processStepDescription(progress, sub)
+				subView.Values = dppTraceValues(sub, progress)
 				subView.Attachments = buildActionAttachments(workflowKey, process, progress.Data)
 			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 				subView.Status = processStatusTerminated
@@ -294,18 +361,15 @@ func dppDialogIDFragment(value string) string {
 	return out
 }
 
-func dppTraceValues(sub WorkflowSub, data map[string]interface{}) []DPPTraceabilityValue {
+func dppTraceValues(sub WorkflowSub, progress ProcessStep) []DPPTraceabilityValue {
+	data := progress.Data
 	if len(data) == 0 {
 		return nil
 	}
 
 	flattened := make([]ActionKV, 0)
-	if strings.EqualFold(strings.TrimSpace(sub.InputType), "formata") {
-		if raw, ok := data[sub.InputKey]; ok {
-			flattened = append(flattened, flattenDisplayValues("", raw)...)
-		}
-	} else if raw, ok := data[sub.InputKey]; ok && !isAttachmentMetaValue(raw) {
-		flattened = append(flattened, flattenDisplayValues(sub.InputKey, raw)...)
+	if raw, ok := processStepDataValue(progress, sub); ok {
+		flattened = append(flattened, flattenDisplayValues("", raw)...)
 	}
 	if len(flattened) == 0 {
 		keys := make([]string, 0, len(data))

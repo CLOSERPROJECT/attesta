@@ -27,6 +27,34 @@ func TestParseDigitalLinkPathValidAndInvalid(t *testing.T) {
 	}
 }
 
+func TestParseDigitalLinkAttachmentPath(t *testing.T) {
+	gtin, lot, serial, attachmentID, ok, err := parseDigitalLinkAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/file%201/file")
+	if err != nil {
+		t.Fatalf("parseDigitalLinkAttachmentPath(valid): %v", err)
+	}
+	if !ok {
+		t.Fatal("expected attachment path")
+	}
+	if gtin != "09506000134352" || lot != "LOT-001" || serial != "SERIAL-001" || attachmentID != "file 1" {
+		t.Fatalf("unexpected parsed values: gtin=%q lot=%q serial=%q attachmentID=%q", gtin, lot, serial, attachmentID)
+	}
+
+	_, _, _, _, ok, err = parseDigitalLinkAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001")
+	if ok || err != nil {
+		t.Fatalf("plain DPP path returned ok=%v err=%v, want ok=false err=nil", ok, err)
+	}
+
+	_, _, _, _, ok, err = parseDigitalLinkAttachmentPath("/01/not-digits/10/LOT-001/21/SERIAL-001/attachment/file/file")
+	if !ok || err == nil {
+		t.Fatalf("invalid attachment path returned ok=%v err=%v, want ok=true with error", ok, err)
+	}
+
+	_, _, _, _, ok, err = parseDigitalLinkAttachmentPath("/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/%20/file")
+	if !ok || err == nil {
+		t.Fatalf("blank attachment id returned ok=%v err=%v, want ok=true with error", ok, err)
+	}
+}
+
 func TestDigitalLinkURLPathEscapesValues(t *testing.T) {
 	url := digitalLinkURL("09506000134352", "LOT 001", "SERIAL/001")
 	if url != "/01/09506000134352/10/LOT%20001/21/SERIAL%2F001" {
@@ -50,6 +78,16 @@ func TestDPPFirstStringValueAndBuildProcessDPP(t *testing.T) {
 	}
 	if got := dppFirstStringValue(def, process, "missing"); got != "" {
 		t.Fatalf("dppFirstStringValue(missing) = %q, want empty", got)
+	}
+
+	nestedProcess := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.2": {State: "done", Data: map[string]interface{}{"b": map[string]interface{}{"note": "LOT-NESTED"}}},
+		},
+	}
+	if got := dppFirstStringValue(def, nestedProcess, "note"); got != "LOT-NESTED" {
+		t.Fatalf("dppFirstStringValue(note nested under title slug) = %q, want LOT-NESTED", got)
 	}
 
 	cfg := DPPConfig{
@@ -217,7 +255,7 @@ func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
 						Order:     1,
 						Role:      "qa",
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 				},
 			},
@@ -310,10 +348,10 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 	if len(substep.Values) != 2 {
 		t.Fatalf("expected flattened formata values, got %#v", substep.Values)
 	}
-	if substep.Values[0].Key != "details.status" || substep.Values[0].Value != "ok" {
+	if substep.Values[0].Key != "payload.details.status" || substep.Values[0].Value != "ok" {
 		t.Fatalf("unexpected first flattened value: %#v", substep.Values[0])
 	}
-	if substep.Values[1].Key != "details.weight" || substep.Values[1].Value != "42" {
+	if substep.Values[1].Key != "payload.details.weight" || substep.Values[1].Value != "42" {
 		t.Fatalf("unexpected second flattened value: %#v", substep.Values[1])
 	}
 }
@@ -374,6 +412,85 @@ func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
 	}
 }
 
+func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
+	traceability := []DPPTraceabilityStep{
+		{
+			Substeps: []DPPTraceabilitySubstep{
+				{
+					Attachments: []ActionAttachmentView{
+						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+						{Filename: "legacy.pdf", URL: "/w/workflow/process/p1/attachment/legacy/file"},
+					},
+				},
+			},
+		},
+	}
+
+	mapped := publicDPPTraceabilityAttachmentURLs(traceability, "/01/09506000134352/10/LOT-001/21/SERIAL-001")
+	attachment := mapped[0].Substeps[0].Attachments[0]
+	if attachment.URL != "/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/file%201/file" {
+		t.Fatalf("public URL = %q", attachment.URL)
+	}
+	if attachment.PreviewURL != attachment.URL+"?inline=1#page=1&toolbar=0&navpanes=0&view=FitH" {
+		t.Fatalf("preview URL = %q", attachment.PreviewURL)
+	}
+	if got := mapped[0].Substeps[0].Attachments[1].URL; got != "/w/workflow/process/p1/attachment/legacy/file" {
+		t.Fatalf("attachment without ID URL changed to %q", got)
+	}
+
+	unchanged := publicDPPTraceabilityAttachmentURLs([]DPPTraceabilityStep{
+		{
+			Substeps: []DPPTraceabilitySubstep{
+				{
+					Attachments: []ActionAttachmentView{
+						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+					},
+				},
+			},
+		},
+	}, " ")
+	if unchanged[0].Substeps[0].Attachments[0].URL != "/w/workflow/process/p1/attachment/file%201/file" {
+		t.Fatalf("blank digital link changed URL to %q", unchanged[0].Substeps[0].Attachments[0].URL)
+	}
+}
+
+func TestDPPProcessHasAttachment(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{SubstepID: "1.1", InputType: "formata"},
+				},
+			},
+		},
+	}
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {
+				State: "done",
+				Data: map[string]interface{}{
+					"attachment": map[string]interface{}{
+						"attachmentId": "65f2a79b8e7f7d8f3c7c99aa",
+						"filename":     "cert.pdf",
+					},
+				},
+			},
+		},
+	}
+
+	if !dppProcessHasAttachment(def, process, "65f2a79b8e7f7d8f3c7c99aa") {
+		t.Fatal("expected process to expose its own attachment")
+	}
+	if dppProcessHasAttachment(def, process, primitive.NewObjectID().Hex()) {
+		t.Fatal("expected unrelated attachment to be rejected")
+	}
+	if dppProcessHasAttachment(def, nil, "65f2a79b8e7f7d8f3c7c99aa") {
+		t.Fatal("expected nil process to be rejected")
+	}
+}
+
 func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
@@ -388,7 +505,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 						Order:     1,
 						Roles:     []string{"qa", "manager"},
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 					{
 						SubstepID: "1.2",
@@ -396,7 +513,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 						Order:     2,
 						Role:      "qa",
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 					{
 						SubstepID: "1.3",
@@ -404,7 +521,7 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 						Order:     3,
 						Role:      "qa",
 						InputKey:  "value",
-						InputType: "string",
+						InputType: "formata",
 					},
 				},
 			},
@@ -501,9 +618,9 @@ func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
 	sub := WorkflowSub{
 		SubstepID: "1.1",
 		InputKey:  "value",
-		InputType: "string",
+		InputType: "formata",
 	}
-	values := dppTraceValues(sub, map[string]interface{}{
+	values := dppTraceValues(sub, ProcessStep{Data: map[string]interface{}{
 		"other": map[string]interface{}{
 			"nested": "ok",
 		},
@@ -511,7 +628,7 @@ func TestDPPTraceValuesFallbackFlattensMapAndSkipsAttachmentMeta(t *testing.T) {
 			"attachmentId": primitive.NewObjectID().Hex(),
 			"filename":     "proof.pdf",
 		},
-	})
+	}})
 	if len(values) != 1 {
 		t.Fatalf("expected one fallback flattened value, got %#v", values)
 	}

@@ -55,7 +55,6 @@ func TestHandleProcessRoutesDispatchesEndpoints(t *testing.T) {
 		{name: "merkle export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/merkle.json", wantStatus: http.StatusOK},
 		{name: "all files zip", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/files.zip", wantStatus: http.StatusOK},
 		{name: "complete substep", method: http.MethodPost, path: "/process/" + process.ID.Hex() + "/substep/1.1/complete", body: "value=%7B%22status%22%3A%22ok%22%7D", wantStatus: http.StatusOK, wantBody: "PROCESS " + process.ID.Hex()},
-		{name: "substep file branch", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/substep/1.3/file", wantStatus: http.StatusNotFound},
 	}
 
 	for _, tc := range tests {
