@@ -6,23 +6,20 @@ import (
 )
 
 func TestNormalizePayload(t *testing.T) {
-	formataSub := WorkflowSub{InputType: "formata", InputKey: "details"}
+	formataSub := WorkflowSub{Title: "Inspection Details", InputType: "formata", InputKey: "details"}
 	formataPayload, err := normalizePayload(formataSub, `{"status":"ok","weight":42}`)
 	if err != nil {
 		t.Fatalf("expected formata payload to parse, got error: %v", err)
 	}
-	value, ok := formataPayload["details"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected formata payload object, got %#v", formataPayload["details"])
-	}
+	value := formataPayload
 	if value["status"] != "ok" {
 		t.Fatalf("expected formata payload status %q, got %#v", "ok", value["status"])
 	}
 	if _, err := normalizePayload(formataSub, "[]"); err == nil {
 		t.Fatal("expected formata payload parse failure for non-object JSON")
 	}
-	if _, err := normalizePayload(WorkflowSub{InputType: "string", InputKey: "note"}, `"ok"`); err == nil {
-		t.Fatal("expected non-formata payload parse failure")
+	if _, err := normalizePayload(WorkflowSub{InputType: "formata", InputKey: "note"}, `"ok"`); err == nil {
+		t.Fatal("expected formata payload parse failure for scalar JSON")
 	}
 }
 

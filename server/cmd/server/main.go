@@ -96,10 +96,11 @@ type ProcessTermination struct {
 }
 
 type ProcessStep struct {
-	State  string                 `bson:"state"`
-	DoneAt *time.Time             `bson:"doneAt,omitempty"`
-	DoneBy *Actor                 `bson:"doneBy,omitempty"`
-	Data   map[string]interface{} `bson:"data,omitempty"`
+	State       string                 `bson:"state"`
+	Description *string                `bson:"description,omitempty"`
+	DoneAt      *time.Time             `bson:"doneAt,omitempty"`
+	DoneBy      *Actor                 `bson:"doneBy,omitempty"`
+	Data        map[string]interface{} `bson:"data,omitempty"`
 }
 
 type Actor struct {
@@ -123,14 +124,6 @@ type Notarization struct {
 type FakeNotary struct {
 	Method string `bson:"method"`
 	Digest string `bson:"digest"`
-}
-
-type AttachmentPayload struct {
-	AttachmentID string
-	Filename     string
-	ContentType  string
-	Size         int64
-	SHA256       string
 }
 
 type Server struct {
@@ -159,6 +152,7 @@ type SSEHub struct {
 type TimelineSubstep struct {
 	SubstepID    string
 	Title        string
+	Description  string
 	Selected     bool
 	Action       *ActionView
 	RoleColor    template.CSS
@@ -193,16 +187,17 @@ type NotarizedAttachment struct {
 }
 
 type NotarizedSubstep struct {
-	SubstepID  string                 `json:"substep_id"`
-	Title      string                 `json:"title"`
-	Role       string                 `json:"role"`
-	Status     string                 `json:"status"`
-	DoneAt     string                 `json:"done_at,omitempty"`
-	DoneBy     string                 `json:"done_by,omitempty"`
-	DoneRole   string                 `json:"done_role,omitempty"`
-	Payload    map[string]interface{} `json:"payload,omitempty"`
-	Digest     string                 `json:"digest,omitempty"`
-	Attachment *NotarizedAttachment   `json:"attachment,omitempty"`
+	SubstepID   string                 `json:"substep_id"`
+	Title       string                 `json:"title"`
+	Description *string                `json:"description,omitempty"`
+	Role        string                 `json:"role"`
+	Status      string                 `json:"status"`
+	DoneAt      string                 `json:"done_at,omitempty"`
+	DoneBy      string                 `json:"done_by,omitempty"`
+	DoneRole    string                 `json:"done_role,omitempty"`
+	Payload     map[string]interface{} `json:"payload,omitempty"`
+	Digest      string                 `json:"digest,omitempty"`
+	Attachment  *NotarizedAttachment   `json:"attachment,omitempty"`
 }
 
 type NotarizedStep struct {
@@ -244,6 +239,7 @@ type ActionView struct {
 	ProcessID     string
 	SubstepID     string
 	Title         string
+	Description   string
 	Role          string
 	RoleBadges    []ActionRoleBadge
 	MatchingRoles []ActionRoleOption
@@ -284,12 +280,13 @@ type ActionKV struct {
 }
 
 type ActionAttachmentView struct {
-	Key         string
-	Filename    string
-	URL         string
-	PreviewURL  string
-	PreviewKind string
-	SHA256      string
+	AttachmentID string
+	Key          string
+	Filename     string
+	URL          string
+	PreviewURL   string
+	PreviewKind  string
+	SHA256       string
 }
 
 type Department struct {
@@ -716,6 +713,7 @@ type DPPTraceabilityStep struct {
 type DPPTraceabilitySubstep struct {
 	SubstepID     string
 	Title         string
+	Description   string
 	Role          string
 	RoleBadges    []DPPTraceabilityRoleBadge
 	RoleColor     template.CSS
@@ -1371,6 +1369,15 @@ func attachmentMaxBytes() int64 {
 		return defaultMaxBytes
 	}
 	return value
+}
+
+func completionFormMaxBytes() int64 {
+	const overhead = int64(1 << 20)
+	maxAttachmentBytes := attachmentMaxBytes()
+	if maxAttachmentBytes > 1<<62 {
+		return maxAttachmentBytes
+	}
+	return maxAttachmentBytes*4 + overhead
 }
 
 func organizationLogoMaxBytes() int64 {
@@ -4957,10 +4964,6 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleDownloadProcessAttachment(w, r, processID, parts[2])
 		return
 	}
-	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "file" && r.Method == http.MethodGet {
-		s.handleDownloadSubstepFile(w, r, processID, parts[2])
-		return
-	}
 	http.NotFound(w, r)
 }
 
@@ -5283,6 +5286,14 @@ func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Contex
 }
 
 func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
+	if gtin, lot, serial, attachmentID, ok, err := parseDigitalLinkAttachmentPath(r.URL.Path); ok {
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		s.handleDigitalLinkDPPAttachment(w, r, gtin, lot, serial, attachmentID)
+		return
+	}
 	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
 	if err != nil {
 		http.NotFound(w, r)
@@ -5325,6 +5336,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaMap(cfg), organizationNameMap(cfg))
+	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
@@ -5343,6 +5355,66 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) handleDigitalLinkDPPAttachment(w http.ResponseWriter, r *http.Request, gtin, lot, serial, attachmentID string) {
+	process, err := s.store.LoadProcessByDigitalLink(r.Context(), gtin, lot, serial)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	process.Progress = normalizeProgressKeys(process.Progress)
+
+	workflowKey := strings.TrimSpace(process.WorkflowKey)
+	if workflowKey == "" {
+		workflowKey = s.defaultWorkflowKey()
+	}
+	cfg, err := s.workflowByKey(workflowKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !dppProcessHasAttachment(cfg.Workflow, process, attachmentID) {
+		http.NotFound(w, r)
+		return
+	}
+	s.streamProcessAttachment(w, r, process, attachmentID)
+}
+
+func publicDPPTraceabilityAttachmentURLs(traceability []DPPTraceabilityStep, digitalLink string) []DPPTraceabilityStep {
+	base := strings.TrimRight(strings.TrimSpace(digitalLink), "/")
+	if base == "" {
+		return traceability
+	}
+	for stepIndex := range traceability {
+		for substepIndex := range traceability[stepIndex].Substeps {
+			attachments := traceability[stepIndex].Substeps[substepIndex].Attachments
+			for attachmentIndex := range attachments {
+				attachmentID := strings.TrimSpace(attachments[attachmentIndex].AttachmentID)
+				if attachmentID == "" {
+					continue
+				}
+				downloadURL := base + "/attachment/" + url.PathEscape(attachmentID) + "/file"
+				attachments[attachmentIndex].URL = downloadURL
+				attachments[attachmentIndex].PreviewURL = actionAttachmentPreviewURL(downloadURL, attachments[attachmentIndex].PreviewKind)
+			}
+			traceability[stepIndex].Substeps[substepIndex].Attachments = attachments
+		}
+	}
+	return traceability
+}
+
+func dppProcessHasAttachment(def WorkflowDef, process *Process, attachmentID string) bool {
+	attachmentID = strings.TrimSpace(attachmentID)
+	if process == nil || attachmentID == "" {
+		return false
+	}
+	for _, file := range collectProcessAttachments(def, process) {
+		if strings.TrimSpace(file.AttachmentID) == attachmentID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Request, processID string) {
@@ -5556,68 +5628,6 @@ func (s *Server) handleMerkleJSON(w http.ResponseWriter, r *http.Request, proces
 	writeJSON(w, export.Merkle)
 }
 
-func (s *Server) handleDownloadSubstepFile(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	workflowKey, cfg, ok := s.selectedWorkflowOrRedirectHome(w, r)
-	if !ok {
-		return
-	}
-	process, err := s.loadProcess(r.Context(), processID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	if !s.processBelongsToWorkflow(process, workflowKey) {
-		http.NotFound(w, r)
-		return
-	}
-	substep, _, err := findSubstep(cfg.Workflow, substepID)
-	if err != nil || substep.InputType != "file" {
-		http.NotFound(w, r)
-		return
-	}
-	progress, ok := process.Progress[substepID]
-	if !ok || progress.State != "done" {
-		http.NotFound(w, r)
-		return
-	}
-	attachmentPayload, ok := readAttachmentPayload(progress.Data, substep.InputKey)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	attachmentID, err := primitive.ObjectIDFromHex(attachmentPayload.AttachmentID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	attachment, err := s.store.LoadAttachmentByID(r.Context(), attachmentID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	download, err := s.store.OpenAttachmentDownload(r.Context(), attachmentID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer download.Close()
-
-	contentType := strings.TrimSpace(attachment.ContentType)
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-	filename := sanitizeAttachmentFilename(attachment.Filename)
-	w.Header().Set("Content-Type", contentType)
-	disposition := "attachment"
-	if strings.TrimSpace(r.URL.Query().Get("inline")) != "" {
-		disposition = "inline"
-	}
-	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, filename))
-	if _, err := io.Copy(w, download); err != nil {
-		return
-	}
-}
-
 func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.Request, processID, attachmentID string) {
 	workflowKey, _, ok := s.selectedWorkflowOrRedirectHome(w, r)
 	if !ok {
@@ -5629,6 +5639,14 @@ func (s *Server) handleDownloadProcessAttachment(w http.ResponseWriter, r *http.
 		return
 	}
 	if !s.processBelongsToWorkflow(process, workflowKey) {
+		http.NotFound(w, r)
+		return
+	}
+	s.streamProcessAttachment(w, r, process, attachmentID)
+}
+
+func (s *Server) streamProcessAttachment(w http.ResponseWriter, r *http.Request, process *Process, attachmentID string) {
+	if process == nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -5714,7 +5732,15 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
 		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
 	}
-	_ = r.ParseForm()
+	r.Body = http.MaxBytesReader(w, r.Body, completionFormMaxBytes())
+	if err := r.ParseForm(); err != nil {
+		if isRequestTooLarge(err) {
+			s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
+			return
+		}
+		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
+		return
+	}
 	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
 	if activeRole == "" && len(actor.RoleSlugs) == 1 {
 		activeRole = actor.RoleSlugs[0]
@@ -5777,11 +5803,13 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
+	description := substep.InputKey
 	progressUpdate := ProcessStep{
-		State:  "done",
-		DoneAt: &now,
-		DoneBy: &actor,
-		Data:   payload,
+		State:       "done",
+		Description: &description,
+		DoneAt:      &now,
+		DoneBy:      &actor,
+		Data:        payload,
 	}
 
 	if err := s.store.UpdateProcessProgress(ctx, process.ID, workflowKey, substepID, progressUpdate); err != nil {
@@ -5959,9 +5987,6 @@ var (
 )
 
 func (s *Server) parseCompletionPayload(r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	if substep.InputType != "formata" {
-		return nil, errors.New("Only formata substeps are supported.")
-	}
 	return s.parseFormataPayload(r, processID, substep, now)
 }
 
@@ -5975,13 +6000,15 @@ func (s *Server) parseFormataPayload(r *http.Request, processID primitive.Object
 	if err != nil {
 		return nil, err
 	}
-	raw := payload[substep.InputKey]
-	converted, err := s.persistFormataAttachments(r.Context(), processID, substep, raw, now, []string{substep.InputKey})
+	converted, err := s.persistFormataAttachments(r.Context(), processID, substep, payload, now, nil)
 	if err != nil {
 		return nil, err
 	}
-	payload[substep.InputKey] = converted
-	return payload, nil
+	convertedPayload, ok := converted.(map[string]interface{})
+	if !ok {
+		return nil, errInvalidForm
+	}
+	return convertedPayload, nil
 }
 
 func parseFormataScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
@@ -6177,41 +6204,6 @@ func isRequestTooLarge(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "request body too large") || strings.Contains(msg, "message too large")
-}
-
-func readAttachmentPayload(data map[string]interface{}, inputKey string) (AttachmentPayload, bool) {
-	if data == nil {
-		return AttachmentPayload{}, false
-	}
-	raw, ok := data[inputKey]
-	if !ok {
-		return AttachmentPayload{}, false
-	}
-
-	values, ok := raw.(map[string]interface{})
-	if !ok {
-		if typed, ok := raw.(primitive.M); ok {
-			values = map[string]interface{}(typed)
-		} else {
-			return AttachmentPayload{}, false
-		}
-	}
-
-	attachmentID, _ := asString(values["attachmentId"])
-	filename, _ := asString(values["filename"])
-	contentType, _ := asString(values["contentType"])
-	size, _ := asInt64(values["size"])
-	sha256Digest, _ := asString(values["sha256"])
-	if attachmentID == "" {
-		return AttachmentPayload{}, false
-	}
-	return AttachmentPayload{
-		AttachmentID: attachmentID,
-		Filename:     filename,
-		ContentType:  contentType,
-		Size:         size,
-		SHA256:       sha256Digest,
-	}, true
 }
 
 func asString(value interface{}) (string, bool) {
@@ -6793,6 +6785,7 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 			if process != nil {
 				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
 					entry.Status = "done"
+					entry.Description = processStepDescription(progress, sub)
 					if progress.DoneBy != nil {
 						entry.DoneBy = progress.DoneBy.ID
 						entry.DoneRole = progress.DoneBy.Role
@@ -6806,16 +6799,8 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleMe
 					if progress.DoneAt != nil {
 						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 					}
-					if sub.InputType == "file" {
-						if attachment, ok := readAttachmentPayload(progress.Data, sub.InputKey); ok {
-							entry.FileName = attachment.Filename
-							entry.FileSHA256 = attachment.SHA256
-							entry.FileURL = fmt.Sprintf("%s/process/%s/substep/%s/file", workflowPath(workflowKey), process.ID.Hex(), sub.SubstepID)
-						}
-					} else {
-						if value, ok := progress.Data[sub.InputKey]; ok {
-							entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
-						}
+					if value, ok := processStepDataValue(progress, sub); ok {
+						entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
 					}
 				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 					entry.Status = processStatusTerminated
@@ -7013,24 +6998,6 @@ func collectAttachmentsFromValue(raw interface{}, files *[]NotarizedAttachment) 
 	}
 }
 
-func attachmentMetaFromPayload(data map[string]interface{}, inputKey string) *NotarizedAttachment {
-	if data == nil {
-		return nil
-	}
-	raw, ok := data[inputKey]
-	if !ok {
-		return nil
-	}
-	switch typed := raw.(type) {
-	case map[string]interface{}:
-		return attachmentMetaFromMap(typed)
-	case primitive.M:
-		return attachmentMetaFromMap(map[string]interface{}(typed))
-	default:
-		return nil
-	}
-}
-
 func attachmentMetaFromMap(payload map[string]interface{}) *NotarizedAttachment {
 	if payload == nil {
 		return nil
@@ -7090,11 +7057,9 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 					entry.DoneBy = progress.DoneBy.ID
 					entry.DoneRole = progress.DoneBy.Role
 				}
+				entry.Description = progress.Description
 				entry.Payload = progress.Data
 				entry.Digest = digestPayload(progress.Data)
-				if sub.InputType == "file" {
-					entry.Attachment = attachmentMetaFromPayload(progress.Data, sub.InputKey)
-				}
 			} else if availableMap[sub.SubstepID] {
 				state = "available"
 			}
@@ -7329,10 +7294,12 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		doneAt := ""
 		doneBy := ""
 		doneRole := ""
+		description := strings.TrimSpace(sub.InputKey)
 		var values []ActionKV
 		var attachments []ActionAttachmentView
 		if status == "done" && process != nil {
 			if progress, ok := process.Progress[sub.SubstepID]; ok {
+				description = processStepDescription(progress, sub)
 				if progress.DoneAt != nil {
 					doneAt = humanReadableTraceabilityTime(*progress.DoneAt)
 				}
@@ -7355,18 +7322,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 						roleBorder = cssValue(selectedMeta.Border, "var(--border)")
 					}
 				}
-				if sub.InputType == "formata" {
-					values = flattenDisplayValues("", progress.Data[sub.InputKey])
-				} else if value, ok := progress.Data[sub.InputKey]; ok && !isAttachmentMetaValue(value) {
-					values = flattenDisplayValues(sub.InputKey, value)
+				if value, ok := processStepDataValue(progress, sub); ok {
+					values = flattenDisplayValues("", value)
 				}
 				attachments = buildActionAttachments(workflowKey, process, progress.Data)
 			}
 		}
-		if sub.InputType == "formata" {
-			formSchema = marshalJSONCompact(sub.Schema)
-			formUISchema = marshalJSONCompact(sub.UISchema)
-		}
+		formSchema = marshalJSONCompact(sub.Schema)
+		formUISchema = marshalJSONCompact(sub.UISchema)
 		actions = append(actions, ActionView{
 			WorkflowKey:   workflowKey,
 			ProcessID:     processIDString(process),
@@ -7379,6 +7342,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			RoleColor:     roleColor,
 			RoleBorder:    roleBorder,
 			InputKey:      sub.InputKey,
+			Description:   description,
 			InputType:     sub.InputType,
 			FormSchema:    formSchema,
 			FormUISchema:  formUISchema,
@@ -7628,12 +7592,13 @@ func buildActionAttachments(workflowKey string, process *Process, data map[strin
 		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
 		previewKind := actionAttachmentPreviewKind(meta)
 		attachments = append(attachments, ActionAttachmentView{
-			Key:         item.Key,
-			Filename:    sanitizeAttachmentFilename(meta.Filename),
-			URL:         downloadURL,
-			PreviewURL:  actionAttachmentPreviewURL(downloadURL, previewKind),
-			PreviewKind: previewKind,
-			SHA256:      strings.TrimSpace(meta.SHA256),
+			AttachmentID: id,
+			Key:          item.Key,
+			Filename:     sanitizeAttachmentFilename(meta.Filename),
+			URL:          downloadURL,
+			PreviewURL:   actionAttachmentPreviewURL(downloadURL, previewKind),
+			PreviewKind:  previewKind,
+			SHA256:       strings.TrimSpace(meta.SHA256),
 		})
 	}
 	sort.Slice(attachments, func(i, j int) bool {
@@ -7823,23 +7788,14 @@ func normalizeInputTypes(workflow *WorkflowDef) error {
 
 func normalizeInputType(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "number":
-		return "number", nil
-	case "string", "text":
-		return "string", nil
-	case "file":
-		return "file", nil
 	case "formata", "schema", "jsonschema":
 		return "formata", nil
 	default:
-		return "", fmt.Errorf("unsupported value %q (allowed: number, string, text, file, formata)", value)
+		return "", fmt.Errorf("unsupported value %q (allowed: formata)", value)
 	}
 }
 
 func normalizeSubstepInputConfig(substep *WorkflowSub) error {
-	if substep.InputType != "formata" {
-		return nil
-	}
 	if len(substep.Schema) == 0 {
 		return errors.New("schema is required when inputType=formata")
 	}
@@ -7915,10 +7871,41 @@ func normalizeDPPSerialStrategy(raw string) (string, error) {
 	}
 }
 
-func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
-	if sub.InputType != "formata" {
-		return nil, errors.New("Value must be a valid JSON object.")
+func substepDataKey(sub WorkflowSub) string {
+	source := strings.TrimSpace(sub.Title)
+	if source == "" {
+		source = strings.TrimSpace(sub.InputKey)
 	}
+	if source == "" {
+		source = strings.TrimSpace(sub.SubstepID)
+	}
+	return canonifySlug(source)
+}
+
+func substepDataKeys(sub WorkflowSub) []string {
+	keys := []string{substepDataKey(sub)}
+	legacy := strings.TrimSpace(sub.InputKey)
+	if legacy != "" && legacy != keys[0] {
+		keys = append(keys, legacy)
+	}
+	return keys
+}
+
+func processStepDescription(progress ProcessStep, sub WorkflowSub) string {
+	if progress.Description != nil {
+		return *progress.Description
+	}
+	return strings.TrimSpace(sub.InputKey)
+}
+
+func processStepDataValue(progress ProcessStep, sub WorkflowSub) (interface{}, bool) {
+	if progress.Data == nil {
+		return nil, false
+	}
+	return progress.Data, true
+}
+
+func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, error) {
 	var decoded interface{}
 	if err := json.Unmarshal([]byte(value), &decoded); err != nil {
 		return nil, errors.New("Value must be a valid JSON object.")
@@ -7927,7 +7914,7 @@ func normalizePayload(sub WorkflowSub, value string) (map[string]interface{}, er
 	if !ok {
 		return nil, errors.New("Value must be a valid JSON object.")
 	}
-	return map[string]interface{}{sub.InputKey: valueObject}, nil
+	return valueObject, nil
 }
 
 func prefersJSONResponse(r *http.Request) bool {

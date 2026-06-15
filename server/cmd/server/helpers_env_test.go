@@ -27,3 +27,32 @@ func TestBoolEnvOrAndSessionTTLDays(t *testing.T) {
 		}
 	})
 }
+
+func TestAttachmentAndCompletionFormMaxBytes(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		t.Setenv("ATTACHMENT_MAX_BYTES", "")
+		if got := attachmentMaxBytes(); got != 25*1024*1024 {
+			t.Fatalf("attachmentMaxBytes = %d, want default", got)
+		}
+		if got := completionFormMaxBytes(); got != 25*1024*1024*4+1<<20 {
+			t.Fatalf("completionFormMaxBytes = %d, want encoded form allowance", got)
+		}
+	})
+
+	t.Run("custom value", func(t *testing.T) {
+		t.Setenv("ATTACHMENT_MAX_BYTES", "1024")
+		if got := attachmentMaxBytes(); got != 1024 {
+			t.Fatalf("attachmentMaxBytes = %d, want 1024", got)
+		}
+		if got := completionFormMaxBytes(); got != 1024*4+1<<20 {
+			t.Fatalf("completionFormMaxBytes = %d, want custom encoded form allowance", got)
+		}
+	})
+
+	t.Run("invalid value falls back", func(t *testing.T) {
+		t.Setenv("ATTACHMENT_MAX_BYTES", "not-a-number")
+		if got := attachmentMaxBytes(); got != 25*1024*1024 {
+			t.Fatalf("attachmentMaxBytes = %d, want default", got)
+		}
+	})
+}
