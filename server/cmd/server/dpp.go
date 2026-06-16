@@ -259,6 +259,12 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 			progress, done := process.Progress[sub.SubstepID]
 			if done && progress.State == "done" {
 				subView.Status = "done"
+				if override, ok := process.Overrides[sub.SubstepID]; ok && strings.TrimSpace(override.SubstepID) != "" {
+					subView.Reason = "Completed with local form adaptation."
+					if strings.TrimSpace(override.Reason) != "" {
+						subView.DetailMessage = "Reason: " + strings.TrimSpace(override.Reason)
+					}
+				}
 				if progress.DoneAt != nil {
 					subView.DoneAt = progress.DoneAt.UTC().Format(time.RFC3339)
 					subView.DoneAtHuman = humanReadableTraceabilityTime(*progress.DoneAt)

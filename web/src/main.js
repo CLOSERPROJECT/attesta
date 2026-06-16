@@ -229,6 +229,166 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
   }
 };
 
+let substepOverrideModal;
+let substepOverrideEditor;
+let substepOverrideMessageHandler;
+
+const ensureSubstepOverrideModal = () => {
+  if (substepOverrideModal instanceof HTMLDialogElement) {
+    return substepOverrideModal;
+  }
+  const dialog = document.createElement("dialog");
+  dialog.className = "substep-override-modal";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.addEventListener("close", () => {
+    if (substepOverrideMessageHandler) {
+      window.removeEventListener("message", substepOverrideMessageHandler);
+      substepOverrideMessageHandler = undefined;
+    }
+    dialog.innerHTML = "";
+    substepOverrideEditor = undefined;
+  });
+  document.body.appendChild(dialog);
+  substepOverrideModal = dialog;
+  return dialog;
+};
+
+const closeSubstepOverrideModal = () => {
+  if (substepOverrideMessageHandler) {
+    window.removeEventListener("message", substepOverrideMessageHandler);
+    substepOverrideMessageHandler = undefined;
+  }
+  if (substepOverrideModal instanceof HTMLDialogElement && substepOverrideModal.open) {
+    substepOverrideModal.close();
+  }
+  if (substepOverrideModal instanceof HTMLDialogElement) {
+    substepOverrideModal.innerHTML = "";
+  }
+  substepOverrideEditor = undefined;
+};
+
+const setSubstepOverrideError = (editor, message) => {
+  const errorNode = editor?.querySelector(".js-substep-override-error");
+  if (errorNode instanceof HTMLElement) {
+    errorNode.textContent = message || "";
+  }
+};
+
+const initializeSubstepOverrideEditor = (editor) => {
+  if (!(editor instanceof HTMLElement)) {
+    return;
+  }
+  substepOverrideEditor = editor;
+
+  if (substepOverrideMessageHandler) {
+    window.removeEventListener("message", substepOverrideMessageHandler);
+    substepOverrideMessageHandler = undefined;
+  }
+
+  const iframe = editor.querySelector(".js-substep-override-frame");
+  if (!(iframe instanceof HTMLIFrameElement)) {
+    return;
+  }
+
+  const saveUrl = editor.dataset.saveUrl || "";
+  if (!saveUrl) {
+    setSubstepOverrideError(editor, "Save route is missing.");
+    return;
+  }
+
+  let schema;
+  let uiSchema;
+  try {
+    schema = JSON.parse(editor.dataset.schema || "{}");
+    uiSchema = JSON.parse(editor.dataset.uischema || "{}");
+  } catch (_err) {
+    setSubstepOverrideError(editor, "Unable to load current schema.");
+    return;
+  }
+
+  const builderBase = (editor.dataset.builderOrigin || window.location.origin).replace(/\/$/, "");
+  let builderOrigin = window.location.origin;
+  try {
+    builderOrigin = new URL(builderBase, window.location.origin).origin;
+  } catch (_err) {
+  }
+
+  iframe.src =
+    `${builderBase}/formata-arch/#/single-form` +
+    `?targetOrigin=${encodeURIComponent(window.location.origin)}`;
+
+  substepOverrideMessageHandler = async (event) => {
+    if (event.origin !== builderOrigin) {
+      return;
+    }
+    if (event.data?.type === "formata:schema-ready") {
+      iframe.contentWindow?.postMessage(
+        {
+          type: "formata:schema-load",
+          schema,
+          uiSchema,
+        },
+        builderOrigin
+      );
+      return;
+    }
+    if (event.data?.type !== "formata:schema-saved") {
+      return;
+    }
+    const reasonInput = editor.querySelector(".js-substep-override-reason");
+    const reason = reasonInput instanceof HTMLTextAreaElement ? reasonInput.value.trim() : "";
+    if (!reason) {
+      setSubstepOverrideError(editor, "Reason is required.");
+      return;
+    }
+    try {
+      const response = await fetch(saveUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          schema: event.data.schema,
+          uiSchema: event.data.uiSchema || {},
+          reason,
+        }),
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        setSubstepOverrideError(editor, message || "Failed to save local adaptation.");
+        return;
+      }
+      closeSubstepOverrideModal();
+      await loadProcessContent(currentSelectedSubstep());
+    } catch (_err) {
+      setSubstepOverrideError(editor, "Failed to save local adaptation.");
+    }
+  };
+  window.addEventListener("message", substepOverrideMessageHandler);
+};
+
+const openSubstepOverrideEditor = async (url) => {
+  const dialog = ensureSubstepOverrideModal();
+  dialog.innerHTML = "<div class=\"substep-override-loading\">Loading...</div>";
+  if (!dialog.open) {
+    dialog.showModal();
+  }
+  try {
+    const response = await fetch(url, { headers: { "Accept": "text/html" } });
+    const html = await response.text();
+    if (!response.ok) {
+      dialog.innerHTML = "<div class=\"substep-override-editor\"><button type=\"button\" class=\"secondary js-close-substep-override\">Close</button><div class=\"error\">Unable to open editor.</div></div>";
+      return;
+    }
+    dialog.innerHTML = html;
+    initializeSubstepOverrideEditor(dialog.querySelector(".js-substep-override-editor"));
+  } catch (_err) {
+    dialog.innerHTML = "<div class=\"substep-override-editor\"><button type=\"button\" class=\"secondary js-close-substep-override\">Close</button><div class=\"error\">Unable to open editor.</div></div>";
+  }
+};
+
 const shareLink = async (button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -862,6 +1022,21 @@ document.body.addEventListener("toggle", (event) => {
 document.body.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) {
+    return;
+  }
+  const closeOverrideButton = target.closest(".js-close-substep-override");
+  if (closeOverrideButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    closeSubstepOverrideModal();
+    return;
+  }
+  const overrideButton = target.closest(".js-open-substep-override");
+  if (overrideButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const url = overrideButton.dataset.overrideUrl || "";
+    if (url) {
+      void openSubstepOverrideEditor(url);
+    }
     return;
   }
   const prevCarouselButton = target.closest("[data-carousel-prev]");

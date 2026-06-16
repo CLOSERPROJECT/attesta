@@ -69,16 +69,29 @@ type WorkflowSub struct {
 }
 
 type Process struct {
-	ID            primitive.ObjectID     `bson:"_id,omitempty"`
-	WorkflowDefID primitive.ObjectID     `bson:"workflowDefId"`
-	WorkflowKey   string                 `bson:"workflowKey,omitempty"`
-	Name          string                 `bson:"name,omitempty"`
-	CreatedAt     time.Time              `bson:"createdAt"`
-	CreatedBy     string                 `bson:"createdBy"`
-	Status        string                 `bson:"status"`
-	Progress      map[string]ProcessStep `bson:"progress"`
-	DPP           *ProcessDPP            `bson:"dpp,omitempty"`
-	Termination   *ProcessTermination    `bson:"termination,omitempty"`
+	ID            primitive.ObjectID         `bson:"_id,omitempty"`
+	WorkflowDefID primitive.ObjectID         `bson:"workflowDefId"`
+	WorkflowKey   string                     `bson:"workflowKey,omitempty"`
+	Name          string                     `bson:"name,omitempty"`
+	CreatedAt     time.Time                  `bson:"createdAt"`
+	CreatedBy     string                     `bson:"createdBy"`
+	Status        string                     `bson:"status"`
+	Progress      map[string]ProcessStep     `bson:"progress"`
+	Overrides     map[string]SubstepOverride `bson:"substepOverrides,omitempty"`
+	DPP           *ProcessDPP                `bson:"dpp,omitempty"`
+	Termination   *ProcessTermination        `bson:"termination,omitempty"`
+}
+
+type SubstepOverride struct {
+	SubstepID      string                 `bson:"substepId" json:"substepId"`
+	Schema         map[string]interface{} `bson:"schema" json:"schema"`
+	UISchema       map[string]interface{} `bson:"uiSchema,omitempty" json:"uiSchema,omitempty"`
+	Reason         string                 `bson:"reason" json:"reason"`
+	ModifiedBy     string                 `bson:"modifiedBy" json:"modifiedBy"`
+	ModifiedByOrg  string                 `bson:"modifiedByOrg,omitempty" json:"modifiedByOrg,omitempty"`
+	ModifiedByRole string                 `bson:"modifiedByRole,omitempty" json:"modifiedByRole,omitempty"`
+	CreatedAt      time.Time              `bson:"createdAt" json:"createdAt"`
+	UpdatedAt      time.Time              `bson:"updatedAt" json:"updatedAt"`
 }
 
 type ProcessDPP struct {
@@ -142,6 +155,7 @@ type Server struct {
 	catalog        map[string]RuntimeConfig
 	viteDevServer  string
 	enforceAuth    bool
+	formataArchURL string
 }
 
 type SSEHub struct {
@@ -187,17 +201,18 @@ type NotarizedAttachment struct {
 }
 
 type NotarizedSubstep struct {
-	SubstepID   string                 `json:"substep_id"`
-	Title       string                 `json:"title"`
-	Description *string                `json:"description,omitempty"`
-	Role        string                 `json:"role"`
-	Status      string                 `json:"status"`
-	DoneAt      string                 `json:"done_at,omitempty"`
-	DoneBy      string                 `json:"done_by,omitempty"`
-	DoneRole    string                 `json:"done_role,omitempty"`
-	Payload     map[string]interface{} `json:"payload,omitempty"`
-	Digest      string                 `json:"digest,omitempty"`
-	Attachment  *NotarizedAttachment   `json:"attachment,omitempty"`
+	SubstepID             string                 `json:"substep_id"`
+	Title                 string                 `json:"title"`
+	Description           *string                `json:"description,omitempty"`
+	Role                  string                 `json:"role"`
+	Status                string                 `json:"status"`
+	DoneAt                string                 `json:"done_at,omitempty"`
+	DoneBy                string                 `json:"done_by,omitempty"`
+	DoneRole              string                 `json:"done_role,omitempty"`
+	Payload               map[string]interface{} `json:"payload,omitempty"`
+	Digest                string                 `json:"digest,omitempty"`
+	Attachment            *NotarizedAttachment   `json:"attachment,omitempty"`
+	LocalAdaptationReason string                 `json:"local_adaptation_reason,omitempty"`
 }
 
 type NotarizedStep struct {
@@ -235,31 +250,36 @@ type NotarizedProcessTermination struct {
 }
 
 type ActionView struct {
-	WorkflowKey   string
-	ProcessID     string
-	SubstepID     string
-	Title         string
-	Description   string
-	Role          string
-	RoleBadges    []ActionRoleBadge
-	MatchingRoles []ActionRoleOption
-	RoleLabel     string
-	RoleColor     template.CSS
-	RoleBorder    template.CSS
-	InputKey      string
-	InputType     string
-	FormSchema    string
-	FormUISchema  string
-	Status        string
-	DoneAt        string
-	DoneBy        string
-	DoneRole      string
-	Values        []ActionKV
-	Attachments   []ActionAttachmentView
-	Disabled      bool
-	ReadOnly      bool
-	Reason        string
-	DetailMessage string
+	WorkflowKey    string
+	ProcessID      string
+	SubstepID      string
+	Title          string
+	Description    string
+	Role           string
+	RoleBadges     []ActionRoleBadge
+	MatchingRoles  []ActionRoleOption
+	RoleLabel      string
+	RoleColor      template.CSS
+	RoleBorder     template.CSS
+	InputKey       string
+	InputType      string
+	FormSchema     string
+	FormUISchema   string
+	Status         string
+	DoneAt         string
+	DoneBy         string
+	DoneRole       string
+	Values         []ActionKV
+	Attachments    []ActionAttachmentView
+	Disabled       bool
+	ReadOnly       bool
+	Reason         string
+	DetailMessage  string
+	CanAdaptForm   bool
+	AdaptURL       string
+	FormataArchURL string
+	OverrideReason string
+	HasOverride    bool
 }
 
 type ActionRoleBadge struct {
@@ -741,6 +761,19 @@ type DPPTraceabilityValue struct {
 	Value string
 }
 
+type SubstepOverrideEditorView struct {
+	ProcessID      string
+	WorkflowKey    string
+	SubstepID      string
+	Title          string
+	Schema         string
+	UISchema       string
+	Reason         string
+	FormataArchURL string
+	SaveURL        string
+	Error          string
+}
+
 type rolePaletteStyle struct {
 	Color  string
 	Border string
@@ -846,17 +879,18 @@ func main() {
 	}
 
 	server := &Server{
-		mongo:         client,
-		store:         &MongoStore{db: db},
-		identity:      NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
-		tmpl:          tmpl,
-		authorizer:    NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
-		sse:           newSSEHub(),
-		now:           time.Now,
-		workflowDefID: primitive.NewObjectID(),
-		configDir:     configDir,
-		viteDevServer: strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
-		enforceAuth:   true,
+		mongo:          client,
+		store:          &MongoStore{db: db},
+		identity:       NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
+		tmpl:           tmpl,
+		authorizer:     NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
+		sse:            newSSEHub(),
+		now:            time.Now,
+		workflowDefID:  primitive.NewObjectID(),
+		configDir:      configDir,
+		viteDevServer:  strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+		enforceAuth:    true,
+		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 	}
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
@@ -2195,6 +2229,8 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/org-admin/users", s.handleOrgAdminUsers)
 	mux.HandleFunc("/org-admin/formata-builder", s.handleOrgAdminFormataBuilder)
 	mux.HandleFunc("/org-admin/formata-builder/", s.handleOrgAdminFormataBuilder)
+	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
+	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
 	mux.HandleFunc("/w/", s.handleWorkflowRoutes)
 	mux.HandleFunc("/", s.handleHome)
@@ -4960,6 +4996,17 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
 	}
+	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "override" {
+		switch r.Method {
+		case http.MethodGet:
+			s.handleGetSubstepOverride(w, r, processID, parts[2])
+		case http.MethodPost:
+			s.handleSaveSubstepOverride(w, r, processID, parts[2])
+		default:
+			http.NotFound(w, r)
+		}
+		return
+	}
 	if len(parts) == 4 && parts[1] == "attachment" && parts[3] == "file" && r.Method == http.MethodGet {
 		s.handleDownloadProcessAttachment(w, r, processID, parts[2])
 		return
@@ -5305,6 +5352,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
+	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
 
 	workflowKey := strings.TrimSpace(process.WorkflowKey)
 	if workflowKey == "" {
@@ -5687,6 +5735,185 @@ func (s *Server) streamProcessAttachment(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+func actorForSubstepUser(user *AccountUser, workflowKey string) Actor {
+	actor := Actor{
+		ID:          accountActorID(user),
+		OrgSlug:     user.OrgSlug,
+		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
+		WorkflowKey: workflowKey,
+	}
+	if len(user.RoleSlugs) > 0 {
+		actor.Role = user.RoleSlugs[0]
+	}
+	return actor
+}
+
+func (s *Server) authorizeSubstepOverrideRequest(r *http.Request, user *AccountUser, workflowKey string, cfg RuntimeConfig, processID, substepID string) (*Process, WorkflowSub, WorkflowStep, Actor, int, string, bool) {
+	actor := actorForSubstepUser(user, workflowKey)
+	process, err := s.loadProcess(r.Context(), processID)
+	if err != nil {
+		return process, WorkflowSub{}, WorkflowStep{}, actor, http.StatusNotFound, "Process not found.", false
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		return process, WorkflowSub{}, WorkflowStep{}, actor, http.StatusNotFound, "Process not found.", false
+	}
+	canonical, step, err := findSubstep(cfg.Workflow, substepID)
+	if err != nil {
+		return process, WorkflowSub{}, WorkflowStep{}, actor, http.StatusNotFound, "Substep not found.", false
+	}
+	if !substepSupportsLocalOverride(canonical) {
+		return process, canonical, step, actor, http.StatusBadRequest, "Local adaptation is supported only for Formata/schema substeps.", false
+	}
+	if progress, ok := process.Progress[substepID]; ok && progress.State == "done" {
+		return process, canonical, step, actor, http.StatusConflict, "Completed substeps cannot be adapted.", false
+	}
+	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
+	if !sequenceOK {
+		return process, canonical, step, actor, http.StatusConflict, "Step is locked: complete previous steps first.", false
+	}
+	allowedRoles := substepRoles(canonical)
+	ownedRoles := append([]string(nil), actor.RoleSlugs...)
+	if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
+		ownedRoles = []string{strings.TrimSpace(actor.Role)}
+	}
+	matchingRoles := intersectRoles(allowedRoles, ownedRoles)
+	if !s.enforceAuth && len(matchingRoles) == 0 && len(allowedRoles) > 0 {
+		matchingRoles = []string{allowedRoles[0]}
+		actor.RoleSlugs = append([]string(nil), allowedRoles...)
+	}
+	if len(matchingRoles) == 0 {
+		return process, canonical, step, actor, http.StatusForbidden, "Not authorized for this action.", false
+	}
+	actor.Role = matchingRoles[0]
+	if s.authorizer == nil {
+		return process, canonical, step, actor, http.StatusBadGateway, "Cerbos check failed.", false
+	}
+	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, canonical, step.Order, step.OrganizationSlug, sequenceOK)
+	if err != nil {
+		logRequestError(r, err, "cerbos check failed for process %s substep %s override", processID, substepID)
+		return process, canonical, step, actor, http.StatusBadGateway, "Cerbos check failed.", false
+	}
+	if !allowed {
+		return process, canonical, step, actor, http.StatusForbidden, "Not authorized for this action.", false
+	}
+	return process, canonical, step, actor, http.StatusOK, "", true
+}
+
+func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request, processID, substepID string) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, selected := s.selectedWorkflowOrRedirectHome(w, r)
+	if !selected {
+		return
+	}
+	process, canonical, _, _, status, message, ok := s.authorizeSubstepOverrideRequest(r, user, workflowKey, cfg, processID, substepID)
+	if !ok {
+		http.Error(w, message, status)
+		return
+	}
+	override := process.Overrides[strings.TrimSpace(substepID)]
+	effective := effectiveSubstep(canonical, &override)
+	if strings.TrimSpace(override.SubstepID) == "" {
+		effective = canonical
+	}
+	view := SubstepOverrideEditorView{
+		ProcessID:      process.ID.Hex(),
+		WorkflowKey:    workflowKey,
+		SubstepID:      canonical.SubstepID,
+		Title:          canonical.Title,
+		Schema:         marshalJSONCompact(effective.Schema),
+		UISchema:       marshalJSONCompact(effective.UISchema),
+		Reason:         strings.TrimSpace(override.Reason),
+		FormataArchURL: strings.TrimRight(strings.TrimSpace(s.formataArchURL), "/"),
+		SaveURL:        fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, process.ID.Hex(), canonical.SubstepID),
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, "substep_override_editor.html", view); err != nil {
+		logRequestError(r, err, "failed to render substep override editor for process %s substep %s", processID, substepID)
+	}
+}
+
+func (s *Server) handleSaveSubstepOverride(w http.ResponseWriter, r *http.Request, processID, substepID string) {
+	user, _, ok := s.requireAuthenticatedPost(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, selected := s.selectedWorkflowOrRedirectHome(w, r)
+	if !selected {
+		return
+	}
+	process, canonical, _, actor, status, message, ok := s.authorizeSubstepOverrideRequest(r, user, workflowKey, cfg, processID, substepID)
+	if !ok {
+		http.Error(w, message, status)
+		return
+	}
+	var body struct {
+		Schema   json.RawMessage `json:"schema"`
+		UISchema json.RawMessage `json:"uiSchema"`
+		Reason   string          `json:"reason"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2<<20)).Decode(&body); err != nil {
+		http.Error(w, "Invalid override payload.", http.StatusBadRequest)
+		return
+	}
+	reason := strings.TrimSpace(body.Reason)
+	if reason == "" {
+		http.Error(w, "Reason is required.", http.StatusBadRequest)
+		return
+	}
+	schema, err := decodeJSONObject(body.Schema)
+	if err != nil || len(schema) == 0 {
+		http.Error(w, "Schema must be a JSON object.", http.StatusBadRequest)
+		return
+	}
+	uiSchema := map[string]interface{}{}
+	if len(body.UISchema) > 0 && string(body.UISchema) != "null" {
+		uiSchema, err = decodeJSONObject(body.UISchema)
+		if err != nil {
+			http.Error(w, "uiSchema must be a JSON object.", http.StatusBadRequest)
+			return
+		}
+	}
+	now := s.nowUTC()
+	override := SubstepOverride{
+		SubstepID:      canonical.SubstepID,
+		Schema:         schema,
+		UISchema:       uiSchema,
+		Reason:         reason,
+		ModifiedBy:     actor.ID,
+		ModifiedByOrg:  actor.OrgSlug,
+		ModifiedByRole: actor.Role,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if err := s.store.SaveSubstepOverride(r.Context(), process.ID, workflowKey, canonical.SubstepID, override); err != nil {
+		logRequestError(r, err, "failed to save substep override for process %s substep %s", process.ID.Hex(), canonical.SubstepID)
+		http.Error(w, "Failed to save local adaptation.", http.StatusInternalServerError)
+		return
+	}
+	if s.sse != nil {
+		s.sse.Broadcast("process:"+workflowKey+":"+process.ID.Hex(), "process-updated")
+	}
+	writeJSON(w, map[string]interface{}{"ok": true})
+}
+
+func decodeJSONObject(raw json.RawMessage) (map[string]interface{}, error) {
+	if len(raw) == 0 {
+		return nil, errors.New("missing object")
+	}
+	var decoded interface{}
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return nil, err
+	}
+	object, ok := decoded.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("not an object")
+	}
+	return object, nil
+}
+
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
 	user, _, ok := s.requireAuthenticatedPost(w, r)
 	if !ok {
@@ -5789,8 +6016,13 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
+	override := process.Overrides[strings.TrimSpace(substepID)]
+	effective := effectiveSubstep(substep, &override)
+	if strings.TrimSpace(override.SubstepID) == "" {
+		effective = substep
+	}
 	now := s.nowUTC()
-	payload, err := s.parseCompletionPayload(r, process.ID, substep, now)
+	payload, err := s.parseCompletionPayload(r, process.ID, effective, now)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrAttachmentTooLarge):
@@ -6329,6 +6561,7 @@ func (s *Server) loadProcess(ctx context.Context, id string) (*Process, error) {
 		return nil, err
 	}
 	process.Progress = normalizeProgressKeys(process.Progress)
+	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
 	return process, nil
 }
 
@@ -7060,6 +7293,9 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 				entry.Description = progress.Description
 				entry.Payload = progress.Data
 				entry.Digest = digestPayload(progress.Data)
+				if override, ok := process.Overrides[sub.SubstepID]; ok && strings.TrimSpace(override.SubstepID) != "" {
+					entry.LocalAdaptationReason = strings.TrimSpace(override.Reason)
+				}
 			} else if availableMap[sub.SubstepID] {
 				state = "available"
 			}
@@ -7214,6 +7450,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	}
 	pastTermination := false
 	for _, sub := range ordered {
+		var override *SubstepOverride
+		if process != nil {
+			if item, ok := process.Overrides[sub.SubstepID]; ok {
+				itemCopy := item
+				override = &itemCopy
+			}
+		}
+		effective := effectiveSubstep(sub, override)
 		allowedRoles := substepRoles(sub)
 		ownedRoles := append([]string(nil), actor.RoleSlugs...)
 		if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
@@ -7328,33 +7572,55 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				attachments = buildActionAttachments(workflowKey, process, progress.Data)
 			}
 		}
-		formSchema = marshalJSONCompact(sub.Schema)
-		formUISchema = marshalJSONCompact(sub.UISchema)
+		formSchema = marshalJSONCompact(effective.Schema)
+		formUISchema = marshalJSONCompact(effective.UISchema)
+		hasOverride := override != nil && strings.TrimSpace(override.SubstepID) != ""
+		overrideReason := ""
+		if hasOverride {
+			overrideReason = strings.TrimSpace(override.Reason)
+			if status == "done" {
+				detail := "Completed with local form adaptation."
+				if overrideReason != "" {
+					detail += "\nReason: " + overrideReason
+				}
+				reason = detail
+			}
+		}
+		canAdaptForm := status == "available" && !disabled && substepSupportsLocalOverride(sub)
+		adaptURL := ""
+		if canAdaptForm {
+			adaptURL = fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, processIDString(process), sub.SubstepID)
+		}
 		actions = append(actions, ActionView{
-			WorkflowKey:   workflowKey,
-			ProcessID:     processIDString(process),
-			SubstepID:     sub.SubstepID,
-			Title:         sub.Title,
-			Role:          role,
-			RoleBadges:    roleBadges,
-			MatchingRoles: matchingRoles,
-			RoleLabel:     roleLabel,
-			RoleColor:     roleColor,
-			RoleBorder:    roleBorder,
-			InputKey:      sub.InputKey,
-			Description:   description,
-			InputType:     sub.InputType,
-			FormSchema:    formSchema,
-			FormUISchema:  formUISchema,
-			Status:        status,
-			DoneAt:        doneAt,
-			DoneBy:        doneBy,
-			DoneRole:      doneRole,
-			Values:        values,
-			Attachments:   attachments,
-			Disabled:      disabled,
-			Reason:        reason,
-			DetailMessage: detailMessage,
+			WorkflowKey:    workflowKey,
+			ProcessID:      processIDString(process),
+			SubstepID:      sub.SubstepID,
+			Title:          sub.Title,
+			Role:           role,
+			RoleBadges:     roleBadges,
+			MatchingRoles:  matchingRoles,
+			RoleLabel:      roleLabel,
+			RoleColor:      roleColor,
+			RoleBorder:     roleBorder,
+			InputKey:       sub.InputKey,
+			Description:    description,
+			InputType:      sub.InputType,
+			FormSchema:     formSchema,
+			FormUISchema:   formUISchema,
+			Status:         status,
+			DoneAt:         doneAt,
+			DoneBy:         doneBy,
+			DoneRole:       doneRole,
+			Values:         values,
+			Attachments:    attachments,
+			Disabled:       disabled,
+			Reason:         reason,
+			DetailMessage:  detailMessage,
+			CanAdaptForm:   canAdaptForm,
+			AdaptURL:       adaptURL,
+			FormataArchURL: "",
+			OverrideReason: overrideReason,
+			HasOverride:    hasOverride,
 		})
 		if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 			pastTermination = true
@@ -7675,6 +7941,48 @@ func normalizeProgressKeys(progress map[string]ProcessStep) map[string]ProcessSt
 		normalized[decoded] = value
 	}
 	return normalized
+}
+
+func normalizeSubstepOverrideKeys(overrides map[string]SubstepOverride) map[string]SubstepOverride {
+	if overrides == nil {
+		return map[string]SubstepOverride{}
+	}
+	normalized := make(map[string]SubstepOverride, len(overrides))
+	for key, value := range overrides {
+		decoded := strings.ReplaceAll(key, "_", ".")
+		if strings.TrimSpace(value.SubstepID) != "" {
+			decoded = strings.TrimSpace(value.SubstepID)
+		}
+		normalized[decoded] = value
+	}
+	return normalized
+}
+
+func substepSupportsLocalOverride(sub WorkflowSub) bool {
+	return normalizeInputTypeForCheck(sub.InputType) == "formata" && len(sub.Schema) > 0
+}
+
+func normalizeInputTypeForCheck(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "formata", "schema", "jsonschema":
+		return "formata"
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+}
+
+func effectiveSubstep(canonical WorkflowSub, override *SubstepOverride) WorkflowSub {
+	effective := canonical
+	if override == nil {
+		return effective
+	}
+	if override.Schema != nil {
+		effective.Schema = cloneInterfaceMap(override.Schema)
+	}
+	if override.UISchema != nil {
+		effective.UISchema = cloneInterfaceMap(override.UISchema)
+	}
+	return effective
 }
 
 func isHTMXRequest(r *http.Request) bool {

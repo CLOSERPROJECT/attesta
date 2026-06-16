@@ -192,6 +192,55 @@ func TestCerbosAuthorizerCanCompleteReturnsErrorForBadStatusAndBadJSON(t *testin
 	}
 }
 
+func TestCerbosAuthorizerCanDeleteStreamAndCanAccess(t *testing.T) {
+	var requests []map[string]interface{}
+	pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var captured map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		requests = append(requests, captured)
+		_, _ = w.Write([]byte(`{"resourceInstances":{"wf-a":{"actions":{"delete":"EFFECT_ALLOW"}},"resource-1":{"actions":{"view":"EFFECT_ALLOW"}}}}`))
+	}))
+	defer pdp.Close()
+	authorizer := NewCerbosAuthorizer(pdp.URL, pdp.Client(), func() time.Time { return time.Unix(1700000000, 0) })
+	user := &AccountUser{
+		Email:     "owner@example.com",
+		OrgSlug:   "org-a",
+		RoleSlugs: []string{"role-a"},
+	}
+	allowed, err := authorizer.CanDeleteStream(context.Background(), user, " wf-a ", " owner@example.com ", false)
+	if err != nil || !allowed {
+		t.Fatalf("CanDeleteStream allowed=%v err=%v", allowed, err)
+	}
+	allowed, err = authorizer.CanAccess(context.Background(), user, " widget ", " resource-1 ", map[string]interface{}{"owner": "org-a"}, " view ")
+	if err != nil || !allowed {
+		t.Fatalf("CanAccess allowed=%v err=%v", allowed, err)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(requests))
+	}
+	deletePrincipal := requests[0]["principal"].(map[string]interface{})
+	deleteAttr := deletePrincipal["attr"].(map[string]interface{})
+	if deleteAttr["workflowKey"] != "wf-a" {
+		t.Fatalf("delete principal workflowKey = %#v", deleteAttr["workflowKey"])
+	}
+	resource := requests[1]["resource"].(map[string]interface{})
+	if resource["kind"] != "widget" {
+		t.Fatalf("resource kind = %#v", resource["kind"])
+	}
+}
+
+func TestCerbosAuthorizerNilUsersDenyWrapperActions(t *testing.T) {
+	authorizer := NewCerbosAuthorizer("http://127.0.0.1:1", nil, time.Now)
+	if allowed, err := authorizer.CanDeleteStream(context.Background(), nil, "wf", "u1", false); err != nil || allowed {
+		t.Fatalf("CanDeleteStream nil user allowed=%v err=%v", allowed, err)
+	}
+	if allowed, err := authorizer.CanAccess(context.Background(), nil, "kind", "id", nil, "view"); err != nil || allowed {
+		t.Fatalf("CanAccess nil user allowed=%v err=%v", allowed, err)
+	}
+}
+
 func TestCerbosAuthorizerCanCompleteFallsBackToLegacyRoleFields(t *testing.T) {
 	var captured map[string]interface{}
 	pdp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

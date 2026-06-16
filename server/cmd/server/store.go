@@ -33,6 +33,8 @@ type Store interface {
 	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error
 	UpdateProcessTermination(ctx context.Context, id primitive.ObjectID, workflowKey string, termination ProcessTermination) error
 	UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error
+	GetSubstepOverride(ctx context.Context, processID primitive.ObjectID, substepID string) (*SubstepOverride, error)
+	SaveSubstepOverride(ctx context.Context, processID primitive.ObjectID, workflowKey, substepID string, override SubstepOverride) error
 	InsertNotarization(ctx context.Context, notarization Notarization) error
 	SaveAttachment(ctx context.Context, upload AttachmentUpload, content io.Reader) (Attachment, error)
 	LoadAttachmentByID(ctx context.Context, id primitive.ObjectID) (*Attachment, error)
@@ -414,6 +416,37 @@ func (s *MongoStore) UpdateProcessDPP(ctx context.Context, id primitive.ObjectID
 	return err
 }
 
+func (s *MongoStore) GetSubstepOverride(ctx context.Context, processID primitive.ObjectID, substepID string) (*SubstepOverride, error) {
+	process, err := s.LoadProcessByID(ctx, processID)
+	if err != nil {
+		return nil, err
+	}
+	overrides := normalizeSubstepOverrideKeys(process.Overrides)
+	override, ok := overrides[strings.TrimSpace(substepID)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	cloned := cloneSubstepOverride(override)
+	return &cloned, nil
+}
+
+func (s *MongoStore) SaveSubstepOverride(ctx context.Context, processID primitive.ObjectID, workflowKey, substepID string, override SubstepOverride) error {
+	existing, err := s.GetSubstepOverride(ctx, processID, substepID)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return err
+	}
+	if existing != nil && !existing.CreatedAt.IsZero() {
+		override.CreatedAt = existing.CreatedAt
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"workflowKey": workflowKey,
+			"substepOverrides." + encodeProgressKey(substepID): override,
+		},
+	}
+	return s.database().Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": processID}, update).Err()
+}
+
 func (s *MongoStore) InsertNotarization(ctx context.Context, notarization Notarization) error {
 	_, err := s.database().Collection("notarizations").InsertOne(ctx, notarization)
 	return err
@@ -738,6 +771,47 @@ func (s *MemoryStore) UpdateProcessDPP(_ context.Context, id primitive.ObjectID,
 	return nil
 }
 
+func (s *MemoryStore) GetSubstepOverride(_ context.Context, processID primitive.ObjectID, substepID string) (*SubstepOverride, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	process, ok := s.processes[processID]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	overrides := normalizeSubstepOverrideKeys(process.Overrides)
+	override, ok := overrides[strings.TrimSpace(substepID)]
+	if !ok {
+		return nil, mongo.ErrNoDocuments
+	}
+	cloned := cloneSubstepOverride(override)
+	return &cloned, nil
+}
+
+func (s *MemoryStore) SaveSubstepOverride(_ context.Context, processID primitive.ObjectID, workflowKey, substepID string, override SubstepOverride) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	process, ok := s.processes[processID]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	if process.Overrides == nil {
+		process.Overrides = map[string]SubstepOverride{}
+	}
+	trimmedID := strings.TrimSpace(substepID)
+	key := encodeProgressKey(trimmedID)
+	if existing, ok := process.Overrides[key]; ok && !existing.CreatedAt.IsZero() {
+		override.CreatedAt = existing.CreatedAt
+	}
+	if existing, ok := process.Overrides[trimmedID]; ok && !existing.CreatedAt.IsZero() {
+		override.CreatedAt = existing.CreatedAt
+		delete(process.Overrides, trimmedID)
+	}
+	process.WorkflowKey = strings.TrimSpace(workflowKey)
+	process.Overrides[key] = cloneSubstepOverride(override)
+	s.processes[processID] = process
+	return nil
+}
+
 func (s *MemoryStore) LoadProcessByDigitalLink(_ context.Context, gtin, lot, serial string) (*Process, error) {
 	trimGTIN := strings.TrimSpace(gtin)
 	trimLot := strings.TrimSpace(lot)
@@ -982,6 +1056,12 @@ func cloneProcess(process Process) Process {
 	for key, value := range process.Progress {
 		cloned.Progress[key] = cloneProcessStep(value)
 	}
+	if process.Overrides != nil {
+		cloned.Overrides = make(map[string]SubstepOverride, len(process.Overrides))
+		for key, value := range process.Overrides {
+			cloned.Overrides[key] = cloneSubstepOverride(value)
+		}
+	}
 	return cloned
 }
 
@@ -1014,6 +1094,41 @@ func cloneProcessStep(step ProcessStep) ProcessStep {
 		}
 	}
 	return cloned
+}
+
+func cloneSubstepOverride(override SubstepOverride) SubstepOverride {
+	cloned := override
+	cloned.Schema = cloneInterfaceMap(override.Schema)
+	cloned.UISchema = cloneInterfaceMap(override.UISchema)
+	return cloned
+}
+
+func cloneInterfaceMap(source map[string]interface{}) map[string]interface{} {
+	if source == nil {
+		return nil
+	}
+	cloned := make(map[string]interface{}, len(source))
+	for key, value := range source {
+		cloned[key] = cloneInterfaceValue(value)
+	}
+	return cloned
+}
+
+func cloneInterfaceValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return cloneInterfaceMap(typed)
+	case primitive.M:
+		return cloneInterfaceMap(map[string]interface{}(typed))
+	case []interface{}:
+		items := make([]interface{}, len(typed))
+		for index, item := range typed {
+			items[index] = cloneInterfaceValue(item)
+		}
+		return items
+	default:
+		return value
+	}
 }
 
 type attachmentTracker struct {

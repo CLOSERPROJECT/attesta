@@ -16,6 +16,18 @@
     </p>
     <hr />
   {{ end }}
+  {{ if .HasOverride }}
+    <p class="muted" style="white-space: pre-line; margin: 0;">
+      {{- if eq .Status "done" -}}
+        Completed with local form adaptation.
+      {{- else -}}
+        Local form adaptation saved.
+      {{- end -}}{{- if .OverrideReason -}}
+        Reason:
+        {{ .OverrideReason }}
+      {{- end -}}
+    </p>
+  {{ end }}
   {{ if .DetailMessage }}
     <div class="action-submitted">
       <p class="muted" style="white-space: pre-line; margin: 0;">
@@ -77,6 +89,18 @@
           {{ if $formataDisabled }}disabled{{ end }}
         />
       </label>
+      {{ if .CanAdaptForm }}
+        <div class="local-adaptation-tools">
+          <button
+            type="button"
+            class="secondary js-open-substep-override"
+            style="width:100%"
+            data-override-url="{{ .AdaptURL }}"
+          >
+            Adapt form for available data
+          </button>
+        </div>
+      {{ end }}
       {{ if .ReadOnly }}
         {{ if .Reason }}
           <p class="muted" style="margin: 12px 0 0;">{{ .Reason }}</p>
