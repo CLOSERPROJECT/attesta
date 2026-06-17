@@ -446,7 +446,7 @@ func (s *Server) handleEmbeddedFormataArch(w http.ResponseWriter, r *http.Reques
 	}
 	pathValue := strings.TrimSpace(r.URL.Path)
 	isRootPath := pathValue == "/formata-arch" || pathValue == "/formata-arch/"
-	s.serveEmbeddedFormataBuilder(w, r, "/formata-arch", isRootPath, false)
+	s.serveEmbeddedFormataBuilder(w, r, "/formata-arch", isRootPath, true)
 }
 
 func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Request, mountPath string, isRootPath bool, injectOverrides bool) {

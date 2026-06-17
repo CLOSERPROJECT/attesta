@@ -392,8 +392,8 @@ func TestHandleEmbeddedFormataArchAuthenticatedUser(t *testing.T) {
 		if strings.Contains(body, "/org-admin/formata-builder/assets/") {
 			t.Fatalf("did not expect org-admin asset prefix, got %q", body)
 		}
-		if strings.Contains(body, "data-attesta-formata-builder-overrides") {
-			t.Fatalf("did not expect attesta builder overrides on substep form editor")
+		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
+			t.Fatalf("expected attesta builder overrides on substep form editor")
 		}
 	})
 
