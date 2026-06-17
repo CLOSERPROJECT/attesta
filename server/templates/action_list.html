@@ -89,24 +89,24 @@
           {{ if $formataDisabled }}disabled{{ end }}
         />
       </label>
-      {{ if .CanAdaptForm }}
-        <div class="local-adaptation-tools">
-          <button
-            type="button"
-            class="secondary js-open-substep-override"
-            style="width:100%"
-            data-override-url="{{ .AdaptURL }}"
-          >
-            Adapt form for available data
-          </button>
-        </div>
-      {{ end }}
       {{ if .ReadOnly }}
         {{ if .Reason }}
           <p class="muted" style="margin: 12px 0 0;">{{ .Reason }}</p>
         {{ end }}
       {{ end }}
     </form>
+    {{ if .CanAdaptForm }}
+      <div class="local-adaptation-tools">
+        <button
+          type="button"
+          class="secondary js-open-substep-override"
+          style="padding-top: 8px; padding-bottom: 8px;"
+          data-override-url="{{ .AdaptURL }}"
+        >
+          Edit form
+        </button>
+      </div>
+    {{ end }}
   {{ else }}
     <div class="action-submitted">
       <h3 style="margin-bottom: 0;">Submitted</h3>
