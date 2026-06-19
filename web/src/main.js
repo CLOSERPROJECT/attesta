@@ -64,6 +64,9 @@ const formataShadowOverrides = `
     color: var(--ink) !important;
 	  font-family: "Space Grotesk", system-ui, sans-serif !important;
   }
+  [data-slot="field-legend"]:has(#root__title) {
+    display: none !important;
+  }
 `;
 
 const applyFormataShadowOverrides = (component, attempt = 0) => {
