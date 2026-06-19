@@ -7,8 +7,12 @@
     </p>
   {{ end }}
   <div class="role-pill-row" style="margin: 0;">
-    <span style="margin-right: 4px; font-size: 12px;"
-      >Required role{{ if not (eq (len .RoleBadges) 1) }}s{{ end }}:
+    <span style="margin-right: 4px; font-size: 12px;">
+      {{- if eq .Status "done" -}}
+        Completed by role:
+      {{- else -}}
+        Required role{{ if not (eq (len .RoleBadges) 1) }}s{{ end }}:
+      {{- end -}}
     </span>
     {{ range .RoleBadges }}
       <span
@@ -128,7 +132,9 @@
       </div>
     {{ end }}
     <div class="action-submitted">
-      <h3 style="margin-bottom: 0;">Submitted</h3>
+      <span style="margin-bottom: 0; font-weight: bold; font-size: 14px;"
+        >Submitted</span
+      >
       <div class="action-submitted">
         <dl class="action-submitted-values">
           {{ if .Values }}
@@ -147,7 +153,9 @@
           {{ end }}
         </dl>
         {{ if .Attachments }}
-          <h3 style="margin: 10px 0;">Attachments</h3>
+          <span style="margin: 10px 0; font-weight: bold; font-size: 14px;"
+            >Attachments</span
+          >
           {{ template "attachment_carousel" .Attachments }}
         {{ end }}
       </div>
