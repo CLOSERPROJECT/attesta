@@ -344,10 +344,9 @@ const initializeSubstepOverrideEditor = (editor) => {
     if (event.data?.type !== "formata:schema-saved") {
       return;
     }
-    const reasonInput = editor.querySelector(".js-substep-override-reason");
     const reason =
-      reasonInput instanceof HTMLTextAreaElement
-        ? reasonInput.value.trim()
+      typeof event.data.changeReason === "string"
+        ? event.data.changeReason.trim()
         : "";
     if (!reason) {
       setSubstepOverrideError(editor, "Reason is required.");
@@ -363,7 +362,7 @@ const initializeSubstepOverrideEditor = (editor) => {
         body: JSON.stringify({
           schema: event.data.schema,
           uiSchema: event.data.uiSchema || {},
-          reason,
+          changeReason: reason,
         }),
       });
       if (!response.ok) {

@@ -5850,15 +5850,15 @@ func (s *Server) handleSaveSubstepOverride(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var body struct {
-		Schema   json.RawMessage `json:"schema"`
-		UISchema json.RawMessage `json:"uiSchema"`
-		Reason   string          `json:"reason"`
+		Schema       json.RawMessage `json:"schema"`
+		UISchema     json.RawMessage `json:"uiSchema"`
+		ChangeReason string          `json:"changeReason"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2<<20)).Decode(&body); err != nil {
 		http.Error(w, "Invalid override payload.", http.StatusBadRequest)
 		return
 	}
-	reason := strings.TrimSpace(body.Reason)
+	reason := strings.TrimSpace(body.ChangeReason)
 	if reason == "" {
 		http.Error(w, "Reason is required.", http.StatusBadRequest)
 		return

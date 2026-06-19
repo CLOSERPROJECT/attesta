@@ -33,9 +33,6 @@
       <button
         type="button"
         class="secondary secondary-small js-open-substep-override"
-        {{ if not .HasOverride }}
-          style="margin-top: -11px; margin-bottom: -40px;"
-        {{ end }}
         data-override-url="{{ .AdaptURL }}"
       >
         {{ template "icon-pencil" . }}

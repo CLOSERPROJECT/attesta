@@ -39,6 +39,19 @@ func TestHandleSaveSubstepOverrideCreatesAndUpdatesBeforeCompletion(t *testing.T
 	}
 }
 
+func TestHandleSaveSubstepOverrideAcceptsFormataChangeReason(t *testing.T) {
+	store := NewMemoryStore()
+	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
+	rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"changeReason":"source field changed"}`)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", rr.Code, rr.Body.String())
+	}
+	override := loadSubstepOverrideForTest(t, store, processID, "1.1")
+	if override.Reason != "source field changed" {
+		t.Fatalf("reason = %q", override.Reason)
+	}
+}
+
 func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInvalid(t *testing.T) {
 	t.Run("unauthorized", func(t *testing.T) {
 		store := NewMemoryStore()
@@ -47,7 +60,7 @@ func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInva
 				return false, nil
 			},
 		})
-		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"reason":"because"}`)
+		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"changeReason":"because"}`)
 		if rr.Code != http.StatusForbidden {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusForbidden)
 		}
@@ -60,7 +73,7 @@ func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInva
 		process, _ := store.SnapshotProcess(id)
 		process.Progress["1_1"] = ProcessStep{State: "done"}
 		store.SeedProcess(process)
-		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"reason":"because"}`)
+		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"changeReason":"because"}`)
 		if rr.Code != http.StatusConflict {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusConflict)
 		}
@@ -72,7 +85,7 @@ func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInva
 		cfg := testFormataRuntimeConfig()
 		cfg.Workflow.Steps[0].Substep[0].InputType = "file"
 		server.configProvider = func() (RuntimeConfig, error) { return cfg, nil }
-		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"reason":"because"}`)
+		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"changeReason":"because"}`)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
@@ -81,7 +94,7 @@ func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInva
 	t.Run("empty reason", func(t *testing.T) {
 		store := NewMemoryStore()
 		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"reason":" "}`)
+		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":{},"changeReason":" "}`)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
@@ -90,7 +103,7 @@ func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInva
 	t.Run("invalid schema", func(t *testing.T) {
 		store := NewMemoryStore()
 		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":[],"uiSchema":{},"reason":"because"}`)
+		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":[],"uiSchema":{},"changeReason":"because"}`)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
@@ -108,7 +121,7 @@ func TestHandleSaveSubstepOverrideRejectsUnauthorizedCompletedUnsupportedAndInva
 	t.Run("invalid ui schema", func(t *testing.T) {
 		store := NewMemoryStore()
 		server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":[],"reason":"because"}`)
+		rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"uiSchema":[],"changeReason":"because"}`)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
@@ -242,7 +255,7 @@ func TestGetSubstepOverrideReturnsRequestErrors(t *testing.T) {
 func TestSaveSubstepOverrideDefaultsMissingUISchema(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-	rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"reason":"no ui schema"}`)
+	rr := postSubstepOverrideForTest(t, server, processID, "1.1", `{"schema":{"type":"object"},"changeReason":"no ui schema"}`)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d body = %s", rr.Code, rr.Body.String())
 	}
@@ -313,9 +326,9 @@ func TestSubstepOverrideHelpersCloneNestedSchemaValues(t *testing.T) {
 func saveSubstepOverrideForTest(t *testing.T, server *Server, processID, substepID, schema, uiSchema, reason string) {
 	t.Helper()
 	body := map[string]json.RawMessage{
-		"schema":   json.RawMessage(schema),
-		"uiSchema": json.RawMessage(uiSchema),
-		"reason":   json.RawMessage(strconvQuote(reason)),
+		"schema":       json.RawMessage(schema),
+		"uiSchema":     json.RawMessage(uiSchema),
+		"changeReason": json.RawMessage(strconvQuote(reason)),
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
