@@ -26,11 +26,16 @@
         Back
       </button>
       <div class="hero-body">
-        <h1>{{ .WorkflowName }}</h1>
-        <p class="process-page-title">
+        <div
+          style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"
+        >
+          <h1>{{ .WorkflowName }}</h1>
           {{ if .InstanceName }}
-            <span class="process-name">{{ .InstanceName }}</span>
+            <h1>-</h1>
+            <h1 class="process-name">{{ .InstanceName }}</h1>
           {{ end }}
+        </div>
+        <p class="process-page-title">
           <span class="process-id">{{ .ProcessID }}</span>
         </p>
       </div>

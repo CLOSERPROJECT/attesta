@@ -1714,8 +1714,7 @@ button.secondary-small {
 }
 
 .process-name {
-  font-weight: 600;
-  color: var(--ink);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
