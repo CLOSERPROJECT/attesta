@@ -1,44 +1,24 @@
 {{/* Used on /w/.WorkflowKey/process/.ProcessID to render list of actions */}}
 
 {{ define "action_detail_content.html" }}
-  <div class="role-pill-row" style="margin: 8px 0 0;">
+  {{ if .InputKey }}
+    <p class="muted" style="white-space: pre-line; margin: 0; font-size: 12px;">
+      {{- .InputKey -}}
+    </p>
+  {{ end }}
+  <div class="role-pill-row" style="margin: 0;">
+    <span style="margin-right: 4px; font-size: 12px;"
+      >Required role{{ if not (eq (len .RoleBadges) 1) }}s{{ end }}:
+    </span>
     {{ range .RoleBadges }}
       <span
-        class="pill role-pill"
+        class="pill pill-sm role-pill"
         style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
         >{{ .Label }}</span
       >
     {{ end }}
   </div>
-  {{ if .InputKey }}
-    <p class="muted" style="white-space: pre-line; margin: 0;">
-      {{- .InputKey -}}
-    </p>
-    <hr />
-  {{ end }}
-  <div class="local-adaptation-tools">
-    {{ if .HasOverride }}
-      <p class="muted" style="white-space: pre-line; margin: 0;">
-        {{- if eq .Status "done" -}}
-          {{ printf "Completed with local form adaptation. " }}
-        {{- else -}}
-          {{ printf "Local form adaptation saved. " }}
-        {{- end -}}
-        {{- if .OverrideReason -}}
-          {{ printf "Reason: %s" .OverrideReason }}
-        {{- end -}}
-      </p>
-    {{ end }}
-    {{ if .CanAdaptForm }}
-      <button
-        type="button"
-        class="secondary secondary-small js-open-substep-override"
-        data-override-url="{{ .AdaptURL }}"
-      >
-        {{ template "icon-pencil" . }}
-      </button>
-    {{ end }}
-  </div>
+  <hr style="margin: 0" />
   {{ if .DetailMessage }}
     <div class="action-submitted">
       <p class="muted" style="white-space: pre-line; margin: 0;">
@@ -47,6 +27,36 @@
     </div>
   {{ else if ne .Status "done" }}
     {{ $formataDisabled := or .ReadOnly .Disabled }}
+    {{ if not $formataDisabled }}
+      <div class="local-adaptation-tools">
+        {{ if .HasOverride }}
+          <span class="muted" style="white-space: pre-line; margin: 0;">
+            {{- printf "Local form adaptation saved. " -}}
+            {{- if .OverrideReason -}}
+              {{ printf "Reason: %s" .OverrideReason }}
+            {{- end -}}
+          </span>
+        {{ end }}
+        {{ if .CanAdaptForm }}
+          <div
+            style="display: flex; align-items: center; justify-content: end; margin-left: auto; font-size: 10px; gap: 4px;"
+          >
+            {{ if not .HasOverride }}
+              <span class="muted">
+                Need to edit the form? Adapt it locally for this substep.
+              </span>
+            {{ end }}
+            <button
+              type="button"
+              class="js-open-substep-override"
+              data-override-url="{{ .AdaptURL }}"
+            >
+              {{ template "icon-pencil-small" . }} Edit substep
+            </button>
+          </div>
+        {{ end }}
+      </div>
+    {{ end }}
     <form
       class="action-form"
       {{ if not .ReadOnly }}
@@ -107,6 +117,16 @@
       {{ end }}
     </form>
   {{ else }}
+    {{ if .HasOverride }}
+      <div class="local-adaptation-tools">
+        <p class="muted" style="white-space: pre-line; margin: 0;">
+          {{- printf "Completed with local form adaptation. " -}}
+          {{- if .OverrideReason -}}
+            {{ printf "Reason: %s" .OverrideReason }}
+          {{- end -}}
+        </p>
+      </div>
+    {{ end }}
     <div class="action-submitted">
       <h3 style="margin-bottom: 0;">Submitted</h3>
       <div class="action-submitted">

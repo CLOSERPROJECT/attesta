@@ -937,6 +937,11 @@ button.secondary-small {
   padding: 5px 10px;
 }
 
+.pill-sm {
+  font-size: 10px;
+  padding: 1px 4px;
+}
+
 .role-pill {
   color: var(--pill-bg);
   background: color-mix(in srgb, var(--pill-bg) 10%, transparent);
@@ -946,6 +951,7 @@ button.secondary-small {
 .role-pill-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   row-gap: 8px;
   column-gap: 4px;
 }
@@ -1066,13 +1072,6 @@ button.secondary-small {
   align-items: center;
   margin-right: 4px;
   margin-top: 0px;
-}
-
-.local-adaptation-tools button {
-  display: flex;
-  align-items: flex-end;
-  margin-left: auto;
-  border: none;
 }
 
 .substep-override-modal {
@@ -2864,4 +2863,18 @@ hr {
       min-width: 150px;
     }
   }
+}
+
+.js-open-substep-override {
+  display: inline-flex;
+  padding: 0px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  margin: 0;
+  font-size: 10px;
+}
+
+.js-open-substep-override:hover {
+  text-decoration: underline;
 }
