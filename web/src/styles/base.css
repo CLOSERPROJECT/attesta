@@ -1062,10 +1062,17 @@ button.secondary-small {
 }
 
 .local-adaptation-tools {
-  justify-content: flex-end;
   display: flex;
+  align-items: center;
   margin-right: 4px;
-  margin-top: -8px;
+  margin-top: 0px;
+}
+
+.local-adaptation-tools button {
+  display: flex;
+  align-items: flex-end;
+  margin-left: auto;
+  border: none;
 }
 
 .substep-override-modal {

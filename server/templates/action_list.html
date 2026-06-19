@@ -16,18 +16,32 @@
     </p>
     <hr />
   {{ end }}
-  {{ if .HasOverride }}
-    <p class="muted" style="white-space: pre-line; margin: 0;">
-      {{- if eq .Status "done" -}}
-        Completed with local form adaptation.
-      {{- else -}}
-        Local form adaptation saved.
-      {{- end -}}{{- if .OverrideReason -}}
-        Reason:
-        {{ .OverrideReason }}
-      {{- end -}}
-    </p>
-  {{ end }}
+  <div class="local-adaptation-tools">
+    {{ if .HasOverride }}
+      <p class="muted" style="white-space: pre-line; margin: 0;">
+        {{- if eq .Status "done" -}}
+          {{ printf "Completed with local form adaptation. " }}
+        {{- else -}}
+          {{ printf "Local form adaptation saved. " }}
+        {{- end -}}
+        {{- if .OverrideReason -}}
+          {{ printf "Reason: %s" .OverrideReason }}
+        {{- end -}}
+      </p>
+    {{ end }}
+    {{ if .CanAdaptForm }}
+      <button
+        type="button"
+        class="secondary secondary-small js-open-substep-override"
+        {{ if not .HasOverride }}
+          style="margin-top: -11px; margin-bottom: -40px;"
+        {{ end }}
+        data-override-url="{{ .AdaptURL }}"
+      >
+        {{ template "icon-pencil" . }}
+      </button>
+    {{ end }}
+  </div>
   {{ if .DetailMessage }}
     <div class="action-submitted">
       <p class="muted" style="white-space: pre-line; margin: 0;">
@@ -95,18 +109,6 @@
         {{ end }}
       {{ end }}
     </form>
-    {{ if .CanAdaptForm }}
-      <div class="local-adaptation-tools">
-        <button
-          type="button"
-          class="secondary js-open-substep-override"
-          style="padding-top: 8px; padding-bottom: 8px;"
-          data-override-url="{{ .AdaptURL }}"
-        >
-          Edit form
-        </button>
-      </div>
-    {{ end }}
   {{ else }}
     <div class="action-submitted">
       <h3 style="margin-bottom: 0;">Submitted</h3>
