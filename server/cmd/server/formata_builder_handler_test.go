@@ -351,6 +351,63 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 }
 
+func TestHandleEmbeddedFormataArchAuthenticatedUser(t *testing.T) {
+	now := time.Now().UTC()
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "step-user",
+		OrgSlug:        "builder-org",
+		Email:          "step-user@example.com",
+		RoleSlugs:      []string{"dep1"},
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	server := &Server{
+		identity:    testIdentityForSessions(now, map[string]AccountUser{"step-session": user}),
+		enforceAuth: true,
+		now:         time.Now,
+	}
+
+	t.Run("unauthenticated redirects", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/formata-arch", nil)
+		rec := httptest.NewRecorder()
+		server.handleEmbeddedFormataArch(rec, req)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+	})
+
+	t.Run("authenticated non org admin can load single form app", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/formata-arch", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "step-session"})
+		rec := httptest.NewRecorder()
+		server.handleEmbeddedFormataArch(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, "/formata-arch/assets/") {
+			t.Fatalf("expected same-origin formata-arch asset prefix, got %q", body)
+		}
+		if strings.Contains(body, "/org-admin/formata-builder/assets/") {
+			t.Fatalf("did not expect org-admin asset prefix, got %q", body)
+		}
+		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
+			t.Fatalf("expected attesta builder overrides on substep form editor")
+		}
+	})
+
+	t.Run("post is not allowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/formata-arch", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "step-session"})
+		rec := httptest.NewRecorder()
+		server.handleEmbeddedFormataArch(rec, req)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		}
+	})
+}
+
 func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "platform-admin-builder-post@example.com")
 	t.Setenv("ADMIN_PASSWORD", "secret")

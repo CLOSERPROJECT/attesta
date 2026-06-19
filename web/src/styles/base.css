@@ -279,7 +279,9 @@ svg.bi {
   font-weight: 600;
   line-height: 1;
   text-decoration: none;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
 }
 
 .nav .nav-action:hover,
@@ -636,7 +638,10 @@ button.secondary-small {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 180ms ease, color 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
 }
 
 .timeline-step[open] .timeline-step-chevron {
@@ -714,7 +719,9 @@ button.secondary-small {
   border-left: 6px solid var(--substep-done-border);
   background: var(--substep-done);
   cursor: pointer;
-  transition: transform 300ms ease, opacity 300ms ease;
+  transition:
+    transform 300ms ease,
+    opacity 300ms ease;
   min-width: 0;
   gap: 8px;
   position: relative;
@@ -762,7 +769,7 @@ button.secondary-small {
   .substep-accordion-chevron {
     transform: rotate(180deg);
     color: var(--ink);
-  };
+  }
 }
 
 .substep-available {
@@ -852,7 +859,11 @@ button.secondary-small {
 .substep-terminated .substep-head .status {
   border-color: var(--stream-terminated);
   color: var(--stream-terminated);
-  background-color: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--stream-terminated) 5%,
+    transparent
+  );
 }
 
 .substep-skipped .substep-head .status {
@@ -1050,6 +1061,68 @@ button.secondary-small {
   margin: 0;
 }
 
+.local-adaptation-tools {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+  margin-top: 0px;
+}
+
+.local-adaptation-tools button {
+  display: flex;
+  align-items: flex-end;
+  margin-left: auto;
+  border: none;
+}
+
+.substep-override-modal {
+  width: calc(100vw - 32px);
+  height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.substep-override-modal::backdrop {
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.substep-override-editor,
+.substep-override-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.substep-override-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.substep-override-reason {
+  display: grid;
+  gap: 6px;
+}
+
+.substep-override-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
 .action-submitted-values {
   margin: 0;
   display: grid;
@@ -1189,7 +1262,10 @@ button.secondary-small {
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
-  transition: background-color 140ms ease, transform 140ms ease, opacity 140ms ease;
+  transition:
+    background-color 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
 }
 
 .action-submitted-attachments-dot[aria-current="true"] {
@@ -1230,10 +1306,13 @@ button.secondary-small {
   min-height: 200px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background:  var(--panel);
+  background: var(--panel);
   color: var(--ink);
   text-decoration: none;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease;
 }
 
 .workflow-card-shell .workflow-card {
@@ -1394,7 +1473,7 @@ button.secondary-small {
 
 .workflow-card-dropdown {
   position: absolute;
-  top: calc(100% );
+  top: calc(100%);
   right: 0;
   min-width: 160px;
   padding: 8px;
@@ -1649,7 +1728,9 @@ button.secondary-small {
 }
 
 .process-id {
-  font-family: Source Code Pro, monospace;
+  font-family:
+    Source Code Pro,
+    monospace;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
@@ -2173,7 +2254,8 @@ button.secondary-small {
   line-height: 1.4;
 }
 
-.org-admin-panel-main[data-org-admin-ready="true"] [data-org-admin-panel][hidden] {
+.org-admin-panel-main[data-org-admin-ready="true"]
+  [data-org-admin-panel][hidden] {
   display: none;
 }
 
@@ -2467,7 +2549,7 @@ button.secondary-small {
   row-gap: 8px;
 }
 
-.user-email{
+.user-email {
   min-width: 0;
   justify-self: start;
   display: inline-flex;
@@ -2475,7 +2557,7 @@ button.secondary-small {
   gap: 8px;
 }
 
-.user-tags{
+.user-tags {
   display: inline-flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -2629,7 +2711,9 @@ hr {
   bottom: -22px;
   width: 2px;
   background: color-mix(in srgb, var(--border) 84%, var(--accent));
-  transition: bottom 240ms ease, background 240ms ease;
+  transition:
+    bottom 240ms ease,
+    background 240ms ease;
 }
 
 .dpp-history-item:last-child::before {
@@ -2767,7 +2851,7 @@ hr {
 .active-role-selector {
   h3 {
     margin-bottom: 2px;
-  };
+  }
   label {
     display: flex;
     flex-direction: row;
@@ -2779,5 +2863,5 @@ hr {
     select {
       min-width: 150px;
     }
-  };
+  }
 }

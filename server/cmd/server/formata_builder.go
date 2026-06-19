@@ -272,7 +272,7 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			s.handleOrgAdminFormataBuilderStream(w, r, strings.TrimSpace(streamPath), user)
 			return
 		}
-		s.serveEmbeddedFormataBuilder(w, r, isRootPath)
+		s.serveEmbeddedFormataBuilder(w, r, "/org-admin/formata-builder", isRootPath, true)
 		return
 	case http.MethodPost:
 		if !isRootPath {
@@ -436,8 +436,22 @@ func (s *Server) formataBuilderStreamEditState(ctx context.Context, user *Accoun
 	return editable, editable && hasProcesses, nil
 }
 
-func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Request, isRootPath bool) {
-	relativePath := strings.TrimPrefix(strings.TrimSpace(r.URL.Path), "/org-admin/formata-builder")
+func (s *Server) handleEmbeddedFormataArch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
+	pathValue := strings.TrimSpace(r.URL.Path)
+	isRootPath := pathValue == "/formata-arch" || pathValue == "/formata-arch/"
+	s.serveEmbeddedFormataBuilder(w, r, "/formata-arch", isRootPath, true)
+}
+
+func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Request, mountPath string, isRootPath bool, injectOverrides bool) {
+	mountPath = "/" + strings.Trim(strings.TrimSpace(mountPath), "/")
+	relativePath := strings.TrimPrefix(strings.TrimSpace(r.URL.Path), mountPath)
 	relativePath = strings.TrimPrefix(relativePath, "/")
 	if isRootPath || relativePath == "" {
 		relativePath = "index.html"
@@ -465,8 +479,8 @@ func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Requ
 		w.Header().Set("Content-Type", contentType)
 	}
 	if shouldRewriteFormataAssetContent(cleaned, contentType) {
-		data = bytes.ReplaceAll(data, []byte("/formata-arch/"), []byte("/org-admin/formata-builder/"))
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") || strings.EqualFold(path.Ext(cleaned), ".html") {
+		data = bytes.ReplaceAll(data, []byte("/formata-arch/"), []byte(mountPath+"/"))
+		if injectOverrides && (strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") || strings.EqualFold(path.Ext(cleaned), ".html")) {
 			data = injectFormataBuilderOverrides(data)
 		}
 	}

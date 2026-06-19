@@ -104,6 +104,7 @@ func testTemplates() *template.Template {
 {{define "process_body"}}PROCESS {{.ProcessID}} {{template "process_content.html" .}}{{end}}
 {{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}} {{.ActionList.Error}}{{with .ActionList.Action}}{{.SubstepID}}{{end}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
+{{define "substep_override_editor.html"}}OVERRIDE_EDITOR {{.SubstepID}} {{.FormataArchURL}} {{.SaveURL}} {{.Schema}} {{.UISchema}} {{.Reason}} {{.Error}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
 {{define "dpp_body"}}DPP GTIN {{.GTIN}} LOT {{.Lot}} SERIAL {{.Serial}} LINK {{.DigitalLink}} MERKLE {{.Export.Merkle.Root}}{{end}}
 {{define "dpp.html"}}{{template "layout.html" .}}{{end}}

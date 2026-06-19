@@ -26,7 +26,7 @@ const formataShadowOverrides = `
   }
   [data-slot="input"]::file-selector-button,
   [data-slot="button"] {
-    background: var(---panel) !important;
+    background: var(--panel) !important;
     color: var(--formata-accent) !important;
     border: 1px solid var(--formata-accent) !important;
     cursor: pointer;
@@ -40,6 +40,10 @@ const formataShadowOverrides = `
     font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
+    justify-content: flex-end;
+    display: flex;
+    margin-left: auto;
+    width: fit-content;
   }
   [data-slot="slider-range"] {
     background: var(--formata-accent) !important;
@@ -59,6 +63,9 @@ const formataShadowOverrides = `
     border-color: var(--border) !important;
     color: var(--ink) !important;
 	  font-family: "Space Grotesk", system-ui, sans-serif !important;
+  }
+  [data-slot="field-legend"]:has(#root__title) {
+    display: none !important;
   }
 `;
 
@@ -89,8 +96,7 @@ const getPreferredTheme = () => {
     if (stored === "light" || stored === "dark") {
       return stored;
     }
-  } catch (err) {
-  }
+  } catch (err) {}
 
   if (
     window.matchMedia &&
@@ -116,8 +122,7 @@ const setTheme = (theme) => {
   applyTheme(theme);
   try {
     localStorage.setItem(themeStorageKey, theme);
-  } catch (err) {
-  }
+  } catch (err) {}
 };
 
 applyTheme(getPreferredTheme());
@@ -128,7 +133,6 @@ if (themeToggle) {
     setTheme(current === "dark" ? "light" : "dark");
   });
 }
-
 const root = document.querySelector("[data-process-id]");
 const processId = root?.dataset?.processId;
 const workflowKey = root?.dataset?.workflowKey;
@@ -139,7 +143,7 @@ let skipNextProcessUpdatedEventTimer = 0;
 const focusNextActionInput = () => {
   const container = processPageContent || document;
   const nextInput = container.querySelector(
-    "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])"
+    "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])",
   );
   if (nextInput) {
     nextInput.focus();
@@ -155,12 +159,13 @@ const syncSelectedSubstepURL = (substepId = "") => {
       url.searchParams.delete("substep");
     }
     window.history.replaceState({}, "", url);
-  } catch (_err) {
-  }
+  } catch (_err) {}
 };
 
 const currentSelectedSubstep = () => {
-  const selectedPanel = document.querySelector(".js-process-substep-panel[open]");
+  const selectedPanel = document.querySelector(
+    ".js-process-substep-panel[open]",
+  );
   if (selectedPanel instanceof HTMLElement) {
     return (selectedPanel.dataset.substepId || "").trim();
   }
@@ -188,7 +193,7 @@ const markSelectedSubstep = (substepId = "") => {
     }
     container.classList.toggle(
       "substep-selected",
-      selected !== "" && node.dataset.substepId === selected
+      selected !== "" && node.dataset.substepId === selected,
     );
   }
   syncSelectedSubstepURL(selected);
@@ -225,7 +230,179 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     await initializeFormataForms(processPageContent);
     markSelectedSubstep(currentSelectedSubstep());
     focusNextActionInput();
+  } catch (_err) {}
+};
+
+let substepOverrideModal;
+let substepOverrideEditor;
+let substepOverrideMessageHandler;
+
+const ensureSubstepOverrideModal = () => {
+  if (substepOverrideModal instanceof HTMLDialogElement) {
+    return substepOverrideModal;
+  }
+  const dialog = document.createElement("dialog");
+  dialog.className = "substep-override-modal";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.addEventListener("close", () => {
+    if (substepOverrideMessageHandler) {
+      window.removeEventListener("message", substepOverrideMessageHandler);
+      substepOverrideMessageHandler = undefined;
+    }
+    dialog.innerHTML = "";
+    substepOverrideEditor = undefined;
+  });
+  document.body.appendChild(dialog);
+  substepOverrideModal = dialog;
+  return dialog;
+};
+
+const closeSubstepOverrideModal = () => {
+  if (substepOverrideMessageHandler) {
+    window.removeEventListener("message", substepOverrideMessageHandler);
+    substepOverrideMessageHandler = undefined;
+  }
+  if (
+    substepOverrideModal instanceof HTMLDialogElement &&
+    substepOverrideModal.open
+  ) {
+    substepOverrideModal.close();
+  }
+  if (substepOverrideModal instanceof HTMLDialogElement) {
+    substepOverrideModal.innerHTML = "";
+  }
+  substepOverrideEditor = undefined;
+};
+
+const setSubstepOverrideError = (editor, message) => {
+  const errorNode = editor?.querySelector(".js-substep-override-error");
+  if (errorNode instanceof HTMLElement) {
+    errorNode.textContent = message || "";
+  }
+};
+
+const initializeSubstepOverrideEditor = (editor) => {
+  if (!(editor instanceof HTMLElement)) {
+    return;
+  }
+  substepOverrideEditor = editor;
+
+  if (substepOverrideMessageHandler) {
+    window.removeEventListener("message", substepOverrideMessageHandler);
+    substepOverrideMessageHandler = undefined;
+  }
+
+  const iframe = editor.querySelector(".js-substep-override-frame");
+  if (!(iframe instanceof HTMLIFrameElement)) {
+    return;
+  }
+
+  const saveUrl = editor.dataset.saveUrl || "";
+  if (!saveUrl) {
+    setSubstepOverrideError(editor, "Save route is missing.");
+    return;
+  }
+
+  let schema;
+  let uiSchema;
+  try {
+    schema = JSON.parse(editor.dataset.schema || "{}");
+    uiSchema = JSON.parse(editor.dataset.uischema || "{}");
   } catch (_err) {
+    setSubstepOverrideError(editor, "Unable to load current schema.");
+    return;
+  }
+
+  const builderBase = (
+    editor.dataset.builderOrigin || window.location.origin
+  ).replace(/\/$/, "");
+  let builderOrigin = window.location.origin;
+  try {
+    builderOrigin = new URL(builderBase, window.location.origin).origin;
+  } catch (_err) {}
+
+  iframe.src =
+    `${builderBase}/formata-arch/#/single-form` +
+    `?targetOrigin=${encodeURIComponent(window.location.origin)}`;
+
+  substepOverrideMessageHandler = async (event) => {
+    if (event.origin !== builderOrigin) {
+      return;
+    }
+    if (event.data?.type === "formata:schema-ready") {
+      iframe.contentWindow?.postMessage(
+        {
+          type: "formata:schema-load",
+          schema,
+          uiSchema,
+        },
+        builderOrigin,
+      );
+      return;
+    }
+    if (event.data?.type !== "formata:schema-saved") {
+      return;
+    }
+    const reason =
+      typeof event.data.changeReason === "string"
+        ? event.data.changeReason.trim()
+        : "";
+    if (!reason) {
+      setSubstepOverrideError(editor, "Reason is required.");
+      return;
+    }
+    try {
+      const response = await fetch(saveUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          schema: event.data.schema,
+          uiSchema: event.data.uiSchema || {},
+          changeReason: reason,
+        }),
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        setSubstepOverrideError(
+          editor,
+          message || "Failed to save local adaptation.",
+        );
+        return;
+      }
+      closeSubstepOverrideModal();
+      await loadProcessContent(currentSelectedSubstep());
+    } catch (_err) {
+      setSubstepOverrideError(editor, "Failed to save local adaptation.");
+    }
+  };
+  window.addEventListener("message", substepOverrideMessageHandler);
+};
+
+const openSubstepOverrideEditor = async (url) => {
+  const dialog = ensureSubstepOverrideModal();
+  dialog.innerHTML = '<div class="substep-override-loading">Loading...</div>';
+  if (!dialog.open) {
+    dialog.showModal();
+  }
+  try {
+    const response = await fetch(url, { headers: { Accept: "text/html" } });
+    const html = await response.text();
+    if (!response.ok) {
+      dialog.innerHTML =
+        '<div class="substep-override-editor"><button type="button" class="secondary js-close-substep-override">Close</button><div class="error">Unable to open editor.</div></div>';
+      return;
+    }
+    dialog.innerHTML = html;
+    initializeSubstepOverrideEditor(
+      dialog.querySelector(".js-substep-override-editor"),
+    );
+  } catch (_err) {
+    dialog.innerHTML =
+      '<div class="substep-override-editor"><button type="button" class="secondary js-close-substep-override">Close</button><div class="error">Unable to open editor.</div></div>';
   }
 };
 
@@ -244,7 +421,12 @@ const shareLink = async (button) => {
       await navigator.share({ url: absoluteURL });
       return;
     } catch (err) {
-      if (err && typeof err === "object" && "name" in err && err.name === "AbortError") {
+      if (
+        err &&
+        typeof err === "object" &&
+        "name" in err &&
+        err.name === "AbortError"
+      ) {
         return;
       }
     }
@@ -258,8 +440,7 @@ const shareLink = async (button) => {
         button.textContent = originalText;
       }, 1200);
       return;
-    } catch (_err) {
-    }
+    } catch (_err) {}
   }
   window.prompt(`Copy ${shareLabel}:`, absoluteURL);
 };
@@ -292,10 +473,13 @@ const updateAttachmentCarousel = (carousel, nextIndex) => {
   }
   const maxIndex = slides.length - 1;
   const safeIndex = Math.min(Math.max(nextIndex, 0), maxIndex);
-  const currentIndex = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+  const currentIndex =
+    Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
   const currentSlide = slides[currentIndex];
   const nextSlide = slides[safeIndex];
-  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const prefersReducedMotion = window.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  )?.matches;
 
   if (
     currentSlide instanceof HTMLElement &&
@@ -308,16 +492,16 @@ const updateAttachmentCarousel = (carousel, nextIndex) => {
     currentSlide.animate(
       [
         { opacity: 1, transform: "translateX(0)" },
-        { opacity: 0, transform: `translateX(${direction * -18}px)` }
+        { opacity: 0, transform: `translateX(${direction * -18}px)` },
       ],
-      { duration: 220, easing: "ease" }
+      { duration: 220, easing: "ease" },
     );
     nextSlide.animate(
       [
         { opacity: 0, transform: `translateX(${direction * 18}px)` },
-        { opacity: 1, transform: "translateX(0)" }
+        { opacity: 1, transform: "translateX(0)" },
       ],
-      { duration: 220, easing: "ease" }
+      { duration: 220, easing: "ease" },
     );
   }
 
@@ -378,8 +562,7 @@ const copyLinkValue = async (button) => {
         button.textContent = originalText;
       }, 1200);
       return;
-    } catch (_err) {
-    }
+    } catch (_err) {}
   }
   window.prompt(`Copy ${label}:`, absoluteURL);
 };
@@ -402,8 +585,7 @@ const copyTextValue = async (button) => {
         button.textContent = originalText;
       }, 1200);
       return;
-    } catch (_err) {
-    }
+    } catch (_err) {}
   }
   window.prompt(`Copy ${label}:`, value);
 };
@@ -427,7 +609,10 @@ const normalizeFormataSchema = (schema) => {
   if (!normalized.type) {
     normalized.type = "object";
   }
-  if (normalized.type === "object" && (!normalized.properties || typeof normalized.properties !== "object")) {
+  if (
+    normalized.type === "object" &&
+    (!normalized.properties || typeof normalized.properties !== "object")
+  ) {
     normalized.properties = {};
   }
   if (normalized.required && !Array.isArray(normalized.required)) {
@@ -451,10 +636,18 @@ const normalizeFieldUiSchema = (fieldUi) => {
   const options = normalizeUiOptions(normalized["ui:options"]);
   const description = normalized["ui:description"];
   const help = normalized["ui:help"];
-  if (typeof description === "string" && description.trim() !== "" && typeof options.description !== "string") {
+  if (
+    typeof description === "string" &&
+    description.trim() !== "" &&
+    typeof options.description !== "string"
+  ) {
     options.description = description;
   }
-  if (typeof help === "string" && help.trim() !== "" && typeof options.help !== "string") {
+  if (
+    typeof help === "string" &&
+    help.trim() !== "" &&
+    typeof options.help !== "string"
+  ) {
     options.help = help;
   }
   if (Object.keys(options).length > 0) {
@@ -484,7 +677,10 @@ const normalizeFormataUiSchema = (uiSchema) => {
   if (!uiSchema || typeof uiSchema !== "object" || Array.isArray(uiSchema)) {
     return {};
   }
-  const source = uiSchema.properties && typeof uiSchema.properties === "object" ? uiSchema.properties : uiSchema;
+  const source =
+    uiSchema.properties && typeof uiSchema.properties === "object"
+      ? uiSchema.properties
+      : uiSchema;
   const normalized = {};
   const rootOptions = normalizeUiOptions(uiSchema["ui:options"]);
   if (Array.isArray(uiSchema["ui:order"])) {
@@ -512,8 +708,14 @@ const normalizeFormataUiSchema = (uiSchema) => {
 const fileToDataURL = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(reader.result), { once: true });
-    reader.addEventListener("error", () => reject(new Error("failed to read file")), { once: true });
+    reader.addEventListener("load", () => resolve(reader.result), {
+      once: true,
+    });
+    reader.addEventListener(
+      "error",
+      () => reject(new Error("failed to read file")),
+      { once: true },
+    );
     reader.readAsDataURL(file);
   });
 
@@ -524,8 +726,7 @@ const serializeFormataValue = async (value) => {
       if (typeof dataURL === "string" && dataURL.startsWith("data:")) {
         return dataURL;
       }
-    } catch (_err) {
-    }
+    } catch (_err) {}
     return "";
   }
   if (Array.isArray(value)) {
@@ -574,11 +775,16 @@ const readFormataComponentValue = (component) => {
 };
 
 const extractFormataSubmitPayload = async (componentEvent, component) => {
-  const detail = componentEvent instanceof CustomEvent ? componentEvent.detail : undefined;
+  const detail =
+    componentEvent instanceof CustomEvent ? componentEvent.detail : undefined;
   if (detail instanceof FormData) {
     return await formDataToObject(detail);
   }
-  if (detail && typeof detail === "object" && detail.formData instanceof FormData) {
+  if (
+    detail &&
+    typeof detail === "object" &&
+    detail.formData instanceof FormData
+  ) {
     return await formDataToObject(detail.formData);
   }
   if (detail && typeof detail === "object" && !Array.isArray(detail)) {
@@ -590,7 +796,7 @@ const extractFormataSubmitPayload = async (componentEvent, component) => {
 let formataReadyPromise;
 const formataScriptURLs = [
   "https://cdn.jsdelivr.net/gh/CLOSERPROJECT/formata@main/dist/formata-web-component.umd.js",
-  "https://closerproject.github.io/formata-arch/formata-web-component.umd.js"
+  "https://closerproject.github.io/formata-arch/formata-web-component.umd.js",
 ];
 
 const waitForFormataDefinition = (timeoutMs) => {
@@ -599,13 +805,15 @@ const waitForFormataDefinition = (timeoutMs) => {
   }
   return Promise.race([
     customElements.whenDefined("formata-form").then(() => true),
-    new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs))
+    new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs)),
   ]);
 };
 
 const loadExternalScript = (url) =>
   new Promise((resolve) => {
-    const existing = document.querySelector(`script[data-formata-src="${url}"]`);
+    const existing = document.querySelector(
+      `script[data-formata-src="${url}"]`,
+    );
     if (existing) {
       resolve(true);
       return;
@@ -645,7 +853,7 @@ const waitForFormata = async () => {
   }
   return await Promise.race([
     formataReadyPromise,
-    new Promise((resolve) => setTimeout(() => resolve(false), 5000))
+    new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
   ]);
 };
 
@@ -662,12 +870,18 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
   hiddenInput.value = serialized;
   form.dataset.formataSubmitState = "inflight";
 
-  const url = form.dataset.formataPost || form.getAttribute("hx-post") || form.getAttribute("action");
-  const target =
-    form.dataset.formataTarget ||
-    "#process-page-content";
+  const url =
+    form.dataset.formataPost ||
+    form.getAttribute("hx-post") ||
+    form.getAttribute("action");
+  const target = form.dataset.formataTarget || "#process-page-content";
   const htmxApi = window.htmx;
-  if (url && htmxApi && typeof htmxApi.ajax === "function" && document.querySelector(target)) {
+  if (
+    url &&
+    htmxApi &&
+    typeof htmxApi.ajax === "function" &&
+    document.querySelector(target)
+  ) {
     if (target === "#process-page-content") {
       skipNextProcessUpdatedEvent = true;
       window.clearTimeout(skipNextProcessUpdatedEventTimer);
@@ -679,7 +893,7 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
       source: form,
       target,
       swap: "innerHTML",
-      values: { value: serialized }
+      values: { value: serialized },
     });
     return true;
   }
@@ -706,9 +920,13 @@ const initializeFormataForms = async (container = document) => {
     }
     host.dataset.formataReady = "true";
 
-    const rawSchema = parseJsonAttribute(host.getAttribute("data-formata-schema"));
+    const rawSchema = parseJsonAttribute(
+      host.getAttribute("data-formata-schema"),
+    );
     const schema = normalizeFormataSchema(rawSchema);
-    const rawUiSchema = parseJsonAttribute(host.getAttribute("data-formata-uischema"));
+    const rawUiSchema = parseJsonAttribute(
+      host.getAttribute("data-formata-uischema"),
+    );
     const uiSchema = normalizeFormataUiSchema(rawUiSchema);
     if (!schema) {
       continue;
@@ -753,7 +971,9 @@ const initializeFormataForms = async (container = document) => {
       try {
         payload = await extractFormataSubmitPayload(componentEvent, component);
       } catch (_err) {
-        payload = await serializeFormataValue(readFormataComponentValue(component));
+        payload = await serializeFormataValue(
+          readFormataComponentValue(component),
+        );
       }
       if (!submitFormataPayload(form, hiddenInput, payload)) {
         form.dataset.formataSubmitState = "idle";
@@ -770,7 +990,9 @@ const initializeFormataForms = async (container = document) => {
       }
       let payload = {};
       try {
-        payload = await serializeFormataValue(readFormataComponentValue(component));
+        payload = await serializeFormataValue(
+          readFormataComponentValue(component),
+        );
       } catch (_err) {
         payload = readFormataComponentValue(component);
       }
@@ -790,7 +1012,7 @@ const initializeFormataForms = async (container = document) => {
 
 if (processId && workflowKey && processPageContent) {
   const source = new EventSource(
-    `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`
+    `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`,
   );
   source.addEventListener("process-updated", () => {
     if (skipNextProcessUpdatedEvent) {
@@ -814,7 +1036,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   const openDropdowns = document.querySelectorAll(
-    ".account-menu[open], .workflow-card-menu[open]"
+    ".account-menu[open], .workflow-card-menu[open]",
   );
   for (const dropdown of openDropdowns) {
     if (!dropdown.contains(target)) {
@@ -844,7 +1066,9 @@ document.body.addEventListener("toggle", (event) => {
     return;
   }
   if (target.open) {
-    for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
+    for (const panel of document.querySelectorAll(
+      ".js-process-substep-panel",
+    )) {
       if (!(panel instanceof HTMLDetailsElement) || panel === target) {
         continue;
       }
@@ -864,12 +1088,28 @@ document.body.addEventListener("click", (event) => {
   if (!(target instanceof Element)) {
     return;
   }
+  const closeOverrideButton = target.closest(".js-close-substep-override");
+  if (closeOverrideButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    closeSubstepOverrideModal();
+    return;
+  }
+  const overrideButton = target.closest(".js-open-substep-override");
+  if (overrideButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const url = overrideButton.dataset.overrideUrl || "";
+    if (url) {
+      void openSubstepOverrideEditor(url);
+    }
+    return;
+  }
   const prevCarouselButton = target.closest("[data-carousel-prev]");
   if (prevCarouselButton instanceof HTMLButtonElement) {
     event.preventDefault();
     const carousel = prevCarouselButton.closest(".js-attachment-carousel");
     if (carousel instanceof HTMLElement) {
-      const current = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+      const current =
+        Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
       updateAttachmentCarousel(carousel, current - 1);
     }
     return;
@@ -879,7 +1119,8 @@ document.body.addEventListener("click", (event) => {
     event.preventDefault();
     const carousel = nextCarouselButton.closest(".js-attachment-carousel");
     if (carousel instanceof HTMLElement) {
-      const current = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+      const current =
+        Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
       updateAttachmentCarousel(carousel, current + 1);
     }
     return;
@@ -889,7 +1130,8 @@ document.body.addEventListener("click", (event) => {
     event.preventDefault();
     const carousel = dotButton.closest(".js-attachment-carousel");
     if (carousel instanceof HTMLElement) {
-      const index = Number.parseInt(dotButton.dataset.carouselDot || "0", 10) || 0;
+      const index =
+        Number.parseInt(dotButton.dataset.carouselDot || "0", 10) || 0;
       updateAttachmentCarousel(carousel, index);
     }
     return;
@@ -920,70 +1162,83 @@ document.body.addEventListener("click", (event) => {
   void shareLink(shareButton);
 });
 
-document.body.addEventListener("touchstart", (event) => {
-  const target = event.target;
-  if (!(target instanceof Element)) {
-    return;
-  }
-  const swipeSurface = target.closest("[data-carousel-swipe]");
-  if (!(swipeSurface instanceof HTMLElement)) {
-    return;
-  }
-  const carousel = swipeSurface.closest(".js-attachment-carousel");
-  if (!(carousel instanceof HTMLElement)) {
-    return;
-  }
-  const touch = event.touches?.[0];
-  if (!touch) {
-    return;
-  }
-  carousel.dataset.touchStartX = String(touch.clientX);
-  carousel.dataset.touchStartY = String(touch.clientY);
-}, { passive: true });
+document.body.addEventListener(
+  "touchstart",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const swipeSurface = target.closest("[data-carousel-swipe]");
+    if (!(swipeSurface instanceof HTMLElement)) {
+      return;
+    }
+    const carousel = swipeSurface.closest(".js-attachment-carousel");
+    if (!(carousel instanceof HTMLElement)) {
+      return;
+    }
+    const touch = event.touches?.[0];
+    if (!touch) {
+      return;
+    }
+    carousel.dataset.touchStartX = String(touch.clientX);
+    carousel.dataset.touchStartY = String(touch.clientY);
+  },
+  { passive: true },
+);
 
-document.body.addEventListener("touchcancel", (event) => {
-  const target = event.target;
-  if (!(target instanceof Element)) {
-    return;
-  }
-  const carousel = target.closest(".js-attachment-carousel");
-  if (!(carousel instanceof HTMLElement)) {
-    return;
-  }
-  clearAttachmentSwipe(carousel);
-}, { passive: true });
+document.body.addEventListener(
+  "touchcancel",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const carousel = target.closest(".js-attachment-carousel");
+    if (!(carousel instanceof HTMLElement)) {
+      return;
+    }
+    clearAttachmentSwipe(carousel);
+  },
+  { passive: true },
+);
 
-document.body.addEventListener("touchend", (event) => {
-  const target = event.target;
-  if (!(target instanceof Element)) {
-    return;
-  }
-  const swipeSurface = target.closest("[data-carousel-swipe]");
-  if (!(swipeSurface instanceof HTMLElement)) {
-    return;
-  }
-  const carousel = swipeSurface.closest(".js-attachment-carousel");
-  if (!(carousel instanceof HTMLElement)) {
-    return;
-  }
-  const startX = Number.parseFloat(carousel.dataset.touchStartX || "");
-  const startY = Number.parseFloat(carousel.dataset.touchStartY || "");
-  clearAttachmentSwipe(carousel);
-  if (!Number.isFinite(startX) || !Number.isFinite(startY)) {
-    return;
-  }
-  const touch = event.changedTouches?.[0];
-  if (!touch) {
-    return;
-  }
-  const deltaX = touch.clientX - startX;
-  const deltaY = touch.clientY - startY;
-  if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) {
-    return;
-  }
-  const current = Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
-  updateAttachmentCarousel(carousel, deltaX < 0 ? current + 1 : current - 1);
-}, { passive: true });
+document.body.addEventListener(
+  "touchend",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const swipeSurface = target.closest("[data-carousel-swipe]");
+    if (!(swipeSurface instanceof HTMLElement)) {
+      return;
+    }
+    const carousel = swipeSurface.closest(".js-attachment-carousel");
+    if (!(carousel instanceof HTMLElement)) {
+      return;
+    }
+    const startX = Number.parseFloat(carousel.dataset.touchStartX || "");
+    const startY = Number.parseFloat(carousel.dataset.touchStartY || "");
+    clearAttachmentSwipe(carousel);
+    if (!Number.isFinite(startX) || !Number.isFinite(startY)) {
+      return;
+    }
+    const touch = event.changedTouches?.[0];
+    if (!touch) {
+      return;
+    }
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+      return;
+    }
+    const current =
+      Number.parseInt(carousel.dataset.carouselIndex || "0", 10) || 0;
+    updateAttachmentCarousel(carousel, deltaX < 0 ? current + 1 : current - 1);
+  },
+  { passive: true },
+);
 
 const deptRoot = document.querySelector("[data-dept-role]");
 if (deptRoot) {
@@ -992,11 +1247,13 @@ if (deptRoot) {
   const dashboard = document.getElementById("dept-dashboard");
   if (role && deptWorkflowKey && dashboard) {
     const source = new EventSource(
-      `/w/${deptWorkflowKey}/events?workflow=${deptWorkflowKey}&role=${role}`
+      `/w/${deptWorkflowKey}/events?workflow=${deptWorkflowKey}&role=${role}`,
     );
     source.addEventListener("role-updated", async () => {
       try {
-        const response = await fetch(`/w/${deptWorkflowKey}/backoffice/${role}/partial`);
+        const response = await fetch(
+          `/w/${deptWorkflowKey}/backoffice/${role}/partial`,
+        );
         if (!response.ok) {
           return;
         }

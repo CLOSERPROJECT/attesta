@@ -117,6 +117,16 @@ func TestDPPFirstStringValueAndBuildProcessDPP(t *testing.T) {
 	}
 }
 
+func TestDPPStringValueHandlesNestedPrimitiveMap(t *testing.T) {
+	value := dppStringValue(primitive.M{"lot": " LOT-9 "}, "lot")
+	if value != "LOT-9" {
+		t.Fatalf("dppStringValue = %q, want LOT-9", value)
+	}
+	if value := dppStringValue(map[string]interface{}{"lot": 42}, "lot"); value != "" {
+		t.Fatalf("dppStringValue non-string = %q, want empty", value)
+	}
+}
+
 func TestBuildProcessDPPErrorsAndStrategyValidation(t *testing.T) {
 	def := testRuntimeConfig().Workflow
 	now := time.Date(2026, 2, 13, 11, 0, 0, 0, time.UTC)

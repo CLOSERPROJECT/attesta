@@ -1,0 +1,44 @@
+{{ define "substep_override_editor.html" }}
+  <div
+    class="substep-override-editor js-substep-override-editor"
+    data-builder-origin="{{ .FormataArchURL }}"
+    data-save-url="{{ .SaveURL }}"
+    data-schema="{{ .Schema }}"
+    data-uischema="{{ .UISchema }}"
+  >
+    <div>
+      <div class="substep-override-header">
+        <div
+          class="substep-head"
+          style="font-size: 1.5em; line-height: 1; align-items: center;"
+        >
+          <span
+            class="pill"
+            style="--pill-bg: var(--panel); --border: var(--ink);"
+            >{{ .SubstepID }}</span
+          >
+          <span>{{ .Title }}</span>
+        </div>
+        <button
+          type="button"
+          class="secondary secondary-small js-close-substep-override"
+        >
+          {{ template "icon-close" }}
+        </button>
+      </div>
+      <span class="muted">
+        This adaptation is local to this process and this substep. It does not
+        change the global workflow. It cannot be changed after the substep is
+        completed.
+      </span>
+    </div>
+    {{ if .Error }}
+      <div class="error">{{ .Error }}</div>
+    {{ else }}
+      <iframe
+        class="substep-override-frame js-substep-override-frame"
+        title="Form editor"
+      ></iframe>
+    {{ end }}
+  </div>
+{{ end }}
