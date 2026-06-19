@@ -758,7 +758,9 @@ button.secondary-small {
 
 .substep-summary-main {
   min-width: 0;
-  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .substep-accordion[open] {
@@ -805,22 +807,14 @@ button.secondary-small {
   background: var(--substep-skipped);
 }
 
-.substep-head {
-  display: flex;
-  align-items: start;
-  gap: 6px;
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
 .substep-title {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
-.substep-head .status {
+.substep-accordion-summary .status {
   margin-left: auto;
   font-weight: 600;
   text-transform: uppercase;
@@ -832,31 +826,31 @@ button.secondary-small {
   padding: 2px 8px;
 }
 
-.substep-available .substep-head .status {
+.substep-available .status {
   border-color: var(--stream-available);
   color: var(--stream-available);
   background-color: color-mix(in srgb, var(--stream-available) 5%, transparent);
 }
 
-.substep-active .substep-head .status {
+.substep-active .status {
   border-color: var(--stream-active);
   color: var(--stream-active);
   background-color: color-mix(in srgb, var(--stream-active) 5%, transparent);
 }
 
-.substep-done .substep-head .status {
+.substep-done .status {
   border-color: var(--stream-done);
   color: var(--stream-done);
   background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
 }
 
-.substep-locked .substep-head .status {
+.substep-locked .status {
   border-color: var(--stream-done);
   color: var(--stream-done);
   background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
 }
 
-.substep-terminated .substep-head .status {
+.substep-terminated .status {
   border-color: var(--stream-terminated);
   color: var(--stream-terminated);
   background-color: color-mix(
@@ -866,7 +860,7 @@ button.secondary-small {
   );
 }
 
-.substep-skipped .substep-head .status {
+.substep-skipped .status {
   border-color: var(--substep-done-border);
   background: var(--substep-skipped);
 }
@@ -878,7 +872,6 @@ button.secondary-small {
   font-size: 12px;
   color: var(--muted);
   min-width: 0;
-  padding-top: 6px;
 }
 
 .substep-meta > * {

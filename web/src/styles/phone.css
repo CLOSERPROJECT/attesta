@@ -47,9 +47,8 @@
   }
 
   .substep-meta {
-    padding-top: 8px;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .dpp-history-digest-full {
