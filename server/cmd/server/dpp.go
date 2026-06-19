@@ -261,8 +261,9 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				subView.Status = "done"
 				if override, ok := process.Overrides[sub.SubstepID]; ok && strings.TrimSpace(override.SubstepID) != "" {
 					subView.Reason = "Completed with local form adaptation."
+					subView.DetailMessage = subView.Reason
 					if strings.TrimSpace(override.Reason) != "" {
-						subView.DetailMessage = "Reason: " + strings.TrimSpace(override.Reason)
+						subView.DetailMessage += " Reason: " + strings.TrimSpace(override.Reason)
 					}
 				}
 				if progress.DoneAt != nil {

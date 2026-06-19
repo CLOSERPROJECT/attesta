@@ -278,7 +278,7 @@ func TestTraceabilityAndExportExposeLocalAdaptation(t *testing.T) {
 	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
 
 	trace := buildDPPTraceabilityView(testFormataRuntimeConfig().Workflow, &process, "workflow", map[string]RoleMeta{}, nil)
-	if trace[0].Substeps[0].Reason != "Completed with local form adaptation." || !strings.Contains(trace[0].Substeps[0].DetailMessage, "local source shape") {
+	if trace[0].Substeps[0].Reason != "Completed with local form adaptation." || trace[0].Substeps[0].DetailMessage != "Completed with local form adaptation. Reason: local source shape" {
 		t.Fatalf("trace adaptation fields = %#v", trace[0].Substeps[0])
 	}
 	export := buildNotarizedExport(testFormataRuntimeConfig().Workflow, &process)

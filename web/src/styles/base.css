@@ -1080,7 +1080,7 @@ button.secondary-small {
   height: calc(100vh - 32px);
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--panel);
   color: var(--ink);
   overflow: hidden;
@@ -1119,7 +1119,7 @@ button.secondary-small {
   min-height: 0;
   flex: 1 1 auto;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--panel);
 }
 
