@@ -70,6 +70,9 @@ const formataShadowOverrides = `
   [data-slot="field-description"]#root__description {
     display: none !important;
   }
+  form.flex.flex-col.gap-4 {
+    gap: 28px !important;
+  }
 `;
 
 const applyFormataShadowOverrides = (component, attempt = 0) => {
