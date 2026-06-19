@@ -152,13 +152,13 @@
             {{ end }}
           {{ end }}
         </dl>
-        {{ if .Attachments }}
-          <span style="margin: 10px 0; font-weight: bold; font-size: 14px;"
-            >Attachments</span
-          >
-          {{ template "attachment_carousel" .Attachments }}
-        {{ end }}
       </div>
     </div>
+    {{ if .Attachments }}
+      <div style="display: grid; gap: 8px; margin: 0px;">
+        <span style="font-weight: bold; font-size: 14px;">Attachments</span>
+        {{ template "attachment_carousel" .Attachments }}
+      </div>
+    {{ end }}
   {{ end }}
 {{ end }}
