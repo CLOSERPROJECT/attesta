@@ -67,6 +67,9 @@ const formataShadowOverrides = `
   [data-slot="field-legend"]:has(#root__title) {
     display: none !important;
   }
+  [data-slot="field-description"]#root__description {
+    display: none !important;
+  }
 `;
 
 const applyFormataShadowOverrides = (component, attempt = 0) => {
