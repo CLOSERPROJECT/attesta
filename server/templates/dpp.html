@@ -140,7 +140,7 @@
                     {{ range .Substeps }}
                       <section class="substep substep-{{ .Status }}">
                         <div style="padding: 12px;">
-                          <div class="substep-head">
+                          <div class="substep-summary-main">
                             <span class="pill">{{ .SubstepID }}</span>
                             <span class="timeline-step-title substep-title"
                               >{{ .Title }}</span
@@ -184,9 +184,11 @@
                               {{ end }}
                             </dl>
                             {{ if .Attachments }}
-                              <h3 style="margin: 4px 0;">
+                              <span
+                                style="margin: 4px 0; font-weight: bold; font-size: 14px;"
+                              >
                                 Attachments preview
-                              </h3>
+                              </span>
                               {{ template "attachment_carousel" .Attachments }}
                             {{ end }}
                             <div class="substep-meta">

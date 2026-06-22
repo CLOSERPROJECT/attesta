@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestActionListTemplateShowsRoleSelectorLabelsWhilePostingSlugs(t *testing.T) {
+func TestActionListTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) {
 	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
 
 	action := ActionView{
@@ -36,12 +36,24 @@ func TestActionListTemplateShowsRoleSelectorLabelsWhilePostingSlugs(t *testing.T
 	body := out.String()
 
 	if !strings.Contains(body, `name="activeRole"`) {
-		t.Fatalf("expected role selector in template, got body: %s", body)
+		t.Fatalf("expected active role hidden input in template, got body: %s", body)
+	}
+	if !strings.Contains(body, `data-active-role-input="true"`) {
+		t.Fatalf("expected active role input to be marked for modal selection, got body: %s", body)
+	}
+	if !strings.Contains(body, `data-active-role-dialog="active-role-dialog-process-1-1.1"`) {
+		t.Fatalf("expected form to reference active role dialog, got body: %s", body)
+	}
+	if strings.Contains(body, `<select`) {
+		t.Fatalf("expected no inline role selector, got body: %s", body)
+	}
+	if !strings.Contains(body, `data-active-role-option="true"`) {
+		t.Fatalf("expected dialog role options to be marked for JS selection, got body: %s", body)
 	}
 	if !strings.Contains(body, `value="dep1"`) || !strings.Contains(body, `value="dep2"`) {
-		t.Fatalf("expected matching role options in template, got body: %s", body)
+		t.Fatalf("expected matching role radio values in template, got body: %s", body)
 	}
-	if !strings.Contains(body, `>Department 1</option>`) || !strings.Contains(body, `>Department 2</option>`) {
-		t.Fatalf("expected selector labels to use role names, got body: %s", body)
+	if !strings.Contains(body, `>Department 1</span>`) || !strings.Contains(body, `>Department 2</span>`) {
+		t.Fatalf("expected dialog labels to use role names, got body: %s", body)
 	}
 }

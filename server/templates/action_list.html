@@ -1,44 +1,28 @@
 {{/* Used on /w/.WorkflowKey/process/.ProcessID to render list of actions */}}
 
 {{ define "action_detail_content.html" }}
-  <div class="role-pill-row" style="margin: 8px 0 0;">
+  {{ if .InputKey }}
+    <p class="muted" style="white-space: pre-line; margin: 0; font-size: 12px;">
+      {{- .InputKey -}}
+    </p>
+  {{ end }}
+  <div class="role-pill-row" style="margin: 0;">
+    <span style="margin-right: 4px; font-size: 12px;">
+      {{- if eq .Status "done" -}}
+        Completed by role:
+      {{- else -}}
+        Required role{{ if not (eq (len .RoleBadges) 1) }}s{{ end }}:
+      {{- end -}}
+    </span>
     {{ range .RoleBadges }}
       <span
-        class="pill role-pill"
+        class="pill pill-sm role-pill"
         style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
         >{{ .Label }}</span
       >
     {{ end }}
   </div>
-  {{ if .InputKey }}
-    <p class="muted" style="white-space: pre-line; margin: 0;">
-      {{- .InputKey -}}
-    </p>
-    <hr />
-  {{ end }}
-  <div class="local-adaptation-tools">
-    {{ if .HasOverride }}
-      <p class="muted" style="white-space: pre-line; margin: 0;">
-        {{- if eq .Status "done" -}}
-          {{ printf "Completed with local form adaptation. " }}
-        {{- else -}}
-          {{ printf "Local form adaptation saved. " }}
-        {{- end -}}
-        {{- if .OverrideReason -}}
-          {{ printf "Reason: %s" .OverrideReason }}
-        {{- end -}}
-      </p>
-    {{ end }}
-    {{ if .CanAdaptForm }}
-      <button
-        type="button"
-        class="secondary secondary-small js-open-substep-override"
-        data-override-url="{{ .AdaptURL }}"
-      >
-        {{ template "icon-pencil" . }}
-      </button>
-    {{ end }}
-  </div>
+  <hr style="margin: 0" />
   {{ if .DetailMessage }}
     <div class="action-submitted">
       <p class="muted" style="white-space: pre-line; margin: 0;">
@@ -47,13 +31,47 @@
     </div>
   {{ else if ne .Status "done" }}
     {{ $formataDisabled := or .ReadOnly .Disabled }}
+    {{ if not $formataDisabled }}
+      <div class="local-adaptation-tools">
+        {{ if .HasOverride }}
+          <span class="muted" style="white-space: pre-line; margin: 0;">
+            {{- printf "Local form adaptation saved. " -}}
+            {{- if .OverrideReason -}}
+              {{ printf "Reason: %s" .OverrideReason }}
+            {{- end -}}
+          </span>
+        {{ end }}
+        {{ if .CanAdaptForm }}
+          <div
+            style="display: flex; align-items: center; justify-content: end; margin-left: auto; font-size: 10px; gap: 4px;"
+          >
+            {{ if not .HasOverride }}
+              <span class="muted">
+                Need to edit the form? Adapt it locally for this substep.
+              </span>
+            {{ end }}
+            <button
+              type="button"
+              class="js-open-substep-override"
+              data-override-url="{{ .AdaptURL }}"
+            >
+              {{ template "icon-pencil-small" . }} Edit substep
+            </button>
+          </div>
+        {{ end }}
+      </div>
+    {{ end }}
     <form
+      id="action-form-{{ .ProcessID }}-{{ .SubstepID }}"
       class="action-form"
       {{ if not .ReadOnly }}
         method="post"
         action="/w/{{ .WorkflowKey }}/process/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
         data-formata-substep="true"
         data-formata-post="/w/{{ .WorkflowKey }}/process/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
+        {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }}
+          data-active-role-dialog="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
+        {{ end }}
       {{ end }}
     >
       {{ if .MatchingRoles }}
@@ -65,23 +83,13 @@
             {{ if .ReadOnly }}disabled{{ end }}
           />
         {{ else }}
-          <div class="active-role-selector">
-            <h3>Active Role</h3>
-            <label>
-              <span>Complete action as:</span>
-              <select
-                name="activeRole"
-                required
-                {{ if $formataDisabled }}disabled{{ end }}
-              >
-                <option value="">Select role</option>
-                {{ range .MatchingRoles }}
-                  <option value="{{ .Slug }}">{{ .Label }}</option>
-                {{ end }}
-              </select>
-            </label>
-          </div>
-          <hr />
+          <input
+            type="hidden"
+            name="activeRole"
+            value=""
+            data-active-role-input="true"
+            {{ if $formataDisabled }}disabled{{ end }}
+          />
         {{ end }}
       {{ end }}
       <label class="action-field-formata">
@@ -106,9 +114,70 @@
         {{ end }}
       {{ end }}
     </form>
+    {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }}
+      <dialog
+        id="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
+        class="manage-dialog js-active-role-dialog"
+        data-active-role-form="action-form-{{ .ProcessID }}-{{ .SubstepID }}"
+      >
+        <div class="manage-dialog-card">
+          <header class="manage-dialog-head">
+            <div>
+              <h3 class="manage-dialog-title">Complete as</h3>
+              <p class="manage-dialog-subtitle">
+                Choose the role to use for this submission.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="secondary secondary-small js-cancel-active-role"
+              aria-label="Close role selection"
+            >
+              {{ template "icon-close" . }}
+            </button>
+          </header>
+          <div class="active-role-options" role="radiogroup">
+            {{ range .MatchingRoles }}
+              <label class="active-role-option">
+                <input
+                  type="radio"
+                  name="roleChoice-{{ $.ProcessID }}-{{ $.SubstepID }}"
+                  value="{{ .Slug }}"
+                  data-active-role-option="true"
+                />
+                <span>{{ .Label }}</span>
+              </label>
+            {{ end }}
+          </div>
+          <p class="active-role-error" data-active-role-error hidden>
+            Select a role to continue.
+          </p>
+          <div
+            class="manage-dialog-actions manage-dialog-actions-end"
+            style="margin-top: 12px;"
+          >
+            <button type="button" class="primary js-confirm-active-role">
+              Confirm
+            </button>
+          </div>
+        </div>
+      </dialog>
+    {{ end }}
   {{ else }}
+    {{ if .HasOverride }}
+      <div class="local-adaptation-tools">
+        <p class="muted" style="white-space: pre-line; margin: 0;">
+          {{- printf "Completed with local form adaptation. " -}}
+          {{- if .OverrideReason -}}
+            {{ printf "Reason: %s" .OverrideReason }}
+          {{- end -}}
+        </p>
+      </div>
+    {{ end }}
     <div class="action-submitted">
-      <h3 style="margin-bottom: 0;">Submitted</h3>
+      <span style="margin-bottom: 0; font-weight: bold; font-size: 14px;"
+        >Submitted</span
+      >
       <div class="action-submitted">
         <dl class="action-submitted-values">
           {{ if .Values }}
@@ -126,11 +195,13 @@
             {{ end }}
           {{ end }}
         </dl>
-        {{ if .Attachments }}
-          <h3 style="margin: 10px 0;">Attachments</h3>
-          {{ template "attachment_carousel" .Attachments }}
-        {{ end }}
       </div>
     </div>
+    {{ if .Attachments }}
+      <div style="display: grid; gap: 8px; margin: 0px;">
+        <span style="font-weight: bold; font-size: 14px;">Attachments</span>
+        {{ template "attachment_carousel" .Attachments }}
+      </div>
+    {{ end }}
   {{ end }}
 {{ end }}

@@ -67,6 +67,12 @@ const formataShadowOverrides = `
   [data-slot="field-legend"]:has(#root__title) {
     display: none !important;
   }
+  [data-slot="field-description"]#root__description {
+    display: none !important;
+  }
+  form.flex.flex-col.gap-4 {
+    gap: 28px !important;
+  }
 `;
 
 const applyFormataShadowOverrides = (component, attempt = 0) => {
@@ -861,7 +867,69 @@ const syncFormataValue = (component, hiddenInput) => {
   hiddenInput.value = JSON.stringify(readFormataComponentValue(component));
 };
 
+const pendingActiveRoleSubmits = new WeakMap();
+
+const activeRoleInputForForm = (form) => {
+  const input = form.querySelector("input[data-active-role-input]");
+  return input instanceof HTMLInputElement ? input : null;
+};
+
+const activeRoleDialogForForm = (form) => {
+  const dialogID = (form.dataset.activeRoleDialog || "").trim();
+  if (!dialogID) {
+    return null;
+  }
+  const dialog = document.getElementById(dialogID);
+  return dialog instanceof HTMLDialogElement ? dialog : null;
+};
+
+const requestActiveRoleChoice = (form, onSelected) => {
+  const roleInput = activeRoleInputForForm(form);
+  if (!roleInput || roleInput.value.trim()) {
+    return false;
+  }
+  const dialog = activeRoleDialogForForm(form);
+  if (!dialog) {
+    return false;
+  }
+  const error = dialog.querySelector("[data-active-role-error]");
+  if (error instanceof HTMLElement) {
+    error.hidden = true;
+  }
+  pendingActiveRoleSubmits.set(dialog, onSelected);
+  if (typeof dialog.showModal === "function") {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute("open", "");
+  }
+  const checked = dialog.querySelector(
+    'input[data-active-role-option]:checked',
+  );
+  if (checked instanceof HTMLInputElement) {
+    checked.focus();
+  } else {
+    const firstOption = dialog.querySelector("input[data-active-role-option]");
+    if (firstOption instanceof HTMLInputElement) {
+      firstOption.focus();
+    }
+  }
+  return true;
+};
+
 const submitFormataPayload = (form, hiddenInput, payload) => {
+  const roleInput = activeRoleInputForForm(form);
+  if (
+    roleInput &&
+    !roleInput.value.trim() &&
+    requestActiveRoleChoice(form, () => {
+      if (!submitFormataPayload(form, hiddenInput, payload)) {
+        form.dataset.formataSubmitState = "idle";
+      }
+    })
+  ) {
+    return true;
+  }
+
   const state = form.dataset.formataSubmitState || "idle";
   if (state !== "idle") {
     return false;
@@ -889,11 +957,15 @@ const submitFormataPayload = (form, hiddenInput, payload) => {
         skipNextProcessUpdatedEvent = false;
       }, 2000);
     }
+    const values = { value: serialized };
+    if (roleInput && roleInput.value.trim()) {
+      values.activeRole = roleInput.value.trim();
+    }
     htmxApi.ajax("POST", url, {
       source: form,
       target,
       swap: "innerHTML",
-      values: { value: serialized },
+      values,
     });
     return true;
   }
@@ -1086,6 +1158,49 @@ document.body.addEventListener("toggle", (event) => {
 document.body.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) {
+    return;
+  }
+  const cancelActiveRoleButton = target.closest(".js-cancel-active-role");
+  if (cancelActiveRoleButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const dialog = cancelActiveRoleButton.closest(".js-active-role-dialog");
+    if (dialog instanceof HTMLDialogElement) {
+      pendingActiveRoleSubmits.delete(dialog);
+      dialog.close();
+    }
+    return;
+  }
+  const confirmActiveRoleButton = target.closest(".js-confirm-active-role");
+  if (confirmActiveRoleButton instanceof HTMLButtonElement) {
+    event.preventDefault();
+    const dialog = confirmActiveRoleButton.closest(".js-active-role-dialog");
+    if (!(dialog instanceof HTMLDialogElement)) {
+      return;
+    }
+    const selected = dialog.querySelector(
+      'input[data-active-role-option]:checked',
+    );
+    const error = dialog.querySelector("[data-active-role-error]");
+    if (!(selected instanceof HTMLInputElement)) {
+      if (error instanceof HTMLElement) {
+        error.hidden = false;
+      }
+      return;
+    }
+    const formID = (dialog.dataset.activeRoleForm || "").trim();
+    const form = formID ? document.getElementById(formID) : null;
+    const roleInput =
+      form instanceof HTMLFormElement ? activeRoleInputForForm(form) : null;
+    if (!roleInput) {
+      pendingActiveRoleSubmits.delete(dialog);
+      dialog.close();
+      return;
+    }
+    roleInput.value = selected.value;
+    const submit = pendingActiveRoleSubmits.get(dialog);
+    pendingActiveRoleSubmits.delete(dialog);
+    dialog.close();
+    submit?.();
     return;
   }
   const closeOverrideButton = target.closest(".js-close-substep-override");

@@ -47,9 +47,8 @@
   }
 
   .substep-meta {
-    padding-top: 8px;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .dpp-history-digest-full {
@@ -113,20 +112,6 @@
   .substep-title {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .active-role-selector {
-    width: 100%;
-    h3 {
-      margin-bottom: 6px;
-    };
-    label {
-      flex-direction: column;
-      align-items: flex-start;
-      select {
-        width: 100%;
-      };
-    };
   }
 
   .timeline-step[open] > summary {

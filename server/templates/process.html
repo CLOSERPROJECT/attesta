@@ -26,11 +26,16 @@
         Back
       </button>
       <div class="hero-body">
-        <h1>{{ .WorkflowName }}</h1>
-        <p class="process-page-title">
+        <div
+          style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"
+        >
+          <h1>{{ .WorkflowName }}</h1>
           {{ if .InstanceName }}
-            <span class="process-name">{{ .InstanceName }}</span>
+            <h1>-</h1>
+            <h1 class="process-name">{{ .InstanceName }}</h1>
           {{ end }}
+        </div>
+        <p class="process-page-title">
           <span class="process-id">{{ .ProcessID }}</span>
         </p>
       </div>
@@ -291,26 +296,13 @@
               >
                 <summary class="substep-accordion-summary">
                   <div class="substep-summary-main">
-                    <div class="substep-head">
-                      <span
-                        class="pill"
-                        style="--pill-bg: var(--panel); --border: var(--ink);"
-                        >{{ .SubstepID }}</span
-                      >
-                      <div class="substep-title">
-                        <span class="timeline-step-title">{{ .Title }}</span>
-                      </div>
-                      {{ if not $.HideStatus }}
-                        <span class="status">
-                          {{ if .StatusLabel }}
-                            {{ .StatusLabel }}
-                          {{ else }}
-                            {{ .Status }}
-                          {{ end }}
-                        </span>
-                      {{ end }}
-                    </div>
-                    <div class="substep-summary-supporting">
+                    <span
+                      class="pill"
+                      style="--pill-bg: var(--panel); --border: var(--ink);"
+                      >{{ .SubstepID }}</span
+                    >
+                    <div class="substep-title">
+                      <span class="timeline-step-title">{{ .Title }}</span>
                       {{ if eq .Status "done" }}
                         <div class="substep-meta">
                           {{ if .DoneAt }}
@@ -325,6 +317,15 @@
                       {{ end }}
                     </div>
                   </div>
+                  {{ if not $.HideStatus }}
+                    <span class="status">
+                      {{ if .StatusLabel }}
+                        {{ .StatusLabel }}
+                      {{ else }}
+                        {{ .Status }}
+                      {{ end }}
+                    </span>
+                  {{ end }}
                   <span class="substep-accordion-chevron" aria-hidden="true">
                     {{ template "icon-chevron-down" . }}
                   </span>
