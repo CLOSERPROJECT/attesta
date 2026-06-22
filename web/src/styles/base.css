@@ -1612,7 +1612,7 @@ button.secondary-small {
 .process-list {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: 0;
   display: grid;
   gap: 10px;
 }
@@ -1763,7 +1763,6 @@ button.secondary-small {
 
 .home-workflow-panel-main {
   display: grid;
-  gap: 24px;
 }
 
 .preview-panel {
@@ -1772,6 +1771,60 @@ button.secondary-small {
 
 .instances-panel {
   scroll-margin-top: 140px;
+}
+
+.panel-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stream-status-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.stream-status-section {
+  scroll-margin-top: 44px;
+  display: grid;
+  gap: 12px;
+}
+
+.stream-status-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 6px solid;
+}
+
+.stream-status-section-head h3 {
+  margin: 0;
+}
+
+.stream-status-sort {
+  margin: 0;
+  justify-content: flex-start;
+}
+
+.stream-preview-dialog {
+  width: min(80rem, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
+}
+
+.stream-preview-dialog-card {
+  width: 100%;
+  max-height: min(900px, calc(100vh - 48px));
+  overflow: auto;
+}
+
+.stream-preview-dialog-body {
+  display: grid;
+  gap: 16px;
 }
 
 .process-progress-line {
