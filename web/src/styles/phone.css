@@ -32,6 +32,9 @@
     form {
       width: 100%;
     };
+    .panel-actions {
+      width: 100%;
+    };
   }
 
   .dpp-history-item::before,
