@@ -25,9 +25,10 @@
             {{ if eq .Status "available" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="org-admin-sidebar-link is-active"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
+                aria-current="page"
                 aria-label="Available streams"
                 title="Streams waiting for your input"
               >
@@ -39,6 +40,7 @@
                 class="org-admin-sidebar-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
+                aria-current="false"
                 aria-label="Active streams"
                 title="Streams waiting for someone else input"
               >
@@ -50,6 +52,7 @@
                 class="org-admin-sidebar-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
+                aria-current="false"
                 aria-label="Completed streams"
                 title="Streams completed successfully"
               >
@@ -61,6 +64,7 @@
                 class="org-admin-sidebar-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
+                aria-current="false"
                 aria-label="Terminated streams"
                 title="Streams terminated before completion"
               >
@@ -187,6 +191,7 @@
                 class="stream-status-section"
                 id="{{ .PanelID }}"
                 data-home-panel="{{ .Status }}"
+                {{ if ne .Status "available" }}hidden{{ end }}
               >
                 <div
                   class="stream-status-section-head"
@@ -410,7 +415,38 @@
           return;
         }
 
-        const setPanel = (panelName) => {
+        const panels = Array.from(homeRoot.querySelectorAll("[data-home-panel]"));
+        const statusPanelNames = panels.map((panel) =>
+          (panel.getAttribute("data-home-panel") || "").trim(),
+        );
+
+        const defaultPanelName = statusPanelNames.includes("available")
+          ? "available"
+          : statusPanelNames[0] || "";
+
+        const initialPanelName = () => {
+          const hashPanelID = window.location.hash.replace(/^#/, "");
+          if (hashPanelID) {
+            const hashPanel = panels.find((panel) => panel.id === hashPanelID);
+            if (hashPanel) {
+              return (hashPanel.getAttribute("data-home-panel") || "").trim();
+            }
+          }
+
+          const params = new URLSearchParams(window.location.search);
+          const queryPanel = statusPanelNames.find((panelName) => {
+            return (
+              params.has(panelName + "_page") || params.has(panelName + "_sort")
+            );
+          });
+          return queryPanel || defaultPanelName;
+        };
+
+        const showPanel = (panelName) => {
+          if (!statusPanelNames.includes(panelName)) {
+            panelName = defaultPanelName;
+          }
+
           const buttons = Array.from(
             homeRoot.querySelectorAll("[data-home-nav]"),
           );
@@ -420,6 +456,11 @@
             button.classList.toggle("is-active", isActive);
             button.setAttribute("aria-current", isActive ? "page" : "false");
           });
+
+          panels.forEach((panel) => {
+            const currentName = panel.getAttribute("data-home-panel");
+            panel.hidden = currentName !== panelName;
+          });
         };
 
         Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
@@ -428,30 +469,15 @@
               const panelName = (
                 button.getAttribute("data-home-nav") || ""
               ).trim();
-              setPanel(panelName);
               if (panelName === "preview") {
                 return;
               }
-              const panel = homeRoot.querySelector(
-                `[data-home-panel="${panelName}"]`,
-              );
-              if (!panel) {
-                return;
-              }
-              const behavior = window.matchMedia(
-                "(prefers-reduced-motion: reduce)",
-              ).matches
-                ? "auto"
-                : "smooth";
-              panel.scrollIntoView({ behavior, block: "start" });
+              showPanel(panelName);
             });
           },
         );
 
-        const firstStatus = homeRoot.querySelector("[data-home-panel]");
-        if (firstStatus) {
-          setPanel(firstStatus.getAttribute("data-home-panel") || "");
-        }
+        showPanel(initialPanelName());
       })();
     </script>
   </div>

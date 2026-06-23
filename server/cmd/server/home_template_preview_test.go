@@ -109,8 +109,20 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	if !strings.Contains(compactBody, `aria-label="Stream status sections"`) {
 		t.Fatalf("expected stream status sidebar, got: %s", body)
 	}
-	if !strings.Contains(body, `scrollIntoView({ behavior, block: "start" })`) {
-		t.Fatalf("expected nav click to scroll to panel, got: %s", body)
+	for _, marker := range []string{
+		`id="stream-section-available" data-home-panel="available"`,
+		`id="stream-section-active" data-home-panel="active" hidden`,
+		`id="stream-section-done" data-home-panel="done" hidden`,
+		`id="stream-section-terminated" data-home-panel="terminated" hidden`,
+		`panels.forEach((panel)`,
+		`panel.hidden = currentName !== panelName`,
+	} {
+		if !strings.Contains(compactBody, marker) {
+			t.Fatalf("expected single visible stream status marker %q, got: %s", marker, body)
+		}
+	}
+	if strings.Contains(body, `scrollIntoView`) {
+		t.Fatalf("did not expect stream status nav to scroll between panels, got: %s", body)
 	}
 
 	if strings.Contains(body, `/process//substep/1.1/complete`) {
@@ -145,10 +157,10 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, marker := range []string{
-		`No Available instances`,
-		`No Active instances`,
-		`No Done instances`,
-		`No Terminated instances`,
+		`No available instances`,
+		`No active instances`,
+		`No completed instances`,
+		`No terminated instances`,
 	} {
 		if !strings.Contains(compactBody, marker) {
 			t.Fatalf("expected empty status marker %q, got: %s", marker, body)
@@ -210,7 +222,7 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	body := out.String()
 	compactBody := strings.Join(strings.Fields(body), " ")
 
-	if !strings.Contains(compactBody, `aria-label="Active stream instances pagination"`) {
+	if !strings.Contains(compactBody, `Active stream instances pagination`) {
 		t.Fatalf("expected active stream instances pagination nav, got: %s", body)
 	}
 	if !strings.Contains(compactBody, `/w/workflow/?active_page=3&amp;active_sort=status#stream-section-active`) {

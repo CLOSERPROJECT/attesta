@@ -1792,6 +1792,10 @@ button.secondary-small {
   gap: 12px;
 }
 
+.stream-status-section[hidden] {
+  display: none;
+}
+
 .stream-status-section-head {
   display: flex;
   align-items: center;
