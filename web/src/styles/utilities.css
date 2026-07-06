@@ -22,6 +22,16 @@
   margin-bottom: 16px;
 }
 
+/* Replaces repeated manage-dialog danger-zone paragraph spacing (margin: 0 0 20px). */
+.u-mb-20 {
+  margin-bottom: 20px;
+}
+
+/* Replaces inline margin-left: 4px on compact CTA labels. */
+.u-ml-4 {
+  margin-left: 4px;
+}
+
 .u-pre-line {
   white-space: pre-line;
 }
@@ -60,4 +70,16 @@
 
 .u-divider-flush {
   margin: 0;
+}
+
+/* Replaces 20px-margin hr dividers in platform-admin invite dialogs. */
+.u-divider-20 {
+  margin: 20px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* Replaces hardcoded signup error color with token-based danger text. */
+.text-danger {
+  color: var(--danger);
 }

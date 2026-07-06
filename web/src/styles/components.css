@@ -1066,6 +1066,16 @@ button.secondary-small {
   color: var(--muted);
 }
 
+.workflow-card-footer {
+  margin: auto 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
 .workflow-card-cta {
   display: inline-flex;
   align-items: center;
@@ -1866,6 +1876,15 @@ hr {
   border: 0;
   border-top: 1px solid var(--border);
   width: 100%;
+}
+
+.pagination-btn {
+  padding: 10px 8px;
+}
+
+.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 .active-role-options {
   display: grid;

@@ -195,7 +195,7 @@
               >
                 <div
                   class="stream-status-section-head"
-                  style="background: color-mix(in srgb, var(--stream-{{ .Status }}) 50%, transparent); border-color: var(--stream-{{ .Status }});"
+                  style="--stream-color: var(--stream-{{ .Status }});"
                 >
                   <h3>
                     {{ if eq .Status "available" }}
@@ -354,8 +354,7 @@
                 {{ end }}
                 {{ if gt .TotalPages 1 }}
                   <nav
-                    class="platform-admin-pagination"
-                    style="margin: 0;"
+                    class="platform-admin-pagination platform-admin-pagination--inline"
                     aria-label="{{ if eq .Status "available" }}
                       Available
                     {{ else if eq .Status "active" }}
@@ -370,10 +369,7 @@
                   >
                     <div class="platform-admin-pagination-pages">
                       <a
-                        class="secondary"
-                        style="padding: 10px 8px; {{ if not .HasPreviousPage }}
-                          pointer-events: none; opacity: 0.5;
-                        {{ end }}"
+                        class="secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
                         href="{{ .PreviousURL }}"
                       >
                         {{ template "icon-chevron-left" . }}
@@ -390,10 +386,7 @@
                         >
                       {{ end }}
                       <a
-                        class="secondary"
-                        style="padding: 10px 8px; {{ if not .HasNextPage }}
-                          pointer-events: none; opacity: 0.5;
-                        {{ end }}"
+                        class="secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
                         href="{{ .NextURL }}"
                       >
                         {{ template "icon-chevron-right" . }}

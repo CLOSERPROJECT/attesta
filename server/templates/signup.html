@@ -6,7 +6,7 @@
         <p>Create an account to continue.</p>
       </div>
       {{ if .Error }}
-        <p class="muted" style="color: #a91919;">{{ .Error }}</p>
+        <p class="text-danger">{{ .Error }}</p>
       {{ end }}
       <form method="post" action="/signup" class="input-form">
         <label for="signup-email">Email</label>
