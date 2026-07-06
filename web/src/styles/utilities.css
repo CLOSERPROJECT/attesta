@@ -9,3 +9,51 @@
 .max-w-7xl {
   max-width: 80rem;
 }
+
+.u-m-0 {
+  margin: 0;
+}
+
+.u-mb-8 {
+  margin-bottom: 8px;
+}
+
+.u-mb-16 {
+  margin-bottom: 16px;
+}
+
+.u-pre-line {
+  white-space: pre-line;
+}
+
+.u-text-sm {
+  font-size: 12px;
+}
+
+.u-text-label {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.u-flex {
+  display: flex;
+}
+
+.u-flex-center {
+  display: flex;
+  align-items: center;
+}
+
+.u-gap-8 {
+  gap: 8px;
+}
+
+.u-gap-16 {
+  gap: 16px;
+}
+
+.u-divider {
+  margin: 24px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}

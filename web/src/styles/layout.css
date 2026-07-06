@@ -9,6 +9,19 @@
   .brand {
     color: var(--brand-pa);
   }
+  .topbar-pa-label {
+    color: var(--ink-pa);
+  }
+  .nav .nav-action {
+    color: var(--ink-pa);
+    border-color: var(--ink-pa);
+  }
+}
+
+.topbar-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .topbar-content {
@@ -220,6 +233,20 @@
 }
 .site-footer {
   margin-top: auto;
+  padding: 18px 32px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--chrome-bg);
+}
+
+.site-footer p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.site-footer p:last-child {
+  margin-bottom: 0;
 }
 .hero {
   width: 100%;
