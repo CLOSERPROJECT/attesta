@@ -6,12 +6,15 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 templates="${root}/server/templates"
 
-if ! command -v rg >/dev/null 2>&1; then
-  echo "check-template-inline-styles: ripgrep (rg) is required" >&2
-  exit 1
-fi
-
 allowed_pattern='--pill-bg:|--dept-color:|--dept-border:|--stream-color:|width:[[:space:]]*\{\{'
+
+scan_styles() {
+  if command -v rg >/dev/null 2>&1; then
+    rg -n 'style=' "${templates}" || true
+  else
+    grep -rn 'style=' "${templates}" 2>/dev/null || true
+  fi
+}
 
 violations=0
 
@@ -29,7 +32,7 @@ while IFS= read -r match; do
   echo "${file}:${line_no}: disallowed inline style" >&2
   echo "  ${content}" >&2
   violations=$((violations + 1))
-done < <(rg -n 'style=' "${templates}" || true)
+done < <(scan_styles)
 
 if [ "$violations" -gt 0 ]; then
   echo "" >&2
