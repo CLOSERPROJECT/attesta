@@ -276,7 +276,7 @@
               class="substep{{ if not $.HideStatus }}
                 substep-{{ .Status }}
               {{ end }}"
-              style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"
+              data-role-palette="{{ .Palette }}"
             >
               <details
                 class="substep-accordion js-process-substep-panel"

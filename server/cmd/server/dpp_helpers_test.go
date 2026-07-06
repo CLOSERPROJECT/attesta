@@ -215,7 +215,7 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, organizationNameMap(testRuntimeConfig()))
+	view := buildDPPTraceabilityView(def, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, organizationNameMap(testRuntimeConfig()))
 	if len(view) == 0 {
 		t.Fatal("expected non-empty traceability view")
 	}
@@ -283,7 +283,7 @@ func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, map[string]string{"org-a": "Acme Org"})
+	view := buildDPPTraceabilityView(def, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, map[string]string{"org-a": "Acme Org"})
 	if len(view) != 1 {
 		t.Fatalf("expected one traceability step, got %#v", view)
 	}
@@ -342,9 +342,9 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{
-		"qa": {ID: "qa", Label: "Quality", Color: "#111111", Border: "#222222"},
-	}, nil)
+	view := buildDPPTraceabilityView(def, process, "workflow", testRoleIndexForOrg("", map[string]RoleMeta{
+		"qa": {ID: "qa", Label: "Quality", Palette: "blue"},
+	}), nil, nil)
 	if len(view) != 1 || len(view[0].Substeps) != 1 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
@@ -352,8 +352,8 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 	if substep.Role != "Quality" {
 		t.Fatalf("role label = %q, want Quality", substep.Role)
 	}
-	if substep.RoleColor == "" || substep.RoleBorder == "" {
-		t.Fatalf("expected role color and border, got color=%q border=%q", substep.RoleColor, substep.RoleBorder)
+	if substep.Palette != "blue" {
+		t.Fatalf("expected role palette blue, got %q", substep.Palette)
 	}
 	if len(substep.Values) != 2 {
 		t.Fatalf("expected flattened formata values, got %#v", substep.Values)
@@ -406,7 +406,7 @@ func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, nil)
+	view := buildDPPTraceabilityView(def, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
 	if len(view) != 1 || len(view[0].Substeps) != 1 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
@@ -547,12 +547,12 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 			},
 		},
 	}
-	roleMeta := map[string]RoleMeta{
-		"qa":      {ID: "qa", Label: "", Color: "#111111", Border: "#222222"},
-		"manager": {ID: "manager", Label: "Manager", Color: "#333333", Border: "#444444"},
-	}
+	roleMeta := testRoleIndexForOrg("", map[string]RoleMeta{
+		"qa":      {ID: "qa", Label: "", Palette: "cyan"},
+		"manager": {ID: "manager", Label: "Manager", Palette: "purple"},
+	})
 
-	view := buildDPPTraceabilityView(def, process, "workflow", roleMeta, nil)
+	view := buildDPPTraceabilityView(def, process, "workflow", roleMeta, nil, nil)
 	if len(view) != 1 || len(view[0].Substeps) != 3 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
@@ -563,8 +563,8 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 	if len(doneSub.RoleBadges) != 1 || doneSub.RoleBadges[0].Label != "Manager" {
 		t.Fatalf("expected selected done role badge, got %#v", doneSub.RoleBadges)
 	}
-	if doneSub.RoleColor == "" || doneSub.RoleBorder == "" {
-		t.Fatalf("expected selected role style values, got color=%q border=%q", doneSub.RoleColor, doneSub.RoleBorder)
+	if doneSub.Palette != "purple" {
+		t.Fatalf("expected selected role palette purple, got %q", doneSub.Palette)
 	}
 	if doneSub.Status != "done" {
 		t.Fatalf("done substep status = %q, want done", doneSub.Status)
@@ -600,7 +600,7 @@ func TestBuildDPPTraceabilityViewTerminatedStreamMessages(t *testing.T) {
 		},
 	}
 
-	view := buildDPPTraceabilityView(def, process, "workflow", map[string]RoleMeta{}, nil)
+	view := buildDPPTraceabilityView(def, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
 	if len(view) == 0 || len(view[0].Substeps) < 3 {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}

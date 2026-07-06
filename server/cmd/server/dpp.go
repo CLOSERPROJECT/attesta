@@ -203,11 +203,12 @@ func gs1ElementString(gtin, lot, serial string) string {
 	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
 }
 
-func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleMeta map[string]RoleMeta, orgNames map[string]string) []DPPTraceabilityStep {
+func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []DPPTraceabilityStep {
 	steps := make([]DPPTraceabilityStep, 0, len(def.Steps))
 	if process == nil {
 		return steps
 	}
+	substepOrgs := substepOrganizationMap(def)
 	availableMap := computeAvailability(def, process)
 	terminated := process.Termination != nil
 	terminationSubstepID := ""
@@ -232,19 +233,18 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 			if primaryRole == "" && len(allowedRoles) > 0 {
 				primaryRole = strings.TrimSpace(allowedRoles[0])
 			}
-			meta := roleMetaFor(primaryRole, roleMeta)
+			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], primaryRole, roleIndex, cfgRoles)
 			roleLabel := strings.TrimSpace(meta.Label)
 			if roleLabel == "" {
 				roleLabel = primaryRole
 			}
 			roleBadges := make([]DPPTraceabilityRoleBadge, 0, len(allowedRoles))
 			for _, role := range allowedRoles {
-				roleStyle := roleMetaFor(role, roleMeta)
+				roleStyle := roleMetaForOrg(substepOrgs[sub.SubstepID], role, roleIndex, cfgRoles)
 				roleBadges = append(roleBadges, DPPTraceabilityRoleBadge{
-					ID:     role,
-					Label:  roleStyle.Label,
-					Color:  cssValue(roleStyle.Color, "var(--role-fallback)"),
-					Border: cssValue(roleStyle.Border, "var(--border)"),
+					ID:      role,
+					Label:   roleStyle.Label,
+					Palette: roleStyle.Palette,
 				})
 			}
 			subView := DPPTraceabilitySubstep{
@@ -252,8 +252,7 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				Title:      sub.Title,
 				Role:       roleLabel,
 				RoleBadges: roleBadges,
-				RoleColor:  cssValue(meta.Color, "var(--role-fallback)"),
-				RoleBorder: cssValue(meta.Border, "var(--border)"),
+				Palette:    meta.Palette,
 				Status:     "locked",
 			}
 			progress, done := process.Progress[sub.SubstepID]
@@ -277,18 +276,16 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 					subView.DoneBy = progress.DoneBy.ID
 					doneRole := strings.TrimSpace(progress.DoneBy.Role)
 					if doneRole != "" {
-						selectedMeta := roleMetaFor(doneRole, roleMeta)
+						selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], doneRole, roleIndex, cfgRoles)
 						subView.Role = selectedMeta.Label
 						subView.RoleBadges = []DPPTraceabilityRoleBadge{
 							{
-								ID:     doneRole,
-								Label:  selectedMeta.Label,
-								Color:  cssValue(selectedMeta.Color, "var(--role-fallback)"),
-								Border: cssValue(selectedMeta.Border, "var(--border)"),
+								ID:      doneRole,
+								Label:   selectedMeta.Label,
+								Palette: selectedMeta.Palette,
 							},
 						}
-						subView.RoleColor = cssValue(selectedMeta.Color, "var(--role-fallback)")
-						subView.RoleBorder = cssValue(selectedMeta.Border, "var(--border)")
+						subView.Palette = selectedMeta.Palette
 					}
 				}
 				subView.Digest = digestPayload(progress.Data)

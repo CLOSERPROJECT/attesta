@@ -61,10 +61,11 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 | Pattern | Example | Consumer |
 |---------|---------|----------|
-| Role pill colors | `style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"` | `.role-pill`, `.pill` |
-| Department colors | `style="--dept-color: {{ .RoleColor }}; --dept-border: {{ .RoleBorder }}"` | `.substep` timeline |
+| Role pill colors (org-admin only) | `style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"` | `.role-pill`, `.pill` in org-admin |
 | Stream status | `style="--stream-color: var(--stream-{{ .Status }});"` | `.stream-status-section-head` |
 | Progress width | `style="width: {{ .Percent }}%;"` | Progress bar fill |
+
+Workflow surfaces (`process`, `action_list`, `dpp`) use `data-role-palette="{{ .Palette }}"` on `.role-pill` and `.substep`; see [ADR-0002](adr/0002-role-color-appwrite-source.md). Palette keys map to `--role-*-bg` / `--role-*-border` in `components.css`.
 
 Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 

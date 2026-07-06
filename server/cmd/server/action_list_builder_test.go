@@ -17,7 +17,7 @@ func TestBuildActionListDoneScalarValues(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.1")
 	if action.Status != "done" {
 		t.Fatalf("expected status done, got %q", action.Status)
@@ -53,7 +53,7 @@ func TestBuildActionListDoneFileAttachments(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.3")
 	if action.Status != "done" {
 		t.Fatalf("expected status done, got %q", action.Status)
@@ -96,7 +96,7 @@ func TestBuildActionListTerminatedStreamDetails(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, map[string]RoleMeta{})
+	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	terminated := findAction(t, actions, "1.2")
 	if terminated.Status != processStatusTerminated {
 		t.Fatalf("terminated status = %q, want %s", terminated.Status, processStatusTerminated)
@@ -121,7 +121,7 @@ func TestBuildActionListTerminatedStreamWithoutReason(t *testing.T) {
 		Termination: &ProcessTermination{SubstepID: "1.1"},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[string]RoleMeta{})
+	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.1")
 	if action.DetailMessage != "No reason provided." {
 		t.Fatalf("detail = %q, want no reason message", action.DetailMessage)
@@ -174,7 +174,7 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.1")
 	if action.DoneAt != "19 Feb 2026 at 09:00 UTC" {
 		t.Fatalf("expected doneAt %q, got %q", "19 Feb 2026 at 09:00 UTC", action.DoneAt)
@@ -249,7 +249,7 @@ func TestBuildActionListDoneFormataPrimitiveAMultiFileAttachments(t *testing.T) 
 		},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.1")
 	if len(action.Values) != 0 {
 		t.Fatalf("expected no scalar values for multi-file formata payload, got %#v", action.Values)
@@ -299,7 +299,7 @@ func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 		Progress: map[string]ProcessStep{},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[string]RoleMeta{})
+	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.2")
 
 	if action.Status != "locked" {
@@ -341,7 +341,7 @@ func TestBuildActionListDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
 		OrgSlug:   "org-b",
 		Role:      "dep1",
 		RoleSlugs: []string{"dep1"},
-	}, true, map[string]RoleMeta{})
+	}, true, map[roleMetaKey]RoleMeta{}, nil)
 	action := findAction(t, actions, "1.1")
 
 	if action.Status != "available" {
@@ -377,12 +377,12 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 		ID:       primitive.NewObjectID(),
 		Progress: map[string]ProcessStep{},
 	}
-	roleMeta := map[string]RoleMeta{
-		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
-		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
-	}
+	roleMeta := testRoleIndexForOrg("", map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Palette: "red"},
+		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
+	})
 
-	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta)
+	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
 	action := findAction(t, actions, "1.1")
 	if len(action.RoleBadges) != 2 {
 		t.Fatalf("role badge count = %d, want 2", len(action.RoleBadges))
@@ -393,8 +393,8 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 	if action.RoleBadges[0].ID != "dep1" || action.RoleBadges[1].ID != "dep2" {
 		t.Fatalf("unexpected badge ids: %#v", action.RoleBadges)
 	}
-	if string(action.RoleBadges[0].Color) != "#aaaaaa" || string(action.RoleBadges[1].Color) != "#bbbbbb" {
-		t.Fatalf("unexpected badge colors: %#v", action.RoleBadges)
+	if action.RoleBadges[0].Palette != "red" || action.RoleBadges[1].Palette != "orange" {
+		t.Fatalf("unexpected badge palettes: %#v", action.RoleBadges)
 	}
 }
 
@@ -428,12 +428,12 @@ func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 			},
 		},
 	}
-	roleMeta := map[string]RoleMeta{
-		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
-		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
-	}
+	roleMeta := testRoleIndexForOrg("", map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Palette: "red"},
+		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
+	})
 
-	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta)
+	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
 	action := findAction(t, actions, "1.1")
 	if action.Status != "done" {
 		t.Fatalf("status = %q, want done", action.Status)
