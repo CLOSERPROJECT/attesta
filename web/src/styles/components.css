@@ -21,6 +21,10 @@ svg.bi {
   height: 21px;
 }
 
+.icon-hidden {
+  display: none;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -644,6 +648,14 @@ button.secondary-small {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.substep-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.5em;
+  line-height: 1;
 }
 
 .substep-override-reason {

@@ -1,6 +1,6 @@
 # ADR-0001: CSS Architecture Refactor for the Main Attesta App
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-06
 - **Scope:** Main Attesta application only — `web/src/styles/`, `web/src/styles.css`, `web/src/main.js` (theme handling only), and `server/templates/*.html`
 - **Out of scope:** `formata-form` shadow-DOM overrides, `server/cmd/server/formata_builder.go`, and the entire `server/cmd/server/formata-arch/` sub-application
@@ -222,12 +222,12 @@ Each template PR should leave **zero static inline styles** except documented dy
 
 ## Success criteria
 
-- [ ] `base.css` removed; styles live in named layers.
-- [ ] Static inline `style=` count in `server/templates/` reduced from 77 to ≤ 16 (dynamic custom props only).
-- [ ] Zero hardcoded hex/rgb colors in template inline styles.
-- [ ] `docs/css.md` documents layer rules and utility vocabulary.
-- [ ] `npm run build` and existing Go template tests pass.
-- [ ] No changes to Formata / Formata Builder styling files.
+- [x] `base.css` removed; styles live in named layers.
+- [x] Static inline `style=` count in `server/templates/` reduced from 77 to ≤ 16 (dynamic custom props only).
+- [x] Zero hardcoded hex/rgb colors in template inline styles.
+- [x] `docs/css.md` documents layer rules and utility vocabulary.
+- [x] `npm run build` and existing Go template tests pass.
+- [x] No changes to Formata / Formata Builder styling files.
 
 ## References
 
