@@ -17,7 +17,7 @@
     {{ range .RoleBadges }}
       <span
         class="pill pill-sm role-pill"
-        style="--pill-bg: {{ .Color }}; --border: {{ .Border }};"
+        data-role-palette="{{ .Palette }}"
         >{{ .Label }}</span
       >
     {{ end }}

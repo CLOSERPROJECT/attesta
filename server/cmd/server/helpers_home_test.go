@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -99,26 +100,9 @@ func TestSortHomeProcessList(t *testing.T) {
 	}
 }
 
-func TestRoleMetaMap(t *testing.T) {
-	server := &Server{}
-	cfg := RuntimeConfig{
-		Departments: []Department{
-			{ID: "dep1", Name: "Department 1", Color: "#aabbcc", Border: "#112233"},
-			{ID: "dep2"},
-		},
-		Users: []User{
-			{ID: "u1", DepartmentID: "dep1"},
-		},
-	}
-
-	meta := server.roleMetaMap(cfg)
-	if meta["dep1"].Label != "Department 1" || meta["dep1"].Color != "#aabbcc" || meta["dep1"].Border != "#112233" {
-		t.Fatalf("dep1 role meta mismatch: %#v", meta["dep1"])
-	}
-	if meta["dep2"].Label != "dep2" {
-		t.Fatalf("dep2 label = %q, want dep2", meta["dep2"].Label)
-	}
-	if meta["dep2"].Color != "#f0f3ea" || meta["dep2"].Border != "#d9e0d0" {
-		t.Fatalf("dep2 defaults mismatch: %#v", meta["dep2"])
+func TestRoleMetaIndexUnavailableUsesFallback(t *testing.T) {
+	got := roleMetaForOrg("org1", "dep1", (&Server{}).roleMetaIndex(context.Background()), nil)
+	if got.Palette != "fallback" {
+		t.Fatalf("palette = %q, want fallback", got.Palette)
 	}
 }

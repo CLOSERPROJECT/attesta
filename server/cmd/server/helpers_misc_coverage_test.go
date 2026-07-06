@@ -78,7 +78,7 @@ func TestHelperCoverageBranches(t *testing.T) {
 		if got := formataAttachmentFilename("", nil, "image/png"); got != "attachment.png" {
 			t.Fatalf("formataAttachmentFilename blank = %q", got)
 		}
-		if got := formataAttachmentFilename("1.2", []string{"nested", "field"}, "text/plain"); got != "1_2-nested_field.asc" {
+		if got := formataAttachmentFilename("1.2", []string{"nested", "field"}, "application/pdf"); got != "1_2-nested_field.pdf" {
 			t.Fatalf("formataAttachmentFilename nested = %q", got)
 		}
 		if got := formataAttachmentFilename("1.1", []string{"payload", "key", "Load 3 files[]", "0"}, "image/png"); got != "1_1-payload_key_Load 3 files_0.png" {

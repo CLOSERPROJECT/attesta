@@ -19,7 +19,7 @@ func TestBuildTimelineFormataDisplay(t *testing.T) {
 		},
 	}
 
-	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{}, nil)
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) < 2 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -48,7 +48,7 @@ func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 		},
 	}
 
-	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{}, nil)
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -71,7 +71,7 @@ func TestBuildTimelineTerminatedStreamStatuses(t *testing.T) {
 		Termination: &ProcessTermination{SubstepID: "1.2"},
 	}
 
-	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[string]RoleMeta{}, nil)
+	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) < 3 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -107,18 +107,18 @@ func TestBuildTimelineUsesRoleStyleForAvailableSubsteps(t *testing.T) {
 		ID:       primitive.NewObjectID(),
 		Progress: map[string]ProcessStep{},
 	}
-	roleMeta := map[string]RoleMeta{
-		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
-		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
-	}
+	roleMeta := testRoleIndexForOrg("", map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Palette: "red"},
+		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
+	})
 
-	timeline := buildTimeline(def, process, "workflow", roleMeta, nil)
+	timeline := buildTimeline(def, process, "workflow", roleMeta, nil, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
 	entry := timeline[0].Substeps[0]
-	if string(entry.RoleColor) != "#aaaaaa" || string(entry.RoleBorder) != "#111111" {
-		t.Fatalf("unexpected role style values: color=%q border=%q", entry.RoleColor, entry.RoleBorder)
+	if entry.Palette != "red" {
+		t.Fatalf("unexpected role palette: %q", entry.Palette)
 	}
 }
 
@@ -154,12 +154,12 @@ func TestBuildTimelineDoneSubstepUsesSelectedRoleStyle(t *testing.T) {
 			},
 		},
 	}
-	roleMeta := map[string]RoleMeta{
-		"dep1": {ID: "dep1", Label: "Department 1", Color: "#aaaaaa", Border: "#111111"},
-		"dep2": {ID: "dep2", Label: "Department 2", Color: "#bbbbbb", Border: "#222222"},
-	}
+	roleMeta := testRoleIndexForOrg("", map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Palette: "red"},
+		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
+	})
 
-	timeline := buildTimeline(def, process, "workflow", roleMeta, nil)
+	timeline := buildTimeline(def, process, "workflow", roleMeta, nil, nil)
 	if len(timeline) == 0 || len(timeline[0].Substeps) == 0 {
 		t.Fatalf("unexpected timeline shape: %#v", timeline)
 	}
@@ -167,8 +167,8 @@ func TestBuildTimelineDoneSubstepUsesSelectedRoleStyle(t *testing.T) {
 	if entry.Status != "done" {
 		t.Fatalf("status = %q, want done", entry.Status)
 	}
-	if string(entry.RoleColor) != "#bbbbbb" || string(entry.RoleBorder) != "#222222" {
-		t.Fatalf("unexpected role style values: color=%q border=%q", entry.RoleColor, entry.RoleBorder)
+	if entry.Palette != "orange" {
+		t.Fatalf("unexpected role palette: %q", entry.Palette)
 	}
 }
 
@@ -191,7 +191,7 @@ func TestBuildTimelineUsesOrganizationNameInStep(t *testing.T) {
 		Progress: map[string]ProcessStep{"1.1": {State: "pending"}},
 	}
 
-	timeline := buildTimeline(def, process, "workflow", map[string]RoleMeta{}, map[string]string{"org-acme": "Acme Org"})
+	timeline := buildTimeline(def, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, map[string]string{"org-acme": "Acme Org"})
 	if len(timeline) != 1 {
 		t.Fatalf("timeline len = %d, want 1", len(timeline))
 	}

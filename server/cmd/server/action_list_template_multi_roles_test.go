@@ -20,8 +20,8 @@ func TestActionListTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) 
 		InputType:   "formata",
 		Status:      "available",
 		RoleBadges: []ActionRoleBadge{
-			{ID: "dep1", Label: "Department 1", Color: template.CSS("#aaaaaa"), Border: template.CSS("#111111")},
-			{ID: "dep2", Label: "Department 2", Color: template.CSS("#bbbbbb"), Border: template.CSS("#222222")},
+			{ID: "dep1", Label: "Department 1", Palette: "red"},
+			{ID: "dep2", Label: "Department 2", Palette: "orange"},
 		},
 		MatchingRoles: []ActionRoleOption{
 			{Slug: "dep1", Label: "Department 1"},
@@ -55,5 +55,11 @@ func TestActionListTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) 
 	}
 	if !strings.Contains(body, `>Department 1</span>`) || !strings.Contains(body, `>Department 2</span>`) {
 		t.Fatalf("expected dialog labels to use role names, got body: %s", body)
+	}
+	if !strings.Contains(body, `data-role-palette="red"`) || !strings.Contains(body, `data-role-palette="orange"`) {
+		t.Fatalf("expected role palette attributes on badges, got body: %s", body)
+	}
+	if strings.Contains(body, `style="--pill-bg:`) {
+		t.Fatalf("expected no inline role pill styles, got body: %s", body)
 	}
 }
