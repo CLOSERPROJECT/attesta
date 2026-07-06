@@ -3,7 +3,7 @@ workflow:
   steps:
     - id: "1"
       title: Shipment intake
-      organization: "org1"
+      organization: organization-1
       order: 0
       substeps:
         - id: "1.1"
@@ -11,7 +11,7 @@ workflow:
           title: Record shipment weight (kg)
           inputKey: shipmentKg
           roles:
-            - "dep1"
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -27,7 +27,7 @@ workflow:
           title: Attach shipment reference
           inputKey: shipmentRef
           roles:
-            - "dep1"
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -41,14 +41,14 @@ workflow:
     - id: "2"
       title: Inspection
       order: 1
-      organization: "org1"
+      organization: organization-1
       substeps:
         - id: "2.1"
           order: 1
           title: Upload inspection report
           inputKey: report
           roles:
-            - "dep2"
+            - mechanic
           inputType: formata
           schema:
             type: object
@@ -66,7 +66,7 @@ workflow:
           title: Record inspection outcome
           order: 2
           roles:
-            - "dep2"
+            - mechanic
           inputKey: inspectionOutcome
           inputType: formata
           schema:
@@ -95,14 +95,14 @@ workflow:
     - id: "3"
       title: Approval
       order: 3
-      organization: "org1"
+      organization: organization-1
       substeps:
         - id: "3.1"
           order: 1
           title: Approve shipment
           inputKey: approval
           roles:
-            - "dep3"
+            - supervisor
           inputType: formata
           schema:
             type: object
@@ -114,51 +114,49 @@ workflow:
                 type: string
                 title: Approval
 organizations:
-  - slug: "org1"
-    name: "Organization 1"
-    color: "#d7e9f2"
-    border: "#6e99b2"
+  - slug: organization-1
+    name: Organization 1
 
 roles:
-  - orgSlug: "org1"
-    slug: "dep1"
-    name: "Company 1"
-    color: "#d7e9f2"
-    border: "#6e99b2"
-  - orgSlug: "org1"
-    slug: "dep2"
-    name: "Department 2"
-    color: "#e0f1d9"
-    border: "#7da36c"
-  - orgSlug: "org1"
-    slug: "dep3"
-    name: "Department 3"
-    color: "#f5e3c9"
-    border: "#c2945a"
+  - orgSlug: organization-1
+    slug: chemist
+    name: Chemist
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - orgSlug: organization-1
+    slug: mechanic
+    name: Mechanic
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - orgSlug: organization-1
+    slug: supervisor
+    name: Supervisor
+    color: var(--role-cyan-bg)
+    border: var(--role-cyan-border)
 
 departments:
-  - id: dep1
-    name: Company 1
-    color: "#d7e9f2"
-    border: "#6e99b2"
-  - id: dep2
-    name: Department 2
-    color: "#e0f1d9"
-    border: "#7da36c"
-  - id: dep3
-    name: Department 3
-    color: "#f5e3c9"
-    border: "#c2945a"
+  - id: chemist
+    name: Chemist
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - id: mechanic
+    name: Mechanic
+    color: var(--role-blue-bg)
+    border: var(--role-blue-border)
+  - id: supervisor
+    name: Supervisor
+    color: var(--role-cyan-bg)
+    border: var(--role-cyan-border)
 users:
   - id: u4
     name: User 4
-    departmentId: dep1
+    departmentId: chemist
   - id: u5
     name: User 5
-    departmentId: dep2
+    departmentId: mechanic
   - id: u6
     name: User 6
-    departmentId: dep3
+    departmentId: supervisor
 dpp:
   enabled: true
   gtin: "09506000134352"

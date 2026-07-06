@@ -5,12 +5,12 @@ workflow:
     - id: "1"
       title: Collection and dismantling of indium waste
       order: 1
-      organization: closing-the-loop
+      organization: organization-1
       substeps:
         - id: "1.1"
           order: 1
           roles:
-            - operator
+            - chemist
           title: Waste information record
           inputKey: Waste document that provides information on the waste (e.g. batch IDs,
             device type/model, quantities, weight, time of collection, waste
@@ -69,7 +69,7 @@ workflow:
             indiumcontaining waste. (Basel - hazardous or Annex VII -
             nonhazardous)
           roles:
-            - operator
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -104,7 +104,7 @@ workflow:
           title: Dismantling log
           inputKey: Record of dismantling steps and material categorization
           roles:
-            - operator
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -135,7 +135,7 @@ workflow:
           title: Indium-containing fraction weights
           inputKey: Measured weight of LCD glass from dismantled waste.
           roles:
-            - operator
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -159,7 +159,7 @@ workflow:
           inputKey: Consolidated batch-level details of waste sent downstream, along with
             all legally required waste transport documents.
           roles:
-            - operator
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -180,7 +180,7 @@ workflow:
     - id: "2"
       title: Quantification of indium content in waste sample
       order: 2
-      organization: due2lab
+      organization: organization-2
       substeps:
         - id: "2.1"
           order: 1
@@ -209,14 +209,14 @@ workflow:
     - id: "3"
       title: Indium recovery and refinement
       order: 3
-      organization: critical
+      organization: organization-3
       substeps:
         - id: "3.1"
           order: 1
           title: Indium recovery results report
           inputKey: Consolidated analysis report on indium recovery outcomes.
           roles:
-            - projectmanager
+            - qainspector
           inputType: formata
           schema:
             type: object
@@ -244,7 +244,7 @@ workflow:
             success or failure of each step, potential advantages and
             disadvantages, images, etc.
           roles:
-            - projectmanager
+            - qainspector
           inputType: formata
           schema:
             type: object
@@ -269,15 +269,15 @@ workflow:
     - id: "4"
       title: TMIn production
       order: 4
-      organization: dockweiler
+      organization: organization-1
       substeps:
         - id: "4.1"
           order: 1
           title: Transfilling document
           inputKey: Document outlining canister preparation and usage
           roles:
-            - headofrd
-            - tbsoperator
+            - mechanic
+            - supervisor
           inputType: formata
           schema:
             type: object
@@ -301,7 +301,7 @@ workflow:
           inputKey: Information on safe handling, hazards, and regulatory compliance of
             TMIn
           roles:
-            - headofshipping
+            - chemist
           inputType: formata
           schema:
             type: object
@@ -326,7 +326,7 @@ workflow:
             compliance. It may also contain other relevant info such as batch
             ID, safety info, etc
           roles:
-            - headofquality
+            - supervisor
           inputType: formata
           schema:
             type: object
@@ -347,7 +347,7 @@ workflow:
     - id: "5"
       title: Advanced In precursor production
       order: 5
-      organization: ifw
+      organization: organization-2
       substeps:
         - id: "5.1"
           order: 1
@@ -355,7 +355,7 @@ workflow:
           inputKey: Detailed record of synthesis conditions, including solvents,
             temperatures, parameters and ligand information
           roles:
-            - analyticalchemist
+            - analyst
           inputType: formata
           schema:
             type: object
@@ -379,7 +379,7 @@ workflow:
           inputKey: Results of precursor initial screening and testing (e.g. thin-film
             processing and characterization)
           roles:
-            - chemicalprocesstechnologist
+            - analyst
           inputType: formata
           schema:
             type: object
@@ -403,7 +403,7 @@ workflow:
           inputKey: Document that summarizes the properties and specifications of the
             synthesized compound
           roles:
-            - projectmanager
+            - analyst
           inputType: formata
           schema:
             type: object
@@ -424,73 +424,42 @@ workflow:
     - id: "6"
       title: Secondary indium deposition for wafer and electronic device fabrication
       order: 6
-      organization: atlant-3d
+      organization: organization-3
       substeps: []
 
 organizations:
-  - slug: critical
-    name: CRITICAL
-  - slug: dockweiler
-    name: Dockweiler
-  - slug: ifw
-    name: IFW
-  - slug: atlant-3d
-    name: Atlant-3D
-  - slug: due2lab
-    name: Due2Lab
-  - slug: closing-the-loop
-    name: Closing the loop
+  - slug: organization-1
+    name: Organization 1
+  - slug: organization-2
+    name: Organization 2
+  - slug: organization-3
+    name: Organization 3
 roles:
-  - name: Project manager
-    slug: projectmanager
-    orgSlug: critical
+  - orgSlug: organization-1
+    slug: chemist
+    name: Chemist
     color: var(--role-blue-bg)
     border: var(--role-blue-border)
-  - name: Head of shipping
-    slug: headofshipping
-    orgSlug: dockweiler
+  - orgSlug: organization-1
+    slug: mechanic
+    name: Mechanic
     color: var(--role-blue-bg)
     border: var(--role-blue-border)
-  - name: Head of R&D
-    slug: headofrd
-    orgSlug: dockweiler
-    color: var(--role-emerald-bg)
-    border: var(--role-emerald-border)
-  - name: T&BS operator
-    slug: tbsoperator
-    orgSlug: dockweiler
-    color: var(--role-lime-bg)
-    border: var(--role-lime-border)
-  - name: Head of Quality
-    slug: headofquality
-    orgSlug: dockweiler
-    color: var(--role-orange-bg)
-    border: var(--role-orange-border)
-  - name: Analytical chemist
-    slug: analyticalchemist
-    orgSlug: ifw
-    color: var(--role-teal-bg)
-    border: var(--role-teal-border)
-  - name: Chemical process technologist
-    slug: chemicalprocesstechnologist
-    orgSlug: ifw
-    color: var(--role-green-bg)
-    border: var(--role-green-border)
-  - name: Project manager
-    slug: projectmanager
-    orgSlug: ifw
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
-  - name: Analyst
+  - orgSlug: organization-1
+    slug: supervisor
+    name: Supervisor
+    color: var(--role-cyan-bg)
+    border: var(--role-cyan-border)
+  - orgSlug: organization-2
     slug: analyst
-    orgSlug: due2lab
+    name: Analyst
     color: var(--role-emerald-bg)
     border: var(--role-emerald-border)
-  - name: Operator
-    slug: operator
-    orgSlug: closing-the-loop
-    color: var(--role-amber-bg)
-    border: var(--role-amber-border)
+  - orgSlug: organization-3
+    slug: qainspector
+    name: QA Inspector
+    color: var(--role-pink-bg)
+    border: var(--role-pink-border)
 dpp:
   enabled: true
   gtin: "09506000134352"
