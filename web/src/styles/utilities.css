@@ -57,3 +57,7 @@
   border: none;
   border-top: 1px solid var(--border);
 }
+
+.u-divider-flush {
+  margin: 0;
+}

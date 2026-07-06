@@ -464,6 +464,44 @@ button.secondary-small {
   column-gap: 4px;
 }
 
+.role-pill-label {
+  margin-right: 4px;
+  font-size: 12px;
+}
+
+.pill-accent {
+  --pill-bg: var(--accent-2-opposite);
+  --border: var(--border);
+}
+
+.pill-panel {
+  --pill-bg: var(--panel);
+  --border: var(--ink);
+}
+
+.local-adaptation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+  font-size: 10px;
+  gap: 4px;
+}
+
+.action-reason {
+  margin: 12px 0 0;
+}
+
+.action-attachments {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.manage-dialog-actions-spaced {
+  margin-top: 12px;
+}
+
 
 .role-badge {
   font-size: 11px;
@@ -1048,6 +1086,17 @@ button.secondary-small {
 .panel-block {
   margin-top: 18px;
 }
+
+.panel-block-spaced {
+  margin-bottom: 12px;
+}
+
+.process-hero-titles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .process-list {
   list-style: none;
   padding: 0;
@@ -1334,12 +1383,19 @@ button.secondary-small {
   color: var(--muted);
 }
 
-.input-form input {
+.input-form input,
+.input-form textarea {
   padding: 8px 10px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--ink);
+}
+
+.input-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
 }
 
 .form-actions {

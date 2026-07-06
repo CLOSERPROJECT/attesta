@@ -26,9 +26,7 @@
         Back
       </button>
       <div class="hero-body">
-        <div
-          style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"
-        >
+        <div class="process-hero-titles">
           <h1>{{ .WorkflowName }}</h1>
           {{ if .InstanceName }}
             <h1>-</h1>
@@ -43,7 +41,7 @@
     {{ if .ActionList.ProcessDone }}
       <div class="process-resources-grid">
         {{ template "workflow_timeline" .ActionList }}
-        <div class="stack tablet-seprator" style="gap: 16px;">
+        <div class="stack tablet-seprator u-gap-16">
           {{ template "process_termination_details" .ActionList }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}
@@ -111,12 +109,7 @@
                   if you want to continue. Optionally you can enter a
                   reason:</span
                 >
-                <textarea
-                  name="reason"
-                  rows="5"
-                  maxlength="1000"
-                  style="width: 100%; box-sizing: border-box; resize: vertical;"
-                ></textarea>
+                <textarea name="reason" rows="5" maxlength="1000"></textarea>
               </label>
               <div class="manage-dialog-actions manage-dialog-actions-end">
                 <button type="submit" class="danger">
@@ -153,8 +146,8 @@
       >
     </div>
     {{ if .Attachments }}
-      <div class="panel-block" style="margin-bottom: 12px;">
-        <p class="muted" style="margin: 0 0 8px;">Attachments</p>
+      <div class="panel-block panel-block-spaced">
+        <p class="muted u-m-0 u-mb-8">Attachments</p>
         <ul class="process-attachments-list">
           {{ range .Attachments }}
             <li>
@@ -185,7 +178,7 @@
           View DPP data
         </button>
       </div>
-      <div class="stack" style="gap: 8px;">
+      <div class="stack u-gap-8">
         <div>
           <strong>GS1 Digital Link:</strong>
           <a href="{{ .DPPURL }}"><code>{{ .DPPURL }}</code></a>
@@ -250,11 +243,7 @@
       >
         <summary class="timeline-step-summary" aria-label="Open stream step">
           <div class="timeline-step-summary-main">
-            <span
-              class="pill pill-step-number"
-              style="--pill-bg: var(--panel); --border: var(--ink); "
-              >{{ .StepID }}</span
-            >
+            <span class="pill pill-step-number pill-panel">{{ .StepID }}</span>
             {{ if .OrgLogoURL }}
               <img
                 src="{{ .OrgLogoURL }}"
@@ -296,11 +285,7 @@
               >
                 <summary class="substep-accordion-summary">
                   <div class="substep-summary-main">
-                    <span
-                      class="pill"
-                      style="--pill-bg: var(--panel); --border: var(--ink);"
-                      >{{ .SubstepID }}</span
-                    >
+                    <span class="pill pill-panel">{{ .SubstepID }}</span>
                     <div class="substep-title">
                       <span class="timeline-step-title">{{ .Title }}</span>
                       {{ if eq .Status "done" }}

@@ -2,12 +2,12 @@
 
 {{ define "action_detail_content.html" }}
   {{ if .InputKey }}
-    <p class="muted" style="white-space: pre-line; margin: 0; font-size: 12px;">
+    <p class="muted u-m-0 u-pre-line u-text-sm">
       {{- .InputKey -}}
     </p>
   {{ end }}
-  <div class="role-pill-row" style="margin: 0;">
-    <span style="margin-right: 4px; font-size: 12px;">
+  <div class="role-pill-row u-m-0">
+    <span class="role-pill-label">
       {{- if eq .Status "done" -}}
         Completed by role:
       {{- else -}}
@@ -22,10 +22,10 @@
       >
     {{ end }}
   </div>
-  <hr style="margin: 0" />
+  <hr class="u-divider-flush" />
   {{ if .DetailMessage }}
     <div class="action-submitted">
-      <p class="muted" style="white-space: pre-line; margin: 0;">
+      <p class="muted u-m-0 u-pre-line">
         {{- .DetailMessage -}}
       </p>
     </div>
@@ -34,7 +34,7 @@
     {{ if not $formataDisabled }}
       <div class="local-adaptation-tools">
         {{ if .HasOverride }}
-          <span class="muted" style="white-space: pre-line; margin: 0;">
+          <span class="muted u-m-0 u-pre-line">
             {{- printf "Local form adaptation saved. " -}}
             {{- if .OverrideReason -}}
               {{ printf "Reason: %s" .OverrideReason }}
@@ -42,9 +42,7 @@
           </span>
         {{ end }}
         {{ if .CanAdaptForm }}
-          <div
-            style="display: flex; align-items: center; justify-content: end; margin-left: auto; font-size: 10px; gap: 4px;"
-          >
+          <div class="local-adaptation-actions">
             {{ if not .HasOverride }}
               <span class="muted">
                 Need to edit the form? Adapt it locally for this substep.
@@ -110,7 +108,7 @@
       </label>
       {{ if .ReadOnly }}
         {{ if .Reason }}
-          <p class="muted" style="margin: 12px 0 0;">{{ .Reason }}</p>
+          <p class="muted action-reason">{{ .Reason }}</p>
         {{ end }}
       {{ end }}
     </form>
@@ -153,8 +151,7 @@
             Select a role to continue.
           </p>
           <div
-            class="manage-dialog-actions manage-dialog-actions-end"
-            style="margin-top: 12px;"
+            class="manage-dialog-actions manage-dialog-actions-end manage-dialog-actions-spaced"
           >
             <button type="button" class="primary js-confirm-active-role">
               Confirm
@@ -166,7 +163,7 @@
   {{ else }}
     {{ if .HasOverride }}
       <div class="local-adaptation-tools">
-        <p class="muted" style="white-space: pre-line; margin: 0;">
+        <p class="muted u-m-0 u-pre-line">
           {{- printf "Completed with local form adaptation. " -}}
           {{- if .OverrideReason -}}
             {{ printf "Reason: %s" .OverrideReason }}
@@ -175,9 +172,7 @@
       </div>
     {{ end }}
     <div class="action-submitted">
-      <span style="margin-bottom: 0; font-weight: bold; font-size: 14px;"
-        >Submitted</span
-      >
+      <span class="u-text-label">Submitted</span>
       <div class="action-submitted">
         <dl class="action-submitted-values">
           {{ if .Values }}
@@ -198,8 +193,8 @@
       </div>
     </div>
     {{ if .Attachments }}
-      <div style="display: grid; gap: 8px; margin: 0px;">
-        <span style="font-weight: bold; font-size: 14px;">Attachments</span>
+      <div class="action-attachments">
+        <span class="u-text-label">Attachments</span>
         {{ template "attachment_carousel" .Attachments }}
       </div>
     {{ end }}

@@ -545,3 +545,34 @@
 .dpp-history-accordion .action-submitted {
   gap: 12px;
 }
+
+.dpp-termination-meta {
+  margin: 3px 0 20px;
+}
+
+.dpp-history-step-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.dpp-history-step-head .pill {
+  width: fit-content;
+}
+
+.dpp-divider-tight {
+  margin: 0 0 4px;
+}
+
+.dpp-substep-body {
+  padding: 12px;
+}
+
+.dpp-substep-submitted {
+  margin-top: 20px;
+}
+
+.dpp-attachment-preview-label {
+  margin: 4px 0;
+}

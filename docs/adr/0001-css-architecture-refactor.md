@@ -85,9 +85,9 @@ web/src/styles.css
 
 **Rule:** A selector lives in exactly one layer. Tokens never appear outside `tokens.css`. Utilities never encode component semantics.
 
-### 2. Introduce a minimal utility vocabulary
+### 2. Introduce a utility vocabulary
 
-Add a small, documented set of utility classes in `utilities.css`. Prefix with `u-` to distinguish from semantic components.
+Add a documented set of utility classes in `utilities.css`. Prefix with `u-` to distinguish from semantic components. There is no fixed cap — prefer component/page classes for domain-specific patterns, and add utilities when a spacing or typography primitive repeats across templates.
 
 | Utility | Purpose | Replaces (examples) |
 |---------|---------|---------------------|
@@ -167,7 +167,7 @@ Each template PR should leave **zero static inline styles** except documented dy
 | Risk | Mitigation |
 |------|------------|
 | Visual regressions across 18 templates | Migrate one template at a time; rely on existing template tests (`*_template_test.go`) and manual smoke on key pages |
-| Utility sprawl | Cap initial set to ~15 classes; new utilities require justification in PR description |
+| Utility sprawl | Prefer component classes for domain patterns; new `u-*` utilities need a one-line justification in the PR (what repeated inline pattern they replace) |
 | `base.css` split breaks specificity | Move-only commit first; no selector changes during split |
 | Role palette token bloat | Defer palette consolidation to a follow-up ADR; out of scope for pass 1 |
 

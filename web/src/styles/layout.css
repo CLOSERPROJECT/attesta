@@ -286,6 +286,14 @@
   display: grid;
   gap: 24px;
 }
+
+.stack.u-gap-8 {
+  gap: 8px;
+}
+
+.stack.u-gap-16 {
+  gap: 16px;
+}
 .landing {
   max-width: 520px;
 }
