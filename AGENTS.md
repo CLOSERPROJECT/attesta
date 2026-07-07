@@ -7,7 +7,7 @@ This repo is a small end-to-end demo:
 - **Frontend**: Vite-built JS/CSS bundle, plus **HTMX** in templates and **SSE** for live updates.
 - **Authorization**: **Cerbos** policy engine for “can complete substep” checks.
 
-See: `README.md`, `QUICKSTART.md`, `DOCKER.md`.
+See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling).
 
 ## Current auth/org status (2026-03)
 - Demo impersonation has been removed from production code paths.
@@ -38,6 +38,7 @@ When acting as a coding agent in this repository:
 - Prefer **minimal, localized changes**
 - Do not refactor for style or architecture unless explicitly requested
 - Match existing patterns, even if they are imperfect
+- Read `docs/css.md` before changing templates or styles in `web/src/styles/`
 - Read relevant code before making changes (especially `server/cmd/server/main.go`)
 - Ask before making breaking changes to routes, workflow config, or persistence
 
@@ -48,6 +49,7 @@ When acting as a coding agent in this repository:
   - `server/config/workflow.yaml` — runtime workflow + departments + users.
 - `web/` — Vite project
   - `web/src/main.js` — SSE + partial refresh client logic.
+  - `web/src/styles/` — layered CSS (see `docs/css.md`).
   - `web/dist/` — build output (served by backend as static assets).
 - `cerbos/` — Cerbos configuration and policies
   - `cerbos/config/config.yaml`

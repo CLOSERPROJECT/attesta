@@ -28,30 +28,16 @@
           Share DPP link
         </button>
       </div>
-      <div class="role-pill-row" style="margin-bottom: 16px;">
-        <span
-          class="pill"
-          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
-          >GTIN|{{ .GTIN }}</span
-        >
-        <span
-          class="pill"
-          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
-          >Lot|{{ .Lot }}</span
-        >
-        <span
-          class="pill"
-          style="--pill-bg: var(--accent-2-opposite); --border: var(--border);"
-          >Serial|{{ .Serial }}</span
-        >
+      <div class="role-pill-row u-mb-16">
+        <span class="pill pill-accent">GTIN|{{ .GTIN }}</span>
+        <span class="pill pill-accent">Lot|{{ .Lot }}</span>
+        <span class="pill pill-accent">Serial|{{ .Serial }}</span>
       </div>
       {{ if .Termination }}
-        <hr style="margin: 24px 0;" />
+        <hr class="u-divider" />
         <div class="panel-block">
-          <h2 style="color: var(--danger); margin-bottom: 0px;">
-            Stream ended early
-          </h2>
-          <p style="margin: 3px 0 20px;">
+          <h2 class="manage-dialog-danger-title">Stream ended early</h2>
+          <p class="dpp-termination-meta">
             {{ if .Termination.EndedAtHuman }}
               Ended at
               {{ .Termination.EndedAtHuman }}
@@ -78,7 +64,7 @@
           {{ end }}
         </div>
       {{ end }}
-      <hr style="margin: 24px 0;" />
+      <hr class="u-divider" />
       <h2>History</h2>
       <div class="dpp-history-list">
         {{ range .Traceability }}
@@ -92,14 +78,8 @@
               </div>
               <div class="dpp-history-card">
                 <div class="dpp-history-card-copy">
-                  <div
-                    style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;"
-                  >
-                    <span
-                      class="pill"
-                      style="width: fit-content; --pill-bg: var(--panel); --border: var(--ink);"
-                      >Step {{ .StepID }}</span
-                    >
+                  <div class="dpp-history-step-head">
+                    <span class="pill pill-panel">Step {{ .StepID }}</span>
                     <h3>{{ .Title }}</h3>
                   </div>
                   <div class="dpp-history-meta">
@@ -136,10 +116,10 @@
               <div class="dpp-history-details-wrap">
                 <div class="dpp-history-details-inner">
                   <div class="dpp-history-accordion">
-                    <hr style="margin: 0 0 4px;" />
+                    <hr class="dpp-divider-tight" />
                     {{ range .Substeps }}
                       <section class="substep substep-{{ .Status }}">
-                        <div style="padding: 12px;">
+                        <div class="dpp-substep-body">
                           <div class="substep-summary-main">
                             <span class="pill">{{ .SubstepID }}</span>
                             <span class="timeline-step-title substep-title"
@@ -153,15 +133,9 @@
                               >{{ .Role }}</span
                             >
                           </div>
-                          <div
-                            class="action-submitted"
-                            style="margin-top: 20px;"
-                          >
+                          <div class="action-submitted dpp-substep-submitted">
                             {{ if .DetailMessage }}
-                              <p
-                                class="muted"
-                                style="white-space: pre-line; margin: 0;"
-                              >
+                              <p class="muted u-m-0 u-pre-line">
                                 {{- .DetailMessage -}}
                               </p>
                             {{ end }}
@@ -185,7 +159,7 @@
                             </dl>
                             {{ if .Attachments }}
                               <span
-                                style="margin: 4px 0; font-weight: bold; font-size: 14px;"
+                                class="u-text-label dpp-attachment-preview-label"
                               >
                                 Attachments preview
                               </span>
@@ -247,7 +221,7 @@
         {{ end }}
       </div>
 
-      <hr style="margin: 24px 0;" />
+      <hr class="u-divider" />
       <div class="dpp-integrity">
         <h2>Integrity</h2>
         <div class="dpp-integrity-root">

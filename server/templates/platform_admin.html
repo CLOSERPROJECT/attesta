@@ -256,10 +256,10 @@
                     </button>
                   </div>
                 </form>
-                <hr style="margin: 20px 0;" />
+                <hr class="u-divider-20" />
                 <div class="platform-admin-admin-summary">
                   <div>
-                    <h4 class="muted" style="margin-bottom: 10px;">
+                    <h4 class="muted">
                       Current org admins
                     </h4>
                     {{ if .OrgAdminEmails }}
@@ -269,13 +269,13 @@
                         {{ end }}
                       </ul>
                     {{ else }}
-                      <p style="font-size: 13px; margin: 0;">
+                      <p class="muted platform-admin-empty-note">
                         No accepted org admins yet.
                       </p>
                     {{ end }}
                   </div>
                   <div>
-                    <h4 class="muted" style="margin-bottom: 10px;">
+                    <h4 class="muted">
                       Pending invites
                     </h4>
                     {{ if .PendingOrgAdminEmails }}
@@ -285,7 +285,7 @@
                         {{ end }}
                       </ul>
                     {{ else }}
-                      <p style="font-size: 13px; margin: 0;">
+                      <p class="muted platform-admin-empty-note">
                         No pending org admin invites.
                       </p>
                     {{ end }}
@@ -379,7 +379,7 @@
                     {{ template "icon-close" . }}
                   </button>
                 </header>
-                <p style="margin: 0 0 20px;">
+                <p class="u-m-0 u-mb-20">
                   This will permanently remove the organization and its
                   memberships. Confirm only if you want to continue.
                 </p>
@@ -417,10 +417,7 @@
       >
         <div class="platform-admin-pagination-pages">
           <a
-            class="secondary"
-            style="padding: 10px 8px; {{ if not .HasPreviousPage }}
-              pointer-events: none; opacity: 0.5;
-            {{ end }}"
+            class="secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
             href="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
@@ -471,10 +468,7 @@
             >
           {{ end }}
           <a
-            class="secondary"
-            style="padding: 10px 8px; {{ if not .HasNextPage }}
-              pointer-events: none; opacity: 0.5;
-            {{ end }}"
+            class="secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
             href="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}

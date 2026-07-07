@@ -142,12 +142,19 @@ tasks:
   test:
     desc: Run backend unit tests.
     cmds:
+      - task: css:lint
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
+
+  css:lint:
+    desc: Fail on disallowed inline style= attributes in Go templates.
+    cmds:
+      - bash deployment/scripts/check-template-inline-styles.sh
 
   cover:
     desc: Run backend tests with a 90% coverage gate.
     cmds:
+      - task: css:lint
       - task: goa:generate
       - |
           sh -c '
