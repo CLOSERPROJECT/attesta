@@ -45,9 +45,9 @@ func testRuntimeConfig() RuntimeConfig {
 			},
 		},
 		Departments: []Department{
-			{ID: "dep1", Name: "Department 1", Color: "#f0f3ea", Border: "#d9e0d0"},
-			{ID: "dep2", Name: "Department 2", Color: "#f0f3ea", Border: "#d9e0d0"},
-			{ID: "dep3", Name: "Department 3", Color: "#f0f3ea", Border: "#d9e0d0"},
+			{ID: "dep1", Name: "Department 1"},
+			{ID: "dep2", Name: "Department 2"},
+			{ID: "dep3", Name: "Department 3"},
 		},
 		Users: []User{
 			{ID: "u1", Name: "User 1", DepartmentID: "dep1"},
@@ -99,7 +99,7 @@ func testTemplates() *template.Template {
 {{define "dashboard_body"}}DASHBOARD_ME {{.ID}} TODO {{len .TodoActions}} ACTIVE {{len .ActiveProcesses}} DONE {{len .DoneProcesses}}{{end}}
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
-{{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.RoleColor}} {{.RoleBorder}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.Palette}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{template "process_content.html" .}}{{end}}
 {{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}} {{.ActionList.Error}}{{with .ActionList.Action}}{{.SubstepID}}{{end}}{{end}}

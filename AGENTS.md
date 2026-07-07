@@ -18,7 +18,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
 - Platform admin behavior has been removed from Attesta. Bootstrap orgs and first org-admins in Appwrite instead.
 - Auth/org state now lives in Appwrite:
   - orgs -> teams
-  - role catalog -> team prefs
+  - role catalog -> team prefs (`roles[].palette` resolved to CSS via `data-role-palette` on templates)
   - accepted roles -> user labels
   - invites -> memberships
   - signup/login/reset -> Appwrite account/session/recovery flows

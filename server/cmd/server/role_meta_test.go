@@ -13,6 +13,32 @@ func testRoleIndexForOrg(orgSlug string, roles map[string]RoleMeta) map[roleMeta
 	return index
 }
 
+func TestResolveRolePalettePaletteOnlyFixtures(t *testing.T) {
+	cases := []struct {
+		name    string
+		role    IdentityRole
+		palette string
+	}{
+		{
+			name: "palette only blue",
+			role: IdentityRole{Slug: "chemist", Name: "Chemist", Palette: "blue"},
+			palette: "blue",
+		},
+		{
+			name: "palette only emerald",
+			role: IdentityRole{Slug: "chemist", Name: "Chemist", Palette: "emerald"},
+			palette: "emerald",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveRolePalette(tc.role); got != tc.palette {
+				t.Fatalf("resolveRolePalette() = %q, want %q", got, tc.palette)
+			}
+		})
+	}
+}
+
 func TestRoleMetaIndexFromIdentity(t *testing.T) {
 	server := &Server{
 		identity: &fakeIdentityStore{

@@ -175,6 +175,11 @@ func TestHandlePublicCatalogAdditionalOrderingAndStreamBranches(t *testing.T) {
 	if len(got.Roles) != 3 || got.Roles[0].Slug != "builder" || got.Roles[1].Slug != "alpha" || got.Roles[2].Slug != "zeta" {
 		t.Fatalf("roles = %#v", got.Roles)
 	}
+	for _, role := range got.Roles {
+		if role.Palette != "fallback" {
+			t.Fatalf("role %q palette = %q, want fallback", role.Slug, role.Palette)
+		}
+	}
 }
 
 func TestOrganizationLogoAdditionalBranches(t *testing.T) {

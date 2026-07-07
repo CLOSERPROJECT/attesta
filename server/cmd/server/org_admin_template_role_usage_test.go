@@ -2,10 +2,10 @@ package main
 
 import (
 	"bytes"
-	"html/template"
 	"path/filepath"
 	"strings"
 	"testing"
+	"html/template"
 )
 
 func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
@@ -14,18 +14,16 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 	view := OrgAdminView{
 		RoleRows: []OrgAdminRoleRow{
 			{
-				Slug:       "approver",
-				Name:       "Approver",
-				RoleColor:  template.CSS("var(--role-blue-bg)"),
-				RoleBorder: template.CSS("var(--role-blue-border)"),
-				InUse:      true,
+				Slug:    "approver",
+				Name:    "Approver",
+				Palette: "blue",
+				InUse:   true,
 			},
 			{
-				Slug:       "qa-reviewer",
-				Name:       "QA Reviewer",
-				RoleColor:  template.CSS("var(--role-emerald-bg)"),
-				RoleBorder: template.CSS("var(--role-emerald-border)"),
-				InUse:      false,
+				Slug:    "qa-reviewer",
+				Name:    "QA Reviewer",
+				Palette: "emerald",
+				InUse:   false,
 			},
 		},
 	}
@@ -37,6 +35,9 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 	body := out.String()
 	compactBody := strings.Join(strings.Fields(body), " ")
 
+	if !strings.Contains(body, `data-role-palette="blue"`) || !strings.Contains(body, `data-role-palette="emerald"`) {
+		t.Fatalf("expected role palette attributes in output, got: %s", body)
+	}
 	if !strings.Contains(compactBody, `aria-label="Edit role"`) || !strings.Contains(compactBody, `title="Role in use"`) || !strings.Contains(compactBody, `disabled`) {
 		t.Fatalf("expected in-use edit button to be disabled, got: %s", body)
 	}

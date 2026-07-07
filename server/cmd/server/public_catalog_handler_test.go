@@ -61,8 +61,8 @@ func TestHandlePublicCatalog(t *testing.T) {
 				Slug: "acme-org",
 				Name: "Acme Org",
 				Roles: []IdentityRole{
-					{Slug: "inspector", Name: "Inspector", Color: "#f0f3ea", Border: "#d9e0d0"},
-					{Slug: "org-admin", Name: "Org Admin", Color: "#000000", Border: "#ffffff"},
+					{Slug: "inspector", Name: "Inspector", Palette: "blue"},
+					{Slug: "org-admin", Name: "Org Admin", Palette: "red"},
 				},
 			},
 			{
@@ -70,7 +70,12 @@ func TestHandlePublicCatalog(t *testing.T) {
 				Slug: "beta-org",
 				Name: "Beta Org",
 				Roles: []IdentityRole{
-					{Slug: "assembler", Name: "Assembler", Color: "#f8efe0", Border: "#e9d4a8"},
+					{
+						Slug:   "assembler",
+						Name:   "Assembler",
+						Color:  "var(--role-emerald-bg)",
+						Border: "var(--role-emerald-border)",
+					},
 				},
 			},
 		}, nil
@@ -94,9 +99,44 @@ func TestHandlePublicCatalog(t *testing.T) {
 	if len(got.Organizations) != 2 || len(got.Roles) != 2 {
 		t.Fatalf("response = %#v", got)
 	}
+	palettesBySlug := map[string]string{}
 	for _, role := range got.Roles {
 		if role.Slug == "org-admin" {
 			t.Fatalf("unexpected org-admin role in response: %#v", role)
+		}
+		if role.Palette == "" {
+			t.Fatalf("role %q missing palette: %#v", role.Slug, role)
+		}
+		palettesBySlug[role.Slug] = role.Palette
+	}
+	if palettesBySlug["inspector"] != "blue" {
+		t.Fatalf("inspector palette = %q, want blue", palettesBySlug["inspector"])
+	}
+	if palettesBySlug["assembler"] != "emerald" {
+		t.Fatalf("assembler palette = %q, want emerald", palettesBySlug["assembler"])
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode raw response: %v", err)
+	}
+	roles, ok := raw["roles"].([]any)
+	if !ok || len(roles) != 2 {
+		t.Fatalf("raw roles = %#v", raw["roles"])
+	}
+	for _, item := range roles {
+		role, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("role item = %#v", item)
+		}
+		if _, hasColor := role["color"]; hasColor {
+			t.Fatalf("role %#v should not include color", role)
+		}
+		if _, hasBorder := role["border"]; hasBorder {
+			t.Fatalf("role %#v should not include border", role)
+		}
+		if palette, ok := role["palette"].(string); !ok || palette == "" {
+			t.Fatalf("role %#v missing palette", role)
 		}
 	}
 }

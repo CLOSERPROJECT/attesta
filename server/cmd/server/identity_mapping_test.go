@@ -31,8 +31,8 @@ func TestIdentityOrgPrefsRoundTrip(t *testing.T) {
 		Name:       "Acme Org",
 		LogoFileID: "logo-file-1",
 		Roles: []IdentityRole{
-			{Slug: "qa-reviewer", Name: "QA Reviewer", Color: "#123456", Border: "solid"},
-			{Slug: "qa-approver", Name: "QA Approver", Color: "#654321", Border: "dashed"},
+			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "blue"},
+			{Slug: "qa-approver", Name: "QA Approver", Palette: "emerald"},
 		},
 	}
 
@@ -53,6 +53,9 @@ func TestIdentityOrgPrefsRoundTrip(t *testing.T) {
 	}
 	if decoded.Roles[0].Slug != "qa-reviewer" || decoded.Roles[1].Slug != "qa-approver" {
 		t.Fatalf("roles = %#v", decoded.Roles)
+	}
+	if decoded.Roles[0].Palette != "blue" || decoded.Roles[1].Palette != "emerald" {
+		t.Fatalf("role palettes = %#v", decoded.Roles)
 	}
 }
 

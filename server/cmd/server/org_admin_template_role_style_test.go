@@ -2,10 +2,10 @@ package main
 
 import (
 	"bytes"
-	"html/template"
 	"path/filepath"
 	"strings"
 	"testing"
+	"html/template"
 )
 
 func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
@@ -24,18 +24,16 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 				IsOrgAdmin: true,
 				RoleOptions: []OrgAdminRoleOption{
 					{
-						Slug:       "org-admin",
-						Name:       "Org Admin",
-						RoleColor:  template.CSS("var(--role-red-bg)"),
-						RoleBorder: template.CSS("var(--role-red-border)"),
-						Selected:   true,
+						Slug:     "org-admin",
+						Name:     "Org Admin",
+						Palette:  "red",
+						Selected: true,
 					},
 					{
-						Slug:       "qa-reviewer",
-						Name:       "QA Reviewer",
-						RoleColor:  template.CSS("var(--role-emerald-bg)"),
-						RoleBorder: template.CSS("var(--role-emerald-border)"),
-						Selected:   true,
+						Slug:     "qa-reviewer",
+						Name:     "QA Reviewer",
+						Palette:  "emerald",
+						Selected: true,
 					},
 				},
 			},
@@ -51,8 +49,8 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 	if strings.Contains(body, "ZgotmplZ") {
 		t.Fatalf("unexpected escaped css marker in output: %s", body)
 	}
-	if !strings.Contains(body, `style="--pill-bg: var(--role-emerald-bg); --border: var(--role-emerald-border)"`) {
-		t.Fatalf("expected role pill css variables in output, got body: %s", body)
+	if !strings.Contains(body, `data-role-palette="emerald"`) {
+		t.Fatalf("expected role pill palette attribute in output, got body: %s", body)
 	}
 
 	emailStart := strings.Index(body, `<span class="user-email">`)

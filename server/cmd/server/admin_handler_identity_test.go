@@ -2202,7 +2202,7 @@ func TestHandleOrgAdminRolesWithIdentity(t *testing.T) {
 	if updateSessionSecret != "session-1" {
 		t.Fatalf("session secret = %q", updateSessionSecret)
 	}
-	if len(updatedRoles) != 2 || updatedRoles[1].Slug != "approver" {
+	if len(updatedRoles) != 2 || updatedRoles[1].Slug != "approver" || updatedRoles[1].Palette != "blue" {
 		t.Fatalf("updated roles = %#v", updatedRoles)
 	}
 }
@@ -3596,7 +3596,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		if len(updatedRoles) != 1 || updatedRoles[0].Slug != canonifyIdentityRoleSlug("Lead Reviewer") || updatedRoles[0].Name != "Lead Reviewer" {
 			t.Fatalf("updated roles = %#v", updatedRoles)
 		}
-		if updatedRoles[0].Color == "" || updatedRoles[0].Border == "" {
+		if updatedRoles[0].Palette != defaultRolePaletteFromInput("Lead Reviewer") {
 			t.Fatalf("expected palette to be persisted, got %#v", updatedRoles[0])
 		}
 	})

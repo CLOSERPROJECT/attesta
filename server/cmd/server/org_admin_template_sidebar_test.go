@@ -22,10 +22,9 @@ func TestOrgAdminTemplateRendersSidebarPanels(t *testing.T) {
 		},
 		RoleRows: []OrgAdminRoleRow{
 			{
-				Slug:       "qa-reviewer",
-				Name:       "QA Reviewer",
-				RoleColor:  template.CSS("var(--role-emerald-bg)"),
-				RoleBorder: template.CSS("var(--role-emerald-border)"),
+				Slug:    "qa-reviewer",
+				Name:    "QA Reviewer",
+				Palette: "emerald",
 			},
 		},
 		Users: []OrgAdminUserRow{

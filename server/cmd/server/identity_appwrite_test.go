@@ -336,7 +336,7 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 		t.Fatalf("uploaded logo content type = %q, want image/png", uploadedLogo.ContentType)
 	}
 
-	updatedOrg, err := identity.UpdateOrganization(context.Background(), "session-secret", "fresh-org", "Updated Org", uploadedLogo.ID, []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer"}})
+	updatedOrg, err := identity.UpdateOrganization(context.Background(), "session-secret", "fresh-org", "Updated Org", uploadedLogo.ID, []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "blue"}})
 	if err != nil {
 		t.Fatalf("UpdateOrganization error: %v", err)
 	}
@@ -402,7 +402,7 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 		t.Fatalf("create admin team session header = %q, want empty", createTeamSessionHeader)
 	}
 
-	updatedAdminOrg, err := identity.UpdateOrganizationAsAdmin(context.Background(), "fresh-org", "Updated Org", "logo-1", []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer"}})
+	updatedAdminOrg, err := identity.UpdateOrganizationAsAdmin(context.Background(), "fresh-org", "Updated Org", "logo-1", []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "blue"}})
 	if err != nil {
 		t.Fatalf("UpdateOrganizationAsAdmin error: %v", err)
 	}
