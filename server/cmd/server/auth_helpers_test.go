@@ -448,20 +448,13 @@ func TestCookieAndPlatformAdminHelpers(t *testing.T) {
 	})
 }
 
-func TestWorkflowValidationAndRoleStyleHelpers(t *testing.T) {
+func TestWorkflowRefValidationError(t *testing.T) {
 	if got := (&WorkflowRefValidationError{}).Error(); got != "workflow references are invalid" {
 		t.Fatalf("empty workflow validation error = %q", got)
 	}
 	errText := (&WorkflowRefValidationError{Messages: []string{"missing org", "missing role"}}).Error()
 	if errText != "workflow references are invalid:\n- missing org\n- missing role" {
 		t.Fatalf("workflow validation error = %q", errText)
-	}
-
-	if got := resolveRolePaletteStyle("sky"); got.Color == "" || got.Border == "" {
-		t.Fatalf("expected known palette style, got %#v", got)
-	}
-	if got := resolveRolePaletteStyle("unknown"); got != rolePaletteStyles["red"] {
-		t.Fatalf("fallback palette style = %#v, want %#v", got, rolePaletteStyles["red"])
 	}
 }
 

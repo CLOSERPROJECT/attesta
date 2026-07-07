@@ -86,7 +86,7 @@ Formata is concerned with workflow structure (steps, substeps, role slugs) only.
 
 Migrate `org_admin.html` role pills from inline `--pill-bg` / `--border` to `data-role-palette="{{ .Palette }}"`, reusing `components.css` rules.
 
-Remove `RoleColor` / `RoleBorder` from `OrgAdminRoleRow` and `OrgAdminRoleOption` view models. `resolveRolePaletteStyle()` remains for internal validation of picker values, not for template injection.
+Remove `RoleColor` / `RoleBorder` from `OrgAdminRoleRow` and `OrgAdminRoleOption` view models. Palette picker validation uses `canonifySlug` + `rolePaletteStyles` key lookup via `resolveRolePalette()`.
 
 ### 7. Invalid or missing palette → `"fallback"`
 

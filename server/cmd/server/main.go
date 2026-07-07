@@ -822,14 +822,6 @@ var rolePaletteKeys = []string{
 	"sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
 }
 
-func resolveRolePaletteStyle(palette string) rolePaletteStyle {
-	key := canonifySlug(palette)
-	if style, ok := rolePaletteStyles[key]; ok {
-		return style
-	}
-	return rolePaletteStyles["red"]
-}
-
 func defaultRolePaletteFromInput(raw string) string {
 	normalized := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(raw)), " "))
 	if normalized == "" || len(rolePaletteKeys) == 0 {
