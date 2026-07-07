@@ -307,10 +307,15 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 		},
 	}
 
+	roleIndex := testRoleIndexForOrg("org1", map[string]RoleMeta{
+		"dep1": {ID: "dep1", Label: "Department 1", Palette: "blue"},
+	})
+	roleIndex[roleMetaKey{OrgSlug: "org2", RoleSlug: "dep2"}] = RoleMeta{ID: "dep2", Label: "Department 2", Palette: "emerald"}
+
 	action, ok := nextAvailableAuthorizedAction(cfg.Workflow, &matching, "workflow", Actor{
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
-	}, (&Server{}).roleMetaMap(cfg))
+	}, roleIndex, cfg.Roles)
 	if !ok {
 		t.Fatalf("expected available authorized action")
 	}
@@ -324,14 +329,14 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &otherOrg, "workflow", Actor{
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
-	}, (&Server{}).roleMetaMap(cfg)); ok {
+	}, roleIndex, cfg.Roles); ok {
 		t.Fatalf("did not expect authorized action for step in another organization")
 	}
 
 	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &done, "workflow", Actor{
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
-	}, (&Server{}).roleMetaMap(cfg)); ok {
+	}, roleIndex, cfg.Roles); ok {
 		t.Fatalf("did not expect authorized action for done process")
 	}
 }

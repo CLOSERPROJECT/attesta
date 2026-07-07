@@ -38,12 +38,11 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 				OrgName:  "Acme Org",
 				Expanded: true,
 				Substeps: []TimelineSubstep{{
-					SubstepID:  "1.1",
-					Title:      "Capture batch data",
-					Status:     "available",
-					Selected:   true,
-					RoleColor:  template.CSS("#004466"),
-					RoleBorder: template.CSS("#003355"),
+					SubstepID: "1.1",
+					Title:     "Capture batch data",
+					Status:    "available",
+					Selected:  true,
+					Palette:   "blue",
 					Action: &ActionView{
 						WorkflowKey: "workflow",
 						ProcessID:   "process-1",
