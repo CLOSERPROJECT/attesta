@@ -232,7 +232,7 @@
                   <li class="roles-item">
                     <span
                       class="pill pill-lg role-pill"
-                      style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"
+                      data-role-palette="{{ .Palette }}"
                     >
                       {{ .Name }}
                     </span>
@@ -305,7 +305,7 @@
                           <div class="manage-dialog-role-pill">
                             <span
                               class="pill pill-lg role-pill"
-                              style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }}"
+                              data-role-palette="{{ .Palette }}"
                             >
                               {{ .Name }}
                             </span>
@@ -431,7 +431,7 @@
                           <div class="manage-dialog-role-pill">
                             <span
                               class="pill pill-lg role-pill"
-                              style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }}"
+                              data-role-palette="{{ .Palette }}"
                             >
                               {{ .Name }}
                             </span>
@@ -520,7 +520,7 @@
                           {{ if and .Selected (not (or (eq .Slug "org-admin") (eq .Slug "org_admin"))) }}
                             <span
                               class="pill role-pill"
-                              style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }}"
+                              data-role-palette="{{ .Palette }}"
                             >
                               {{ .Name }}
                             </span>

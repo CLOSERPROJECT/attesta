@@ -36,7 +36,7 @@ func (s *Server) roleMetaIndex(ctx context.Context) map[roleMetaKey]RoleMeta {
 			index[roleMetaKey{OrgSlug: orgSlug, RoleSlug: roleSlug}] = RoleMeta{
 				ID:      roleSlug,
 				Label:   label,
-				Palette: rolePaletteKeyFromStyle(role.Color, role.Border, role.Name),
+				Palette: resolveRolePalette(role),
 			}
 		}
 	}

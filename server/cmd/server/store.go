@@ -62,8 +62,7 @@ type Role struct {
 	OrgSlug   string             `bson:"orgSlug"`
 	Slug      string             `bson:"slug"`
 	Name      string             `bson:"name"`
-	Color     string             `bson:"color,omitempty"`
-	Border    string             `bson:"border,omitempty"`
+	Palette   string             `bson:"palette,omitempty"`
 	CreatedAt time.Time          `bson:"createdAt"`
 }
 

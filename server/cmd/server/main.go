@@ -307,10 +307,8 @@ type ActionAttachmentView struct {
 }
 
 type Department struct {
-	ID     string `yaml:"id"`
-	Name   string `yaml:"name"`
-	Color  string `yaml:"color"`
-	Border string `yaml:"border"`
+	ID   string `yaml:"id"`
+	Name string `yaml:"name"`
 }
 
 type User struct {
@@ -329,18 +327,14 @@ type RuntimeConfig struct {
 }
 
 type WorkflowOrganization struct {
-	Slug   string `yaml:"slug"`
-	Name   string `yaml:"name"`
-	Color  string `yaml:"color"`
-	Border string `yaml:"border"`
+	Slug string `yaml:"slug"`
+	Name string `yaml:"name"`
 }
 
 type WorkflowRole struct {
 	OrgSlug string `yaml:"orgSlug"`
 	Slug    string `yaml:"slug"`
 	Name    string `yaml:"name"`
-	Color   string `yaml:"color"`
-	Border  string `yaml:"border"`
 }
 
 type DPPConfig struct {
@@ -408,8 +402,7 @@ type PublicCatalogRole struct {
 	OrgSlug string `json:"orgSlug"`
 	Name    string `json:"name"`
 	Slug    string `json:"slug"`
-	Color   string `json:"color"`
-	Border  string `json:"border"`
+	Palette string `json:"palette"`
 }
 
 type WorkflowPickerView struct {
@@ -634,20 +627,17 @@ type OrgAdminErrors struct {
 }
 
 type OrgAdminRoleOption struct {
-	Slug       string
-	Name       string
-	RoleColor  template.CSS
-	RoleBorder template.CSS
-	Selected   bool
+	Slug     string
+	Name     string
+	Palette  string
+	Selected bool
 }
 
 type OrgAdminRoleRow struct {
-	Slug       string
-	Name       string
-	Palette    string
-	RoleColor  template.CSS
-	RoleBorder template.CSS
-	InUse      bool
+	Slug    string
+	Name    string
+	Palette string
+	InUse   bool
 }
 
 type OrgAdminUserRow struct {
@@ -861,19 +851,18 @@ func rolePaletteKeyFromStyle(color, border, fallbackName string) string {
 	return defaultRolePaletteFromInput(fallbackName)
 }
 
-func resolveRoleBadgeStyle(color, border string) rolePaletteStyle {
-	resolvedColor := strings.TrimSpace(color)
-	if resolvedColor == "" {
-		resolvedColor = "var(--role-fallback)"
+func resolveRolePalette(role IdentityRole) string {
+	if key := canonifySlug(role.Palette); key != "" {
+		if _, ok := rolePaletteStyles[key]; ok {
+			return key
+		}
 	}
-	resolvedBorder := strings.TrimSpace(border)
-	if resolvedBorder == "" {
-		resolvedBorder = "var(--border)"
+	color := strings.TrimSpace(role.Color)
+	border := strings.TrimSpace(role.Border)
+	if color != "" || border != "" {
+		return rolePaletteKeyFromStyle(color, border, role.Name)
 	}
-	return rolePaletteStyle{
-		Color:  resolvedColor,
-		Border: resolvedBorder,
-	}
+	return "fallback"
 }
 
 type workflowContextKey struct{}
@@ -2320,8 +2309,7 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 				OrgSlug: orgSlug,
 				Name:    strings.TrimSpace(role.Name),
 				Slug:    strings.TrimSpace(role.Slug),
-				Color:   strings.TrimSpace(role.Color),
-				Border:  strings.TrimSpace(role.Border),
+				Palette: resolveRolePalette(role),
 			})
 		}
 	}
@@ -3098,8 +3086,7 @@ func rolesFromIdentityOrg(org IdentityOrg) []Role {
 			OrgSlug: strings.TrimSpace(org.Slug),
 			Slug:    strings.TrimSpace(role.Slug),
 			Name:    strings.TrimSpace(role.Name),
-			Color:   strings.TrimSpace(role.Color),
-			Border:  strings.TrimSpace(role.Border),
+			Palette: resolveRolePalette(role),
 		})
 	}
 	return roles
@@ -3818,12 +3805,10 @@ func firstNonEmpty(values ...string) string {
 func buildOrgAdminRolePills(roles []Role) []OrgAdminRoleOption {
 	rolePills := make([]OrgAdminRoleOption, 0, len(roles))
 	for _, role := range roles {
-		roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
 		rolePills = append(rolePills, OrgAdminRoleOption{
-			Slug:       role.Slug,
-			Name:       role.Name,
-			RoleColor:  cssValue(roleStyle.Color, "var(--role-fallback)"),
-			RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
+			Slug:    role.Slug,
+			Name:    role.Name,
+			Palette: role.Palette,
 		})
 	}
 	return rolePills
@@ -3855,14 +3840,11 @@ func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgA
 		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
 			continue
 		}
-		roleStyle := resolveRoleBadgeStyle(role.Color, role.Border)
 		rows = append(rows, OrgAdminRoleRow{
-			Slug:       strings.TrimSpace(role.Slug),
-			Name:       strings.TrimSpace(role.Name),
-			Palette:    rolePaletteKeyFromStyle(role.Color, role.Border, role.Name),
-			RoleColor:  cssValue(roleStyle.Color, "var(--role-fallback)"),
-			RoleBorder: cssValue(roleStyle.Border, "var(--border)"),
-			InUse:      organizationRoleInUse(role.Slug, users, invites),
+			Slug:    strings.TrimSpace(role.Slug),
+			Name:    strings.TrimSpace(role.Name),
+			Palette: role.Palette,
+			InUse:   organizationRoleInUse(role.Slug, users, invites),
 		})
 	}
 	return rows
@@ -3882,11 +3864,10 @@ func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []I
 				selected = orgUser.IsOrgAdmin
 			}
 			roleOptions = append(roleOptions, OrgAdminRoleOption{
-				Slug:       role.Slug,
-				Name:       role.Name,
-				RoleColor:  role.RoleColor,
-				RoleBorder: role.RoleBorder,
-				Selected:   selected,
+				Slug:     role.Slug,
+				Name:     role.Name,
+				Palette:  role.Palette,
+				Selected: selected,
 			})
 		}
 		userID := strings.TrimSpace(orgUser.ID)
@@ -4228,7 +4209,6 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			if palette == "" {
 				palette = defaultRolePaletteFromInput(name)
 			}
-			paletteStyle := resolveRolePaletteStyle(palette)
 			for _, existingRole := range ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org)) {
 				if strings.EqualFold(canonifyIdentityRoleSlug(existingRole.Slug), roleSlug) {
 					s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role slug already exists", RoleAction: "create", RoleName: name, RolePalette: palette})
@@ -4236,10 +4216,9 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			updatedRoles := append(append([]IdentityRole(nil), org.Roles...), IdentityRole{
-				Slug:   roleSlug,
-				Name:   name,
-				Color:  paletteStyle.Color,
-				Border: paletteStyle.Border,
+				Slug:    roleSlug,
+				Name:    name,
+				Palette: canonifySlug(palette),
 			})
 			if _, err := s.identity.UpdateOrganization(r.Context(), sessionSecret, user.OrgSlug, org.Name, org.LogoFileID, updatedRoles); err != nil {
 				if isDuplicateSlugError(err) {
@@ -4278,7 +4257,6 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			if palette == "" {
 				palette = defaultRolePaletteFromInput(name)
 			}
-			paletteStyle := resolveRolePaletteStyle(palette)
 			updatedRoles := append([]IdentityRole(nil), org.Roles...)
 			found := false
 			for idx := range updatedRoles {
@@ -4292,8 +4270,9 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 				found = true
 				updatedRoles[idx].Slug = roleSlug
 				updatedRoles[idx].Name = name
-				updatedRoles[idx].Color = paletteStyle.Color
-				updatedRoles[idx].Border = paletteStyle.Border
+				updatedRoles[idx].Palette = canonifySlug(palette)
+				updatedRoles[idx].Color = ""
+				updatedRoles[idx].Border = ""
 			}
 			if !found {
 				s.renderOrgAdminWithErrors(w, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "edit", RoleSlug: currentSlug, RoleName: name, RolePalette: palette})
@@ -6922,10 +6901,8 @@ func normalizeWorkflowConfig(cfg *RuntimeConfig) {
 		defaultOrg = "default-org"
 		cfg.Organizations = []WorkflowOrganization{
 			{
-				Slug:   defaultOrg,
-				Name:   "Default organization",
-				Color:  "#f0f3ea",
-				Border: "#d9e0d0",
+				Slug: defaultOrg,
+				Name: "Default organization",
 			},
 		}
 	}
@@ -6936,8 +6913,6 @@ func normalizeWorkflowConfig(cfg *RuntimeConfig) {
 				OrgSlug: defaultOrg,
 				Slug:    strings.TrimSpace(dept.ID),
 				Name:    strings.TrimSpace(dept.Name),
-				Color:   strings.TrimSpace(dept.Color),
-				Border:  strings.TrimSpace(dept.Border),
 			})
 		}
 	}

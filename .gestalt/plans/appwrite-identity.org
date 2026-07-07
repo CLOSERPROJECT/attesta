@@ -42,11 +42,11 @@ Done when:
 Why: The user requested `org -> team`, `roles -> user labels`, `user -> user`, while Attesta still needs an org-scoped role catalog and org-admin behavior.
 Change:
 - Use Appwrite team ID = Attesta org slug when possible; team name = org display name.
-- Store org role catalog in team prefs because labels alone do not define the available roles or their color metadata:
+- Store org role catalog in team prefs because labels alone do not define the available roles or their palette metadata:
   - team prefs shape:
     - `schemaVersion`
     - `logoFileId`
-    - `roles: [{slug,name,color,border}]`
+    - `roles: [{slug,name,palette}]`
 - Store accepted business roles as user labels with an Attesta namespace:
   - `attesta:role:<slug>`
   - `attesta:org-admin`
@@ -162,7 +162,7 @@ Change:
 - `POST /org-admin/roles`:
   - load team prefs
   - validate slug uniqueness within `prefs.roles`
-  - append `{slug,name,color,border}`
+  - append `{slug,name,palette}`
   - write the full prefs object back with optimistic overwrite discipline
 - `renderOrgAdmin`:
   - load current org from Appwrite team + prefs
@@ -176,7 +176,7 @@ Tests:
 - Migrate role handler tests to adapter fakes.
 - Cover:
   - duplicate role slug
-  - color/border persistence
+  - palette persistence
   - replacing a user’s labels with exact submitted roles
   - self-protection on org-admin role removal
 Done when:

@@ -6,7 +6,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 templates="${root}/server/templates"
 
-allowed_pattern='--pill-bg:|--stream-color:|width:[[:space:]]*\{\{'
+allowed_pattern='--stream-color:|width:[[:space:]]*\{\{'
 
 scan_styles() {
   if command -v rg >/dev/null 2>&1; then

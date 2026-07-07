@@ -61,11 +61,10 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 | Pattern | Example | Consumer |
 |---------|---------|----------|
-| Role pill colors (org-admin only) | `style="--pill-bg: {{ .RoleColor }}; --border: {{ .RoleBorder }};"` | `.role-pill`, `.pill` in org-admin |
 | Stream status | `style="--stream-color: var(--stream-{{ .Status }});"` | `.stream-status-section-head` |
 | Progress width | `style="width: {{ .Percent }}%;"` | Progress bar fill |
 
-Workflow surfaces (`process`, `action_list`, `dpp`) use `data-role-palette="{{ .Palette }}"` on `.role-pill` and `.substep`; see [ADR-0002](adr/0002-role-color-appwrite-source.md). Palette keys map to `--role-*-bg` / `--role-*-border` in `components.css`.
+Role pills and substeps (`process`, `action_list`, `dpp`, `org_admin`) use `data-role-palette="{{ .Palette }}"` on `.role-pill` and `.substep`; see [ADR-0002](adr/0002-role-color-appwrite-source.md) and [ADR-0003](adr/0003-role-palette-storage.md). Palette keys map to `--role-*-bg` / `--role-*-border` in `components.css`. The org-admin palette picker may set transient client-side `--swatch-bg` / `--swatch-border` on preview swatches only (not on role pill rows).
 
 Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 
@@ -75,7 +74,7 @@ Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 |-------|-----|
 | `.panel`, `.stack` | Content blocks and vertical rhythm |
 | `.muted` | Secondary text color |
-| `.pill`, `.role-pill` | Badges; pair with dynamic `--pill-bg` when needed |
+| `.pill`, `.role-pill` | Badges; pair with `data-role-palette` for role colors |
 | `.is-disabled` | Disabled pagination / non-interactive controls |
 | `.pagination-btn` | Chevron pagination buttons |
 | `.site-footer` | Page footer (no inline styles) |

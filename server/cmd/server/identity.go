@@ -66,10 +66,11 @@ type IdentityOrg struct {
 }
 
 type IdentityRole struct {
-	Slug   string `json:"slug"`
-	Name   string `json:"name"`
-	Color  string `json:"color,omitempty"`
-	Border string `json:"border,omitempty"`
+	Slug    string `json:"slug"`
+	Name    string `json:"name"`
+	Palette string `json:"palette,omitempty"`
+	Color   string `json:"color,omitempty"`  // legacy read only
+	Border  string `json:"border,omitempty"` // legacy read only
 }
 
 type IdentitySession struct {
