@@ -12,21 +12,21 @@
   }
 
   .org-admin-panel-main {
-    scroll-margin-top: 12px;
+    scroll-margin-top: var(--space-4);
     grid-column: auto;
   }
 
   .preview-panel,
   .instances-panel {
-    scroll-margin-top: 12px;
+    scroll-margin-top: var(--space-4);
   }
 
   .process-resources-grid {
-    gap: 24px;
+    gap: var(--space-7);
   }
 
   .tablet-seprator {
     border-top: 1px solid var(--border);
-    padding-top: 24px;
+    padding-top: var(--space-7);
   }
 }

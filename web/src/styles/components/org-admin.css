@@ -4,7 +4,7 @@
 
 .roles-picker-toggle {
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--space-3) var(--space-9);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -14,7 +14,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-9);
   text-align: left;
 }
 
@@ -61,10 +61,10 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--panel);
-  box-shadow: 0 12px 24px rgb(0 0 0 / 12%);
-  padding: 8px;
+  box-shadow: 0 12px 24px var(--shadow-dropdown);
+  padding: var(--space-3);
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .roles-picker-menu[hidden] {
@@ -73,7 +73,7 @@
 
 .roles-picker-search {
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--space-3) var(--space-9);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -88,7 +88,7 @@
   max-height: 220px;
   overflow: auto;
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .roles-picker-option {
@@ -97,7 +97,7 @@
   border: 1px solid transparent;
   background: transparent;
   border-radius: 4px;
-  padding: 8px 10px;
+  padding: var(--space-3) var(--space-9);
   color: var(--ink);
   font: inherit;
   display: flex;
@@ -128,7 +128,7 @@
 
 .roles-picker-empty {
   margin: 0;
-  padding: 4px 2px 2px;
+  padding: var(--space-1) 2px 2px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -137,7 +137,7 @@
   display: flex;
   align-items: center;
   font-size: 13px;
-  gap: 10px;
+  gap: var(--space-9);
 }
 
 .role-palette-select-wrap {
@@ -156,7 +156,7 @@
 
 .role-palette-option {
   justify-content: flex-start;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .role-palette-option .roles-picker-option-check {
@@ -185,8 +185,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
 
   button {
     flex-shrink: 0;
@@ -204,28 +204,28 @@
 .users-list {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: var(--space-4) 0 0;
   display: grid;
-  gap: 10px;
+  gap: var(--space-9);
 }
 
 .roles-list {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: var(--space-4) 0 0;
   display: grid;
-  gap: 10px;
+  gap: var(--space-9);
 }
 
 .roles-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  padding: 10px 12px;
+  padding: var(--space-9) var(--space-4);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .roles-item .pill {
@@ -236,11 +236,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  padding: 10px 12px;
+  padding: var(--space-9) var(--space-4);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .user-main {
@@ -248,7 +248,7 @@
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 18px;
+  gap: var(--space-3) var(--space-11);
 }
 
 .user-email {
@@ -256,12 +256,12 @@
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .user-tags {
   display: inline-flex;
-  gap: 8px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -269,14 +269,14 @@
   display: inline-flex;
   align-items: center;
   justify-self: end;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .user-action-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: var(--space-1);
   border: 0;
   background: transparent;
   color: var(--accent);
@@ -315,7 +315,7 @@
 }
 
 .manage-dialog::backdrop {
-  background: rgb(16 26 20 / 48%);
+  background: var(--backdrop-modal);
   backdrop-filter: blur(2px);
 }
 
@@ -324,7 +324,7 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   box-shadow: 0 16px 34px var(--shadow);
-  padding: 16px;
+  padding: var(--space-5);
   display: grid;
 }
 
@@ -332,8 +332,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .manage-dialog-title {
@@ -342,7 +342,7 @@
 }
 
 .manage-dialog-subtitle {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -350,7 +350,7 @@
 .manage-dialog-actions {
   display: flex;
   width: 100%;
-  gap: 10px;
+  gap: var(--space-9);
 }
 
 .manage-dialog-actions-end {
@@ -368,12 +368,12 @@
 
 .manage-dialog-danger-zone {
   border-top: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-6);
 }
 
 .manage-dialog-danger-copy {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .manage-dialog-danger-title {
@@ -390,15 +390,15 @@ hr {
 
 .active-role-options {
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .active-role-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--space-9);
+  padding: var(--space-9) var(--space-4);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: color-mix(in srgb, var(--panel) 92%, var(--accent));
@@ -423,5 +423,5 @@ hr {
 .active-role-error {
   color: var(--danger);
   font-size: 13px;
-  margin: 8px 0 0;
+  margin: var(--space-3) 0 0;
 }

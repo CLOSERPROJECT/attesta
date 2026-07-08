@@ -7,12 +7,12 @@
   .dpp-history-summary,
   .dpp-history-details {
     grid-template-columns: 20px minmax(0, 1fr);
-    gap: 14px;
+    gap: var(--space-10);
   }
 
   .dpp-integrity-item {
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--space-2);
   }
 
   .dpp-integrity-hash-full {
@@ -24,14 +24,14 @@
   }
 
   .panel {
-    padding: 16px;
+    padding: var(--space-5);
   }
 
   .roles-item,
   .users-item {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding: 10px;
+    gap: var(--space-9);
+    padding: var(--space-9);
   }
 
   .roles-item .user-actions,
@@ -42,7 +42,7 @@
   .user-main {
     flex-direction: column;
     align-items: flex-start;
-    row-gap: 6px;
+    row-gap: var(--space-2);
   }
 
   .user-email {
@@ -56,7 +56,7 @@
 
   .manage-dialog-head {
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--space-9);
   }
 
   .manage-dialog-actions {
@@ -71,7 +71,7 @@
   .stream-status-section-head {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: var(--space-9);
   }
 
   .stream-status-sort {
@@ -98,7 +98,7 @@
   .process-head {
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
+    gap: var(--space-2);
   }
 
   .process-item-body {
@@ -107,8 +107,8 @@
 
   .timeline-step-summary {
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px;
+    gap: var(--space-3);
+    padding: var(--space-9);
   }
 
   .timeline-step-summary-main {
@@ -122,14 +122,14 @@
   }
 
   .timeline-substeps {
-    padding-inline: 10px;
+    padding-inline: var(--space-9);
   }
 
   .substep-accordion-summary {
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 6px;
-    padding: 10px;
+    gap: var(--space-2);
+    padding: var(--space-9);
   }
 
   .substep-accordion-summary .status {
@@ -137,7 +137,7 @@
   }
 
   .substep-details {
-    padding-inline: 10px;
+    padding-inline: var(--space-9);
   }
 
   .data-hash {
@@ -192,18 +192,18 @@
   }
 
   .page {
-    padding: 16px 16px 32px;
+    padding: var(--space-5) var(--space-5) 32px;
   }
 
   .topbar {
-    padding: 10px 16px;
+    padding: var(--space-9) var(--space-5);
   }
 
   .process-meta {
     flex-direction: column;
     align-items: start;
-    gap: 4px;
-    margin-top: 8px;
+    gap: var(--space-1);
+    margin-top: var(--space-3);
   }
 
   .action-submitted-values {
@@ -212,7 +212,7 @@
   }
 
   .action-submitted-values dt {
-    margin-top: 8px;
+    margin-top: var(--space-3);
   }
 
   .action-submitted-attachment-meta {

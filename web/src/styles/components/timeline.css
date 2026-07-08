@@ -1,6 +1,6 @@
 .timeline-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -20,12 +20,12 @@
 }
 
 .timeline-step-summary {
-  padding: 12px;
+  padding: var(--space-4);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -37,7 +37,7 @@
 .timeline-step-summary-main {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -98,7 +98,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .timeline-step-title {
@@ -118,11 +118,11 @@
 
 .timeline-substeps {
   list-style: none;
-  padding: 16px 12px 12px;
+  padding: var(--space-5) var(--space-4) var(--space-4);
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-9);
   min-width: 0;
 }
 
@@ -136,7 +136,7 @@
     transform 300ms ease,
     opacity 300ms ease;
   min-width: 0;
-  gap: 8px;
+  gap: var(--space-3);
   position: relative;
 }
 
@@ -160,8 +160,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 .substep-accordion-summary::marker,
@@ -173,12 +173,12 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .substep-accordion[open] {
   .substep-accordion-summary {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-4);
     border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   }
 
@@ -225,7 +225,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .substep-accordion-summary .status {
@@ -237,7 +237,7 @@
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--tag-bg);
-  padding: 2px 8px;
+  padding: 2px var(--space-3);
 }
 
 .substep-available .status {
@@ -282,7 +282,7 @@
 .substep-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-4);
   font-size: 12px;
   color: var(--muted);
   min-width: 0;
@@ -294,19 +294,19 @@
 }
 
 .substep-summary-supporting {
-  padding-top: 6px;
+  padding-top: var(--space-2);
 }
 
 .substep-details {
-  padding: 0 12px 12px;
+  padding: 0 var(--space-4) var(--space-4);
   display: grid;
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .data-hash {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
   max-width: min(100%, 520px);
 }
@@ -332,17 +332,17 @@
 }
 
 .substep-override-modal::backdrop {
-  background: rgb(0 0 0 / 42%);
+  background: var(--backdrop-fullscreen);
 }
 
 .substep-override-editor,
 .substep-override-loading {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-10);
   height: 100%;
   min-height: 0;
-  padding: 18px;
+  padding: var(--space-11);
   box-sizing: border-box;
 }
 
@@ -350,20 +350,20 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .substep-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   font-size: 1.5em;
   line-height: 1;
 }
 
 .substep-override-reason {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .substep-override-frame {

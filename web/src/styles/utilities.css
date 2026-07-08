@@ -15,21 +15,21 @@
 }
 
 .u-mb-8 {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-3);
 }
 
 .u-mb-16 {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-5);
 }
 
 /* Replaces repeated manage-dialog danger-zone paragraph spacing (margin: 0 0 20px). */
 .u-mb-20 {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-6);
 }
 
 /* Replaces inline margin-left: 4px on compact CTA labels. */
 .u-ml-4 {
-  margin-left: 4px;
+  margin-left: var(--space-1);
 }
 
 .u-pre-line {
@@ -55,15 +55,15 @@
 }
 
 .u-gap-8 {
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .u-gap-16 {
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .u-divider {
-  margin: 24px 0;
+  margin: var(--space-7) 0;
   border: none;
   border-top: 1px solid var(--border);
 }
@@ -74,12 +74,12 @@
 
 /* Replaces 20px-margin hr dividers in platform-admin invite dialogs. */
 .u-divider-20 {
-  margin: 20px 0;
+  margin: var(--space-6) 0;
   border: none;
   border-top: 1px solid var(--border);
 }
 
 /* Replaces hardcoded signup error color with token-based danger text. */
-.text-danger {
+.u-text-danger {
   color: var(--danger);
 }
