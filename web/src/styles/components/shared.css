@@ -138,9 +138,9 @@ button.secondary-small {
 }
 
 .role-pill {
-  color: var(--role-ink);
-  background: var(--pill-bg);
-  border-color: var(--palette-border, var(--border));
+  color: var(--pill-bg);
+  background: color-mix(in srgb, var(--pill-bg) 10%, transparent);
+  border-color: var(--pill-bg);
 }
 
 .role-pill-row {

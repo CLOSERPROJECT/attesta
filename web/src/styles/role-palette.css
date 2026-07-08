@@ -85,7 +85,7 @@
 }
 
 .role-pill {
-  --pill-bg: var(--palette-bg, var(--role-fallback));
+  --pill-bg: var(--palette-bg, var(--muted));
 }
 
 .substep {

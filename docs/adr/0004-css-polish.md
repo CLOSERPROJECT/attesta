@@ -180,7 +180,7 @@ Systematic review and fixes for:
 
 - [x] `:focus-visible` on interactive controls missing visible focus rings — global ring on `button`, `a`, `input`, `select`, `textarea`, and `summary` in `reset.css`; existing component rules retained.
 - [x] `prefers-reduced-motion` for animations/transitions added in CSS layers — `@media (prefers-reduced-motion: reduce)` block in `reset.css`.
-- [x] Role pill contrast in dark mode (validate after `light-dark()` token change) — `.role-pill` uses `color: var(--role-ink)` on solid `var(--pill-bg)` backgrounds.
+- [x] Role pill contrast in dark mode (validate after `light-dark()` token change) — ~~`.role-pill` uses `color: var(--role-ink)` on solid `var(--pill-bg)` backgrounds.~~ **Superseded (2026-07):** reverted to the pre-ADR soft-badge style (`color`/`border-color: var(--pill-bg)` with a `color-mix(... 10% ...)` tint) to match the deployed look per product preference.
 
 #### 15. Formata shadow-DOM styling (separate effort)
 
