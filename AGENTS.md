@@ -49,7 +49,7 @@ When acting as a coding agent in this repository:
   - `server/config/workflow.yaml` — runtime workflow + departments + users.
 - `web/` — Vite project
   - `web/src/main.js` — SSE + partial refresh client logic.
-  - `web/src/styles/` — layered CSS (see `docs/css.md`).
+  - `web/src/styles/` — layered CSS (`tokens.css`, `role-palette.css`, …; see `docs/css.md`).
   - `web/dist/` — build output (served by backend as static assets).
 - `cerbos/` — Cerbos configuration and policies
   - `cerbos/config/config.yaml`

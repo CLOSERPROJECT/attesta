@@ -1,6 +1,6 @@
 # CSS style guide (main Attesta app)
 
-This document describes how styling works for the server-rendered Attesta UI. It implements [ADR-0001](adr/0001-css-architecture-refactor.md).
+This document describes how styling works for the server-rendered Attesta UI. It implements [ADR-0001](adr/0001-css-architecture-refactor.md) and [ADR-0004](adr/0004-css-polish.md).
 
 **Scope:** `web/src/styles/`, `server/templates/*.html`. Formata embed and Formata Builder (`formata-arch/`) are out of scope.
 
@@ -11,6 +11,7 @@ Styles load in this order from `web/src/styles.css`:
 | Layer | File | Contains |
 |-------|------|----------|
 | Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font import |
+| Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout.css` | Page chrome: topbar, nav, stack, grids, footer |
@@ -24,7 +25,32 @@ Styles load in this order from `web/src/styles.css`:
 
 - Light/dark mode toggles `data-theme="light|dark"` on `<html>` (see `web/src/main.js`).
 - Use design tokens (`var(--ink)`, `var(--panel)`, `var(--accent)`, etc.) — do not hardcode hex/rgb in templates or new CSS.
+- Role hue and stream status tokens use CSS `light-dark()` in `:root` (see [ADR-0004](adr/0004-css-polish.md)); `[data-theme="dark"]` keeps only non-role overrides.
 - Token names are stable; do not rename without a dedicated migration.
+
+### Breakpoint tokens
+
+Canonical viewport widths in `tokens.css`:
+
+| Token | Value | Typical use |
+|-------|-------|-------------|
+| `--bp-phone` | `640px` | `phone.css` overrides |
+| `--bp-tablet` | `900px` | Intermediate layouts |
+| `--bp-desktop` | `1200px` | Sidebar grids (`desktop.css`, `tablet.css`) |
+
+Media query conditions must use literal `px` values (CSS cannot evaluate `var()` in `@media`). Keep breakpoint files in sync with these tokens; reference the token in layout properties inside queries when helpful (e.g. `min(var(--bp-desktop), 100vw)` on dialogs).
+
+### Documented color literal exceptions
+
+After the Phase 7 token hygiene audit, a few one-off compositional `rgba()` values remain outside `tokens.css`. Do not copy these into new CSS — prefer tokens or `color-mix(in srgb, var(--*) …%)`.
+
+| File | Value | Use |
+|------|-------|-----|
+| `pages.css` | `rgba(255, 255, 255, 0.04)` | Inset top highlight on `.platform-admin-search-field` gradient |
+| `components/org-admin.css` | `rgba(0, 0, 0, 0.12)` | Elevated dropdown shadow on `.roles-picker-menu` |
+| `components/org-admin.css` | `rgba(16, 26, 20, 0.48)` | Tinted backdrop on `.manage-dialog::backdrop` |
+| `components/actions.css` | `rgba(16, 26, 20, 0.16)` | Elevated shadow on attachment carousel nav buttons |
+| `components/timeline.css` | `rgba(0, 0, 0, 0.42)` | Fullscreen modal backdrop on `.substep-override-modal::backdrop` |
 
 ## Utilities (`u-*`)
 
@@ -32,6 +58,9 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 | Class | Effect |
 |-------|--------|
+| `u-mx-auto` | `margin-inline: auto` |
+| `u-max-w-prose` | `max-width: 65ch` |
+| `u-max-w-7xl` | `max-width: 80rem` |
 | `u-m-0` | `margin: 0` |
 | `u-mb-8` | `margin-bottom: 8px` |
 | `u-mb-16` | `margin-bottom: 16px` |
@@ -61,10 +90,11 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 | Pattern | Example | Consumer |
 |---------|---------|----------|
-| Stream status | `style="--stream-color: var(--stream-{{ .Status }});"` | `.stream-status-section-head` |
-| Progress width | `style="width: {{ .Percent }}%;"` | Progress bar fill |
+| Progress width | `style="--progress: {{ .Percent }}%;"` | `.process-progress-fill` via `width: var(--progress, 0%)` |
 
-Role pills and substeps (`process`, `action_list`, `dpp`, `org_admin`) use `data-role-palette="{{ .Palette }}"` on `.role-pill` and `.substep`; see [ADR-0002](adr/0002-role-color-appwrite-source.md) and [ADR-0003](adr/0003-role-palette-storage.md). Palette keys map to `--role-*-bg` / `--role-*-border` in `components.css`. The org-admin palette picker may set transient client-side `--swatch-bg` / `--swatch-border` on preview swatches only (not on role pill rows).
+Stream status uses `data-stream-status="{{ .Status }}"` on `.stream-status-section-head` (mapped in `role-palette.css`); no inline style.
+
+Role pills and substeps (`process`, `action_list`, `dpp`, `org_admin`) use `data-role-palette="{{ .Palette }}"` on `.role-pill` and `.substep`; see [ADR-0002](adr/0002-role-color-appwrite-source.md) and [ADR-0003](adr/0003-role-palette-storage.md). Palette keys map to `--role-*-bg` / `--role-*-border` in `role-palette.css`. The org-admin palette picker may set transient client-side `--swatch-bg` / `--swatch-border` on preview swatches only (not on role pill rows).
 
 Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 
