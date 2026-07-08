@@ -24,7 +24,7 @@
 .action-form label {
   display: flex;
   flex-direction: column;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -121,7 +121,7 @@
 .action-submitted-values dt,
 .action-submitted-values dd {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .action-submitted-values dt {
@@ -190,7 +190,6 @@
 
 .action-submitted-attachment-copy h4 {
   margin: 0;
-  font-size: 15px;
 }
 
 .action-submitted-attachment-preview {

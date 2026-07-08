@@ -92,7 +92,7 @@
   cursor: pointer;
   font: inherit;
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
   text-decoration: none;
   transition:
     background-color 140ms ease,
@@ -156,13 +156,13 @@
 
 .nav .account-menu-label {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
 .nav .account-menu-email {
   margin: var(--space-2) 0 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
@@ -182,7 +182,7 @@
   padding: 7px 9px;
   background: transparent;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-align: left;
   margin-left: 0;
@@ -237,8 +237,8 @@
 .site-footer p {
   margin: 0 0 var(--space-2);
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
 }
 
 .site-footer p:last-child {

@@ -94,7 +94,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .process-title,
@@ -112,13 +112,13 @@
 }
 
 .process-id {
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--font-mono);
   color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .process-title .process-id {
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .process-toolbar {
@@ -133,12 +133,12 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .process-toolbar select {
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
   padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
@@ -188,7 +188,7 @@
 .status-tag {
   padding: 2px var(--space-2);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   border: 1px solid var(--border);
@@ -196,7 +196,7 @@
 
 .status-tag-compact {
   padding: 1px var(--space-2);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .status-tag.status-active {
@@ -227,7 +227,7 @@
   display: flex;
   place-items: center start;
   gap: var(--space-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 

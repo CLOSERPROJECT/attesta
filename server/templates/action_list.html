@@ -2,7 +2,7 @@
 
 {{ define "action_detail_content.html" }}
   {{ if .InputKey }}
-    <p class="muted u-m-0 u-pre-line u-text-sm">
+    <p class="muted u-m-0 u-pre-line u-text-xs">
       {{- .InputKey -}}
     </p>
   {{ end }}
@@ -172,7 +172,7 @@
       </div>
     {{ end }}
     <div class="action-submitted">
-      <span class="u-text-label">Submitted</span>
+      <span class="u-text-sm">Submitted</span>
       <div class="action-submitted">
         <dl class="action-submitted-values">
           {{ if .Values }}
@@ -194,7 +194,7 @@
     </div>
     {{ if .Attachments }}
       <div class="action-attachments">
-        <span class="u-text-label">Attachments</span>
+        <span class="u-text-sm">Attachments</span>
         {{ template "attachment_carousel" .Attachments }}
       </div>
     {{ end }}

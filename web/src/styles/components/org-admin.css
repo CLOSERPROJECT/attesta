@@ -117,7 +117,7 @@
 
 .roles-picker-option-check {
   display: none;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -130,13 +130,13 @@
   margin: 0;
   padding: var(--space-1) 2px 2px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .role-palette-picker {
   display: flex;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--text-sm);
   gap: var(--space-3);
 }
 
@@ -338,13 +338,12 @@
 
 .manage-dialog-title {
   margin: 0;
-  font-size: 18px;
 }
 
 .manage-dialog-subtitle {
   margin: var(--space-1) 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .manage-dialog-actions {
@@ -379,7 +378,7 @@
 .manage-dialog-danger-title {
   margin: 0;
   color: var(--danger);
-  font-weight: 700;
+  font-weight: var(--font-bold);
 }
 
 hr {
@@ -422,6 +421,6 @@ hr {
 
 .active-role-error {
   color: var(--danger);
-  font-size: 13px;
+  font-size: var(--text-sm);
   margin: var(--space-2) 0 0;
 }

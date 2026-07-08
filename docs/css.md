@@ -102,6 +102,41 @@ Media query conditions must use literal `px` values (CSS cannot evaluate `var()`
 
 Google Fonts are imported in `tokens.css`. Use `var(--font-sans)` / `var(--font-mono)` in new CSS — do not repeat font family strings.
 
+### Type scale
+
+Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index tracks size: `--text-sm` = `0.875rem` = 14px.
+
+| Token | rem | px | Typical use |
+|-------|-----|----|-------------|
+| `--text-xs` | `0.75rem` | 12 | Captions, pills, compact tags, meta IDs |
+| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels |
+| `--text-base` | `1rem` | 16 | Body, inputs, buttons, default prose |
+| `--text-lg` | `1.125rem` | 18 | Card titles, dialog titles, emphasis headings |
+| `--text-xl` | `1.25rem` | 20 | Section headings (`h2` in panels) |
+| `--text-2xl` | `1.5rem` | 24 | Large titles, emphasis page headings |
+| `--text-3xl` | `1.875rem` | 30 | Page titles (`h1` default) |
+
+**Line-height tokens**
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--leading-none` | `1` | Pills, single-line badges |
+| `--leading-tight` | `1.25` | Headings, compact titles |
+| `--leading-normal` | `1.5` | Body, form fields, paragraphs |
+| `--leading-relaxed` | `1.625` | Long-form muted copy (rare) |
+
+**Weight tokens**
+
+| Token | Value | Loaded face |
+|-------|-------|-------------|
+| `--font-normal` | `400` | Space Grotesk 400 |
+| `--font-semibold` | `600` | Space Grotesk 600 |
+| `--font-bold` | `700` | Space Grotesk 700 |
+
+**Heading defaults** are set in `reset.css` (`h1`–`h4`): `h1` → `--text-3xl`, `h2` → `--text-xl`, `h3` → `--text-lg`, `h4` → `--text-base`, all with `--font-semibold` and `--leading-tight`. Prefer tokens over raw `font-size` in component CSS; remove redundant heading `font-size` overrides when they only duplicate semantics.
+
+**Control sizing pattern:** buttons use `--text-base` (`shared.css`), form labels use `--text-sm` (`forms.css`), and inputs / textareas / selects use `--text-base`. The 14px label + 16px input pairing is intentional — common in web forms and keeps tap targets accessible.
+
 ### Spacing scale
 
 Canonical spacing tokens in `tokens.css` — a Tailwind-aligned scale on a 4px grid, expressed in `rem` (migrate incrementally; legacy `px` literals remain valid). The index tracks size: `--space-N` ≈ `N × 4px` (`--space-4` = `1rem` = 16px):
@@ -120,7 +155,7 @@ The scale is monotonic: `--space-N` is always larger than `--space-(N-1)`. Do no
 
 Prefer `u-*` utilities or component classes over raw `px` in templates. New page CSS should use spacing tokens where practical.
 
-**Intentional `px` exceptions** (not on the spacing scale): layout dimensions (`width`/`height`), `border-radius`, `border-width`, `font-size`, scroll anchors (`44px`, `140px`), and composite padding with off-scale values (e.g. `32px` horizontal chrome).
+**Intentional `px` exceptions** (not on the spacing scale): layout dimensions (`width`/`height`), `border-radius`, `border-width`, scroll anchors (`44px`, `140px`), and composite padding with off-scale values (e.g. `32px` horizontal chrome). Use type tokens for `font-size` — not raw `px`.
 
 ### Elevation and backdrop tokens
 
@@ -208,8 +243,10 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 | `u-mb-5` | `margin-bottom: var(--space-5)` (20px) |
 | `u-ml-1` | `margin-left: var(--space-1)` (4px) |
 | `u-pre-line` | `white-space: pre-line` |
-| `u-text-sm` | `font-size: 12px` |
-| `u-text-label` | `font-size: 14px; font-weight: bold` |
+| `u-text-xs` | `font-size: var(--text-xs)` |
+| `u-text-sm` | `font-size: var(--text-sm); font-weight: var(--font-semibold)` |
+| `u-text-base` | `font-size: var(--text-base)` |
+| `u-text-lg` | `font-size: var(--text-lg)` |
 | `u-flex` | `display: flex` |
 | `u-flex-center` | `display: flex; align-items: center` |
 | `u-gap-2` | `gap: var(--space-2)` (8px) |

@@ -36,13 +36,21 @@
   white-space: pre-line;
 }
 
-.u-text-sm {
-  font-size: 12px;
+.u-text-xs {
+  font-size: var(--text-xs);
 }
 
-.u-text-label {
-  font-size: 14px;
-  font-weight: bold;
+.u-text-sm {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.u-text-base {
+  font-size: var(--text-base);
+}
+
+.u-text-lg {
+  font-size: var(--text-lg);
 }
 
 .u-flex {
