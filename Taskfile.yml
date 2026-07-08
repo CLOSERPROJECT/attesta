@@ -79,6 +79,7 @@ tasks:
     desc: Hot reload Go server.
     cmds:
       - task: goa:generate
+      - task: build:formata
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
       - |
           sh -c '
@@ -113,10 +114,55 @@ tasks:
       - sh -c 'cd web && npm install'
       - sh -c 'cd web && npm run dev'
 
+  build:frontends:
+    desc: Build all bundled frontends (embedded Formata builder + web static assets).
+    cmds:
+      - task: build:formata
+      - task: build:web
+
+  build:formata:
+    desc: Build the embedded Formata builder bundle (server/cmd/server/formata-arch -> attesta/).
+    sources:
+      - server/cmd/server/formata-arch/src/**/*
+      - server/cmd/server/formata-arch/public/**/*
+      - server/cmd/server/formata-arch/index.html
+      - server/cmd/server/formata-arch/package.json
+      - server/cmd/server/formata-arch/bun.lock
+      - server/cmd/server/formata-arch/vite.config.ts
+      - server/cmd/server/formata-arch/tsconfig.json
+    generates:
+      - server/cmd/server/formata-arch/attesta/**/*
+    cmds:
+      - |
+          sh -c '
+          set -eu
+          if ! command -v bun >/dev/null 2>&1; then
+            echo "bun is required to build the Formata builder (https://bun.sh)" >&2
+            exit 1
+          fi
+          cd server/cmd/server/formata-arch
+          bun install
+          bun run build
+          '
+
+  build:web:
+    desc: Build the web (Vite) static bundle into web/dist.
+    sources:
+      - web/src/**/*
+      - web/package.json
+      - web/package-lock.json
+      - web/vite.config.js
+    generates:
+      - web/dist/**/*
+    cmds:
+      - sh -c 'cd web && npm install'
+      - sh -c 'cd web && npm run build'
+
   run:server:
     desc: Generate Goa artifacts, sync Go deps, and run the backend on localhost:3000.
     cmds:
       - task: goa:generate
+      - task: build:frontends
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
       - |
           sh -c '
