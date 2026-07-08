@@ -5,13 +5,16 @@
 }
 
 .topbar-pa {
-  background: var(--tobar-pa-bg);
+  background: var(--topbar-pa-bg);
+
   .brand {
     color: var(--brand-pa);
   }
+
   .topbar-pa-label {
     color: var(--ink-pa);
   }
+
   .nav .nav-action {
     color: var(--ink-pa);
     border-color: var(--ink-pa);
@@ -98,13 +101,8 @@
 
 .nav .nav-action:hover,
 .nav .account-menu[open] .nav-action {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--nav-hover-bg);
   text-decoration: none;
-}
-
-[data-theme="dark"] .nav .nav-action:hover,
-[data-theme="dark"] .nav .account-menu[open] .nav-action {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 .nav .nav-action-link {
@@ -167,6 +165,9 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav .account-menu-section form {
@@ -209,13 +210,6 @@
   background: color-mix(in srgb, var(--danger) 10%, var(--panel));
 }
 
-/* Optional: long emails won’t overflow */
-.nav .account-menu-email {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .nav .theme-toggle .theme-icon-sun {
   display: none;
 }
@@ -227,10 +221,12 @@
 [data-theme="dark"] .nav .theme-toggle .theme-icon-moon {
   display: none;
 }
+
 .page {
   flex: 1;
   padding: 28px 32px 60px;
 }
+
 .site-footer {
   margin-top: auto;
   padding: 18px 32px 24px;
@@ -248,9 +244,10 @@
 .site-footer p:last-child {
   margin-bottom: 0;
 }
+
 .hero {
   width: 100%;
-  padding: 20px 0px;
+  padding: 20px 0;
   display: flex;
   flex-direction: column;
   align-items: start;
@@ -262,9 +259,10 @@
   align-items: center;
   gap: 4px;
   border: none;
-  padding: 0px;
+  padding: 0;
 }
 
+/* stylelint: declaration-no-important — overrides global button hover fill on hero CTA */
 .hero button:hover:not(:disabled) {
   background: transparent !important;
   text-decoration: underline;
@@ -273,15 +271,18 @@
 .hero-body {
   justify-self: start;
   margin: 0;
+
   h1 {
     margin: 0;
   }
+
   p {
     margin: 4px 0 0;
     opacity: 0.7;
     font-weight: 400;
   }
 }
+
 .stack {
   display: grid;
   gap: 24px;
@@ -294,23 +295,28 @@
 .stack.u-gap-16 {
   gap: 16px;
 }
+
 .landing {
   max-width: 520px;
 }
+
 .login-wrapper {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
 }
+
 .panel.login {
   width: 100%;
   max-width: 460px;
 }
+
 .landing.landing-wide {
   max-width: none;
   width: 100%;
 }
+
 .process-resources-grid {
   gap: 12px;
   display: grid;
@@ -318,22 +324,26 @@
   justify-content: start;
   align-items: start;
 }
+
 .workflow-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-content: start;
   gap: 12px;
 }
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
 }
+
 .home-workflow-grid {
   display: grid;
   gap: 24px;
   align-items: start;
 }
+
 .org-admin-grid {
   display: grid;
   gap: 24px;

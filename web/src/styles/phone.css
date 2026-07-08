@@ -1,4 +1,5 @@
-@media (max-width: 640px) {
+/* --bp-phone: 640px — media queries cannot use var(); keep px in sync with tokens.css */
+@media (width <= 640px) {
   .dpp-history-item::before {
     left: 9px;
   }
@@ -21,17 +22,145 @@
   .dpp-integrity-hash-button {
     display: inline;
   }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .roles-item,
+  .users-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .roles-item .user-actions,
+  .users-item .user-actions {
+    justify-self: start;
+  }
+
+  .user-main {
+    flex-direction: column;
+    align-items: flex-start;
+    row-gap: 6px;
+  }
+
+  .user-email {
+    overflow-wrap: anywhere;
+  }
+
+  .role-palette-picker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manage-dialog-head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .manage-dialog-actions {
+    flex-direction: column;
+  }
+
+  .manage-dialog-actions .primary,
+  .manage-dialog-actions .secondary {
+    width: 100%;
+  }
+
+  .stream-status-section-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .stream-status-sort {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .stream-status-sort .process-control {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .stream-status-sort select {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .stream-preview-dialog {
+    width: min(var(--bp-desktop), calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+
+  .process-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .process-item-body {
+    padding-inline: 0;
+  }
+
+  .timeline-step-summary {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .timeline-step-summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .timeline-step-org-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .timeline-substeps {
+    padding-inline: 10px;
+  }
+
+  .substep-accordion-summary {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .substep-accordion-summary .status {
+    margin-left: 0;
+  }
+
+  .substep-details {
+    padding-inline: 10px;
+  }
+
+  .data-hash {
+    max-width: 100%;
+  }
+
+  .hash-value {
+    max-width: min(100%, 200px);
+  }
 }
 
-@media (max-width: 720px) {
+@media (width <= 720px) {
   .panel-head-actions {
     flex-direction: column;
+
     button {
       width: 100%;
     };
+
     form {
       width: 100%;
     };
+
     .panel-actions {
       width: 100%;
     };
