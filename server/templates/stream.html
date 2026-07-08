@@ -1,7 +1,7 @@
 {{/* Used on /w/.WorkflowKey to render the stream page (home_body). */}}
 
 {{ define "home_body" }}
-  <div class="stack max-w-7xl mx-auto">
+  <div class="stack u-max-w-7xl u-mx-auto">
     <section class="hero">
       <button class="secondary" onclick="location.href='/'">
         {{ template "icon-back" . }}
@@ -193,10 +193,7 @@
                 data-home-panel="{{ .Status }}"
                 {{ if ne .Status "available" }}hidden{{ end }}
               >
-                <div
-                  class="stream-status-section-head"
-                  style="--stream-color: var(--stream-{{ .Status }});"
-                >
+                <div class="stream-status-section-head" data-stream-status="{{ .Status }}">
                   <h3>
                     {{ if eq .Status "available" }}
                       Available
@@ -310,10 +307,7 @@
                               aria-valuemax="100"
                               aria-valuenow="{{ .Percent }}"
                             >
-                              <div
-                                class="process-progress-fill"
-                                style="width: {{ .Percent }}%;"
-                              ></div>
+                              <div class="process-progress-fill" style="--progress: {{ .Percent }}%;"></div>
                             </div>
                             <div class="process-meta">
                               <span class="process-meta-primary"
