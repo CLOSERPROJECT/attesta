@@ -1,6 +1,6 @@
 # CSS style guide (main Attesta app)
 
-This document describes how styling works for the server-rendered Attesta UI. It implements [ADR-0001](adr/0001-css-architecture-refactor.md) and [ADR-0004](adr/0004-css-polish.md).
+Source of truth for styling the server-rendered Attesta UI: CSS architecture, theming, role palettes, template rules, and lint.
 
 **Scope:** `web/src/styles/`, `server/templates/*.html`. Formata embed and Formata Builder (`formata-arch/`) are out of scope.
 
@@ -12,10 +12,10 @@ Styles load in this order from `web/src/styles.css`:
 |-------|------|----------|
 | Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font import |
 | Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
-| Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults |
+| Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout.css` | Page chrome: topbar, nav, stack, grids, footer |
-| Components | `components.css` | Reusable UI: panels, timeline, pills, forms |
+| Components | `components.css` | Barrel importing `components/*.css` (timeline, actions, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Page-specific compositions (DPP, stream, admin) |
 | Breakpoints | `phone.css`, `tablet.css`, `desktop.css` | Media-query overrides |
 
@@ -25,7 +25,7 @@ Styles load in this order from `web/src/styles.css`:
 
 - Light/dark mode toggles `data-theme="light|dark"` on `<html>` (see `web/src/main.js`).
 - Use design tokens (`var(--ink)`, `var(--panel)`, `var(--accent)`, etc.) — do not hardcode hex/rgb in templates or new CSS.
-- Role hue and stream status tokens use CSS `light-dark()` in `:root` (see [ADR-0004](adr/0004-css-polish.md)); `[data-theme="dark"]` keeps only non-role overrides.
+- Role hue and stream status tokens use CSS `light-dark()` in `:root`; `[data-theme="dark"]` keeps only non-role overrides.
 - Token names are stable; do not rename without a dedicated migration.
 
 ### Breakpoint tokens
@@ -42,7 +42,7 @@ Media query conditions must use literal `px` values (CSS cannot evaluate `var()`
 
 ### Documented color literal exceptions
 
-After the Phase 7 token hygiene audit, a few one-off compositional `rgba()` values remain outside `tokens.css`. Do not copy these into new CSS — prefer tokens or `color-mix(in srgb, var(--*) …%)`.
+A few one-off compositional `rgba()` values remain outside `tokens.css`. Do not copy these into new CSS — prefer tokens or `color-mix(in srgb, var(--*) …%)`.
 
 | File | Value | Use |
 |------|-------|-----|
@@ -51,6 +51,62 @@ After the Phase 7 token hygiene audit, a few one-off compositional `rgba()` valu
 | `components/org-admin.css` | `rgba(16, 26, 20, 0.48)` | Tinted backdrop on `.manage-dialog::backdrop` |
 | `components/actions.css` | `rgba(16, 26, 20, 0.16)` | Elevated shadow on attachment carousel nav buttons |
 | `components/timeline.css` | `rgba(0, 0, 0, 0.42)` | Fullscreen modal backdrop on `.substep-override-modal::backdrop` |
+
+## Role palette
+
+Role badge colors are resolved at runtime from **Appwrite team prefs**, not from workflow YAML or inline CSS values.
+
+### Data flow
+
+```
+Appwrite team prefs          Backend (roleMetaIndex)          Templates + CSS
+{ slug, name, palette }  →   (orgSlug, roleSlug) → key   →   data-role-palette="blue"
+                                                                      ↓
+                                                             role-palette.css → --role-*-bg
+```
+
+| Layer | Responsibility |
+|-------|----------------|
+| Appwrite | Canonical store: `{ slug, name, palette }` where `palette` is a named key (`blue`, `emerald`, …) |
+| Backend | Resolves org-scoped `(orgSlug, roleSlug)` to a palette key; never emits `var(--role-*-*)` strings to workflow templates |
+| Workflow YAML | Slug/org/name for validation only; `color` / `border` fields are ignored by Go |
+| Templates | Set `data-role-palette="{{ .Palette }}"` on `.role-pill` and timeline substeps |
+| `tokens.css` + `role-palette.css` | Single source of appearance; maps palette key → `--role-*-bg` tokens |
+
+### Storage and API
+
+- **Writes** persist `palette` only (no `color` / `border`).
+- **Reads** use `palette` when present; legacy rows with `color` / `border` CSS var strings fall back to `rolePaletteKeyFromStyle()`.
+- **`GET /api/catalog`** returns `palette` per role (no `color` / `border`).
+- **Unknown or missing role** → palette key `"fallback"` (not YAML-embedded colors).
+
+### Lookup rules
+
+Resolution is org-scoped via `(orgSlug, roleSlug)`:
+
+| Caller context | Lookup key |
+|----------------|------------|
+| Substep on a step with `organization: <org>` | `(stepOrg, roleSlug)` |
+| Substep with no step org; role unique in workflow | first org from config or identity catalog containing the slug |
+| Unknown org or missing role in Appwrite | `"fallback"`; label from slug |
+
+Key backend symbols: `roleMetaIndex`, `roleMetaFor`, `rolePaletteKeyFromStyle` in `server/cmd/server/`.
+
+### Frontend styling
+
+17 named palette keys (`red`, `orange`, `amber`, … `rose`) are defined in `rolePaletteStyles` and mapped in `role-palette.css`.
+
+Role pills on `process`, `action_list`, `dpp`, and `org_admin` use:
+
+```html
+<span class="role-pill" data-role-palette="{{ .Palette }}">{{ .Label }}</span>
+```
+
+Timeline substeps use the same attribute on `.substep`. Appearance is a soft-badge: text/border from the bg token with a 10% tint background (`color-mix`). The org-admin palette picker sets transient `--swatch-bg` on preview swatches only (not on role pill rows).
+
+Stream status uses `data-stream-status="{{ .Status }}"` on `.stream-status-section-head` (mapped in `role-palette.css`).
+
+Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 
 ## Utilities (`u-*`)
 
@@ -92,11 +148,7 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 |---------|---------|----------|
 | Progress width | `style="--progress: {{ .Percent }}%;"` | `.process-progress-fill` via `width: var(--progress, 0%)` |
 
-Stream status uses `data-stream-status="{{ .Status }}"` on `.stream-status-section-head` (mapped in `role-palette.css`); no inline style.
-
-Role pills (`process`, `action_list`, `dpp`, `org_admin`) use `data-role-palette="{{ .Palette }}"` on `.role-pill`; see [ADR-0002](adr/0002-role-color-appwrite-source.md) and [ADR-0003](adr/0003-role-palette-storage.md). Palette keys map to `--role-*-bg` in `role-palette.css` (soft-badge: text/border from bg token, 10% tint background). The org-admin palette picker sets transient `--swatch-bg` on preview swatches only (not on role pill rows).
-
-Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
+All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-stream-status`), not inline custom properties.
 
 ## Common component classes
 
@@ -123,7 +175,10 @@ Go serves the bundle at `/static/`.
 task css:lint
 ```
 
-Fails on disallowed `style=` attributes in `server/templates/`. Allowed patterns are listed above.
+Runs two checks:
+
+1. **Template inline styles** — fails on disallowed `style=` attributes in `server/templates/` (allowed patterns listed above).
+2. **stylelint** — CSS rules on `web/src/styles/**/*.css` (no hex/rgb outside `tokens.css`, no new `!important`).
 
 ## Adding new UI
 
@@ -132,3 +187,8 @@ Fails on disallowed `style=` attributes in `server/templates/`. Allowed patterns
 3. If the pattern is domain-specific, add a component or page class.
 4. Use tokens for colors; never hardcode hex in templates.
 5. Run `task css:lint` before opening a PR.
+
+## Out of scope / known gaps
+
+- **Formata embed** shadow-DOM styling in `web/src/main.js` (`!important` overrides) — separate effort; not covered here.
+- **Adding a new palette key** requires updates to `rolePaletteStyles`, `role-palette.css`, and the org-admin palette picker — not Go string passthrough to templates.

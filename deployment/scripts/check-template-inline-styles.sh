@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fail when server templates use disallowed inline style= attributes.
-# Allowed patterns are documented in docs/css.md (ADR-0001).
+# Allowed patterns are documented in docs/css.md.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
