@@ -24,9 +24,6 @@ web/dist/
 *.local
 !deployment/Dockerfile.local
 
-# Task (go-task) fingerprint cache
-.task/
-
 # Go
 bin/
 *.exe
