@@ -1,0 +1,244 @@
+.process-hero-titles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.process-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.process-item {
+  display: block;
+}
+
+.process-item-link {
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.process-available .process-item-link {
+  padding-left: 7px;
+  border-left: 6px solid var(--stream-available);
+  border-color: var(--stream-available);
+}
+
+.process-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 6px;
+}
+
+.process-item-link:hover,
+.process-item-link:focus-visible {
+  background-color: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.process-item-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.process-item-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  border: 1px solid currentcolor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--stream-active);
+  background: color-mix(in srgb, currentcolor 8%, transparent);
+}
+
+.process-item-icon.status-available {
+  color: var(--stream-available);
+}
+
+.process-item-icon.status-done {
+  color: var(--stream-done);
+}
+
+.process-item-icon.status-terminated {
+  color: var(--stream-terminated);
+}
+
+.no-process-item {
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--ink) 10%, var(--surface-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.process-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.process-title,
+.process-page-title {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.process-name {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.process-id {
+  font-family:
+    "Source Code Pro",
+    monospace;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.process-title .process-id {
+  font-size: 12px;
+}
+
+.process-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.process-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.process-toolbar select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.panel-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.process-progress-line {
+  height: 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.process-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: var(--progress, 0%);
+}
+
+.process-active .process-progress-fill {
+  height: 100%;
+  background: var(--stream-active);
+  width: var(--progress, 0%);
+}
+
+.process-done .process-progress-fill {
+  height: 100%;
+  background: var(--stream-done);
+  width: var(--progress, 0%);
+}
+
+.process-terminated .process-progress-fill {
+  height: 100%;
+  background: var(--stream-terminated);
+  width: var(--progress, 0%);
+}
+
+.status-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+}
+
+.status-tag-compact {
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+.status-tag.status-active {
+  border-color: var(--stream-active);
+  color: var(--stream-active);
+  background-color: color-mix(in srgb, var(--stream-active) 5%, transparent);
+}
+
+.status-tag.status-available {
+  color: var(--stream-available);
+  border-color: var(--stream-available);
+  background-color: color-mix(in srgb, var(--stream-available) 5%, transparent);
+}
+
+.status-tag.status-done {
+  color: var(--stream-done);
+  border-color: var(--stream-done);
+  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
+}
+
+.status-tag.status-terminated {
+  color: var(--stream-terminated);
+  border-color: var(--stream-terminated);
+  background: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
+}
+
+.process-meta {
+  display: flex;
+  place-items: center start;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.process-meta > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.process-meta-primary {
+  font-weight: 600;
+  color: var(--ink);
+}
