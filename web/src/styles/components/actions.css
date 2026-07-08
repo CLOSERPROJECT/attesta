@@ -1,21 +1,21 @@
 .action-reason {
-  margin: 12px 0 0;
+  margin: var(--space-3) 0 0;
 }
 
 .action-attachments {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 
 .manage-dialog-actions-spaced {
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
 
 .action-form {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: flex-end;
   position: relative;
   z-index: 1;
@@ -24,7 +24,7 @@
 .action-form label {
   display: flex;
   flex-direction: column;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -32,11 +32,11 @@
   flex: 1 1 100%;
   width: 100%;
   max-width: 100%;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .action-form input {
-  padding: 8px 10px;
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   min-width: 160px;
@@ -45,7 +45,7 @@
 }
 
 .action-form select {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -100,14 +100,14 @@
 
 .action-submitted {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 
 .local-adaptation-tools {
   display: flex;
   align-items: center;
-  margin-right: 4px;
+  margin-right: var(--space-1);
   margin-top: 0;
 }
 
@@ -115,27 +115,27 @@
   margin: 0;
   display: grid;
   grid-template-columns: minmax(120px, auto) 1fr;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .action-submitted-values dt,
 .action-submitted-values dd {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .action-submitted-values dt {
   color: var(--muted);
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--font-mono);
 }
 
 .action-submitted-attachments {
   margin: 0;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: 4px;
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   background: var(--surface-2);
   width: min(100%, 760px);
 }
@@ -146,9 +146,9 @@
   z-index: 2;
   min-width: 40px;
   min-height: 36px;
-  padding: 0 10px;
+  padding: 0 var(--space-3);
   transform: translateY(-50%);
-  box-shadow: 0 10px 24px rgb(16 26 20 / 16%);
+  box-shadow: 0 10px 24px var(--shadow-elevated);
 }
 
 .action-submitted-attachments-nav-prev {
@@ -166,7 +166,7 @@
 
 .action-submitted-attachment {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   width: min(100%, 760px);
   margin: 0 auto;
 }
@@ -180,17 +180,16 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .action-submitted-attachment-copy {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .action-submitted-attachment-copy h4 {
   margin: 0;
-  font-size: 15px;
 }
 
 .action-submitted-attachment-preview {
@@ -229,8 +228,8 @@
   height: 100%;
   display: grid;
   place-items: center;
-  gap: 6px;
-  padding: 24px;
+  gap: var(--space-2);
+  padding: var(--space-6);
   text-align: center;
   color: var(--muted);
 }
@@ -243,7 +242,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .action-submitted-attachments-dot {
@@ -270,4 +269,41 @@
 
 .action-submitted-attachment-preview-fallback strong {
   color: var(--ink);
+}
+
+@media (--md-down) {
+  .action-submitted-values {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  .action-submitted-values dt {
+    margin-top: var(--space-2);
+  }
+
+  .action-submitted-attachment-meta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .action-submitted-attachments-nav {
+    display: none;
+  }
+
+  .action-submitted-attachment {
+    width: 100%;
+  }
+
+  .action-submitted-attachment-preview {
+    min-height: 220px;
+    max-height: 360px;
+  }
+
+  .action-submitted-attachment-gesture {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    touch-action: pan-y;
+  }
 }

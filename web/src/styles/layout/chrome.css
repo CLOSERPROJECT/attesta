@@ -1,5 +1,5 @@
 .topbar {
-  padding: 20px 32px;
+  padding: var(--space-5) 32px;
   border-bottom: 1px solid var(--border);
   background: var(--chrome-bg);
 }
@@ -24,7 +24,7 @@
 .topbar-brand-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .topbar-content {
@@ -36,7 +36,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  margin-right: 12px;
+  margin-right: var(--space-3);
 }
 
 .brand-logo {
@@ -72,7 +72,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .nav .account-menu {
@@ -84,7 +84,7 @@
   align-items: center;
   justify-content: center;
   min-height: 38px;
-  padding: 0 14px;
+  padding: 0 var(--space-4);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: transparent;
@@ -92,7 +92,7 @@
   cursor: pointer;
   font: inherit;
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
   text-decoration: none;
   transition:
     background-color 140ms ease,
@@ -106,7 +106,7 @@
 }
 
 .nav .nav-action-link {
-  padding-inline: 16px;
+  padding-inline: var(--space-4);
 }
 
 .nav .theme-toggle,
@@ -141,7 +141,7 @@
 }
 
 .nav .account-menu-section {
-  padding: 8px;
+  padding: var(--space-2);
 }
 
 .nav .account-menu-section + .account-menu-section {
@@ -151,18 +151,18 @@
 }
 
 .nav .account-menu-section:first-child {
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
 }
 
 .nav .account-menu-label {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
 .nav .account-menu-email {
-  margin: 6px 0 0;
-  font-size: 14px;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
@@ -177,12 +177,12 @@
 .nav .account-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
   padding: 7px 9px;
   background: transparent;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-align: left;
   margin-left: 0;
@@ -224,21 +224,21 @@
 
 .page {
   flex: 1;
-  padding: 28px 32px 60px;
+  padding: var(--space-7) 32px 60px;
 }
 
 .site-footer {
   margin-top: auto;
-  padding: 18px 32px 24px;
+  padding: var(--space-5) 32px var(--space-6);
   border-top: 1px solid var(--border);
   background: var(--chrome-bg);
 }
 
 .site-footer p {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
 }
 
 .site-footer p:last-child {
@@ -247,23 +247,23 @@
 
 .hero {
   width: 100%;
-  padding: 20px 0;
+  padding: var(--space-5) 0;
   display: flex;
   flex-direction: column;
   align-items: start;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .hero button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   border: none;
   padding: 0;
 }
 
-/* stylelint: declaration-no-important — overrides global button hover fill on hero CTA */
 .hero button:hover:not(:disabled) {
+  /* stylelint-disable-next-line declaration-no-important -- overrides global button hover fill on hero CTA */
   background: transparent !important;
   text-decoration: underline;
 }
@@ -277,7 +277,7 @@
   }
 
   p {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     opacity: 0.7;
     font-weight: 400;
   }
@@ -285,15 +285,15 @@
 
 .stack {
   display: grid;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
-.stack.u-gap-8 {
-  gap: 8px;
+.stack.u-gap-2 {
+  gap: var(--space-2);
 }
 
-.stack.u-gap-16 {
-  gap: 16px;
+.stack.u-gap-4 {
+  gap: var(--space-4);
 }
 
 .landing {
@@ -315,41 +315,4 @@
 .landing.landing-wide {
   max-width: none;
   width: 100%;
-}
-
-.process-resources-grid {
-  gap: 12px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  justify-content: start;
-  align-items: start;
-}
-
-.workflow-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-content: start;
-  gap: 12px;
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.home-workflow-grid {
-  display: grid;
-  gap: 24px;
-  align-items: start;
-}
-
-.org-admin-grid {
-  display: grid;
-  gap: 24px;
-  align-items: start;
-}
-
-.org-admin-grid-ready {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }

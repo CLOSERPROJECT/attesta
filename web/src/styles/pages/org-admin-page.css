@@ -1,0 +1,144 @@
+/* Org admin page shell (forms/dialogs live in components/org-admin.css). */
+
+.org-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.org-admin-sidebar-nav {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.org-admin-sidebar-link {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.org-admin-sidebar-link:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.org-admin-sidebar-link.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+
+.org-admin-sidebar-link-title {
+  font-weight: 600;
+}
+
+.org-admin-sidebar-link-copy {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.org-admin-panel-main[data-org-admin-ready="true"]
+  [data-org-admin-panel][hidden] {
+  display: none;
+}
+
+.org-admin-panel-main {
+  grid-column: span 2;
+  display: grid;
+  gap: var(--space-7);
+}
+
+.org-admin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.org-admin-form-actions-stack {
+  display: grid;
+  justify-content: end;
+  gap: var(--space-3);
+}
+
+.org-profile-logo {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  object-fit: contain;
+  background: var(--panel);
+  padding: var(--space-1);
+}
+
+.org-profile-logo-sm {
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+}
+
+.org-profile-logo-placeholder {
+  width: 64px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--pill-bg);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.org-profile-logo-placeholder-sm {
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+}
+
+.org-profile-logo-placeholder-sm .icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.org-profile-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.org-profile-form {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.org-profile-name,
+.org-profile-slug {
+  margin: 0;
+}
+
+@media (--xl-down) {
+  .org-admin-panel-main {
+    scroll-margin-top: var(--space-3);
+    grid-column: auto;
+  }
+}

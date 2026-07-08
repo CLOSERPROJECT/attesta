@@ -14,35 +14,43 @@
   margin: 0;
 }
 
-.u-mb-8 {
-  margin-bottom: 8px;
+.u-mb-2 {
+  margin-bottom: var(--space-2);
 }
 
-.u-mb-16 {
-  margin-bottom: 16px;
+.u-mb-4 {
+  margin-bottom: var(--space-4);
 }
 
-/* Replaces repeated manage-dialog danger-zone paragraph spacing (margin: 0 0 20px). */
-.u-mb-20 {
-  margin-bottom: 20px;
+/* Replaces repeated manage-dialog danger-zone paragraph spacing. */
+.u-mb-5 {
+  margin-bottom: var(--space-5);
 }
 
-/* Replaces inline margin-left: 4px on compact CTA labels. */
-.u-ml-4 {
-  margin-left: 4px;
+/* Replaces inline margin-left on compact CTA labels. */
+.u-ml-1 {
+  margin-left: var(--space-1);
 }
 
 .u-pre-line {
   white-space: pre-line;
 }
 
-.u-text-sm {
-  font-size: 12px;
+.u-text-xs {
+  font-size: var(--text-xs);
 }
 
-.u-text-label {
-  font-size: 14px;
-  font-weight: bold;
+.u-text-sm {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.u-text-base {
+  font-size: var(--text-base);
+}
+
+.u-text-lg {
+  font-size: var(--text-lg);
 }
 
 .u-flex {
@@ -54,16 +62,16 @@
   align-items: center;
 }
 
-.u-gap-8 {
-  gap: 8px;
+.u-gap-2 {
+  gap: var(--space-2);
 }
 
-.u-gap-16 {
-  gap: 16px;
+.u-gap-4 {
+  gap: var(--space-4);
 }
 
 .u-divider {
-  margin: 24px 0;
+  margin: var(--space-6) 0;
   border: none;
   border-top: 1px solid var(--border);
 }
@@ -73,13 +81,13 @@
 }
 
 /* Replaces 20px-margin hr dividers in platform-admin invite dialogs. */
-.u-divider-20 {
-  margin: 20px 0;
+.u-divider-5 {
+  margin: var(--space-5) 0;
   border: none;
   border-top: 1px solid var(--border);
 }
 
 /* Replaces hardcoded signup error color with token-based danger text. */
-.text-danger {
+.u-text-danger {
   color: var(--danger);
 }

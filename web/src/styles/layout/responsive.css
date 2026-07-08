@@ -1,0 +1,23 @@
+@media (--md-down) {
+  .page {
+    padding: var(--space-4) var(--space-4) 32px;
+  }
+
+  .topbar {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+@media (--xl-down) {
+  .layout-stack-separator {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-6);
+  }
+}
+
+@media (--xl-up) {
+  .org-admin-sidebar {
+    position: sticky;
+    top: 44px;
+  }
+}

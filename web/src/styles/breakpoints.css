@@ -1,0 +1,10 @@
+/* Tailwind v3 defaults — sole source for @media thresholds */
+@custom-media --sm-up (width >= 640px);
+@custom-media --md-up (width >= 768px);
+@custom-media --lg-up (width >= 1024px);
+@custom-media --xl-up (width >= 1280px);
+@custom-media --2xl-up (width >= 1536px);
+@custom-media --sm-down (width < 640px);
+@custom-media --md-down (width < 768px);
+@custom-media --lg-down (width < 1024px);
+@custom-media --xl-down (width < 1280px);

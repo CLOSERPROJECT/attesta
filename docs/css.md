@@ -10,16 +10,69 @@ Styles load in this order from `web/src/styles.css`:
 
 | Layer | File | Contains |
 |-------|------|----------|
+| Breakpoints | `breakpoints.css` | Sole source of `@custom-media` aliases (Tailwind v3 widths) |
 | Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font import |
 | Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
-| Layout | `layout.css` | Page chrome: topbar, nav, stack, grids, footer |
+| Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
 | Components | `components.css` | Barrel importing `components/*.css` (timeline, actions, forms, org-admin, stream, shared) |
-| Pages | `pages.css` | Page-specific compositions (DPP, stream, admin) |
-| Breakpoints | `phone.css`, `tablet.css`, `desktop.css` | Media-query overrides |
+| Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
-**Placement rule:** token → utility → component → page. A selector lives in exactly one layer.
+**Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
+
+**Responsive placement:** co-locate `@media (--…)` blocks at the **bottom** of the owning module (component or page CSS). Shared page chrome and grid breakpoint behavior belongs in `layout/` (`grids.css`, `responsive.css`), not in separate breakpoint files.
+
+### Page modules (`pages/`)
+
+| File | Prefix / scope | Templates |
+|------|----------------|-----------|
+| `pages/process.css` | `.process-*` | `process.html` |
+| `pages/dpp.css` | `.dpp-*` | `dpp.html` |
+| `pages/home.css` | `.home-*`, `.preview-panel`, `.instances-panel` | `home.html`, `stream.html` (nav panels) |
+| `pages/stream.css` | `.stream-*` | `stream.html` |
+| `pages/org-admin-page.css` | `.org-admin-*`, `.org-profile-*` (page shell) | `org_admin.html` |
+| `pages/platform-admin.css` | `.platform-admin-*` | `platform_admin.html` |
+
+Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not the page module.
+
+### Template ↔ CSS index
+
+| Template | Primary CSS | Also uses |
+|----------|-------------|-----------|
+| `layout.html` | `layout/index.css` | `components/shared.css` |
+| `home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
+| `stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `role-palette.css` |
+| `process.html` | `pages/process.css` | `components/timeline.css`, `components/actions.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| `action_list.html` | `components/actions.css` | `components/forms.css`, `role-palette.css` |
+| `dpp.html` | `pages/dpp.css` | `components/timeline.css`, `role-palette.css` |
+| `org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
+| `platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
+| `login.html`, `signup.html`, `invite.html`, `reset_*.html` | `components/forms.css` | `components/shared.css` |
+| `attachment_carousel.html` | `components/actions.css` | — |
+| `substep_override_editor.html` | `components/timeline.css` | — |
+
+### `data-*` contract (templates → CSS / JS)
+
+| Attribute | Set in | Consumed by |
+|-----------|--------|-------------|
+| `data-theme` | `main.js` on `<html>` | `tokens.css` (`[data-theme="dark"]`) |
+| `data-role-palette` | role badges, timeline substeps | `role-palette.css` |
+| `data-stream-status` | `stream.html` section heads | `role-palette.css` |
+| `data-progress` (via `style="--progress: …"`) | `stream.html` | `.process-progress-fill` in `components/stream.css` |
+| `data-org-admin-nav`, `data-org-admin-panel`, `data-org-admin-default-panel`, `data-org-admin-ready` | `org_admin.html` | `pages/org-admin-page.css`, inline script in `org_admin.html` |
+| `data-home-nav`, `data-home-panel` | `stream.html` | `main.js` (panel switching) |
+| `data-process-id`, `data-workflow-key`, `data-selected-substep`, `data-substep-id` | `process.html` | `main.js` (SSE refresh, accordion) |
+| `data-formata-*`, `data-active-role-*` | `action_list.html` | `main.js` (Formata embed, role picker) |
+| `data-override-url` | `action_list.html` | `main.js` (substep override editor) |
+| `data-carousel-*` | `attachment_carousel.html` | `main.js`, `components/actions.css` |
+| `data-copy-text`, `data-copy-label` | `dpp.html` | `main.js` (clipboard) |
+| `data-share-url`, `data-share-label` | `dpp.html` | `main.js` (share link) |
+| `data-target` | password visibility toggles | `main.js` |
+| `data-value`, `data-label`, `data-selected` | org-admin role pickers | `components/org-admin.css`, inline script |
+| `data-role-color` | `role_palette_options.html` | org-admin palette picker script |
+
+Behavior hooks use a `js-*` class prefix alongside `data-*` where needed; do not style `js-*` classes in CSS.
 
 ## Theming
 
@@ -28,29 +81,102 @@ Styles load in this order from `web/src/styles.css`:
 - Role hue and stream status tokens use CSS `light-dark()` in `:root`; `[data-theme="dark"]` keeps only non-role overrides.
 - Token names are stable; do not rename without a dedicated migration.
 
-### Breakpoint tokens
+### Breakpoints
 
-Canonical viewport widths in `tokens.css`:
+**Tailwind v3 widths** (sm → 2xl) are the canonical thresholds:
 
-| Token | Value | Typical use |
+| Tailwind | Width | `@custom-media` up | `@custom-media` down |
+|----------|-------|--------------------|----------------------|
+| sm | 640px | `--sm-up` `(width >= 640px)` | `--sm-down` `(width < 640px)` |
+| md | 768px | `--md-up` | `--md-down` |
+| lg | 1024px | `--lg-up` | `--lg-down` |
+| xl | 1280px | `--xl-up` | `--xl-down` |
+| 2xl | 1536px | `--2xl-up` | — |
+
+- **`breakpoints.css`** is imported first in `styles.css` and is the **only** file that may define `@custom-media`.
+- **Stylesheet modules** use `@media (--sm-down) { … }` (or other aliases). Do **not** repeat `@custom-media` or write `@media (width … 640px)` in component/page CSS.
+- **PostCSS:** `postcss-custom-media` (see `web/postcss.config.js`) expands aliases at build time; Vite runs PostCSS on the bundled CSS.
+
+**JS sync:** when JavaScript needs the same threshold as CSS, use the equivalent `matchMedia` query. Example: `--xl-down` `(width < 1280px)` ↔ `matchMedia("(max-width: 1279px)")` (as in `org_admin.html` for mobile panel switching). Keep JS literals aligned with the table above when adding new breakpoint checks.
+
+### Font tokens
+
+| Token | Value |
+|-------|-------|
+| `--font-sans` | Space Grotesk stack (body, buttons, UI copy) |
+| `--font-mono` | Source Code Pro stack (hashes, codes) |
+
+Google Fonts are imported in `tokens.css`. Use `var(--font-sans)` / `var(--font-mono)` in new CSS — do not repeat font family strings.
+
+### Type scale
+
+Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index tracks size: `--text-sm` = `0.875rem` = 14px.
+
+| Token | rem | px | Typical use |
+|-------|-----|----|-------------|
+| `--text-xs` | `0.75rem` | 12 | Captions, pills, compact tags, meta IDs |
+| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels |
+| `--text-base` | `1rem` | 16 | Body, inputs, buttons, default prose |
+| `--text-lg` | `1.125rem` | 18 | Card titles, dialog titles, emphasis headings |
+| `--text-xl` | `1.25rem` | 20 | Section headings (`h2` in panels) |
+| `--text-2xl` | `1.5rem` | 24 | Large titles, emphasis page headings |
+| `--text-3xl` | `1.875rem` | 30 | Page titles (`h1` default) |
+
+**Line-height tokens**
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--leading-none` | `1` | Pills, single-line badges |
+| `--leading-tight` | `1.25` | Headings, compact titles |
+| `--leading-normal` | `1.5` | Body, form fields, paragraphs |
+| `--leading-relaxed` | `1.625` | Long-form muted copy (rare) |
+
+**Weight tokens**
+
+| Token | Value | Loaded face |
 |-------|-------|-------------|
-| `--bp-phone` | `640px` | `phone.css` overrides |
-| `--bp-tablet` | `900px` | Intermediate layouts |
-| `--bp-desktop` | `1200px` | Sidebar grids (`desktop.css`, `tablet.css`) |
+| `--font-normal` | `400` | Space Grotesk 400 |
+| `--font-semibold` | `600` | Space Grotesk 600 |
+| `--font-bold` | `700` | Space Grotesk 700 |
 
-Media query conditions must use literal `px` values (CSS cannot evaluate `var()` in `@media`). Keep breakpoint files in sync with these tokens; reference the token in layout properties inside queries when helpful (e.g. `min(var(--bp-desktop), 100vw)` on dialogs).
+**Heading defaults** are set in `reset.css` (`h1`–`h4`): `h1` → `--text-3xl`, `h2` → `--text-xl`, `h3` → `--text-lg`, `h4` → `--text-base`, all with `--font-semibold` and `--leading-tight`. Prefer tokens over raw `font-size` in component CSS; remove redundant heading `font-size` overrides when they only duplicate semantics.
+
+**Control sizing pattern:** buttons use `--text-base` (`shared.css`), form labels use `--text-sm` (`forms.css`), and inputs / textareas / selects use `--text-base`. The 14px label + 16px input pairing is intentional — common in web forms and keeps tap targets accessible.
+
+### Spacing scale
+
+Canonical spacing tokens in `tokens.css` — a Tailwind-aligned scale on a 4px grid, expressed in `rem` (migrate incrementally; legacy `px` literals remain valid). The index tracks size: `--space-N` ≈ `N × 4px` (`--space-4` = `1rem` = 16px):
+
+| Token | Value | px | Typical use |
+|-------|-------|----|-------------|
+| `--space-1` | `0.25rem` | 4 | Tight inline gaps |
+| `--space-2` | `0.5rem` | 8 | Default small gap, compact lists |
+| `--space-3` | `0.75rem` | 12 | Card padding, compact control padding |
+| `--space-4` | `1rem` | 16 | Grid gaps, card/list item padding |
+| `--space-5` | `1.25rem` | 20 | Panel padding, section margins/gaps |
+| `--space-6` | `1.5rem` | 24 | Stack default gap |
+| `--space-7` | `1.75rem` | 28 | Large section rhythm |
+
+The scale is monotonic: `--space-N` is always larger than `--space-(N-1)`. Do not reintroduce off-grid values (6/10/14/18px) or non-monotonic indices.
+
+Prefer `u-*` utilities or component classes over raw `px` in templates. New page CSS should use spacing tokens where practical.
+
+**Intentional `px` exceptions** (not on the spacing scale): layout dimensions (`width`/`height`), `border-radius`, `border-width`, scroll anchors (`44px`, `140px`), and composite padding with off-scale values (e.g. `32px` horizontal chrome). Use type tokens for `font-size` — not raw `px`.
+
+### Elevation and backdrop tokens
+
+| Token | Use |
+|-------|-----|
+| `--shadow` | Default panel shadow |
+| `--shadow-elevated` | Raised controls (carousel nav) |
+| `--shadow-dropdown` | Floating menus |
+| `--backdrop-modal` | Dialog `::backdrop` tint |
+| `--backdrop-fullscreen` | Fullscreen modal backdrop |
+| `--inset-highlight` | Inset top edge on gradient fields |
 
 ### Documented color literal exceptions
 
-A few one-off compositional `rgba()` values remain outside `tokens.css`. Do not copy these into new CSS — prefer tokens or `color-mix(in srgb, var(--*) …%)`.
-
-| File | Value | Use |
-|------|-------|-----|
-| `pages.css` | `rgba(255, 255, 255, 0.04)` | Inset top highlight on `.platform-admin-search-field` gradient |
-| `components/org-admin.css` | `rgba(0, 0, 0, 0.12)` | Elevated dropdown shadow on `.roles-picker-menu` |
-| `components/org-admin.css` | `rgba(16, 26, 20, 0.48)` | Tinted backdrop on `.manage-dialog::backdrop` |
-| `components/actions.css` | `rgba(16, 26, 20, 0.16)` | Elevated shadow on attachment carousel nav buttons |
-| `components/timeline.css` | `rgba(0, 0, 0, 0.42)` | Fullscreen modal backdrop on `.substep-override-modal::backdrop` |
+No compositional color literals remain outside `tokens.css`. If you need a new shadow or backdrop tint, add a semantic token in `tokens.css` rather than an inline `rgb()`.
 
 ## Role palette
 
@@ -94,7 +220,7 @@ Key backend symbols: `roleMetaIndex`, `roleMetaFor`, `rolePaletteKeyFromStyle` i
 
 ### Frontend styling
 
-17 named palette keys (`red`, `orange`, `amber`, … `rose`) are defined in `rolePaletteStyles` and mapped in `role-palette.css`.
+17 named palette keys (`red`, `orange`, `amber`, … `rose`) are defined in `rolePaletteStyles` / `rolePaletteKeys` (Go) and mapped in `role-palette.css`. `TestRolePaletteKeysMatchCSS` keeps Go and CSS keys in sync.
 
 Role pills on `process`, `action_list`, `dpp`, and `org_admin` use:
 
@@ -118,23 +244,25 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 | `u-max-w-prose` | `max-width: 65ch` |
 | `u-max-w-7xl` | `max-width: 80rem` |
 | `u-m-0` | `margin: 0` |
-| `u-mb-8` | `margin-bottom: 8px` |
-| `u-mb-16` | `margin-bottom: 16px` |
-| `u-mb-20` | `margin-bottom: 20px` |
-| `u-ml-4` | `margin-left: 4px` |
+| `u-mb-2` | `margin-bottom: var(--space-2)` (8px) |
+| `u-mb-4` | `margin-bottom: var(--space-4)` (16px) |
+| `u-mb-5` | `margin-bottom: var(--space-5)` (20px) |
+| `u-ml-1` | `margin-left: var(--space-1)` (4px) |
 | `u-pre-line` | `white-space: pre-line` |
-| `u-text-sm` | `font-size: 12px` |
-| `u-text-label` | `font-size: 14px; font-weight: bold` |
+| `u-text-xs` | `font-size: var(--text-xs)` |
+| `u-text-sm` | `font-size: var(--text-sm); font-weight: var(--font-semibold)` |
+| `u-text-base` | `font-size: var(--text-base)` |
+| `u-text-lg` | `font-size: var(--text-lg)` |
 | `u-flex` | `display: flex` |
 | `u-flex-center` | `display: flex; align-items: center` |
-| `u-gap-8` | `gap: 8px` |
-| `u-gap-16` | `gap: 16px` |
-| `u-divider` | Horizontal rule, 24px vertical margin |
+| `u-gap-2` | `gap: var(--space-2)` (8px) |
+| `u-gap-4` | `gap: var(--space-4)` (16px) |
+| `u-divider` | Horizontal rule, `var(--space-6)` vertical margin |
 | `u-divider-flush` | `<hr>` with `margin: 0` |
-| `u-divider-20` | Horizontal rule, 20px vertical margin |
-| `text-danger` | `color: var(--danger)` |
+| `u-divider-5` | Horizontal rule, `var(--space-5)` vertical margin |
+| `u-text-danger` | `color: var(--danger)` |
 
-**Stack gap modifiers:** `.stack.u-gap-8` and `.stack.u-gap-16` override the default 24px stack gap.
+**Stack gap modifiers:** `.stack.u-gap-2` and `.stack.u-gap-4` override the default `var(--space-6)` stack gap.
 
 **Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.workflow-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
 
@@ -175,16 +303,17 @@ Go serves the bundle at `/static/`.
 task css:lint
 ```
 
-Runs two checks:
+Runs three checks:
 
-1. **Template inline styles** — fails on disallowed `style=` attributes in `server/templates/` (allowed patterns listed above).
-2. **stylelint** — CSS rules on `web/src/styles/**/*.css` (no hex/rgb outside `tokens.css`, no new `!important`).
+1. **Template inline styles** — `deployment/scripts/check-template-inline-styles.sh` fails on disallowed `style=` attributes in `server/templates/` (allowed patterns listed above).
+2. **Breakpoint guard** — `deployment/scripts/check-css-breakpoints.sh` fails when any file under `web/src/styles/` (except `breakpoints.css`) contains `@media (width …)` with literal `px` values; use `@media (--sm-down)` etc. instead.
+3. **stylelint** — CSS rules on `web/src/styles/**/*.css` (no hex/rgb outside `tokens.css`, no new `!important`).
 
 ## Adding new UI
 
 1. Check for an existing component class or utility.
 2. If spacing/typography repeats across templates, add a `u-*` utility.
-3. If the pattern is domain-specific, add a component or page class.
+3. If the pattern is domain-specific, add a component or page class (see **Page modules**).
 4. Use tokens for colors; never hardcode hex in templates.
 5. Run `task css:lint` before opening a PR.
 

@@ -1,0 +1,18 @@
+.home-workflow-panel-main {
+  display: grid;
+}
+
+.preview-panel {
+  scroll-margin-top: 44px;
+}
+
+.instances-panel {
+  scroll-margin-top: 140px;
+}
+
+@media (--xl-down) {
+  .preview-panel,
+  .instances-panel {
+    scroll-margin-top: var(--space-3);
+  }
+}

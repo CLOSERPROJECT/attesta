@@ -1,6 +1,6 @@
 .timeline-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -20,12 +20,12 @@
 }
 
 .timeline-step-summary {
-  padding: 12px;
+  padding: var(--space-3);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -37,7 +37,7 @@
 .timeline-step-summary-main {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -98,31 +98,31 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .timeline-step-title {
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: var(--font-bold);
   color: var(--ink);
   overflow-wrap: anywhere;
 }
 
 .timeline-step-org {
-  font-size: 13px;
-  line-height: 1.25;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
   color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .timeline-substeps {
   list-style: none;
-  padding: 16px 12px 12px;
+  padding: var(--space-4) var(--space-3) var(--space-3);
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -136,7 +136,7 @@
     transform 300ms ease,
     opacity 300ms ease;
   min-width: 0;
-  gap: 8px;
+  gap: var(--space-2);
   position: relative;
 }
 
@@ -160,8 +160,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .substep-accordion-summary::marker,
@@ -173,12 +173,12 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .substep-accordion[open] {
   .substep-accordion-summary {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
     border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   }
 
@@ -225,19 +225,19 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .substep-accordion-summary .status {
   margin-left: auto;
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: var(--text-xs);
   letter-spacing: 0.04em;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--tag-bg);
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
 }
 
 .substep-available .status {
@@ -282,8 +282,8 @@
 .substep-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 12px;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
   color: var(--muted);
   min-width: 0;
 }
@@ -294,19 +294,19 @@
 }
 
 .substep-summary-supporting {
-  padding-top: 6px;
+  padding-top: var(--space-2);
 }
 
 .substep-details {
-  padding: 0 12px 12px;
+  padding: 0 var(--space-3) var(--space-3);
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .data-hash {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
   max-width: min(100%, 520px);
 }
@@ -332,17 +332,17 @@
 }
 
 .substep-override-modal::backdrop {
-  background: rgb(0 0 0 / 42%);
+  background: var(--backdrop-fullscreen);
 }
 
 .substep-override-editor,
 .substep-override-loading {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
   height: 100%;
   min-height: 0;
-  padding: 18px;
+  padding: var(--space-5);
   box-sizing: border-box;
 }
 
@@ -350,20 +350,20 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .substep-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 1.5em;
-  line-height: 1;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  line-height: var(--leading-none);
 }
 
 .substep-override-reason {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .substep-override-frame {
@@ -383,9 +383,110 @@
   border: none;
   color: var(--accent);
   margin: 0;
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .js-open-substep-override:hover {
   text-decoration: underline;
+}
+
+@media (--sm-down) {
+  .timeline-step-summary {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .timeline-step-summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .timeline-step-org-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .timeline-substeps {
+    padding-inline: var(--space-3);
+  }
+
+  .substep-accordion-summary {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .substep-accordion-summary .status {
+    margin-left: 0;
+  }
+
+  .substep-details {
+    padding-inline: var(--space-3);
+  }
+
+  .data-hash {
+    max-width: 100%;
+  }
+
+  .hash-value {
+    max-width: min(100%, 200px);
+  }
+}
+
+@media (--md-down) {
+  .substep-meta {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .substep-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timeline-step[open] > summary {
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 10;
+  }
+
+  .substep.substep-done .substep-accordion[open] > .substep-accordion-summary {
+    background: var(--substep-done);
+  }
+
+  .substep.substep-available .substep-accordion[open] > .substep-accordion-summary {
+    background: var(--substep-available);
+  }
+
+  .substep.substep-active .substep-accordion[open] > .substep-accordion-summary {
+    background: var(--substep-available);
+  }
+
+  .substep.substep-locked .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-done);
+  }
+
+  .substep.substep-terminated .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-terminated-border);
+    background: var(--substep-terminated);
+  }
+
+  .substep.substep-skipped .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-skipped);
+  }
+
+  .substep-accordion[open] > summary {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .timeline-step[open]:has(.substep-accordion[open]) > summary {
+    position: static;
+  }
 }

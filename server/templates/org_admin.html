@@ -257,7 +257,7 @@
                           {{ template "icon-trash-muted" . }}
                         </button>
                       {{ else }}
-                        <span class="muted u-text-sm"
+                        <span class="muted u-text-xs"
                           >Not used</span
                         >
                         <button
@@ -674,7 +674,7 @@
                             {{ template "icon-close" . }}
                           </button>
                         </header>
-                        <p class="u-m-0 u-mb-20">
+                        <p class="u-m-0 u-mb-5">
                           This will remove the account from your organization.
                           Confirm only if you want to permanently delete this
                           user access.
@@ -901,7 +901,7 @@
 <script>
   (function () {
     const orgAdminShell = document.querySelector("[data-org-admin-shell]");
-    const orgAdminMobilePanelMedia = window.matchMedia("(max-width: 1199px)");
+    const orgAdminMobilePanelMedia = window.matchMedia("(max-width: 1279px)");
     const orgAdminStorageKey = "attesta_org_admin_panel";
     const orgAdminPanels = new Set(["profile", "roles", "members"]);
     let activeOrgAdminPanel = "profile";

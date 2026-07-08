@@ -1,10 +1,8 @@
+@import "./styles/breakpoints.css";
 @import "./styles/tokens.css";
 @import "./styles/role-palette.css";
 @import "./styles/reset.css";
 @import "./styles/utilities.css";
-@import "./styles/layout.css";
+@import "./styles/layout/index.css";
 @import "./styles/components.css";
 @import "./styles/pages.css";
-@import "./styles/phone.css";
-@import "./styles/tablet.css";
-@import "./styles/desktop.css";
