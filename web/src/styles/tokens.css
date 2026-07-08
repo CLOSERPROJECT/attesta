@@ -3,6 +3,19 @@
 :root {
   color-scheme: light;
 
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "Source Code Pro", monospace;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-7: 24px;
+  --space-8: 28px;
+  --space-9: 10px;
+  --space-10: 14px;
+  --space-11: 18px;
   --bp-phone: 640px;
   --bp-tablet: 900px;
   --bp-desktop: 1200px;
@@ -16,6 +29,11 @@
   --danger: #c0392b;
   --border: #d9e0d0;
   --shadow: rgb(16 26 20 / 8%);
+  --shadow-elevated: rgb(16 26 20 / 16%);
+  --shadow-dropdown: rgb(0 0 0 / 12%);
+  --backdrop-modal: rgb(16 26 20 / 48%);
+  --backdrop-fullscreen: rgb(0 0 0 / 42%);
+  --inset-highlight: rgb(255 255 255 / 4%);
   --inset-ring: rgb(0 0 0 / 8%);
   --nav-hover-bg: light-dark(rgb(0 0 0 / 4%), rgb(255 255 255 / 6%));
   --page-bg: linear-gradient(135deg, #f3f4ef 0%, #e9efe2 100%);
