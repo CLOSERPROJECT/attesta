@@ -41,7 +41,7 @@
     {{ if .ActionList.ProcessDone }}
       <div class="process-resources-grid">
         {{ template "workflow_timeline" .ActionList }}
-        <div class="stack tablet-seprator u-gap-4">
+        <div class="stack layout-stack-separator u-gap-4">
           {{ template "process_termination_details" .ActionList }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}

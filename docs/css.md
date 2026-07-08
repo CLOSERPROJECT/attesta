@@ -10,16 +10,18 @@ Styles load in this order from `web/src/styles.css`:
 
 | Layer | File | Contains |
 |-------|------|----------|
+| Breakpoints | `breakpoints.css` | Sole source of `@custom-media` aliases (Tailwind v3 widths) |
 | Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font import |
 | Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
-| Layout | `layout.css` | Page chrome: topbar, nav, stack, grids, footer |
+| Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
 | Components | `components.css` | Barrel importing `components/*.css` (timeline, actions, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
-| Breakpoints | `phone.css`, `tablet.css`, `desktop.css` | Media-query overrides |
 
-**Placement rule:** token → utility → component → page. A selector lives in exactly one layer.
+**Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
+
+**Responsive placement:** co-locate `@media (--…)` blocks at the **bottom** of the owning module (component or page CSS). Shared page chrome and grid breakpoint behavior belongs in `layout/` (`grids.css`, `responsive.css`), not in separate breakpoint files.
 
 ### Page modules (`pages/`)
 
@@ -38,10 +40,10 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 
 | Template | Primary CSS | Also uses |
 |----------|-------------|-----------|
-| `layout.html` | `layout.css` | `components/shared.css` |
-| `home.html` | `pages/home.css` | `components/stream.css`, `layout.css` |
+| `layout.html` | `layout/index.css` | `components/shared.css` |
+| `home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
 | `stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `role-palette.css` |
-| `process.html` | `pages/process.css` | `components/timeline.css`, `components/actions.css`, `role-palette.css` |
+| `process.html` | `pages/process.css` | `components/timeline.css`, `components/actions.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `action_list.html` | `components/actions.css` | `components/forms.css`, `role-palette.css` |
 | `dpp.html` | `pages/dpp.css` | `components/timeline.css`, `role-palette.css` |
 | `org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
@@ -49,8 +51,6 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 | `login.html`, `signup.html`, `invite.html`, `reset_*.html` | `components/forms.css` | `components/shared.css` |
 | `attachment_carousel.html` | `components/actions.css` | — |
 | `substep_override_editor.html` | `components/timeline.css` | — |
-
-Responsive overrides for page classes live in `phone.css`, `tablet.css`, and `desktop.css` — not inline in page modules.
 
 ### `data-*` contract (templates → CSS / JS)
 
@@ -81,17 +81,23 @@ Behavior hooks use a `js-*` class prefix alongside `data-*` where needed; do not
 - Role hue and stream status tokens use CSS `light-dark()` in `:root`; `[data-theme="dark"]` keeps only non-role overrides.
 - Token names are stable; do not rename without a dedicated migration.
 
-### Breakpoint tokens
+### Breakpoints
 
-Canonical viewport widths in `tokens.css`:
+**Tailwind v3 widths** (sm → 2xl) are the canonical thresholds:
 
-| Token | Value | Typical use |
-|-------|-------|-------------|
-| `--bp-phone` | `640px` | `phone.css` overrides |
-| `--bp-tablet` | `900px` | Intermediate layouts |
-| `--bp-desktop` | `1200px` | Sidebar grids (`desktop.css`, `tablet.css`) |
+| Tailwind | Width | `@custom-media` up | `@custom-media` down |
+|----------|-------|--------------------|----------------------|
+| sm | 640px | `--sm-up` `(width >= 640px)` | `--sm-down` `(width < 640px)` |
+| md | 768px | `--md-up` | `--md-down` |
+| lg | 1024px | `--lg-up` | `--lg-down` |
+| xl | 1280px | `--xl-up` | `--xl-down` |
+| 2xl | 1536px | `--2xl-up` | — |
 
-Media query conditions must use literal `px` values (CSS cannot evaluate `var()` in `@media`). Keep breakpoint files in sync with these tokens; reference the token in layout properties inside queries when helpful (e.g. `min(var(--bp-desktop), 100vw)` on dialogs).
+- **`breakpoints.css`** is imported first in `styles.css` and is the **only** file that may define `@custom-media`.
+- **Stylesheet modules** use `@media (--sm-down) { … }` (or other aliases). Do **not** repeat `@custom-media` or write `@media (width … 640px)` in component/page CSS.
+- **PostCSS:** `postcss-custom-media` (see `web/postcss.config.js`) expands aliases at build time; Vite runs PostCSS on the bundled CSS.
+
+**JS sync:** when JavaScript needs the same threshold as CSS, use the equivalent `matchMedia` query. Example: `--xl-down` `(width < 1280px)` ↔ `matchMedia("(max-width: 1279px)")` (as in `org_admin.html` for mobile panel switching). Keep JS literals aligned with the table above when adding new breakpoint checks.
 
 ### Font tokens
 
@@ -297,10 +303,11 @@ Go serves the bundle at `/static/`.
 task css:lint
 ```
 
-Runs two checks:
+Runs three checks:
 
-1. **Template inline styles** — fails on disallowed `style=` attributes in `server/templates/` (allowed patterns listed above).
-2. **stylelint** — CSS rules on `web/src/styles/**/*.css` (no hex/rgb outside `tokens.css`, no new `!important`).
+1. **Template inline styles** — `deployment/scripts/check-template-inline-styles.sh` fails on disallowed `style=` attributes in `server/templates/` (allowed patterns listed above).
+2. **Breakpoint guard** — `deployment/scripts/check-css-breakpoints.sh` fails when any file under `web/src/styles/` (except `breakpoints.css`) contains `@media (width …)` with literal `px` values; use `@media (--sm-down)` etc. instead.
+3. **stylelint** — CSS rules on `web/src/styles/**/*.css` (no hex/rgb outside `tokens.css`, no new `!important`).
 
 ## Adding new UI
 

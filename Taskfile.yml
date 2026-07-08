@@ -147,9 +147,10 @@ tasks:
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
 
   css:lint:
-    desc: CSS lint (template inline styles + stylelint).
+    desc: CSS lint (template inline styles + breakpoint guard + stylelint).
     cmds:
       - bash deployment/scripts/check-template-inline-styles.sh
+      - bash deployment/scripts/check-css-breakpoints.sh
       - cd web && { [ -d node_modules ] || npm ci; }
       - cd web && npm run lint:css
 

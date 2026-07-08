@@ -389,3 +389,104 @@
 .js-open-substep-override:hover {
   text-decoration: underline;
 }
+
+@media (--sm-down) {
+  .timeline-step-summary {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .timeline-step-summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .timeline-step-org-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .timeline-substeps {
+    padding-inline: var(--space-3);
+  }
+
+  .substep-accordion-summary {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .substep-accordion-summary .status {
+    margin-left: 0;
+  }
+
+  .substep-details {
+    padding-inline: var(--space-3);
+  }
+
+  .data-hash {
+    max-width: 100%;
+  }
+
+  .hash-value {
+    max-width: min(100%, 200px);
+  }
+}
+
+@media (--md-down) {
+  .substep-meta {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .substep-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timeline-step[open] > summary {
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 10;
+  }
+
+  .substep.substep-done .substep-accordion[open] > .substep-accordion-summary {
+    background: var(--substep-done);
+  }
+
+  .substep.substep-available .substep-accordion[open] > .substep-accordion-summary {
+    background: var(--substep-available);
+  }
+
+  .substep.substep-active .substep-accordion[open] > .substep-accordion-summary {
+    background: var(--substep-available);
+  }
+
+  .substep.substep-locked .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-done);
+  }
+
+  .substep.substep-terminated .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-terminated-border);
+    background: var(--substep-terminated);
+  }
+
+  .substep.substep-skipped .substep-accordion[open] > .substep-accordion-summary {
+    border-color: var(--substep-done-border);
+    background: var(--substep-skipped);
+  }
+
+  .substep-accordion[open] > summary {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .timeline-step[open]:has(.substep-accordion[open]) > summary {
+    position: static;
+  }
+}

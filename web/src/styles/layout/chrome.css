@@ -262,8 +262,8 @@
   padding: 0;
 }
 
-/* stylelint: declaration-no-important — overrides global button hover fill on hero CTA */
 .hero button:hover:not(:disabled) {
+  /* stylelint-disable-next-line declaration-no-important -- overrides global button hover fill on hero CTA */
   background: transparent !important;
   text-decoration: underline;
 }
@@ -315,41 +315,4 @@
 .landing.landing-wide {
   max-width: none;
   width: 100%;
-}
-
-.process-resources-grid {
-  gap: var(--space-3);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  justify-content: start;
-  align-items: start;
-}
-
-.workflow-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-content: start;
-  gap: var(--space-3);
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-4);
-}
-
-.home-workflow-grid {
-  display: grid;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.org-admin-grid {
-  display: grid;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.org-admin-grid-ready {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }

@@ -21,7 +21,13 @@
       }
     },
     {
-      "files": ["**/layout.css"],
+      "files": ["**/breakpoints.css"],
+      "rules": {
+        "custom-media-pattern": null
+      }
+    },
+    {
+      "files": ["**/layout/**", "**/layout/*.css"],
       "rules": {
         "declaration-no-important": null
       }

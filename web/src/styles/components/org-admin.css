@@ -424,3 +424,64 @@ hr {
   font-size: var(--text-sm);
   margin: var(--space-2) 0 0;
 }
+
+@media (--sm-down) {
+  .roles-item,
+  .users-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  .roles-item .user-actions,
+  .users-item .user-actions {
+    justify-self: start;
+  }
+
+  .user-main {
+    flex-direction: column;
+    align-items: flex-start;
+    row-gap: var(--space-2);
+  }
+
+  .user-email {
+    overflow-wrap: anywhere;
+  }
+
+  .role-palette-picker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manage-dialog-head {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .manage-dialog-actions {
+    flex-direction: column;
+  }
+
+  .manage-dialog-actions .primary,
+  .manage-dialog-actions .secondary {
+    width: 100%;
+  }
+}
+
+@media (--md-down) {
+  .panel-head-actions {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+
+    form {
+      width: 100%;
+    }
+
+    .panel-actions {
+      width: 100%;
+    }
+  }
+}

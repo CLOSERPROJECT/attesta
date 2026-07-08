@@ -135,3 +135,10 @@
 .org-profile-slug {
   margin: 0;
 }
+
+@media (--xl-down) {
+  .org-admin-panel-main {
+    scroll-margin-top: var(--space-3);
+    grid-column: auto;
+  }
+}

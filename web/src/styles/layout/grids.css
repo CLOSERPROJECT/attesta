@@ -1,0 +1,74 @@
+.workflow-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: start;
+  gap: var(--space-3);
+}
+
+@media (--sm-up) {
+  .workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (--lg-up) {
+  .workflow-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (--2xl-up) {
+  .workflow-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.home-workflow-grid {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (--xl-up) {
+  .home-workflow-grid {
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.org-admin-grid {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.org-admin-grid-ready {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (--xl-up) {
+  .org-admin-grid-ready {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.process-resources-grid {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: start;
+  align-items: start;
+}
+
+@media (--lg-up) {
+  .process-resources-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+}

@@ -35,8 +35,15 @@
 }
 
 .stream-preview-dialog {
-  width: min(80rem, calc(100vw - 48px));
-  max-width: calc(100vw - 48px);
+  width: calc(100vw - 24px);
+  max-width: calc(100vw - 24px);
+}
+
+@media (--sm-up) {
+  .stream-preview-dialog {
+    width: min(80rem, calc(100vw - 48px));
+    max-width: calc(100vw - 48px);
+  }
 }
 
 .stream-preview-dialog-card {

@@ -9,3 +9,10 @@
 .instances-panel {
   scroll-margin-top: 140px;
 }
+
+@media (--xl-down) {
+  .preview-panel,
+  .instances-panel {
+    scroll-margin-top: var(--space-3);
+  }
+}

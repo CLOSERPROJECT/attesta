@@ -485,3 +485,9 @@ button.secondary-small {
   opacity: 0.5;
   pointer-events: none;
 }
+
+@media (--sm-down) {
+  .panel {
+    padding: var(--space-4);
+  }
+}
