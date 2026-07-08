@@ -1,0 +1,51 @@
+.stream-status-sections {
+  display: grid;
+  gap: var(--space-11);
+}
+
+.stream-status-section {
+  scroll-margin-top: 44px;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.stream-status-section[hidden] {
+  display: none;
+}
+
+.stream-status-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: 4px;
+  border-left: 6px solid;
+  background: color-mix(in srgb, var(--stream-color) 50%, transparent);
+  border-color: var(--stream-color);
+}
+
+.stream-status-section-head h3 {
+  margin: 0;
+}
+
+.stream-status-sort {
+  margin: 0;
+  justify-content: flex-start;
+}
+
+.stream-preview-dialog {
+  width: min(80rem, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
+}
+
+.stream-preview-dialog-card {
+  width: 100%;
+  max-height: min(900px, calc(100vh - 48px));
+  overflow: auto;
+}
+
+.stream-preview-dialog-body {
+  display: grid;
+  gap: var(--space-5);
+}
