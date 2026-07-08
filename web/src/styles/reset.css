@@ -20,8 +20,31 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
 h1,
 h2,
 h3 {
   margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* stylelint: declaration-no-important — must beat component transition rules */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

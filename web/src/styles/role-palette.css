@@ -1,0 +1,77 @@
+/* Palette key → shared custom properties (consumed by .role-pill, etc.) */
+[data-role-palette="red"] {
+  --palette-bg: var(--role-red-bg);
+}
+
+[data-role-palette="orange"] {
+  --palette-bg: var(--role-orange-bg);
+}
+
+[data-role-palette="amber"] {
+  --palette-bg: var(--role-amber-bg);
+}
+
+[data-role-palette="yellow"] {
+  --palette-bg: var(--role-yellow-bg);
+}
+
+[data-role-palette="lime"] {
+  --palette-bg: var(--role-lime-bg);
+}
+
+[data-role-palette="green"] {
+  --palette-bg: var(--role-green-bg);
+}
+
+[data-role-palette="emerald"] {
+  --palette-bg: var(--role-emerald-bg);
+}
+
+[data-role-palette="teal"] {
+  --palette-bg: var(--role-teal-bg);
+}
+
+[data-role-palette="cyan"] {
+  --palette-bg: var(--role-cyan-bg);
+}
+
+[data-role-palette="sky"] {
+  --palette-bg: var(--role-sky-bg);
+}
+
+[data-role-palette="blue"] {
+  --palette-bg: var(--role-blue-bg);
+}
+
+[data-role-palette="indigo"] {
+  --palette-bg: var(--role-indigo-bg);
+}
+
+[data-role-palette="violet"] {
+  --palette-bg: var(--role-violet-bg);
+}
+
+[data-role-palette="purple"] {
+  --palette-bg: var(--role-purple-bg);
+}
+
+[data-role-palette="fuchsia"] {
+  --palette-bg: var(--role-fuchsia-bg);
+}
+
+[data-role-palette="pink"] {
+  --palette-bg: var(--role-pink-bg);
+}
+
+[data-role-palette="rose"] {
+  --palette-bg: var(--role-rose-bg);
+}
+
+.role-pill {
+  --pill-bg: var(--palette-bg, var(--muted));
+}
+
+.stream-status-section-head[data-stream-status="available"] { --stream-color: var(--stream-available); }
+.stream-status-section-head[data-stream-status="active"] { --stream-color: var(--stream-active); }
+.stream-status-section-head[data-stream-status="done"] { --stream-color: var(--stream-done); }
+.stream-status-section-head[data-stream-status="terminated"] { --stream-color: var(--stream-terminated); }

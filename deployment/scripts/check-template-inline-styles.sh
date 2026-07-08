@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Fail when server templates use disallowed inline style= attributes.
-# Allowed patterns are documented in docs/css.md (ADR-0001).
+# Allowed patterns are documented in docs/css.md.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 templates="${root}/server/templates"
 
-allowed_pattern='--stream-color:|width:[[:space:]]*\{\{'
+allowed_pattern='--progress:'
 
 scan_styles() {
   if command -v rg >/dev/null 2>&1; then

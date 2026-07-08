@@ -1,0 +1,30 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "color-no-hex": true,
+    "declaration-no-important": true,
+    "max-nesting-depth": 3,
+    "no-descending-specificity": null,
+    "selector-class-pattern": [
+      "^[a-z][a-z0-9]*(-[a-z0-9]+)*(--[a-z0-9]+(-[a-z0-9]+)*)?$",
+      {
+        "resolveNestedSelectors": true
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/tokens.css", "**/reset.css"],
+      "rules": {
+        "color-no-hex": null,
+        "declaration-no-important": null
+      }
+    },
+    {
+      "files": ["**/layout.css"],
+      "rules": {
+        "declaration-no-important": null
+      }
+    }
+  ]
+}

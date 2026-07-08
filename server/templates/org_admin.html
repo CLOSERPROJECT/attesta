@@ -2,7 +2,7 @@
 
 {{ define "org_admin_body" }}
 
-  <div class="stack max-w-7xl mx-auto">
+  <div class="stack u-max-w-7xl u-mx-auto">
     <section class="hero">
       <button class="secondary" onclick="location.href='/'">
         {{ template "icon-back" . }}
@@ -749,7 +749,7 @@
                 </div>
                 <div class="form-field">
                   <label for="role-palette">Role color palette</label>
-                  <div class="role-palette-picker" data-role-palette-picker>
+                  <div class="role-palette-picker" data-role-palette-picker data-role-palette-auto>
                     <div class="role-palette-select-wrap">
                       <select
                         id="role-palette"
@@ -1008,7 +1008,8 @@
       }
 
       const paletteKeys = Array.from(paletteSelect.options).map((option) => option.value).filter(Boolean);
-      let autoPaletteEnabled = true;
+      const paletteAutoCapable = picker.hasAttribute("data-role-palette-auto");
+      let autoPaletteEnabled = paletteAutoCapable;
       const normalizeRoleName = (value) => value.trim().toLowerCase().replace(/\s+/g, " ");
       const fnv1a32 = (value) => {
         let hash = 0x811c9dc5;
@@ -1028,9 +1029,7 @@
       const updatePalettePreview = () => {
         const option = paletteSelect.options[paletteSelect.selectedIndex];
         const color = option ? option.getAttribute("data-role-color") : "";
-        const border = option ? option.getAttribute("data-role-border") : "";
-        palettePreview.style.setProperty("--swatch-bg", color || "var(--role-fallback)");
-        palettePreview.style.setProperty("--swatch-border", border || "var(--border)");
+        palettePreview.style.setProperty("--swatch-bg", color || "var(--muted)");
         const label = option ? option.text.trim() : "";
         palettePreview.title = label;
         paletteToggleLabel.textContent = label || "Select palette";
@@ -1070,8 +1069,7 @@
         button.setAttribute("data-role-palette-option", "");
         button.setAttribute("data-value", option.value);
         swatch.className = "role-palette-option-swatch";
-        swatch.style.setProperty("--swatch-bg", option.getAttribute("data-role-color") || "var(--role-fallback)");
-        swatch.style.setProperty("--swatch-border", option.getAttribute("data-role-border") || "var(--border)");
+        swatch.style.setProperty("--swatch-bg", option.getAttribute("data-role-color") || "var(--muted)");
         label.textContent = option.text.trim();
         check.className = "roles-picker-option-check";
         check.textContent = "Selected";
@@ -1115,13 +1113,16 @@
       });
       if (roleNameInput) {
         roleNameInput.addEventListener("input", () => {
-          if (!autoPaletteEnabled) {
-            autoPaletteEnabled = true;
+          if (!paletteAutoCapable) {
+            return;
           }
+          autoPaletteEnabled = true;
           applySuggestedPalette();
         });
       }
-      applySuggestedPalette();
+      if (paletteAutoCapable) {
+        applySuggestedPalette();
+      }
       updatePalettePreview();
     });
 
