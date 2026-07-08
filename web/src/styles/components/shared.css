@@ -140,7 +140,7 @@ button.secondary-small {
 .role-pill {
   color: var(--role-ink);
   background: var(--pill-bg);
-  border-color: var(--border);
+  border-color: var(--palette-border, var(--border));
 }
 
 .role-pill-row {
