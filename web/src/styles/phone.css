@@ -7,7 +7,7 @@
   .dpp-history-summary,
   .dpp-history-details {
     grid-template-columns: 20px minmax(0, 1fr);
-    gap: var(--space-10);
+    gap: var(--space-4);
   }
 
   .dpp-integrity-item {
@@ -24,14 +24,14 @@
   }
 
   .panel {
-    padding: var(--space-5);
+    padding: var(--space-4);
   }
 
   .roles-item,
   .users-item {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-9);
-    padding: var(--space-9);
+    gap: var(--space-3);
+    padding: var(--space-3);
   }
 
   .roles-item .user-actions,
@@ -56,7 +56,7 @@
 
   .manage-dialog-head {
     flex-wrap: wrap;
-    gap: var(--space-9);
+    gap: var(--space-3);
   }
 
   .manage-dialog-actions {
@@ -71,7 +71,7 @@
   .stream-status-section-head {
     flex-direction: column;
     align-items: stretch;
-    gap: var(--space-9);
+    gap: var(--space-3);
   }
 
   .stream-status-sort {
@@ -107,8 +107,8 @@
 
   .timeline-step-summary {
     flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-9);
+    gap: var(--space-2);
+    padding: var(--space-3);
   }
 
   .timeline-step-summary-main {
@@ -122,14 +122,14 @@
   }
 
   .timeline-substeps {
-    padding-inline: var(--space-9);
+    padding-inline: var(--space-3);
   }
 
   .substep-accordion-summary {
     flex-wrap: wrap;
     align-items: flex-start;
     gap: var(--space-2);
-    padding: var(--space-9);
+    padding: var(--space-3);
   }
 
   .substep-accordion-summary .status {
@@ -137,7 +137,7 @@
   }
 
   .substep-details {
-    padding-inline: var(--space-9);
+    padding-inline: var(--space-3);
   }
 
   .data-hash {
@@ -192,18 +192,18 @@
   }
 
   .page {
-    padding: var(--space-5) var(--space-5) 32px;
+    padding: var(--space-4) var(--space-4) 32px;
   }
 
   .topbar {
-    padding: var(--space-9) var(--space-5);
+    padding: var(--space-3) var(--space-4);
   }
 
   .process-meta {
     flex-direction: column;
     align-items: start;
     gap: var(--space-1);
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
   }
 
   .action-submitted-values {
@@ -212,7 +212,7 @@
   }
 
   .action-submitted-values dt {
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
   }
 
   .action-submitted-attachment-meta {

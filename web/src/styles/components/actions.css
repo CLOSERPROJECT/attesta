@@ -1,21 +1,21 @@
 .action-reason {
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
 }
 
 .action-attachments {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
 }
 
 .manage-dialog-actions-spaced {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
 }
 
 .action-form {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-9);
+  gap: var(--space-3);
   align-items: flex-end;
   position: relative;
   z-index: 1;
@@ -32,11 +32,11 @@
   flex: 1 1 100%;
   width: 100%;
   max-width: 100%;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .action-form input {
-  padding: var(--space-3) var(--space-9);
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   min-width: 160px;
@@ -45,7 +45,7 @@
 }
 
 .action-form select {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -100,7 +100,7 @@
 
 .action-submitted {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
 }
 
@@ -131,11 +131,11 @@
 
 .action-submitted-attachments {
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: 4px;
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   background: var(--surface-2);
   width: min(100%, 760px);
 }
@@ -146,7 +146,7 @@
   z-index: 2;
   min-width: 40px;
   min-height: 36px;
-  padding: 0 var(--space-9);
+  padding: 0 var(--space-3);
   transform: translateY(-50%);
   box-shadow: 0 10px 24px var(--shadow-elevated);
 }
@@ -166,7 +166,7 @@
 
 .action-submitted-attachment {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   width: min(100%, 760px);
   margin: 0 auto;
 }
@@ -180,7 +180,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-9);
+  gap: var(--space-3);
 }
 
 .action-submitted-attachment-copy {
@@ -230,7 +230,7 @@
   display: grid;
   place-items: center;
   gap: var(--space-2);
-  padding: var(--space-7);
+  padding: var(--space-6);
   text-align: center;
   color: var(--muted);
 }
@@ -243,7 +243,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .action-submitted-attachments-dot {

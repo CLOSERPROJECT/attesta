@@ -104,21 +104,19 @@ Google Fonts are imported in `tokens.css`. Use `var(--font-sans)` / `var(--font-
 
 ### Spacing scale
 
-Canonical spacing tokens in `tokens.css` (migrate incrementally; legacy `px` literals remain valid):
+Canonical spacing tokens in `tokens.css` — a Tailwind-aligned scale on a 4px grid, expressed in `rem` (migrate incrementally; legacy `px` literals remain valid). The index tracks size: `--space-N` ≈ `N × 4px` (`--space-4` = `1rem` = 16px):
 
-| Token | Value | Typical use |
-|-------|-------|-------------|
-| `--space-1` | `4px` | Tight inline gaps |
-| `--space-2` | `6px` | Compact lists |
-| `--space-3` | `8px` | Default small gap |
-| `--space-4` | `12px` | Card padding, section gaps |
-| `--space-5` | `16px` | Grid gaps |
-| `--space-6` | `20px` | Panel padding, section margins |
-| `--space-7` | `24px` | Stack default gap |
-| `--space-8` | `28px` | Large section rhythm |
-| `--space-9` | `10px` | Compact control padding |
-| `--space-10` | `14px` | Card/list item padding |
-| `--space-11` | `18px` | Section gaps, modal padding |
+| Token | Value | px | Typical use |
+|-------|-------|----|-------------|
+| `--space-1` | `0.25rem` | 4 | Tight inline gaps |
+| `--space-2` | `0.5rem` | 8 | Default small gap, compact lists |
+| `--space-3` | `0.75rem` | 12 | Card padding, compact control padding |
+| `--space-4` | `1rem` | 16 | Grid gaps, card/list item padding |
+| `--space-5` | `1.25rem` | 20 | Panel padding, section margins/gaps |
+| `--space-6` | `1.5rem` | 24 | Stack default gap |
+| `--space-7` | `1.75rem` | 28 | Large section rhythm |
+
+The scale is monotonic: `--space-N` is always larger than `--space-(N-1)`. Do not reintroduce off-grid values (6/10/14/18px) or non-monotonic indices.
 
 Prefer `u-*` utilities or component classes over raw `px` in templates. New page CSS should use spacing tokens where practical.
 
@@ -205,23 +203,23 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 | `u-max-w-prose` | `max-width: 65ch` |
 | `u-max-w-7xl` | `max-width: 80rem` |
 | `u-m-0` | `margin: 0` |
-| `u-mb-8` | `margin-bottom: 8px` |
-| `u-mb-16` | `margin-bottom: 16px` |
-| `u-mb-20` | `margin-bottom: 20px` |
-| `u-ml-4` | `margin-left: 4px` |
+| `u-mb-2` | `margin-bottom: var(--space-2)` (8px) |
+| `u-mb-4` | `margin-bottom: var(--space-4)` (16px) |
+| `u-mb-5` | `margin-bottom: var(--space-5)` (20px) |
+| `u-ml-1` | `margin-left: var(--space-1)` (4px) |
 | `u-pre-line` | `white-space: pre-line` |
 | `u-text-sm` | `font-size: 12px` |
 | `u-text-label` | `font-size: 14px; font-weight: bold` |
 | `u-flex` | `display: flex` |
 | `u-flex-center` | `display: flex; align-items: center` |
-| `u-gap-8` | `gap: 8px` |
-| `u-gap-16` | `gap: 16px` |
-| `u-divider` | Horizontal rule, 24px vertical margin |
+| `u-gap-2` | `gap: var(--space-2)` (8px) |
+| `u-gap-4` | `gap: var(--space-4)` (16px) |
+| `u-divider` | Horizontal rule, `var(--space-6)` vertical margin |
 | `u-divider-flush` | `<hr>` with `margin: 0` |
-| `u-divider-20` | Horizontal rule, 20px vertical margin |
+| `u-divider-5` | Horizontal rule, `var(--space-5)` vertical margin |
 | `u-text-danger` | `color: var(--danger)` |
 
-**Stack gap modifiers:** `.stack.u-gap-8` and `.stack.u-gap-16` override the default 24px stack gap.
+**Stack gap modifiers:** `.stack.u-gap-2` and `.stack.u-gap-4` override the default `var(--space-6)` stack gap.
 
 **Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.workflow-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
 

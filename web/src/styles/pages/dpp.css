@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .dpp-integrity-list {
@@ -14,7 +14,7 @@
   padding: 0;
   margin: 0;
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .dpp-integrity-item {
@@ -48,12 +48,12 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--space-10);
+  gap: var(--space-4);
 }
 
 .dpp-history-item {
   position: relative;
-  padding-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
 }
 
 .dpp-history-item:last-child {
@@ -81,7 +81,7 @@
   list-style: none;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
-  gap: var(--space-11);
+  gap: var(--space-5);
   align-items: start;
   cursor: pointer;
 }
@@ -115,11 +115,11 @@
   border-radius: 4px;
   background: linear-gradient(180deg, var(--panel), var(--surface-2));
   box-shadow: 0 10px 28px var(--shadow);
-  padding: var(--space-5);
+  padding: var(--space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -143,7 +143,7 @@
 .dpp-history-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-9);
+  gap: var(--space-3);
   color: var(--muted);
   font-size: 13px;
 }
@@ -160,7 +160,7 @@
 .dpp-history-details {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
-  gap: var(--space-11);
+  gap: var(--space-5);
 }
 
 .dpp-history-details-offset {
@@ -188,9 +188,9 @@
   border-radius: 0 0 4px 4px;
   background: color-mix(in srgb, var(--panel) 88%, var(--surface-2));
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--panel) 78%, white);
-  padding: 0 var(--space-11) var(--space-11);
+  padding: 0 var(--space-5) var(--space-5);
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .dpp-history-accordion .substep {
@@ -202,16 +202,16 @@
 }
 
 .dpp-history-accordion .action-submitted {
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .dpp-termination-meta {
-  margin: 3px 0 var(--space-6);
+  margin: 3px 0 var(--space-5);
 }
 
 .dpp-history-step-head {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
   margin-bottom: var(--space-1);
 }
@@ -225,11 +225,11 @@
 }
 
 .dpp-substep-body {
-  padding: var(--space-4);
+  padding: var(--space-3);
 }
 
 .dpp-substep-submitted {
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
 .dpp-attachment-preview-label {

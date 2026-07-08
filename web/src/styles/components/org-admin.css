@@ -4,7 +4,7 @@
 
 .roles-picker-toggle {
   width: 100%;
-  padding: var(--space-3) var(--space-9);
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -14,7 +14,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-9);
+  gap: var(--space-3);
   text-align: left;
 }
 
@@ -62,9 +62,9 @@
   border-radius: 4px;
   background: var(--panel);
   box-shadow: 0 12px 24px var(--shadow-dropdown);
-  padding: var(--space-3);
+  padding: var(--space-2);
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .roles-picker-menu[hidden] {
@@ -73,7 +73,7 @@
 
 .roles-picker-search {
   width: 100%;
-  padding: var(--space-3) var(--space-9);
+  padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -97,7 +97,7 @@
   border: 1px solid transparent;
   background: transparent;
   border-radius: 4px;
-  padding: var(--space-3) var(--space-9);
+  padding: var(--space-2) var(--space-3);
   color: var(--ink);
   font: inherit;
   display: flex;
@@ -137,7 +137,7 @@
   display: flex;
   align-items: center;
   font-size: 13px;
-  gap: var(--space-9);
+  gap: var(--space-3);
 }
 
 .role-palette-select-wrap {
@@ -156,7 +156,7 @@
 
 .role-palette-option {
   justify-content: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .role-palette-option .roles-picker-option-check {
@@ -185,8 +185,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-5);
-  margin-bottom: var(--space-6);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 
   button {
     flex-shrink: 0;
@@ -204,28 +204,28 @@
 .users-list {
   list-style: none;
   padding: 0;
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
   display: grid;
-  gap: var(--space-9);
+  gap: var(--space-3);
 }
 
 .roles-list {
   list-style: none;
   padding: 0;
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
   display: grid;
-  gap: var(--space-9);
+  gap: var(--space-3);
 }
 
 .roles-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  padding: var(--space-9) var(--space-4);
+  padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .roles-item .pill {
@@ -236,11 +236,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  padding: var(--space-9) var(--space-4);
+  padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .user-main {
@@ -248,7 +248,7 @@
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-3) var(--space-11);
+  gap: var(--space-2) var(--space-5);
 }
 
 .user-email {
@@ -256,12 +256,12 @@
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .user-tags {
   display: inline-flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -324,7 +324,7 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   box-shadow: 0 16px 34px var(--shadow);
-  padding: var(--space-5);
+  padding: var(--space-4);
   display: grid;
 }
 
@@ -332,8 +332,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
 }
 
 .manage-dialog-title {
@@ -350,7 +350,7 @@
 .manage-dialog-actions {
   display: flex;
   width: 100%;
-  gap: var(--space-9);
+  gap: var(--space-3);
 }
 
 .manage-dialog-actions-end {
@@ -368,7 +368,7 @@
 
 .manage-dialog-danger-zone {
   border-top: 1px solid var(--border);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
 }
 
 .manage-dialog-danger-copy {
@@ -390,15 +390,15 @@ hr {
 
 .active-role-options {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .active-role-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-9);
-  padding: var(--space-9) var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: color-mix(in srgb, var(--panel) 92%, var(--accent));
@@ -423,5 +423,5 @@ hr {
 .active-role-error {
   color: var(--danger);
   font-size: 13px;
-  margin: var(--space-3) 0 0;
+  margin: var(--space-2) 0 0;
 }

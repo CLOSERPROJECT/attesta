@@ -1,5 +1,5 @@
 .topbar {
-  padding: var(--space-6) 32px;
+  padding: var(--space-5) 32px;
   border-bottom: 1px solid var(--border);
   background: var(--chrome-bg);
 }
@@ -24,7 +24,7 @@
 .topbar-brand-row {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .topbar-content {
@@ -36,7 +36,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  margin-right: var(--space-4);
+  margin-right: var(--space-3);
 }
 
 .brand-logo {
@@ -72,7 +72,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-9);
+  gap: var(--space-2);
 }
 
 .nav .account-menu {
@@ -84,7 +84,7 @@
   align-items: center;
   justify-content: center;
   min-height: 38px;
-  padding: 0 var(--space-10);
+  padding: 0 var(--space-4);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: transparent;
@@ -106,7 +106,7 @@
 }
 
 .nav .nav-action-link {
-  padding-inline: var(--space-5);
+  padding-inline: var(--space-4);
 }
 
 .nav .theme-toggle,
@@ -141,7 +141,7 @@
 }
 
 .nav .account-menu-section {
-  padding: var(--space-3);
+  padding: var(--space-2);
 }
 
 .nav .account-menu-section + .account-menu-section {
@@ -151,7 +151,7 @@
 }
 
 .nav .account-menu-section:first-child {
-  padding: var(--space-9) var(--space-5);
+  padding: var(--space-3) var(--space-4);
 }
 
 .nav .account-menu-label {
@@ -177,7 +177,7 @@
 .nav .account-menu-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
   padding: 7px 9px;
   background: transparent;
@@ -224,18 +224,18 @@
 
 .page {
   flex: 1;
-  padding: var(--space-8) 32px 60px;
+  padding: var(--space-7) 32px 60px;
 }
 
 .site-footer {
   margin-top: auto;
-  padding: var(--space-11) 32px var(--space-7);
+  padding: var(--space-5) 32px var(--space-6);
   border-top: 1px solid var(--border);
   background: var(--chrome-bg);
 }
 
 .site-footer p {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
@@ -247,11 +247,11 @@
 
 .hero {
   width: 100%;
-  padding: var(--space-6) 0;
+  padding: var(--space-5) 0;
   display: flex;
   flex-direction: column;
   align-items: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .hero button {
@@ -285,15 +285,15 @@
 
 .stack {
   display: grid;
-  gap: var(--space-7);
+  gap: var(--space-6);
 }
 
-.stack.u-gap-8 {
-  gap: var(--space-3);
+.stack.u-gap-2 {
+  gap: var(--space-2);
 }
 
-.stack.u-gap-16 {
-  gap: var(--space-5);
+.stack.u-gap-4 {
+  gap: var(--space-4);
 }
 
 .landing {
@@ -318,7 +318,7 @@
 }
 
 .process-resources-grid {
-  gap: var(--space-4);
+  gap: var(--space-3);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   justify-content: start;
@@ -329,24 +329,24 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-content: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .home-workflow-grid {
   display: grid;
-  gap: var(--space-7);
+  gap: var(--space-6);
   align-items: start;
 }
 
 .org-admin-grid {
   display: grid;
-  gap: var(--space-7);
+  gap: var(--space-6);
   align-items: start;
 }
 

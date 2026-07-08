@@ -5,17 +5,13 @@
 
   --font-sans: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "Source Code Pro", monospace;
-  --space-1: 4px;
-  --space-2: 6px;
-  --space-3: 8px;
-  --space-4: 12px;
-  --space-5: 16px;
-  --space-6: 20px;
-  --space-7: 24px;
-  --space-8: 28px;
-  --space-9: 10px;
-  --space-10: 14px;
-  --space-11: 18px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
   --bp-phone: 640px;
   --bp-tablet: 900px;
   --bp-desktop: 1200px;

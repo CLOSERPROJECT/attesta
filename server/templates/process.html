@@ -41,7 +41,7 @@
     {{ if .ActionList.ProcessDone }}
       <div class="process-resources-grid">
         {{ template "workflow_timeline" .ActionList }}
-        <div class="stack tablet-seprator u-gap-16">
+        <div class="stack tablet-seprator u-gap-4">
           {{ template "process_termination_details" .ActionList }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}
@@ -147,7 +147,7 @@
     </div>
     {{ if .Attachments }}
       <div class="panel-block panel-block-spaced">
-        <p class="muted u-m-0 u-mb-8">Attachments</p>
+        <p class="muted u-m-0 u-mb-2">Attachments</p>
         <ul class="process-attachments-list">
           {{ range .Attachments }}
             <li>
@@ -178,7 +178,7 @@
           View DPP data
         </button>
       </div>
-      <div class="stack u-gap-8">
+      <div class="stack u-gap-2">
         <div>
           <strong>GS1 Digital Link:</strong>
           <a href="{{ .DPPURL }}"><code>{{ .DPPURL }}</code></a>
