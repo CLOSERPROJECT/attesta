@@ -94,7 +94,7 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 Stream status uses `data-stream-status="{{ .Status }}"` on `.stream-status-section-head` (mapped in `role-palette.css`); no inline style.
 
-Role pills and substeps (`process`, `action_list`, `dpp`, `org_admin`) use `data-role-palette="{{ .Palette }}"` on `.role-pill` and `.substep`; see [ADR-0002](adr/0002-role-color-appwrite-source.md) and [ADR-0003](adr/0003-role-palette-storage.md). Palette keys map to `--role-*-bg` / `--role-*-border` in `role-palette.css`. The org-admin palette picker may set transient client-side `--swatch-bg` / `--swatch-border` on preview swatches only (not on role pill rows).
+Role pills (`process`, `action_list`, `dpp`, `org_admin`) use `data-role-palette="{{ .Palette }}"` on `.role-pill`; see [ADR-0002](adr/0002-role-color-appwrite-source.md) and [ADR-0003](adr/0003-role-palette-storage.md). Palette keys map to `--role-*-bg` in `role-palette.css` (soft-badge: text/border from bg token, 10% tint background). The org-admin palette picker sets transient `--swatch-bg` on preview swatches only (not on role pill rows).
 
 Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 

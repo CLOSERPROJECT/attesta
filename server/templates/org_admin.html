@@ -1028,9 +1028,7 @@
       const updatePalettePreview = () => {
         const option = paletteSelect.options[paletteSelect.selectedIndex];
         const color = option ? option.getAttribute("data-role-color") : "";
-        const border = option ? option.getAttribute("data-role-border") : "";
-        palettePreview.style.setProperty("--swatch-bg", color || "var(--role-fallback)");
-        palettePreview.style.setProperty("--swatch-border", border || "var(--border)");
+        palettePreview.style.setProperty("--swatch-bg", color || "var(--muted)");
         const label = option ? option.text.trim() : "";
         palettePreview.title = label;
         paletteToggleLabel.textContent = label || "Select palette";
@@ -1070,8 +1068,7 @@
         button.setAttribute("data-role-palette-option", "");
         button.setAttribute("data-value", option.value);
         swatch.className = "role-palette-option-swatch";
-        swatch.style.setProperty("--swatch-bg", option.getAttribute("data-role-color") || "var(--role-fallback)");
-        swatch.style.setProperty("--swatch-border", option.getAttribute("data-role-border") || "var(--border)");
+        swatch.style.setProperty("--swatch-bg", option.getAttribute("data-role-color") || "var(--muted)");
         label.textContent = option.text.trim();
         check.className = "roles-picker-option-check";
         check.textContent = "Selected";

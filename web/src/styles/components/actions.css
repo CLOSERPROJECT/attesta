@@ -12,18 +12,6 @@
   margin-top: 12px;
 }
 
-
-.role-badge {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--role-border, var(--border));
-  background: var(--role-color, var(--role-fallback));
-  color: var(--role-ink);
-}
-
 .action-form {
   display: flex;
   flex-wrap: wrap;

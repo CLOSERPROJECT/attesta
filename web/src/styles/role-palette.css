@@ -1,96 +1,74 @@
-/* Palette key → shared custom properties (consumed by .role-pill, .substep, etc.) */
+/* Palette key → shared custom properties (consumed by .role-pill, etc.) */
 [data-role-palette="red"] {
   --palette-bg: var(--role-red-bg);
-  --palette-border: var(--role-red-border);
 }
 
 [data-role-palette="orange"] {
   --palette-bg: var(--role-orange-bg);
-  --palette-border: var(--role-orange-border);
 }
 
 [data-role-palette="amber"] {
   --palette-bg: var(--role-amber-bg);
-  --palette-border: var(--role-amber-border);
 }
 
 [data-role-palette="yellow"] {
   --palette-bg: var(--role-yellow-bg);
-  --palette-border: var(--role-yellow-border);
 }
 
 [data-role-palette="lime"] {
   --palette-bg: var(--role-lime-bg);
-  --palette-border: var(--role-lime-border);
 }
 
 [data-role-palette="green"] {
   --palette-bg: var(--role-green-bg);
-  --palette-border: var(--role-green-border);
 }
 
 [data-role-palette="emerald"] {
   --palette-bg: var(--role-emerald-bg);
-  --palette-border: var(--role-emerald-border);
 }
 
 [data-role-palette="teal"] {
   --palette-bg: var(--role-teal-bg);
-  --palette-border: var(--role-teal-border);
 }
 
 [data-role-palette="cyan"] {
   --palette-bg: var(--role-cyan-bg);
-  --palette-border: var(--role-cyan-border);
 }
 
 [data-role-palette="sky"] {
   --palette-bg: var(--role-sky-bg);
-  --palette-border: var(--role-sky-border);
 }
 
 [data-role-palette="blue"] {
   --palette-bg: var(--role-blue-bg);
-  --palette-border: var(--role-blue-border);
 }
 
 [data-role-palette="indigo"] {
   --palette-bg: var(--role-indigo-bg);
-  --palette-border: var(--role-indigo-border);
 }
 
 [data-role-palette="violet"] {
   --palette-bg: var(--role-violet-bg);
-  --palette-border: var(--role-violet-border);
 }
 
 [data-role-palette="purple"] {
   --palette-bg: var(--role-purple-bg);
-  --palette-border: var(--role-purple-border);
 }
 
 [data-role-palette="fuchsia"] {
   --palette-bg: var(--role-fuchsia-bg);
-  --palette-border: var(--role-fuchsia-border);
 }
 
 [data-role-palette="pink"] {
   --palette-bg: var(--role-pink-bg);
-  --palette-border: var(--role-pink-border);
 }
 
 [data-role-palette="rose"] {
   --palette-bg: var(--role-rose-bg);
-  --palette-border: var(--role-rose-border);
 }
 
 .role-pill {
   --pill-bg: var(--palette-bg, var(--muted));
-}
-
-.substep {
-  --dept-color: var(--palette-bg, var(--dept-fallback));
-  --dept-border: var(--palette-border, var(--border));
 }
 
 .stream-status-section-head[data-stream-status="available"] { --stream-color: var(--stream-available); }
