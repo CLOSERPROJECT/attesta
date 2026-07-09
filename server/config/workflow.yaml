@@ -273,28 +273,23 @@ roles:
   - orgSlug: organization-1
     slug: chemist
     name: Chemist
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - orgSlug: organization-1
     slug: mechanic
     name: Mechanic
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - orgSlug: organization-1
     slug: supervisor
     name: Supervisor
-    color: var(--role-cyan-bg)
-    border: var(--role-cyan-border)
+    color: var(--role-cyan)
   - orgSlug: organization-2
     slug: analyst
     name: Analyst
-    color: var(--role-emerald-bg)
-    border: var(--role-emerald-border)
+    color: var(--role-emerald)
   - orgSlug: organization-3
     slug: qainspector
     name: QA Inspector
-    color: var(--role-pink-bg)
-    border: var(--role-pink-border)
+    color: var(--role-pink)
 
 dpp:
   enabled: true

@@ -1,70 +1,70 @@
 /* Palette key → shared custom properties (consumed by .role-pill, etc.) */
 [data-role-palette="red"] {
-  --palette-bg: var(--role-red-bg);
+  --palette-bg: var(--role-red);
 }
 
 [data-role-palette="orange"] {
-  --palette-bg: var(--role-orange-bg);
+  --palette-bg: var(--role-orange);
 }
 
 [data-role-palette="amber"] {
-  --palette-bg: var(--role-amber-bg);
+  --palette-bg: var(--role-amber);
 }
 
 [data-role-palette="yellow"] {
-  --palette-bg: var(--role-yellow-bg);
+  --palette-bg: var(--role-yellow);
 }
 
 [data-role-palette="lime"] {
-  --palette-bg: var(--role-lime-bg);
+  --palette-bg: var(--role-lime);
 }
 
 [data-role-palette="green"] {
-  --palette-bg: var(--role-green-bg);
+  --palette-bg: var(--role-green);
 }
 
 [data-role-palette="emerald"] {
-  --palette-bg: var(--role-emerald-bg);
+  --palette-bg: var(--role-emerald);
 }
 
 [data-role-palette="teal"] {
-  --palette-bg: var(--role-teal-bg);
+  --palette-bg: var(--role-teal);
 }
 
 [data-role-palette="cyan"] {
-  --palette-bg: var(--role-cyan-bg);
+  --palette-bg: var(--role-cyan);
 }
 
 [data-role-palette="sky"] {
-  --palette-bg: var(--role-sky-bg);
+  --palette-bg: var(--role-sky);
 }
 
 [data-role-palette="blue"] {
-  --palette-bg: var(--role-blue-bg);
+  --palette-bg: var(--role-blue);
 }
 
 [data-role-palette="indigo"] {
-  --palette-bg: var(--role-indigo-bg);
+  --palette-bg: var(--role-indigo);
 }
 
 [data-role-palette="violet"] {
-  --palette-bg: var(--role-violet-bg);
+  --palette-bg: var(--role-violet);
 }
 
 [data-role-palette="purple"] {
-  --palette-bg: var(--role-purple-bg);
+  --palette-bg: var(--role-purple);
 }
 
 [data-role-palette="fuchsia"] {
-  --palette-bg: var(--role-fuchsia-bg);
+  --palette-bg: var(--role-fuchsia);
 }
 
 [data-role-palette="pink"] {
-  --palette-bg: var(--role-pink-bg);
+  --palette-bg: var(--role-pink);
 }
 
 [data-role-palette="rose"] {
-  --palette-bg: var(--role-rose-bg);
+  --palette-bg: var(--role-rose);
 }
 
 .role-pill {

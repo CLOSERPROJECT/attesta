@@ -71,10 +71,9 @@ func TestHandlePublicCatalog(t *testing.T) {
 				Name: "Beta Org",
 				Roles: []IdentityRole{
 					{
-						Slug:   "assembler",
-						Name:   "Assembler",
-						Color:  "var(--role-emerald-bg)",
-						Border: "var(--role-emerald-border)",
+						Slug:  "assembler",
+						Name:  "Assembler",
+						Color: "var(--role-emerald-bg)",
 					},
 				},
 			},

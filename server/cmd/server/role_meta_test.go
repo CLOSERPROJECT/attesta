@@ -48,10 +48,9 @@ func TestRoleMetaIndexFromIdentity(t *testing.T) {
 						Slug: "org1",
 						Roles: []IdentityRole{
 							{
-								Slug:   "chemist",
-								Name:   "Chemist",
-								Color:  "var(--role-blue-bg)",
-								Border: "var(--role-blue-border)",
+								Slug:  "chemist",
+								Name:  "Chemist",
+								Color: "var(--role-blue-bg)",
 							},
 						},
 					},
@@ -59,10 +58,9 @@ func TestRoleMetaIndexFromIdentity(t *testing.T) {
 						Slug: "org2",
 						Roles: []IdentityRole{
 							{
-								Slug:   "chemist",
-								Name:   "Chemist",
-								Color:  "var(--role-emerald-bg)",
-								Border: "var(--role-emerald-border)",
+								Slug:  "chemist",
+								Name:  "Chemist",
+								Color: "var(--role-emerald-bg)",
 							},
 						},
 					},

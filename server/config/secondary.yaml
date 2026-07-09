@@ -121,32 +121,26 @@ roles:
   - orgSlug: organization-1
     slug: chemist
     name: Chemist
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - orgSlug: organization-1
     slug: mechanic
     name: Mechanic
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - orgSlug: organization-1
     slug: supervisor
     name: Supervisor
-    color: var(--role-cyan-bg)
-    border: var(--role-cyan-border)
+    color: var(--role-cyan)
 
 departments:
   - id: chemist
     name: Chemist
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - id: mechanic
     name: Mechanic
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - id: supervisor
     name: Supervisor
-    color: var(--role-cyan-bg)
-    border: var(--role-cyan-border)
+    color: var(--role-cyan)
 users:
   - id: u4
     name: User 4

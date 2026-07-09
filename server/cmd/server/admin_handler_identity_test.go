@@ -3555,7 +3555,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			ID:    "team-1",
 			Slug:  "acme",
 			Name:  "Acme Org",
-			Roles: []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer", Color: "var(--role-blue-bg)", Border: "var(--role-blue-border)"}},
+			Roles: []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer", Color: "var(--role-blue-bg)"}},
 		}
 		var updatedRoles []IdentityRole
 		server := &Server{
@@ -3658,7 +3658,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			Slug: "acme",
 			Name: "Acme Org",
 			Roles: []IdentityRole{
-				{Slug: "approver", Name: "Approver", Color: "var(--role-blue-bg)", Border: "var(--role-blue-border)"},
+				{Slug: "approver", Name: "Approver", Color: "var(--role-blue-bg)"},
 			},
 		}
 		server := &Server{

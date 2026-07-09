@@ -793,28 +793,27 @@ type SubstepOverrideEditorView struct {
 }
 
 type rolePaletteStyle struct {
-	Color  string
-	Border string
+	Color string
 }
 
 var rolePaletteStyles = map[string]rolePaletteStyle{
-	"red":     {Color: "var(--role-red-bg)", Border: "var(--role-red-border)"},
-	"orange":  {Color: "var(--role-orange-bg)", Border: "var(--role-orange-border)"},
-	"amber":   {Color: "var(--role-amber-bg)", Border: "var(--role-amber-border)"},
-	"yellow":  {Color: "var(--role-yellow-bg)", Border: "var(--role-yellow-border)"},
-	"lime":    {Color: "var(--role-lime-bg)", Border: "var(--role-lime-border)"},
-	"green":   {Color: "var(--role-green-bg)", Border: "var(--role-green-border)"},
-	"emerald": {Color: "var(--role-emerald-bg)", Border: "var(--role-emerald-border)"},
-	"teal":    {Color: "var(--role-teal-bg)", Border: "var(--role-teal-border)"},
-	"cyan":    {Color: "var(--role-cyan-bg)", Border: "var(--role-cyan-border)"},
-	"sky":     {Color: "var(--role-sky-bg)", Border: "var(--role-sky-border)"},
-	"blue":    {Color: "var(--role-blue-bg)", Border: "var(--role-blue-border)"},
-	"indigo":  {Color: "var(--role-indigo-bg)", Border: "var(--role-indigo-border)"},
-	"violet":  {Color: "var(--role-violet-bg)", Border: "var(--role-violet-border)"},
-	"purple":  {Color: "var(--role-purple-bg)", Border: "var(--role-purple-border)"},
-	"fuchsia": {Color: "var(--role-fuchsia-bg)", Border: "var(--role-fuchsia-border)"},
-	"pink":    {Color: "var(--role-pink-bg)", Border: "var(--role-pink-border)"},
-	"rose":    {Color: "var(--role-rose-bg)", Border: "var(--role-rose-border)"},
+	"red":     {Color: "var(--role-red-bg)"},
+	"orange":  {Color: "var(--role-orange-bg)"},
+	"amber":   {Color: "var(--role-amber-bg)"},
+	"yellow":  {Color: "var(--role-yellow-bg)"},
+	"lime":    {Color: "var(--role-lime-bg)"},
+	"green":   {Color: "var(--role-green-bg)"},
+	"emerald": {Color: "var(--role-emerald-bg)"},
+	"teal":    {Color: "var(--role-teal-bg)"},
+	"cyan":    {Color: "var(--role-cyan-bg)"},
+	"sky":     {Color: "var(--role-sky-bg)"},
+	"blue":    {Color: "var(--role-blue-bg)"},
+	"indigo":  {Color: "var(--role-indigo-bg)"},
+	"violet":  {Color: "var(--role-violet-bg)"},
+	"purple":  {Color: "var(--role-purple-bg)"},
+	"fuchsia": {Color: "var(--role-fuchsia-bg)"},
+	"pink":    {Color: "var(--role-pink-bg)"},
+	"rose":    {Color: "var(--role-rose-bg)"},
 }
 
 var rolePaletteKeys = []string{
@@ -832,11 +831,10 @@ func defaultRolePaletteFromInput(raw string) string {
 	return rolePaletteKeys[int(hasher.Sum32()%uint32(len(rolePaletteKeys)))]
 }
 
-func rolePaletteKeyFromStyle(color, border, fallbackName string) string {
+func rolePaletteKeyFromStyle(color, fallbackName string) string {
 	trimmedColor := strings.TrimSpace(color)
-	trimmedBorder := strings.TrimSpace(border)
 	for key, style := range rolePaletteStyles {
-		if style.Color == trimmedColor && style.Border == trimmedBorder {
+		if style.Color == trimmedColor {
 			return key
 		}
 	}
@@ -849,10 +847,8 @@ func resolveRolePalette(role IdentityRole) string {
 			return key
 		}
 	}
-	color := strings.TrimSpace(role.Color)
-	border := strings.TrimSpace(role.Border)
-	if color != "" || border != "" {
-		return rolePaletteKeyFromStyle(color, border, role.Name)
+	if color := strings.TrimSpace(role.Color); color != "" {
+		return rolePaletteKeyFromStyle(color, role.Name)
 	}
 	return "fallback"
 }

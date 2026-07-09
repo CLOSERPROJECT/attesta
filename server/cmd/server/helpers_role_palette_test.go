@@ -19,15 +19,14 @@ func TestResolveRolePalette(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy color border only", func(t *testing.T) {
+	t.Run("legacy color only", func(t *testing.T) {
 		got := resolveRolePalette(IdentityRole{
-			Slug:   "chemist",
-			Name:   "Chemist",
-			Color:  "var(--role-blue-bg)",
-			Border: "var(--role-blue-border)",
+			Slug:  "chemist",
+			Name:  "Chemist",
+			Color: "var(--role-blue-bg)",
 		})
 		if got != "blue" {
-			t.Fatalf("legacy color/border = %q, want blue", got)
+			t.Fatalf("legacy color = %q, want blue", got)
 		}
 	})
 
@@ -47,7 +46,6 @@ func TestResolveRolePalette(t *testing.T) {
 			Name:    "Chemist",
 			Palette: "not-a-real-palette",
 			Color:   "var(--role-blue-bg)",
-			Border:  "var(--role-blue-border)",
 		})
 		if got != "blue" {
 			t.Fatalf("invalid palette with legacy = %q, want blue", got)

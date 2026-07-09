@@ -444,53 +444,43 @@ roles:
   - name: Project manager
     slug: projectmanager
     orgSlug: critical
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - name: Head of shipping
     slug: headofshipping
     orgSlug: dockweiler
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - name: Head of R&D
     slug: headofrd
     orgSlug: dockweiler
-    color: var(--role-emerald-bg)
-    border: var(--role-emerald-border)
+    color: var(--role-emerald)
   - name: T&BS operator
     slug: tbsoperator
     orgSlug: dockweiler
-    color: var(--role-lime-bg)
-    border: var(--role-lime-border)
+    color: var(--role-lime)
   - name: Head of Quality
     slug: headofquality
     orgSlug: dockweiler
-    color: var(--role-orange-bg)
-    border: var(--role-orange-border)
+    color: var(--role-orange)
   - name: Analytical chemist
     slug: analyticalchemist
     orgSlug: ifw
-    color: var(--role-teal-bg)
-    border: var(--role-teal-border)
+    color: var(--role-teal)
   - name: Chemical process technologist
     slug: chemicalprocesstechnologist
     orgSlug: ifw
-    color: var(--role-green-bg)
-    border: var(--role-green-border)
+    color: var(--role-green)
   - name: Project manager
     slug: projectmanager
     orgSlug: ifw
-    color: var(--role-blue-bg)
-    border: var(--role-blue-border)
+    color: var(--role-blue)
   - name: Analyst
     slug: analyst
     orgSlug: due2lab
-    color: var(--role-emerald-bg)
-    border: var(--role-emerald-border)
+    color: var(--role-emerald)
   - name: Operator
     slug: operator
     orgSlug: closing-the-loop
-    color: var(--role-amber-bg)
-    border: var(--role-amber-border)
+    color: var(--role-amber)
 dpp:
   enabled: true
   gtin: "09506000134352"

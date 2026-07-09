@@ -188,22 +188,22 @@ Role badge colors are resolved at runtime from **Appwrite team prefs**, not from
 Appwrite team prefs          Backend (roleMetaIndex)          Templates + CSS
 { slug, name, palette }  →   (orgSlug, roleSlug) → key   →   data-role-palette="blue"
                                                                       ↓
-                                                             role-palette.css → --role-*-bg
+                                                             role-palette.css → --role-*
 ```
 
 | Layer | Responsibility |
 |-------|----------------|
 | Appwrite | Canonical store: `{ slug, name, palette }` where `palette` is a named key (`blue`, `emerald`, …) |
 | Backend | Resolves org-scoped `(orgSlug, roleSlug)` to a palette key; never emits `var(--role-*-*)` strings to workflow templates |
-| Workflow YAML | Slug/org/name for validation only; `color` / `border` fields are ignored by Go |
+| Workflow YAML | Slug/org/name for validation only; `color` fields are ignored by Go |
 | Templates | Set `data-role-palette="{{ .Palette }}"` on `.role-pill` and timeline substeps |
-| `tokens.css` + `role-palette.css` | Single source of appearance; maps palette key → `--role-*-bg` tokens |
+| `tokens.css` + `role-palette.css` | Single source of appearance; maps palette key → `--role-*` tokens |
 
 ### Storage and API
 
-- **Writes** persist `palette` only (no `color` / `border`).
-- **Reads** use `palette` when present; legacy rows with `color` / `border` CSS var strings fall back to `rolePaletteKeyFromStyle()`.
-- **`GET /api/catalog`** returns `palette` per role (no `color` / `border`).
+- **Writes** persist `palette` only (no `color`).
+- **Reads** use `palette` when present; legacy rows with `color` CSS var strings fall back to `rolePaletteKeyFromStyle()`.
+- **`GET /api/catalog`** returns `palette` per role (no `color`).
 - **Unknown or missing role** → palette key `"fallback"` (not YAML-embedded colors).
 
 ### Lookup rules
