@@ -26,7 +26,7 @@ svg.bi {
 }
 
 .panel {
-  background: var(--panel);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: var(--space-5);
@@ -44,22 +44,22 @@ svg.bi {
   }
 
   p {
-    color: var(--muted);
+    color: var(--muted-foreground);
     margin: 3px 0 0;
   }
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .primary,
 button {
   font-family: var(--font-sans);
   font-size: var(--text-base);
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--panel);
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
   padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   cursor: pointer;
@@ -67,11 +67,11 @@ button {
 }
 
 button.secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
 }
 
 button.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 90%, var(--panel));
+  background: color-mix(in srgb, var(--primary) 90%, var(--card));
 }
 
 button[disabled] {
@@ -80,22 +80,22 @@ button[disabled] {
 }
 
 button.danger {
-  background: var(--danger);
+  background: var(--destructive);
   border: none;
-  color: var(--panel);
+  color: var(--destructive-foreground);
 }
 
 .secondary {
   display: inline-block;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--primary);
   border-radius: 4px;
   font-weight: 600;
 }
 
 button.secondary {
   background: transparent;
-  color: var(--accent);
+  color: var(--primary);
 }
 
 button.secondary-small {
@@ -113,7 +113,7 @@ button.secondary-small {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   padding: 2px var(--space-2);
-  background: var(--pill-bg);
+  background: var(--pill);
   border-radius: 4px;
   border: 1px solid var(--border);
 }
@@ -139,9 +139,9 @@ button.secondary-small {
 }
 
 .role-pill {
-  color: var(--pill-bg);
-  background: color-mix(in srgb, var(--pill-bg) 10%, transparent);
-  border-color: var(--pill-bg);
+  color: var(--role-chroma);
+  background: color-mix(in srgb, var(--role-chroma) 10%, transparent);
+  border-color: var(--role-chroma);
 }
 
 .role-pill-row {
@@ -157,13 +157,12 @@ button.secondary-small {
 }
 
 .pill-accent {
-  --pill-bg: var(--accent-2-opposite);
-  --border: var(--border);
+  --pill: var(--highlight);
 }
 
 .pill-panel {
-  --pill-bg: var(--panel);
-  --border: var(--ink);
+  --pill: var(--card);
+  --border: var(--foreground);
 }
 
 .local-adaptation-actions {
@@ -194,8 +193,8 @@ button.secondary-small {
   min-height: 200px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--ink);
+  background: var(--card);
+  color: var(--foreground);
   text-decoration: none;
   transition:
     transform 140ms ease,
@@ -211,7 +210,7 @@ button.secondary-small {
 .workflow-card-shell:focus-within .workflow-card {
   transform: translateY(-1px);
   box-shadow: 0 12px 22px var(--shadow);
-  border-color: var(--accent);
+  border-color: var(--primary);
 }
 
 .workflow-card-head {
@@ -235,7 +234,7 @@ button.secondary-small {
 .workflow-card-title-link:focus-visible,
 .workflow-card-body:focus-visible,
 .workflow-card-menu-trigger:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -260,7 +259,7 @@ button.secondary-small {
 
 .workflow-card-description {
   margin: 0;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
   display: -webkit-box;
@@ -291,13 +290,13 @@ button.secondary-small {
   padding-right: var(--space-4);
   text-align: left;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--muted-foreground);
   white-space: nowrap;
 }
 
 .workflow-card-stats td {
   font-weight: 600;
-  color: var(--ink);
+  color: var(--foreground);
   text-align: right;
 }
 
@@ -305,22 +304,22 @@ button.secondary-small {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .workflow-card-create {
   border-width: 2px;
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
   align-items: center;
   text-align: center;
   justify-content: center;
 }
 
 .workflow-card-create:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
   text-decoration: none;
 }
 
@@ -336,9 +335,9 @@ button.secondary-small {
   width: 36px;
   height: 36px;
   padding: 0;
-  background: var(--panel);
+  background: var(--card);
   transform: translateY(-6px) translateX(6px);
-  color: var(--text);
+  color: var(--foreground);
   cursor: pointer;
   list-style: none;
 }
@@ -353,8 +352,8 @@ button.secondary-small {
 
 .workflow-card-menu-trigger:hover,
 .workflow-card-menu[open] .workflow-card-menu-trigger {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
 }
 
 .workflow-card-dropdown {
@@ -365,7 +364,7 @@ button.secondary-small {
   padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--panel);
+  background: var(--card);
   box-shadow: 0 10px 26px var(--shadow);
   z-index: 40;
   display: grid;
@@ -383,7 +382,7 @@ button.secondary-small {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--ink);
+  color: var(--foreground);
   text-decoration: none;
   text-align: left;
   font: inherit;
@@ -393,13 +392,13 @@ button.secondary-small {
 }
 
 .workflow-card-menu-item:hover {
-  background: var(--surface-2);
+  background: var(--muted);
   text-decoration: none;
 }
 
 .workflow-card-menu-item-disabled,
 .workflow-card-menu-item:disabled {
-  color: var(--muted);
+  color: var(--muted-foreground);
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -410,16 +409,16 @@ button.secondary-small {
 }
 
 .workflow-card-menu-item-danger {
-  color: var(--danger);
+  color: var(--destructive);
 }
 
 .workflow-card-menu-item-danger:hover {
-  background: color-mix(in srgb, var(--danger) 10%, var(--panel));
+  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
 }
 
 .workflow-card-menu-item-danger.workflow-card-menu-item-disabled,
 .workflow-card-menu-item-danger:disabled {
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .workflow-card-footer {
@@ -439,8 +438,8 @@ button.secondary-small {
   min-width: 150px;
   padding: var(--space-2) var(--space-3);
   border-radius: 4px;
-  background: var(--accent);
-  color: var(--panel);
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-weight: 600;
 }
 
@@ -458,9 +457,9 @@ button.secondary-small {
 }
 
 .error {
-  background: var(--error-bg);
-  border: 1px solid var(--danger);
-  color: var(--error-ink);
+  background: var(--destructive-muted);
+  color: var(--destructive-muted-foreground);
+  border: 1px solid color-mix(in srgb, var(--destructive-muted-foreground) 35%, transparent);
   padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   margin-block: 0;
@@ -468,9 +467,9 @@ button.secondary-small {
 }
 
 .confirmation {
-  background: var(--confirmation-bg);
-  border: 1px solid var(--confirmation-border);
-  color: var(--confirmation-ink);
+  background: var(--success-muted);
+  color: var(--success-muted-foreground);
+  border: 1px solid color-mix(in srgb, var(--success-muted-foreground) 35%, transparent);
   padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   margin-block: 0;

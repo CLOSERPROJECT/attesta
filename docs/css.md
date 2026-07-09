@@ -77,9 +77,9 @@ Behavior hooks use a `js-*` class prefix alongside `data-*` where needed; do not
 ## Theming
 
 - Light/dark mode toggles `data-theme="light|dark"` on `<html>` (see `web/src/main.js`).
-- Use design tokens (`var(--ink)`, `var(--panel)`, `var(--accent)`, etc.) — do not hardcode hex/rgb in templates or new CSS.
+- Use design tokens (`var(--foreground)`, `var(--card)`, `var(--primary)`, etc.) — do not hardcode hex/rgb in templates or new CSS.
 - Role hue and stream status tokens use CSS `light-dark()` in `:root`; `[data-theme="dark"]` keeps only non-role overrides.
-- Token names are stable; do not rename without a dedicated migration.
+- Token names follow shadcn-style `{role}` + `{role}-foreground` pairs (see `tokens.css`).
 
 ### Breakpoints
 
@@ -260,7 +260,7 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 | `u-divider` | Horizontal rule, `var(--space-6)` vertical margin |
 | `u-divider-flush` | `<hr>` with `margin: 0` |
 | `u-divider-5` | Horizontal rule, `var(--space-5)` vertical margin |
-| `u-text-danger` | `color: var(--danger)` |
+| `u-text-danger` | `color: var(--destructive)` |
 
 **Stack gap modifiers:** `.stack.u-gap-2` and `.stack.u-gap-4` override the default `var(--space-6)` stack gap.
 

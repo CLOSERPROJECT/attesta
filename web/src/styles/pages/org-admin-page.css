@@ -22,7 +22,7 @@
   text-align: left;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: var(--muted);
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -34,13 +34,13 @@
 }
 
 .org-admin-sidebar-link:hover {
-  border-color: var(--accent);
+  border-color: var(--primary);
   transform: translateY(-1px);
 }
 
 .org-admin-sidebar-link.is-active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--muted));
 }
 
 .org-admin-sidebar-link-title {
@@ -48,7 +48,7 @@
 }
 
 .org-admin-sidebar-link-copy {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }
@@ -82,7 +82,7 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   object-fit: contain;
-  background: var(--panel);
+  background: var(--card);
   padding: var(--space-1);
 }
 
@@ -101,8 +101,8 @@
   padding: var(--space-1);
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--pill-bg);
-  color: var(--muted);
+  background: var(--pill);
+  color: var(--muted-foreground);
   font-size: var(--text-xs);
   font-weight: 600;
   text-align: center;

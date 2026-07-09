@@ -161,47 +161,46 @@ textarea,
 }
 
 formata-form {
-	--attesta-formata-muted: var(--attesta-muted);
-	--attesta-formata-accent: var(--attesta-accent);
-	--attesta-formata-panel: var(--attesta-panel);
-	--attesta-formata-ink: var(--attesta-ink);
+	--attesta-formata-muted-foreground: var(--attesta-muted);
+	--attesta-formata-primary: var(--attesta-accent);
+	--attesta-formata-card: var(--attesta-panel);
+	--attesta-formata-foreground: var(--attesta-ink);
 	--attesta-formata-border: var(--attesta-border);
-	--attesta-formata-button-contrast: var(--attesta-panel);
 }
 `
 
 const formataBuilderPreviewShadowOverrides = `
 :host {
-	--formata-muted: var(--attesta-formata-muted);
-	--formata-accent: var(--attesta-formata-accent);
+	--formata-muted-foreground: var(--attesta-formata-muted-foreground);
+	--formata-primary: var(--attesta-formata-primary);
 }
 
 [data-slot="field-legend"] {
-	color: var(--attesta-formata-ink) !important;
+	color: var(--attesta-formata-foreground) !important;
 	font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
 [data-slot="field-description"] {
-	color: var(--attesta-formata-muted) !important;
+	color: var(--attesta-formata-muted-foreground) !important;
 	font-family: "Space Grotesk", system-ui, sans-serif;
 	font-size: 13px;
 }
 
 [data-slot="input"]::file-selector-button,
 [data-slot="button"] {
-	background: var(--attesta-formata-panel) !important;
-	color: var(--attesta-formata-accent) !important;
-	border: 1px solid var(--attesta-formata-accent) !important;
+	background: var(--attesta-formata-card) !important;
+	color: var(--attesta-formata-primary) !important;
+	border: 1px solid var(--attesta-formata-primary) !important;
 	cursor: pointer;
 	border-radius: 4px;
 }
 
 [data-slot="slider-range"] {
-	background: var(--attesta-formata-accent) !important;
+	background: var(--attesta-formata-primary) !important;
 }
 
 [data-slot="slider-track"] {
-	background: var(--attesta-formata-panel) !important;
+	background: var(--attesta-formata-card) !important;
 }
 
 [data-slot="input"],
@@ -212,9 +211,9 @@ const formataBuilderPreviewShadowOverrides = `
 input,
 select,
 textarea {
-	background: var(--attesta-formata-panel) !important;
+	background: var(--attesta-formata-card) !important;
 	border-color: var(--attesta-formata-border) !important;
-	color: var(--attesta-formata-ink) !important;
+	color: var(--attesta-formata-foreground) !important;
 	font-family: "Space Grotesk", system-ui, sans-serif !important;
 }
 

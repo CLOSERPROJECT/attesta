@@ -9,7 +9,7 @@
   flex-direction: column;
   gap: var(--space-2);
   font-size: var(--text-sm);
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .form-field {
@@ -20,7 +20,7 @@
 
 .form-field > label {
   font-size: var(--text-sm);
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .input-form input,
@@ -28,8 +28,8 @@
   padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--ink);
+  background: var(--card);
+  color: var(--foreground);
   font-size: var(--text-base);
 }
 
@@ -73,7 +73,7 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  color: var(--muted);
+  color: var(--muted-foreground);
   display: flex;
   align-items: center;
 }
@@ -113,8 +113,8 @@
   padding: var(--space-2) var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--ink);
+  background: var(--card);
+  color: var(--foreground);
   font-family: inherit;
   font-size: var(--text-base);
 }
