@@ -1,23 +1,23 @@
 .topbar {
   padding: var(--space-5) 32px;
   border-bottom: 1px solid var(--border);
-  background: var(--chrome-bg);
+  background: var(--secondary);
 }
 
 .topbar-pa {
-  background: var(--topbar-pa-bg);
+  background: var(--topbar-inverted);
 
   .brand {
-    color: var(--brand-pa);
+    color: var(--topbar-inverted-primary);
   }
 
   .topbar-pa-label {
-    color: var(--ink-pa);
+    color: var(--topbar-inverted-foreground);
   }
 
   .nav .nav-action {
-    color: var(--ink-pa);
-    border-color: var(--ink-pa);
+    color: var(--topbar-inverted-foreground);
+    border-color: var(--topbar-inverted-foreground);
   }
 }
 
@@ -88,7 +88,7 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   background: transparent;
-  color: var(--ink);
+  color: var(--foreground);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
@@ -101,7 +101,7 @@
 
 .nav .nav-action:hover,
 .nav .account-menu[open] .nav-action {
-  background: var(--nav-hover-bg);
+  background: var(--nav-hover);
   text-decoration: none;
 }
 
@@ -135,7 +135,7 @@
   min-width: 220px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--panel);
+  background: var(--card);
   box-shadow: 0 10px 26px var(--shadow);
   z-index: 40;
 }
@@ -157,14 +157,14 @@
 .nav .account-menu-label {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .nav .account-menu-email {
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -181,7 +181,7 @@
   width: 100%;
   padding: 7px 9px;
   background: transparent;
-  color: var(--ink);
+  color: var(--foreground);
   font-size: var(--text-sm);
   font-weight: 600;
   text-align: left;
@@ -197,17 +197,17 @@
 }
 
 .nav .account-menu-item:hover {
-  background: var(--surface-2);
+  background: var(--muted);
   text-decoration: none;
 }
 
 .nav .account-menu-item-danger {
   border: none;
-  color: var(--danger);
+  color: var(--destructive);
 }
 
 .nav .account-menu-item-danger:hover {
-  background: color-mix(in srgb, var(--danger) 10%, var(--panel));
+  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
 }
 
 .nav .theme-toggle .theme-icon-sun {
@@ -231,12 +231,12 @@
   margin-top: auto;
   padding: var(--space-5) 32px var(--space-6);
   border-top: 1px solid var(--border);
-  background: var(--chrome-bg);
+  background: var(--secondary);
 }
 
 .site-footer p {
   margin: 0 0 var(--space-2);
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
 }

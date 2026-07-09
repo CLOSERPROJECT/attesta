@@ -11,12 +11,12 @@
 .timeline-step {
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--panel);
+  background: var(--card);
   overflow: visible;
 }
 
 .timeline-step:hover {
-  border-color: var(--accent);
+  border-color: var(--primary);
 }
 
 .timeline-step-summary {
@@ -46,7 +46,7 @@
 .dpp-accordion-chevron {
   width: 32px;
   height: 32px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -59,12 +59,12 @@
 
 .timeline-step[open] .timeline-step-chevron {
   transform: rotate(180deg);
-  color: var(--ink);
+  color: var(--foreground);
 }
 
 .dpp-history-item[open] .dpp-accordion-chevron {
   transform: rotate(180deg);
-  color: var(--ink);
+  color: var(--foreground);
 }
 
 .timeline-step-chevron .icon-svg,
@@ -79,7 +79,7 @@
   height: 44px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--card);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -105,14 +105,14 @@
   font-size: var(--text-base);
   line-height: 1.2;
   font-weight: var(--font-bold);
-  color: var(--ink);
+  color: var(--foreground);
   overflow-wrap: anywhere;
 }
 
 .timeline-step-org {
   font-size: var(--text-sm);
   line-height: var(--leading-tight);
-  color: var(--muted);
+  color: var(--muted-foreground);
   overflow-wrap: anywhere;
 }
 
@@ -128,9 +128,9 @@
 
 .substep {
   border-radius: 4px;
-  border: 1px solid var(--substep-done-border);
-  border-left: 6px solid var(--substep-done-border);
-  background: var(--substep-done);
+  border: 1px solid var(--substep-done);
+  border-left: 6px solid var(--substep-done);
+  background: var(--substep-done-muted);
   cursor: pointer;
   transition:
     transform 300ms ease,
@@ -141,7 +141,7 @@
 }
 
 .substep:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -184,30 +184,30 @@
 
   .substep-accordion-chevron {
     transform: rotate(180deg);
-    color: var(--ink);
+    color: var(--foreground);
   }
 }
 
 .substep-available {
-  border-color: var(--accent);
-  background: var(--substep-available);
+  border-color: var(--substep-available);
+  background: var(--substep-available-muted);
 }
 
 .substep-active {
   border-color: var(--border);
-  background: var(--substep-available);
+  background: var(--substep-available-muted);
   opacity: 0.7;
 }
 
 .substep-done {
-  border-color: var(--substep-done-border);
-  background: var(--substep-done);
+  border-color: var(--substep-done);
+  background: var(--substep-done-muted);
 }
 
 .substep-locked {
   opacity: 0.3;
-  border-color: var(--substep-done-border);
-  background: var(--substep-done);
+  border-color: var(--substep-done);
+  background: var(--substep-done-muted);
 }
 
 .substep-terminated {
@@ -217,8 +217,8 @@
 
 .substep-skipped {
   opacity: 0.55;
-  border-color: var(--substep-done-border);
-  background: var(--substep-skipped);
+  border-color: var(--substep-done);
+  background: var(--substep-skipped-muted);
 }
 
 .substep-title {
@@ -236,7 +236,7 @@
   letter-spacing: 0.04em;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--tag-bg);
+  background: var(--tag);
   padding: 2px var(--space-2);
 }
 
@@ -275,8 +275,8 @@
 }
 
 .substep-skipped .status {
-  border-color: var(--substep-done-border);
-  background: var(--substep-skipped);
+  border-color: var(--substep-done);
+  background: var(--substep-skipped-muted);
 }
 
 .substep-meta {
@@ -284,7 +284,7 @@
   flex-wrap: wrap;
   gap: var(--space-3);
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--muted-foreground);
   min-width: 0;
 }
 
@@ -326,8 +326,8 @@
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--panel);
-  color: var(--ink);
+  background: var(--card);
+  color: var(--foreground);
   overflow: hidden;
 }
 
@@ -373,7 +373,7 @@
   flex: 1 1 auto;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--panel);
+  background: var(--card);
 }
 
 .js-open-substep-override {
@@ -381,7 +381,7 @@
   padding: 0;
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--primary);
   margin: 0;
   font-size: var(--text-xs);
 }
@@ -449,35 +449,35 @@
   .timeline-step[open] > summary {
     position: sticky;
     top: 0;
-    background: var(--panel);
+    background: var(--card);
     z-index: 10;
   }
 
   .substep.substep-done .substep-accordion[open] > .substep-accordion-summary {
-    background: var(--substep-done);
+    background: var(--substep-done-muted);
   }
 
   .substep.substep-available .substep-accordion[open] > .substep-accordion-summary {
-    background: var(--substep-available);
+    background: var(--substep-available-muted);
   }
 
   .substep.substep-active .substep-accordion[open] > .substep-accordion-summary {
-    background: var(--substep-available);
+    background: var(--substep-available-muted);
   }
 
   .substep.substep-locked .substep-accordion[open] > .substep-accordion-summary {
-    border-color: var(--substep-done-border);
-    background: var(--substep-done);
+    border-color: var(--substep-done);
+    background: var(--substep-done-muted);
   }
 
   .substep.substep-terminated .substep-accordion[open] > .substep-accordion-summary {
-    border-color: var(--substep-terminated-border);
+    border-color: var(--substep-terminated);
     background: var(--substep-terminated);
   }
 
   .substep.substep-skipped .substep-accordion[open] > .substep-accordion-summary {
-    border-color: var(--substep-done-border);
-    background: var(--substep-skipped);
+    border-color: var(--substep-done);
+    background: var(--substep-skipped-muted);
   }
 
   .substep-accordion[open] > summary {

@@ -1,74 +1,75 @@
 /* Palette key → shared custom properties (consumed by .role-pill, etc.) */
 [data-role-palette="red"] {
-  --palette-bg: var(--role-red);
+  --role-chroma: var(--role-red);
 }
 
 [data-role-palette="orange"] {
-  --palette-bg: var(--role-orange);
+  --role-chroma: var(--role-orange);
 }
 
 [data-role-palette="amber"] {
-  --palette-bg: var(--role-amber);
+  --role-chroma: var(--role-amber);
 }
 
 [data-role-palette="yellow"] {
-  --palette-bg: var(--role-yellow);
+  --role-chroma: var(--role-yellow);
 }
 
 [data-role-palette="lime"] {
-  --palette-bg: var(--role-lime);
+  --role-chroma: var(--role-lime);
 }
 
 [data-role-palette="green"] {
-  --palette-bg: var(--role-green);
+  --role-chroma: var(--role-green);
 }
 
 [data-role-palette="emerald"] {
-  --palette-bg: var(--role-emerald);
+  --role-chroma: var(--role-emerald);
 }
 
 [data-role-palette="teal"] {
-  --palette-bg: var(--role-teal);
+  --role-chroma: var(--role-teal);
 }
 
 [data-role-palette="cyan"] {
-  --palette-bg: var(--role-cyan);
+  --role-chroma: var(--role-cyan);
 }
 
 [data-role-palette="sky"] {
-  --palette-bg: var(--role-sky);
+  --role-chroma: var(--role-sky);
 }
 
 [data-role-palette="blue"] {
-  --palette-bg: var(--role-blue);
+  --role-chroma: var(--role-blue);
 }
 
 [data-role-palette="indigo"] {
-  --palette-bg: var(--role-indigo);
+  --role-chroma: var(--role-indigo);
 }
 
 [data-role-palette="violet"] {
-  --palette-bg: var(--role-violet);
+  --role-chroma: var(--role-violet);
 }
 
 [data-role-palette="purple"] {
-  --palette-bg: var(--role-purple);
+  --role-chroma: var(--role-purple);
 }
 
 [data-role-palette="fuchsia"] {
-  --palette-bg: var(--role-fuchsia);
+  --role-chroma: var(--role-fuchsia);
 }
 
 [data-role-palette="pink"] {
-  --palette-bg: var(--role-pink);
+  --role-chroma: var(--role-pink);
 }
 
 [data-role-palette="rose"] {
-  --palette-bg: var(--role-rose);
+  --role-chroma: var(--role-rose);
 }
 
-.role-pill {
-  --pill-bg: var(--palette-bg, var(--muted));
+[data-role-palette="fallback"],
+.role-pill:not([data-role-palette]) {
+  --role-chroma: var(--muted-foreground);
 }
 
 .stream-status-section-head[data-stream-status="available"] { --stream-color: var(--stream-available); }

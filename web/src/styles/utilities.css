@@ -89,5 +89,5 @@
 
 /* Replaces hardcoded signup error color with token-based danger text. */
 .u-text-danger {
-  color: var(--danger);
+  color: var(--destructive);
 }
