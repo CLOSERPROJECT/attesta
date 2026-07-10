@@ -37,12 +37,12 @@
   --space-7: 1.75rem;
 
   /* Surfaces */
-  --foreground: #12210c;
-  --muted-foreground: #4f5d47;
   --background: linear-gradient(135deg, #f3f4ef 0%, #e9efe2 100%);
+  --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
   --muted: #f8f9f4;
+  --muted-foreground: #4f5d47;
   --secondary: #fffaf2;
 
   /* Accent & semantic */
@@ -99,10 +99,10 @@
   --role-rose: light-dark(oklch(51.4% 0.222 16.935deg), oklch(89.2% 0.058 10.001deg));
 
   /* Substep */
-  --substep-done-muted: #f7f7f7;
   --substep-done: #d4d4d4;
-  --substep-available-muted: #e9f1ef;
+  --substep-done-muted: #f7f7f7;
   --substep-available: #d4dbd9;
+  --substep-available-muted: #e9f1ef;
   --substep-terminated: #dd8379;
   --substep-skipped-muted: #f2f0ed;
 
@@ -121,11 +121,11 @@
   color-scheme: dark;
 
   /* Surfaces */
-  --foreground: #ecf1eb;
-  --muted-foreground: #a6b2a2;
   --background: linear-gradient(135deg, #0b0f0d 0%, #121915 100%);
+  --foreground: #ecf1eb;
   --card: #151c17;
   --muted: rgb(255 255 255 / 4%);
+  --muted-foreground: #a6b2a2;
   --secondary: #0f1411;
 
   /* Accent & semantic */
@@ -156,9 +156,9 @@
   --topbar-inverted-primary: #1e6f5c;
 
   /* Substep */
-  --substep-done-muted: rgb(255 255 255 / 6%);
   --substep-done: rgb(255 255 255 / 14%);
-  --substep-available-muted: rgb(87 194 166 / 12%);
+  --substep-done-muted: rgb(255 255 255 / 6%);
   --substep-available: rgb(87 194 166 / 22%);
+  --substep-available-muted: rgb(87 194 166 / 12%);
   --substep-skipped-muted: rgb(255 255 255 / 4%);
 }
