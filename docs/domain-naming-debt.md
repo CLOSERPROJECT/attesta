@@ -9,9 +9,9 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 | **Stream** (blueprint) | `Workflow`, `WorkflowDef`, `workflow.yaml`, `workflowKey`, `/w/:key/`, … | Domain retires **workflow**; code keeps aliases until rename pass. |
 | **Stream instance** | `Process`, `/process/:id`, `process.html`, `ProcessPageView`, `handleTerminateProcess`, … | User-facing "stream" often means instance; glossary uses **stream instance** for precision. |
 | **Step** (blueprint phase) | `ProcessStep` (runtime progress per substep — different concept) | `ProcessStep` overloads "step"; consider rename to `SubstepProgress` or similar in a later pass. |
-| **Substep** (completable unit) | `Action`, `ActionView`, `buildActionList`, `action_list.html`, … | Retire **Action** everywhere. See rename targets below. |
+| **Substep** (completable unit) | `Action` (remaining in routes/Cerbos only) | Retire **Action** everywhere else. See rename targets below. |
 | **Stream picker** | `home.html`, `home_picker_body`, `handleHome` | → `stream_picker.html`, `stream_picker_body` |
-| **Stream instance detail** (page + payload) | `process.html`, `process_body`, `process_content.html`, `ProcessPageView`, `ActionListView` | → `stream_instance_detail.html`, `stream_instance_detail_body`, `stream_instance_detail_content`; `StreamInstanceDetailView` |
+| **Stream instance detail** (page + payload) | `process.html`, `process_body`, `process_content.html`, `ProcessPageView` | → `stream_instance_detail.html`, `stream_instance_detail_body`, `stream_instance_detail_content` |
 
 | **Stream timeline** (accordion tree) | `components/stream_timeline.html`, define `stream_timeline` | Migrated 2026-07-13 |
 | **Substep body** (inner panel) | `components/substep_body.html`, define `substep_body` | Migrated 2026-07-13 |
@@ -19,15 +19,16 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 
 ### Action → Substep rename targets (future pass)
 
-**Go types & functions**
-- `ActionView` → `SubstepBodyView` (carries `Mode`: preview | actionable | result | message)
-- `ActionListView` → `StreamInstanceDetailView`
-- `buildActionList` → `buildSubstepBodies` (or `buildSubstepViews`)
-- `buildProcessActionListView` → `buildStreamInstanceDetailView`
-- `ActionRoleBadge`, `ActionRoleOption`, `ActionKV`, `ActionAttachmentView` → `SubstepRoleBadge`, etc.
-- `selectedActionBySubstep`, `nextAvailableAuthorizedAction` → drop "action" from names
-- `TimelineSubstep.Action` → `Body` (`*SubstepBodyView`)
-- Test files: `action_list_*_test.go` → `substep_body_*_test.go`
+**Go types & functions** — done in go-domain-vocabulary pass (2026-07-13); see resolved section below.
+
+~~- `ActionView` → `SubstepBodyView` (carries `Mode`: preview | actionable | result | message)~~
+~~- `ActionListView` → `StreamInstanceDetailView`~~
+~~- `buildActionList` → `buildSubstepBodies` (or `buildSubstepViews`)~~
+~~- `buildProcessActionListView` → `buildStreamInstanceDetailView`~~
+~~- `ActionRoleBadge`, `ActionRoleOption`, `ActionKV`, `ActionAttachmentView` → `SubstepRoleBadge`, etc.~~
+~~- `selectedActionBySubstep`, `nextAvailableAuthorizedAction` → drop "action" from names~~
+~~- `TimelineSubstep.Action` → `Body` (`*SubstepBodyView`)~~
+~~- Test files: `action_list_*_test.go` → `substep_body_*_test.go`~~
 
 **Templates & defines**
 
@@ -40,6 +41,14 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 
 - `workflow_timeline` → `components/stream_timeline.html`, define `stream_timeline`
 - `timeline.css` step chrome → `components/stream-timeline.css` (class prefix rename deferred)
+
+### Resolved in go-domain-vocabulary pass (2026-07-13)
+
+- `ActionView` → `SubstepBodyView` (+ satellite types in `components.go`)
+- `ActionListView` → `StreamInstanceDetailView`; `ProcessPageView.ActionList` → `Detail`
+- `TimelineSubstep.Action` → `Body`
+- Builders: `buildSubstepViews`, `buildStreamInstanceDetailView`, etc.
+- Test files: `substep_views_builder_test.go`, `stream_instance_detail_test.go`
 
 ### Still open (templates & defines)
 
@@ -58,7 +67,10 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 
 ## Open items
 
-- Full Go rename pass per tables above (`ActionView` → `SubstepBodyView`, …)
+- Full workflow/process/page renames (`Process` → stream instance, routes, `process.html` filename)
+- DPP history: converge `dpp-history-*` onto `substep_body` partials
+- CSS class prefix: `.timeline-*` → `.stream-timeline-*` (deferred)
+- `SubstepBodyView.Mode` explicit field
 
 ## Resolved in session
 

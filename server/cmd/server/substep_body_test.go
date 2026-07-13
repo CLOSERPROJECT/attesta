@@ -9,20 +9,20 @@ import (
 func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
 		SubstepID:   "1.1",
 		Title:       "Completed substep",
 		InputKey:    "notes",
 		Status:      "done",
-		RoleBadges: []ActionRoleBadge{
+		RoleBadges: []SubstepRoleBadge{
 			{ID: "dep1", Label: "Department 1", Palette: "red"},
 		},
-		Values: []ActionKV{
+		Values: []SubstepKV{
 			{Key: "notes", Value: "All good"},
 		},
-		Attachments: []ActionAttachmentView{
+		Attachments: []SubstepAttachmentView{
 			{
 				Key:      "photo",
 				URL:      "/w/workflow/process/process-1/substep/1.1/file?id=abc",
@@ -55,14 +55,14 @@ func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 func TestSubstepBodyTemplateRendersMessageMode(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey:   "workflow",
 		ProcessID:     "process-1",
 		SubstepID:     "2.1",
 		Title:         "Skipped substep",
 		Status:        "done",
 		DetailMessage: "Skipped: not applicable for this batch.",
-		RoleBadges: []ActionRoleBadge{
+		RoleBadges: []SubstepRoleBadge{
 			{ID: "dep1", Label: "Department 1", Palette: "red"},
 		},
 	}

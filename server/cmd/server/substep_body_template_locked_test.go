@@ -9,7 +9,7 @@ import (
 func TestSubstepBodyTemplateLockedFormataHooks(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey:  "workflow",
 		ProcessID:    "process-1",
 		SubstepID:    "1.2",

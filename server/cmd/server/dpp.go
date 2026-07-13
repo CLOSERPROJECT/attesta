@@ -291,7 +291,7 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				subView.Digest = digestPayload(progress.Data)
 				subView.Description = processStepDescription(progress, sub)
 				subView.Values = dppTraceValues(sub, progress)
-				subView.Attachments = buildActionAttachments(workflowKey, process, progress.Data)
+				subView.Attachments = buildSubstepAttachments(workflowKey, process, progress.Data)
 			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 				subView.Status = processStatusTerminated
 				subView.Reason = "Stream ended early"
@@ -371,7 +371,7 @@ func dppTraceValues(sub WorkflowSub, progress ProcessStep) []DPPTraceabilityValu
 		return nil
 	}
 
-	flattened := make([]ActionKV, 0)
+	flattened := make([]SubstepKV, 0)
 	if raw, ok := processStepDataValue(progress, sub); ok {
 		flattened = append(flattened, flattenDisplayValues("", raw)...)
 	}

@@ -312,7 +312,7 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 	})
 	roleIndex[roleMetaKey{OrgSlug: "org2", RoleSlug: "dep2"}] = RoleMeta{ID: "dep2", Label: "Department 2", Palette: "emerald"}
 
-	action, ok := nextAvailableAuthorizedAction(cfg.Workflow, &matching, "workflow", Actor{
+	action, ok := nextAuthorizedSubstepBody(cfg.Workflow, &matching, "workflow", Actor{
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
 	}, roleIndex, cfg.Roles)
@@ -326,14 +326,14 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 		t.Fatalf("matching roles = %#v, want dep1/Department 1", action.MatchingRoles)
 	}
 
-	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &otherOrg, "workflow", Actor{
+	if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &otherOrg, "workflow", Actor{
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
 	}, roleIndex, cfg.Roles); ok {
 		t.Fatalf("did not expect authorized action for step in another organization")
 	}
 
-	if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &done, "workflow", Actor{
+	if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &done, "workflow", Actor{
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
 	}, roleIndex, cfg.Roles); ok {

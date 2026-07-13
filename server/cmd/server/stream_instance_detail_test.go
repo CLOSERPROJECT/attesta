@@ -6,7 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestBuildProcessActionListViewDoesNotFilterByCurrentActiveRole(t *testing.T) {
+func TestBuildStreamInstanceDetailViewDoesNotFilterByCurrentActiveRole(t *testing.T) {
 	process := &Process{
 		ID: primitive.NewObjectID(),
 		Progress: map[string]ProcessStep{
@@ -24,9 +24,9 @@ func TestBuildProcessActionListViewDoesNotFilterByCurrentActiveRole(t *testing.T
 		Role:      "dep2",
 		RoleSlugs: []string{"dep1", "dep2"},
 	}
-	view := server.buildProcessActionListView(t.Context(), testRuntimeConfig(), "workflow", process, actor, "", "", false)
+	view := server.buildStreamInstanceDetailView(t.Context(), testRuntimeConfig(), "workflow", process, actor, "", "", false)
 
-	if view.Action == nil || view.Action.SubstepID != "1.1" {
-		t.Fatalf("expected dep1 step to remain visible after dep2 completion context, got %#v", view.Action)
+	if view.SelectedBody == nil || view.SelectedBody.SubstepID != "1.1" {
+		t.Fatalf("expected dep1 step to remain visible after dep2 completion context, got %#v", view.SelectedBody)
 	}
 }

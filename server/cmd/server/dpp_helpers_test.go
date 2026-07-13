@@ -427,7 +427,7 @@ func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
 		{
 			Substeps: []DPPTraceabilitySubstep{
 				{
-					Attachments: []ActionAttachmentView{
+					Attachments: []SubstepAttachmentView{
 						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
 						{Filename: "legacy.pdf", URL: "/w/workflow/process/p1/attachment/legacy/file"},
 					},
@@ -452,7 +452,7 @@ func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
 		{
 			Substeps: []DPPTraceabilitySubstep{
 				{
-					Attachments: []ActionAttachmentView{
+					Attachments: []SubstepAttachmentView{
 						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
 					},
 				},

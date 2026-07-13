@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func testStreamTimelineView() ActionListView {
-	return ActionListView{
+func testStreamTimelineView() StreamInstanceDetailView {
+	return StreamInstanceDetailView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
 		Timeline: []TimelineStep{{
@@ -22,7 +22,7 @@ func testStreamTimelineView() ActionListView {
 				Status:    "available",
 				Selected:  true,
 				Palette:   "blue",
-				Action: &ActionView{
+				Body: &SubstepBodyView{
 					WorkflowKey: "workflow",
 					ProcessID:   "process-1",
 					SubstepID:   "1.1",
@@ -120,7 +120,7 @@ func TestStreamTimelineTemplateRendersMissingActionMessage(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := testStreamTimelineView()
-	view.Timeline[0].Substeps[0].Action = nil
+	view.Timeline[0].Substeps[0].Body = nil
 
 	var out bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", view); err != nil {
