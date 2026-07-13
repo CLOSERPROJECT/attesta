@@ -2,7 +2,7 @@
 
 Source of truth for styling the server-rendered Attesta UI: CSS architecture, theming, role palettes, template rules, and lint.
 
-**Scope:** `web/src/styles/`, `server/templates/*.html`. Formata embed and Formata Builder (`formata-arch/`) are out of scope.
+**Scope:** `web/src/styles/`, `server/templates/**/*.html`. Formata embed and Formata Builder (`formata-arch/`) are out of scope.
 
 ## Layer stack
 
@@ -27,28 +27,37 @@ Styles load in this order from `web/src/styles.css`:
 
 | File | Prefix / scope | Templates |
 |------|----------------|-----------|
-| `pages/process.css` | `.process-*` | `process.html` |
-| `pages/dpp.css` | `.dpp-*` | `dpp.html` |
-| `pages/home.css` | `.home-*`, `.preview-panel`, `.instances-panel` | `home.html`, `stream.html` (nav panels) |
-| `pages/stream.css` | `.stream-*` | `stream.html` |
-| `pages/org-admin-page.css` | `.org-admin-*`, `.org-profile-*` (page shell) | `org_admin.html` |
-| `pages/platform-admin.css` | `.platform-admin-*` | `platform_admin.html` |
+| `pages/process.css` | `.process-*` | `pages/process.html` |
+| `pages/dpp.css` | `.dpp-*` | `pages/dpp.html` |
+| `pages/home.css` | `.home-*`, `.preview-panel`, `.instances-panel` | `pages/home.html`, `pages/stream.html` (nav panels) |
+| `pages/stream.css` | `.stream-*` | `pages/stream.html` |
+| `pages/org-admin-page.css` | `.org-admin-*`, `.org-profile-*` (page shell) | `pages/org_admin.html` |
+| `pages/platform-admin.css` | `.platform-admin-*` | `pages/platform_admin.html` |
 
 Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not the page module.
+
+### Component modules (`components/`)
+
+| File | Prefix / scope | Templates |
+|------|----------------|-----------|
+| `components/page-header.css` | `.page-header-*` | `components/page_header.html` |
+
+Other partials (`action_list.html`, `icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
 
 ### Template ↔ CSS index
 
 | Template | Primary CSS | Also uses |
 |----------|-------------|-----------|
 | `layout.html` | `layout/index.css` | `components/shared.css` |
-| `home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
-| `stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `role-palette.css` |
-| `process.html` | `pages/process.css` | `components/timeline.css`, `components/actions.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| `components/page_header.html` | `components/page-header.css` | — |
+| `pages/home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
+| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `role-palette.css` |
+| `pages/process.html` | `pages/process.css` | `components/timeline.css`, `components/actions.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `action_list.html` | `components/actions.css` | `components/forms.css`, `role-palette.css` |
-| `dpp.html` | `pages/dpp.css` | `components/timeline.css`, `role-palette.css` |
-| `org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
-| `platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
-| `login.html`, `signup.html`, `invite.html`, `reset_*.html` | `components/forms.css` | `components/shared.css` |
+| `pages/dpp.html` | `pages/dpp.css` | `components/timeline.css`, `role-palette.css` |
+| `pages/org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
+| `pages/platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
+| `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
 | `attachment_carousel.html` | `components/actions.css` | — |
 | `substep_override_editor.html` | `components/timeline.css` | — |
 

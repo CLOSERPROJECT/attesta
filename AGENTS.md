@@ -47,7 +47,7 @@ When acting as a coding agent in this repository:
 ## Layout
 - `server/` — Go module (`server/go.mod`)
   - `server/cmd/server/` — all backend code (single `package main`) and most logic.
-  - `server/templates/` — Go `html/template` templates.
+  - `server/templates/` — Go `html/template` templates (`layout.html` at root; full screens in `pages/`; reusable partials in `components/` as they are migrated).
   - `server/config/workflow.yaml` — runtime workflow + departments + users.
 - `web/` — Vite project
   - `web/src/main.js` — SSE + partial refresh client logic.
@@ -186,13 +186,16 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 - `gtin` is normalized/validated at config load (must resolve to 14 digits when enabled).
 - On first transition to process `done`, backend stores `process.dpp` (`gtin`, `lot`, `serial`, `generatedAt`) and keeps identifiers stable on repeated completion calls.
 - Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}`:
-  - HTML landing page (template: `server/templates/dpp.html`)
+  - HTML landing page (template: `server/templates/pages/dpp.html`)
   - JSON (`Accept: application/json` or `?format=json`)
 - DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.
 
 ## Templates and static assets
-- Templates are parsed from `server/templates/*.html` (`server/cmd/server/main.go:258-261`).
+- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`.
+- **Template define names** match the file stem (no extension): e.g. `components/page_header.html` → `{{ define "page_header" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated.
+- **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`PageHeaderView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page-specific assembly stays in handlers or future `page_*.go` files.
+- **Component eligibility:** extract to `templates/components/` + namespaced CSS + `components.go` struct when reused on 2+ pages, is an HTMX/SSE partial target, or has a dedicated view struct. Migrate one component at a time; primitives stay in `components/shared.css`.
 - Backoffice action cards (`server/templates/action_list.html`) render editable forms only for non-`done` actions; `done` actions render a read-only Submitted block with flattened values and attachment download links.
 - Locked Formata actions render `action-card action-locked` and `.js-formata-host[data-formata-disabled="true"]`; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
 - Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).
