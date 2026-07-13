@@ -9,7 +9,7 @@ import (
 func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
 		SubstepID:   "1.1",
@@ -55,7 +55,7 @@ func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 func TestSubstepBodyTemplateRendersMessageMode(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey:   "workflow",
 		ProcessID:     "process-1",
 		SubstepID:     "2.1",

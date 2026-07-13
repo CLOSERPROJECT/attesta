@@ -173,7 +173,7 @@ func TestSubstepOverrideEffectiveSchemaAndCanonicalWorkflowUnchanged(t *testing.
 	}
 }
 
-func TestCompletedActionViewExposesLocalAdaptationReason(t *testing.T) {
+func TestCompletedSubstepBodyViewExposesLocalAdaptationReason(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 	saveSubstepOverrideForTest(t, server, processID, "1.1", `{"type":"object"}`, `{}`, "missing field in source system")

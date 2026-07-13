@@ -168,7 +168,7 @@ type TimelineSubstep struct {
 	Title        string
 	Description  string
 	Selected     bool
-	Action       *ActionView
+	Action       *SubstepBodyView
 	Palette      string
 	Status       string
 	StatusLabel  string
@@ -246,38 +246,6 @@ type NotarizedProcessTermination struct {
 	EndedBy   string `json:"ended_by,omitempty"`
 	EndedRole string `json:"ended_role,omitempty"`
 	SubstepID string `json:"substep_id,omitempty"`
-}
-
-type ActionView struct {
-	WorkflowKey    string
-	ProcessID      string
-	SubstepID      string
-	Title          string
-	Description    string
-	Role           string
-	RoleBadges     []SubstepRoleBadge
-	MatchingRoles  []SubstepRoleOption
-	RoleLabel      string
-	Palette        string
-	InputKey       string
-	InputType      string
-	FormSchema     string
-	FormUISchema   string
-	Status         string
-	DoneAt         string
-	DoneBy         string
-	DoneRole       string
-	Values         []SubstepKV
-	Attachments    []SubstepAttachmentView
-	Disabled       bool
-	ReadOnly       bool
-	Reason         string
-	DetailMessage  string
-	CanAdaptForm   bool
-	AdaptURL       string
-	FormataArchURL string
-	OverrideReason string
-	HasOverride    bool
 }
 
 type Department struct {
@@ -399,7 +367,7 @@ type ActionListView struct {
 	CurrentUser       Actor
 	SelectedSubstepID string
 	ProcessDone       bool
-	Action            *ActionView
+	Action            *SubstepBodyView
 	Error             string
 	Timeline          []TimelineStep
 	HideStatus        bool
@@ -5381,7 +5349,7 @@ func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string
 	return userIdentityView{}, false
 }
 
-func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []ActionView) []ActionView {
+func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []SubstepBodyView) []SubstepBodyView {
 	if len(actions) == 0 {
 		return actions
 	}
@@ -7042,13 +7010,13 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 	return out
 }
 
-func nextAvailableAuthorizedAction(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) (ActionView, bool) {
+func nextAvailableAuthorizedAction(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) (SubstepBodyView, bool) {
 	for _, action := range buildActionList(def, process, workflowKey, actor, false, roleIndex, cfgRoles) {
 		if action.Status == "available" && !action.Disabled {
 			return action, true
 		}
 	}
-	return ActionView{}, false
+	return SubstepBodyView{}, false
 }
 
 func organizationLogoURLMap(ctx context.Context, identity IdentityStore) map[string]string {
@@ -7532,8 +7500,8 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 	return WorkflowSub{}, false
 }
 
-func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []ActionView {
-	var actions []ActionView
+func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
+	var actions []SubstepBodyView
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
 	substepOrgs := substepOrganizationMap(def)
@@ -7683,7 +7651,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if canAdaptForm {
 			adaptURL = fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, processIDString(process), sub.SubstepID)
 		}
-		actions = append(actions, ActionView{
+		actions = append(actions, SubstepBodyView{
 			WorkflowKey:    workflowKey,
 			ProcessID:      processIDString(process),
 			SubstepID:      sub.SubstepID,
@@ -7720,7 +7688,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 	return actions
 }
 
-func resolveSelectedSubstepID(actions []ActionView, requested string, processDone bool) string {
+func resolveSelectedSubstepID(actions []SubstepBodyView, requested string, processDone bool) string {
 	if processDone || len(actions) == 0 {
 		return ""
 	}
@@ -7740,14 +7708,14 @@ func resolveSelectedSubstepID(actions []ActionView, requested string, processDon
 	return actions[0].SubstepID
 }
 
-func selectedActionBySubstep(actions []ActionView, selectedSubstepID string, processDone bool) (ActionView, bool) {
+func selectedActionBySubstep(actions []SubstepBodyView, selectedSubstepID string, processDone bool) (SubstepBodyView, bool) {
 	if processDone {
-		return ActionView{}, false
+		return SubstepBodyView{}, false
 	}
 	selectedSubstepID = strings.TrimSpace(selectedSubstepID)
 	if selectedSubstepID == "" {
 		if len(actions) == 0 {
-			return ActionView{}, false
+			return SubstepBodyView{}, false
 		}
 		return actions[0], true
 	}
@@ -7756,7 +7724,7 @@ func selectedActionBySubstep(actions []ActionView, selectedSubstepID string, pro
 			return action, true
 		}
 	}
-	return ActionView{}, false
+	return SubstepBodyView{}, false
 }
 
 func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string) []TimelineStep {
@@ -7775,11 +7743,11 @@ func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string
 	return timeline
 }
 
-func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []TimelineStep {
+func decorateTimelineActions(timeline []TimelineStep, actions []SubstepBodyView) []TimelineStep {
 	if len(timeline) == 0 || len(actions) == 0 {
 		return timeline
 	}
-	actionsBySubstep := make(map[string]ActionView, len(actions))
+	actionsBySubstep := make(map[string]SubstepBodyView, len(actions))
 	for _, action := range actions {
 		actionsBySubstep[strings.TrimSpace(action.SubstepID)] = action
 	}

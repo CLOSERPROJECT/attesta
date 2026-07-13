@@ -66,7 +66,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 							Title:     "Record input",
 							Status:    "available",
 							Selected:  true,
-							Action: &ActionView{
+							Action: &SubstepBodyView{
 								WorkflowKey:   "workflow",
 								SubstepID:     "1.1",
 								Title:         "Record input",

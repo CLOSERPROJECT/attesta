@@ -22,7 +22,7 @@ func testStreamTimelineView() ActionListView {
 				Status:    "available",
 				Selected:  true,
 				Palette:   "blue",
-				Action: &ActionView{
+				Action: &SubstepBodyView{
 					WorkflowKey: "workflow",
 					ProcessID:   "process-1",
 					SubstepID:   "1.1",

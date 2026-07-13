@@ -8,7 +8,7 @@ import (
 )
 
 func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.1", Status: "locked"},
 		{SubstepID: "1.2", Status: "available"},
 		{SubstepID: "1.3", Status: "done"},
@@ -23,7 +23,7 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	if got := resolveSelectedSubstepID(actions, "", true); got != "" {
 		t.Fatalf("resolveSelectedSubstepID done = %q, want empty", got)
 	}
-	if got := resolveSelectedSubstepID([]ActionView{{SubstepID: "9.1", Status: "locked"}}, "", false); got != "9.1" {
+	if got := resolveSelectedSubstepID([]SubstepBodyView{{SubstepID: "9.1", Status: "locked"}}, "", false); got != "9.1" {
 		t.Fatalf("resolveSelectedSubstepID first fallback = %q, want %q", got, "9.1")
 	}
 	if got := resolveSelectedSubstepID(nil, "", false); got != "" {
@@ -91,7 +91,7 @@ func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 			{SubstepID: "1.2", Status: "available"},
 		},
 	}}
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow", Status: "available"},
 	}
 
@@ -117,7 +117,7 @@ func TestDecorateTimelineActionsMapsUnauthorizedAvailableToActive(t *testing.T) 
 			{SubstepID: "1.1", Status: "available"},
 		},
 	}}
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.1", Status: "available", Disabled: true},
 	}
 

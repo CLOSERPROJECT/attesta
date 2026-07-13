@@ -449,7 +449,7 @@ func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 	}
 }
 
-func findAction(t *testing.T, actions []ActionView, substepID string) ActionView {
+func findAction(t *testing.T, actions []SubstepBodyView, substepID string) SubstepBodyView {
 	t.Helper()
 	for _, action := range actions {
 		if action.SubstepID == substepID {
@@ -457,5 +457,5 @@ func findAction(t *testing.T, actions []ActionView, substepID string) ActionView
 		}
 	}
 	t.Fatalf("action %s not found", substepID)
-	return ActionView{}
+	return SubstepBodyView{}
 }

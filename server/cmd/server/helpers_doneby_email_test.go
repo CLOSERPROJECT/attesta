@@ -112,7 +112,7 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 			{StepID: "1", OrganizationSlug: "org-a"},
 		},
 	}
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
 		{SubstepID: "1.15", DoneBy: "appwrite:user-2"},
 		{SubstepID: "1.2", DoneBy: "legacy-user"},
@@ -128,7 +128,7 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		},
 	}
 
-	deniedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]ActionView(nil), actions...))
+	deniedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]SubstepBodyView(nil), actions...))
 	if deniedActions[0].DoneBy != "appwrite:user-1" {
 		t.Fatalf("denied action doneBy = %q, want appwrite:user-1", deniedActions[0].DoneBy)
 	}
@@ -143,7 +143,7 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-2", deniedTimeline[0].Substeps[1].DoneBy)
 	}
 
-	allowedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]ActionView(nil), actions...))
+	allowedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]SubstepBodyView(nil), actions...))
 	if allowedActions[0].DoneBy != "appwrite@example.com" {
 		t.Fatalf("allowed action doneBy = %q, want appwrite@example.com", allowedActions[0].DoneBy)
 	}
@@ -223,7 +223,7 @@ func TestApplyDoneByEmailFallsBackToOpaqueActorIDWhenEmailUnavailable(t *testing
 	def := WorkflowDef{
 		Steps: []WorkflowStep{{StepID: "1", OrganizationSlug: "org-a"}},
 	}
-	actions := []ActionView{{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"}}
+	actions := []SubstepBodyView{{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"}}
 	timeline := []TimelineStep{{
 		StepID: "1",
 		Substeps: []TimelineSubstep{

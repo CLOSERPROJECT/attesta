@@ -28,7 +28,7 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 			WorkflowKey: "workflow",
 			ProcessID:   "process-1",
 			ProcessDone: true,
-			Action: &ActionView{
+			Action: &SubstepBodyView{
 				WorkflowKey: "workflow",
 				ProcessID:   "process-1",
 				SubstepID:   "1.1",
@@ -47,7 +47,7 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 					Status:    "available",
 					Selected:  true,
 					Palette:   "blue",
-					Action: &ActionView{
+					Action: &SubstepBodyView{
 						WorkflowKey: "workflow",
 						ProcessID:   "process-1",
 						SubstepID:   "1.1",

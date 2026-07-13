@@ -39,3 +39,36 @@ type SubstepAttachmentView struct {
 	PreviewKind  string
 	SHA256       string
 }
+
+// SubstepBodyView is the view model for templates/components/substep_body.html.
+type SubstepBodyView struct {
+	WorkflowKey    string
+	ProcessID      string
+	SubstepID      string
+	Title          string
+	Description    string
+	Role           string
+	RoleBadges     []SubstepRoleBadge
+	MatchingRoles  []SubstepRoleOption
+	RoleLabel      string
+	Palette        string
+	InputKey       string
+	InputType      string
+	FormSchema     string
+	FormUISchema   string
+	Status         string
+	DoneAt         string
+	DoneBy         string
+	DoneRole       string
+	Values         []SubstepKV
+	Attachments    []SubstepAttachmentView
+	Disabled       bool
+	ReadOnly       bool
+	Reason         string
+	DetailMessage  string
+	CanAdaptForm   bool
+	AdaptURL       string
+	FormataArchURL string
+	OverrideReason string
+	HasOverride    bool
+}
