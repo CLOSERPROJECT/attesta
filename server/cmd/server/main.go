@@ -142,6 +142,7 @@ type FakeNotary struct {
 type Server struct {
 	mongo          *mongo.Client
 	store          Store
+	process        *ProcessService
 	identity       IdentityStore
 	tmpl           *template.Template
 	authorizer     Authorizer
@@ -897,6 +898,7 @@ func main() {
 		enforceAuth:    true,
 		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 	}
+	server.process = &ProcessService{store: server.store, now: server.now}
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
@@ -5669,40 +5671,7 @@ func (s *Server) handleProcessDownloadsPartial(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) ensureProcessCompletionArtifacts(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process) *Process {
-	if process == nil || !isProcessClosed(cfg.Workflow, process) {
-		return process
-	}
-
-	updated := false
-	if process.Termination == nil && strings.TrimSpace(process.Status) != "done" && isProcessDone(cfg.Workflow, process) {
-		if err := s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done"); err != nil {
-			log.Printf("failed to persist process status for %s: %v", process.ID.Hex(), err)
-		} else {
-			updated = true
-		}
-	}
-
-	if cfg.DPP.Enabled && process.DPP == nil {
-		dpp, err := buildProcessDPP(cfg.Workflow, cfg.DPP, process, s.nowUTC())
-		if err != nil {
-			log.Printf("failed to build dpp for process %s: %v", process.ID.Hex(), err)
-		} else if err := s.store.UpdateProcessDPP(ctx, process.ID, workflowKey, dpp); err != nil {
-			log.Printf("failed to persist dpp for process %s: %v", process.ID.Hex(), err)
-		} else {
-			updated = true
-		}
-	}
-
-	if !updated {
-		return process
-	}
-	reloaded, err := s.store.LoadProcessByID(ctx, process.ID)
-	if err != nil {
-		log.Printf("failed to reload process %s after completion artifact update: %v", process.ID.Hex(), err)
-		return process
-	}
-	reloaded.Progress = normalizeProgressKeys(reloaded.Progress)
-	return reloaded
+	return s.processService().EnsureCompletionArtifacts(ctx, cfg, workflowKey, process)
 }
 
 func (s *Server) handleDownloadAllFiles(w http.ResponseWriter, r *http.Request, processID string) {
@@ -6161,50 +6130,29 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	description := substep.InputKey
-	progressUpdate := ProcessStep{
-		State:       "done",
-		Description: &description,
-		DoneAt:      &now,
-		DoneBy:      &actor,
-		Data:        payload,
-	}
-
-	if err := s.store.UpdateProcessProgress(ctx, process.ID, workflowKey, substepID, progressUpdate); err != nil {
-		logRequestError(r, err, "failed to update process %s substep %s", process.ID.Hex(), substepID)
-		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
-		return
-	}
-
-	notary := Notarization{
-		ProcessID: process.ID,
-		SubstepID: substepID,
-		Payload:   payload,
-		Actor:     actor,
-		CreatedAt: now,
-		FakeNotary: FakeNotary{
-			Method: "sha256",
-			Digest: digestPayload(payload),
-		},
-	}
-	if err := s.store.InsertNotarization(ctx, notary); err != nil {
-		logRequestError(r, err, "failed to notarize process %s substep %s", process.ID.Hex(), substepID)
-		s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
-		return
-	}
-
-	process, _ = s.loadProcess(ctx, processID)
-	if process != nil && isProcessDone(cfg.Workflow, process) {
-		_ = s.store.UpdateProcessStatus(ctx, process.ID, workflowKey, "done")
-		if cfg.DPP.Enabled && process.DPP == nil {
-			dpp, dppErr := buildProcessDPP(cfg.Workflow, cfg.DPP, process, now)
-			if dppErr != nil {
-				log.Printf("failed to build dpp for process %s: %v", process.ID.Hex(), dppErr)
-			} else if updateErr := s.store.UpdateProcessDPP(ctx, process.ID, workflowKey, dpp); updateErr != nil {
-				log.Printf("failed to persist dpp for process %s: %v", process.ID.Hex(), updateErr)
-			}
+	process, err = s.processService().CompleteSubstep(ctx, CompleteSubstepCmd{
+		Process:     process,
+		WorkflowKey: workflowKey,
+		SubstepID:   substepID,
+		Substep:     substep,
+		Actor:       actor,
+		Payload:     payload,
+		Config:      cfg,
+		Now:         now,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrProgressUpdate):
+			logRequestError(r, err, "failed to update process %s substep %s", process.ID.Hex(), substepID)
+			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
+		case errors.Is(err, ErrNotarization):
+			logRequestError(r, err, "failed to notarize process %s substep %s", process.ID.Hex(), substepID)
+			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
+		default:
+			logRequestError(r, err, "failed to complete process %s substep %s", process.ID.Hex(), substepID)
+			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
 		}
-		process, _ = s.loadProcess(ctx, processID)
+		return
 	}
 
 	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
@@ -8304,6 +8252,14 @@ func (s *Server) nowUTC() time.Time {
 		return time.Now().UTC()
 	}
 	return s.now().UTC()
+}
+
+func (s *Server) processService() *ProcessService {
+	if s.process != nil {
+		return s.process
+	}
+	s.process = &ProcessService{store: s.store, now: s.now}
+	return s.process
 }
 
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {

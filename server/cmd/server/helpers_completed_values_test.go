@@ -392,10 +392,12 @@ func TestEnsureProcessCompletionArtifactsUpdatesDoneStatus(t *testing.T) {
 		},
 	}
 	cfg := RuntimeConfig{Workflow: def}
+	fixedNow := time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC)
 	store := NewMemoryStore()
 	server := &Server{
-		store: store,
-		now:   func() time.Time { return time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC) },
+		store:   store,
+		process: &ProcessService{store: store, now: func() time.Time { return fixedNow }},
+		now:     func() time.Time { return fixedNow },
 	}
 
 	processID := primitive.NewObjectID()
@@ -439,10 +441,12 @@ func TestEnsureProcessCompletionArtifactsNoopAndReloadFallback(t *testing.T) {
 		},
 	}
 	cfg := RuntimeConfig{Workflow: def}
+	fixedNow := time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC)
 	store := NewMemoryStore()
 	server := &Server{
-		store: store,
-		now:   func() time.Time { return time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC) },
+		store:   store,
+		process: &ProcessService{store: store, now: func() time.Time { return fixedNow }},
+		now:     func() time.Time { return fixedNow },
 	}
 
 	if got := server.ensureProcessCompletionArtifacts(context.Background(), cfg, "workflow", nil); got != nil {
@@ -513,10 +517,12 @@ func TestEnsureProcessCompletionArtifactsGeneratesDPP(t *testing.T) {
 			SerialStrategy: "process_id_hex",
 		},
 	}
+	fixedNow := time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC)
 	store := NewMemoryStore()
 	server := &Server{
-		store: store,
-		now:   func() time.Time { return time.Date(2026, 2, 19, 10, 0, 0, 0, time.UTC) },
+		store:   store,
+		process: &ProcessService{store: store, now: func() time.Time { return fixedNow }},
+		now:     func() time.Time { return fixedNow },
 	}
 
 	processID := primitive.NewObjectID()
