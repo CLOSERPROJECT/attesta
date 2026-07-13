@@ -141,3 +141,50 @@ func TestCompleteSubstepMarksProgressAndNotarizes(t *testing.T) {
 		t.Fatalf("unexpected notarization: %#v", notaries[0])
 	}
 }
+
+func TestCompleteSubstepProgressUpdateError(t *testing.T) {
+	store := NewMemoryStore()
+	store.UpdateProgressErr = assertErr("update failed")
+	svc := &ProcessService{store: store, now: time.Now}
+	processID := primitive.NewObjectID()
+	process := &Process{ID: processID, Progress: map[string]ProcessStep{"1.1": {State: "pending"}}}
+	substep := WorkflowSub{SubstepID: "1.1", Order: 1, InputKey: "value"}
+
+	_, err := svc.CompleteSubstep(context.Background(), CompleteSubstepCmd{
+		Process: process, WorkflowKey: "workflow", SubstepID: "1.1",
+		Substep: substep, Actor: Actor{ID: "u1", Role: "dep1"},
+		Payload: map[string]interface{}{"value": "x"}, Config: RuntimeConfig{Workflow: WorkflowDef{}},
+		Now: time.Now().UTC(),
+	})
+	if !errors.Is(err, ErrProgressUpdate) {
+		t.Fatalf("expected ErrProgressUpdate, got %v", err)
+	}
+	if len(store.Notarizations()) != 0 {
+		t.Fatal("expected no notarization when progress update fails")
+	}
+}
+
+func TestCompleteSubstepNotarizationErrorAfterProgressSaved(t *testing.T) {
+	store := NewMemoryStore()
+	store.InsertNotarizeErr = assertErr("notarize failed")
+	svc := &ProcessService{store: store, now: time.Now}
+	processID := primitive.NewObjectID()
+	store.SeedProcess(Process{ID: processID, Progress: map[string]ProcessStep{"1_1": {State: "pending"}}})
+	process, _ := store.LoadProcessByID(context.Background(), processID)
+	process.Progress = normalizeProgressKeys(process.Progress)
+	substep := WorkflowSub{SubstepID: "1.1", Order: 1, InputKey: "value"}
+
+	_, err := svc.CompleteSubstep(context.Background(), CompleteSubstepCmd{
+		Process: process, WorkflowKey: "workflow", SubstepID: "1.1",
+		Substep: substep, Actor: Actor{ID: "u1", Role: "dep1"},
+		Payload: map[string]interface{}{"value": "x"}, Config: RuntimeConfig{Workflow: WorkflowDef{}},
+		Now: time.Now().UTC(),
+	})
+	if !errors.Is(err, ErrNotarization) {
+		t.Fatalf("expected ErrNotarization, got %v", err)
+	}
+	stored, _ := store.LoadProcessByID(context.Background(), processID)
+	if step := stored.Progress["1_1"]; step.State != "done" {
+		t.Fatalf("expected progress saved despite notarization failure, got %q", step.State)
+	}
+}
