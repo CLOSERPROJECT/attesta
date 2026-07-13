@@ -9,13 +9,14 @@ This repo is a small end-to-end demo:
 
 See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling).
 
-## Current auth/org status (2026-03)
+## Current auth/org status (2026-07)
 - Demo impersonation has been removed from production code paths.
-- Session auth is active (`attesta_session` cookie) and now stores an Appwrite session secret.
+- Session auth is active (`attesta_session` cookie). Regular users store an Appwrite session secret; platform admin uses a separate env-derived session value (`platform-admin:…`).
 - Dashboard route is `/dashboard` (workflow-scoped variant: `/w/:workflow/dashboard`).
 - Admin consoles:
+  - Platform admin: `/admin/orgs` (create/edit/delete orgs, upload logos, invite org admins)
   - Org admin: `/org-admin/roles`, `/org-admin/users`
-- Platform admin behavior has been removed from Attesta. Bootstrap orgs and first org-admins in Appwrite instead.
+- Platform admin is env-driven (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). On startup the server ensures that account exists in Appwrite (`bootstrapPlatformAdminIdentity`). Cerbos policy `platform_admin_console` gates console access.
 - Auth/org state now lives in Appwrite:
   - orgs -> teams
   - role catalog -> team prefs (`roles[].palette` resolved to CSS via `data-role-palette` on templates)
@@ -23,6 +24,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
   - invites -> memberships
   - signup/login/reset -> Appwrite account/session/recovery flows
 - Global topbar now renders role-aware admin links on authenticated pages:
+  - Platform admin sees `Orgs` (`/admin/orgs`)
   - Org admin with org context sees `My Org` (`/org-admin/users`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 - Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
@@ -117,6 +119,7 @@ Backend environment variables (observed):
 - `APPWRITE_ORG_ASSETS_BUCKET` (default `org-assets`)
 - `WORKFLOW_CONFIG` (default `config/workflow.yaml`) — used in `server/cmd/server/main.go:271`
 - `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size; used in `server/cmd/server/main.go:298-309`
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` — platform admin credentials; both required to enable the console
 - `ANYONE_CAN_CREATE_ACCOUNT`
 - `SESSION_TTL_DAYS`, `COOKIE_SECURE`
 
@@ -137,6 +140,7 @@ Key endpoints:
 - `GET/POST /login`, `GET/POST /signup`, `POST /logout`
 - `GET /invite/accept`
 - `GET/POST /reset`, `GET/POST /reset/confirm`
+- `GET/POST /admin/orgs`, `GET/POST /admin/orgs/` (platform admin org console; logo at `/admin/orgs/logo/:id`)
 - `GET/POST /org-admin/roles`, `GET/POST /org-admin/users`
 - `GET /events` (SSE)
 
