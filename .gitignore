@@ -24,6 +24,9 @@ web/dist/
 *.local
 !deployment/Dockerfile.local
 
+# Git worktrees
+.worktrees/
+
 # Go
 bin/
 *.exe
