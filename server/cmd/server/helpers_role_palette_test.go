@@ -100,7 +100,14 @@ func TestRolePaletteKeysMatchCSS(t *testing.T) {
 		}
 	}
 
+	reservedCSSKeys := map[string]bool{
+		// Unknown/missing roles resolve to "fallback" in Go but it is not auto-assigned.
+		"fallback": true,
+	}
 	for key := range cssKeys {
+		if reservedCSSKeys[key] {
+			continue
+		}
 		if !goSet[key] {
 			t.Errorf("role-palette.css contains %q but rolePaletteKeys does not", key)
 		}

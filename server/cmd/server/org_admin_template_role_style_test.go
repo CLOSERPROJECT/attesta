@@ -2,16 +2,19 @@ package main
 
 import (
 	"bytes"
-	"path/filepath"
 	"strings"
 	"testing"
-	"html/template"
 )
 
 func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
+		Header: PageHeaderView{
+			Title:       "Organization admin dashboard",
+			Description: "Create and manage roles and users",
+			BackHref:    "/",
+		},
 		Roles: []Role{
 			{Slug: "org-admin", Name: "Org Admin"},
 			{Slug: "qa-reviewer", Name: "QA Reviewer"},
@@ -87,8 +90,13 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 }
 
 func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	view := OrgAdminView{
+		Header: PageHeaderView{
+			Title:       "Organization admin dashboard",
+			Description: "Create and manage roles and users",
+			BackHref:    "/",
+		},
 		InviteLink: "/invite/token-pending",
 	}
 

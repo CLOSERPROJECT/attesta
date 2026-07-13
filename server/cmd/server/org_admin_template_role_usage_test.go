@@ -2,16 +2,19 @@ package main
 
 import (
 	"bytes"
-	"path/filepath"
 	"strings"
 	"testing"
-	"html/template"
 )
 
 func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
+		Header: PageHeaderView{
+			Title:       "Organization admin dashboard",
+			Description: "Create and manage roles and users",
+			BackHref:    "/",
+		},
 		RoleRows: []OrgAdminRoleRow{
 			{
 				Slug:    "approver",

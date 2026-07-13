@@ -9,13 +9,14 @@ This repo is a small end-to-end demo:
 
 See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling).
 
-## Current auth/org status (2026-03)
+## Current auth/org status (2026-07)
 - Demo impersonation has been removed from production code paths.
-- Session auth is active (`attesta_session` cookie) and now stores an Appwrite session secret.
+- Session auth is active (`attesta_session` cookie). Regular users store an Appwrite session secret; platform admin uses a separate env-derived session value (`platform-admin:…`).
 - Dashboard route is `/dashboard` (workflow-scoped variant: `/w/:workflow/dashboard`).
 - Admin consoles:
+  - Platform admin: `/admin/orgs` (create/edit/delete orgs, upload logos, invite org admins)
   - Org admin: `/org-admin/roles`, `/org-admin/users`
-- Platform admin behavior has been removed from Attesta. Bootstrap orgs and first org-admins in Appwrite instead.
+- Platform admin is env-driven (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). On startup the server ensures that account exists in Appwrite (`bootstrapPlatformAdminIdentity`). Cerbos policy `platform_admin_console` gates console access.
 - Auth/org state now lives in Appwrite:
   - orgs -> teams
   - role catalog -> team prefs (`roles[].palette` resolved to CSS via `data-role-palette` on templates)
@@ -23,6 +24,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
   - invites -> memberships
   - signup/login/reset -> Appwrite account/session/recovery flows
 - Global topbar now renders role-aware admin links on authenticated pages:
+  - Platform admin sees `Orgs` (`/admin/orgs`)
   - Org admin with org context sees `My Org` (`/org-admin/users`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 - Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
@@ -45,7 +47,7 @@ When acting as a coding agent in this repository:
 ## Layout
 - `server/` — Go module (`server/go.mod`)
   - `server/cmd/server/` — all backend code (single `package main`) and most logic.
-  - `server/templates/` — Go `html/template` templates.
+  - `server/templates/` — Go `html/template` templates (`layout.html` at root; full screens in `pages/`; reusable partials in `components/` as they are migrated).
   - `server/config/workflow.yaml` — runtime workflow + departments + users.
 - `web/` — Vite project
   - `web/src/main.js` — SSE + partial refresh client logic.
@@ -117,6 +119,7 @@ Backend environment variables (observed):
 - `APPWRITE_ORG_ASSETS_BUCKET` (default `org-assets`)
 - `WORKFLOW_CONFIG` (default `config/workflow.yaml`) — used in `server/cmd/server/main.go:271`
 - `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size; used in `server/cmd/server/main.go:298-309`
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` — platform admin credentials; both required to enable the console
 - `ANYONE_CAN_CREATE_ACCOUNT`
 - `SESSION_TTL_DAYS`, `COOKIE_SECURE`
 
@@ -137,6 +140,7 @@ Key endpoints:
 - `GET/POST /login`, `GET/POST /signup`, `POST /logout`
 - `GET /invite/accept`
 - `GET/POST /reset`, `GET/POST /reset/confirm`
+- `GET/POST /admin/orgs`, `GET/POST /admin/orgs/` (platform admin org console; logo at `/admin/orgs/logo/:id`)
 - `GET/POST /org-admin/roles`, `GET/POST /org-admin/users`
 - `GET /events` (SSE)
 
@@ -182,13 +186,16 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 - `gtin` is normalized/validated at config load (must resolve to 14 digits when enabled).
 - On first transition to process `done`, backend stores `process.dpp` (`gtin`, `lot`, `serial`, `generatedAt`) and keeps identifiers stable on repeated completion calls.
 - Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}`:
-  - HTML landing page (template: `server/templates/dpp.html`)
+  - HTML landing page (template: `server/templates/pages/dpp.html`)
   - JSON (`Accept: application/json` or `?format=json`)
 - DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.
 
 ## Templates and static assets
-- Templates are parsed from `server/templates/*.html` (`server/cmd/server/main.go:258-261`).
+- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`.
+- **Template define names** match the file stem (no extension): e.g. `components/page_header.html` → `{{ define "page_header" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated.
+- **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`PageHeaderView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page-specific assembly stays in handlers or future `page_*.go` files.
+- **Component eligibility:** extract to `templates/components/` + namespaced CSS + `components.go` struct when reused on 2+ pages, is an HTMX/SSE partial target, or has a dedicated view struct. Migrate one component at a time; primitives stay in `components/shared.css`.
 - Backoffice action cards (`server/templates/action_list.html`) render editable forms only for non-`done` actions; `done` actions render a read-only Submitted block with flattened values and attachment download links.
 - Locked Formata actions render `action-card action-locked` and `.js-formata-host[data-formata-disabled="true"]`; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
 - Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).

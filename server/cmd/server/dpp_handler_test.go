@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -116,10 +114,7 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 
 	store := NewMemoryStore()
 	process := seedDPPProcess(store)
-	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
-	if err != nil {
-		t.Fatalf("parse templates: %v", err)
-	}
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store:     store,
 		tmpl:      tmpl,
@@ -187,10 +182,7 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 		},
 	}
 	store.SeedProcess(process)
-	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
-	if err != nil {
-		t.Fatalf("parse templates: %v", err)
-	}
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store:     store,
 		tmpl:      tmpl,
@@ -415,10 +407,7 @@ func TestHandleDigitalLinkDPPHTMLShowsPrematureTermination(t *testing.T) {
 		SubstepID: "1.2",
 	}
 	store.SeedProcess(process)
-	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
-	if err != nil {
-		t.Fatalf("parse templates: %v", err)
-	}
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store: store,
 		tmpl:  tmpl,

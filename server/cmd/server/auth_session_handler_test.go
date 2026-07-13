@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"errors"
-	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -207,7 +205,7 @@ func TestHandleLogoutSkipsIdentityDeleteForPlatformAdminSession(t *testing.T) {
 }
 
 func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store: NewMemoryStore(),
 		tmpl:  tmpl,
@@ -228,7 +226,7 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 
 func TestHandleLoginPageShowsSignupWhenEnabled(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{identity: &fakeIdentityStore{}, tmpl: tmpl}
 
 	req := httptest.NewRequest(http.MethodGet, "/login", nil)
@@ -244,7 +242,7 @@ func TestHandleLoginPageShowsSignupWhenEnabled(t *testing.T) {
 }
 
 func TestHandleLoginPageShowsNoticeConfirmation(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{tmpl: tmpl}
 
 	req := httptest.NewRequest(http.MethodGet, "/login?notice=password_reset_success", nil)
@@ -292,7 +290,7 @@ func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 }
 
 func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
@@ -320,7 +318,7 @@ func TestHandleLoginRejectsInvalidCredentials(t *testing.T) {
 }
 
 func TestHandleLoginBadRequestIdentityErrorRendersFormError(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		identity: &fakeIdentityStore{
 			createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {

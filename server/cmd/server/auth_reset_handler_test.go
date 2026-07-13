@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -385,7 +384,7 @@ func TestHandleResetSetBranches(t *testing.T) {
 }
 
 func TestHandleResetPageHidesAdminTopbarLinks(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store: NewMemoryStore(),
 		tmpl:  tmpl,

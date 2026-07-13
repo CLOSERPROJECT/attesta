@@ -3,16 +3,7 @@
 {{ define "platform_admin_body" }}
 
   <div class="stack u-max-w-7xl u-mx-auto">
-    <section class="hero">
-      <button class="secondary" onclick="location.href='/'">
-        {{ template "icon-back" . }}
-        Back
-      </button>
-      <div class="hero-body">
-        <h1>Platform admin dashboard</h1>
-        <p>Create and manage organizations</p>
-      </div>
-    </section>
+    {{ template "page_header" .Header }}
 
     <section class="panel">
       <div class="panel-head-actions">

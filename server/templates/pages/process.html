@@ -17,27 +17,7 @@
 {{ define "process_content.html" }}
   {{ template "error_banner.html" .ActionList }}
   <div class="stack">
-    <section class="hero">
-      <button
-        class="secondary"
-        onclick="location.href='/w/{{ .WorkflowKey }}/'"
-      >
-        {{ template "icon-back" . }}
-        Back
-      </button>
-      <div class="hero-body">
-        <div class="process-hero-titles">
-          <h1>{{ .WorkflowName }}</h1>
-          {{ if .InstanceName }}
-            <h1>-</h1>
-            <h1 class="process-name">{{ .InstanceName }}</h1>
-          {{ end }}
-        </div>
-        <p class="process-page-title">
-          <span class="process-id">{{ .ProcessID }}</span>
-        </p>
-      </div>
-    </section>
+    {{ template "page_header" .Header }}
     {{ if .ActionList.ProcessDone }}
       <div class="process-resources-grid">
         {{ template "workflow_timeline" .ActionList }}

@@ -416,7 +416,7 @@ func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
 	}
 	sessionID := "session-home-indicator"
 
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		authorizer:  fakeAuthorizer{},
 		store:       store,
@@ -448,7 +448,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
 
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		authorizer: fakeAuthorizer{},
 		tmpl:       tmpl,
@@ -464,7 +464,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, `class="stack u-max-w-7xl u-mx-auto"`) ||
-		!strings.Contains(body, `class="hero"`) ||
+		!strings.Contains(body, `class="page-header"`) ||
 		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
@@ -530,7 +530,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
 
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	t.Run("visible for org admin", func(t *testing.T) {
 		store := NewMemoryStore()
@@ -605,7 +605,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 }
 
 func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	cfg := RuntimeConfig{
 		Organizations: []WorkflowOrganization{
 			{Slug: "org1", Name: "Organization 1"},
@@ -676,7 +676,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 }
 
 func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	now := time.Date(2026, 3, 7, 11, 0, 0, 0, time.UTC)
 
 	t.Run("visible for creator before any process starts", func(t *testing.T) {
@@ -1143,7 +1143,7 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 }
 
 func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	store := NewMemoryStore()
 	createdAt := time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)
 	doneAt := time.Date(2026, 2, 3, 11, 30, 0, 0, time.UTC)

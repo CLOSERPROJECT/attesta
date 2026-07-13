@@ -3,16 +3,7 @@
 {{ define "org_admin_body" }}
 
   <div class="stack u-max-w-7xl u-mx-auto">
-    <section class="hero">
-      <button class="secondary" onclick="location.href='/'">
-        {{ template "icon-back" . }}
-        Back
-      </button>
-      <div class="hero-body">
-        <h1>Organization admin dashboard</h1>
-        <p>Create and manage roles and users</p>
-      </div>
-    </section>
+    {{ template "page_header" .Header }}
     <div
       class="org-admin-grid{{ if not .NeedsOrganizationSetup }}
         org-admin-grid-ready
