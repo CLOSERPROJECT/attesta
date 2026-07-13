@@ -72,3 +72,55 @@ type SubstepBodyView struct {
 	OverrideReason string
 	HasOverride    bool
 }
+
+// TimelineSubstep is one row in the stream timeline accordion (summary + optional body).
+type TimelineSubstep struct {
+	SubstepID    string
+	Title        string
+	Description  string
+	Selected     bool
+	Body         *SubstepBodyView
+	Palette      string
+	Status       string
+	StatusLabel  string
+	DoneBy       string
+	DoneRole     string
+	DoneAt       string
+	DisplayValue string
+	FileName     string
+	FileSHA256   string
+	FileURL      string
+}
+
+// TimelineStep groups substeps under a blueprint step in the stream timeline.
+type TimelineStep struct {
+	StepID     string
+	Title      string
+	OrgSlug    string
+	OrgName    string
+	OrgLogoURL string
+	Expanded   bool
+	Substeps   []TimelineSubstep
+}
+
+// StreamInstanceDetailView is the HTMX/SSE partial payload for stream instance detail content.
+type StreamInstanceDetailView struct {
+	WorkflowKey       string
+	WorkflowPath      string
+	ProcessID         string
+	CurrentUser       Actor
+	SelectedSubstepID string
+	ProcessDone       bool
+	SelectedBody      *SubstepBodyView
+	Error             string
+	Timeline          []TimelineStep
+	HideStatus        bool
+	DPPURL            string
+	DPPGS1            string
+	Attachments       []ProcessDownloadAttachment
+	CanTerminate      bool
+	TerminateAction   string
+	TerminateSubstep  string
+	TerminateRoles    []SubstepRoleOption
+	Termination       *ProcessTerminationView
+}

@@ -163,34 +163,6 @@ type SSEHub struct {
 	stream map[string]map[chan string]struct{}
 }
 
-type TimelineSubstep struct {
-	SubstepID    string
-	Title        string
-	Description  string
-	Selected     bool
-	Action       *SubstepBodyView
-	Palette      string
-	Status       string
-	StatusLabel  string
-	DoneBy       string
-	DoneRole     string
-	DoneAt       string
-	DisplayValue string
-	FileName     string
-	FileSHA256   string
-	FileURL      string
-}
-
-type TimelineStep struct {
-	StepID     string
-	Title      string
-	OrgSlug    string
-	OrgName    string
-	OrgLogoURL string
-	Expanded   bool
-	Substeps   []TimelineSubstep
-}
-
 type NotarizedAttachment struct {
 	AttachmentID string `json:"attachment_id"`
 	Filename     string `json:"filename"`
@@ -360,27 +332,6 @@ type HomeWorkflowPickerView struct {
 	WorkflowPickerView
 }
 
-type ActionListView struct {
-	WorkflowKey       string
-	WorkflowPath      string
-	ProcessID         string
-	CurrentUser       Actor
-	SelectedSubstepID string
-	ProcessDone       bool
-	Action            *SubstepBodyView
-	Error             string
-	Timeline          []TimelineStep
-	HideStatus        bool
-	DPPURL            string
-	DPPGS1            string
-	Attachments       []ProcessDownloadAttachment
-	CanTerminate      bool
-	TerminateAction   string
-	TerminateSubstep  string
-	TerminateRoles    []SubstepRoleOption
-	Termination       *ProcessTerminationView
-}
-
 type ProcessListItem struct {
 	ID              string
 	Name            string
@@ -445,7 +396,7 @@ type HomeView struct {
 	NextPage            int
 	Processes           []ProcessListItem
 	ProcessGroups       []ProcessStatusGroup
-	Preview             ActionListView
+	Preview             StreamInstanceDetailView
 }
 
 type LoginView struct {
@@ -636,7 +587,7 @@ type ProcessPageView struct {
 	InstanceName string
 	Status       string
 	StatusLabel  string
-	ActionList   ActionListView
+	Detail       StreamInstanceDetailView
 	DPPURL       string
 	DPPGS1       string
 	Attachments  []ProcessDownloadAttachment
@@ -4941,8 +4892,8 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		pageNumbers = append(pageNumbers, current)
 	}
 
-	preview := makeActionListReadOnly(
-		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
+	preview := makeStreamInstanceDetailReadOnly(
+		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
 		"Preview only. Start an instance to submit data.",
 	)
 	preview.HideStatus = true
@@ -5160,7 +5111,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 }
 
-func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ActionListView {
+func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) StreamInstanceDetailView {
 	roleMeta := s.roleMetaIndex(ctx)
 	actions := buildSubstepViews(cfg.Workflow, process, workflowKey, actor, onlyRole, roleMeta, cfg.Roles)
 	processDone := process != nil && isProcessClosed(cfg.Workflow, process)
@@ -5170,7 +5121,7 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 	actions = s.applyDoneByEmailToSubstepViews(ctx, cfg.Workflow, actor, actions)
 	timeline = decorateTimelineSubstepBodies(timeline, actions)
 
-	view := ActionListView{
+	view := StreamInstanceDetailView{
 		WorkflowKey:       workflowKey,
 		WorkflowPath:      workflowPath(workflowKey),
 		ProcessID:         processIDString(process),
@@ -5189,7 +5140,7 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 		}
 	}
 	if action, ok := selectedSubstepBody(actions, selected, processDone); ok {
-		view.Action = &action
+		view.SelectedBody = &action
 	}
 	if process != nil && process.Termination != nil {
 		view.Termination = processTerminationView(process.Termination)
@@ -5203,16 +5154,16 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 			view.DPPGS1 = gs1ElementString(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
 		}
 	}
-	if view.Action != nil {
-		action := *view.Action
-		view.Action = &action
+	if view.SelectedBody != nil {
+		action := *view.SelectedBody
+		view.SelectedBody = &action
 	}
 	view.Timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, actor, view.Timeline)
 	return view
 }
 
 func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
-	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
+	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
 	processID := ""
 	instanceName := ""
 	status := processStatusActive
@@ -5238,10 +5189,10 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		InstanceName: instanceName,
 		Status:       status,
 		StatusLabel:  processStatusLabel(status),
-		ActionList:   actionList,
-		DPPURL:       actionList.DPPURL,
-		DPPGS1:       actionList.DPPGS1,
-		Attachments:  actionList.Attachments,
+		Detail:       detail,
+		DPPURL:       detail.DPPURL,
+		DPPGS1:       detail.DPPGS1,
+		Attachments:  detail.Attachments,
 	}
 }
 
@@ -5259,28 +5210,28 @@ func buildWorkflowPreviewProcess(def WorkflowDef, workflowKey string) *Process {
 	return process
 }
 
-func makeActionListReadOnly(view ActionListView, reason string) ActionListView {
+func makeStreamInstanceDetailReadOnly(view StreamInstanceDetailView, reason string) StreamInstanceDetailView {
 	reason = strings.TrimSpace(reason)
 	view.CanTerminate = false
 	view.TerminateAction = ""
 	view.TerminateSubstep = ""
 	view.TerminateRoles = nil
-	if view.Action != nil {
-		action := *view.Action
+	if view.SelectedBody != nil {
+		action := *view.SelectedBody
 		action.ReadOnly = true
 		action.Reason = reason
-		view.Action = &action
+		view.SelectedBody = &action
 	}
 	for stepIndex := range view.Timeline {
 		for substepIndex := range view.Timeline[stepIndex].Substeps {
-			action := view.Timeline[stepIndex].Substeps[substepIndex].Action
+			action := view.Timeline[stepIndex].Substeps[substepIndex].Body
 			if action == nil {
 				continue
 			}
 			actionCopy := *action
 			actionCopy.ReadOnly = true
 			actionCopy.Reason = reason
-			view.Timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+			view.Timeline[stepIndex].Substeps[substepIndex].Body = &actionCopy
 		}
 	}
 	return view
@@ -7759,7 +7710,7 @@ func decorateTimelineSubstepBodies(timeline []TimelineStep, actions []SubstepBod
 				continue
 			}
 			actionCopy := action
-			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+			timeline[stepIndex].Substeps[substepIndex].Body = &actionCopy
 			switch action.Status {
 			case "done", "locked", processStatusTerminated, "skipped":
 				timeline[stepIndex].Substeps[substepIndex].Status = action.Status

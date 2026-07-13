@@ -96,14 +96,14 @@ func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 	}
 
 	got := decorateTimelineSubstepBodies(timeline, actions)
-	if got[0].Substeps[0].Action != nil {
+	if got[0].Substeps[0].Body != nil {
 		t.Fatal("expected unrelated substep action to stay nil")
 	}
-	if got[0].Substeps[1].Action == nil {
+	if got[0].Substeps[1].Body == nil {
 		t.Fatal("expected matching substep action to be attached")
 	}
-	if got[0].Substeps[1].Action.SubstepID != "1.2" || got[0].Substeps[1].Action.Title != "Inspect lot" {
-		t.Fatalf("attached action = %#v", got[0].Substeps[1].Action)
+	if got[0].Substeps[1].Body.SubstepID != "1.2" || got[0].Substeps[1].Body.Title != "Inspect lot" {
+		t.Fatalf("attached action = %#v", got[0].Substeps[1].Body)
 	}
 	if got[0].Substeps[1].Status != "available" {
 		t.Fatalf("status = %q, want available", got[0].Substeps[1].Status)

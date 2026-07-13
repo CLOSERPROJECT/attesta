@@ -80,7 +80,7 @@ func TestRenderActionErrorForRequest(t *testing.T) {
 	}
 }
 
-func TestRenderActionViewsReturn500WhenConfigFails(t *testing.T) {
+func TestRenderSubstepBodyViewsReturn500WhenConfigFails(t *testing.T) {
 	server := &Server{
 		tmpl: testTemplates(),
 		configProvider: func() (RuntimeConfig, error) {

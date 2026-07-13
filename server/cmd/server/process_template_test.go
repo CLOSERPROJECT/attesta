@@ -24,11 +24,11 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 		},
 		ProcessID:    "process-1",
 		InstanceName: "Pilot batch",
-		ActionList: ActionListView{
+		Detail: StreamInstanceDetailView{
 			WorkflowKey: "workflow",
 			ProcessID:   "process-1",
 			ProcessDone: true,
-			Action: &SubstepBodyView{
+			SelectedBody: &SubstepBodyView{
 				WorkflowKey: "workflow",
 				ProcessID:   "process-1",
 				SubstepID:   "1.1",
@@ -47,7 +47,7 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 					Status:    "available",
 					Selected:  true,
 					Palette:   "blue",
-					Action: &SubstepBodyView{
+					Body: &SubstepBodyView{
 						WorkflowKey: "workflow",
 						ProcessID:   "process-1",
 						SubstepID:   "1.1",

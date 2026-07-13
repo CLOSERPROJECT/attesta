@@ -120,7 +120,7 @@ func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 func TestHandleCompleteSubstepProcessContentSelectsNextAvailable(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}SEL {{.ActionList.SelectedSubstepID}}{{end}}`))
+	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}SEL {{.Detail.SelectedSubstepID}}{{end}}`))
 
 	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/1.1/complete?substep=1.1", strings.NewReader("value=%7B%22status%22%3A%22ok%22%7D"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -351,7 +351,7 @@ func TestHandleTerminateProcessErrorPaths(t *testing.T) {
 func TestHandleTerminateProcessBuildsDPPAndRendersProcessContent(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}DONE {{.ActionList.ProcessDone}} {{.DPPURL}}{{end}}`))
+	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}DONE {{.Detail.ProcessDone}} {{.DPPURL}}{{end}}`))
 	cfg := testFormataRuntimeConfig()
 	cfg.DPP = DPPConfig{
 		Enabled:        true,

@@ -53,7 +53,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		WorkflowDescription: "Previewable workflow",
 		Processes:           []ProcessListItem{process},
 		ProcessGroups:       testHomeProcessGroups(process),
-		Preview: ActionListView{
+		Preview: StreamInstanceDetailView{
 			HideStatus: true,
 			Timeline: []TimelineStep{
 				{
@@ -66,7 +66,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 							Title:     "Record input",
 							Status:    "available",
 							Selected:  true,
-							Action: &SubstepBodyView{
+							Body: &SubstepBodyView{
 								WorkflowKey:   "workflow",
 								SubstepID:     "1.1",
 								Title:         "Record input",
