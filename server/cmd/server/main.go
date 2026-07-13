@@ -819,7 +819,7 @@ var rolePaletteStyles = map[string]rolePaletteStyle{
 
 var rolePaletteKeys = []string{
 	"red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan",
-	"sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
+	"sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose", "fallback",
 }
 
 func defaultRolePaletteFromInput(raw string) string {
