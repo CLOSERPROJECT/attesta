@@ -1670,7 +1670,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			if deriveProcessStatus(cfg.Workflow, &process) != "active" {
 				continue
 			}
-			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, key, actor, roleMeta, cfg.Roles); ok {
+			if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &process, key, actor, roleMeta, cfg.Roles); ok {
 				option.HasUserTurn = true
 				break
 			}
@@ -4908,7 +4908,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			LastDigestShort: lastDigest,
 		}
 		if item.Status == "active" {
-			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta, cfg.Roles); ok {
+			if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &process, workflowKey, actor, roleMeta, cfg.Roles); ok {
 				item.Status = "available"
 				item.StatusLabel = processStatusLabel(item.Status)
 			}
@@ -5162,13 +5162,13 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 
 func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ActionListView {
 	roleMeta := s.roleMetaIndex(ctx)
-	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, onlyRole, roleMeta, cfg.Roles)
+	actions := buildSubstepViews(cfg.Workflow, process, workflowKey, actor, onlyRole, roleMeta, cfg.Roles)
 	processDone := process != nil && isProcessClosed(cfg.Workflow, process)
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
 	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, roleMeta, cfg.Roles, organizationNameMap(cfg)), selected)
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
-	actions = s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, actions)
-	timeline = decorateTimelineActions(timeline, actions)
+	actions = s.applyDoneByEmailToSubstepViews(ctx, cfg.Workflow, actor, actions)
+	timeline = decorateTimelineSubstepBodies(timeline, actions)
 
 	view := ActionListView{
 		WorkflowKey:       workflowKey,
@@ -5181,14 +5181,14 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 		Timeline:          timeline,
 	}
 	if process != nil && !processDone {
-		if action, ok := nextAvailableAuthorizedAction(cfg.Workflow, process, workflowKey, actor, roleMeta, cfg.Roles); ok {
+		if action, ok := nextAuthorizedSubstepBody(cfg.Workflow, process, workflowKey, actor, roleMeta, cfg.Roles); ok {
 			view.CanTerminate = true
 			view.TerminateAction = fmt.Sprintf("%s/process/%s/terminate", workflowPath(workflowKey), process.ID.Hex())
 			view.TerminateSubstep = action.SubstepID
 			view.TerminateRoles = append([]SubstepRoleOption(nil), action.MatchingRoles...)
 		}
 	}
-	if action, ok := selectedActionBySubstep(actions, selected, processDone); ok {
+	if action, ok := selectedSubstepBody(actions, selected, processDone); ok {
 		view.Action = &action
 	}
 	if process != nil && process.Termination != nil {
@@ -5349,7 +5349,7 @@ func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string
 	return userIdentityView{}, false
 }
 
-func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []SubstepBodyView) []SubstepBodyView {
+func (s *Server) applyDoneByEmailToSubstepViews(ctx context.Context, def WorkflowDef, viewer Actor, actions []SubstepBodyView) []SubstepBodyView {
 	if len(actions) == 0 {
 		return actions
 	}
@@ -6248,7 +6248,7 @@ func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	action, ok := nextAvailableAuthorizedAction(cfg.Workflow, process, workflowKey, actor, s.roleMetaIndex(r.Context()), cfg.Roles)
+	action, ok := nextAuthorizedSubstepBody(cfg.Workflow, process, workflowKey, actor, s.roleMetaIndex(r.Context()), cfg.Roles)
 	if !ok {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
 		return
@@ -7010,8 +7010,8 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 	return out
 }
 
-func nextAvailableAuthorizedAction(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) (SubstepBodyView, bool) {
-	for _, action := range buildActionList(def, process, workflowKey, actor, false, roleIndex, cfgRoles) {
+func nextAuthorizedSubstepBody(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) (SubstepBodyView, bool) {
+	for _, action := range buildSubstepViews(def, process, workflowKey, actor, false, roleIndex, cfgRoles) {
 		if action.Status == "available" && !action.Disabled {
 			return action, true
 		}
@@ -7500,7 +7500,7 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 	return WorkflowSub{}, false
 }
 
-func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
+func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
 	var actions []SubstepBodyView
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
@@ -7708,7 +7708,7 @@ func resolveSelectedSubstepID(actions []SubstepBodyView, requested string, proce
 	return actions[0].SubstepID
 }
 
-func selectedActionBySubstep(actions []SubstepBodyView, selectedSubstepID string, processDone bool) (SubstepBodyView, bool) {
+func selectedSubstepBody(actions []SubstepBodyView, selectedSubstepID string, processDone bool) (SubstepBodyView, bool) {
 	if processDone {
 		return SubstepBodyView{}, false
 	}
@@ -7743,7 +7743,7 @@ func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string
 	return timeline
 }
 
-func decorateTimelineActions(timeline []TimelineStep, actions []SubstepBodyView) []TimelineStep {
+func decorateTimelineSubstepBodies(timeline []TimelineStep, actions []SubstepBodyView) []TimelineStep {
 	if len(timeline) == 0 || len(actions) == 0 {
 		return timeline
 	}

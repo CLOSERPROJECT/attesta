@@ -30,19 +30,19 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 		t.Fatalf("resolveSelectedSubstepID empty list = %q, want empty", got)
 	}
 
-	selected, ok := selectedActionBySubstep(actions, "1.2", false)
+	selected, ok := selectedSubstepBody(actions, "1.2", false)
 	if !ok || selected.SubstepID != "1.2" {
-		t.Fatalf("selectedActionBySubstep selected = %#v (ok=%t), want substep 1.2 only", selected, ok)
+		t.Fatalf("selectedSubstepBody selected = %#v (ok=%t), want substep 1.2 only", selected, ok)
 	}
-	selected, ok = selectedActionBySubstep(actions, "", false)
+	selected, ok = selectedSubstepBody(actions, "", false)
 	if !ok || selected.SubstepID != "1.1" {
-		t.Fatalf("selectedActionBySubstep empty selected = %#v (ok=%t), want first action", selected, ok)
+		t.Fatalf("selectedSubstepBody empty selected = %#v (ok=%t), want first action", selected, ok)
 	}
-	if _, ok := selectedActionBySubstep(actions, "404", false); ok {
-		t.Fatal("selectedActionBySubstep missing selected should return false")
+	if _, ok := selectedSubstepBody(actions, "404", false); ok {
+		t.Fatal("selectedSubstepBody missing selected should return false")
 	}
-	if _, ok := selectedActionBySubstep(actions, "1.2", true); ok {
-		t.Fatal("selectedActionBySubstep done process should return false")
+	if _, ok := selectedSubstepBody(actions, "1.2", true); ok {
+		t.Fatal("selectedSubstepBody done process should return false")
 	}
 }
 
@@ -95,7 +95,7 @@ func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow", Status: "available"},
 	}
 
-	got := decorateTimelineActions(timeline, actions)
+	got := decorateTimelineSubstepBodies(timeline, actions)
 	if got[0].Substeps[0].Action != nil {
 		t.Fatal("expected unrelated substep action to stay nil")
 	}
@@ -121,7 +121,7 @@ func TestDecorateTimelineActionsMapsUnauthorizedAvailableToActive(t *testing.T) 
 		{SubstepID: "1.1", Status: "available", Disabled: true},
 	}
 
-	got := decorateTimelineActions(timeline, actions)
+	got := decorateTimelineSubstepBodies(timeline, actions)
 	if got[0].Substeps[0].Status != "active" {
 		t.Fatalf("status = %q, want active", got[0].Substeps[0].Status)
 	}

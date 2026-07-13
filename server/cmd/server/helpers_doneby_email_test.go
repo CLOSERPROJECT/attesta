@@ -128,7 +128,7 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		},
 	}
 
-	deniedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]SubstepBodyView(nil), actions...))
+	deniedActions := server.applyDoneByEmailToSubstepViews(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]SubstepBodyView(nil), actions...))
 	if deniedActions[0].DoneBy != "appwrite:user-1" {
 		t.Fatalf("denied action doneBy = %q, want appwrite:user-1", deniedActions[0].DoneBy)
 	}
@@ -143,7 +143,7 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-2", deniedTimeline[0].Substeps[1].DoneBy)
 	}
 
-	allowedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]SubstepBodyView(nil), actions...))
+	allowedActions := server.applyDoneByEmailToSubstepViews(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]SubstepBodyView(nil), actions...))
 	if allowedActions[0].DoneBy != "appwrite@example.com" {
 		t.Fatalf("allowed action doneBy = %q, want appwrite@example.com", allowedActions[0].DoneBy)
 	}
@@ -231,7 +231,7 @@ func TestApplyDoneByEmailFallsBackToOpaqueActorIDWhenEmailUnavailable(t *testing
 		},
 	}}
 
-	mappedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, actions)
+	mappedActions := server.applyDoneByEmailToSubstepViews(context.Background(), def, Actor{OrgSlug: "org-a"}, actions)
 	if mappedActions[0].DoneBy != "appwrite:user-no-email" {
 		t.Fatalf("mapped action doneBy = %q, want opaque appwrite actor id", mappedActions[0].DoneBy)
 	}

@@ -164,7 +164,7 @@ func TestSubstepOverrideEffectiveSchemaAndCanonicalWorkflowUnchanged(t *testing.
 	process, _ := store.SnapshotProcess(id)
 	process.Progress = normalizeProgressKeys(process.Progress)
 	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
-	actions := buildActionList(cfg.Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(cfg.Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	if len(actions) == 0 || !strings.Contains(actions[0].FormSchema, "local") {
 		t.Fatalf("effective form schema = %q", actions[0].FormSchema)
 	}
@@ -184,7 +184,7 @@ func TestCompletedSubstepBodyViewExposesLocalAdaptationReason(t *testing.T) {
 	process, _ = store.SnapshotProcess(id)
 	process.Progress = normalizeProgressKeys(process.Progress)
 	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
-	actions := buildActionList(testFormataRuntimeConfig().Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(testFormataRuntimeConfig().Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	if !actions[0].HasOverride || !strings.Contains(actions[0].Reason, "missing field") {
 		t.Fatalf("adaptation reason not exposed: %#v", actions[0])
 	}
