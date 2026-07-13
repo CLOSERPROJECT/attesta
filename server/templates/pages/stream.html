@@ -2,18 +2,7 @@
 
 {{ define "home_body" }}
   <div class="stack u-max-w-7xl u-mx-auto">
-    <section class="hero">
-      <button class="secondary" onclick="location.href='/'">
-        {{ template "icon-back" . }}
-        Back
-      </button>
-      <div class="hero-body">
-        <h1>{{ .WorkflowName }}</h1>
-        {{ if .WorkflowDescription }}
-          <p>{{ .WorkflowDescription }}</p>
-        {{ end }}
-      </div>
-    </section>
+    {{ template "page_header" .Header }}
     <div class="home-workflow-grid" data-home-root>
       <section class="panel org-admin-sidebar">
         <div class="panel-heading">

@@ -2,14 +2,12 @@ package main
 
 import (
 	"bytes"
-	"html/template"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestLoginTemplateShowsForgotPasswordLink(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	var out bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&out, "login_body", LoginView{}); err != nil {
@@ -26,7 +24,7 @@ func TestLoginTemplateShowsForgotPasswordLink(t *testing.T) {
 }
 
 func TestLoginTemplateShowsConfirmation(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	var out bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&out, "login_body", LoginView{Confirmation: "Password reset successfully. Now you can enter with your new credentials."}); err != nil {

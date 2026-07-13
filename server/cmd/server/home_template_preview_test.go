@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"html/template"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -38,7 +36,7 @@ func testHomeProcessGroups(items ...ProcessListItem) []ProcessStatusGroup {
 }
 
 func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	process := ProcessListItem{ID: "process-1", Name: "Pilot batch", Status: "active", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}
 	view := HomeView{
@@ -46,6 +44,11 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
+		},
+		Header: PageHeaderView{
+			Title:       "Demo workflow",
+			Description: "Previewable workflow",
+			BackHref:    "/",
 		},
 		WorkflowDescription: "Previewable workflow",
 		Processes:           []ProcessListItem{process},
@@ -137,13 +140,18 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 }
 
 func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
+		},
+		Header: PageHeaderView{
+			Title:       "Demo workflow",
+			Description: "Previewable workflow",
+			BackHref:    "/",
 		},
 		WorkflowDescription: "Previewable workflow",
 		ProcessGroups:       testHomeProcessGroups(),
@@ -169,13 +177,17 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 }
 
 func TestHomeTemplateRendersStatusPagination(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
+		},
+		Header: PageHeaderView{
+			Title:    "Demo workflow",
+			BackHref: "/",
 		},
 		Sort:         "status",
 		StatusFilter: "active",
@@ -237,13 +249,17 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 }
 
 func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
+		},
+		Header: PageHeaderView{
+			Title:    "Demo workflow",
+			BackHref: "/",
 		},
 		ProcessGroups: testHomeProcessGroups(ProcessListItem{
 			ID:            "process-1",

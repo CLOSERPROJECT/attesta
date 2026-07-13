@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -234,10 +233,7 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 			Serial: "SERIAL-001",
 		},
 	})
-	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
-	if err != nil {
-		t.Fatalf("parse templates: %v", err)
-	}
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store: store,
 		tmpl:  tmpl,
@@ -279,10 +275,7 @@ func TestHandleProcessDownloadsPartialExcludesDPPSection(t *testing.T) {
 			Serial: "SERIAL-001",
 		},
 	})
-	tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
-	if err != nil {
-		t.Fatalf("parse templates: %v", err)
-	}
+	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store: store,
 		tmpl:  tmpl,
@@ -325,13 +318,7 @@ func TestHandleProcessDownloadsPartialBackfillsDPPForDoneProcess(t *testing.T) {
 
 	server := &Server{
 		store: store,
-		tmpl: func() *template.Template {
-			tmpl, err := template.ParseGlob(filepath.Join("..", "..", "templates", "*.html"))
-			if err != nil {
-				t.Fatalf("parse templates: %v", err)
-			}
-			return tmpl
-		}(),
+		tmpl: parseTestTemplates(t),
 		configProvider: func() (RuntimeConfig, error) {
 			cfg := testRuntimeConfig()
 			cfg.DPP = DPPConfig{

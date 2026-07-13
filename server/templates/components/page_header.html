@@ -1,0 +1,35 @@
+{{/* Shared page chrome: optional back link, title, optional subtitle, description, and meta line. */}}
+
+{{ define "page_header" }}
+  <section class="page-header">
+    {{ if .BackHref }}
+      <a class="page-header-back" href="{{ .BackHref }}">
+        {{ template "icon-back" . }}
+        {{ if .BackLabel }}
+          {{ .BackLabel }}
+        {{ else }}
+          Back
+        {{ end }}
+      </a>
+    {{ end }}
+    <div class="page-header-body">
+      {{ if .Subtitle }}
+        <div class="page-header-titles">
+          <h1>{{ .Title }}</h1>
+          <h1 aria-hidden="true">-</h1>
+          <h1 class="page-header-subtitle">{{ .Subtitle }}</h1>
+        </div>
+      {{ else }}
+        <h1>{{ .Title }}</h1>
+      {{ end }}
+      {{ if .Description }}
+        <p>{{ .Description }}</p>
+      {{ end }}
+      {{ if .Meta }}
+        <p class="page-header-meta">
+          <span class="page-header-meta-id">{{ .Meta }}</span>
+        </p>
+      {{ end }}
+    </div>
+  </section>
+{{ end }}

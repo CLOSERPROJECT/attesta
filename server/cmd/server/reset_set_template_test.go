@@ -2,14 +2,12 @@ package main
 
 import (
 	"bytes"
-	"html/template"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestResetSetTemplateShowsConfirmPasswordAndToggles(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	var out bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&out, "reset_set_body", ResetSetView{

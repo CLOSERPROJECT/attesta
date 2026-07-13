@@ -2,14 +2,12 @@ package main
 
 import (
 	"bytes"
-	"html/template"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestActionListTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	action := ActionView{
 		WorkflowKey: "workflow",

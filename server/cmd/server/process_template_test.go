@@ -2,14 +2,12 @@ package main
 
 import (
 	"bytes"
-	"html/template"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 
 	view := ProcessPageView{
 		PageBase: PageBase{
@@ -17,6 +15,12 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 			WorkflowKey:  "workflow",
 			WorkflowName: "Main Workflow",
 			WorkflowPath: "/w/workflow",
+		},
+		Header: PageHeaderView{
+			Title:    "Main Workflow",
+			BackHref: "/w/workflow/",
+			Subtitle: "Pilot batch",
+			Meta:     "process-1",
 		},
 		ProcessID:    "process-1",
 		InstanceName: "Pilot batch",

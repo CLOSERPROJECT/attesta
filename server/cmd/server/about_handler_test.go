@@ -2,16 +2,14 @@ package main
 
 import (
 	"bytes"
-	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestLayoutRendersFooterContent(t *testing.T) {
-	tmpl := template.Must(template.ParseGlob(filepath.Join("..", "..", "templates", "*.html")))
+	tmpl := parseTestTemplates(t)
 	var rendered bytes.Buffer
 	view := PageBase{}
 
