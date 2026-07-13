@@ -245,44 +245,6 @@
   margin-bottom: 0;
 }
 
-.hero {
-  width: 100%;
-  padding: var(--space-5) 0;
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  gap: var(--space-3);
-}
-
-.hero button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  border: none;
-  padding: 0;
-}
-
-.hero button:hover:not(:disabled) {
-  /* stylelint-disable-next-line declaration-no-important -- overrides global button hover fill on hero CTA */
-  background: transparent !important;
-  text-decoration: underline;
-}
-
-.hero-body {
-  justify-self: start;
-  margin: 0;
-
-  h1 {
-    margin: 0;
-  }
-
-  p {
-    margin: var(--space-1) 0 0;
-    opacity: 0.7;
-    font-weight: 400;
-  }
-}
-
 .stack {
   display: grid;
   gap: var(--space-6);
