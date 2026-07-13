@@ -255,8 +255,8 @@ type ActionView struct {
 	Title          string
 	Description    string
 	Role           string
-	RoleBadges     []ActionRoleBadge
-	MatchingRoles  []ActionRoleOption
+	RoleBadges     []SubstepRoleBadge
+	MatchingRoles  []SubstepRoleOption
 	RoleLabel      string
 	Palette        string
 	InputKey       string
@@ -267,8 +267,8 @@ type ActionView struct {
 	DoneAt         string
 	DoneBy         string
 	DoneRole       string
-	Values         []ActionKV
-	Attachments    []ActionAttachmentView
+	Values         []SubstepKV
+	Attachments    []SubstepAttachmentView
 	Disabled       bool
 	ReadOnly       bool
 	Reason         string
@@ -278,32 +278,6 @@ type ActionView struct {
 	FormataArchURL string
 	OverrideReason string
 	HasOverride    bool
-}
-
-type ActionRoleBadge struct {
-	ID      string
-	Label   string
-	Palette string
-}
-
-type ActionRoleOption struct {
-	Slug  string
-	Label string
-}
-
-type ActionKV struct {
-	Key   string
-	Value string
-}
-
-type ActionAttachmentView struct {
-	AttachmentID string
-	Key          string
-	Filename     string
-	URL          string
-	PreviewURL   string
-	PreviewKind  string
-	SHA256       string
 }
 
 type Department struct {
@@ -435,7 +409,7 @@ type ActionListView struct {
 	CanTerminate      bool
 	TerminateAction   string
 	TerminateSubstep  string
-	TerminateRoles    []ActionRoleOption
+	TerminateRoles    []SubstepRoleOption
 	Termination       *ProcessTerminationView
 }
 
@@ -771,7 +745,7 @@ type DPPTraceabilitySubstep struct {
 	DoneBy        string
 	Digest        string
 	Values        []DPPTraceabilityValue
-	Attachments   []ActionAttachmentView
+	Attachments   []SubstepAttachmentView
 }
 
 type DPPTraceabilityRoleBadge struct {
@@ -5243,7 +5217,7 @@ func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConf
 			view.CanTerminate = true
 			view.TerminateAction = fmt.Sprintf("%s/process/%s/terminate", workflowPath(workflowKey), process.ID.Hex())
 			view.TerminateSubstep = action.SubstepID
-			view.TerminateRoles = append([]ActionRoleOption(nil), action.MatchingRoles...)
+			view.TerminateRoles = append([]SubstepRoleOption(nil), action.MatchingRoles...)
 		}
 	}
 	if action, ok := selectedActionBySubstep(actions, selected, processDone); ok {
@@ -7586,14 +7560,14 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 			ownedRoles = []string{strings.TrimSpace(actor.Role)}
 		}
 		matchingRoleSlugs := intersectRoles(allowedRoles, ownedRoles)
-		matchingRoles := make([]ActionRoleOption, 0, len(matchingRoleSlugs))
+		matchingRoles := make([]SubstepRoleOption, 0, len(matchingRoleSlugs))
 		for _, role := range matchingRoleSlugs {
 			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], role, roleIndex, cfgRoles)
 			label := strings.TrimSpace(meta.Label)
 			if label == "" {
 				label = role
 			}
-			matchingRoles = append(matchingRoles, ActionRoleOption{
+			matchingRoles = append(matchingRoles, SubstepRoleOption{
 				Slug:  role,
 				Label: label,
 			})
@@ -7602,10 +7576,10 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		if primaryRole == "" && len(allowedRoles) > 0 {
 			primaryRole = allowedRoles[0]
 		}
-		roleBadges := make([]ActionRoleBadge, 0, len(allowedRoles))
+		roleBadges := make([]SubstepRoleBadge, 0, len(allowedRoles))
 		for _, role := range allowedRoles {
 			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], role, roleIndex, cfgRoles)
-			roleBadges = append(roleBadges, ActionRoleBadge{
+			roleBadges = append(roleBadges, SubstepRoleBadge{
 				ID:      role,
 				Label:   meta.Label,
 				Palette: meta.Palette,
@@ -7659,8 +7633,8 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 		doneBy := ""
 		doneRole := ""
 		description := strings.TrimSpace(sub.InputKey)
-		var values []ActionKV
-		var attachments []ActionAttachmentView
+		var values []SubstepKV
+		var attachments []SubstepAttachmentView
 		if status == "done" && process != nil {
 			if progress, ok := process.Progress[sub.SubstepID]; ok {
 				description = processStepDescription(progress, sub)
@@ -7673,7 +7647,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 					if doneRole != "" {
 						selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], doneRole, roleIndex, cfgRoles)
 						role = doneRole
-						roleBadges = []ActionRoleBadge{
+						roleBadges = []SubstepRoleBadge{
 							{
 								ID:      doneRole,
 								Label:   selectedMeta.Label,
@@ -7687,7 +7661,7 @@ func buildActionList(def WorkflowDef, process *Process, workflowKey string, acto
 				if value, ok := processStepDataValue(progress, sub); ok {
 					values = flattenDisplayValues("", value)
 				}
-				attachments = buildActionAttachments(workflowKey, process, progress.Data)
+				attachments = buildSubstepAttachments(workflowKey, process, progress.Data)
 			}
 		}
 		formSchema = marshalJSONCompact(effective.Schema)
@@ -7846,9 +7820,9 @@ func decorateTimelineOrganizationLogos(timeline []TimelineStep, logoURLs map[str
 	return timeline
 }
 
-func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
+func flattenDisplayValues(inputKey string, raw interface{}) []SubstepKV {
 	key := strings.TrimSpace(inputKey)
-	var out []ActionKV
+	var out []SubstepKV
 	collectDisplayValues(key, raw, &out)
 	if len(out) > 1 {
 		sort.Slice(out, func(i, j int) bool {
@@ -7858,7 +7832,7 @@ func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
 	return out
 }
 
-func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
+func collectDisplayValues(path string, raw interface{}, out *[]SubstepKV) {
 	switch typed := raw.(type) {
 	case map[string]interface{}:
 		if isAttachmentMetaMap(typed) {
@@ -7900,7 +7874,7 @@ func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
 		if strings.TrimSpace(key) == "" {
 			key = "value"
 		}
-		*out = append(*out, ActionKV{Key: key, Value: value})
+		*out = append(*out, SubstepKV{Key: key, Value: value})
 	}
 }
 
@@ -7956,12 +7930,12 @@ func isAttachmentMetaMap(payload map[string]interface{}) bool {
 	return attachmentMetaFromMap(payload) != nil
 }
 
-func buildActionAttachments(workflowKey string, process *Process, data map[string]interface{}) []ActionAttachmentView {
+func buildSubstepAttachments(workflowKey string, process *Process, data map[string]interface{}) []SubstepAttachmentView {
 	if process == nil {
 		return nil
 	}
 	seen := map[string]struct{}{}
-	attachments := make([]ActionAttachmentView, 0)
+	attachments := make([]SubstepAttachmentView, 0)
 	for _, item := range attachmentViewsFromValue(data) {
 		meta := item.Meta
 		id := strings.TrimSpace(meta.AttachmentID)
@@ -7974,7 +7948,7 @@ func buildActionAttachments(workflowKey string, process *Process, data map[strin
 		seen[id] = struct{}{}
 		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
 		previewKind := actionAttachmentPreviewKind(meta)
-		attachments = append(attachments, ActionAttachmentView{
+		attachments = append(attachments, SubstepAttachmentView{
 			AttachmentID: id,
 			Key:          item.Key,
 			Filename:     sanitizeAttachmentFilename(meta.Filename),

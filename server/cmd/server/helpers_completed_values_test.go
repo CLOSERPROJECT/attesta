@@ -124,7 +124,7 @@ func TestCompletedValueHelpers(t *testing.T) {
 	}
 }
 
-func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
+func TestBuildSubstepAttachmentsAndDownloadViews(t *testing.T) {
 	processID := primitive.NewObjectID()
 	process := &Process{ID: processID}
 	attachmentID := primitive.NewObjectID().Hex()
@@ -137,10 +137,10 @@ func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
 		},
 	}
 
-	if got := buildActionAttachments("workflow", nil, data); got != nil {
+	if got := buildSubstepAttachments("workflow", nil, data); got != nil {
 		t.Fatalf("expected nil for nil process, got %#v", got)
 	}
-	attachments := buildActionAttachments("workflow", process, data)
+	attachments := buildSubstepAttachments("workflow", process, data)
 	if len(attachments) != 2 {
 		t.Fatalf("expected 2 deduplicated attachments, got %#v", attachments)
 	}
@@ -177,7 +177,7 @@ func TestBuildActionAttachmentsAndDownloadViews(t *testing.T) {
 	}
 }
 
-func TestActionAttachmentPreviewKindAndURL(t *testing.T) {
+func TestSubstepAttachmentPreviewKindAndURL(t *testing.T) {
 	tests := []struct {
 		name       string
 		meta       NotarizedAttachment

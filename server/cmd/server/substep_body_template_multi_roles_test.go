@@ -17,11 +17,11 @@ func TestSubstepBodyTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T)
 		InputKey:    "value",
 		InputType:   "formata",
 		Status:      "available",
-		RoleBadges: []ActionRoleBadge{
+		RoleBadges: []SubstepRoleBadge{
 			{ID: "dep1", Label: "Department 1", Palette: "red"},
 			{ID: "dep2", Label: "Department 2", Palette: "orange"},
 		},
-		MatchingRoles: []ActionRoleOption{
+		MatchingRoles: []SubstepRoleOption{
 			{Slug: "dep1", Label: "Department 1"},
 			{Slug: "dep2", Label: "Department 2"},
 		},

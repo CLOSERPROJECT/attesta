@@ -74,7 +74,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 								FormSchema:    `{"type":"object","properties":{"value":{"type":"string"}}}`,
 								ReadOnly:      true,
 								Reason:        "Preview only. Start an instance to submit data.",
-								MatchingRoles: []ActionRoleOption{{Slug: "dep1", Label: "Department 1"}},
+								MatchingRoles: []SubstepRoleOption{{Slug: "dep1", Label: "Department 1"}},
 							},
 						},
 					},
