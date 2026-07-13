@@ -903,7 +903,7 @@ const requestActiveRoleChoice = (form, onSelected) => {
     dialog.setAttribute("open", "");
   }
   const checked = dialog.querySelector(
-    'input[data-active-role-option]:checked',
+    "input[data-active-role-option]:checked",
   );
   if (checked instanceof HTMLInputElement) {
     checked.focus();
@@ -1178,7 +1178,7 @@ document.body.addEventListener("click", (event) => {
       return;
     }
     const selected = dialog.querySelector(
-      'input[data-active-role-option]:checked',
+      "input[data-active-role-option]:checked",
     );
     const error = dialog.querySelector("[data-active-role-error]");
     if (!(selected instanceof HTMLInputElement)) {

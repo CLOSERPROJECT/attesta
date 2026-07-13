@@ -1,0 +1,134 @@
+package main
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
+
+func testStreamTimelineView() ActionListView {
+	return ActionListView{
+		WorkflowKey: "workflow",
+		ProcessID:   "process-1",
+		Timeline: []TimelineStep{{
+			StepID:     "1",
+			Title:      "Production",
+			OrgName:    "Acme Org",
+			OrgLogoURL: "https://example.com/logo.png",
+			Expanded:   true,
+			Substeps: []TimelineSubstep{{
+				SubstepID: "1.1",
+				Title:     "Capture batch data",
+				Status:    "available",
+				Selected:  true,
+				Palette:   "blue",
+				Action: &ActionView{
+					WorkflowKey: "workflow",
+					ProcessID:   "process-1",
+					SubstepID:   "1.1",
+					Title:       "Capture batch data",
+					Status:      "available",
+					FormSchema:  `{"type":"object"}`,
+				},
+			}},
+		}},
+	}
+}
+
+func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", testStreamTimelineView()); err != nil {
+		t.Fatalf("render stream_timeline template: %v", err)
+	}
+	body := out.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
+
+	for _, want := range []string{
+		`class="timeline-list"`,
+		`class="timeline-step"`,
+		`class="timeline-step-summary"`,
+		`class="timeline-step-org-mark"`,
+		`src="https://example.com/logo.png"`,
+		`class="timeline-substeps"`,
+		`class="substep substep-available"`,
+		`class="substep-accordion js-process-substep-panel"`,
+		`data-substep-id="1.1"`,
+		`class="substep-details"`,
+		`<span class="status">available</span>`,
+		"Production",
+		"Acme Org",
+		"Capture batch data",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in rendered timeline, got: %s", want, body)
+		}
+	}
+	if !strings.Contains(compactBody, `class="substep-accordion js-process-substep-panel" data-substep-id="1.1" open`) {
+		t.Fatalf("expected selected substep accordion open, got: %s", body)
+	}
+}
+
+func TestStreamTimelineTemplateHidesStatusWhenHideStatus(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := testStreamTimelineView()
+	view.HideStatus = true
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", view); err != nil {
+		t.Fatalf("render stream_timeline template: %v", err)
+	}
+	body := out.String()
+
+	if strings.Contains(body, `<span class="status">`) {
+		t.Fatalf("did not expect status pill when HideStatus is true, got: %s", body)
+	}
+	if strings.Contains(body, `class="substep substep-available"`) {
+		t.Fatalf("did not expect status-colored substep class when HideStatus is true, got: %s", body)
+	}
+	if !strings.Contains(body, `class="substep"`) {
+		t.Fatalf("expected bare substep class, got: %s", body)
+	}
+}
+
+func TestStreamTimelineTemplateRendersOrgLogoFallback(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := testStreamTimelineView()
+	view.Timeline[0].OrgLogoURL = ""
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", view); err != nil {
+		t.Fatalf("render stream_timeline template: %v", err)
+	}
+	body := out.String()
+
+	if strings.Contains(body, `src="https://example.com/logo.png"`) {
+		t.Fatalf("did not expect org logo img when URL empty, got: %s", body)
+	}
+	if !strings.Contains(body, `class="timeline-step-org-mark"`) {
+		t.Fatalf("expected org mark fallback container, got: %s", body)
+	}
+	if !strings.Contains(body, `class="icon-svg"`) {
+		t.Fatalf("expected icon-no-org fallback svg, got: %s", body)
+	}
+}
+
+func TestStreamTimelineTemplateRendersMissingActionMessage(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := testStreamTimelineView()
+	view.Timeline[0].Substeps[0].Action = nil
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", view); err != nil {
+		t.Fatalf("render stream_timeline template: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, "No data form configured for this substep.") {
+		t.Fatalf("expected missing-action fallback copy, got: %s", body)
+	}
+}

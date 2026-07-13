@@ -13,8 +13,8 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 | **Stream picker** | `home.html`, `home_picker_body`, `handleHome` | → `stream_picker.html`, `stream_picker_body` |
 | **Stream instance detail** (page + payload) | `process.html`, `process_body`, `process_content.html`, `ProcessPageView`, `ActionListView` | → `stream_instance_detail.html`, `stream_instance_detail_body`, `stream_instance_detail_content`; `StreamInstanceDetailView` |
 
-| **Stream timeline** (accordion tree) | `workflow_timeline` define in `process.html` | → `stream_timeline` component |
-| **Substep body** (inner panel) | `action_list.html`, `action_detail_content.html` | → `substep_body.html`, define `substep_body` |
+| **Stream timeline** (accordion tree) | `components/stream_timeline.html`, define `stream_timeline` | Migrated 2026-07-13 |
+| **Substep body** (inner panel) | `components/substep_body.html`, define `substep_body` | Migrated 2026-07-13 |
 | **Substep body modes** | inferred from `Status`, `ReadOnly`, `Disabled`, `DetailMessage` | explicit: `preview`, `actionable`, `result`, `message` |
 
 ### Action → Substep rename targets (future pass)
@@ -30,15 +30,27 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 - Test files: `action_list_*_test.go` → `substep_body_*_test.go`
 
 **Templates & defines**
-- `workflow_timeline` → `stream_timeline` (`components/stream_timeline.html`)
-- `action_list.html` → `substep_body.html`, define `substep_body`
-- `action_detail_content.html` → remove (fold into `substep_body`)
+
+### Resolved in substep_body migration (2026-07-13)
+
+- `action_list.html` → `components/substep_body.html`, define `substep_body`
+- `action_detail_content.html` → removed (folded into `substep_body`)
+
+### Resolved in stream_timeline migration (2026-07-13)
+
+- `workflow_timeline` → `components/stream_timeline.html`, define `stream_timeline`
+- `timeline.css` step chrome → `components/stream-timeline.css` (class prefix rename deferred)
+
+### Still open (templates & defines)
+
 - DPP history: converge on `substep_body` (result/message modes) over time; `dpp-history-*` markup is debt
 
 **CSS**
-- `actions.css` → split: `substep-body.css` (+ shared form chrome as needed)
-- `.action-*` classes → `.substep-body-*` (or `.substep-*` where shared with summary)
-- `timeline.css` → extract `stream-timeline.css` when migrating `stream_timeline`
+
+### Resolved in substep_body CSS migration (2026-07-13)
+
+- `actions.css` → `components/substep-body.css`
+- `.action-*` classes → `.substep-body-*` (carousel root: `.substep-body-attachments-carousel`)
 
 **Docs**
 - AGENTS.md "action cards" → substep summary / substep body
@@ -46,7 +58,7 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 
 ## Open items
 
-_None — vocabulary session complete. Next: migrate `substep_body` component (template move + define rename; no full code rename pass yet)._
+- Full Go rename pass per tables above (`ActionView` → `SubstepBodyView`, …)
 
 ## Resolved in session
 

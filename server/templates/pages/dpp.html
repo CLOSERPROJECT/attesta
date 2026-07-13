@@ -48,7 +48,7 @@
             {{ end }}
           </p>
           {{ if .Termination.Reason }}
-            <dl class="action-submitted-values">
+            <dl class="substep-body-submitted-values">
               <dt>Reason</dt>
               <dd>{{ .Termination.Reason }}</dd>
             </dl>
@@ -126,13 +126,13 @@
                               >{{ .Role }}</span
                             >
                           </div>
-                          <div class="action-submitted dpp-substep-submitted">
+                          <div class="substep-body-submitted dpp-substep-submitted">
                             {{ if .DetailMessage }}
                               <p class="muted u-m-0 u-pre-line">
                                 {{- .DetailMessage -}}
                               </p>
                             {{ end }}
-                            <dl class="action-submitted-values">
+                            <dl class="substep-body-submitted-values">
                               {{ if .Values }}
                                 {{ range .Values }}
                                   <dt>{{ .Key }}</dt>

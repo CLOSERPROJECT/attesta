@@ -200,7 +200,7 @@
   transform: none;
 }
 
-.dpp-history-accordion .action-submitted {
+.dpp-history-accordion .substep-body-submitted {
   gap: var(--space-3);
 }
 

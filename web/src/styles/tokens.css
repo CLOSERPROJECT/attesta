@@ -80,23 +80,74 @@
   --topbar-inverted-primary: #57c2a6;
 
   /* Role palette */
-  --role-red: light-dark(oklch(50.5% 0.213 27.518deg), oklch(88.5% 0.062 18.334deg));
-  --role-orange: light-dark(oklch(55.3% 0.195 38.402deg), oklch(90.1% 0.076 70.697deg));
-  --role-amber: light-dark(oklch(55.5% 0.163 48.998deg), oklch(92.4% 0.12 95.746deg));
-  --role-yellow: light-dark(oklch(55.4% 0.135 66.442deg), oklch(94.5% 0.129 101.54deg));
-  --role-lime: light-dark(oklch(53.2% 0.157 131.589deg), oklch(93.8% 0.127 124.321deg));
-  --role-green: light-dark(oklch(52.7% 0.154 150.069deg), oklch(92.5% 0.084 155.995deg));
-  --role-emerald: light-dark(oklch(50.8% 0.118 165.612deg), oklch(90.5% 0.093 164.15deg));
-  --role-teal: light-dark(oklch(51.1% 0.096 186.391deg), oklch(91% 0.096 180.426deg));
-  --role-cyan: light-dark(oklch(52% 0.105 223.128deg), oklch(91.7% 0.08 205.041deg));
-  --role-sky: light-dark(oklch(50% 0.134 242.749deg), oklch(90.1% 0.058 230.902deg));
-  --role-blue: light-dark(oklch(48.8% 0.243 264.376deg), oklch(88.2% 0.059 254.128deg));
-  --role-indigo: light-dark(oklch(45.7% 0.24 277.023deg), oklch(87% 0.065 274.039deg));
-  --role-violet: light-dark(oklch(49.1% 0.27 292.581deg), oklch(89.4% 0.057 293.283deg));
-  --role-purple: light-dark(oklch(49.6% 0.265 301.924deg), oklch(90.2% 0.063 306.703deg));
-  --role-fuchsia: light-dark(oklch(51.8% 0.253 323.949deg), oklch(90.3% 0.076 319.62deg));
-  --role-pink: light-dark(oklch(50.5% 0.213 350.534deg), oklch(89.9% 0.061 343.231deg));
-  --role-rose: light-dark(oklch(51.4% 0.222 16.935deg), oklch(89.2% 0.058 10.001deg));
+  --role-red: light-dark(
+    oklch(50.5% 0.213 27.518deg),
+    oklch(88.5% 0.062 18.334deg)
+  );
+  --role-orange: light-dark(
+    oklch(55.3% 0.195 38.402deg),
+    oklch(90.1% 0.076 70.697deg)
+  );
+  --role-amber: light-dark(
+    oklch(55.5% 0.163 48.998deg),
+    oklch(92.4% 0.12 95.746deg)
+  );
+  --role-yellow: light-dark(
+    oklch(55.4% 0.135 66.442deg),
+    oklch(94.5% 0.129 101.54deg)
+  );
+  --role-lime: light-dark(
+    oklch(53.2% 0.157 131.589deg),
+    oklch(93.8% 0.127 124.321deg)
+  );
+  --role-green: light-dark(
+    oklch(52.7% 0.154 150.069deg),
+    oklch(92.5% 0.084 155.995deg)
+  );
+  --role-emerald: light-dark(
+    oklch(50.8% 0.118 165.612deg),
+    oklch(90.5% 0.093 164.15deg)
+  );
+  --role-teal: light-dark(
+    oklch(51.1% 0.096 186.391deg),
+    oklch(91% 0.096 180.426deg)
+  );
+  --role-cyan: light-dark(
+    oklch(52% 0.105 223.128deg),
+    oklch(91.7% 0.08 205.041deg)
+  );
+  --role-sky: light-dark(
+    oklch(50% 0.134 242.749deg),
+    oklch(90.1% 0.058 230.902deg)
+  );
+  --role-blue: light-dark(
+    oklch(48.8% 0.243 264.376deg),
+    oklch(88.2% 0.059 254.128deg)
+  );
+  --role-indigo: light-dark(
+    oklch(45.7% 0.24 277.023deg),
+    oklch(87% 0.065 274.039deg)
+  );
+  --role-violet: light-dark(
+    oklch(49.1% 0.27 292.581deg),
+    oklch(89.4% 0.057 293.283deg)
+  );
+  --role-purple: light-dark(
+    oklch(49.6% 0.265 301.924deg),
+    oklch(90.2% 0.063 306.703deg)
+  );
+  --role-fuchsia: light-dark(
+    oklch(51.8% 0.253 323.949deg),
+    oklch(90.3% 0.076 319.62deg)
+  );
+  --role-pink: light-dark(
+    oklch(50.5% 0.213 350.534deg),
+    oklch(89.9% 0.061 343.231deg)
+  );
+  --role-rose: light-dark(
+    oklch(51.4% 0.222 16.935deg),
+    oklch(89.2% 0.058 10.001deg)
+  );
 
   /* Substep */
   --substep-done: #d4d4d4;

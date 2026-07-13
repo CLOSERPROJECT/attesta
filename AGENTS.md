@@ -192,12 +192,13 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.
 
 ## Templates and static assets
-- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`.
+- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`. Custom funcs in `templateFuncs()` include `dict` for inline map literals (e.g. `{{ template "stream_timeline_step" dict "Step" . "HideStatus" $.HideStatus }}`).
 - **Template define names** match the file stem (no extension): e.g. `components/page_header.html` → `{{ define "page_header" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated.
 - **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`PageHeaderView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page-specific assembly stays in handlers or future `page_*.go` files.
 - **Component eligibility:** extract to `templates/components/` + namespaced CSS + `components.go` struct when reused on 2+ pages, is an HTMX/SSE partial target, or has a dedicated view struct. Migrate one component at a time; primitives stay in `components/shared.css`.
-- Backoffice action cards (`server/templates/action_list.html`) render editable forms only for non-`done` actions; `done` actions render a read-only Submitted block with flattened values and attachment download links.
-- Locked Formata actions render `action-card action-locked` and `.js-formata-host[data-formata-disabled="true"]`; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
+- Substep bodies (`server/templates/components/substep_body.html`) render editable forms only for non-`done` substeps; `done` substeps render a read-only Submitted block with flattened values and attachment download links.
+- Stream timeline (`server/templates/components/stream_timeline.html`) renders the step/substep accordion tree on stream instance detail and stream dashboard preview; inner defines `stream_timeline_step` and `stream_timeline_substep` dispatch to `substep_body`.
+- Locked Formata substeps render `.js-formata-host[data-formata-disabled="true"]` in preview mode; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
 - Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).
 - Layout template includes HTMX via an external script tag (`server/templates/layout.html:9-13`).
 

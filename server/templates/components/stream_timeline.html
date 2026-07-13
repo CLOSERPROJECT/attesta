@@ -1,0 +1,100 @@
+{{/* Stream timeline: accordion tree of steps and substeps (see CONTEXT.md) */}}
+
+{{ define "stream_timeline" }}
+  <div class="timeline-list">
+    {{ range .Timeline }}
+      {{ template "stream_timeline_step" dict "Step" . "HideStatus" $.HideStatus }}
+    {{ end }}
+  </div>
+{{ end }}
+
+{{ define "stream_timeline_step" }}
+  <details
+    class="timeline-step"
+    {{ if .Step.Expanded }}open{{ end }}
+  >
+    <summary class="timeline-step-summary" aria-label="Open stream step">
+      <div class="timeline-step-summary-main">
+        <span class="pill pill-step-number pill-panel">{{ .Step.StepID }}</span>
+        {{ if .Step.OrgLogoURL }}
+          <img
+            src="{{ .Step.OrgLogoURL }}"
+            alt=""
+            class="timeline-step-org-mark"
+          />
+        {{ else }}
+          <span class="timeline-step-org-mark">
+            {{ template "icon-no-org" . }}
+          </span>
+        {{ end }}
+        <span class="timeline-step-copy">
+          <span class="timeline-step-title">{{ .Step.Title }}</span>
+          <span class="timeline-step-org"
+            >{{ if .Step.OrgName }}
+              {{ .Step.OrgName }}
+            {{ else }}
+              No organization
+            {{ end }}</span
+          >
+        </span>
+      </div>
+      <span class="timeline-step-chevron" aria-hidden="true">
+        {{ template "icon-chevron-down" . }}
+      </span>
+    </summary>
+    <ul class="timeline-substeps">
+      {{ range .Step.Substeps }}
+        {{ template "stream_timeline_substep" dict "Substep" . "HideStatus" $.HideStatus }}
+      {{ end }}
+    </ul>
+  </details>
+{{ end }}
+
+{{ define "stream_timeline_substep" }}
+  <li
+    class="substep{{ if not .HideStatus }} substep-{{ .Substep.Status }}{{ end }}"
+    data-role-palette="{{ .Substep.Palette }}"
+  >
+    <details
+      class="substep-accordion js-process-substep-panel"
+      data-substep-id="{{ .Substep.SubstepID }}"
+      {{ if .Substep.Selected }}open{{ end }}
+    >
+      <summary class="substep-accordion-summary">
+        <div class="substep-summary-main">
+          <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+          <div class="substep-title">
+            <span class="timeline-step-title">{{ .Substep.Title }}</span>
+            {{ if eq .Substep.Status "done" }}
+              <div class="substep-meta">
+                {{ if .Substep.DoneAt }}
+                  <span class="time">Completed at {{ .Substep.DoneAt }}</span>
+                {{ end }}
+                {{ if .Substep.DoneBy }}
+                  <span class="actor">by {{ .Substep.DoneBy }}</span>
+                {{ else }}
+                  <span class="actor">completed</span>
+                {{ end }}
+              </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ if not .HideStatus }}
+          <span class="status">{{- if .Substep.StatusLabel }}{{ .Substep.StatusLabel }}{{ else }}{{ .Substep.Status }}{{ end -}}</span>
+        {{ end }}
+        <span class="substep-accordion-chevron" aria-hidden="true">
+          {{ template "icon-chevron-down" . }}
+        </span>
+      </summary>
+      <div class="substep-details">
+        {{ with .Substep.Action }}
+          {{ template "substep_body" . }}
+        {{ else }}
+          <p class="muted">
+            No data form configured for this substep.
+          </p>
+        {{ end }}
+      </div>
+    </details>
+  </li>
+{{ end }}

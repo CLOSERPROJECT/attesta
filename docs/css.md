@@ -16,7 +16,7 @@ Styles load in this order from `web/src/styles.css`:
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
-| Components | `components.css` | Barrel importing `components/*.css` (timeline, actions, forms, org-admin, stream, shared) |
+| Components | `components.css` | Barrel importing `components/*.css` (timeline, stream-timeline, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
 **Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
@@ -41,8 +41,10 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 | File | Prefix / scope | Templates |
 |------|----------------|-----------|
 | `components/page-header.css` | `.page-header-*` | `components/page_header.html` |
+| `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
+| `components/stream-timeline.css` | `.timeline-list`, `.timeline-step*` | `components/stream_timeline.html`, `pages/dpp.html` (`.timeline-step-title` reuse) |
 
-Other partials (`action_list.html`, `icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
+Other partials (`icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
 
 ### Template ↔ CSS index
 
@@ -51,14 +53,15 @@ Other partials (`action_list.html`, `icons.html`, …) still live at `server/tem
 | `layout.html` | `layout/index.css` | `components/shared.css` |
 | `components/page_header.html` | `components/page-header.css` | — |
 | `pages/home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
-| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `role-palette.css` |
-| `pages/process.html` | `pages/process.css` | `components/timeline.css`, `components/actions.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
-| `action_list.html` | `components/actions.css` | `components/forms.css`, `role-palette.css` |
-| `pages/dpp.html` | `pages/dpp.css` | `components/timeline.css`, `role-palette.css` |
+| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
+| `pages/process.html` | `pages/process.css` | `components/timeline.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| `components/stream_timeline.html` | `components/stream-timeline.css` | `components/timeline.css`, `components/substep-body.css`, `role-palette.css` |
+| `components/substep_body.html` | `components/substep-body.css` | `components/forms.css`, `role-palette.css` |
+| `pages/dpp.html` | `pages/dpp.css` | `components/timeline.css`, `components/substep-body.css`, `role-palette.css` |
 | `pages/org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
 | `pages/platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
 | `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
-| `attachment_carousel.html` | `components/actions.css` | — |
+| `attachment_carousel.html` | `components/substep-body.css` | — |
 | `substep_override_editor.html` | `components/timeline.css` | — |
 
 ### `data-*` contract (templates → CSS / JS)
@@ -72,9 +75,9 @@ Other partials (`action_list.html`, `icons.html`, …) still live at `server/tem
 | `data-org-admin-nav`, `data-org-admin-panel`, `data-org-admin-default-panel`, `data-org-admin-ready` | `org_admin.html` | `pages/org-admin-page.css`, inline script in `org_admin.html` |
 | `data-home-nav`, `data-home-panel` | `stream.html` | `main.js` (panel switching) |
 | `data-process-id`, `data-workflow-key`, `data-selected-substep`, `data-substep-id` | `process.html` | `main.js` (SSE refresh, accordion) |
-| `data-formata-*`, `data-active-role-*` | `action_list.html` | `main.js` (Formata embed, role picker) |
-| `data-override-url` | `action_list.html` | `main.js` (substep override editor) |
-| `data-carousel-*` | `attachment_carousel.html` | `main.js`, `components/actions.css` |
+| `data-formata-*`, `data-active-role-*` | `components/substep_body.html` | `main.js` (Formata embed, role picker) |
+| `data-override-url` | `components/substep_body.html` | `main.js` (substep override editor) |
+| `data-carousel-*` | `attachment_carousel.html` | `main.js`, `components/substep-body.css` |
 | `data-copy-text`, `data-copy-label` | `dpp.html` | `main.js` (clipboard) |
 | `data-share-url`, `data-share-label` | `dpp.html` | `main.js` (share link) |
 | `data-target` | password visibility toggles | `main.js` |
