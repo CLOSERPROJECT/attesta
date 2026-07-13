@@ -87,7 +87,7 @@
         </span>
       </summary>
       <div class="substep-details">
-        {{ with .Substep.Action }}
+        {{ with .Substep.Body }}
           {{ template "substep_body" . }}
         {{ else }}
           <p class="muted">
