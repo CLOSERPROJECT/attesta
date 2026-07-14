@@ -154,8 +154,8 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="stream-substep-summary-meta-time"`,
-		`class="stream-substep-summary-meta-actor"`,
+		`class="substep-meta-time"`,
+		`class="substep-meta-actor"`,
 		"Completed at 5 Mar 2026 at 14:30 UTC",
 		"by alice@example.com",
 	} {
@@ -177,7 +177,7 @@ func TestStreamTimelineTemplateUsesSubstepTitleHeadingClass(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, `class="stream-substep-summary-title"`) {
+	if !strings.Contains(body, `class="substep-title-heading"`) {
 		t.Fatalf("expected substep title heading class, got: %s", body)
 	}
 	if strings.Contains(body, `class="stream-step-summary-title">Capture batch data`) {

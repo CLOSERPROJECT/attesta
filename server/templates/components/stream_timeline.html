@@ -38,7 +38,24 @@
       {{ if .Substep.Selected }}open{{ end }}
     >
       <summary class="substep-accordion-summary">
-        {{ template "stream_substep_summary" . }}
+        <div class="substep-summary-main">
+          <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+          <div class="substep-title">
+            <span class="substep-title-heading">{{ .Substep.Title }}</span>
+            {{ if eq .Substep.Status "done" }}
+              <div class="substep-meta">
+                {{ if .Substep.DoneAt }}
+                  <span class="substep-meta-time">Completed at {{ .Substep.DoneAt }}</span>
+                {{ end }}
+                {{ if .Substep.DoneBy }}
+                  <span class="substep-meta-actor">by {{ .Substep.DoneBy }}</span>
+                {{ else }}
+                  <span class="substep-meta-actor">completed</span>
+                {{ end }}
+              </div>
+            {{ end }}
+          </div>
+        </div>
         {{ if not .HideStatus }}
           <span class="status">{{- if .Substep.StatusLabel }}{{ .Substep.StatusLabel }}{{ else }}{{ .Substep.Status }}{{ end -}}</span>
         {{ end }}
