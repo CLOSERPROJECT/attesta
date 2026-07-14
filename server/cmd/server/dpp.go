@@ -268,9 +268,10 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				overrideReason = strings.TrimSpace(override.Reason)
 			}
 
-			progress, done := process.Progress[sub.SubstepID]
-			if done && progress.State == "done" {
-				status = "done"
+			status = resolveTimelineSubstepStatus(sub.SubstepID, process, availableMap, terminated, terminationSubstepID, pastTermination)
+			switch status {
+			case "done":
+				progress := process.Progress[sub.SubstepID]
 				if hasOverride {
 					reason = "Completed with local form adaptation."
 					if overrideReason != "" {
@@ -297,19 +298,15 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				digest = digestPayload(progress.Data)
 				values = dppTraceValues(sub, progress)
 				attachments = buildSubstepAttachments(workflowKey, process, progress.Data)
-			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				status = processStatusTerminated
+			case processStatusTerminated:
 				reason = "Stream ended early"
 				detailMessage = terminationReason
 				if detailMessage == "" {
 					detailMessage = "No reason provided."
 				}
-			} else if terminated && (pastTermination || terminationSubstepID == "") {
-				status = "skipped"
+			case "skipped":
 				reason = "Stream ended early"
 				detailMessage = "Step not completed because the stream was ended before this."
-			} else if availableMap[sub.SubstepID] {
-				status = "available"
 			}
 
 			body := &SubstepBodyView{
@@ -348,9 +345,7 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				Body:        body,
 			}
 			row.Substeps = append(row.Substeps, entry)
-			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				pastTermination = true
-			}
+			pastTermination = advanceTimelinePastTermination(sub.SubstepID, terminated, terminationSubstepID, pastTermination)
 		}
 		steps = append(steps, row)
 	}

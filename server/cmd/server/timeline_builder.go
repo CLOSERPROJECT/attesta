@@ -2,6 +2,29 @@ package main
 
 import "strings"
 
+func resolveTimelineSubstepStatus(substepID string, process *Process, availableMap map[string]bool, terminated bool, terminationSubstepID string, pastTermination bool) string {
+	if process == nil {
+		return "locked"
+	}
+	if progress, ok := process.Progress[substepID]; ok && progress.State == "done" {
+		return "done"
+	}
+	if terminated && strings.TrimSpace(substepID) == terminationSubstepID {
+		return processStatusTerminated
+	}
+	if terminated && (pastTermination || terminationSubstepID == "") {
+		return "skipped"
+	}
+	if availableMap[substepID] {
+		return "available"
+	}
+	return "locked"
+}
+
+func advanceTimelinePastTermination(substepID string, terminated bool, terminationSubstepID string, pastTermination bool) bool {
+	return pastTermination || (terminated && strings.TrimSpace(substepID) == terminationSubstepID)
+}
+
 func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []TimelineStep {
 	steps := sortedSteps(def)
 	substepOrgs := substepOrganizationMap(def)
@@ -32,38 +55,25 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIn
 				Title:     sub.Title,
 				Palette:   meta.Palette,
 			}
-			if process != nil {
-				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
-					entry.Status = "done"
-					if progress.DoneBy != nil {
-						entry.DoneBy = progress.DoneBy.ID
-						entry.DoneRole = progress.DoneBy.Role
-						selectedRole := strings.TrimSpace(progress.DoneBy.Role)
-						if selectedRole != "" {
-							selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], selectedRole, roleIndex, cfgRoles)
-							entry.Palette = selectedMeta.Palette
-						}
+			entry.Status = resolveTimelineSubstepStatus(sub.SubstepID, process, availableMap, terminated, terminationSubstepID, pastTermination)
+			if entry.Status == "done" && process != nil {
+				progress := process.Progress[sub.SubstepID]
+				if progress.DoneBy != nil {
+					entry.DoneBy = progress.DoneBy.ID
+					entry.DoneRole = progress.DoneBy.Role
+					selectedRole := strings.TrimSpace(progress.DoneBy.Role)
+					if selectedRole != "" {
+						selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], selectedRole, roleIndex, cfgRoles)
+						entry.Palette = selectedMeta.Palette
 					}
-					if progress.DoneAt != nil {
-						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
-					}
-				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-					entry.Status = processStatusTerminated
-				} else if terminated && (pastTermination || terminationSubstepID == "") {
-					entry.Status = "skipped"
-				} else if availableMap[sub.SubstepID] {
-					entry.Status = "available"
-				} else {
-					entry.Status = "locked"
 				}
-			} else {
-				entry.Status = "locked"
+				if progress.DoneAt != nil {
+					entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
+				}
 			}
 			entry.StatusLabel = processStatusLabel(entry.Status)
 			row.Substeps = append(row.Substeps, entry)
-			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				pastTermination = true
-			}
+			pastTermination = advanceTimelinePastTermination(sub.SubstepID, terminated, terminationSubstepID, pastTermination)
 		}
 		timeline = append(timeline, row)
 	}

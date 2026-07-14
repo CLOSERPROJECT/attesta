@@ -7,6 +7,158 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestResolveTimelineSubstepStatus(t *testing.T) {
+	process := &Process{
+		ID: primitive.NewObjectID(),
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done"},
+			"1.2": {State: "pending"},
+		},
+		Termination: &ProcessTermination{SubstepID: "1.3"},
+	}
+	availableMap := map[string]bool{
+		"1.4": true,
+	}
+
+	tests := []struct {
+		name                 string
+		substepID            string
+		process              *Process
+		availableMap         map[string]bool
+		terminated           bool
+		terminationSubstepID string
+		pastTermination      bool
+		want                 string
+	}{
+		{
+			name:         "nil process locked",
+			substepID:    "1.1",
+			process:      nil,
+			availableMap: availableMap,
+			want:         "locked",
+		},
+		{
+			name:         "done progress",
+			substepID:    "1.1",
+			process:      process,
+			availableMap: availableMap,
+			want:         "done",
+		},
+		{
+			name:                 "termination substep",
+			substepID:            "1.3",
+			process:              process,
+			availableMap:         availableMap,
+			terminated:           true,
+			terminationSubstepID: "1.3",
+			want:                 processStatusTerminated,
+		},
+		{
+			name:                 "skipped after termination",
+			substepID:            "1.4",
+			process:              process,
+			availableMap:         availableMap,
+			terminated:           true,
+			terminationSubstepID: "1.3",
+			pastTermination:      true,
+			want:                 "skipped",
+		},
+		{
+			name:                 "skipped when termination id missing",
+			substepID:            "1.2",
+			process:              process,
+			availableMap:         availableMap,
+			terminated:           true,
+			terminationSubstepID: "",
+			want:                 "skipped",
+		},
+		{
+			name:         "available before termination",
+			substepID:    "1.4",
+			process:      process,
+			availableMap: availableMap,
+			want:         "available",
+		},
+		{
+			name:         "locked pending progress",
+			substepID:    "1.2",
+			process:      process,
+			availableMap: availableMap,
+			want:         "locked",
+		},
+		{
+			name:                 "done beats termination on same substep",
+			substepID:            "1.1",
+			process:              process,
+			availableMap:         availableMap,
+			terminated:           true,
+			terminationSubstepID: "1.1",
+			want:                 "done",
+		},
+		{
+			name:                 "available beats skipped when not past termination",
+			substepID:            "1.4",
+			process:              process,
+			availableMap:         availableMap,
+			terminated:           true,
+			terminationSubstepID: "1.3",
+			pastTermination:      false,
+			want:                 "available",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveTimelineSubstepStatus(tc.substepID, tc.process, tc.availableMap, tc.terminated, tc.terminationSubstepID, tc.pastTermination)
+			if got != tc.want {
+				t.Fatalf("status = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAdvanceTimelinePastTermination(t *testing.T) {
+	tests := []struct {
+		name                 string
+		substepID            string
+		terminated           bool
+		terminationSubstepID string
+		pastTermination      bool
+		want                 bool
+	}{
+		{
+			name:            "already past termination",
+			substepID:       "1.4",
+			terminated:      true,
+			pastTermination: true,
+			want:            true,
+		},
+		{
+			name:                 "marks termination substep",
+			substepID:            "1.3",
+			terminated:           true,
+			terminationSubstepID: "1.3",
+			want:                 true,
+		},
+		{
+			name:                 "before termination substep",
+			substepID:            "1.2",
+			terminated:           true,
+			terminationSubstepID: "1.3",
+			want:                 false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := advanceTimelinePastTermination(tc.substepID, tc.terminated, tc.terminationSubstepID, tc.pastTermination)
+			if got != tc.want {
+				t.Fatalf("pastTermination = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 	cfg := testRuntimeConfig()
 	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)
