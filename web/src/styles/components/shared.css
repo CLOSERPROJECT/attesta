@@ -126,6 +126,7 @@ button.secondary-small {
   height: 24px;
   text-align: center;
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .pill-lg {
@@ -459,7 +460,8 @@ button.secondary-small {
 .error {
   background: var(--destructive-muted);
   color: var(--destructive-muted-foreground);
-  border: 1px solid color-mix(in srgb, var(--destructive-muted-foreground) 35%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--destructive-muted-foreground) 35%, transparent);
   padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   margin-block: 0;
@@ -469,7 +471,8 @@ button.secondary-small {
 .confirmation {
   background: var(--success-muted);
   color: var(--success-muted-foreground);
-  border: 1px solid color-mix(in srgb, var(--success-muted-foreground) 35%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--success-muted-foreground) 35%, transparent);
   padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   margin-block: 0;
