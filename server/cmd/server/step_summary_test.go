@@ -27,10 +27,10 @@ func TestStepSummaryTemplateRendersExtendedMetadata(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, want := range []string{
-		`class="timeline-step-summary-main"`,
-		`class="timeline-step-org-mark"`,
+		`class="stream-timeline-step-summary-main"`,
+		`class="stream-timeline-step-org-mark"`,
 		`src="https://example.com/logo.png"`,
-		`class="timeline-step-title"`,
+		`class="stream-timeline-step-title"`,
 		`class="step-summary-meta"`,
 		"<strong>Organization:</strong>",
 		"Acme Org",
@@ -62,7 +62,7 @@ func TestStepSummaryTemplateHidesOrgMarkWhenFlagSet(t *testing.T) {
 	}
 	body := out.String()
 
-	if strings.Contains(body, `class="timeline-step-org-mark"`) {
+	if strings.Contains(body, `class="stream-timeline-step-org-mark"`) {
 		t.Fatalf("did not expect org mark when HideOrgMark is true, got: %s", body)
 	}
 	if !strings.Contains(body, "Acme Org") {

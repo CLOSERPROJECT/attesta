@@ -1,7 +1,7 @@
 {{/* Stream timeline: accordion tree of steps and substeps (see CONTEXT.md) */}}
 
 {{ define "stream_timeline" }}
-  <div class="timeline-list">
+  <div class="stream-timeline-list">
     {{ range .Timeline }}
       {{ template "stream_timeline_step" dict "Step" . "HideStatus" $.HideStatus }}
     {{ end }}
@@ -10,16 +10,16 @@
 
 {{ define "stream_timeline_step" }}
   <details
-    class="timeline-step"
+    class="stream-timeline-step"
     {{ if .Step.Expanded }}open{{ end }}
   >
-    <summary class="timeline-step-summary" aria-label="Open stream step">
+    <summary class="stream-timeline-step-summary" aria-label="Open stream step">
       {{ template "step_summary" .Step.Summary }}
-      <span class="timeline-step-chevron" aria-hidden="true">
+      <span class="stream-timeline-step-chevron" aria-hidden="true">
         {{ template "icon-chevron-down" . }}
       </span>
     </summary>
-    <ul class="timeline-substeps">
+    <ul class="stream-timeline-substeps">
       {{ range .Step.Substeps }}
         {{ template "stream_timeline_substep" dict "Substep" . "HideStatus" $.HideStatus }}
       {{ end }}

@@ -101,7 +101,7 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 50%, var(--border));
 }
 
-.dpp-history-item > .timeline-step {
+.dpp-history-item > .stream-timeline-step {
   grid-column: 2;
   min-width: 0;
 }
