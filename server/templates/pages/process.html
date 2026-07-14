@@ -20,7 +20,7 @@
     {{ template "page_header" .Header }}
     {{ if .Detail.ProcessDone }}
       <div class="process-resources-grid">
-        {{ template "stream_timeline" .Detail }}
+        {{ template "stream_timeline" .Detail.StreamTimeline }}
         <div class="stack layout-stack-separator u-gap-4">
           {{ template "process_termination_details" .Detail }}
           {{ template "process_dpp" . }}
@@ -28,7 +28,7 @@
         </div>
       </div>
     {{ else }}
-      {{ template "stream_timeline" .Detail }}
+      {{ template "stream_timeline" .Detail.StreamTimeline }}
       {{ if .Detail.CanTerminate }}
         <div class="manage-dialog-actions manage-dialog-actions-end">
           <button

@@ -65,7 +65,7 @@
             <div class="dpp-history-rail" aria-hidden="true">
               <span class="dpp-history-dot"></span>
             </div>
-            {{ template "stream_timeline_step" dict "Step" . "HideStatus" true }}
+            {{ template "stream_timeline_step" (streamTimelineStep . true) }}
           </div>
         {{ end }}
       </div>

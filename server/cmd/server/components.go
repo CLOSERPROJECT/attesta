@@ -108,6 +108,24 @@ type TimelineStep struct {
 	Substeps []TimelineSubstep
 }
 
+// StreamTimelineView is the view model for templates/components/stream_timeline.html.
+type StreamTimelineView struct {
+	Timeline   []TimelineStep
+	HideStatus bool
+}
+
+// StreamTimelineStepView wraps one timeline step for stream_timeline_step.
+type StreamTimelineStepView struct {
+	Step       TimelineStep
+	HideStatus bool
+}
+
+// StreamTimelineSubstepView wraps one timeline substep for stream_timeline_substep.
+type StreamTimelineSubstepView struct {
+	Substep    TimelineSubstep
+	HideStatus bool
+}
+
 // StreamInstanceDetailView is the HTMX/SSE partial payload for stream instance detail content.
 type StreamInstanceDetailView struct {
 	WorkflowKey       string
@@ -128,4 +146,11 @@ type StreamInstanceDetailView struct {
 	TerminateSubstep  string
 	TerminateRoles    []SubstepRoleOption
 	Termination       *ProcessTerminationView
+}
+
+func (v StreamInstanceDetailView) StreamTimeline() StreamTimelineView {
+	return StreamTimelineView{
+		Timeline:   v.Timeline,
+		HideStatus: v.HideStatus,
+	}
 }

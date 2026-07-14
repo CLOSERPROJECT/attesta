@@ -6,10 +6,8 @@ import (
 	"testing"
 )
 
-func testStreamTimelineView() StreamInstanceDetailView {
-	return StreamInstanceDetailView{
-		WorkflowKey: "workflow",
-		ProcessID:   "process-1",
+func testStreamTimelineView() StreamTimelineView {
+	return StreamTimelineView{
 		Timeline: []TimelineStep{{
 			Summary: StepSummaryView{
 				StepID:           "1",

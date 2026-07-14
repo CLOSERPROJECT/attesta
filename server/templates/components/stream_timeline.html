@@ -3,7 +3,7 @@
 {{ define "stream_timeline" }}
   <div class="stream-timeline-list">
     {{ range .Timeline }}
-      {{ template "stream_timeline_step" dict "Step" . "HideStatus" $.HideStatus }}
+      {{ template "stream_timeline_step" (streamTimelineStep . $.HideStatus) }}
     {{ end }}
   </div>
 {{ end }}
@@ -21,7 +21,7 @@
     </summary>
     <ul class="stream-timeline-substeps">
       {{ range .Step.Substeps }}
-        {{ template "stream_timeline_substep" dict "Substep" . "HideStatus" $.HideStatus }}
+        {{ template "stream_timeline_substep" (streamTimelineSubstep . $.HideStatus) }}
       {{ end }}
     </ul>
   </details>
