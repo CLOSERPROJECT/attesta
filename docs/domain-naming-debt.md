@@ -53,7 +53,7 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 ### Resolved in DPP / stream_timeline convergence (2026-07-14)
 
 - DPP history substep content → `substep_body` (result/message modes) via `stream_timeline_step`
-- Step summaries shared via `step_summary` / `StepSummaryView`
+- Step summaries shared via `stream_step_summary` / `StepSummaryView`
 - Digest copy UI in `substep_body` → `.substep-body-digest-*` (was `.dpp-integrity-hash*` in shared partial)
 
 ### Still open (templates & defines)

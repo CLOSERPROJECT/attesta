@@ -14,7 +14,7 @@
     {{ if .Step.Expanded }}open{{ end }}
   >
     <summary class="stream-timeline-step-summary" aria-label="Open stream step">
-      {{ template "step_summary" .Step.Summary }}
+      {{ template "stream_step_summary" .Step.Summary }}
       <span class="stream-timeline-step-chevron" aria-hidden="true">
         {{ template "icon-chevron-down" . }}
       </span>

@@ -52,14 +52,14 @@ func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
 		`class="stream-timeline-list"`,
 		`class="stream-timeline-step"`,
 		`class="stream-timeline-step-summary"`,
-		`class="stream-timeline-step-org-mark"`,
+		`class="stream-step-summary-org-mark"`,
 		`src="https://example.com/logo.png"`,
 		`class="stream-timeline-substeps"`,
 		`class="substep substep-available"`,
 		`class="substep-accordion js-process-substep-panel"`,
 		`data-substep-id="1.1"`,
 		`class="substep-details"`,
-		`class="step-summary-meta"`,
+		`class="stream-step-summary-meta"`,
 		`<span class="status">available</span>`,
 		"Production",
 		"<strong>Organization:</strong>",
@@ -114,7 +114,7 @@ func TestStreamTimelineTemplateRendersOrgLogoFallback(t *testing.T) {
 	if strings.Contains(body, `src="https://example.com/logo.png"`) {
 		t.Fatalf("did not expect org logo img when URL empty, got: %s", body)
 	}
-	if !strings.Contains(body, `class="stream-timeline-step-org-mark"`) {
+	if !strings.Contains(body, `class="stream-step-summary-org-mark"`) {
 		t.Fatalf("expected org mark fallback container, got: %s", body)
 	}
 	if !strings.Contains(body, `class="icon-svg"`) {
@@ -180,7 +180,7 @@ func TestStreamTimelineTemplateUsesSubstepTitleHeadingClass(t *testing.T) {
 	if !strings.Contains(body, `class="substep-title-heading"`) {
 		t.Fatalf("expected substep title heading class, got: %s", body)
 	}
-	if strings.Contains(body, `class="stream-timeline-step-title">Capture batch data`) {
-		t.Fatalf("substep title must not reuse stream-timeline-step-title, got: %s", body)
+	if strings.Contains(body, `class="stream-step-summary-title">Capture batch data`) {
+		t.Fatalf("substep title must not reuse stream-step-summary-title, got: %s", body)
 	}
 }

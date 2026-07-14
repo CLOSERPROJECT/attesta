@@ -40,7 +40,7 @@ type SubstepAttachmentView struct {
 	SHA256       string
 }
 
-// StepSummaryView is the view model for templates/components/step_summary.html.
+// StepSummaryView is the view model for templates/components/stream_step_summary.html.
 type StepSummaryView struct {
 	StepID           string
 	Title            string

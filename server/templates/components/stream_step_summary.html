@@ -1,24 +1,24 @@
 {{/* Step summary: accordion summary content shared by stream_timeline and DPP history. */}}
 
-{{ define "step_summary" }}
-  <div class="stream-timeline-step-summary-main">
+{{ define "stream_step_summary" }}
+  <div class="stream-step-summary-main">
     <span class="pill pill-step-number pill-panel">{{ .StepID }}</span>
     {{ if not .HideOrgMark }}
       {{ if .OrgLogoURL }}
         <img
           src="{{ .OrgLogoURL }}"
           alt=""
-          class="stream-timeline-step-org-mark"
+          class="stream-step-summary-org-mark"
         />
       {{ else }}
-        <span class="stream-timeline-step-org-mark">
+        <span class="stream-step-summary-org-mark">
           {{ template "icon-no-org" . }}
         </span>
       {{ end }}
     {{ end }}
-    <span class="stream-timeline-step-copy">
-      <span class="stream-timeline-step-title">{{ .Title }}</span>
-      <div class="step-summary-meta">
+    <span class="stream-step-summary-copy">
+      <span class="stream-step-summary-title">{{ .Title }}</span>
+      <div class="stream-step-summary-meta">
         <span
           ><strong>Organization:</strong>
           {{ if .OrganizationName }}

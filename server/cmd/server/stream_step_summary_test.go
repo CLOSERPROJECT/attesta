@@ -20,18 +20,18 @@ func TestStepSummaryTemplateRendersExtendedMetadata(t *testing.T) {
 		CompletedAtHuman: "5 Mar 2026 at 14:30 UTC",
 		SubstepCount:     3,
 	}
-	if err := tmpl.ExecuteTemplate(&out, "step_summary", summary); err != nil {
-		t.Fatalf("render step_summary template: %v", err)
+	if err := tmpl.ExecuteTemplate(&out, "stream_step_summary", summary); err != nil {
+		t.Fatalf("render stream_step_summary template: %v", err)
 	}
 	body := out.String()
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, want := range []string{
-		`class="stream-timeline-step-summary-main"`,
-		`class="stream-timeline-step-org-mark"`,
+		`class="stream-step-summary-main"`,
+		`class="stream-step-summary-org-mark"`,
 		`src="https://example.com/logo.png"`,
-		`class="stream-timeline-step-title"`,
-		`class="step-summary-meta"`,
+		`class="stream-step-summary-title"`,
+		`class="stream-step-summary-meta"`,
 		"<strong>Organization:</strong>",
 		"Acme Org",
 		"<strong>Completed at:</strong>",
@@ -57,12 +57,12 @@ func TestStepSummaryTemplateHidesOrgMarkWhenFlagSet(t *testing.T) {
 		OrgLogoURL:       "https://example.com/logo.png",
 		HideOrgMark:      true,
 	}
-	if err := tmpl.ExecuteTemplate(&out, "step_summary", summary); err != nil {
-		t.Fatalf("render step_summary template: %v", err)
+	if err := tmpl.ExecuteTemplate(&out, "stream_step_summary", summary); err != nil {
+		t.Fatalf("render stream_step_summary template: %v", err)
 	}
 	body := out.String()
 
-	if strings.Contains(body, `class="stream-timeline-step-org-mark"`) {
+	if strings.Contains(body, `class="stream-step-summary-org-mark"`) {
 		t.Fatalf("did not expect org mark when HideOrgMark is true, got: %s", body)
 	}
 	if !strings.Contains(body, "Acme Org") {
@@ -78,8 +78,8 @@ func TestStepSummaryTemplateOmitsOptionalFields(t *testing.T) {
 		StepID: "2",
 		Title:  "Review",
 	}
-	if err := tmpl.ExecuteTemplate(&out, "step_summary", summary); err != nil {
-		t.Fatalf("render step_summary template: %v", err)
+	if err := tmpl.ExecuteTemplate(&out, "stream_step_summary", summary); err != nil {
+		t.Fatalf("render stream_step_summary template: %v", err)
 	}
 	body := out.String()
 

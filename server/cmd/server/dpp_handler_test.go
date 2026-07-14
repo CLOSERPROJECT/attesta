@@ -153,7 +153,7 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if strings.Contains(body, ">Documents<") {
 		t.Fatalf("expected Documents section removed from body, got %q", body)
 	}
-	if strings.Contains(body, `class="stream-timeline-step-org-mark"`) {
+	if strings.Contains(body, `class="stream-step-summary-org-mark"`) {
 		t.Fatalf("did not expect org mark on DPP page, got %q", body)
 	}
 }
