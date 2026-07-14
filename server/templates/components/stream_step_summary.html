@@ -35,8 +35,7 @@
         {{ end }}
         {{ if .SubstepCount }}
           <span
-            ><strong>Substeps recorded:</strong> {{ .SubstepCount }}
-            substep{{ if ne .SubstepCount 1 }}s{{ end }}</span
+            ><strong>Substeps:</strong> {{ .SubstepCount }}</span
           >
         {{ end }}
       </div>

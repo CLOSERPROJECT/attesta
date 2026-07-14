@@ -64,7 +64,7 @@ func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
 		"Production",
 		"<strong>Organization:</strong>",
 		"Acme Org",
-		"<strong>Substeps recorded:</strong>",
+		"<strong>Substeps:</strong>",
 		"Capture batch data",
 	} {
 		if !strings.Contains(body, want) {
@@ -154,17 +154,18 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="substep-meta-time"`,
-		`class="substep-meta-actor"`,
-		"Completed at 5 Mar 2026 at 14:30 UTC",
-		"by alice@example.com",
+		`class="substep-meta"`,
+		"<strong>Completed at:</strong>",
+		"5 Mar 2026 at 14:30 UTC",
+		"<strong>Operator:</strong>",
+		"alice@example.com",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in rendered timeline, got: %s", want, body)
 		}
 	}
 	if strings.Contains(body, `class="time"`) || strings.Contains(body, `class="actor"`) {
-		t.Fatalf("expected namespaced meta classes, got: %s", body)
+		t.Fatalf("expected labeled meta markup, got: %s", body)
 	}
 }
 

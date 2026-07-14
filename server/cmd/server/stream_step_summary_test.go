@@ -36,8 +36,8 @@ func TestStepSummaryTemplateRendersExtendedMetadata(t *testing.T) {
 		"Acme Org",
 		"<strong>Completed at:</strong>",
 		"5 Mar 2026 at 14:30 UTC",
-		"<strong>Substeps recorded:</strong>",
-		"3 substeps",
+		"<strong>Substeps:</strong>",
+		"Substeps:</strong> 3",
 		"Production",
 	} {
 		if !strings.Contains(compactBody, want) {
@@ -86,7 +86,7 @@ func TestStepSummaryTemplateOmitsOptionalFields(t *testing.T) {
 	if strings.Contains(body, "Completed at:") {
 		t.Fatalf("did not expect completed-at line, got: %s", body)
 	}
-	if strings.Contains(body, "Substeps recorded:") {
+	if strings.Contains(body, "Substeps:") {
 		t.Fatalf("did not expect substep count line, got: %s", body)
 	}
 	if !strings.Contains(body, "No organization") {

@@ -45,12 +45,12 @@
             {{ if eq .Substep.Status "done" }}
               <div class="substep-meta">
                 {{ if .Substep.DoneAt }}
-                  <span class="substep-meta-time">Completed at {{ .Substep.DoneAt }}</span>
+                  <span
+                    ><strong>Completed at:</strong> {{ .Substep.DoneAt }}</span
+                  >
                 {{ end }}
                 {{ if .Substep.DoneBy }}
-                  <span class="substep-meta-actor">by {{ .Substep.DoneBy }}</span>
-                {{ else }}
-                  <span class="substep-meta-actor">completed</span>
+                  <span><strong>Operator:</strong> {{ .Substep.DoneBy }}</span>
                 {{ end }}
               </div>
             {{ end }}
