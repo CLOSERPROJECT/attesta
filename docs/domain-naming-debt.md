@@ -54,6 +54,7 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 
 - DPP history substep content → `substep_body` (result/message modes) via `stream_timeline_step`
 - Step summaries shared via `stream_step_summary` / `StepSummaryView`
+- Substep summaries shared via `stream_substep_summary` partial
 - Digest copy UI in `substep_body` → `.substep-body-digest-*` (was `.dpp-integrity-hash*` in shared partial)
 
 ### Still open (templates & defines)
@@ -71,8 +72,8 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 
 - `.timeline-*` step chrome → `.stream-timeline-*`
 - `timeline.css` → `components/substep-shell.css`
-- Substep title: `.substep-title-heading` (no longer reuses step title class)
-- Substep meta spans: `.substep-meta-time`, `.substep-meta-actor`
+- Substep title: `.stream-substep-summary-title` (was `.substep-title-heading`)
+- Substep meta spans: `.stream-substep-summary-meta-time`, `.stream-substep-summary-meta-actor` (was `.substep-meta-*`)
 - Removed dead `.data-hash`, `.hash-value`, `.substep-summary-supporting`
 - `.process-page` moved to `pages/process.css`
 

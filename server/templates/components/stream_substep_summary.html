@@ -1,0 +1,22 @@
+{{/* Substep summary: accordion summary content shared by stream_timeline. */}}
+
+{{ define "stream_substep_summary" }}
+  <div class="stream-substep-summary-main">
+    <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+    <div class="stream-substep-summary-copy">
+      <span class="stream-substep-summary-title">{{ .Substep.Title }}</span>
+      {{ if eq .Substep.Status "done" }}
+        <div class="stream-substep-summary-meta">
+          {{ if .Substep.DoneAt }}
+            <span class="stream-substep-summary-meta-time">Completed at {{ .Substep.DoneAt }}</span>
+          {{ end }}
+          {{ if .Substep.DoneBy }}
+            <span class="stream-substep-summary-meta-actor">by {{ .Substep.DoneBy }}</span>
+          {{ else }}
+            <span class="stream-substep-summary-meta-actor">completed</span>
+          {{ end }}
+        </div>
+      {{ end }}
+    </div>
+  </div>
+{{ end }}

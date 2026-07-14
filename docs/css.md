@@ -42,6 +42,7 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 |------|----------------|-----------|
 | `components/page-header.css` | `.page-header-*` | `components/page_header.html` |
 | `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
+| `components/stream-substep-summary.css` | `.stream-substep-summary-*` | `components/stream_substep_summary.html` |
 | `components/stream-step-summary.css` | `.stream-step-summary-*` | `components/stream_step_summary.html` |
 | `components/stream-timeline.css` | `.stream-timeline-list`, `.stream-timeline-step*` | `components/stream_timeline.html` |
 | `components/substep-shell.css` | `.substep*`, override modal | `components/stream_timeline.html`, `substep_override_editor.html` |
@@ -57,10 +58,11 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `pages/home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` | `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| `components/stream_substep_summary.html` | `components/stream-substep-summary.css` | — |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
-| `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
+| `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/stream-substep-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/substep_body.html` | `components/substep-body.css` | `components/forms.css`, `role-palette.css` |
-| `pages/dpp.html` | `pages/dpp.css` | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
+| `pages/dpp.html` | `pages/dpp.css` | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/stream-substep-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `pages/org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
 | `pages/platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
 | `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
