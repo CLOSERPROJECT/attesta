@@ -332,4 +332,9 @@
     top: 0;
     z-index: 10;
   }
+
+  /* When a substep accordion opens, unstick the parent stream-timeline step summary. */
+  .stream-timeline-step[open]:has(.substep-accordion[open]) > .stream-timeline-step-summary {
+    position: static;
+  }
 }
