@@ -21,6 +21,27 @@ svg.bi {
   height: 21px;
 }
 
+.stream-timeline-step-chevron,
+.substep-accordion-chevron {
+  width: 32px;
+  height: 32px;
+  color: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    transform 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+.stream-timeline-step-chevron .icon-svg,
+.substep-accordion-chevron .icon-svg {
+  width: 18px;
+  height: 18px;
+}
+
 .icon-hidden {
   display: none;
 }

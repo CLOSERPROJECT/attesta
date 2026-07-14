@@ -44,7 +44,8 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 | `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
 | `components/stream-step-summary.css` | `.stream-step-summary-*` | `components/stream_step_summary.html` |
 | `components/stream-timeline.css` | `.stream-timeline-list`, `.stream-timeline-step*` | `components/stream_timeline.html` |
-| `components/substep-shell.css` | `.substep*`, override modal | `components/substep_shell.html`, `substep_override_editor.html` |
+| `components/substep-shell.css` | `.substep*`, accordion shell | `components/substep_shell.html` |
+| `components/substep-override.css` | `.substep-override-*`, `.js-open-substep-override` | `substep_override_editor.html` |
 
 Other partials (`icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
 
@@ -66,7 +67,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `pages/platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
 | `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
 | `attachment_carousel.html` | `components/substep-body.css` | — |
-| `substep_override_editor.html` | `components/substep-shell.css` | — |
+| `substep_override_editor.html` | `components/substep-override.css` | — |
 
 ### `data-*` contract (templates → CSS / JS)
 

@@ -30,28 +30,9 @@
   display: none;
 }
 
-.stream-timeline-step-chevron {
-  width: 32px;
-  height: 32px;
-  color: var(--muted-foreground);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition:
-    transform 180ms ease,
-    color 180ms ease,
-    border-color 180ms ease;
-}
-
 .stream-timeline-step[open] .stream-timeline-step-chevron {
   transform: rotate(180deg);
   color: var(--foreground);
-}
-
-.stream-timeline-step-chevron .icon-svg {
-  width: 18px;
-  height: 18px;
 }
 
 .stream-timeline-substeps {
@@ -81,5 +62,10 @@
     top: 0;
     background: var(--card);
     z-index: 10;
+  }
+
+  /* When a substep accordion opens, unstick the parent stream-timeline step summary. */
+  .stream-timeline-step[open]:has(.substep-accordion[open]) > .stream-timeline-step-summary {
+    position: static;
   }
 }
