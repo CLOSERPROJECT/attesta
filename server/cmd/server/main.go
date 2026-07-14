@@ -7002,7 +7002,6 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIn
 			if process != nil {
 				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
 					entry.Status = "done"
-					entry.Description = processStepDescription(progress, sub)
 					if progress.DoneBy != nil {
 						entry.DoneBy = progress.DoneBy.ID
 						entry.DoneRole = progress.DoneBy.Role
@@ -7014,9 +7013,6 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIn
 					}
 					if progress.DoneAt != nil {
 						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
-					}
-					if value, ok := processStepDataValue(progress, sub); ok {
-						entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
 					}
 				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
 					entry.Status = processStatusTerminated

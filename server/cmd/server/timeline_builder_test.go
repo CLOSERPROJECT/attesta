@@ -7,29 +7,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestBuildTimelineFormataDisplay(t *testing.T) {
-	cfg := testRuntimeConfig()
-	process := &Process{
-		ID:        primitive.NewObjectID(),
-		CreatedAt: time.Now().UTC(),
-		Status:    "active",
-		Progress: map[string]ProcessStep{
-			"1.1": {State: "done", Data: map[string]interface{}{"value": 10.0}},
-			"1.2": {State: "done", Data: map[string]interface{}{"note": "batch-1"}},
-		},
-	}
-
-	timeline := buildTimeline(cfg.Workflow, process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
-	if len(timeline) == 0 || len(timeline[0].Substeps) < 2 {
-		t.Fatalf("unexpected timeline shape: %#v", timeline)
-	}
-
-	valueEntry := timeline[0].Substeps[1]
-	if valueEntry.DisplayValue != "map[note:batch-1]" {
-		t.Fatalf("expected formata display value, got %q", valueEntry.DisplayValue)
-	}
-}
-
 func TestBuildTimelineLegacyActorWithoutOrgSlug(t *testing.T) {
 	cfg := testRuntimeConfig()
 	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)

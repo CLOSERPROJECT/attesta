@@ -88,21 +88,16 @@ type SubstepBodyView struct {
 
 // TimelineSubstep is one row in the stream timeline accordion (summary + optional body).
 type TimelineSubstep struct {
-	SubstepID    string
-	Title        string
-	Description  string
-	Selected     bool
-	Body         *SubstepBodyView
-	Palette      string
-	Status       string
-	StatusLabel  string
-	DoneBy       string
-	DoneRole     string
-	DoneAt       string
-	DisplayValue string
-	FileName     string
-	FileSHA256   string
-	FileURL      string
+	SubstepID   string
+	Title       string
+	Selected    bool
+	Body        *SubstepBodyView
+	Palette     string
+	Status      string
+	StatusLabel string
+	DoneBy      string
+	DoneRole    string
+	DoneAt      string
 }
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.

@@ -50,9 +50,15 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 - Builders: `buildSubstepViews`, `buildStreamInstanceDetailView`, etc.
 - Test files: `substep_views_builder_test.go`, `stream_instance_detail_test.go`
 
+### Resolved in DPP / stream_timeline convergence (2026-07-14)
+
+- DPP history substep content → `substep_body` (result/message modes) via `stream_timeline_step`
+- Step summaries shared via `step_summary` / `StepSummaryView`
+- Digest copy UI in `substep_body` → `.substep-body-digest-*` (was `.dpp-integrity-hash*` in shared partial)
+
 ### Still open (templates & defines)
 
-- DPP history: converge on `substep_body` (result/message modes) over time; `dpp-history-*` markup is debt
+- DPP history vertical rail wrapper (`.dpp-history-list`, `.dpp-history-rail`, `.dpp-history-dot`) — page-specific chrome, not substep content debt
 
 **CSS**
 
@@ -68,7 +74,6 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 ## Open items
 
 - Full workflow/process/page renames (`Process` → stream instance, routes, `process.html` filename)
-- DPP history: converge `dpp-history-*` onto `substep_body` partials
 - CSS class prefix: `.timeline-*` → `.stream-timeline-*` (deferred)
 - `SubstepBodyView.Mode` explicit field
 

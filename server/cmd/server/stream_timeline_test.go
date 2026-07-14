@@ -122,7 +122,7 @@ func TestStreamTimelineTemplateRendersOrgLogoFallback(t *testing.T) {
 	}
 }
 
-func TestStreamTimelineTemplateRendersMissingActionMessage(t *testing.T) {
+func TestStreamTimelineTemplateRendersMissingBodyMessage(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := testStreamTimelineView()

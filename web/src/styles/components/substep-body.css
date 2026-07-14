@@ -271,6 +271,36 @@
   color: var(--foreground);
 }
 
+.substep-body-digest-hash {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.substep-body-digest-button {
+  display: none;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+@media (--sm-down) {
+  .substep-body-digest-hash {
+    display: none;
+  }
+
+  .substep-body-digest-button {
+    display: inline;
+  }
+}
+
 @media (--md-down) {
   .substep-body-submitted-values {
     grid-template-columns: 1fr;
