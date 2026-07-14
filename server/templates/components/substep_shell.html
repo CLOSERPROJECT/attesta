@@ -1,0 +1,48 @@
+{{ define "substep_shell" }}
+  <li
+    class="substep{{ if not .HideStatus }} substep-{{ .Substep.Status }}{{ end }}"
+    data-role-palette="{{ .Substep.Palette }}"
+  >
+    <details
+      class="substep-accordion js-process-substep-panel"
+      data-substep-id="{{ .Substep.SubstepID }}"
+      {{ if .Substep.Selected }}open{{ end }}
+    >
+      <summary class="substep-accordion-summary">
+        <div class="substep-summary-main">
+          <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+          <div class="substep-title">
+            <span class="substep-title-heading">{{ .Substep.Title }}</span>
+            {{ if eq .Substep.Status "done" }}
+              <div class="substep-meta">
+                {{ if .Substep.DoneAt }}
+                  <span
+                    ><strong>Completed at:</strong> {{ .Substep.DoneAt }}</span
+                  >
+                {{ end }}
+                {{ if .Substep.DoneBy }}
+                  <span><strong>Operator:</strong> {{ .Substep.DoneBy }}</span>
+                {{ end }}
+              </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ if not .HideStatus }}
+          <span class="status">{{- if .Substep.StatusLabel }}{{ .Substep.StatusLabel }}{{ else }}{{ .Substep.Status }}{{ end -}}</span>
+        {{ end }}
+        <span class="substep-accordion-chevron" aria-hidden="true">
+          {{ template "icon-chevron-down" . }}
+        </span>
+      </summary>
+      <div class="substep-details">
+        {{ with .Substep.Body }}
+          {{ template "substep_body" . }}
+        {{ else }}
+          <p class="muted">
+            No data form configured for this substep.
+          </p>
+        {{ end }}
+      </div>
+    </details>
+  </li>
+{{ end }}
