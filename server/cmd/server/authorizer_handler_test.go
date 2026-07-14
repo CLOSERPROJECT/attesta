@@ -137,8 +137,9 @@ func newServerForCompleteTests(t *testing.T, store *MemoryStore, authorizer Auth
 	store.SeedProcess(process)
 
 	server := &Server{
-		store:      store,
-		tmpl:       testTemplates(),
+		store:   store,
+		process: &ProcessService{store: store, now: func() time.Time { return fixedNow }},
+		tmpl:    testTemplates(),
 		authorizer: authorizer,
 		sse:        newSSEHub(),
 		configProvider: func() (RuntimeConfig, error) {
