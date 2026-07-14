@@ -211,4 +211,26 @@
       {{ template "attachment_carousel" .Attachments }}
     </div>
   {{ end }}
+  {{ if .Digest }}
+    <div class="substep-meta">
+      <span class="data"
+        >digest
+        <code class="dpp-integrity-hash">{{ .Digest }}</code>
+        <button
+          type="button"
+          class="dpp-integrity-hash-button js-copy-text"
+          data-copy-text="{{ .Digest }}"
+          data-copy-label="digest"
+          aria-label="Copy full digest for substep {{ .SubstepID }}"
+          title="{{ .Digest }}"
+        >
+          {{ if gt (len .Digest) 7 }}
+            {{ slice .Digest 0 7 }}
+          {{ else }}
+            {{ .Digest }}
+          {{ end }}
+        </button></span
+      >
+    </div>
+  {{ end }}
 {{ end }}

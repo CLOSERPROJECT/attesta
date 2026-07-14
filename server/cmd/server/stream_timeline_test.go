@@ -11,11 +11,14 @@ func testStreamTimelineView() StreamInstanceDetailView {
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
 		Timeline: []TimelineStep{{
-			StepID:     "1",
-			Title:      "Production",
-			OrgName:    "Acme Org",
-			OrgLogoURL: "https://example.com/logo.png",
-			Expanded:   true,
+			Summary: StepSummaryView{
+				StepID:           "1",
+				Title:            "Production",
+				OrganizationName: "Acme Org",
+				OrgLogoURL:       "https://example.com/logo.png",
+				SubstepCount:     1,
+			},
+			Expanded: true,
 			Substeps: []TimelineSubstep{{
 				SubstepID: "1.1",
 				Title:     "Capture batch data",
@@ -56,9 +59,12 @@ func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
 		`class="substep-accordion js-process-substep-panel"`,
 		`data-substep-id="1.1"`,
 		`class="substep-details"`,
+		`class="step-summary-meta"`,
 		`<span class="status">available</span>`,
 		"Production",
+		"<strong>Organization:</strong>",
 		"Acme Org",
+		"<strong>Substeps recorded:</strong>",
 		"Capture batch data",
 	} {
 		if !strings.Contains(body, want) {
@@ -97,7 +103,7 @@ func TestStreamTimelineTemplateRendersOrgLogoFallback(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := testStreamTimelineView()
-	view.Timeline[0].OrgLogoURL = ""
+	view.Timeline[0].Summary.OrgLogoURL = ""
 
 	var out bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", view); err != nil {

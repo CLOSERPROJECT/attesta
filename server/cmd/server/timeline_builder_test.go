@@ -198,25 +198,25 @@ func TestBuildTimelineUsesOrganizationNameInStep(t *testing.T) {
 	if timeline[0].OrgSlug != "org-acme" {
 		t.Fatalf("timeline org slug = %q, want %q", timeline[0].OrgSlug, "org-acme")
 	}
-	if timeline[0].OrgName != "Acme Org" {
-		t.Fatalf("timeline org name = %q, want %q", timeline[0].OrgName, "Acme Org")
+	if timeline[0].Summary.OrganizationName != "Acme Org" {
+		t.Fatalf("timeline org name = %q, want %q", timeline[0].Summary.OrganizationName, "Acme Org")
 	}
 }
 
 func TestDecorateTimelineOrganizationLogos(t *testing.T) {
 	timeline := []TimelineStep{
-		{StepID: "1", OrgSlug: "org-acme", OrgName: "Acme Org"},
-		{StepID: "2", OrgSlug: "org-beta", OrgName: "Beta Org"},
+		{OrgSlug: "org-acme", Summary: StepSummaryView{StepID: "1", OrganizationName: "Acme Org"}},
+		{OrgSlug: "org-beta", Summary: StepSummaryView{StepID: "2", OrganizationName: "Beta Org"}},
 	}
 
 	decorated := decorateTimelineOrganizationLogos(timeline, map[string]string{
 		"org-acme": "/organization/logo/org-acme",
 	})
 
-	if decorated[0].OrgLogoURL != "/organization/logo/org-acme" {
-		t.Fatalf("first timeline org logo url = %q", decorated[0].OrgLogoURL)
+	if decorated[0].Summary.OrgLogoURL != "/organization/logo/org-acme" {
+		t.Fatalf("first timeline org logo url = %q", decorated[0].Summary.OrgLogoURL)
 	}
-	if decorated[1].OrgLogoURL != "" {
-		t.Fatalf("second timeline org logo url = %q, want empty", decorated[1].OrgLogoURL)
+	if decorated[1].Summary.OrgLogoURL != "" {
+		t.Fatalf("second timeline org logo url = %q, want empty", decorated[1].Summary.OrgLogoURL)
 	}
 }

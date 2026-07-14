@@ -225,17 +225,23 @@ func TestBuildDPPTraceabilityViewIncludesValuesAndFiles(t *testing.T) {
 	for _, step := range view {
 		for _, sub := range step.Substeps {
 			if sub.SubstepID == "1.2" {
-				for _, value := range sub.Values {
+				if sub.Body == nil {
+					t.Fatal("expected substep body for 1.2")
+				}
+				for _, value := range sub.Body.Values {
 					if value.Key == "note" && value.Value == "LOT-2026" {
 						foundValue = true
 					}
 				}
 			}
 			if sub.SubstepID == "1.3" {
-				if len(sub.Attachments) == 1 &&
-					sub.Attachments[0].Filename == "cert.pdf" &&
-					sub.Attachments[0].URL != "" &&
-					sub.Attachments[0].PreviewKind == "document" {
+				if sub.Body == nil {
+					t.Fatal("expected substep body for 1.3")
+				}
+				if len(sub.Body.Attachments) == 1 &&
+					sub.Body.Attachments[0].Filename == "cert.pdf" &&
+					sub.Body.Attachments[0].URL != "" &&
+					sub.Body.Attachments[0].PreviewKind == "document" {
 					foundFile = true
 				}
 			}
@@ -288,20 +294,20 @@ func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
 		t.Fatalf("expected one traceability step, got %#v", view)
 	}
 	step := view[0]
-	if step.OrganizationName != "Acme Org" {
-		t.Fatalf("organization name = %q, want Acme Org", step.OrganizationName)
+	if step.Summary.OrganizationName != "Acme Org" {
+		t.Fatalf("organization name = %q, want Acme Org", step.Summary.OrganizationName)
 	}
-	if step.CompletedAt != "2026-03-05T14:30:00Z" {
-		t.Fatalf("completedAt = %q, want RFC3339", step.CompletedAt)
+	if !step.Summary.HideOrgMark {
+		t.Fatal("expected HideOrgMark on DPP traceability steps")
 	}
-	if step.CompletedAtHuman != "5 Mar 2026 at 14:30 UTC" {
-		t.Fatalf("completedAtHuman = %q, want human-readable time", step.CompletedAtHuman)
+	if step.Summary.CompletedAt != "2026-03-05T14:30:00Z" {
+		t.Fatalf("completedAt = %q, want RFC3339", step.Summary.CompletedAt)
 	}
-	if step.DetailsDialogID != "dpp-step-dialog-1" {
-		t.Fatalf("detailsDialogID = %q, want dpp-step-dialog-1", step.DetailsDialogID)
+	if step.Summary.CompletedAtHuman != "5 Mar 2026 at 14:30 UTC" {
+		t.Fatalf("completedAtHuman = %q, want human-readable time", step.Summary.CompletedAtHuman)
 	}
-	if step.Substeps[0].DoneAtHuman != "5 Mar 2026 at 14:30 UTC" {
-		t.Fatalf("substep DoneAtHuman = %q, want human-readable time", step.Substeps[0].DoneAtHuman)
+	if step.Substeps[0].DoneAt != "5 Mar 2026 at 14:30 UTC" {
+		t.Fatalf("substep DoneAt = %q, want human-readable time", step.Substeps[0].DoneAt)
 	}
 }
 
@@ -349,20 +355,23 @@ func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
 	substep := view[0].Substeps[0]
-	if substep.Role != "Quality" {
-		t.Fatalf("role label = %q, want Quality", substep.Role)
+	if substep.Body == nil {
+		t.Fatal("expected substep body")
+	}
+	if substep.Body.Role != "Quality" {
+		t.Fatalf("role label = %q, want Quality", substep.Body.Role)
 	}
 	if substep.Palette != "blue" {
 		t.Fatalf("expected role palette blue, got %q", substep.Palette)
 	}
-	if len(substep.Values) != 2 {
-		t.Fatalf("expected flattened formata values, got %#v", substep.Values)
+	if len(substep.Body.Values) != 2 {
+		t.Fatalf("expected flattened formata values, got %#v", substep.Body.Values)
 	}
-	if substep.Values[0].Key != "payload.details.status" || substep.Values[0].Value != "ok" {
-		t.Fatalf("unexpected first flattened value: %#v", substep.Values[0])
+	if substep.Body.Values[0].Key != "payload.details.status" || substep.Body.Values[0].Value != "ok" {
+		t.Fatalf("unexpected first flattened value: %#v", substep.Body.Values[0])
 	}
-	if substep.Values[1].Key != "payload.details.weight" || substep.Values[1].Value != "42" {
-		t.Fatalf("unexpected second flattened value: %#v", substep.Values[1])
+	if substep.Body.Values[1].Key != "payload.details.weight" || substep.Body.Values[1].Value != "42" {
+		t.Fatalf("unexpected second flattened value: %#v", substep.Body.Values[1])
 	}
 }
 
@@ -411,25 +420,30 @@ func TestBuildDPPTraceabilityViewFindsNestedAttachments(t *testing.T) {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
 	substep := view[0].Substeps[0]
-	if len(substep.Attachments) != 1 {
-		t.Fatalf("expected one nested attachment, got %#v", substep.Attachments)
+	if substep.Body == nil {
+		t.Fatal("expected substep body")
 	}
-	if substep.Attachments[0].Filename != "proof.pdf" {
-		t.Fatalf("attachment filename = %q, want proof.pdf", substep.Attachments[0].Filename)
+	if len(substep.Body.Attachments) != 1 {
+		t.Fatalf("expected one nested attachment, got %#v", substep.Body.Attachments)
 	}
-	if substep.Attachments[0].URL == "" {
-		t.Fatalf("expected attachment URL, got %#v", substep.Attachments[0])
+	if substep.Body.Attachments[0].Filename != "proof.pdf" {
+		t.Fatalf("attachment filename = %q, want proof.pdf", substep.Body.Attachments[0].Filename)
+	}
+	if substep.Body.Attachments[0].URL == "" {
+		t.Fatalf("expected attachment URL, got %#v", substep.Body.Attachments[0])
 	}
 }
 
 func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
-	traceability := []DPPTraceabilityStep{
+	traceability := []TimelineStep{
 		{
-			Substeps: []DPPTraceabilitySubstep{
+			Substeps: []TimelineSubstep{
 				{
-					Attachments: []SubstepAttachmentView{
-						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
-						{Filename: "legacy.pdf", URL: "/w/workflow/process/p1/attachment/legacy/file"},
+					Body: &SubstepBodyView{
+						Attachments: []SubstepAttachmentView{
+							{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+							{Filename: "legacy.pdf", URL: "/w/workflow/process/p1/attachment/legacy/file"},
+						},
 					},
 				},
 			},
@@ -437,30 +451,32 @@ func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
 	}
 
 	mapped := publicDPPTraceabilityAttachmentURLs(traceability, "/01/09506000134352/10/LOT-001/21/SERIAL-001")
-	attachment := mapped[0].Substeps[0].Attachments[0]
+	attachment := mapped[0].Substeps[0].Body.Attachments[0]
 	if attachment.URL != "/01/09506000134352/10/LOT-001/21/SERIAL-001/attachment/file%201/file" {
 		t.Fatalf("public URL = %q", attachment.URL)
 	}
 	if attachment.PreviewURL != attachment.URL+"?inline=1#page=1&toolbar=0&navpanes=0&view=FitH" {
 		t.Fatalf("preview URL = %q", attachment.PreviewURL)
 	}
-	if got := mapped[0].Substeps[0].Attachments[1].URL; got != "/w/workflow/process/p1/attachment/legacy/file" {
+	if got := mapped[0].Substeps[0].Body.Attachments[1].URL; got != "/w/workflow/process/p1/attachment/legacy/file" {
 		t.Fatalf("attachment without ID URL changed to %q", got)
 	}
 
-	unchanged := publicDPPTraceabilityAttachmentURLs([]DPPTraceabilityStep{
+	unchanged := publicDPPTraceabilityAttachmentURLs([]TimelineStep{
 		{
-			Substeps: []DPPTraceabilitySubstep{
+			Substeps: []TimelineSubstep{
 				{
-					Attachments: []SubstepAttachmentView{
-						{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+					Body: &SubstepBodyView{
+						Attachments: []SubstepAttachmentView{
+							{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+						},
 					},
 				},
 			},
 		},
 	}, " ")
-	if unchanged[0].Substeps[0].Attachments[0].URL != "/w/workflow/process/p1/attachment/file%201/file" {
-		t.Fatalf("blank digital link changed URL to %q", unchanged[0].Substeps[0].Attachments[0].URL)
+	if unchanged[0].Substeps[0].Body.Attachments[0].URL != "/w/workflow/process/p1/attachment/file%201/file" {
+		t.Fatalf("blank digital link changed URL to %q", unchanged[0].Substeps[0].Body.Attachments[0].URL)
 	}
 }
 
@@ -557,11 +573,14 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 		t.Fatalf("unexpected traceability shape: %#v", view)
 	}
 	doneSub := view[0].Substeps[0]
-	if doneSub.Role != "Manager" {
-		t.Fatalf("done role label = %q, want Manager", doneSub.Role)
+	if doneSub.Body == nil {
+		t.Fatal("expected done substep body")
 	}
-	if len(doneSub.RoleBadges) != 1 || doneSub.RoleBadges[0].Label != "Manager" {
-		t.Fatalf("expected selected done role badge, got %#v", doneSub.RoleBadges)
+	if doneSub.Body.Role != "Manager" {
+		t.Fatalf("done role label = %q, want Manager", doneSub.Body.Role)
+	}
+	if len(doneSub.Body.RoleBadges) != 1 || doneSub.Body.RoleBadges[0].Label != "Manager" {
+		t.Fatalf("expected selected done role badge, got %#v", doneSub.Body.RoleBadges)
 	}
 	if doneSub.Palette != "purple" {
 		t.Fatalf("expected selected role palette purple, got %q", doneSub.Palette)
@@ -574,8 +593,8 @@ func TestBuildDPPTraceabilityViewRoleBadgesAndDoneRoleSelection(t *testing.T) {
 	if availableSub.Status != "available" {
 		t.Fatalf("available substep status = %q, want available", availableSub.Status)
 	}
-	if availableSub.Role != "qa" {
-		t.Fatalf("available role label fallback = %q, want qa", availableSub.Role)
+	if availableSub.Body == nil || availableSub.Body.Role != "qa" {
+		t.Fatalf("available role label fallback = %q, want qa", availableSub.Body.Role)
 	}
 
 	lockedSub := view[0].Substeps[2]
@@ -608,19 +627,22 @@ func TestBuildDPPTraceabilityViewTerminatedStreamMessages(t *testing.T) {
 	if terminatedSub.Status != processStatusTerminated {
 		t.Fatalf("terminated substep status = %q, want %s", terminatedSub.Status, processStatusTerminated)
 	}
-	if terminatedSub.Reason != "Stream ended early" {
-		t.Fatalf("terminated reason = %q", terminatedSub.Reason)
+	if terminatedSub.Body == nil {
+		t.Fatal("expected terminated substep body")
 	}
-	if terminatedSub.DetailMessage != "supplier cancelled" {
-		t.Fatalf("terminated detail = %q", terminatedSub.DetailMessage)
+	if terminatedSub.Body.Reason != "Stream ended early" {
+		t.Fatalf("terminated reason = %q", terminatedSub.Body.Reason)
+	}
+	if terminatedSub.Body.DetailMessage != "supplier cancelled" {
+		t.Fatalf("terminated detail = %q", terminatedSub.Body.DetailMessage)
 	}
 
 	skippedSub := view[0].Substeps[2]
 	if skippedSub.Status != "skipped" {
 		t.Fatalf("skipped substep status = %q, want skipped", skippedSub.Status)
 	}
-	if skippedSub.DetailMessage != "Step not completed because the stream was ended before this." {
-		t.Fatalf("skipped detail = %q", skippedSub.DetailMessage)
+	if skippedSub.Body == nil || skippedSub.Body.DetailMessage != "Step not completed because the stream was ended before this." {
+		t.Fatalf("skipped detail = %q", skippedSub.Body.DetailMessage)
 	}
 }
 

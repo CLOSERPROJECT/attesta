@@ -141,14 +141,20 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if !strings.Contains(body, "5 Mar 2026 at 14:30 UTC") {
 		t.Fatalf("expected human-readable completion time in body, got %q", body)
 	}
-	if !strings.Contains(body, `aria-label="Toggle step details"`) {
-		t.Fatalf("expected accordion summary toggle in body, got %q", body)
+	if !strings.Contains(body, `class="timeline-step-summary"`) {
+		t.Fatalf("expected stream timeline step summary in body, got %q", body)
+	}
+	if !strings.Contains(body, `class="dpp-history-item"`) {
+		t.Fatalf("expected dpp history rail wrapper in body, got %q", body)
 	}
 	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(body, "<dd>1</dd>") {
 		t.Fatalf("expected inline traceability value in body, got %q", body)
 	}
 	if strings.Contains(body, ">Documents<") {
 		t.Fatalf("expected Documents section removed from body, got %q", body)
+	}
+	if strings.Contains(body, `class="timeline-step-org-mark"`) {
+		t.Fatalf("did not expect org mark on DPP page, got %q", body)
 	}
 }
 

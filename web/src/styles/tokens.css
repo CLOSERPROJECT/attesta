@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Source+Code+Pro:wght@500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Code+Pro:wght@500&display=swap");
 
 :root {
   color-scheme: light;
@@ -24,6 +24,7 @@
 
   /* Font weights */
   --font-normal: 400;
+  --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
 

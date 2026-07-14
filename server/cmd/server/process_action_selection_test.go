@@ -85,7 +85,6 @@ func TestCloneRequestWithSelectedSubstepHandlesNilURL(t *testing.T) {
 
 func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 	timeline := []TimelineStep{{
-		StepID: "1",
 		Substeps: []TimelineSubstep{
 			{SubstepID: "1.1", Status: "available"},
 			{SubstepID: "1.2", Status: "available"},
@@ -112,7 +111,6 @@ func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 
 func TestDecorateTimelineActionsMapsUnauthorizedAvailableToActive(t *testing.T) {
 	timeline := []TimelineStep{{
-		StepID: "1",
 		Substeps: []TimelineSubstep{
 			{SubstepID: "1.1", Status: "available"},
 		},

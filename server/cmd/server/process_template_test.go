@@ -37,9 +37,11 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 				FormSchema:  `{"type":"object","properties":{"status":{"type":"string"}}}`,
 			},
 			Timeline: []TimelineStep{{
-				StepID:   "1",
-				Title:    "Production",
-				OrgName:  "Acme Org",
+				Summary: StepSummaryView{
+					StepID:           "1",
+					Title:            "Production",
+					OrganizationName: "Acme Org",
+				},
 				Expanded: true,
 				Substeps: []TimelineSubstep{{
 					SubstepID: "1.1",

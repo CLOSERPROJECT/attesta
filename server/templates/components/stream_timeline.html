@@ -14,30 +14,7 @@
     {{ if .Step.Expanded }}open{{ end }}
   >
     <summary class="timeline-step-summary" aria-label="Open stream step">
-      <div class="timeline-step-summary-main">
-        <span class="pill pill-step-number pill-panel">{{ .Step.StepID }}</span>
-        {{ if .Step.OrgLogoURL }}
-          <img
-            src="{{ .Step.OrgLogoURL }}"
-            alt=""
-            class="timeline-step-org-mark"
-          />
-        {{ else }}
-          <span class="timeline-step-org-mark">
-            {{ template "icon-no-org" . }}
-          </span>
-        {{ end }}
-        <span class="timeline-step-copy">
-          <span class="timeline-step-title">{{ .Step.Title }}</span>
-          <span class="timeline-step-org"
-            >{{ if .Step.OrgName }}
-              {{ .Step.OrgName }}
-            {{ else }}
-              No organization
-            {{ end }}</span
-          >
-        </span>
-      </div>
+      {{ template "step_summary" .Step.Summary }}
       <span class="timeline-step-chevron" aria-hidden="true">
         {{ template "icon-chevron-down" . }}
       </span>

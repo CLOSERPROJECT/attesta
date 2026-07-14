@@ -609,7 +609,7 @@ type DPPPageView struct {
 	Serial       string
 	IssuedAt     string
 	Workflow     WorkflowDef
-	Traceability []DPPTraceabilityStep
+	Traceability []TimelineStep
 	Integrity    DPPIntegrityView
 	Export       NotarizedProcessExport
 	Termination  *ProcessTerminationView
@@ -637,45 +637,6 @@ type DPPIntegrityHashView struct {
 type DPPIntegrityLeafView struct {
 	SubstepID string
 	Hash      DPPIntegrityHashView
-}
-
-type DPPTraceabilityStep struct {
-	StepID           string
-	Title            string
-	OrganizationName string
-	CompletedAt      string
-	CompletedAtHuman string
-	DetailsDialogID  string
-	Substeps         []DPPTraceabilitySubstep
-}
-
-type DPPTraceabilitySubstep struct {
-	SubstepID     string
-	Title         string
-	Description   string
-	Role          string
-	RoleBadges    []DPPTraceabilityRoleBadge
-	Palette       string
-	Status        string
-	Reason        string
-	DetailMessage string
-	DoneAt        string
-	DoneAtHuman   string
-	DoneBy        string
-	Digest        string
-	Values        []DPPTraceabilityValue
-	Attachments   []SubstepAttachmentView
-}
-
-type DPPTraceabilityRoleBadge struct {
-	ID      string
-	Label   string
-	Palette string
-}
-
-type DPPTraceabilityValue struct {
-	Key   string
-	Value string
 }
 
 type SubstepOverrideEditorView struct {
@@ -5373,7 +5334,7 @@ func (s *Server) applyDoneByEmailToTermination(ctx context.Context, def Workflow
 	return &mapped
 }
 
-func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
+func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []TimelineStep) []TimelineStep {
 	if len(traceability) == 0 {
 		return traceability
 	}
@@ -5386,6 +5347,9 @@ func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Contex
 			}
 			if strings.TrimSpace(identity.fallbackID) != "" {
 				traceability[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
+				if body := traceability[stepIdx].Substeps[subIdx].Body; body != nil {
+					body.DoneBy = identity.fallbackID
+				}
 			}
 		}
 	}
@@ -5444,6 +5408,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaIndex(r.Context()), cfg.Roles, organizationNameMap(cfg))
+	traceability = decorateTimelineOrganizationLogos(traceability, organizationLogoURLMap(r.Context(), s.identity))
 	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
@@ -5493,14 +5458,18 @@ func (s *Server) handleDigitalLinkDPPAttachment(w http.ResponseWriter, r *http.R
 	s.streamProcessAttachment(w, r, process, attachmentID)
 }
 
-func publicDPPTraceabilityAttachmentURLs(traceability []DPPTraceabilityStep, digitalLink string) []DPPTraceabilityStep {
+func publicDPPTraceabilityAttachmentURLs(traceability []TimelineStep, digitalLink string) []TimelineStep {
 	base := strings.TrimRight(strings.TrimSpace(digitalLink), "/")
 	if base == "" {
 		return traceability
 	}
 	for stepIndex := range traceability {
 		for substepIndex := range traceability[stepIndex].Substeps {
-			attachments := traceability[stepIndex].Substeps[substepIndex].Attachments
+			body := traceability[stepIndex].Substeps[substepIndex].Body
+			if body == nil {
+				continue
+			}
+			attachments := body.Attachments
 			for attachmentIndex := range attachments {
 				attachmentID := strings.TrimSpace(attachments[attachmentIndex].AttachmentID)
 				if attachmentID == "" {
@@ -5510,7 +5479,7 @@ func publicDPPTraceabilityAttachmentURLs(traceability []DPPTraceabilityStep, dig
 				attachments[attachmentIndex].URL = downloadURL
 				attachments[attachmentIndex].PreviewURL = actionAttachmentPreviewURL(downloadURL, attachments[attachmentIndex].PreviewKind)
 			}
-			traceability[stepIndex].Substeps[substepIndex].Attachments = attachments
+			body.Attachments = attachments
 		}
 	}
 	return traceability
@@ -7013,13 +6982,12 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIn
 
 	var timeline []TimelineStep
 	for _, step := range steps {
+		workflowSubsteps := sortedSubsteps(step)
 		row := TimelineStep{
-			StepID:  step.StepID,
-			Title:   step.Title,
 			OrgSlug: strings.TrimSpace(step.OrganizationSlug),
-			OrgName: organizationDisplayName(step.OrganizationSlug, orgNames),
+			Summary: buildStepSummary(step, workflowSubsteps, process, orgNames),
 		}
-		for _, sub := range sortedSubsteps(step) {
+		for _, sub := range workflowSubsteps {
 			allowedRoles := substepRoles(sub)
 			primaryRole := sub.Role
 			if strings.TrimSpace(primaryRole) == "" && len(allowedRoles) > 0 {
@@ -7734,7 +7702,7 @@ func decorateTimelineOrganizationLogos(timeline []TimelineStep, logoURLs map[str
 		return timeline
 	}
 	for stepIndex := range timeline {
-		timeline[stepIndex].OrgLogoURL = strings.TrimSpace(logoURLs[strings.TrimSpace(timeline[stepIndex].OrgSlug)])
+		timeline[stepIndex].Summary.OrgLogoURL = strings.TrimSpace(logoURLs[strings.TrimSpace(timeline[stepIndex].OrgSlug)])
 	}
 	return timeline
 }

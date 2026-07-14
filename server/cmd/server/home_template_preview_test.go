@@ -57,8 +57,10 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			HideStatus: true,
 			Timeline: []TimelineStep{
 				{
-					StepID:   "1",
-					Title:    "Collect",
+					Summary: StepSummaryView{
+						StepID: "1",
+						Title:  "Collect",
+					},
 					Expanded: true,
 					Substeps: []TimelineSubstep{
 						{

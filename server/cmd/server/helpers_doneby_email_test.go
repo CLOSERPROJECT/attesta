@@ -119,7 +119,6 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 	}
 	timeline := []TimelineStep{
 		{
-			StepID: "1",
 			Substeps: []TimelineSubstep{
 				{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
 				{SubstepID: "1.15", DoneBy: "appwrite:user-2"},
@@ -190,13 +189,12 @@ func TestApplyDoneByIdentityFallbackToDPPTraceability(t *testing.T) {
 		},
 	}
 
-	traceability := []DPPTraceabilityStep{
+	traceability := []TimelineStep{
 		{
-			StepID: "1",
-			Substeps: []DPPTraceabilitySubstep{
-				{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
-				{SubstepID: "1.15", DoneBy: "appwrite:user-1"},
-				{SubstepID: "1.2", DoneBy: "legacy-user"},
+			Substeps: []TimelineSubstep{
+				{SubstepID: "1.1", DoneBy: "appwrite:user-1", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
+				{SubstepID: "1.15", DoneBy: "appwrite:user-1", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
+				{SubstepID: "1.2", DoneBy: "legacy-user", Body: &SubstepBodyView{DoneBy: "legacy-user"}},
 			},
 		},
 	}
@@ -225,7 +223,6 @@ func TestApplyDoneByEmailFallsBackToOpaqueActorIDWhenEmailUnavailable(t *testing
 	}
 	actions := []SubstepBodyView{{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"}}
 	timeline := []TimelineStep{{
-		StepID: "1",
 		Substeps: []TimelineSubstep{
 			{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"},
 		},

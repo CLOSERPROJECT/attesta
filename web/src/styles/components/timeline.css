@@ -2,8 +2,7 @@
   min-width: 0;
 }
 
-.substep-accordion-chevron,
-.dpp-accordion-chevron {
+.substep-accordion-chevron {
   width: 32px;
   height: 32px;
   color: var(--muted-foreground);
@@ -17,13 +16,7 @@
     border-color 180ms ease;
 }
 
-.dpp-history-item[open] .dpp-accordion-chevron {
-  transform: rotate(180deg);
-  color: var(--foreground);
-}
-
-.substep-accordion-chevron .icon-svg,
-.dpp-accordion-chevron .icon-svg {
+.substep-accordion-chevron .icon-svg {
   width: 18px;
   height: 18px;
 }

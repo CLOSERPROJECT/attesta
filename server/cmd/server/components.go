@@ -40,6 +40,18 @@ type SubstepAttachmentView struct {
 	SHA256       string
 }
 
+// StepSummaryView is the view model for templates/components/step_summary.html.
+type StepSummaryView struct {
+	StepID           string
+	Title            string
+	OrganizationName string
+	OrgLogoURL       string
+	HideOrgMark      bool
+	CompletedAt      string
+	CompletedAtHuman string
+	SubstepCount     int
+}
+
 // SubstepBodyView is the view model for templates/components/substep_body.html.
 type SubstepBodyView struct {
 	WorkflowKey    string
@@ -71,6 +83,7 @@ type SubstepBodyView struct {
 	FormataArchURL string
 	OverrideReason string
 	HasOverride    bool
+	Digest         string
 }
 
 // TimelineSubstep is one row in the stream timeline accordion (summary + optional body).
@@ -94,13 +107,10 @@ type TimelineSubstep struct {
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.
 type TimelineStep struct {
-	StepID     string
-	Title      string
-	OrgSlug    string
-	OrgName    string
-	OrgLogoURL string
-	Expanded   bool
-	Substeps   []TimelineSubstep
+	Summary  StepSummaryView
+	OrgSlug  string
+	Expanded bool
+	Substeps []TimelineSubstep
 }
 
 // StreamInstanceDetailView is the HTMX/SSE partial payload for stream instance detail content.

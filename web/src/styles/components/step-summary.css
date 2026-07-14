@@ -1,0 +1,13 @@
+.step-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+.step-summary-meta strong {
+  color: inherit;
+  font-weight: var(--font-medium);
+}
