@@ -67,6 +67,15 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 - `actions.css` → `components/substep-body.css`
 - `.action-*` classes → `.substep-body-*` (carousel root: `.substep-body-attachments-carousel`)
 
+### Resolved in stream-timeline CSS alignment (2026-07-14)
+
+- `.timeline-*` step chrome → `.stream-timeline-*`
+- `timeline.css` → `components/substep-shell.css`
+- Substep title: `.substep-title-heading` (no longer reuses step title class)
+- Substep meta spans: `.substep-meta-time`, `.substep-meta-actor`
+- Removed dead `.data-hash`, `.hash-value`, `.substep-summary-supporting`
+- `.process-page` moved to `pages/process.css`
+
 **Docs**
 - AGENTS.md "action cards" → substep summary / substep body
 - `docs/css.md` index entries
@@ -74,7 +83,6 @@ Running log from the UI refactor vocabulary session (2026-07-13). Canonical term
 ## Open items
 
 - Full workflow/process/page renames (`Process` → stream instance, routes, `process.html` filename)
-- CSS class prefix: `.timeline-*` → `.stream-timeline-*` (deferred)
 - `SubstepBodyView.Mode` explicit field
 
 ## Resolved in session

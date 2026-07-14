@@ -16,7 +16,7 @@ Styles load in this order from `web/src/styles.css`:
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
-| Components | `components.css` | Barrel importing `components/*.css` (timeline, stream-timeline, forms, org-admin, stream, shared) |
+| Components | `components.css` | Barrel importing `components/*.css` (substep-shell, stream-timeline, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
 **Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
@@ -43,7 +43,8 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 | `components/page-header.css` | `.page-header-*` | `components/page_header.html` |
 | `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
 | `components/step-summary.css` | `.step-summary-meta` | `components/step_summary.html` |
-| `components/stream-timeline.css` | `.timeline-list`, `.timeline-step*` | `components/stream_timeline.html`, `components/step_summary.html` |
+| `components/stream-timeline.css` | `.stream-timeline-list`, `.stream-timeline-step*` | `components/stream_timeline.html`, `components/step_summary.html` |
+| `components/substep-shell.css` | `.substep*`, override modal | `components/stream_timeline.html`, `substep_override_editor.html` |
 
 Other partials (`icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
 
@@ -55,16 +56,16 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `components/page_header.html` | `components/page-header.css` | — |
 | `pages/home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
-| `pages/process.html` | `pages/process.css` | `components/timeline.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| `pages/process.html` | `pages/process.css` | `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/step_summary.html` | `components/step-summary.css`, `components/stream-timeline.css` | — |
-| `components/stream_timeline.html` | `components/stream-timeline.css` | `components/step-summary.css`, `components/timeline.css`, `components/substep-body.css`, `role-palette.css` |
+| `components/stream_timeline.html` | `components/stream-timeline.css` | `components/step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/substep_body.html` | `components/substep-body.css` | `components/forms.css`, `role-palette.css` |
-| `pages/dpp.html` | `pages/dpp.css` | `components/stream-timeline.css`, `components/step-summary.css`, `components/timeline.css`, `components/substep-body.css`, `role-palette.css` |
+| `pages/dpp.html` | `pages/dpp.css` | `components/stream-timeline.css`, `components/step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `pages/org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
 | `pages/platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
 | `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
 | `attachment_carousel.html` | `components/substep-body.css` | — |
-| `substep_override_editor.html` | `components/timeline.css` | — |
+| `substep_override_editor.html` | `components/substep-shell.css` | — |
 
 ### `data-*` contract (templates → CSS / JS)
 
