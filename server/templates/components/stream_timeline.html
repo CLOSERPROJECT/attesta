@@ -41,16 +41,16 @@
         <div class="substep-summary-main">
           <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
           <div class="substep-title">
-            <span class="timeline-step-title">{{ .Substep.Title }}</span>
+            <span class="substep-title-heading">{{ .Substep.Title }}</span>
             {{ if eq .Substep.Status "done" }}
               <div class="substep-meta">
                 {{ if .Substep.DoneAt }}
-                  <span class="time">Completed at {{ .Substep.DoneAt }}</span>
+                  <span class="substep-meta-time">Completed at {{ .Substep.DoneAt }}</span>
                 {{ end }}
                 {{ if .Substep.DoneBy }}
-                  <span class="actor">by {{ .Substep.DoneBy }}</span>
+                  <span class="substep-meta-actor">by {{ .Substep.DoneBy }}</span>
                 {{ else }}
-                  <span class="actor">completed</span>
+                  <span class="substep-meta-actor">completed</span>
                 {{ end }}
               </div>
             {{ end }}

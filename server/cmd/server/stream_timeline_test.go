@@ -138,3 +138,49 @@ func TestStreamTimelineTemplateRendersMissingBodyMessage(t *testing.T) {
 		t.Fatalf("expected missing-action fallback copy, got: %s", body)
 	}
 }
+
+func TestStreamTimelineTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := testStreamTimelineView()
+	view.Timeline[0].Substeps[0].Status = "done"
+	view.Timeline[0].Substeps[0].DoneAt = "5 Mar 2026 at 14:30 UTC"
+	view.Timeline[0].Substeps[0].DoneBy = "alice@example.com"
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", view); err != nil {
+		t.Fatalf("render stream_timeline template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`class="substep-meta-time"`,
+		`class="substep-meta-actor"`,
+		"Completed at 5 Mar 2026 at 14:30 UTC",
+		"by alice@example.com",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in rendered timeline, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `class="time"`) || strings.Contains(body, `class="actor"`) {
+		t.Fatalf("expected namespaced meta classes, got: %s", body)
+	}
+}
+
+func TestStreamTimelineTemplateUsesSubstepTitleHeadingClass(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "stream_timeline", testStreamTimelineView()); err != nil {
+		t.Fatalf("render stream_timeline template: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, `class="substep-title-heading"`) {
+		t.Fatalf("expected substep title heading class, got: %s", body)
+	}
+	if strings.Contains(body, `class="timeline-step-title">Capture batch data`) {
+		t.Fatalf("substep title must not reuse timeline-step-title, got: %s", body)
+	}
+}

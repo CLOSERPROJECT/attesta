@@ -123,6 +123,14 @@
   gap: var(--space-1);
 }
 
+.substep-title-heading {
+  font-size: var(--text-base);
+  line-height: 1.2;
+  font-weight: var(--font-bold);
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
 .substep-accordion-summary .status {
   margin-left: auto;
   font-weight: 600;
