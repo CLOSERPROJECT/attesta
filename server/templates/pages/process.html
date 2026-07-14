@@ -6,7 +6,7 @@
     class="process-page stack u-max-w-7xl u-mx-auto"
     data-process-id="{{ .ProcessID }}"
     data-workflow-key="{{ .WorkflowKey }}"
-    data-selected-substep="{{ .ActionList.SelectedSubstepID }}"
+    data-selected-substep="{{ .Detail.SelectedSubstepID }}"
   >
     <div id="process-page-content">
       {{ template "process_content.html" . }}
@@ -15,21 +15,21 @@
 {{ end }}
 
 {{ define "process_content.html" }}
-  {{ template "error_banner.html" .ActionList }}
+  {{ template "error_banner.html" .Detail }}
   <div class="stack">
     {{ template "page_header" .Header }}
-    {{ if .ActionList.ProcessDone }}
+    {{ if .Detail.ProcessDone }}
       <div class="process-resources-grid">
-        {{ template "workflow_timeline" .ActionList }}
+        {{ template "stream_timeline" .Detail.StreamTimeline }}
         <div class="stack layout-stack-separator u-gap-4">
-          {{ template "process_termination_details" .ActionList }}
+          {{ template "process_termination_details" .Detail }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}
         </div>
       </div>
     {{ else }}
-      {{ template "workflow_timeline" .ActionList }}
-      {{ if .ActionList.CanTerminate }}
+      {{ template "stream_timeline" .Detail.StreamTimeline }}
+      {{ if .Detail.CanTerminate }}
         <div class="manage-dialog-actions manage-dialog-actions-end">
           <button
             type="button"
@@ -48,7 +48,7 @@
                 </h3>
                 <p class="manage-dialog-subtitle">
                   Available substep
-                  {{ .ActionList.TerminateSubstep }}
+                  {{ .Detail.TerminateSubstep }}
                 </p>
               </div>
               <button
@@ -61,22 +61,22 @@
             </header>
             <form
               method="post"
-              action="{{ .ActionList.TerminateAction }}"
+              action="{{ .Detail.TerminateAction }}"
               class="input-form"
             >
-              {{ if .ActionList.TerminateRoles }}
-                {{ if eq (len .ActionList.TerminateRoles) 1 }}
+              {{ if .Detail.TerminateRoles }}
+                {{ if eq (len .Detail.TerminateRoles) 1 }}
                   <input
                     type="hidden"
                     name="activeRole"
-                    value="{{ (index .ActionList.TerminateRoles 0).Slug }}"
+                    value="{{ (index .Detail.TerminateRoles 0).Slug }}"
                   />
                 {{ else }}
                   <label>
                     <span>End stream as</span>
                     <select name="activeRole" required>
                       <option value="">Select role</option>
-                      {{ range .ActionList.TerminateRoles }}
+                      {{ range .Detail.TerminateRoles }}
                         <option value="{{ .Slug }}">{{ .Label }}</option>
                       {{ end }}
                     </select>
@@ -199,7 +199,7 @@
         </p>
       </div>
       {{ if .Termination.Reason }}
-        <dl class="action-submitted-values">
+        <dl class="substep-body-submitted-values">
           <dt>Reason</dt>
           <dd>{{ .Termination.Reason }}</dd>
         </dl>
@@ -212,103 +212,4 @@
 
 {{ define "process.html" }}
   {{ template "layout.html" . }}
-{{ end }}
-
-{{ define "workflow_timeline" }}
-  <div class="timeline-list">
-    {{ range .Timeline }}
-      <details
-        class="timeline-step"
-        {{ if .Expanded }}open{{ end }}
-      >
-        <summary class="timeline-step-summary" aria-label="Open stream step">
-          <div class="timeline-step-summary-main">
-            <span class="pill pill-step-number pill-panel">{{ .StepID }}</span>
-            {{ if .OrgLogoURL }}
-              <img
-                src="{{ .OrgLogoURL }}"
-                alt=""
-                class="timeline-step-org-mark"
-              />
-            {{ else }}
-              <span class="timeline-step-org-mark">
-                {{ template "icon-no-org" . }}
-              </span>
-            {{ end }}
-            <span class="timeline-step-copy">
-              <span class="timeline-step-title">{{ .Title }}</span>
-              <span class="timeline-step-org"
-                >{{ if .OrgName }}
-                  {{ .OrgName }}
-                {{ else }}
-                  No organization
-                {{ end }}</span
-              >
-            </span>
-          </div>
-          <span class="timeline-step-chevron" aria-hidden="true">
-            {{ template "icon-chevron-down" . }}
-          </span>
-        </summary>
-        <ul class="timeline-substeps">
-          {{ range .Substeps }}
-            <li
-              class="substep{{ if not $.HideStatus }}
-                substep-{{ .Status }}
-              {{ end }}"
-              data-role-palette="{{ .Palette }}"
-            >
-              <details
-                class="substep-accordion js-process-substep-panel"
-                data-substep-id="{{ .SubstepID }}"
-                {{ if .Selected }}open{{ end }}
-              >
-                <summary class="substep-accordion-summary">
-                  <div class="substep-summary-main">
-                    <span class="pill pill-panel">{{ .SubstepID }}</span>
-                    <div class="substep-title">
-                      <span class="timeline-step-title">{{ .Title }}</span>
-                      {{ if eq .Status "done" }}
-                        <div class="substep-meta">
-                          {{ if .DoneAt }}
-                            <span class="time">Completed at {{ .DoneAt }}</span>
-                          {{ end }}
-                          {{ if .DoneBy }}
-                            <span class="actor">by {{ .DoneBy }}</span>
-                          {{ else }}
-                            <span class="actor">completed</span>
-                          {{ end }}
-                        </div>
-                      {{ end }}
-                    </div>
-                  </div>
-                  {{ if not $.HideStatus }}
-                    <span class="status">
-                      {{ if .StatusLabel }}
-                        {{ .StatusLabel }}
-                      {{ else }}
-                        {{ .Status }}
-                      {{ end }}
-                    </span>
-                  {{ end }}
-                  <span class="substep-accordion-chevron" aria-hidden="true">
-                    {{ template "icon-chevron-down" . }}
-                  </span>
-                </summary>
-                <div class="substep-details">
-                  {{ with .Action }}
-                    {{ template "action_detail_content.html" . }}
-                  {{ else }}
-                    <p class="muted">
-                      No data form configured for this substep.
-                    </p>
-                  {{ end }}
-                </div>
-              </details>
-            </li>
-          {{ end }}
-        </ul>
-      </details>
-    {{ end }}
-  </div>
 {{ end }}

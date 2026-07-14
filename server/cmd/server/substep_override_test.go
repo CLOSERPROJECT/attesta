@@ -164,7 +164,7 @@ func TestSubstepOverrideEffectiveSchemaAndCanonicalWorkflowUnchanged(t *testing.
 	process, _ := store.SnapshotProcess(id)
 	process.Progress = normalizeProgressKeys(process.Progress)
 	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
-	actions := buildActionList(cfg.Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(cfg.Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	if len(actions) == 0 || !strings.Contains(actions[0].FormSchema, "local") {
 		t.Fatalf("effective form schema = %q", actions[0].FormSchema)
 	}
@@ -173,7 +173,7 @@ func TestSubstepOverrideEffectiveSchemaAndCanonicalWorkflowUnchanged(t *testing.
 	}
 }
 
-func TestCompletedActionViewExposesLocalAdaptationReason(t *testing.T) {
+func TestCompletedSubstepBodyViewExposesLocalAdaptationReason(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 	saveSubstepOverrideForTest(t, server, processID, "1.1", `{"type":"object"}`, `{}`, "missing field in source system")
@@ -184,7 +184,7 @@ func TestCompletedActionViewExposesLocalAdaptationReason(t *testing.T) {
 	process, _ = store.SnapshotProcess(id)
 	process.Progress = normalizeProgressKeys(process.Progress)
 	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
-	actions := buildActionList(testFormataRuntimeConfig().Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(testFormataRuntimeConfig().Workflow, &process, "workflow", Actor{ID: "u1", Role: "dep1", RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	if !actions[0].HasOverride || !strings.Contains(actions[0].Reason, "missing field") {
 		t.Fatalf("adaptation reason not exposed: %#v", actions[0])
 	}
@@ -278,8 +278,12 @@ func TestTraceabilityAndExportExposeLocalAdaptation(t *testing.T) {
 	process.Overrides = normalizeSubstepOverrideKeys(process.Overrides)
 
 	trace := buildDPPTraceabilityView(testFormataRuntimeConfig().Workflow, &process, "workflow", map[roleMetaKey]RoleMeta{}, nil, nil)
-	if trace[0].Substeps[0].Reason != "Completed with local form adaptation." || trace[0].Substeps[0].DetailMessage != "Completed with local form adaptation. Reason: local source shape" {
-		t.Fatalf("trace adaptation fields = %#v", trace[0].Substeps[0])
+	body := trace[0].Substeps[0].Body
+	if body == nil || !body.HasOverride || body.OverrideReason != "local source shape" {
+		t.Fatalf("trace adaptation fields = %#v", body)
+	}
+	if body.DetailMessage != "" {
+		t.Fatalf("override trace should not use DetailMessage, got %q", body.DetailMessage)
 	}
 	export := buildNotarizedExport(testFormataRuntimeConfig().Workflow, &process)
 	if export.Steps[0].Substeps[0].LocalAdaptationReason != "local source shape" {

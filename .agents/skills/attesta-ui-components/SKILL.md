@@ -31,7 +31,7 @@ Migrate **one component at a time**. Do not move every partial in one pass.
 |-------|-------------------|------------|------------------|
 | Templates | `server/templates/components/{name}.html` | `server/templates/pages/{name}.html` | `server/templates/{name}.html` (root) |
 | CSS | `web/src/styles/components/{name}.css` | `web/src/styles/pages/{name}.css` | cluster files at `components/` |
-| Go view structs | `server/cmd/server/components.go` | page structs stay in `main.go` until peeled | — |
+| Go view structs | `server/cmd/server/components.go` | handlers and page structs mostly in `main.go` | peeled view assembly: `stream_instance_detail.go`, `substep_views_builder.go`, `timeline_builder.go` |
 
 `layout.html` stays at `server/templates/layout.html`.
 
@@ -49,7 +49,7 @@ Separate **reused** styles (`components/`) from **page-specific** styles (`pages
 - All shared component view DTOs in **one** `components.go` file.
 - **No** fluent `With*` methods on simple DTOs; use struct literals at call sites.
 - **No** page-specific preset functions in shared component code (e.g. no `streamPageHeader()`).
-- Extract a constructor only when there is real logic (validation, computed fields); page-specific constructors belong in future `page_*.go`, not `components.go`.
+- Extract a constructor only when there is real logic (validation, computed fields); page-specific constructors belong in peeled files (`stream_instance_detail.go`, `substep_views_builder.go`, …) or future `page_*.go`, not `components.go`.
 - Split a type out of `components.go` only when it grows non-trivial logic or large isolated tests (~80–100+ lines).
 
 Example:
@@ -69,7 +69,7 @@ Header: PageHeaderView{
 
 Globs: `templates/*.html`, `templates/pages/*.html`, `templates/components/*.html`.
 
-## Reference implementation
+## Reference implementations
 
 `page_header` — first migrated component:
 
@@ -77,6 +77,12 @@ Globs: `templates/*.html`, `templates/pages/*.html`, `templates/components/*.htm
 - `web/src/styles/components/page-header.css`
 - `PageHeaderView` in `server/cmd/server/components.go`
 - Tests: `server/cmd/server/page_header_test.go`
+
+Also see:
+
+- `substep_shell` — accordion chrome wrapping `substep_body` (`components/substep_shell.html`, `substep-shell.css`)
+- `substep_body` — inner panel with explicit `SubstepBodyView.Mode` dispatch
+- `dpp_history_step` — DPP traceability rail wrapper around `stream_timeline_step`
 
 ## Docs and verification
 
@@ -93,6 +99,6 @@ task css:lint
 
 ## Out of scope (for now)
 
-- Peeling `page_*.go` from `main.go` (Phase 3)
+- Further peeling of `page_*.go` from `main.go`
 - `ErrorBannerView` until a handler passes it
 - Renaming legacy partial defines (`action_detail_content.html`, `role-palette-options`, …) — align when each partial is migrated

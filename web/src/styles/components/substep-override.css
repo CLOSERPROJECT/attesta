@@ -1,0 +1,69 @@
+.substep-override-modal {
+  width: calc(100vw - 32px);
+  height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--foreground);
+  overflow: hidden;
+}
+
+.substep-override-modal::backdrop {
+  background: var(--backdrop-fullscreen);
+}
+
+.substep-override-editor,
+.substep-override-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-5);
+  box-sizing: border-box;
+}
+
+.substep-override-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.substep-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  line-height: var(--leading-none);
+}
+
+.substep-override-reason {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.substep-override-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+}
+
+.js-open-substep-override {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--primary);
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.js-open-substep-override:hover {
+  text-decoration: underline;
+}

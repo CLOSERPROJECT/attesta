@@ -203,126 +203,139 @@ func gs1ElementString(gtin, lot, serial string) string {
 	return fmt.Sprintf("(01)%s(10)%s(21)%s", trimmedGTIN, trimmedLot, trimmedSerial)
 }
 
-func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []DPPTraceabilityStep {
-	steps := make([]DPPTraceabilityStep, 0, len(def.Steps))
-	if process == nil {
-		return steps
-	}
-	substepOrgs := substepOrganizationMap(def)
-	availableMap := computeAvailability(def, process)
-	terminated := process.Termination != nil
-	terminationSubstepID := ""
-	terminationReason := ""
-	if terminated {
-		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
-		terminationReason = strings.TrimSpace(process.Termination.Reason)
-	}
-	pastTermination := false
-	for _, step := range sortedSteps(def) {
-		stepView := DPPTraceabilityStep{
-			StepID:           step.StepID,
-			Title:            step.Title,
-			OrganizationName: organizationDisplayName(step.OrganizationSlug, orgNames),
-			DetailsDialogID:  "dpp-step-dialog-" + dppDialogIDFragment(step.StepID),
+func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []TimelineStep {
+	return buildTimelineSteps(def, process, orgNames, workflowKey, roleIndex, cfgRoles, timelineStepsOptions{
+		emptyIfNilProcess: true,
+		decorateStep: func(row *TimelineStep) {
+			row.Summary.HideOrgMark = true
+		},
+		buildSubstep: buildDPPTraceabilitySubstep,
+	})
+}
+
+func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubstep {
+	sub := ctx.sub
+	process := ctx.process
+	state := ctx.state
+	status := ctx.status
+
+	var override *SubstepOverride
+	if process != nil {
+		if item, ok := process.Overrides[sub.SubstepID]; ok {
+			itemCopy := item
+			override = &itemCopy
 		}
-		allDone := len(step.Substep) > 0
-		var latestDoneAt time.Time
-		for _, sub := range sortedSubsteps(step) {
-			allowedRoles := substepRoles(sub)
-			primaryRole := strings.TrimSpace(sub.Role)
-			if primaryRole == "" && len(allowedRoles) > 0 {
-				primaryRole = strings.TrimSpace(allowedRoles[0])
-			}
-			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], primaryRole, roleIndex, cfgRoles)
-			roleLabel := strings.TrimSpace(meta.Label)
-			if roleLabel == "" {
-				roleLabel = primaryRole
-			}
-			roleBadges := make([]DPPTraceabilityRoleBadge, 0, len(allowedRoles))
-			for _, role := range allowedRoles {
-				roleStyle := roleMetaForOrg(substepOrgs[sub.SubstepID], role, roleIndex, cfgRoles)
-				roleBadges = append(roleBadges, DPPTraceabilityRoleBadge{
-					ID:      role,
-					Label:   roleStyle.Label,
-					Palette: roleStyle.Palette,
-				})
-			}
-			subView := DPPTraceabilitySubstep{
-				SubstepID:  sub.SubstepID,
-				Title:      sub.Title,
-				Role:       roleLabel,
-				RoleBadges: roleBadges,
-				Palette:    meta.Palette,
-				Status:     "locked",
-			}
-			progress, done := process.Progress[sub.SubstepID]
-			if done && progress.State == "done" {
-				subView.Status = "done"
-				if override, ok := process.Overrides[sub.SubstepID]; ok && strings.TrimSpace(override.SubstepID) != "" {
-					subView.Reason = "Completed with local form adaptation."
-					subView.DetailMessage = subView.Reason
-					if strings.TrimSpace(override.Reason) != "" {
-						subView.DetailMessage += " Reason: " + strings.TrimSpace(override.Reason)
-					}
-				}
-				if progress.DoneAt != nil {
-					subView.DoneAt = progress.DoneAt.UTC().Format(time.RFC3339)
-					subView.DoneAtHuman = humanReadableTraceabilityTime(*progress.DoneAt)
-					if progress.DoneAt.After(latestDoneAt) {
-						latestDoneAt = *progress.DoneAt
-					}
-				}
-				if progress.DoneBy != nil {
-					subView.DoneBy = progress.DoneBy.ID
-					doneRole := strings.TrimSpace(progress.DoneBy.Role)
-					if doneRole != "" {
-						selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], doneRole, roleIndex, cfgRoles)
-						subView.Role = selectedMeta.Label
-						subView.RoleBadges = []DPPTraceabilityRoleBadge{
-							{
-								ID:      doneRole,
-								Label:   selectedMeta.Label,
-								Palette: selectedMeta.Palette,
-							},
-						}
-						subView.Palette = selectedMeta.Palette
-					}
-				}
-				subView.Digest = digestPayload(progress.Data)
-				subView.Description = processStepDescription(progress, sub)
-				subView.Values = dppTraceValues(sub, progress)
-				subView.Attachments = buildActionAttachments(workflowKey, process, progress.Data)
-			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				subView.Status = processStatusTerminated
-				subView.Reason = "Stream ended early"
-				subView.DetailMessage = terminationReason
-				if subView.DetailMessage == "" {
-					subView.DetailMessage = "No reason provided."
-				}
-				allDone = false
-			} else if terminated && (pastTermination || terminationSubstepID == "") {
-				subView.Status = "skipped"
-				subView.Reason = "Stream ended early"
-				subView.DetailMessage = "Step not completed because the stream was ended before this."
-				allDone = false
-			} else if availableMap[sub.SubstepID] {
-				subView.Status = "available"
-				allDone = false
-			} else {
-				allDone = false
-			}
-			stepView.Substeps = append(stepView.Substeps, subView)
-			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				pastTermination = true
+	}
+	effective := effectiveSubstep(sub, override)
+	allowedRoles := substepRoles(sub)
+	primaryRole := strings.TrimSpace(sub.Role)
+	if primaryRole == "" && len(allowedRoles) > 0 {
+		primaryRole = strings.TrimSpace(allowedRoles[0])
+	}
+	meta := roleMetaForOrg(state.substepOrgs[sub.SubstepID], primaryRole, ctx.roleIndex, ctx.cfgRoles)
+	roleLabel := strings.TrimSpace(meta.Label)
+	if roleLabel == "" {
+		roleLabel = primaryRole
+	}
+	roleBadges := make([]SubstepRoleBadge, 0, len(allowedRoles))
+	for _, role := range allowedRoles {
+		roleStyle := roleMetaForOrg(state.substepOrgs[sub.SubstepID], role, ctx.roleIndex, ctx.cfgRoles)
+		roleBadges = append(roleBadges, SubstepRoleBadge{
+			ID:      role,
+			Label:   roleStyle.Label,
+			Palette: roleStyle.Palette,
+		})
+	}
+	detailMessage := ""
+	reason := ""
+	doneAtHuman := ""
+	doneBy := ""
+	palette := meta.Palette
+	var values []SubstepKV
+	var attachments []SubstepAttachmentView
+	digest := ""
+
+	hasOverride := override != nil && strings.TrimSpace(override.SubstepID) != ""
+	overrideReason := ""
+	if hasOverride {
+		overrideReason = strings.TrimSpace(override.Reason)
+	}
+
+	switch status {
+	case "done":
+		progress := process.Progress[sub.SubstepID]
+		if hasOverride {
+			reason = "Completed with local form adaptation."
+			if overrideReason != "" {
+				reason += "\nReason: " + overrideReason
 			}
 		}
-		if allDone && !latestDoneAt.IsZero() {
-			stepView.CompletedAt = latestDoneAt.UTC().Format(time.RFC3339)
-			stepView.CompletedAtHuman = humanReadableTraceabilityTime(latestDoneAt)
+		if progress.DoneAt != nil {
+			doneAtHuman = humanReadableTraceabilityTime(*progress.DoneAt)
 		}
-		steps = append(steps, stepView)
+		if progress.DoneBy != nil {
+			doneBy = progress.DoneBy.ID
+			doneRole := strings.TrimSpace(progress.DoneBy.Role)
+			if doneRole != "" {
+				selectedMeta := roleMetaForOrg(state.substepOrgs[sub.SubstepID], doneRole, ctx.roleIndex, ctx.cfgRoles)
+				roleLabel = selectedMeta.Label
+				roleBadges = []SubstepRoleBadge{{
+					ID:      doneRole,
+					Label:   selectedMeta.Label,
+					Palette: selectedMeta.Palette,
+				}}
+				palette = selectedMeta.Palette
+			}
+		}
+		digest = digestPayload(progress.Data)
+		values = dppTraceValues(sub, progress)
+		attachments = buildSubstepAttachments(ctx.workflowKey, process, progress.Data)
+	case processStatusTerminated:
+		reason = "Stream ended early"
+		detailMessage = state.terminationReason
+		if detailMessage == "" {
+			detailMessage = "No reason provided."
+		}
+	case "skipped":
+		reason = "Stream ended early"
+		detailMessage = "Step not completed because the stream was ended before this."
 	}
-	return steps
+
+	processID := ""
+	if process != nil {
+		processID = process.ID.Hex()
+	}
+	body := withSubstepBodyMode(SubstepBodyView{
+		WorkflowKey:    ctx.workflowKey,
+		ProcessID:      processID,
+		SubstepID:      sub.SubstepID,
+		Title:          sub.Title,
+		Role:           roleLabel,
+		RoleBadges:     roleBadges,
+		Palette:        palette,
+		InputKey:       sub.InputKey,
+		InputType:      sub.InputType,
+		FormSchema:     marshalJSONCompact(effective.Schema),
+		FormUISchema:   marshalJSONCompact(effective.UISchema),
+		Status:         status,
+		DoneAt:         doneAtHuman,
+		DoneBy:         doneBy,
+		Values:         values,
+		Attachments:    attachments,
+		ReadOnly:       true,
+		Disabled:       true,
+		Reason:         reason,
+		DetailMessage:  detailMessage,
+		HasOverride:    hasOverride,
+		OverrideReason: overrideReason,
+		Digest:         digest,
+	})
+	return TimelineSubstep{
+		SubstepID: sub.SubstepID,
+		Title:     sub.Title,
+		Selected:  false,
+		Body:      &body,
+	}
 }
 
 func humanReadableTraceabilityTime(value time.Time) string {
@@ -332,46 +345,13 @@ func humanReadableTraceabilityTime(value time.Time) string {
 	return value.UTC().Format("2 Jan 2006 at 15:04 MST")
 }
 
-func dppDialogIDFragment(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "step"
-	}
-	var builder strings.Builder
-	builder.Grow(len(value))
-	lastDash := false
-	for _, r := range value {
-		switch {
-		case r >= 'a' && r <= 'z':
-			builder.WriteRune(r)
-			lastDash = false
-		case r >= 'A' && r <= 'Z':
-			builder.WriteRune(r + ('a' - 'A'))
-			lastDash = false
-		case r >= '0' && r <= '9':
-			builder.WriteRune(r)
-			lastDash = false
-		default:
-			if !lastDash {
-				builder.WriteByte('-')
-				lastDash = true
-			}
-		}
-	}
-	out := strings.Trim(builder.String(), "-")
-	if out == "" {
-		return "step"
-	}
-	return out
-}
-
-func dppTraceValues(sub WorkflowSub, progress ProcessStep) []DPPTraceabilityValue {
+func dppTraceValues(sub WorkflowSub, progress ProcessStep) []SubstepKV {
 	data := progress.Data
 	if len(data) == 0 {
 		return nil
 	}
 
-	flattened := make([]ActionKV, 0)
+	flattened := make([]SubstepKV, 0)
 	if raw, ok := processStepDataValue(progress, sub); ok {
 		flattened = append(flattened, flattenDisplayValues("", raw)...)
 	}
@@ -390,12 +370,12 @@ func dppTraceValues(sub WorkflowSub, progress ProcessStep) []DPPTraceabilityValu
 		}
 	}
 
-	values := make([]DPPTraceabilityValue, 0, len(flattened))
+	values := make([]SubstepKV, 0, len(flattened))
 	for _, item := range flattened {
 		if strings.TrimSpace(item.Value) == "" {
 			continue
 		}
-		values = append(values, DPPTraceabilityValue{Key: item.Key, Value: item.Value})
+		values = append(values, item)
 	}
 	return values
 }

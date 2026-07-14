@@ -12,6 +12,51 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestHandleProcessContentPartialSelectsSubstepInTimeline(t *testing.T) {
+	store := NewMemoryStore()
+	doneAt := time.Date(2026, 2, 26, 10, 0, 0, 0, time.UTC)
+	processID := store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: &doneAt, Data: map[string]interface{}{"value": 10.0}},
+			"1_2": {State: "pending"},
+			"1_3": {State: "pending"},
+			"2_1": {State: "pending"},
+			"2_2": {State: "pending"},
+			"3_1": {State: "pending"},
+			"3_2": {State: "pending"},
+		},
+	})
+	server := &Server{
+		store:      store,
+		tmpl:       parseTestTemplates(t),
+		authorizer: fakeAuthorizer{},
+		configProvider: func() (RuntimeConfig, error) {
+			return testFormataRuntimeConfig(), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/content?substep=1.2", nil)
+	rec := httptest.NewRecorder()
+	server.handleProcessRoutes(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
+
+	if !strings.Contains(compactBody, `class="stream-timeline-step" id="stream-timeline-step-1" open`) {
+		t.Fatalf("expected step 1 expanded, got: %s", body)
+	}
+	if !strings.Contains(compactBody, `class="substep-accordion js-process-substep-panel" data-substep-id="1.2" aria-labelledby="substep-1-2-heading" open`) {
+		t.Fatalf("expected substep 1.2 accordion open, got: %s", body)
+	}
+}
+
 func TestHandleProcessPageAndContentSuccess(t *testing.T) {
 	store := NewMemoryStore()
 	id := seedProcessWithPending(store)

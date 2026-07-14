@@ -164,6 +164,84 @@ func TestCompleteSubstepProgressUpdateError(t *testing.T) {
 	}
 }
 
+func TestProcessServiceServiceNow(t *testing.T) {
+	fixed := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	svc := &ProcessService{now: func() time.Time { return fixed }}
+	if got := svc.serviceNow(time.Time{}); !got.Equal(fixed.UTC()) {
+		t.Fatalf("serviceNow() = %v, want %v", got, fixed.UTC())
+	}
+
+	fallback := time.Date(2026, 3, 2, 8, 30, 0, 0, time.UTC)
+	if got := (&ProcessService{}).serviceNow(fallback); !got.Equal(fallback.UTC()) {
+		t.Fatalf("serviceNow(fallback) = %v, want %v", got, fallback.UTC())
+	}
+}
+
+func TestCompleteSubstepMissingProcess(t *testing.T) {
+	svc := &ProcessService{store: NewMemoryStore()}
+	_, err := svc.CompleteSubstep(context.Background(), CompleteSubstepCmd{
+		Substep: WorkflowSub{SubstepID: "1.1", InputKey: "value"},
+		Actor:   Actor{ID: "u1"},
+		Payload: map[string]interface{}{"value": "x"},
+		Config:  RuntimeConfig{Workflow: WorkflowDef{}},
+	})
+	if err == nil || err.Error() != "missing process" {
+		t.Fatalf("expected missing process error, got %v", err)
+	}
+}
+
+func TestCompleteSubstepUsesServiceNowWhenNowUnset(t *testing.T) {
+	fixed := time.Date(2026, 3, 3, 15, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	svc := &ProcessService{store: store, now: func() time.Time { return fixed }}
+	processID := primitive.NewObjectID()
+	store.SeedProcess(Process{ID: processID, Progress: map[string]ProcessStep{"1_1": {State: "pending"}}})
+	process, err := store.LoadProcessByID(context.Background(), processID)
+	if err != nil {
+		t.Fatalf("LoadProcessByID: %v", err)
+	}
+	process.Progress = normalizeProgressKeys(process.Progress)
+
+	updated, err := svc.CompleteSubstep(context.Background(), CompleteSubstepCmd{
+		Process:     process,
+		WorkflowKey: "workflow",
+		SubstepID:   "1.1",
+		Substep:     WorkflowSub{SubstepID: "1.1", Order: 1, InputKey: "value"},
+		Actor:       Actor{ID: "u1", Role: "dep1"},
+		Payload:     map[string]interface{}{"value": "x"},
+		Config:      RuntimeConfig{Workflow: WorkflowDef{}},
+	})
+	if err != nil {
+		t.Fatalf("CompleteSubstep: %v", err)
+	}
+	step := updated.Progress["1.1"]
+	if step.DoneAt == nil || !step.DoneAt.Equal(fixed.UTC()) {
+		t.Fatalf("DoneAt = %v, want %v", step.DoneAt, fixed.UTC())
+	}
+}
+
+func TestFinalizeProcessIfDoneStatusUpdateError(t *testing.T) {
+	store := NewMemoryStore()
+	store.UpdateStatusErr = assertErr("status failed")
+	svc := &ProcessService{store: store, now: time.Now}
+	processID := primitive.NewObjectID()
+	process := &Process{
+		ID: processID,
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "done", Data: map[string]interface{}{"value": "ok"}},
+		},
+	}
+	cfg := RuntimeConfig{Workflow: WorkflowDef{Steps: []WorkflowStep{{
+		StepID:  "1",
+		Substep: []WorkflowSub{{SubstepID: "1.1", Order: 1, InputKey: "value"}},
+	}}}}
+
+	got := svc.finalizeProcessIfDone(context.Background(), cfg, "workflow", process, time.Now().UTC())
+	if got != process {
+		t.Fatalf("expected original process on status error, got %#v", got)
+	}
+}
+
 func TestCompleteSubstepNotarizationErrorAfterProgressSaved(t *testing.T) {
 	store := NewMemoryStore()
 	store.InsertNotarizeErr = assertErr("notarize failed")

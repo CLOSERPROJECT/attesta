@@ -1,131 +1,3 @@
-.timeline-list {
-  display: grid;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.process-page {
-  min-width: 0;
-}
-
-.timeline-step {
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--card);
-  overflow: visible;
-}
-
-.timeline-step:hover {
-  border-color: var(--primary);
-}
-
-.timeline-step-summary {
-  padding: var(--space-3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.timeline-step-summary::marker,
-.timeline-step-summary::-webkit-details-marker {
-  display: none;
-}
-
-.timeline-step-summary-main {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.timeline-step-chevron,
-.substep-accordion-chevron,
-.dpp-accordion-chevron {
-  width: 32px;
-  height: 32px;
-  color: var(--muted-foreground);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition:
-    transform 180ms ease,
-    color 180ms ease,
-    border-color 180ms ease;
-}
-
-.timeline-step[open] .timeline-step-chevron {
-  transform: rotate(180deg);
-  color: var(--foreground);
-}
-
-.dpp-history-item[open] .dpp-accordion-chevron {
-  transform: rotate(180deg);
-  color: var(--foreground);
-}
-
-.timeline-step-chevron .icon-svg,
-.substep-accordion-chevron .icon-svg,
-.dpp-accordion-chevron .icon-svg {
-  width: 18px;
-  height: 18px;
-}
-
-.timeline-step-org-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.timeline-step-org-mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.timeline-step-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--space-1);
-}
-
-.timeline-step-title {
-  font-size: var(--text-base);
-  line-height: 1.2;
-  font-weight: var(--font-bold);
-  color: var(--foreground);
-  overflow-wrap: anywhere;
-}
-
-.timeline-step-org {
-  font-size: var(--text-sm);
-  line-height: var(--leading-tight);
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
-
-.timeline-substeps {
-  list-style: none;
-  padding: var(--space-4) var(--space-3) var(--space-3);
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
 .substep {
   border-radius: 4px;
   border: 1px solid var(--substep-done);
@@ -228,6 +100,14 @@
   gap: var(--space-1);
 }
 
+.substep-title-heading {
+  font-size: var(--text-base);
+  line-height: 1.2;
+  font-weight: var(--font-semibold);
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
 .substep-accordion-summary .status {
   margin-left: auto;
   font-weight: 600;
@@ -282,19 +162,21 @@
 .substep-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
+  line-height: var(--leading-tight);
   color: var(--muted-foreground);
   min-width: 0;
+}
+
+.substep-meta strong {
+  color: inherit;
+  font-weight: var(--font-medium);
 }
 
 .substep-meta > * {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.substep-summary-supporting {
-  padding-top: var(--space-2);
 }
 
 .substep-details {
@@ -303,114 +185,7 @@
   gap: var(--space-3);
 }
 
-.data-hash {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  max-width: min(100%, 520px);
-}
-
-.hash-value {
-  display: inline-block;
-  max-width: min(100%, 280px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.substep-override-modal {
-  width: calc(100vw - 32px);
-  height: calc(100vh - 32px);
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--card);
-  color: var(--foreground);
-  overflow: hidden;
-}
-
-.substep-override-modal::backdrop {
-  background: var(--backdrop-fullscreen);
-}
-
-.substep-override-editor,
-.substep-override-loading {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  height: 100%;
-  min-height: 0;
-  padding: var(--space-5);
-  box-sizing: border-box;
-}
-
-.substep-override-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.substep-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-lg);
-  line-height: var(--leading-none);
-}
-
-.substep-override-reason {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.substep-override-frame {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  flex: 1 1 auto;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--card);
-}
-
-.js-open-substep-override {
-  display: inline-flex;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--primary);
-  margin: 0;
-  font-size: var(--text-xs);
-}
-
-.js-open-substep-override:hover {
-  text-decoration: underline;
-}
-
 @media (--sm-down) {
-  .timeline-step-summary {
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    padding: var(--space-3);
-  }
-
-  .timeline-step-summary-main {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .timeline-step-org-mark {
-    width: 36px;
-    height: 36px;
-  }
-
-  .timeline-substeps {
-    padding-inline: var(--space-3);
-  }
-
   .substep-accordion-summary {
     flex-wrap: wrap;
     align-items: flex-start;
@@ -425,14 +200,6 @@
   .substep-details {
     padding-inline: var(--space-3);
   }
-
-  .data-hash {
-    max-width: 100%;
-  }
-
-  .hash-value {
-    max-width: min(100%, 200px);
-  }
 }
 
 @media (--md-down) {
@@ -444,13 +211,6 @@
   .substep-title {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .timeline-step[open] > summary {
-    position: sticky;
-    top: 0;
-    background: var(--card);
-    z-index: 10;
   }
 
   .substep.substep-done .substep-accordion[open] > .substep-accordion-summary {
@@ -484,9 +244,5 @@
     position: sticky;
     top: 0;
     z-index: 10;
-  }
-
-  .timeline-step[open]:has(.substep-accordion[open]) > summary {
-    position: static;
   }
 }

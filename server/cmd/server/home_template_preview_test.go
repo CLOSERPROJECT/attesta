@@ -53,12 +53,14 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		WorkflowDescription: "Previewable workflow",
 		Processes:           []ProcessListItem{process},
 		ProcessGroups:       testHomeProcessGroups(process),
-		Preview: ActionListView{
+		Preview: StreamInstanceDetailView{
 			HideStatus: true,
 			Timeline: []TimelineStep{
 				{
-					StepID:   "1",
-					Title:    "Collect",
+					Summary: StepSummaryView{
+						StepID: "1",
+						Title:  "Collect",
+					},
 					Expanded: true,
 					Substeps: []TimelineSubstep{
 						{
@@ -66,7 +68,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 							Title:     "Record input",
 							Status:    "available",
 							Selected:  true,
-							Action: &ActionView{
+							Body: &SubstepBodyView{
 								WorkflowKey:   "workflow",
 								SubstepID:     "1.1",
 								Title:         "Record input",
@@ -74,7 +76,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 								FormSchema:    `{"type":"object","properties":{"value":{"type":"string"}}}`,
 								ReadOnly:      true,
 								Reason:        "Preview only. Start an instance to submit data.",
-								MatchingRoles: []ActionRoleOption{{Slug: "dep1", Label: "Department 1"}},
+								MatchingRoles: []SubstepRoleOption{{Slug: "dep1", Label: "Department 1"}},
 							},
 						},
 					},

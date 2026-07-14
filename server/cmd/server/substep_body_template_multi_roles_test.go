@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-func TestActionListTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) {
+func TestSubstepBodyTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey: "workflow",
 		ProcessID:   "process-1",
 		SubstepID:   "1.1",
@@ -17,19 +17,20 @@ func TestActionListTemplateShowsRoleChoiceDialogWhilePostingSlugs(t *testing.T) 
 		InputKey:    "value",
 		InputType:   "formata",
 		Status:      "available",
-		RoleBadges: []ActionRoleBadge{
+		Mode:        SubstepBodyModeActionable,
+		RoleBadges: []SubstepRoleBadge{
 			{ID: "dep1", Label: "Department 1", Palette: "red"},
 			{ID: "dep2", Label: "Department 2", Palette: "orange"},
 		},
-		MatchingRoles: []ActionRoleOption{
+		MatchingRoles: []SubstepRoleOption{
 			{Slug: "dep1", Label: "Department 1"},
 			{Slug: "dep2", Label: "Department 2"},
 		},
 	}
 
 	var out bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&out, "action_detail_content.html", action); err != nil {
-		t.Fatalf("render action detail template: %v", err)
+	if err := tmpl.ExecuteTemplate(&out, "substep_body", action); err != nil {
+		t.Fatalf("render substep_body template: %v", err)
 	}
 	body := out.String()
 

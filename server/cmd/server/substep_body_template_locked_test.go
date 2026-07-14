@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-func TestActionListTemplateLockedFormataHooks(t *testing.T) {
+func TestSubstepBodyTemplateLockedFormataHooks(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	action := ActionView{
+	action := SubstepBodyView{
 		WorkflowKey:  "workflow",
 		ProcessID:    "process-1",
 		SubstepID:    "1.2",
@@ -19,13 +19,14 @@ func TestActionListTemplateLockedFormataHooks(t *testing.T) {
 		FormSchema:   `{"type":"object"}`,
 		FormUISchema: `{"type":"VerticalLayout","elements":[]}`,
 		Status:       "locked",
+		Mode:         SubstepBodyModePreview,
 		Disabled:     true,
 		Reason:       "Locked by sequence",
 	}
 
 	var out bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&out, "action_detail_content.html", action); err != nil {
-		t.Fatalf("render action detail template: %v", err)
+	if err := tmpl.ExecuteTemplate(&out, "substep_body", action); err != nil {
+		t.Fatalf("render substep_body template: %v", err)
 	}
 	body := strings.Join(strings.Fields(out.String()), " ")
 
@@ -33,7 +34,7 @@ func TestActionListTemplateLockedFormataHooks(t *testing.T) {
 		t.Fatalf("expected description text, got body: %s", body)
 	}
 	if strings.Contains(body, "Locked by sequence") {
-		t.Fatalf("expected locked reason to stay out of action detail, got body: %s", body)
+		t.Fatalf("expected locked reason to stay out of substep body, got body: %s", body)
 	}
 	if !strings.Contains(body, `data-formata-disabled="true"`) {
 		t.Fatalf("expected disabled formata data hook, got body: %s", body)

@@ -21,18 +21,6 @@ func TestHumanReadableTraceabilityTime(t *testing.T) {
 	}
 }
 
-func TestDPPDialogIDFragment(t *testing.T) {
-	if got := dppDialogIDFragment("   "); got != "step" {
-		t.Fatalf("dppDialogIDFragment(blank) = %q, want step", got)
-	}
-	if got := dppDialogIDFragment(" Step 1 / Review "); got != "step-1-review" {
-		t.Fatalf("dppDialogIDFragment(words) = %q, want step-1-review", got)
-	}
-	if got := dppDialogIDFragment("___"); got != "step" {
-		t.Fatalf("dppDialogIDFragment(symbols) = %q, want step", got)
-	}
-}
-
 func TestShortHashLabel(t *testing.T) {
 	if got := shortHashLabel("  abcdef12345  "); got != "abcdef1" {
 		t.Fatalf("shortHashLabel(long) = %q, want abcdef1", got)
