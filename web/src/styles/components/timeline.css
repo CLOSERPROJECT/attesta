@@ -188,31 +188,10 @@
   overflow-wrap: anywhere;
 }
 
-.substep-summary-supporting {
-  padding-top: var(--space-2);
-}
-
 .substep-details {
   padding: 0 var(--space-3) var(--space-3);
   display: grid;
   gap: var(--space-3);
-}
-
-.data-hash {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  max-width: min(100%, 520px);
-}
-
-.hash-value {
-  display: inline-block;
-  max-width: min(100%, 280px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
 }
 
 .substep-override-modal {
@@ -299,14 +278,6 @@
 
   .substep-details {
     padding-inline: var(--space-3);
-  }
-
-  .data-hash {
-    max-width: 100%;
-  }
-
-  .hash-value {
-    max-width: min(100%, 200px);
   }
 }
 
