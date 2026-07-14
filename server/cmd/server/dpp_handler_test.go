@@ -441,6 +441,65 @@ func TestHandleDigitalLinkDPPHTMLShowsPrematureTermination(t *testing.T) {
 	}
 }
 
+func TestHandleDigitalLinkDPPHTMLRendersOverrideSubstepValues(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
+
+	store := NewMemoryStore()
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State: "done",
+				Data:  map[string]interface{}{"value": "override-ok"},
+			},
+		},
+		Overrides: map[string]SubstepOverride{
+			"1_1": {
+				SubstepID: "1.1",
+				Schema:    map[string]interface{}{"type": "object"},
+				Reason:    "local source shape",
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+
+	tmpl := parseTestTemplates(t)
+	server := &Server{
+		store:     store,
+		tmpl:      tmpl,
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d body=%q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		"Completed with local form adaptation.",
+		"Reason: local source shape",
+		"<dt>value</dt>",
+		"<dd>override-ok</dd>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in DPP override body, got: %s", want, body)
+		}
+	}
+}
+
 func seedDPPProcess(store *MemoryStore) Process {
 	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
 	process := Process{

@@ -29,6 +29,7 @@ web/dist/
 
 # Go
 bin/
+server/server
 *.exe
 *.out
 *.test

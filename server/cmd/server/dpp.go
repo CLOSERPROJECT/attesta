@@ -262,14 +262,19 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 			var attachments []SubstepAttachmentView
 			digest := ""
 
+			hasOverride := override != nil && strings.TrimSpace(override.SubstepID) != ""
+			overrideReason := ""
+			if hasOverride {
+				overrideReason = strings.TrimSpace(override.Reason)
+			}
+
 			progress, done := process.Progress[sub.SubstepID]
 			if done && progress.State == "done" {
 				status = "done"
-				if override, ok := process.Overrides[sub.SubstepID]; ok && strings.TrimSpace(override.SubstepID) != "" {
+				if hasOverride {
 					reason = "Completed with local form adaptation."
-					detailMessage = reason
-					if strings.TrimSpace(override.Reason) != "" {
-						detailMessage += " Reason: " + strings.TrimSpace(override.Reason)
+					if overrideReason != "" {
+						reason += "\nReason: " + overrideReason
 					}
 				}
 				if progress.DoneAt != nil {
@@ -326,9 +331,11 @@ func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey str
 				Attachments:   attachments,
 				ReadOnly:      true,
 				Disabled:      true,
-				Reason:        reason,
-				DetailMessage: detailMessage,
-				Digest:        digest,
+				Reason:         reason,
+				DetailMessage:  detailMessage,
+				HasOverride:    hasOverride,
+				OverrideReason: overrideReason,
+				Digest:         digest,
 			}
 			entry := TimelineSubstep{
 				SubstepID:   sub.SubstepID,

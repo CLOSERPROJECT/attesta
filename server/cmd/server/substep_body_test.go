@@ -83,3 +83,41 @@ func TestSubstepBodyTemplateRendersMessageMode(t *testing.T) {
 		t.Fatalf("expected message mode without form, got: %s", body)
 	}
 }
+
+func TestSubstepBodyTemplateRendersOverrideResultMode(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	action := SubstepBodyView{
+		WorkflowKey:    "workflow",
+		ProcessID:      "process-1",
+		SubstepID:      "1.1",
+		Title:          "Adapted substep",
+		Status:         "done",
+		HasOverride:    true,
+		OverrideReason: "local source shape",
+		RoleBadges: []SubstepRoleBadge{
+			{ID: "dep1", Label: "Department 1", Palette: "red"},
+		},
+		Values: []SubstepKV{
+			{Key: "value", Value: "override-ok"},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "substep_body", action); err != nil {
+		t.Fatalf("render substep_body template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		"Completed with local form adaptation.",
+		"Reason: local source shape",
+		">Submitted<",
+		"<dt>value</dt>",
+		"<dd>override-ok</dd>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in rendered override substep body, got: %s", want, body)
+		}
+	}
+}
