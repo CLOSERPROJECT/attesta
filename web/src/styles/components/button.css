@@ -1,0 +1,156 @@
+/*
+ * Button — composable control (CSS-only component).
+ *
+ * <button|a class="btn btn-{variant} [btn-{size}] [btn-icon] [context…]">
+ *
+ * Variants (pick one):
+ *   btn-primary | btn-secondary | btn-ghost | btn-ghost-danger | btn-danger | btn-outline
+ * Sizes (optional):
+ *   btn-xs (28) | btn-sm (32) | default (36) | btn-lg (40)
+ * Shape (optional):
+ *   btn-icon — square; uses effective height for width/height
+ *
+ * Context modifiers live in domain CSS (dialog-close, workflow-card-menu-trigger, …).
+ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-height: var(--btn-height);
+  padding: 0 var(--btn-padding-x);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: var(--leading-none);
+  text-decoration: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+a.btn:hover {
+  text-decoration: none;
+}
+
+.btn:disabled,
+.btn[disabled],
+.btn.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Variants */
+
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.btn-primary:hover:not(:disabled, .is-disabled) {
+  background: color-mix(in srgb, var(--primary) 90%, var(--card));
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-secondary:hover:not(:disabled, .is-disabled) {
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted-foreground);
+}
+
+.btn-ghost:hover:not(:disabled, .is-disabled) {
+  background: color-mix(in srgb, var(--foreground) 4%, var(--muted));
+  color: var(--foreground);
+}
+
+.btn-ghost-danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--destructive);
+}
+
+.btn-ghost-danger:hover:not(:disabled, .is-disabled) {
+  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
+  color: var(--destructive);
+}
+
+.btn-danger {
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+.btn-danger:hover:not(:disabled, .is-disabled) {
+  background: color-mix(in srgb, var(--destructive) 90%, var(--card));
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.btn-outline:hover:not(:disabled, .is-disabled) {
+  background: var(--nav-hover, var(--muted));
+}
+
+/* Sizes */
+
+.btn-xs {
+  min-height: var(--btn-height-xs);
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.btn-sm {
+  min-height: var(--btn-height-sm);
+  padding: 0 var(--btn-padding-x-sm);
+  font-size: var(--text-sm);
+}
+
+.btn-lg {
+  min-height: var(--btn-height-lg);
+  padding: 0 var(--space-4);
+}
+
+/* Icon shape */
+
+.btn-icon {
+  width: var(--btn-height);
+  height: var(--btn-height);
+  min-height: 0;
+  padding: 0;
+}
+
+.btn-xs.btn-icon {
+  width: var(--btn-height-xs);
+  height: var(--btn-height-xs);
+}
+
+.btn-sm.btn-icon {
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+}
+
+.btn-lg.btn-icon {
+  width: var(--btn-height-lg);
+  height: var(--btn-height-lg);
+}
+
+.btn-icon .icon-svg {
+  display: block;
+}

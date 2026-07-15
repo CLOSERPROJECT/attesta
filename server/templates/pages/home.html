@@ -19,7 +19,7 @@
                 {{ if .CanClone }}
                   <details class="workflow-card-menu">
                     <summary
-                      class="workflow-card-menu-trigger"
+                      class="btn btn-ghost btn-icon workflow-card-menu-trigger"
                       aria-label="Open actions for {{ .Name }}"
                       title="Open actions for {{ .Name }}"
                     >
@@ -132,7 +132,7 @@
                     </div>
                     <button
                       type="button"
-                      class="secondary secondary-small"
+                      class="btn btn-ghost btn-icon dialog-close"
                       onclick="document.getElementById('edit-workflow-{{ .Key }}').close()"
                     >
                       {{ template "icon-close" . }}
@@ -145,7 +145,7 @@
                   </p>
                   <div class="dialog-actions">
                     <a href="{{ .EditAction }}">
-                      <button type="button" class="danger">
+                      <button type="button" class="btn btn-danger">
                         Continue to editor
                       </button>
                     </a>
@@ -168,7 +168,7 @@
                     </div>
                     <button
                       type="button"
-                      class="secondary secondary-small"
+                      class="btn btn-ghost btn-icon dialog-close"
                       onclick="document.getElementById('delete-workflow-{{ .Key }}').close()"
                     >
                       {{ template "icon-close" . }}
@@ -186,7 +186,7 @@
                     <div
                       class="dialog-actions"
                     >
-                      <button type="submit" class="danger">
+                      <button type="submit" class="btn btn-danger">
                         Delete stream
                       </button>
                     </div>

@@ -33,7 +33,7 @@
         <div class="dialog-actions">
           <button
             type="button"
-            class="danger"
+            class="btn btn-danger"
             onclick="document.getElementById('terminate-process-dialog').showModal()"
           >
             {{ template "icon-stop" . }} End stream
@@ -53,7 +53,7 @@
               </div>
               <button
                 type="button"
-                class="secondary secondary-small"
+                class="btn btn-ghost btn-icon dialog-close"
                 onclick="document.getElementById('terminate-process-dialog').close()"
               >
                 {{ template "icon-close" . }}
@@ -92,7 +92,7 @@
                 <textarea name="reason" rows="5" maxlength="1000"></textarea>
               </label>
               <div class="dialog-actions">
-                <button type="submit" class="danger">
+                <button type="submit" class="btn btn-danger">
                   {{ template "icon-stop" . }} End stream
                 </button>
               </div>
@@ -113,7 +113,7 @@
       </div>
       <button
         type="button"
-        class="secondary js-download-link"
+        class="btn btn-secondary js-download-link"
         data-download-url="{{ .WorkflowPath }}/process/{{ .ProcessID }}/files.zip"
       >
         {{ template "icon-download" . }}
@@ -151,7 +151,7 @@
         </div>
         <button
           type="button"
-          class="primary"
+          class="btn btn-primary"
           onclick="window.open('{{ .DPPURL }}', '_blank')"
         >
           {{ template "icon-external-link" . }}

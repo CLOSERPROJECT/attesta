@@ -94,6 +94,7 @@ Also see:
 
 - `panel` — card container and section headers (`web/src/styles/components/panel.css`); inline markup in `process.html`, `stream.html`, `dpp.html`, `org_admin.html`, `platform_admin.html`
 - `dialog` — modal shell (`.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … in `web/src/styles/components/dialog.css`); destructive titles stack `.dialog-title u-text-danger`; inline markup in `process.html`, `stream.html`, `home.html`, `org_admin.html`, `platform_admin.html`, `components/substep_body.html`
+- `button` — composable controls (`.btn` + variants/sizes/`btn-icon` in `web/src/styles/components/button.css`)
 
 ## Docs and verification
 

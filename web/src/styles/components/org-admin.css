@@ -252,36 +252,6 @@
   gap: var(--space-2);
 }
 
-.user-action-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1);
-  border: 0;
-  background: transparent;
-  color: var(--primary);
-  cursor: pointer;
-}
-
-.user-action-button .icon-svg {
-  width: 18px;
-  height: 18px;
-}
-
-.user-action-button:hover {
-  opacity: 0.85;
-}
-
-.user-action-button:disabled,
-.user-action-button:disabled:hover {
-  opacity: 1;
-  cursor: not-allowed;
-}
-
-.user-action-button-danger {
-  color: var(--destructive);
-}
-
 hr {
   border: 0;
   border-top: 1px solid var(--border);

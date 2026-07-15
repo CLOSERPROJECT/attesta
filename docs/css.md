@@ -75,6 +75,7 @@ Reused **markup patterns** backed by namespaced CSS, with **no** Go template par
 |--------|-----------------|-----------------|
 | `panel.css` | `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-actions`, `.panel-block` | See file header in `web/src/styles/components/panel.css` |
 | `dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions` | See file header in `web/src/styles/components/dialog.css` |
+| `button.css` | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-ghost-danger`, `.btn-danger`, `.btn-outline`, `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon` | See file header in `web/src/styles/components/button.css` |
 
 **Dialog placement:** generic shell in `dialog.css`; `#stream-preview-dialog` sizing in `pages/stream.css`; org-admin role pill wrapper in `org-admin.css`. Destructive titles use `u-text-danger` (color only) stacked on `.dialog-title`. Wide shell modifier `.dialog-wide` deferred until a second page needs it.
 
@@ -86,7 +87,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 |----------|-------------|-----------|
 | `layout.html` | `layout/index.css` | `components/shared.css` |
 | `components/page_header.html` | `components/page-header.css` | — |
-| Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/shared.css` (buttons, `.muted`) |
+| Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`) |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
 | `pages/home.html` | `pages/home.css` | `components/dialog.css`, `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
@@ -99,7 +100,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `pages/dpp.html` | `pages/dpp.css` | `components/dpp_history_step.html`, `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `pages/org_admin.html` | `pages/org-admin-page.css` | `components/dialog.css`, `components/org-admin.css`, `role-palette.css` |
 | `pages/platform_admin.html` | `pages/platform-admin.css` | `components/dialog.css`, `components/shared.css` |
-| `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
+| `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/button.css`, `components/shared.css` |
 | `attachment_carousel.html` | `components/substep-body.css` | — |
 | `substep_override_editor.html` | `components/substep-override.css` | — |
 
@@ -192,7 +193,7 @@ Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index
 
 **Heading defaults** are set in `reset.css` (`h1`–`h4`): `h1` → `--text-3xl`, `h2` → `--text-xl`, `h3` → `--text-lg`, `h4` → `--text-base`, all with `--font-semibold` and `--leading-tight`. Prefer tokens over raw `font-size` in component CSS; remove redundant heading `font-size` overrides when they only duplicate semantics.
 
-**Control sizing pattern:** buttons use `--text-base` (`shared.css`), form labels use `--text-sm` (`forms.css`), and inputs / textareas / selects use `--text-base`. The 14px label + 16px input pairing is intentional — common in web forms and keeps tap targets accessible.
+**Control sizing pattern:** buttons use the `btn` system in `button.css` (default height `--btn-height` / 36px). Form labels use `--text-sm` (`forms.css`); inputs use `--text-base`.
 
 ### Spacing scale
 

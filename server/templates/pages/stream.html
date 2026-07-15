@@ -72,7 +72,7 @@
           </div>
           <div class="panel-actions">
             <button
-              class="secondary"
+              class="btn btn-secondary"
               type="button"
               data-home-nav="preview"
               onclick="document.getElementById('stream-preview-dialog').showModal()"
@@ -81,7 +81,7 @@
               View preview
             </button>
             <button
-              class="primary"
+              class="btn btn-primary"
               type="button"
               onclick="document.getElementById('new-instance-dialog').showModal()"
               {{ if .Error }}disabled{{ end }}
@@ -102,7 +102,7 @@
               </div>
               <button
                 type="button"
-                class="secondary secondary-small"
+                class="btn btn-ghost btn-icon dialog-close"
                 onclick="document.getElementById('new-instance-dialog').close()"
               >
                 {{ template "icon-close" . }}
@@ -124,7 +124,7 @@
                 />
               </div>
               <div class="dialog-actions">
-                <button class="primary" type="submit">
+                <button class="btn btn-primary" type="submit">
                   {{ template "icon-play" . }}
                   Start instance
                 </button>
@@ -147,7 +147,7 @@
               </div>
               <button
                 type="button"
-                class="secondary secondary-small"
+                class="btn btn-ghost btn-icon dialog-close"
                 onclick="document.getElementById('stream-preview-dialog').close()"
               >
                 {{ template "icon-close" . }}
@@ -352,7 +352,7 @@
                   >
                     <div class="platform-admin-pagination-pages">
                       <a
-                        class="secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
+                        class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
                         href="{{ .PreviousURL }}"
                       >
                         {{ template "icon-chevron-left" . }}
@@ -360,16 +360,16 @@
                       {{ range .PageLinks }}
                         <a
                           class="{{ if .IsCurrent }}
-                            primary
+                            btn btn-primary
                           {{ else }}
-                            secondary
+                            btn btn-secondary
                           {{ end }}"
                           href="{{ .URL }}"
                           >{{ .Page }}</a
                         >
                       {{ end }}
                       <a
-                        class="secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
+                        class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
                         href="{{ .NextURL }}"
                       >
                         {{ template "icon-chevron-right" . }}

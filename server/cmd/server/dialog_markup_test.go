@@ -47,7 +47,7 @@ func TestStreamPageNewInstanceDialogMarkup(t *testing.T) {
 		`class="dialog-actions"`,
 		`class="dialog-title">New instance</h3>`,
 		"Give this stream instance a brief name.",
-		`class="secondary secondary-small"`,
+		`class="btn btn-ghost btn-icon dialog-close"`,
 	} {
 		if !strings.Contains(dialog, want) {
 			t.Fatalf("expected %q in new-instance dialog markup, got:\n%s", want, dialog)
@@ -99,7 +99,7 @@ func TestPlatformAdminCreateOrgDialogMarkup(t *testing.T) {
 		`class="dialog-subtitle"`,
 		`class="dialog-title">New organization</h3>`,
 		"Add a new organization to the platform.",
-		`class="secondary secondary-small"`,
+		`class="btn btn-ghost btn-icon dialog-close"`,
 		"Create organization",
 	} {
 		if !strings.Contains(dialog, want) {

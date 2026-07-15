@@ -670,7 +670,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if !strings.Contains(body, `action="/w/workflow/process/start"`) {
 		t.Fatalf("expected new stream form to remain present, got %q", body)
 	}
-	if !strings.Contains(compactBody, `class="primary"`) || !strings.Contains(compactBody, `type="submit"`) || !strings.Contains(compactBody, `disabled`) || !strings.Contains(compactBody, `New instance`) {
+	if !strings.Contains(compactBody, `class="btn btn-primary"`) || !strings.Contains(compactBody, `type="submit"`) || !strings.Contains(compactBody, `disabled`) || !strings.Contains(compactBody, `New instance`) {
 		t.Fatalf("expected new stream button to be disabled for invalid workflow, got %q", body)
 	}
 }
@@ -717,7 +717,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon workflow-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for creator, got %q", body)
 		}
 		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -788,7 +788,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon workflow-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for started stream, got %q", body)
 		}
 		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
@@ -852,7 +852,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon workflow-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -916,7 +916,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if strings.Contains(body, `class="workflow-card-menu-trigger"`) {
+		if strings.Contains(body, `workflow-card-menu-trigger`) {
 			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
 		}
 		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {

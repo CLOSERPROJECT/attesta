@@ -13,7 +13,7 @@
               <div class="substep-body-attachment-copy">
                 <h4>{{ $attachment.Key }}</h4>
               </div>
-              <a class="secondary" href="{{ $attachment.URL }}">
+              <a class="btn btn-secondary" href="{{ $attachment.URL }}">
                 {{ template "icon-download" $attachment }}
                 Download
               </a>
@@ -49,7 +49,7 @@
         {{ if gt $total 1 }}
           <button
             type="button"
-            class="secondary substep-body-attachments-nav substep-body-attachments-nav-prev"
+            class="btn btn-secondary substep-body-attachments-nav substep-body-attachments-nav-prev"
             data-carousel-prev
             aria-label="Previous attachment preview"
             disabled
@@ -58,7 +58,7 @@
           </button>
           <button
             type="button"
-            class="secondary substep-body-attachments-nav substep-body-attachments-nav-next"
+            class="btn btn-secondary substep-body-attachments-nav substep-body-attachments-nav-next"
             data-carousel-next
             aria-label="Next attachment preview"
           >

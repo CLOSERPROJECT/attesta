@@ -49,7 +49,7 @@
             {{ if .OrganizationError }}
               <p class="error">{{ .OrganizationError }}</p>
             {{ end }}
-            <button class="primary" type="submit">Create organization</button>
+            <button class="btn btn-primary" type="submit">Create organization</button>
           </form>
         {{ else }}
           <div class="org-profile-summary">
@@ -194,7 +194,7 @@
                 <p class="error">{{ .OrganizationError }}</p>
               {{ end }}
               <div class="org-admin-form-actions">
-                <button class="primary" type="submit">Save organization</button>
+                <button class="btn btn-primary" type="submit">Save organization</button>
               </div>
             </form>
           </section>
@@ -209,7 +209,7 @@
                 <p>Available roles for your organization.</p>
               </div>
               <button
-                class="primary"
+                class="btn btn-primary"
                 type="button"
                 onclick="document.getElementById('add-role-dialog').showModal()"
               >
@@ -231,7 +231,7 @@
                       {{ if .InUse }}
                         <button
                           type="button"
-                          class="user-action-button"
+                          class="btn btn-ghost btn-icon btn-xs"
                           aria-label="Edit role"
                           title="Role in use"
                           disabled
@@ -240,7 +240,7 @@
                         </button>
                         <button
                           type="button"
-                          class="user-action-button user-action-button-danger"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
                           aria-label="Delete role"
                           title="Role in use"
                           disabled
@@ -253,7 +253,7 @@
                         >
                         <button
                           type="button"
-                          class="user-action-button"
+                          class="btn btn-ghost btn-icon btn-xs"
                           aria-label="Edit role"
                           onclick="document.getElementById('edit-role-{{ .Slug }}').showModal()"
                         >
@@ -261,7 +261,7 @@
                         </button>
                         <button
                           type="button"
-                          class="user-action-button user-action-button-danger"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
                           aria-label="Delete role"
                           onclick="document.getElementById('delete-role-{{ .Slug }}').showModal()"
                         >
@@ -287,7 +287,7 @@
                             </div>
                             <button
                               type="button"
-                              class="secondary secondary-small"
+                              class="btn btn-ghost btn-icon dialog-close"
                               onclick="document.getElementById('edit-role-{{ .Slug }}').close()"
                             >
                               {{ template "icon-close" . }}
@@ -388,7 +388,7 @@
                             <div
                               class="dialog-actions"
                             >
-                              <button class="primary" type="submit">
+                              <button class="btn btn-primary" type="submit">
                                 Save role
                               </button>
                             </div>
@@ -413,7 +413,7 @@
                             </div>
                             <button
                               type="button"
-                              class="secondary secondary-small"
+                              class="btn btn-ghost btn-icon dialog-close"
                               onclick="document.getElementById('delete-role-{{ .Slug }}').close()"
                             >
                               {{ template "icon-close" . }}
@@ -452,7 +452,7 @@
                             <div
                               class="dialog-actions"
                             >
-                              <button type="submit" class="danger">
+                              <button type="submit" class="btn btn-danger">
                                 Delete role
                               </button>
                             </div>
@@ -478,7 +478,7 @@
                 <p>Members and invites for your organization.</p>
               </div>
               <button
-                class="primary"
+                class="btn btn-primary"
                 type="button"
                 onclick="document.getElementById('add-user-dialog').showModal()"
               >
@@ -522,7 +522,7 @@
                     <div class="user-actions">
                       <button
                         type="button"
-                        class="user-action-button"
+                        class="btn btn-ghost btn-icon btn-xs"
                         aria-label="Edit user"
                         onclick="document.getElementById('manage-user-{{ .UserID }}').showModal()"
                       >
@@ -530,7 +530,7 @@
                       </button>
                       <button
                         type="button"
-                        class="user-action-button user-action-button-danger"
+                        class="btn btn-ghost-danger btn-icon btn-xs"
                         aria-label="Delete user"
                         onclick="document.getElementById('delete-user-{{ .UserID }}').showModal()"
                       >
@@ -549,7 +549,7 @@
                           </div>
                           <button
                             type="button"
-                            class="secondary secondary-small"
+                            class="btn btn-ghost btn-icon dialog-close"
                             onclick="document.getElementById('manage-user-{{ .UserID }}').close()"
                           >
                             {{ template "icon-close" . }}
@@ -636,7 +636,7 @@
                           <div
                             class="dialog-actions"
                           >
-                            <button class="primary" type="submit">
+                            <button class="btn btn-primary" type="submit">
                               Save roles
                             </button>
                           </div>
@@ -659,7 +659,7 @@
                           </div>
                           <button
                             type="button"
-                            class="secondary secondary-small"
+                            class="btn btn-ghost btn-icon dialog-close"
                             onclick="document.getElementById('delete-user-{{ .UserID }}').close()"
                           >
                             {{ template "icon-close" . }}
@@ -688,7 +688,7 @@
                           <div
                             class="dialog-actions"
                           >
-                            <button type="submit" class="danger">
+                            <button type="submit" class="btn btn-danger">
                               Delete account
                             </button>
                           </div>
@@ -717,7 +717,7 @@
                 </div>
                 <button
                   type="button"
-                  class="secondary secondary-small"
+                  class="btn btn-ghost btn-icon dialog-close"
                   onclick="document.getElementById('add-role-dialog').close()"
                 >
                   {{ template "icon-close" . }}
@@ -787,7 +787,7 @@
                   <p class="error">{{ .RoleError }}</p>
                 {{ end }}
                 <div class="dialog-actions">
-                  <button class="primary" type="submit">Create role</button>
+                  <button class="btn btn-primary" type="submit">Create role</button>
                 </div>
               </form>
             </div>
@@ -807,7 +807,7 @@
                 </div>
                 <button
                   type="button"
-                  class="secondary secondary-small"
+                  class="btn btn-ghost btn-icon dialog-close"
                   onclick="document.getElementById('add-user-dialog').close()"
                 >
                   {{ template "icon-close" . }}
@@ -877,7 +877,7 @@
                   <p class="error">{{ .InviteError }}</p>
                 {{ end }}
                 <div class="dialog-actions">
-                  <button class="primary" type="submit">Create invite</button>
+                  <button class="btn btn-primary" type="submit">Create invite</button>
                 </div>
               </form>
             </div>

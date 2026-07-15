@@ -80,20 +80,6 @@
 }
 
 .nav .nav-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-  line-height: var(--leading-none);
-  text-decoration: none;
   transition:
     background-color 140ms ease,
     border-color 140ms ease;
@@ -103,16 +89,6 @@
 .nav .account-menu[open] .nav-action {
   background: var(--nav-hover);
   text-decoration: none;
-}
-
-.nav .nav-action-link {
-  padding-inline: var(--space-4);
-}
-
-.nav .theme-toggle,
-.nav .account-trigger {
-  width: 38px;
-  padding: 0;
 }
 
 .nav .account-trigger::marker {

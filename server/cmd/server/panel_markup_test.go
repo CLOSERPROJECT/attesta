@@ -26,7 +26,7 @@ func TestProcessDownloadsPanelMarkup(t *testing.T) {
 		`class="panel-heading"`,
 		"<h2>Downloads</h2>",
 		"Export attachments and notarized data for this stream.",
-		`class="secondary js-download-link"`,
+		`class="btn btn-secondary js-download-link"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in process_downloads markup, got:\n%s", want, body)
@@ -35,7 +35,7 @@ func TestProcessDownloadsPanelMarkup(t *testing.T) {
 
 	headIdx := strings.Index(body, `class="panel-head-actions"`)
 	headingIdx := strings.Index(body, `class="panel-heading"`)
-	btnIdx := strings.Index(body, `class="secondary js-download-link"`)
+	btnIdx := strings.Index(body, `class="btn btn-secondary js-download-link"`)
 	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
 		t.Fatal("expected panel-head-actions, panel-heading, and action button")
 	}
@@ -64,7 +64,7 @@ func TestProcessDPPPanelMarkup(t *testing.T) {
 		`class="panel-heading"`,
 		"<h2>Digital Product Passport</h2>",
 		"GS1 Digital Link and DPP data for this stream.",
-		`class="primary"`,
+		`class="btn btn-primary"`,
 		"View DPP data",
 	} {
 		if !strings.Contains(body, want) {
@@ -74,7 +74,7 @@ func TestProcessDPPPanelMarkup(t *testing.T) {
 
 	headIdx := strings.Index(body, `class="panel-head-actions"`)
 	headingIdx := strings.Index(body, `class="panel-heading"`)
-	btnIdx := strings.Index(body, `class="primary"`)
+	btnIdx := strings.Index(body, `class="btn btn-primary"`)
 	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
 		t.Fatal("expected panel-head-actions, panel-heading, and action button")
 	}
@@ -152,7 +152,7 @@ func TestDPPBodyPanelMarkup(t *testing.T) {
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Demo workflow</h2>",
-		`class="primary js-share-link"`,
+		`class="btn btn-primary js-share-link"`,
 		"Share DPP link",
 		"GTIN|09506000134352",
 		"Serial|SN1",
@@ -164,7 +164,7 @@ func TestDPPBodyPanelMarkup(t *testing.T) {
 
 	headIdx := strings.Index(body, `class="panel-head-actions"`)
 	headingIdx := strings.Index(body, `class="panel-heading"`)
-	btnIdx := strings.Index(body, `class="primary js-share-link"`)
+	btnIdx := strings.Index(body, `class="btn btn-primary js-share-link"`)
 	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
 		t.Fatal("expected panel-head-actions, panel-heading, and action button")
 	}
@@ -194,7 +194,7 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Organizations</h2>",
-		`class="primary"`,
+		`class="btn btn-primary"`,
 		"Add organization",
 	} {
 		if !strings.Contains(body, want) {

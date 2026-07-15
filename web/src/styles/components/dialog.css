@@ -7,7 +7,7 @@
  *       div
  *         h3.dialog-title[.u-text-danger?]
  *         p.dialog-subtitle?
- *       button.secondary.secondary-small?   (close)
+ *       button.btn.btn-ghost.btn-icon.dialog-close
  *     …body (form | p | div)…
  *     div.dialog-actions
  *       button…
@@ -63,6 +63,10 @@
   font-size: var(--text-sm);
 }
 
+.dialog-close {
+  transform: translate(calc(var(--space-2)), calc(-1 * var(--space-2)));
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -70,7 +74,7 @@
   gap: var(--space-3);
 }
 
-.dialog-actions .primary {
+.dialog-actions .btn-primary {
   width: auto;
 }
 
@@ -84,8 +88,7 @@
     flex-direction: column;
   }
 
-  .dialog-actions .primary,
-  .dialog-actions .secondary {
+  .dialog-actions .btn {
     width: 100%;
   }
 }
