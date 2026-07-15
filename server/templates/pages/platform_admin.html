@@ -54,12 +54,12 @@
     </section>
   </div>
 
-  <dialog id="create-org-dialog" class="manage-dialog">
-    <div class="manage-dialog-card">
-      <header class="manage-dialog-head">
+  <dialog id="create-org-dialog" class="dialog">
+    <div class="dialog-card">
+      <header class="dialog-head">
         <div>
-          <h3 class="manage-dialog-title">New organization</h3>
-          <p class="manage-dialog-subtitle">
+          <h3 class="dialog-title">New organization</h3>
+          <p class="dialog-subtitle">
             Add a new organization to the platform.
           </p>
         </div>
@@ -119,7 +119,7 @@
         {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}
           <p class="error">{{ .OrganizationError }}</p>
         {{ end }}
-        <div class="form-actions form-actions-end">
+        <div class="dialog-actions">
           <button class="primary" type="submit">Create organization</button>
         </div>
       </form>
@@ -198,14 +198,14 @@
               </button>
             </div>
 
-            <dialog id="invite-org-{{ .Slug }}" class="manage-dialog">
-              <div class="manage-dialog-card">
-                <header class="manage-dialog-head">
+            <dialog id="invite-org-{{ .Slug }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title">
+                    <h3 class="dialog-title">
                       Invite organization admin
                     </h3>
-                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
                   <button
                     type="button"
@@ -241,7 +241,7 @@
                   {{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) $.InviteError }}
                     <p class="error">{{ $.InviteError }}</p>
                   {{ end }}
-                  <div class="form-actions form-actions-end">
+                  <div class="dialog-actions">
                     <button class="primary" type="submit">
                       Create org admin invite
                     </button>
@@ -285,12 +285,12 @@
               </div>
             </dialog>
 
-            <dialog id="edit-org-{{ .Slug }}" class="manage-dialog">
-              <div class="manage-dialog-card">
-                <header class="manage-dialog-head">
+            <dialog id="edit-org-{{ .Slug }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title">Edit organization</h3>
-                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    <h3 class="dialog-title">Edit organization</h3>
+                    <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
                   <button
                     type="button"
@@ -344,7 +344,7 @@
                   {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError }}
                     <p class="error">{{ $.OrganizationError }}</p>
                   {{ end }}
-                  <div class="form-actions form-actions-end">
+                  <div class="dialog-actions">
                     <button class="primary" type="submit">
                       Save organization
                     </button>
@@ -353,14 +353,14 @@
               </div>
             </dialog>
 
-            <dialog id="delete-org-{{ .Slug }}" class="manage-dialog">
-              <div class="manage-dialog-card">
-                <header class="manage-dialog-head">
+            <dialog id="delete-org-{{ .Slug }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title manage-dialog-danger-title">
+                    <h3 class="dialog-title u-text-danger">
                       Danger zone - Delete organization
                     </h3>
-                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
                   <button
                     type="button"
@@ -386,7 +386,7 @@
                     name="page"
                     value="{{ $.CurrentPage }}"
                   />
-                  <div class="form-actions form-actions-end">
+                  <div class="dialog-actions">
                     <button type="submit" class="danger">
                       Delete organization
                     </button>

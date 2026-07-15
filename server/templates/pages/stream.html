@@ -91,12 +91,12 @@
             </button>
           </div>
         </div>
-        <dialog id="new-instance-dialog" class="manage-dialog">
-          <div class="manage-dialog-card">
-            <header class="manage-dialog-head">
+        <dialog id="new-instance-dialog" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
               <div>
-                <h3 class="manage-dialog-title">New instance</h3>
-                <p class="manage-dialog-subtitle">
+                <h3 class="dialog-title">New instance</h3>
+                <p class="dialog-subtitle">
                   Give this stream instance a brief name.
                 </p>
               </div>
@@ -123,7 +123,7 @@
                   autocomplete="off"
                 />
               </div>
-              <div class="manage-dialog-actions manage-dialog-actions-end">
+              <div class="dialog-actions">
                 <button class="primary" type="submit">
                   {{ template "icon-play" . }}
                   Start instance
@@ -134,13 +134,13 @@
         </dialog>
         <dialog
           id="stream-preview-dialog"
-          class="manage-dialog stream-preview-dialog"
+          class="dialog"
         >
-          <div class="manage-dialog-card stream-preview-dialog-card">
-            <header class="manage-dialog-head">
+          <div class="dialog-card">
+            <header class="dialog-head">
               <div>
-                <h3 class="manage-dialog-title">Stream preview</h3>
-                <p class="manage-dialog-subtitle">
+                <h3 class="dialog-title">Stream preview</h3>
+                <p class="dialog-subtitle">
                   Inspect the stream timeline and form structure in read-only
                   mode.
                 </p>
@@ -153,7 +153,7 @@
                 {{ template "icon-close" . }}
               </button>
             </header>
-            <div class="stream-preview-dialog-body">
+            <div class="stream-preview-body">
               {{ template "stream_timeline" .Preview.StreamTimeline }}
             </div>
           </div>

@@ -16,7 +16,7 @@ Styles load in this order from `web/src/styles.css`:
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
-| Components | `components.css` | Barrel importing `components/*.css` (panel, page-header, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
+| Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
 **Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
@@ -34,7 +34,7 @@ Styles load in this order from `web/src/styles.css`:
 | `pages/org-admin-page.css` | `.org-admin-*`, `.org-profile-*` (page shell) | `pages/org_admin.html` |
 | `pages/platform-admin.css` | `.platform-admin-*` | `pages/platform_admin.html` |
 
-Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not the page module.
+Org-admin forms and pickers live in `components/org-admin.css`, not the page module. App-wide modal shells live in `components/dialog.css`.
 
 ### Component modules (`components/`)
 
@@ -47,6 +47,7 @@ Org-admin forms, dialogs, and pickers live in `components/org-admin.css`, not th
 | `components/substep-shell.css` | `.substep*`, accordion shell | `components/substep_shell.html` |
 | `components/substep-override.css` | `.substep-override-*`, `.js-open-substep-override` | `substep_override_editor.html` |
 | `components/panel.css` | `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Inline markup per `panel.css` header (CSS-only) |
+| `components/dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Inline markup per `dialog.css` header (CSS-only) |
 
 ### CSS-only components
 
@@ -73,6 +74,9 @@ Reused **markup patterns** backed by namespaced CSS, with **no** Go template par
 | Module | Primary classes | Markup contract |
 |--------|-----------------|-----------------|
 | `panel.css` | `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-actions`, `.panel-block` | See file header in `web/src/styles/components/panel.css` |
+| `dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions` | See file header in `web/src/styles/components/dialog.css` |
+
+**Dialog placement:** generic shell in `dialog.css`; `#stream-preview-dialog` sizing in `pages/stream.css`; org-admin role pill wrapper in `org-admin.css`. Destructive titles use `u-text-danger` (color only) stacked on `.dialog-title`. Wide shell modifier `.dialog-wide` deferred until a second page needs it.
 
 Other partials (`icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
 
@@ -83,17 +87,18 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `layout.html` | `layout/index.css` | `components/shared.css` |
 | `components/page_header.html` | `components/page-header.css` | — |
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/shared.css` (buttons, `.muted`) |
-| `pages/home.html` | `pages/home.css` | `components/stream.css`, `layout/index.css` |
-| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
-| `pages/process.html` | `pages/process.css` | `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
+| `pages/home.html` | `pages/home.css` | `components/dialog.css`, `components/stream.css`, `layout/index.css` |
+| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
+| `pages/process.html` | `pages/process.css` | `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/dpp_history_step.html` | `pages/dpp.css` (`.dpp-history-*`) | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/substep_shell.html` | `components/substep-shell.css` | `components/substep-body.css`, `role-palette.css` |
-| `components/substep_body.html` | `components/substep-body.css` | `components/forms.css`, `role-palette.css` |
+| `components/substep_body.html` | `components/substep-body.css` | `components/dialog.css`, `components/forms.css`, `role-palette.css` |
 | `pages/dpp.html` | `pages/dpp.css` | `components/dpp_history_step.html`, `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
-| `pages/org_admin.html` | `pages/org-admin-page.css` | `components/org-admin.css`, `role-palette.css` |
-| `pages/platform_admin.html` | `pages/platform-admin.css` | `components/shared.css` |
+| `pages/org_admin.html` | `pages/org-admin-page.css` | `components/dialog.css`, `components/org-admin.css`, `role-palette.css` |
+| `pages/platform_admin.html` | `pages/platform-admin.css` | `components/dialog.css`, `components/shared.css` |
 | `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/shared.css` |
 | `attachment_carousel.html` | `components/substep-body.css` | — |
 | `substep_override_editor.html` | `components/substep-override.css` | — |
@@ -329,6 +334,7 @@ All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-s
 | Class | Use |
 |-------|-----|
 | `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Card sections — see `panel.css` header for markup tree (CSS-only component) |
+| `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Modal shells — see `dialog.css` header (CSS-only component) |
 | `.stack` | Vertical rhythm |
 | `.muted` | Secondary text color |
 | `.pill`, `.role-pill` | Badges; pair with `data-role-palette` for role colors |

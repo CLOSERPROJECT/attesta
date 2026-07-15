@@ -275,13 +275,13 @@
                     {{ if not .InUse }}
                       <dialog
                         id="edit-role-{{ .Slug }}"
-                        class="manage-dialog manage-dialog-overflow"
+                        class="dialog dialog-overflow"
                       >
-                        <div class="manage-dialog-card">
-                          <header class="manage-dialog-head">
+                        <div class="dialog-card">
+                          <header class="dialog-head">
                             <div>
-                              <h3 class="manage-dialog-title">Edit Role</h3>
-                              <p class="manage-dialog-subtitle">
+                              <h3 class="dialog-title">Edit Role</h3>
+                              <p class="dialog-subtitle">
                                 Change the role name and color
                               </p>
                             </div>
@@ -293,7 +293,7 @@
                               {{ template "icon-close" . }}
                             </button>
                           </header>
-                          <div class="manage-dialog-role-pill">
+                          <div class="org-admin-dialog-role-pill">
                             <span
                               class="pill pill-lg role-pill"
                               data-role-palette="{{ .Palette }}"
@@ -386,7 +386,7 @@
                               <p class="error">{{ $.RoleError }}</p>
                             {{ end }}
                             <div
-                              class="manage-dialog-actions manage-dialog-actions-end"
+                              class="dialog-actions"
                             >
                               <button class="primary" type="submit">
                                 Save role
@@ -397,17 +397,17 @@
                       </dialog>
                       <dialog
                         id="delete-role-{{ .Slug }}"
-                        class="manage-dialog"
+                        class="dialog"
                       >
-                        <div class="manage-dialog-card">
-                          <header class="manage-dialog-head">
+                        <div class="dialog-card">
+                          <header class="dialog-head">
                             <div>
                               <h3
-                                class="manage-dialog-title manage-dialog-danger-title"
+                                class="dialog-title u-text-danger"
                               >
                                 Danger zone - Delete role
                               </h3>
-                              <p class="manage-dialog-subtitle">
+                              <p class="dialog-subtitle">
                                 This action cannot be undone
                               </p>
                             </div>
@@ -419,7 +419,7 @@
                               {{ template "icon-close" . }}
                             </button>
                           </header>
-                          <div class="manage-dialog-role-pill">
+                          <div class="org-admin-dialog-role-pill">
                             <span
                               class="pill pill-lg role-pill"
                               data-role-palette="{{ .Palette }}"
@@ -450,7 +450,7 @@
                               value="{{ .Slug }}"
                             />
                             <div
-                              class="manage-dialog-actions manage-dialog-actions-end"
+                              class="dialog-actions"
                             >
                               <button type="submit" class="danger">
                                 Delete role
@@ -539,13 +539,13 @@
                     </div>
                     <dialog
                       id="manage-user-{{ .UserID }}"
-                      class="manage-dialog manage-dialog-overflow"
+                      class="dialog dialog-overflow"
                     >
-                      <div class="manage-dialog-card">
-                        <header class="manage-dialog-head">
+                      <div class="dialog-card">
+                        <header class="dialog-head">
                           <div>
-                            <h3 class="manage-dialog-title">Manage User</h3>
-                            <p class="manage-dialog-subtitle">{{ .Email }}</p>
+                            <h3 class="dialog-title">Manage User</h3>
+                            <p class="dialog-subtitle">{{ .Email }}</p>
                           </div>
                           <button
                             type="button"
@@ -634,7 +634,7 @@
                             </div>
                           </div>
                           <div
-                            class="manage-dialog-actions manage-dialog-actions-end"
+                            class="dialog-actions"
                           >
                             <button class="primary" type="submit">
                               Save roles
@@ -645,17 +645,17 @@
                     </dialog>
                     <dialog
                       id="delete-user-{{ .UserID }}"
-                      class="manage-dialog"
+                      class="dialog"
                     >
-                      <div class="manage-dialog-card">
-                        <header class="manage-dialog-head">
+                      <div class="dialog-card">
+                        <header class="dialog-head">
                           <div>
                             <h3
-                              class="manage-dialog-title manage-dialog-danger-title"
+                              class="dialog-title u-text-danger"
                             >
                               Danger zone - Delete Account
                             </h3>
-                            <p class="manage-dialog-subtitle">{{ .Email }}</p>
+                            <p class="dialog-subtitle">{{ .Email }}</p>
                           </div>
                           <button
                             type="button"
@@ -686,7 +686,7 @@
                             value="{{ .UserID }}"
                           />
                           <div
-                            class="manage-dialog-actions manage-dialog-actions-end"
+                            class="dialog-actions"
                           >
                             <button type="submit" class="danger">
                               Delete account
@@ -705,13 +705,13 @@
 
           <dialog
             id="add-role-dialog"
-            class="manage-dialog manage-dialog-overflow"
+            class="dialog dialog-overflow"
           >
-            <div class="manage-dialog-card">
-              <header class="manage-dialog-head">
+            <div class="dialog-card">
+              <header class="dialog-head">
                 <div>
-                  <h3 class="manage-dialog-title">Add Role</h3>
-                  <p class="manage-dialog-subtitle">
+                  <h3 class="dialog-title">Add Role</h3>
+                  <p class="dialog-subtitle">
                     Create a new role for your organization.
                   </p>
                 </div>
@@ -786,7 +786,7 @@
                 {{ if and .RoleError (eq .RoleDialogAction "create") }}
                   <p class="error">{{ .RoleError }}</p>
                 {{ end }}
-                <div class="org-admin-form-actions">
+                <div class="dialog-actions">
                   <button class="primary" type="submit">Create role</button>
                 </div>
               </form>
@@ -795,13 +795,13 @@
 
           <dialog
             id="add-user-dialog"
-            class="manage-dialog manage-dialog-overflow"
+            class="dialog dialog-overflow"
           >
-            <div class="manage-dialog-card">
-              <header class="manage-dialog-head">
+            <div class="dialog-card">
+              <header class="dialog-head">
                 <div>
-                  <h3 class="manage-dialog-title">Add User</h3>
-                  <p class="manage-dialog-subtitle">
+                  <h3 class="dialog-title">Add User</h3>
+                  <p class="dialog-subtitle">
                     Invite a new user to your organization.
                   </p>
                 </div>
@@ -876,9 +876,7 @@
                 {{ if .InviteError }}
                   <p class="error">{{ .InviteError }}</p>
                 {{ end }}
-                <div
-                  class="org-admin-form-actions org-admin-form-actions-stack"
-                >
+                <div class="dialog-actions">
                   <button class="primary" type="submit">Create invite</button>
                 </div>
               </form>

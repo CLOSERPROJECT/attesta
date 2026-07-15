@@ -22,7 +22,7 @@
   margin-bottom: var(--space-4);
 }
 
-/* Replaces repeated manage-dialog danger-zone paragraph spacing. */
+/* Replaces repeated danger-zone paragraph spacing in dialogs. */
 .u-mb-5 {
   margin-bottom: var(--space-5);
 }

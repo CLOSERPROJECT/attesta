@@ -45,10 +45,6 @@
   gap: var(--space-2);
 }
 
-.form-actions-end {
-  align-items: flex-end;
-}
-
 .forgot-password {
   display: flex;
   justify-content: flex-end;

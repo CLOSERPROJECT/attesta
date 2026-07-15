@@ -70,12 +70,6 @@
   margin-top: auto;
 }
 
-.org-admin-form-actions-stack {
-  display: grid;
-  justify-content: end;
-  gap: var(--space-3);
-}
-
 .org-profile-logo {
   width: 64px;
   height: 64px;

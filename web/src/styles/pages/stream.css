@@ -34,25 +34,25 @@
   justify-content: flex-start;
 }
 
-.stream-preview-dialog {
+#stream-preview-dialog.dialog {
   width: calc(100vw - 24px);
   max-width: calc(100vw - 24px);
 }
 
 @media (--sm-up) {
-  .stream-preview-dialog {
+  #stream-preview-dialog.dialog {
     width: min(80rem, calc(100vw - 48px));
     max-width: calc(100vw - 48px);
   }
 }
 
-.stream-preview-dialog-card {
+#stream-preview-dialog .dialog-card {
   width: 100%;
   max-height: min(900px, calc(100vh - 48px));
   overflow: auto;
 }
 
-.stream-preview-dialog-body {
+.stream-preview-body {
   display: grid;
   gap: var(--space-4);
 }

@@ -282,85 +282,6 @@
   color: var(--destructive);
 }
 
-.manage-dialog {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: min(560px, 92vw);
-  max-width: 92vw;
-}
-
-.manage-dialog-overflow {
-  overflow: visible;
-}
-
-.manage-dialog::backdrop {
-  background: var(--backdrop-modal);
-  backdrop-filter: blur(2px);
-}
-
-.manage-dialog-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 16px 34px var(--shadow);
-  padding: var(--space-4);
-  display: grid;
-}
-
-.manage-dialog-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-}
-
-.manage-dialog-title {
-  margin: 0;
-}
-
-.manage-dialog-subtitle {
-  margin: var(--space-1) 0 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-}
-
-.manage-dialog-actions {
-  display: flex;
-  width: 100%;
-  gap: var(--space-3);
-}
-
-.manage-dialog-actions-end {
-  justify-content: flex-end;
-}
-
-.manage-dialog-actions .primary {
-  width: auto;
-}
-
-.manage-dialog-role-pill {
-  display: flex;
-  justify-content: center;
-}
-
-.manage-dialog-danger-zone {
-  border-top: 1px solid var(--border);
-  margin-bottom: var(--space-5);
-}
-
-.manage-dialog-danger-copy {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.manage-dialog-danger-title {
-  margin: 0;
-  color: var(--destructive);
-  font-weight: var(--font-bold);
-}
-
 hr {
   border: 0;
   border-top: 1px solid var(--border);
@@ -432,18 +353,9 @@ hr {
     flex-direction: column;
     align-items: stretch;
   }
+}
 
-  .manage-dialog-head {
-    flex-wrap: wrap;
-    gap: var(--space-3);
-  }
-
-  .manage-dialog-actions {
-    flex-direction: column;
-  }
-
-  .manage-dialog-actions .primary,
-  .manage-dialog-actions .secondary {
-    width: 100%;
-  }
+.org-admin-dialog-role-pill {
+  display: flex;
+  justify-content: center;
 }
