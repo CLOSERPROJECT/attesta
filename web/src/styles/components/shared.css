@@ -46,30 +46,6 @@ svg.bi {
   display: none;
 }
 
-.panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: var(--space-5);
-  box-shadow: 0 10px 26px var(--shadow);
-  min-width: 0;
-}
-
-.panel-heading {
-  margin-bottom: var(--space-6);
-
-  h1,
-  h2,
-  h3 {
-    margin: 0;
-  }
-
-  p {
-    color: var(--muted-foreground);
-    margin: 3px 0 0;
-  }
-}
-
 .muted {
   color: var(--muted-foreground);
 }
@@ -470,14 +446,6 @@ button.secondary-small {
   font-size: var(--text-sm);
 }
 
-.panel-block {
-  margin-top: var(--space-5);
-}
-
-.panel-block-spaced {
-  margin-bottom: var(--space-3);
-}
-
 .error {
   background: var(--destructive-muted);
   color: var(--destructive-muted-foreground);
@@ -507,10 +475,4 @@ button.secondary-small {
 .is-disabled {
   opacity: 0.5;
   pointer-events: none;
-}
-
-@media (--sm-down) {
-  .panel {
-    padding: var(--space-4);
-  }
 }
