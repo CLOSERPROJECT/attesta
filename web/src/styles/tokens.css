@@ -37,6 +37,14 @@
   --space-6: 1.5rem;
   --space-7: 1.75rem;
 
+  /* Buttons */
+  --btn-height-xs: 1.75rem; /* 28px — dense icon actions */
+  --btn-height-sm: 2rem; /* 32px */
+  --btn-height: 2.25rem; /* 36px — default */
+  --btn-height-lg: 2.5rem; /* 40px — nav / touch */
+  --btn-padding-x: var(--space-3);
+  --btn-padding-x-sm: var(--space-2);
+
   /* Surfaces */
   --background: linear-gradient(135deg, #f3f4ef 0%, #e9efe2 100%);
   --foreground: #12210c;

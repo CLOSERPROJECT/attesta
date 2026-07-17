@@ -30,30 +30,30 @@
     {{ else }}
       {{ template "stream_timeline" .Detail.StreamTimeline }}
       {{ if .Detail.CanTerminate }}
-        <div class="manage-dialog-actions manage-dialog-actions-end">
+        <div class="dialog-actions">
           <button
             type="button"
-            class="danger"
+            class="btn btn-danger"
             onclick="document.getElementById('terminate-process-dialog').showModal()"
           >
             {{ template "icon-stop" . }} End stream
           </button>
         </div>
-        <dialog id="terminate-process-dialog" class="manage-dialog">
-          <div class="manage-dialog-card">
-            <header class="manage-dialog-head">
+        <dialog id="terminate-process-dialog" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
               <div>
-                <h3 class="manage-dialog-title manage-dialog-danger-title">
+                <h3 class="dialog-title u-text-danger">
                   Danger zone - End stream early
                 </h3>
-                <p class="manage-dialog-subtitle">
+                <p class="dialog-subtitle">
                   Available substep
                   {{ .Detail.TerminateSubstep }}
                 </p>
               </div>
               <button
                 type="button"
-                class="secondary secondary-small"
+                class="btn btn-ghost btn-icon dialog-close"
                 onclick="document.getElementById('terminate-process-dialog').close()"
               >
                 {{ template "icon-close" . }}
@@ -91,8 +91,8 @@
                 >
                 <textarea name="reason" rows="5" maxlength="1000"></textarea>
               </label>
-              <div class="manage-dialog-actions manage-dialog-actions-end">
-                <button type="submit" class="danger">
+              <div class="dialog-actions">
+                <button type="submit" class="btn btn-danger">
                   {{ template "icon-stop" . }} End stream
                 </button>
               </div>
@@ -113,7 +113,7 @@
       </div>
       <button
         type="button"
-        class="secondary js-download-link"
+        class="btn btn-secondary js-download-link"
         data-download-url="{{ .WorkflowPath }}/process/{{ .ProcessID }}/files.zip"
       >
         {{ template "icon-download" . }}
@@ -151,7 +151,7 @@
         </div>
         <button
           type="button"
-          class="primary"
+          class="btn btn-primary"
           onclick="window.open('{{ .DPPURL }}', '_blank')"
         >
           {{ template "icon-external-link" . }}

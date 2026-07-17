@@ -8,10 +8,6 @@
   margin: 0;
 }
 
-.manage-dialog-actions-spaced {
-  margin-top: var(--space-3);
-}
-
 .substep-body-form {
   display: flex;
   flex-wrap: wrap;
@@ -336,4 +332,8 @@
     display: block;
     touch-action: pan-y;
   }
+}
+
+.active-role-options + .dialog-actions {
+  margin-top: var(--space-3);
 }

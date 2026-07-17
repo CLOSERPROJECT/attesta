@@ -399,7 +399,7 @@ const openSubstepOverrideEditor = async (url) => {
     const html = await response.text();
     if (!response.ok) {
       dialog.innerHTML =
-        '<div class="substep-override-editor"><button type="button" class="secondary js-close-substep-override">Close</button><div class="error">Unable to open editor.</div></div>';
+        '<div class="substep-override-editor"><button type="button" class="btn btn-secondary js-close-substep-override">Close</button><div class="error">Unable to open editor.</div></div>';
       return;
     }
     dialog.innerHTML = html;
@@ -408,7 +408,7 @@ const openSubstepOverrideEditor = async (url) => {
     );
   } catch (_err) {
     dialog.innerHTML =
-      '<div class="substep-override-editor"><button type="button" class="secondary js-close-substep-override">Close</button><div class="error">Unable to open editor.</div></div>';
+      '<div class="substep-override-editor"><button type="button" class="btn btn-secondary js-close-substep-override">Close</button><div class="error">Unable to open editor.</div></div>';
   }
 };
 

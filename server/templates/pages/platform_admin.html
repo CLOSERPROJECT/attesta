@@ -11,7 +11,7 @@
           <h2>Organizations</h2>
         </div>
         <button
-          class="primary"
+          class="btn btn-primary"
           type="button"
           onclick="document.getElementById('create-org-dialog').showModal()"
         >
@@ -54,18 +54,18 @@
     </section>
   </div>
 
-  <dialog id="create-org-dialog" class="manage-dialog">
-    <div class="manage-dialog-card">
-      <header class="manage-dialog-head">
+  <dialog id="create-org-dialog" class="dialog">
+    <div class="dialog-card">
+      <header class="dialog-head">
         <div>
-          <h3 class="manage-dialog-title">New organization</h3>
-          <p class="manage-dialog-subtitle">
+          <h3 class="dialog-title">New organization</h3>
+          <p class="dialog-subtitle">
             Add a new organization to the platform.
           </p>
         </div>
         <button
           type="button"
-          class="secondary secondary-small"
+          class="btn btn-ghost btn-icon dialog-close"
           onclick="document.getElementById('create-org-dialog').close()"
         >
           {{ template "icon-close" . }}
@@ -119,8 +119,8 @@
         {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}
           <p class="error">{{ .OrganizationError }}</p>
         {{ end }}
-        <div class="form-actions form-actions-end">
-          <button class="primary" type="submit">Create organization</button>
+        <div class="dialog-actions">
+          <button class="btn btn-primary" type="submit">Create organization</button>
         </div>
       </form>
     </div>
@@ -146,10 +146,10 @@
       <p class="error">{{ .Error }}</p>
     {{ end }}
     {{ if .Organizations }}
-      <ul class="platform-admin-list">
+      <ul class="list-rows">
         {{ range .Organizations }}
-          <li class="platform-admin-item">
-            <div class="platform-admin-item-main">
+          <li class="list-row">
+            <div class="list-row-main">
               {{ if .LogoAttachmentID }}
                 <img
                   src="/admin/orgs/logo/{{ .LogoAttachmentID }}"
@@ -172,7 +172,7 @@
                 </p>
               </div>
             </div>
-            <div class="user-actions">
+            <div class="list-row-actions">
               <button
                 type="button"
                 class="platform-admin-invite-button"
@@ -182,7 +182,7 @@
               </button>
               <button
                 type="button"
-                class="user-action-button"
+                class="btn btn-ghost btn-icon btn-xs"
                 aria-label="Edit organization"
                 onclick="document.getElementById('edit-org-{{ .Slug }}').showModal()"
               >
@@ -190,7 +190,7 @@
               </button>
               <button
                 type="button"
-                class="user-action-button user-action-button-danger"
+                class="btn btn-ghost-danger btn-icon btn-xs"
                 aria-label="Delete organization"
                 onclick="document.getElementById('delete-org-{{ .Slug }}').showModal()"
               >
@@ -198,18 +198,18 @@
               </button>
             </div>
 
-            <dialog id="invite-org-{{ .Slug }}" class="manage-dialog">
-              <div class="manage-dialog-card">
-                <header class="manage-dialog-head">
+            <dialog id="invite-org-{{ .Slug }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title">
+                    <h3 class="dialog-title">
                       Invite organization admin
                     </h3>
-                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
                   <button
                     type="button"
-                    class="secondary secondary-small"
+                    class="btn btn-ghost btn-icon dialog-close"
                     onclick="document.getElementById('invite-org-{{ .Slug }}').close()"
                   >
                     {{ template "icon-close" . }}
@@ -241,8 +241,8 @@
                   {{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) $.InviteError }}
                     <p class="error">{{ $.InviteError }}</p>
                   {{ end }}
-                  <div class="form-actions form-actions-end">
-                    <button class="primary" type="submit">
+                  <div class="dialog-actions">
+                    <button class="btn btn-primary" type="submit">
                       Create org admin invite
                     </button>
                   </div>
@@ -285,16 +285,16 @@
               </div>
             </dialog>
 
-            <dialog id="edit-org-{{ .Slug }}" class="manage-dialog">
-              <div class="manage-dialog-card">
-                <header class="manage-dialog-head">
+            <dialog id="edit-org-{{ .Slug }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title">Edit organization</h3>
-                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    <h3 class="dialog-title">Edit organization</h3>
+                    <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
                   <button
                     type="button"
-                    class="secondary secondary-small"
+                    class="btn btn-ghost btn-icon dialog-close"
                     onclick="document.getElementById('edit-org-{{ .Slug }}').close()"
                   >
                     {{ template "icon-close" . }}
@@ -344,8 +344,8 @@
                   {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError }}
                     <p class="error">{{ $.OrganizationError }}</p>
                   {{ end }}
-                  <div class="form-actions form-actions-end">
-                    <button class="primary" type="submit">
+                  <div class="dialog-actions">
+                    <button class="btn btn-primary" type="submit">
                       Save organization
                     </button>
                   </div>
@@ -353,18 +353,18 @@
               </div>
             </dialog>
 
-            <dialog id="delete-org-{{ .Slug }}" class="manage-dialog">
-              <div class="manage-dialog-card">
-                <header class="manage-dialog-head">
+            <dialog id="delete-org-{{ .Slug }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
                   <div>
-                    <h3 class="manage-dialog-title manage-dialog-danger-title">
+                    <h3 class="dialog-title u-text-danger">
                       Danger zone - Delete organization
                     </h3>
-                    <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                    <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
                   <button
                     type="button"
-                    class="secondary secondary-small"
+                    class="btn btn-ghost btn-icon dialog-close"
                     onclick="document.getElementById('delete-org-{{ .Slug }}').close()"
                   >
                     {{ template "icon-close" . }}
@@ -386,8 +386,8 @@
                     name="page"
                     value="{{ $.CurrentPage }}"
                   />
-                  <div class="form-actions form-actions-end">
-                    <button type="submit" class="danger">
+                  <div class="dialog-actions">
+                    <button type="submit" class="btn btn-danger">
                       Delete organization
                     </button>
                   </div>
@@ -408,7 +408,7 @@
       >
         <div class="platform-admin-pagination-pages">
           <a
-            class="secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
+            class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
             href="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
@@ -437,9 +437,9 @@
           {{ range .PageNumbers }}
             <a
               class="{{ if eq . $.CurrentPage }}
-                primary
+                btn btn-primary
               {{ else }}
-                secondary
+                btn btn-secondary
               {{ end }}"
               href="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
                 ?{{- if $.SearchQuery -}}
@@ -459,7 +459,7 @@
             >
           {{ end }}
           <a
-            class="secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
+            class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
             href="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}

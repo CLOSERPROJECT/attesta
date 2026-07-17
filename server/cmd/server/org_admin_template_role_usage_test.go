@@ -56,7 +56,7 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 	if !strings.Contains(body, `id="edit-role-qa-reviewer"`) || !strings.Contains(body, `id="delete-role-qa-reviewer"`) {
 		t.Fatalf("expected dialogs for unused role, got: %s", body)
 	}
-	if strings.Contains(body, `<p class="manage-dialog-danger-title">Role in use</p>`) {
+	if strings.Contains(compactBody, `dialog-title u-text-danger">Role in use`) {
 		t.Fatalf("did not expect role-in-use dialog title, got: %s", body)
 	}
 	if strings.Contains(body, "Remove the role from the users that have it before continuing with the action.") {

@@ -46,88 +46,8 @@ svg.bi {
   display: none;
 }
 
-.panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: var(--space-5);
-  box-shadow: 0 10px 26px var(--shadow);
-  min-width: 0;
-}
-
-.panel-heading {
-  margin-bottom: var(--space-6);
-
-  h1,
-  h2,
-  h3 {
-    margin: 0;
-  }
-
-  p {
-    color: var(--muted-foreground);
-    margin: 3px 0 0;
-  }
-}
-
 .muted {
   color: var(--muted-foreground);
-}
-
-.primary,
-button {
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  padding: var(--space-2) var(--space-3);
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-button.secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--primary) 16%, var(--card));
-}
-
-button.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--primary) 90%, var(--card));
-}
-
-button[disabled] {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-button.danger {
-  background: var(--destructive);
-  border: none;
-  color: var(--destructive-foreground);
-}
-
-.secondary {
-  display: inline-block;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--primary);
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-button.secondary {
-  background: transparent;
-  color: var(--primary);
-}
-
-button.secondary-small {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.hash-copy {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-  line-height: var(--leading-none);
 }
 
 .pill {
@@ -351,17 +271,10 @@ button.secondary-small {
 }
 
 .workflow-card-menu-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: var(--card);
-  transform: translateY(-6px) translateX(6px);
-  color: var(--foreground);
-  cursor: pointer;
   list-style: none;
+  transform: translateY(-6px) translateX(6px);
+  background: var(--card);
+  color: var(--foreground);
 }
 
 .workflow-card-menu-trigger::marker {
@@ -374,7 +287,6 @@ button.secondary-small {
 
 .workflow-card-menu-trigger:hover,
 .workflow-card-menu[open] .workflow-card-menu-trigger {
-  border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, var(--card));
 }
 
@@ -470,14 +382,6 @@ button.secondary-small {
   font-size: var(--text-sm);
 }
 
-.panel-block {
-  margin-top: var(--space-5);
-}
-
-.panel-block-spaced {
-  margin-bottom: var(--space-3);
-}
-
 .error {
   background: var(--destructive-muted);
   color: var(--destructive-muted-foreground);
@@ -507,10 +411,4 @@ button.secondary-small {
 .is-disabled {
   opacity: 0.5;
   pointer-events: none;
-}
-
-@media (--sm-down) {
-  .panel {
-    padding: var(--space-4);
-  }
 }

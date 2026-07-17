@@ -138,14 +138,6 @@
   color: var(--foreground);
 }
 
-.panel-actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
 .process-progress-line {
   height: 4px;
   border-radius: 4px;

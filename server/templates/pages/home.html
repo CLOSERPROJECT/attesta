@@ -19,7 +19,7 @@
                 {{ if .CanClone }}
                   <details class="workflow-card-menu">
                     <summary
-                      class="workflow-card-menu-trigger"
+                      class="btn btn-ghost btn-icon workflow-card-menu-trigger"
                       aria-label="Open actions for {{ .Name }}"
                       title="Open actions for {{ .Name }}"
                     >
@@ -119,20 +119,20 @@
               </a>
             </div>
             {{ if .EditRequiresPurge }}
-              <dialog id="edit-workflow-{{ .Key }}" class="manage-dialog">
-                <div class="manage-dialog-card">
-                  <header class="manage-dialog-head">
+              <dialog id="edit-workflow-{{ .Key }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
                     <div>
                       <h3
-                        class="manage-dialog-title manage-dialog-danger-title"
+                        class="dialog-title u-text-danger"
                       >
                         Danger zone - {{ template "icon-pencil" . }} Edit stream
                       </h3>
-                      <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                      <p class="dialog-subtitle">{{ .Name }}</p>
                     </div>
                     <button
                       type="button"
-                      class="secondary secondary-small"
+                      class="btn btn-ghost btn-icon dialog-close"
                       onclick="document.getElementById('edit-workflow-{{ .Key }}').close()"
                     >
                       {{ template "icon-close" . }}
@@ -143,9 +143,9 @@
                     existing instances and their collected workflow data.
                     Continue only if you want to proceed.
                   </p>
-                  <div class="manage-dialog-actions manage-dialog-actions-end">
+                  <div class="dialog-actions">
                     <a href="{{ .EditAction }}">
-                      <button type="button" class="danger">
+                      <button type="button" class="btn btn-danger">
                         Continue to editor
                       </button>
                     </a>
@@ -154,21 +154,21 @@
               </dialog>
             {{ end }}
             {{ if .CanDelete }}
-              <dialog id="delete-workflow-{{ .Key }}" class="manage-dialog">
-                <div class="manage-dialog-card">
-                  <header class="manage-dialog-head">
+              <dialog id="delete-workflow-{{ .Key }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
                     <div>
                       <h3
-                        class="manage-dialog-title manage-dialog-danger-title"
+                        class="dialog-title u-text-danger"
                       >
                         Danger zone - {{ template "icon-trash" . }} Delete
                         stream
                       </h3>
-                      <p class="manage-dialog-subtitle">{{ .Name }}</p>
+                      <p class="dialog-subtitle">{{ .Name }}</p>
                     </div>
                     <button
                       type="button"
-                      class="secondary secondary-small"
+                      class="btn btn-ghost btn-icon dialog-close"
                       onclick="document.getElementById('delete-workflow-{{ .Key }}').close()"
                     >
                       {{ template "icon-close" . }}
@@ -184,9 +184,9 @@
                     class="input-form"
                   >
                     <div
-                      class="manage-dialog-actions manage-dialog-actions-end"
+                      class="dialog-actions"
                     >
-                      <button type="submit" class="danger">
+                      <button type="submit" class="btn btn-danger">
                         Delete stream
                       </button>
                     </div>

@@ -1,0 +1,117 @@
+/*
+ * Panel — card container and section headers (CSS-only component).
+ *
+ * With actions (button, form, or action group):
+ *   section.panel
+ *     div.panel-head-actions
+ *       div.panel-heading
+ *         h1|h2|h3
+ *         p?                         (description)
+ *       button | form | div.panel-actions
+ *         button…
+ *     …content…
+ *
+ * Heading only (no actions):
+ *   section.panel | div
+ *     div.panel-heading
+ *       h1|h2|h3
+ *       p?
+ *     …content…
+ *
+ * Inner block:
+ *   div.panel-block[.panel-block-spaced]
+ *
+ * Modifiers:
+ *   section.panel.panel-sticky   (sticky rail at --xl-up)
+ */
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-5);
+  box-shadow: 0 10px 26px var(--shadow);
+  min-width: 0;
+}
+
+.panel-heading {
+  margin-bottom: var(--space-6);
+
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+  }
+
+  p {
+    color: var(--muted-foreground);
+    margin: 3px 0 0;
+  }
+}
+
+.panel-head-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+
+  button {
+    flex-shrink: 0;
+  }
+
+  form {
+    flex-shrink: 0;
+  }
+}
+
+.panel-head-actions .panel-heading {
+  margin-bottom: 0;
+}
+
+.panel-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.panel-block {
+  margin-top: var(--space-5);
+}
+
+.panel-block-spaced {
+  margin-bottom: var(--space-3);
+}
+
+@media (--xl-up) {
+  .panel-sticky {
+    position: sticky;
+    top: 44px;
+  }
+}
+
+@media (--sm-down) {
+  .panel {
+    padding: var(--space-4);
+  }
+}
+
+@media (--md-down) {
+  .panel-head-actions {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+
+    form {
+      width: 100%;
+    }
+
+    .panel-actions {
+      width: 100%;
+    }
+  }
+}

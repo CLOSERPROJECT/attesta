@@ -8,51 +8,6 @@
   flex-wrap: wrap;
 }
 
-.org-admin-sidebar-nav {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-}
-
-.org-admin-sidebar-link {
-  width: 100%;
-  display: grid;
-  gap: 2px;
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--muted);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    background-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
-}
-
-.org-admin-sidebar-link:hover {
-  border-color: var(--primary);
-  transform: translateY(-1px);
-}
-
-.org-admin-sidebar-link.is-active {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, var(--muted));
-}
-
-.org-admin-sidebar-link-title {
-  font-weight: 600;
-}
-
-.org-admin-sidebar-link-copy {
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-}
-
 .org-admin-panel-main[data-org-admin-ready="true"]
   [data-org-admin-panel][hidden] {
   display: none;
@@ -68,12 +23,6 @@
   display: flex;
   justify-content: flex-end;
   margin-top: auto;
-}
-
-.org-admin-form-actions-stack {
-  display: grid;
-  justify-content: end;
-  gap: var(--space-3);
 }
 
 .org-profile-logo {

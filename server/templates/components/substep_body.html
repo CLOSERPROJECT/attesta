@@ -127,20 +127,20 @@
   {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }}
     <dialog
       id="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
-      class="manage-dialog js-active-role-dialog"
+      class="dialog js-active-role-dialog"
       data-active-role-form="substep-body-form-{{ .ProcessID }}-{{ .SubstepID }}"
     >
-      <div class="manage-dialog-card">
-        <header class="manage-dialog-head">
+      <div class="dialog-card">
+        <header class="dialog-head">
           <div>
-            <h3 class="manage-dialog-title">Complete as</h3>
-            <p class="manage-dialog-subtitle">
+            <h3 class="dialog-title">Complete as</h3>
+            <p class="dialog-subtitle">
               Choose the role to use for this submission.
             </p>
           </div>
           <button
             type="button"
-            class="secondary secondary-small js-cancel-active-role"
+            class="btn btn-ghost btn-icon dialog-close js-cancel-active-role"
             aria-label="Close role selection"
           >
             {{ template "icon-close" . }}
@@ -163,9 +163,9 @@
           Select a role to continue.
         </p>
         <div
-          class="manage-dialog-actions manage-dialog-actions-end manage-dialog-actions-spaced"
+          class="dialog-actions"
         >
-          <button type="button" class="primary js-confirm-active-role">
+          <button type="button" class="btn btn-primary js-confirm-active-role">
             Confirm
           </button>
         </div>

@@ -4,60 +4,60 @@
   <div class="stack u-max-w-7xl u-mx-auto">
     {{ template "page_header" .Header }}
     <div class="home-workflow-grid" data-home-root>
-      <section class="panel org-admin-sidebar">
+      <section class="panel panel-sticky">
         <div class="panel-heading">
           <h2>Streams</h2>
           <p>Jump to instances by status.</p>
         </div>
-        <nav class="org-admin-sidebar-nav" aria-label="Stream status sections">
+        <nav class="sidebar-nav" aria-label="Stream status sections">
           {{ range .ProcessGroups }}
             {{ if eq .Status "available" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link is-active"
+                class="sidebar-nav-link is-active"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="page"
                 aria-label="Available streams"
                 title="Streams waiting for your input"
               >
-                <span class="org-admin-sidebar-link-title"> Available </span>
+                <span class="sidebar-nav-title"> Available </span>
               </button>
             {{ else if eq .Status "active" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="sidebar-nav-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="false"
                 aria-label="Active streams"
                 title="Streams waiting for someone else input"
               >
-                <span class="org-admin-sidebar-link-title"> Active </span>
+                <span class="sidebar-nav-title"> Active </span>
               </button>
             {{ else if eq .Status "done" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="sidebar-nav-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="false"
                 aria-label="Completed streams"
                 title="Streams completed successfully"
               >
-                <span class="org-admin-sidebar-link-title"> Done </span>
+                <span class="sidebar-nav-title"> Done </span>
               </button>
             {{ else if eq .Status "terminated" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="sidebar-nav-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="false"
                 aria-label="Terminated streams"
                 title="Streams terminated before completion"
               >
-                <span class="org-admin-sidebar-link-title"> Terminated </span>
+                <span class="sidebar-nav-title"> Terminated </span>
               </button>
             {{ end }}
           {{ end }}
@@ -72,7 +72,7 @@
           </div>
           <div class="panel-actions">
             <button
-              class="secondary"
+              class="btn btn-secondary"
               type="button"
               data-home-nav="preview"
               onclick="document.getElementById('stream-preview-dialog').showModal()"
@@ -81,7 +81,7 @@
               View preview
             </button>
             <button
-              class="primary"
+              class="btn btn-primary"
               type="button"
               onclick="document.getElementById('new-instance-dialog').showModal()"
               {{ if .Error }}disabled{{ end }}
@@ -91,18 +91,18 @@
             </button>
           </div>
         </div>
-        <dialog id="new-instance-dialog" class="manage-dialog">
-          <div class="manage-dialog-card">
-            <header class="manage-dialog-head">
+        <dialog id="new-instance-dialog" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
               <div>
-                <h3 class="manage-dialog-title">New instance</h3>
-                <p class="manage-dialog-subtitle">
+                <h3 class="dialog-title">New instance</h3>
+                <p class="dialog-subtitle">
                   Give this stream instance a brief name.
                 </p>
               </div>
               <button
                 type="button"
-                class="secondary secondary-small"
+                class="btn btn-ghost btn-icon dialog-close"
                 onclick="document.getElementById('new-instance-dialog').close()"
               >
                 {{ template "icon-close" . }}
@@ -123,8 +123,8 @@
                   autocomplete="off"
                 />
               </div>
-              <div class="manage-dialog-actions manage-dialog-actions-end">
-                <button class="primary" type="submit">
+              <div class="dialog-actions">
+                <button class="btn btn-primary" type="submit">
                   {{ template "icon-play" . }}
                   Start instance
                 </button>
@@ -134,26 +134,26 @@
         </dialog>
         <dialog
           id="stream-preview-dialog"
-          class="manage-dialog stream-preview-dialog"
+          class="dialog"
         >
-          <div class="manage-dialog-card stream-preview-dialog-card">
-            <header class="manage-dialog-head">
+          <div class="dialog-card">
+            <header class="dialog-head">
               <div>
-                <h3 class="manage-dialog-title">Stream preview</h3>
-                <p class="manage-dialog-subtitle">
+                <h3 class="dialog-title">Stream preview</h3>
+                <p class="dialog-subtitle">
                   Inspect the stream timeline and form structure in read-only
                   mode.
                 </p>
               </div>
               <button
                 type="button"
-                class="secondary secondary-small"
+                class="btn btn-ghost btn-icon dialog-close"
                 onclick="document.getElementById('stream-preview-dialog').close()"
               >
                 {{ template "icon-close" . }}
               </button>
             </header>
-            <div class="stream-preview-dialog-body">
+            <div class="stream-preview-body">
               {{ template "stream_timeline" .Preview.StreamTimeline }}
             </div>
           </div>
@@ -352,7 +352,7 @@
                   >
                     <div class="platform-admin-pagination-pages">
                       <a
-                        class="secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
+                        class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
                         href="{{ .PreviousURL }}"
                       >
                         {{ template "icon-chevron-left" . }}
@@ -360,16 +360,16 @@
                       {{ range .PageLinks }}
                         <a
                           class="{{ if .IsCurrent }}
-                            primary
+                            btn btn-primary
                           {{ else }}
-                            secondary
+                            btn btn-secondary
                           {{ end }}"
                           href="{{ .URL }}"
                           >{{ .Page }}</a
                         >
                       {{ end }}
                       <a
-                        class="secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
+                        class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
                         href="{{ .NextURL }}"
                       >
                         {{ template "icon-chevron-right" . }}

@@ -1,0 +1,94 @@
+/*
+ * Dialog — modal shell (CSS-only component).
+ *
+ * dialog.dialog[.dialog-overflow]
+ *   div.dialog-card
+ *     header.dialog-head
+ *       div
+ *         h3.dialog-title[.u-text-danger?]
+ *         p.dialog-subtitle?
+ *       button.btn.btn-ghost.btn-icon.dialog-close
+ *     …body (form | p | div)…
+ *     div.dialog-actions
+ *       button…
+ *
+ * Modifiers (add only when needed):
+ *   .dialog-wide — wide shell (add to this file when 2+ pages need it; until then use page-scoped rules)
+ *   .dialog-overflow — allow flyouts (palette/role pickers) to extend outside the shell
+ *
+ * Page-specific: stream preview sizing → pages/stream.css (#stream-preview-dialog)
+ */
+
+.dialog {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: min(560px, 92vw);
+  max-width: 92vw;
+}
+
+.dialog-overflow {
+  overflow: visible;
+}
+
+.dialog::backdrop {
+  background: var(--backdrop-modal);
+  backdrop-filter: blur(2px);
+}
+
+.dialog-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 16px 34px var(--shadow);
+  padding: var(--space-4);
+  display: grid;
+}
+
+.dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.dialog-title {
+  margin: 0;
+}
+
+.dialog-subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.dialog-close {
+  transform: translate(calc(var(--space-2)), calc(-1 * var(--space-2)));
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  gap: var(--space-3);
+}
+
+.dialog-actions .btn-primary {
+  width: auto;
+}
+
+@media (--sm-down) {
+  .dialog-head {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .dialog-actions {
+    flex-direction: column;
+  }
+
+  .dialog-actions .btn {
+    width: 100%;
+  }
+}

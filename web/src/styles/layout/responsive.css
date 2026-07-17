@@ -14,10 +14,3 @@
     padding-top: var(--space-6);
   }
 }
-
-@media (--xl-up) {
-  .org-admin-sidebar {
-    position: sticky;
-    top: 44px;
-  }
-}

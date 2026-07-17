@@ -46,6 +46,11 @@ func TestOrgAdminTemplateRendersSidebarPanels(t *testing.T) {
 	body := out.String()
 
 	for _, marker := range []string{
+		`panel-sticky`,
+		`class="sidebar-nav"`,
+		`class="sidebar-nav-link"`,
+		`class="sidebar-nav-title"`,
+		`class="sidebar-nav-copy"`,
 		`data-org-admin-nav="profile"`,
 		`data-org-admin-nav="roles"`,
 		`data-org-admin-nav="members"`,

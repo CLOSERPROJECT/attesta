@@ -13,7 +13,7 @@
         </div>
         <button
           type="button"
-          class="primary js-share-link"
+          class="btn btn-primary js-share-link"
           data-share-url="{{ .DigitalLink }}"
           data-share-label="DPP link"
         >
@@ -29,7 +29,7 @@
       {{ if .Termination }}
         <hr class="u-divider" />
         <div class="panel-block">
-          <h2 class="manage-dialog-danger-title">Stream ended early</h2>
+          <h2 class="u-text-danger">Stream ended early</h2>
           <p class="dpp-termination-meta">
             {{ if .Termination.EndedAtHuman }}
               Ended at

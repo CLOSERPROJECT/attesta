@@ -11,17 +11,23 @@ description: >-
 
 ## When to extract a component
 
-Use the full bundle (template + CSS + Go view struct) when **all** apply:
+**Three tiers:**
 
-- Reused on 2+ pages, or is an HTMX/SSE partial target
-- Has namespaced CSS (~10+ rules, e.g. `.page-header-*`)
-- Has a dedicated view struct passed to `{{ template }}`
+| Tier | Template | CSS | Go view struct |
+|------|----------|-----|----------------|
+| **Full component** | `components/{name}.html` | `components/{name}.css` when ~10+ namespaced rules | Dedicated type in `components.go` |
+| **CSS-only component** | **None** — inline HTML in page templates | `components/{name}.css` with markup-tree header comment | **None** |
+| **Cluster / primitive** | inline | `shared.css`, `forms.css`, … | none |
+
+**Full component** — all apply: reused 2+ pages or HTMX/SSE target; namespaced CSS; stable field set assembled in Go.
+
+**CSS-only component** — reused markup tree + related selectors; no mode dispatch; see `docs/css.md` → CSS-only components. Example: panel section headers → `panel.css` (read file header for markup).
 
 **Cluster instead:**
 
-- Small primitives (`.panel`, `.pill`, `.muted`) → `web/src/styles/components/shared.css`
-- Domain groups (forms, org-admin widgets) → existing cluster files (`forms.css`, `org-admin.css`)
-- One-off markup with no dedicated styles → inline in page builder
+- Single-class primitives (`.muted`, `.pill`) → `shared.css`
+- Domain groups (forms, org-admin widgets) → existing cluster files
+- One-off markup with no dedicated styles → inline in page template
 
 Migrate **one component at a time**. Do not move every partial in one pass.
 
@@ -84,6 +90,14 @@ Also see:
 - `substep_body` — inner panel with explicit `SubstepBodyView.Mode` dispatch
 - `dpp_history_step` — DPP traceability rail wrapper around `stream_timeline_step`
 
+### CSS-only components
+
+- `panel` — card container and section headers (`web/src/styles/components/panel.css`); optional `.panel-sticky`; inline markup in `process.html`, `stream.html`, `dpp.html`, `org_admin.html`, `platform_admin.html`
+- `sidebar-nav` — section switcher tiles (`.sidebar-nav`, `.sidebar-nav-link`, … in `web/src/styles/components/sidebar-nav.css`); inline markup in `stream.html`, `org_admin.html`
+- `dialog` — modal shell (`.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … in `web/src/styles/components/dialog.css`); destructive titles stack `.dialog-title u-text-danger`; inline markup in `process.html`, `stream.html`, `home.html`, `org_admin.html`, `platform_admin.html`, `components/substep_body.html`
+- `button` — composable controls (`.btn` + variants/sizes/`btn-icon` in `web/src/styles/components/button.css`)
+- `list-row` — bordered list item with main + actions (`.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` in `web/src/styles/components/list-row.css`); inline markup in `org_admin.html`, `platform_admin.html`
+
 ## Docs and verification
 
 - CSS architecture and template ↔ CSS index: `docs/css.md`
@@ -93,7 +107,7 @@ Before claiming done:
 
 ```bash
 cd server && go test ./cmd/server/ -count=1
-cd server && go test ./cmd/server/ -run PageHeader -count=1
+cd server && go test ./cmd/server/ -run 'PageHeader|DialogMarkup|ListRowMarkup' -count=1
 task css:lint
 ```
 
