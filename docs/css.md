@@ -174,8 +174,8 @@ Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index
 | Token | rem | px | Typical use |
 |-------|-----|----|-------------|
 | `--text-xs` | `0.75rem` | 12 | Captions, pills, compact tags, meta IDs |
-| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels |
-| `--text-base` | `1rem` | 16 | Body, inputs, buttons, default prose |
+| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels, buttons |
+| `--text-base` | `1rem` | 16 | Body, inputs, default prose |
 | `--text-lg` | `1.125rem` | 18 | Card titles, dialog titles, emphasis headings |
 | `--text-xl` | `1.25rem` | 20 | Section headings (`h2` in panels; `h3` for nested/subsection titles) |
 | `--text-2xl` | `1.5rem` | 24 | Large titles, emphasis page headings |

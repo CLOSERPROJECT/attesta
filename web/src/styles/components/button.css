@@ -24,7 +24,7 @@
   border: 1px solid transparent;
   border-radius: 4px;
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: var(--leading-none);
   text-decoration: none;
@@ -113,13 +113,13 @@ a.btn:hover {
 .btn-xs {
   min-height: var(--btn-height-xs);
   padding: 0 var(--space-1);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .btn-sm {
   min-height: var(--btn-height-sm);
   padding: 0 var(--btn-padding-x-sm);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .btn-lg {
