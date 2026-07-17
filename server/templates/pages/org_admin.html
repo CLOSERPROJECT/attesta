@@ -218,16 +218,18 @@
               </button>
             </div>
             {{ if .RoleRows }}
-              <ul class="roles-list">
+              <ul class="list-rows">
                 {{ range .RoleRows }}
-                  <li class="roles-item">
-                    <span
-                      class="pill pill-lg role-pill"
-                      data-role-palette="{{ .Palette }}"
-                    >
-                      {{ .Name }}
-                    </span>
-                    <div class="user-actions">
+                  <li class="list-row">
+                    <div class="list-row-main">
+                      <span
+                        class="pill pill-lg role-pill"
+                        data-role-palette="{{ .Palette }}"
+                      >
+                        {{ .Name }}
+                      </span>
+                    </div>
+                    <div class="list-row-actions">
                       {{ if .InUse }}
                         <button
                           type="button"
@@ -488,10 +490,10 @@
             </div>
             {{ if .UsersError }}<p class="error">{{ .UsersError }}</p>{{ end }}
             {{ if .Users }}
-              <ul class="users-list">
+              <ul class="list-rows">
                 {{ range .Users }}
-                  <li class="users-item">
-                    <div class="user-main">
+                  <li class="list-row">
+                    <div class="list-row-main">
                       <span class="user-email">
                         {{ if .IsOrgAdmin }}
                           {{ template "icon-user-org-admin" . }}
@@ -519,7 +521,7 @@
                         {{ end }}
                       </div>
                     </div>
-                    <div class="user-actions">
+                    <div class="list-row-actions">
                       <button
                         type="button"
                         class="btn btn-ghost btn-icon btn-xs"

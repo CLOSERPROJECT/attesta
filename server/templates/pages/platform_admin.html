@@ -146,10 +146,10 @@
       <p class="error">{{ .Error }}</p>
     {{ end }}
     {{ if .Organizations }}
-      <ul class="platform-admin-list">
+      <ul class="list-rows">
         {{ range .Organizations }}
-          <li class="platform-admin-item">
-            <div class="platform-admin-item-main">
+          <li class="list-row">
+            <div class="list-row-main">
               {{ if .LogoAttachmentID }}
                 <img
                   src="/admin/orgs/logo/{{ .LogoAttachmentID }}"
@@ -172,7 +172,7 @@
                 </p>
               </div>
             </div>
-            <div class="user-actions">
+            <div class="list-row-actions">
               <button
                 type="button"
                 class="platform-admin-invite-button"

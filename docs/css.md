@@ -49,6 +49,7 @@ Org-admin forms and pickers live in `components/org-admin.css`, not the page mod
 | `components/panel.css` | `.panel`, `.panel-sticky`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Inline markup per `panel.css` header (CSS-only) |
 | `components/sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Inline markup per `sidebar-nav.css` header (CSS-only) |
 | `components/dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Inline markup per `dialog.css` header (CSS-only) |
+| `components/list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Inline markup per `list-row.css` header (CSS-only) |
 
 ### CSS-only components
 
@@ -78,6 +79,7 @@ Reused **markup patterns** backed by namespaced CSS, with **no** Go template par
 | `sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | See file header in `web/src/styles/components/sidebar-nav.css` |
 | `dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions` | See file header in `web/src/styles/components/dialog.css` |
 | `button.css` | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-ghost-danger`, `.btn-danger`, `.btn-outline`, `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon` | See file header in `web/src/styles/components/button.css` |
+| `list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | See file header in `web/src/styles/components/list-row.css` |
 
 **Dialog placement:** generic shell in `dialog.css`; `#stream-preview-dialog` sizing in `pages/stream.css`; org-admin role pill wrapper in `org-admin.css`. Destructive titles use `u-text-danger` (color only) stacked on `.dialog-title`. Wide shell modifier `.dialog-wide` deferred until a second page needs it.
 
@@ -92,6 +94,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
 | Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`) |
+| Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
 | `pages/home.html` | `pages/home.css` | `components/dialog.css`, `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` | `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
@@ -341,6 +344,7 @@ All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-s
 | `.panel-sticky` | Optional sticky rail modifier on `.panel` (active at `--xl-up`) |
 | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Section switcher tiles — see `sidebar-nav.css` header |
 | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Modal shells — see `dialog.css` header (CSS-only component) |
+| `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Admin list rows with actions — see `list-row.css` header |
 | `.stack` | Vertical rhythm |
 | `.muted` | Secondary text color |
 | `.pill`, `.role-pill` | Badges; pair with `data-role-palette` for role colors |
