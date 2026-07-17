@@ -1,0 +1,44 @@
+{{/* Step summary: accordion summary content shared by stream_timeline and DPP history. */}}
+
+{{ define "stream_step_summary" }}
+  <div class="stream-step-summary-main">
+    <span class="pill pill-step-number pill-panel">{{ .StepID }}</span>
+    {{ if not .HideOrgMark }}
+      {{ if .OrgLogoURL }}
+        <img
+          src="{{ .OrgLogoURL }}"
+          alt=""
+          class="stream-step-summary-org-mark"
+        />
+      {{ else }}
+        <span class="stream-step-summary-org-mark">
+          {{ template "icon-no-org" . }}
+        </span>
+      {{ end }}
+    {{ end }}
+    <span class="stream-step-summary-copy">
+      <span class="stream-step-summary-title">{{ .Title }}</span>
+      <div class="stream-step-summary-meta">
+        <span
+          ><strong>Organization:</strong>
+          {{ if .OrganizationName }}
+            {{ .OrganizationName }}
+          {{ else }}
+            No organization
+          {{ end }}</span
+        >
+        {{ if .CompletedAtHuman }}
+          <span
+            ><strong>Completed at:</strong>
+            <time datetime="{{ .CompletedAt }}">{{ .CompletedAtHuman }}</time></span
+          >
+        {{ end }}
+        {{ if .SubstepCount }}
+          <span
+            ><strong>Substeps:</strong> {{ .SubstepCount }}</span
+          >
+        {{ end }}
+      </div>
+    </span>
+  </div>
+{{ end }}

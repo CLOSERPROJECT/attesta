@@ -24,11 +24,11 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 		},
 		ProcessID:    "process-1",
 		InstanceName: "Pilot batch",
-		ActionList: ActionListView{
+		Detail: StreamInstanceDetailView{
 			WorkflowKey: "workflow",
 			ProcessID:   "process-1",
 			ProcessDone: true,
-			Action: &ActionView{
+			SelectedBody: &SubstepBodyView{
 				WorkflowKey: "workflow",
 				ProcessID:   "process-1",
 				SubstepID:   "1.1",
@@ -37,9 +37,11 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 				FormSchema:  `{"type":"object","properties":{"status":{"type":"string"}}}`,
 			},
 			Timeline: []TimelineStep{{
-				StepID:   "1",
-				Title:    "Production",
-				OrgName:  "Acme Org",
+				Summary: StepSummaryView{
+					StepID:           "1",
+					Title:            "Production",
+					OrganizationName: "Acme Org",
+				},
 				Expanded: true,
 				Substeps: []TimelineSubstep{{
 					SubstepID: "1.1",
@@ -47,7 +49,7 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 					Status:    "available",
 					Selected:  true,
 					Palette:   "blue",
-					Action: &ActionView{
+					Body: &SubstepBodyView{
 						WorkflowKey: "workflow",
 						ProcessID:   "process-1",
 						SubstepID:   "1.1",
@@ -76,10 +78,10 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 	if !strings.Contains(body, `class="substep-accordion js-process-substep-panel"`) {
 		t.Fatalf("expected process accordion substep panel, got: %s", body)
 	}
-	if !strings.Contains(compactBody, `class="substep-accordion js-process-substep-panel" data-substep-id="1.1" open`) {
+	if !strings.Contains(compactBody, `class="substep-accordion js-process-substep-panel" data-substep-id="1.1" aria-labelledby="substep-1-1-heading" open`) {
 		t.Fatalf("expected selected accordion substep to render open, got: %s", body)
 	}
-	if !strings.Contains(body, `class="process-resources-grid"`) || !strings.Contains(body, `class="timeline-list"`) {
+	if !strings.Contains(body, `class="process-resources-grid"`) || !strings.Contains(body, `class="stream-timeline-list"`) {
 		t.Fatalf("expected process resources grid with timeline, got: %s", body)
 	}
 	if !strings.Contains(body, `class="substep-details"`) {

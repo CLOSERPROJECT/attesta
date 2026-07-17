@@ -1,0 +1,35 @@
+{{/* Stream timeline: accordion tree of steps and substeps (see CONTEXT.md) */}}
+
+{{ define "stream_timeline" }}
+  <div class="stream-timeline-list">
+    {{ range .Timeline }}
+      {{ template "stream_timeline_step" (streamTimelineStep . $.HideStatus) }}
+    {{ end }}
+  </div>
+{{ end }}
+
+{{ define "stream_timeline_step" }}
+  {{ $stepDomID := printf "stream-timeline-step-%s" .Step.Summary.StepID }}
+  {{ $summaryDomID := printf "%s-summary" $stepDomID }}
+  <details
+    class="stream-timeline-step"
+    id="{{ $stepDomID }}"
+    {{ if .Step.Expanded }}open{{ end }}
+  >
+    <summary
+      class="stream-timeline-step-summary"
+      id="{{ $summaryDomID }}"
+      aria-labelledby="{{ $summaryDomID }}"
+    >
+      {{ template "stream_step_summary" .Step.Summary }}
+      <span class="stream-timeline-step-chevron" aria-hidden="true">
+        {{ template "icon-chevron-down" . }}
+      </span>
+    </summary>
+    <ul class="stream-timeline-substeps">
+      {{ range .Step.Substeps }}
+        {{ template "substep_shell" (streamTimelineSubstep . $.HideStatus) }}
+      {{ end }}
+    </ul>
+  </details>
+{{ end }}

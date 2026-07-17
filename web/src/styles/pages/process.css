@@ -1,3 +1,7 @@
+.process-page {
+  min-width: 0;
+}
+
 .process-attachments-list {
   list-style: none;
   padding: 0;

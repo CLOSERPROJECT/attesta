@@ -1,0 +1,71 @@
+.stream-timeline-list {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stream-timeline-step {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  overflow: visible;
+}
+
+.stream-timeline-step:hover {
+  border-color: var(--primary);
+}
+
+.stream-timeline-step-summary {
+  padding: var(--space-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stream-timeline-step-summary::marker,
+.stream-timeline-step-summary::-webkit-details-marker {
+  display: none;
+}
+
+.stream-timeline-step[open] .stream-timeline-step-chevron {
+  transform: rotate(180deg);
+  color: var(--foreground);
+}
+
+.stream-timeline-substeps {
+  list-style: none;
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (--sm-down) {
+  .stream-timeline-step-summary {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .stream-timeline-substeps {
+    padding-inline: var(--space-3);
+  }
+}
+
+@media (--md-down) {
+  .stream-timeline-step[open] > .stream-timeline-step-summary {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 10;
+  }
+
+  /* When a substep accordion opens, unstick the parent stream-timeline step summary. */
+  .stream-timeline-step[open]:has(.substep-accordion[open]) > .stream-timeline-step-summary {
+    position: static;
+  }
+}

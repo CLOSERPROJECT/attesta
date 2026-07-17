@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestBuildActionListDoneScalarValues(t *testing.T) {
+func TestBuildSubstepViewsDoneScalarValues(t *testing.T) {
 	cfg := testRuntimeConfig()
 	process := &Process{
 		ID: primitive.NewObjectID(),
@@ -17,10 +17,13 @@ func TestBuildActionListDoneScalarValues(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.1")
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	action := findSubstepView(t, actions, "1.1")
 	if action.Status != "done" {
 		t.Fatalf("expected status done, got %q", action.Status)
+	}
+	if action.Mode != SubstepBodyModeResult {
+		t.Fatalf("mode = %q, want %q", action.Mode, SubstepBodyModeResult)
 	}
 	if len(action.Values) != 1 {
 		t.Fatalf("expected 1 value row, got %d", len(action.Values))
@@ -33,7 +36,7 @@ func TestBuildActionListDoneScalarValues(t *testing.T) {
 	}
 }
 
-func TestBuildActionListDoneFileAttachments(t *testing.T) {
+func TestBuildSubstepViewsDoneFileAttachments(t *testing.T) {
 	cfg := testRuntimeConfig()
 	processID := primitive.NewObjectID()
 	attachmentID := primitive.NewObjectID().Hex()
@@ -53,8 +56,8 @@ func TestBuildActionListDoneFileAttachments(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.3")
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	action := findSubstepView(t, actions, "1.3")
 	if action.Status != "done" {
 		t.Fatalf("expected status done, got %q", action.Status)
 	}
@@ -83,7 +86,7 @@ func TestBuildActionListDoneFileAttachments(t *testing.T) {
 	}
 }
 
-func TestBuildActionListTerminatedStreamDetails(t *testing.T) {
+func TestBuildSubstepViewsTerminatedStreamDetails(t *testing.T) {
 	cfg := testRuntimeConfig()
 	process := &Process{
 		ID: primitive.NewObjectID(),
@@ -96,24 +99,30 @@ func TestBuildActionListTerminatedStreamDetails(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, map[roleMetaKey]RoleMeta{}, nil)
-	terminated := findAction(t, actions, "1.2")
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	terminated := findSubstepView(t, actions, "1.2")
 	if terminated.Status != processStatusTerminated {
 		t.Fatalf("terminated status = %q, want %s", terminated.Status, processStatusTerminated)
 	}
 	if terminated.DetailMessage != "supplier cancelled" {
 		t.Fatalf("terminated detail = %q", terminated.DetailMessage)
 	}
-	skipped := findAction(t, actions, "1.3")
+	if terminated.Mode != SubstepBodyModeMessage {
+		t.Fatalf("terminated mode = %q, want %q", terminated.Mode, SubstepBodyModeMessage)
+	}
+	skipped := findSubstepView(t, actions, "1.3")
 	if skipped.Status != "skipped" {
 		t.Fatalf("skipped status = %q, want skipped", skipped.Status)
 	}
 	if skipped.DetailMessage != "Step not completed because the stream was ended before this." {
 		t.Fatalf("skipped detail = %q", skipped.DetailMessage)
 	}
+	if skipped.Mode != SubstepBodyModeMessage {
+		t.Fatalf("skipped mode = %q, want %q", skipped.Mode, SubstepBodyModeMessage)
+	}
 }
 
-func TestBuildActionListTerminatedStreamWithoutReason(t *testing.T) {
+func TestBuildSubstepViewsTerminatedStreamWithoutReason(t *testing.T) {
 	cfg := testRuntimeConfig()
 	process := &Process{
 		ID:          primitive.NewObjectID(),
@@ -121,14 +130,14 @@ func TestBuildActionListTerminatedStreamWithoutReason(t *testing.T) {
 		Termination: &ProcessTermination{SubstepID: "1.1"},
 	}
 
-	actions := buildActionList(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.1")
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	action := findSubstepView(t, actions, "1.1")
 	if action.DetailMessage != "No reason provided." {
 		t.Fatalf("detail = %q, want no reason message", action.DetailMessage)
 	}
 }
 
-func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
+func TestBuildSubstepViewsDoneFormataValuesAndAttachments(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -174,8 +183,8 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 		},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.1")
+	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	action := findSubstepView(t, actions, "1.1")
 	if action.DoneAt != "19 Feb 2026 at 09:00 UTC" {
 		t.Fatalf("expected doneAt %q, got %q", "19 Feb 2026 at 09:00 UTC", action.DoneAt)
 	}
@@ -203,7 +212,7 @@ func TestBuildActionListDoneFormataValuesAndAttachments(t *testing.T) {
 	}
 }
 
-func TestBuildActionListDoneFormataPrimitiveAMultiFileAttachments(t *testing.T) {
+func TestBuildSubstepViewsDoneFormataPrimitiveAMultiFileAttachments(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -249,8 +258,8 @@ func TestBuildActionListDoneFormataPrimitiveAMultiFileAttachments(t *testing.T) 
 		},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.1")
+	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	action := findSubstepView(t, actions, "1.1")
 	if len(action.Values) != 0 {
 		t.Fatalf("expected no scalar values for multi-file formata payload, got %#v", action.Values)
 	}
@@ -265,7 +274,7 @@ func TestBuildActionListDoneFormataPrimitiveAMultiFileAttachments(t *testing.T) 
 	}
 }
 
-func TestBuildActionListLockedFormataDisabled(t *testing.T) {
+func TestBuildSubstepViewsLockedFormataDisabled(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -299,8 +308,8 @@ func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 		Progress: map[string]ProcessStep{},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.2")
+	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	action := findSubstepView(t, actions, "1.2")
 
 	if action.Status != "locked" {
 		t.Fatalf("expected status locked, got %q", action.Status)
@@ -311,9 +320,12 @@ func TestBuildActionListLockedFormataDisabled(t *testing.T) {
 	if action.Reason != "Locked by sequence" {
 		t.Fatalf("expected lock reason, got %q", action.Reason)
 	}
+	if action.Mode != SubstepBodyModePreview {
+		t.Fatalf("mode = %q, want %q", action.Mode, SubstepBodyModePreview)
+	}
 }
 
-func TestBuildActionListDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
+func TestBuildSubstepViewsDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -337,12 +349,12 @@ func TestBuildActionListDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
 		Progress: map[string]ProcessStep{},
 	}
 
-	actions := buildActionList(def, process, "workflow", Actor{
+	actions := buildSubstepViews(def, process, "workflow", Actor{
 		OrgSlug:   "org-b",
 		Role:      "dep1",
 		RoleSlugs: []string{"dep1"},
 	}, true, map[roleMetaKey]RoleMeta{}, nil)
-	action := findAction(t, actions, "1.1")
+	action := findSubstepView(t, actions, "1.1")
 
 	if action.Status != "available" {
 		t.Fatalf("expected status available, got %q", action.Status)
@@ -355,7 +367,7 @@ func TestBuildActionListDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
 	}
 }
 
-func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
+func TestBuildSubstepViewsIncludesAllAllowedRoleBadges(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -382,8 +394,8 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
 	})
 
-	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
-	action := findAction(t, actions, "1.1")
+	actions := buildSubstepViews(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
+	action := findSubstepView(t, actions, "1.1")
 	if len(action.RoleBadges) != 2 {
 		t.Fatalf("role badge count = %d, want 2", len(action.RoleBadges))
 	}
@@ -396,9 +408,12 @@ func TestBuildActionListIncludesAllAllowedRoleBadges(t *testing.T) {
 	if action.RoleBadges[0].Palette != "red" || action.RoleBadges[1].Palette != "orange" {
 		t.Fatalf("unexpected badge palettes: %#v", action.RoleBadges)
 	}
+	if action.Mode != SubstepBodyModeActionable {
+		t.Fatalf("mode = %q, want %q", action.Mode, SubstepBodyModeActionable)
+	}
 }
 
-func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
+func TestBuildSubstepViewsDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 	def := WorkflowDef{
 		Steps: []WorkflowStep{
 			{
@@ -433,8 +448,8 @@ func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
 	})
 
-	actions := buildActionList(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
-	action := findAction(t, actions, "1.1")
+	actions := buildSubstepViews(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
+	action := findSubstepView(t, actions, "1.1")
 	if action.Status != "done" {
 		t.Fatalf("status = %q, want done", action.Status)
 	}
@@ -449,13 +464,13 @@ func TestBuildActionListDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 	}
 }
 
-func findAction(t *testing.T, actions []ActionView, substepID string) ActionView {
+func findSubstepView(t *testing.T, views []SubstepBodyView, substepID string) SubstepBodyView {
 	t.Helper()
-	for _, action := range actions {
-		if action.SubstepID == substepID {
-			return action
+	for _, view := range views {
+		if view.SubstepID == substepID {
+			return view
 		}
 	}
-	t.Fatalf("action %s not found", substepID)
-	return ActionView{}
+	t.Fatalf("substep view %q not found in %#v", substepID, views)
+	return SubstepBodyView{}
 }

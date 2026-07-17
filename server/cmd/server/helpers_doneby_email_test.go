@@ -112,38 +112,21 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 			{StepID: "1", OrganizationSlug: "org-a"},
 		},
 	}
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
 		{SubstepID: "1.15", DoneBy: "appwrite:user-2"},
 		{SubstepID: "1.2", DoneBy: "legacy-user"},
 	}
-	timeline := []TimelineStep{
-		{
-			StepID: "1",
-			Substeps: []TimelineSubstep{
-				{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
-				{SubstepID: "1.15", DoneBy: "appwrite:user-2"},
-				{SubstepID: "1.2", DoneBy: "legacy-user"},
-			},
-		},
-	}
 
-	deniedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]ActionView(nil), actions...))
+	deniedActions := server.applyDoneByEmailToSubstepViews(context.Background(), def, Actor{OrgSlug: "org-z"}, append([]SubstepBodyView(nil), actions...))
 	if deniedActions[0].DoneBy != "appwrite:user-1" {
 		t.Fatalf("denied action doneBy = %q, want appwrite:user-1", deniedActions[0].DoneBy)
 	}
 	if deniedActions[1].DoneBy != "appwrite:user-2" {
 		t.Fatalf("denied action doneBy = %q, want appwrite:user-2", deniedActions[1].DoneBy)
 	}
-	deniedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-z"}, cloneTimelineSteps(timeline))
-	if deniedTimeline[0].Substeps[0].DoneBy != "appwrite:user-1" {
-		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-1", deniedTimeline[0].Substeps[0].DoneBy)
-	}
-	if deniedTimeline[0].Substeps[1].DoneBy != "appwrite:user-2" {
-		t.Fatalf("denied timeline doneBy = %q, want appwrite:user-2", deniedTimeline[0].Substeps[1].DoneBy)
-	}
 
-	allowedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]ActionView(nil), actions...))
+	allowedActions := server.applyDoneByEmailToSubstepViews(context.Background(), def, Actor{OrgSlug: "org-a"}, append([]SubstepBodyView(nil), actions...))
 	if allowedActions[0].DoneBy != "appwrite@example.com" {
 		t.Fatalf("allowed action doneBy = %q, want appwrite@example.com", allowedActions[0].DoneBy)
 	}
@@ -152,16 +135,6 @@ func TestApplyDoneByEmailVisibility(t *testing.T) {
 	}
 	if allowedActions[2].DoneBy != "legacy-user" {
 		t.Fatalf("legacy action doneBy = %q, want unchanged legacy-user", allowedActions[2].DoneBy)
-	}
-	allowedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-a"}, cloneTimelineSteps(timeline))
-	if allowedTimeline[0].Substeps[0].DoneBy != "appwrite@example.com" {
-		t.Fatalf("allowed timeline doneBy = %q, want appwrite@example.com", allowedTimeline[0].Substeps[0].DoneBy)
-	}
-	if allowedTimeline[0].Substeps[1].DoneBy != "appwrite:user-2" {
-		t.Fatalf("allowed timeline doneBy = %q, want unresolved appwrite fallback", allowedTimeline[0].Substeps[1].DoneBy)
-	}
-	if allowedTimeline[0].Substeps[2].DoneBy != "legacy-user" {
-		t.Fatalf("legacy timeline doneBy = %q, want unchanged legacy-user", allowedTimeline[0].Substeps[2].DoneBy)
 	}
 
 	termination := &ProcessTerminationView{EndedBy: "appwrite:user-1"}
@@ -190,25 +163,73 @@ func TestApplyDoneByIdentityFallbackToDPPTraceability(t *testing.T) {
 		},
 	}
 
-	traceability := []DPPTraceabilityStep{
+	traceability := []TimelineStep{
 		{
-			StepID: "1",
-			Substeps: []DPPTraceabilitySubstep{
-				{SubstepID: "1.1", DoneBy: "appwrite:user-1"},
-				{SubstepID: "1.15", DoneBy: "appwrite:user-1"},
-				{SubstepID: "1.2", DoneBy: "legacy-user"},
+			Substeps: []TimelineSubstep{
+				{SubstepID: "1.1", DoneBy: "appwrite:user-1", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
+				{SubstepID: "1.15", DoneBy: "", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
+				{SubstepID: "1.2", DoneBy: "legacy-user", Body: &SubstepBodyView{DoneBy: "legacy-user"}},
 			},
 		},
 	}
 	mapped := server.applyDoneByIdentityFallbackToDPPTraceability(context.Background(), traceability)
-	if mapped[0].Substeps[0].DoneBy != "appwrite:user-1" {
-		t.Fatalf("mapped dpp doneBy = %q, want appwrite fallback id", mapped[0].Substeps[0].DoneBy)
+	if mapped[0].Substeps[0].DoneBy != "user-1" {
+		t.Fatalf("mapped dpp doneBy = %q, want stripped public id", mapped[0].Substeps[0].DoneBy)
 	}
-	if mapped[0].Substeps[1].DoneBy != "appwrite:user-1" {
-		t.Fatalf("mapped dpp doneBy = %q, want appwrite fallback id", mapped[0].Substeps[1].DoneBy)
+	if mapped[0].Substeps[0].Body == nil || mapped[0].Substeps[0].Body.DoneBy != "user-1" {
+		t.Fatalf("mapped dpp body doneBy = %#v, want stripped public id", mapped[0].Substeps[0].Body)
+	}
+	if mapped[0].Substeps[1].DoneBy != "user-1" {
+		t.Fatalf("body-only dpp doneBy = %q, want stripped public id", mapped[0].Substeps[1].DoneBy)
+	}
+	if mapped[0].Substeps[1].Body == nil || mapped[0].Substeps[1].Body.DoneBy != "user-1" {
+		t.Fatalf("body-only dpp body doneBy = %#v, want stripped public id", mapped[0].Substeps[1].Body)
 	}
 	if mapped[0].Substeps[2].DoneBy != "legacy-user" {
 		t.Fatalf("legacy dpp doneBy = %q, want unchanged legacy-user", mapped[0].Substeps[2].DoneBy)
+	}
+}
+
+func TestApplyDoneByIdentityFallbackToDPPTraceabilityStripsPrefixWithoutLookup(t *testing.T) {
+	server := &Server{}
+	traceability := []TimelineStep{
+		{
+			Substeps: []TimelineSubstep{
+				{SubstepID: "1.1", Body: &SubstepBodyView{DoneBy: "appwrite:orphan-user"}},
+			},
+		},
+	}
+	mapped := server.applyDoneByIdentityFallbackToDPPTraceability(context.Background(), traceability)
+	if mapped[0].Substeps[0].DoneBy != "orphan-user" {
+		t.Fatalf("doneBy = %q, want orphan-user", mapped[0].Substeps[0].DoneBy)
+	}
+	if mapped[0].Substeps[0].Body == nil || mapped[0].Substeps[0].Body.DoneBy != "orphan-user" {
+		t.Fatalf("body doneBy = %#v, want orphan-user", mapped[0].Substeps[0].Body)
+	}
+}
+
+func TestLookupUserIdentityByActorIDUsesCache(t *testing.T) {
+	calls := 0
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				calls++
+				return IdentityUser{ID: userID, Email: "cached@example.com", Status: "active"}, nil
+			},
+		},
+	}
+	cache := map[string]userIdentityView{}
+
+	first, ok := server.lookupUserIdentityByActorID(context.Background(), "appwrite:user-1", cache)
+	if !ok || first.email != "cached@example.com" {
+		t.Fatalf("first lookup = %#v (ok=%t)", first, ok)
+	}
+	second, ok := server.lookupUserIdentityByActorID(context.Background(), "appwrite:user-1", cache)
+	if !ok || second.email != "cached@example.com" {
+		t.Fatalf("cached lookup = %#v (ok=%t)", second, ok)
+	}
+	if calls != 1 {
+		t.Fatalf("GetUserByID calls = %d, want 1", calls)
 	}
 }
 
@@ -223,29 +244,10 @@ func TestApplyDoneByEmailFallsBackToOpaqueActorIDWhenEmailUnavailable(t *testing
 	def := WorkflowDef{
 		Steps: []WorkflowStep{{StepID: "1", OrganizationSlug: "org-a"}},
 	}
-	actions := []ActionView{{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"}}
-	timeline := []TimelineStep{{
-		StepID: "1",
-		Substeps: []TimelineSubstep{
-			{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"},
-		},
-	}}
+	actions := []SubstepBodyView{{SubstepID: "1.1", DoneBy: "appwrite:user-no-email"}}
 
-	mappedActions := server.applyDoneByEmailToActions(context.Background(), def, Actor{OrgSlug: "org-a"}, actions)
+	mappedActions := server.applyDoneByEmailToSubstepViews(context.Background(), def, Actor{OrgSlug: "org-a"}, actions)
 	if mappedActions[0].DoneBy != "appwrite:user-no-email" {
 		t.Fatalf("mapped action doneBy = %q, want opaque appwrite actor id", mappedActions[0].DoneBy)
 	}
-
-	mappedTimeline := server.applyDoneByEmailToTimeline(context.Background(), def, Actor{OrgSlug: "org-a"}, timeline)
-	if mappedTimeline[0].Substeps[0].DoneBy != "appwrite:user-no-email" {
-		t.Fatalf("mapped timeline doneBy = %q, want opaque appwrite actor id", mappedTimeline[0].Substeps[0].DoneBy)
-	}
-}
-
-func cloneTimelineSteps(src []TimelineStep) []TimelineStep {
-	out := append([]TimelineStep(nil), src...)
-	for i := range out {
-		out[i].Substeps = append([]TimelineSubstep(nil), out[i].Substeps...)
-	}
-	return out
 }

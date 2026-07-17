@@ -1,16 +1,16 @@
 {{ define "attachment_carousel" }}
   {{ $total := len . }}
   {{ if gt $total 0 }}
-    <div class="action-submitted-attachments js-attachment-carousel">
-      <div class="action-submitted-attachments-track">
+    <div class="substep-body-attachments-carousel js-attachment-carousel">
+      <div class="substep-body-attachments-track">
         {{ range $index, $attachment := . }}
           <article
-            class="action-submitted-attachment"
+            class="substep-body-attachment"
             data-carousel-slide
             {{ if ne $index 0 }}hidden{{ end }}
           >
-            <div class="action-submitted-attachment-meta">
-              <div class="action-submitted-attachment-copy">
+            <div class="substep-body-attachment-meta">
+              <div class="substep-body-attachment-copy">
                 <h4>{{ $attachment.Key }}</h4>
               </div>
               <a class="secondary" href="{{ $attachment.URL }}">
@@ -18,10 +18,10 @@
                 Download
               </a>
             </div>
-            <div class="action-submitted-attachment-preview">
+            <div class="substep-body-attachment-preview">
               {{ if gt $total 1 }}
                 <div
-                  class="action-submitted-attachment-gesture"
+                  class="substep-body-attachment-gesture"
                   data-carousel-swipe
                 ></div>
               {{ end }}
@@ -38,7 +38,7 @@
                   loading="lazy"
                 ></iframe>
               {{ else }}
-                <div class="action-submitted-attachment-preview-fallback">
+                <div class="substep-body-attachment-preview-fallback">
                   <strong>Preview unavailable</strong>
                   <span>Use download to open {{ $attachment.Filename }}.</span>
                 </div>
@@ -49,7 +49,7 @@
         {{ if gt $total 1 }}
           <button
             type="button"
-            class="secondary action-submitted-attachments-nav action-submitted-attachments-nav-prev"
+            class="secondary substep-body-attachments-nav substep-body-attachments-nav-prev"
             data-carousel-prev
             aria-label="Previous attachment preview"
             disabled
@@ -58,7 +58,7 @@
           </button>
           <button
             type="button"
-            class="secondary action-submitted-attachments-nav action-submitted-attachments-nav-next"
+            class="secondary substep-body-attachments-nav substep-body-attachments-nav-next"
             data-carousel-next
             aria-label="Next attachment preview"
           >
@@ -68,13 +68,13 @@
       </div>
       {{ if gt $total 1 }}
         <div
-          class="action-submitted-attachments-dots"
+          class="substep-body-attachments-dots"
           aria-label="Attachment preview position"
         >
           {{ range $index, $attachment := . }}
             <button
               type="button"
-              class="action-submitted-attachments-dot"
+              class="substep-body-attachments-dot"
               data-carousel-dot="{{ $index }}"
               aria-label="Show preview for {{ $attachment.Filename }}"
               {{ if eq $index 0 }}aria-current="true"{{ end }}

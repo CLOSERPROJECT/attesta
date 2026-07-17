@@ -49,5 +49,5 @@ The always-visible row for one substep: ID, title, status, and optional completi
 _Avoid_: Action card header
 
 **Substep body**:
-The expandable content below a substep summary. Renders in one of four modes: **preview** (read-only form shell, includes locked), **actionable** (fillable form), **result** (submitted values), or **message** (text-only, e.g. terminated/skipped).
+The expandable content below a substep summary. Renders in one of four modes: **preview** (read-only form shell, includes locked), **actionable** (fillable form), **result** (submitted values), or **message** (text-only, e.g. terminated/skipped). Go builders set an explicit `SubstepBodyView.Mode` field; the template dispatches via `effectiveSubstepBodyMode`.
 _Avoid_: Action detail, action content

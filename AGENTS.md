@@ -12,7 +12,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
 ## Current auth/org status (2026-07)
 - Demo impersonation has been removed from production code paths.
 - Session auth is active (`attesta_session` cookie). Regular users store an Appwrite session secret; platform admin uses a separate env-derived session value (`platform-admin:…`).
-- Dashboard route is `/dashboard` (workflow-scoped variant: `/w/:workflow/dashboard`).
+- Stream dashboard is `/w/:key/` (lists stream instances for one stream). Legacy `/dashboard` and `/w/:key/dashboard` are not registered.
 - Admin consoles:
   - Platform admin: `/admin/orgs` (create/edit/delete orgs, upload logos, invite org admins)
   - Org admin: `/org-admin/roles`, `/org-admin/users`
@@ -46,7 +46,7 @@ When acting as a coding agent in this repository:
 
 ## Layout
 - `server/` — Go module (`server/go.mod`)
-  - `server/cmd/server/` — all backend code (single `package main`) and most logic.
+  - `server/cmd/server/` — single `package main`; route wiring and most handlers in `main.go`, with domain logic peeled into focused files: `timeline_builder.go`, `substep_views_builder.go`, `stream_instance_detail.go`, `stream_step_summary.go`, `done_by_identity.go`, `dpp.go`, `components.go`, `authorizer.go`, `store.go`, `identity*.go`, `formata_builder.go`, `role_meta.go`, `templates.go`.
   - `server/templates/` — Go `html/template` templates (`layout.html` at root; full screens in `pages/`; reusable partials in `components/` as they are migrated).
   - `server/config/workflow.yaml` — runtime workflow + departments + users.
 - `web/` — Vite project
@@ -108,77 +108,89 @@ task start
 ```
 
 ## Runtime configuration
-Backend environment variables (observed):
-- `MONGODB_URI` (default `mongodb://localhost:27017`) — used in `server/cmd/server/main.go:248`
-- `CERBOS_URL` (default `http://localhost:3592`) — used in `server/cmd/server/main.go:267`
+Backend environment variables are read in `main()` (`server/cmd/server/main.go` env bootstrap). Common vars:
+- `MONGODB_URI` (default `mongodb://localhost:27017`)
+- `CERBOS_URL` (default `http://localhost:3592`)
 - `APPWRITE_ENDPOINT` (default `http://appwrite/v1`)
 - `APPWRITE_PROJECT_ID`
 - `APPWRITE_API_KEY`
 - `APPWRITE_INVITE_REDIRECT_URL`
 - `APPWRITE_RESET_REDIRECT_URL`
 - `APPWRITE_ORG_ASSETS_BUCKET` (default `org-assets`)
-- `WORKFLOW_CONFIG` (default `config/workflow.yaml`) — used in `server/cmd/server/main.go:271`
-- `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size; used in `server/cmd/server/main.go:298-309`
+- `WORKFLOW_CONFIG` (default `config/workflow.yaml`); `WORKFLOW_CONFIG_DIR` overrides the catalog directory
+- `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size via `attachmentMaxBytes()`
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD` — platform admin credentials; both required to enable the console
 - `ANYONE_CAN_CREATE_ACCOUNT`
 - `SESSION_TTL_DAYS`, `COOKIE_SECURE`
 
 Example env file: `.env.example`.
 
-Workflow config structure lives in `server/config/workflow.yaml` and is loaded/reloaded by `Server.getConfig()` (`server/cmd/server/main.go:1033+`).
+Workflow YAML lives under `server/config/` (and optional `WORKFLOW_CONFIG_DIR`). Runtime lookup uses `Server.runtimeConfig()` → `configProvider` (tests) or `workflowByKey()` / catalog reload — not a `getConfig()` helper.
 
 ## Backend architecture notes (what to know before changing things)
 ### HTTP routes
-Routes are registered in `server/cmd/server/main.go:274-283`.
-Key endpoints:
-- `POST /process/start`
-- `GET /process/:id`
-- `GET /process/:id/timeline` (partial HTML)
-- `POST /process/:id/substep/:substepId/complete`
-- `GET /process/:id/substep/:substepId/file` (download)
-- `GET /dashboard`
+Global routes are registered in `Server.newMux()` (`server/cmd/server/main.go`). Workflow-scoped routes mount at `/w/` via `handleWorkflowRoutes` → `handleProcessRoutes`.
+
+**Global (non-workflow):**
+- `GET /` — stream picker (`handleHome`)
 - `GET/POST /login`, `GET/POST /signup`, `POST /logout`
-- `GET /invite/accept`
-- `GET/POST /reset`, `GET/POST /reset/confirm`
+- `GET /invite/…`, `GET/POST /reset`, `GET/POST /reset/…`
 - `GET/POST /admin/orgs`, `GET/POST /admin/orgs/` (platform admin org console; logo at `/admin/orgs/logo/:id`)
-- `GET/POST /org-admin/roles`, `GET/POST /org-admin/users`
-- `GET /events` (SSE)
+- `GET/POST /org-admin/roles`, `/org-admin/users`, `/org-admin/formata-builder`, …
+- `GET /01/…` — public DPP Digital Link
+- `GET /events` — legacy SSE mux entry (production UI uses workflow-scoped path below)
+
+**Workflow-scoped (`/w/:key/…`):**
+- `GET /w/:key/` — stream dashboard (instance list + timeline preview)
+- `POST /w/:key/process/start`
+- `GET /w/:key/process/:id` — stream instance detail page
+- `GET /w/:key/process/:id/content` — HTMX/SSE content partial (replaces old `/timeline`)
+- `GET /w/:key/process/:id/downloads` — downloads partial
+- `POST /w/:key/process/:id/terminate`
+- `POST /w/:key/process/:id/substep/:substepId/complete`
+- `GET/POST /w/:key/process/:id/substep/:substepId/override`
+- `GET /w/:key/process/:id/attachment/:attachmentId/file` — attachment download
+- Export downloads: `files.zip`, `notarized.json`, `merkle.json` under `/w/:key/process/:id/…`
+- `GET /w/:key/events?processId=…` or `?role=…` — workflow-scoped SSE (used by `web/src/main.js`)
+
+Legacy `/dashboard` and `/w/:key/dashboard` return 404 (`workflow_coverage_test`).
 
 ### Actor/role identity
-Impersonation is cookie-based:
-- cookie name: `demo_user`
-- cookie value format: `userId|role`
+Session auth via `attesta_session` cookie:
+- Regular users: Appwrite session secret from login/signup/invite flows (`readSession()`, `currentUser()` in `main.go`)
+- Platform admin: env-derived session value (`platform-admin:…` via `platformAdminSessionValue()`)
+- Request actor for Cerbos/completion: `Actor` built from authenticated user + workflow context (org slug, role slugs, `workflowKey`)
 
-See `readActor()` in `server/cmd/server/main.go:1175-1185` and handler `handleImpersonate()` in `server/cmd/server/main.go:534-560`.
+Demo impersonation (`demo_user` cookie, `readActor()`, `handleImpersonate()`) is removed from production code; `demo_user` may still appear in older tests.
 
 ### Authorization (Cerbos)
 The backend checks whether a substep can be completed via Cerbos:
 - client: `CerbosAuthorizer` in `server/cmd/server/authorizer.go`
 - policy: `cerbos/policies/substep_policy.yaml`
 
-Cerbos request includes `sequenceOk` and role requirements (`server/cmd/server/authorizer.go:33-56`).
+Cerbos request includes `sequenceOk` and role requirements (`CerbosAuthorizer` in `authorizer.go`).
 
 ### Process progress keys (Mongo gotcha)
 Substep IDs contain dots (e.g. `1.1`). MongoDB field names cannot contain dots, so progress map keys are encoded:
-- encode for storage: `encodeProgressKey()` replaces `.` with `_` (`server/cmd/server/main.go:1400-1402`)
-- decode for reads: `normalizeProgressKeys()` replaces `_` with `.` (`server/cmd/server/main.go:1404-1414`)
+- encode for storage: `encodeProgressKey()` replaces `.` with `_`
+- decode for reads: `normalizeProgressKeys()` replaces `_` with `.`
 
-When touching progress persistence, follow this pattern (see `MongoStore.UpdateProcessProgress()` in `server/cmd/server/store.go:111-118`).
+When touching progress persistence, follow this pattern (see `MongoStore.UpdateProcessProgress()` in `store.go`).
 
 ### File uploads / downloads
 - Completion payloads are either scalar (`ParseForm`) or file (`ParseMultipartForm`) based on workflow `inputType`.
 - File uploads are size-limited with `http.MaxBytesReader` and `ATTACHMENT_MAX_BYTES`.
-- Files are stored in **Mongo GridFS** bucket named **`attachments`** (`server/cmd/server/store.go:229-231`).
-- Metadata is stored in `attachments.files` (see `LoadAttachmentByID()` in `server/cmd/server/store.go:187+`).
+- Files are stored in **Mongo GridFS** bucket named **`attachments`** (`store.go`).
+- Metadata is stored in `attachments.files` (see `LoadAttachmentByID()` in `store.go`).
 
-Download endpoint streams GridFS content and sets `Content-Disposition` with a sanitized filename (`server/cmd/server/main.go:437-489`, `sanitizeAttachmentFilename()` at `server/cmd/server/main.go:842-860`).
+Download endpoint `handleDownloadProcessAttachment` streams GridFS content and sets `Content-Disposition` with a sanitized filename (`sanitizeAttachmentFilename()` in `main.go`).
 
 ### SSE (server) + partial refresh (web)
-- SSE hub is `SSEHub` (`server/cmd/server/main.go:109-1640`).
+- SSE hub is `SSEHub` (`main.go`).
 - Backend emits:
   - `event: process-updated` for process streams
   - `event: role-updated` for role dashboards
-  (see `handleEvents()` in `server/cmd/server/main.go:862-909`).
+  (see `handleEvents()` in `main.go`; workflow-scoped at `/w/:key/events`).
 - Frontend listens via `EventSource` and refreshes partial HTML via `fetch()` (`web/src/main.js`).
 
 ### DPP / GS1 Digital Link
@@ -192,18 +204,20 @@ Download endpoint streams GridFS content and sets `Content-Disposition` with a s
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.
 
 ## Templates and static assets
-- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`.
+- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`. Custom funcs in `templateFuncs()` include `dict` for inline map literals and typed wrappers such as `streamTimelineStep` / `streamTimelineSubstep` (e.g. `{{ template "stream_timeline_step" (streamTimelineStep . $.HideStatus) }}`).
 - **Template define names** match the file stem (no extension): e.g. `components/page_header.html` → `{{ define "page_header" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated.
-- **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`PageHeaderView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page-specific assembly stays in handlers or future `page_*.go` files.
+- **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`PageHeaderView`, `SubstepBodyView`, `StreamInstanceDetailView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page/view assembly is partially peeled (`stream_instance_detail.go`, `substep_views_builder.go`, `timeline_builder.go`); remaining handlers stay in `main.go`.
 - **Component eligibility:** extract to `templates/components/` + namespaced CSS + `components.go` struct when reused on 2+ pages, is an HTMX/SSE partial target, or has a dedicated view struct. Migrate one component at a time; primitives stay in `components/shared.css`.
-- Backoffice action cards (`server/templates/action_list.html`) render editable forms only for non-`done` actions; `done` actions render a read-only Submitted block with flattened values and attachment download links.
-- Locked Formata actions render `action-card action-locked` and `.js-formata-host[data-formata-disabled="true"]`; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
-- Static assets are served from `../web/dist` under `/static/` (`server/cmd/server/main.go:275`).
-- Layout template includes HTMX via an external script tag (`server/templates/layout.html:9-13`).
+- Substep bodies (`server/templates/components/substep_body.html`) dispatch on explicit **`Mode`** (`preview`|`actionable`|`result`|`message`) via `effectiveSubstepBodyMode`; builders set `SubstepBodyView.Mode` (`resolveSubstepBodyMode` in `components.go`).
+- Stream timeline (`server/templates/components/stream_timeline.html`) renders the step/substep accordion tree on stream instance detail and stream dashboard preview; inner define `stream_timeline_step` calls `substep_shell` via `(streamTimelineSubstep . $.HideStatus)`; `substep_shell` dispatches to `substep_body` with `TimelineSubstep.Body` (`*SubstepBodyView`).
+- Stream instance detail partial (`stream_instance_detail_content`) is built by `buildStreamInstanceDetailView` in `stream_instance_detail.go` and exposed on `ProcessPageView.Detail` (`StreamInstanceDetailView`).
+- Locked Formata substeps render `.js-formata-host[data-formata-disabled="true"]` in preview mode; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
+- Static assets are served from `../web/dist` under `/static/` (`newMux()` in `main.go`).
+- Layout template includes HTMX via an external script tag (`server/templates/layout.html`).
 
 ## Testing patterns
 - Unit tests live next to code in `server/cmd/server/*_test.go`.
-- Most handler tests use `httptest.NewRequest`/`httptest.NewRecorder` and a `MemoryStore` (`server/cmd/server/store.go:233+`).
+- Most handler tests use `httptest.NewRequest`/`httptest.NewRecorder` and a `MemoryStore` (`store.go`).
 - Integration tests are behind build tag `integration` (`server/cmd/server/integration_complete_test.go`) and skip if dependencies are unavailable.
 
 ## Deployment files

@@ -8,7 +8,7 @@ import (
 )
 
 func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.1", Status: "locked"},
 		{SubstepID: "1.2", Status: "available"},
 		{SubstepID: "1.3", Status: "done"},
@@ -23,26 +23,26 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	if got := resolveSelectedSubstepID(actions, "", true); got != "" {
 		t.Fatalf("resolveSelectedSubstepID done = %q, want empty", got)
 	}
-	if got := resolveSelectedSubstepID([]ActionView{{SubstepID: "9.1", Status: "locked"}}, "", false); got != "9.1" {
+	if got := resolveSelectedSubstepID([]SubstepBodyView{{SubstepID: "9.1", Status: "locked"}}, "", false); got != "9.1" {
 		t.Fatalf("resolveSelectedSubstepID first fallback = %q, want %q", got, "9.1")
 	}
 	if got := resolveSelectedSubstepID(nil, "", false); got != "" {
 		t.Fatalf("resolveSelectedSubstepID empty list = %q, want empty", got)
 	}
 
-	selected, ok := selectedActionBySubstep(actions, "1.2", false)
+	selected, ok := selectedSubstepBody(actions, "1.2", false)
 	if !ok || selected.SubstepID != "1.2" {
-		t.Fatalf("selectedActionBySubstep selected = %#v (ok=%t), want substep 1.2 only", selected, ok)
+		t.Fatalf("selectedSubstepBody selected = %#v (ok=%t), want substep 1.2 only", selected, ok)
 	}
-	selected, ok = selectedActionBySubstep(actions, "", false)
+	selected, ok = selectedSubstepBody(actions, "", false)
 	if !ok || selected.SubstepID != "1.1" {
-		t.Fatalf("selectedActionBySubstep empty selected = %#v (ok=%t), want first action", selected, ok)
+		t.Fatalf("selectedSubstepBody empty selected = %#v (ok=%t), want first action", selected, ok)
 	}
-	if _, ok := selectedActionBySubstep(actions, "404", false); ok {
-		t.Fatal("selectedActionBySubstep missing selected should return false")
+	if _, ok := selectedSubstepBody(actions, "404", false); ok {
+		t.Fatal("selectedSubstepBody missing selected should return false")
 	}
-	if _, ok := selectedActionBySubstep(actions, "1.2", true); ok {
-		t.Fatal("selectedActionBySubstep done process should return false")
+	if _, ok := selectedSubstepBody(actions, "1.2", true); ok {
+		t.Fatal("selectedSubstepBody done process should return false")
 	}
 }
 
@@ -85,45 +85,65 @@ func TestCloneRequestWithSelectedSubstepHandlesNilURL(t *testing.T) {
 
 func TestDecorateTimelineActionsAttachesMatchingSubstepAction(t *testing.T) {
 	timeline := []TimelineStep{{
-		StepID: "1",
 		Substeps: []TimelineSubstep{
 			{SubstepID: "1.1", Status: "available"},
 			{SubstepID: "1.2", Status: "available"},
 		},
 	}}
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.2", Title: "Inspect lot", WorkflowKey: "workflow", Status: "available"},
 	}
 
-	got := decorateTimelineActions(timeline, actions)
-	if got[0].Substeps[0].Action != nil {
+	got := decorateTimelineSubstepBodies(timeline, actions)
+	if got[0].Substeps[0].Body != nil {
 		t.Fatal("expected unrelated substep action to stay nil")
 	}
-	if got[0].Substeps[1].Action == nil {
+	if got[0].Substeps[1].Body == nil {
 		t.Fatal("expected matching substep action to be attached")
 	}
-	if got[0].Substeps[1].Action.SubstepID != "1.2" || got[0].Substeps[1].Action.Title != "Inspect lot" {
-		t.Fatalf("attached action = %#v", got[0].Substeps[1].Action)
+	if got[0].Substeps[1].Body.SubstepID != "1.2" || got[0].Substeps[1].Body.Title != "Inspect lot" {
+		t.Fatalf("attached action = %#v", got[0].Substeps[1].Body)
 	}
-	if got[0].Substeps[1].Status != "available" {
-		t.Fatalf("status = %q, want available", got[0].Substeps[1].Status)
+	if got[0].Substeps[1].Body.Status != "available" {
+		t.Fatalf("body status = %q, want available", got[0].Substeps[1].Body.Status)
+	}
+}
+
+func TestDecorateTimelineSubstepBodiesReplacesShellStub(t *testing.T) {
+	stub := &SubstepBodyView{SubstepID: "1.1", Status: "available", Palette: "red"}
+	timeline := []TimelineStep{{
+		Substeps: []TimelineSubstep{{
+			SubstepID: "1.1", Status: "available", Body: stub,
+		}},
+	}}
+	full := []SubstepBodyView{{
+		SubstepID: "1.1", Status: "available", Disabled: true,
+		Title: "Inspect lot", WorkflowKey: "workflow",
+	}}
+	got := decorateTimelineSubstepBodies(timeline, full)
+	shell := substepShellDisplay(got[0].Substeps[0])
+	if shell.Status != "active" {
+		t.Fatalf("shell status = %q, want active after disabled full body", shell.Status)
+	}
+	if got[0].Substeps[0].Body.Title != "Inspect lot" {
+		t.Fatalf("body = %#v", got[0].Substeps[0].Body)
 	}
 }
 
 func TestDecorateTimelineActionsMapsUnauthorizedAvailableToActive(t *testing.T) {
 	timeline := []TimelineStep{{
-		StepID: "1",
 		Substeps: []TimelineSubstep{
 			{SubstepID: "1.1", Status: "available"},
 		},
 	}}
-	actions := []ActionView{
+	actions := []SubstepBodyView{
 		{SubstepID: "1.1", Status: "available", Disabled: true},
 	}
 
-	got := decorateTimelineActions(timeline, actions)
-	if got[0].Substeps[0].Status != "active" {
-		t.Fatalf("status = %q, want active", got[0].Substeps[0].Status)
+	got := decorateTimelineSubstepBodies(timeline, actions)
+	shell := substepShellDisplay(got[0].Substeps[0])
+	if shell.Status != "active" {
+		t.Fatalf("shell status = %q, want active", shell.Status)
 	}
 }
 

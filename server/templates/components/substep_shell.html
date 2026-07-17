@@ -1,0 +1,55 @@
+{{ define "substep_shell" }}
+  {{ $shell := substepShellDisplay .Substep }}
+  {{ $substepDomID := replace .Substep.SubstepID "." "-" }}
+  <li
+    class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
+    data-role-palette="{{ $shell.Palette }}"
+  >
+    <details
+      class="substep-accordion js-process-substep-panel"
+      data-substep-id="{{ .Substep.SubstepID }}"
+      aria-labelledby="substep-{{ $substepDomID }}-heading"
+      {{ if .Substep.Selected }}open{{ end }}
+    >
+      <summary class="substep-accordion-summary">
+        <div class="substep-summary-main">
+          <span class="pill pill-panel">{{ .Substep.SubstepID }}</span>
+          <div class="substep-title">
+            <span class="substep-title-heading" id="substep-{{ $substepDomID }}-heading">{{ .Substep.Title }}</span>
+            {{ if eq $shell.Status "done" }}
+              <div class="substep-meta">
+                {{ if $shell.DoneAt }}
+                  <span class="substep-meta-time"
+                    ><strong>Completed at:</strong> {{ $shell.DoneAt }}</span
+                  >
+                {{ end }}
+                {{ if $shell.DoneBy }}
+                  <span class="substep-meta-actor"
+                    ><strong>Operator:</strong> {{ $shell.DoneBy }}</span
+                  >
+                {{ end }}
+              </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ if not .HideStatus }}
+          <span class="status" aria-label="Status: {{ if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end }}">
+            {{- if $shell.StatusLabel }}{{ $shell.StatusLabel }}{{ else }}{{ $shell.Status }}{{ end -}}
+          </span>
+        {{ end }}
+        <span class="substep-accordion-chevron" aria-hidden="true">
+          {{ template "icon-chevron-down" . }}
+        </span>
+      </summary>
+      <div class="substep-details">
+        {{ with .Substep.Body }}
+          {{ template "substep_body" . }}
+        {{ else }}
+          <p class="muted">
+            No data form configured for this substep.
+          </p>
+        {{ end }}
+      </div>
+    </details>
+  </li>
+{{ end }}

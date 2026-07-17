@@ -141,14 +141,20 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if !strings.Contains(body, "5 Mar 2026 at 14:30 UTC") {
 		t.Fatalf("expected human-readable completion time in body, got %q", body)
 	}
-	if !strings.Contains(body, `aria-label="Toggle step details"`) {
-		t.Fatalf("expected accordion summary toggle in body, got %q", body)
+	if !strings.Contains(body, `class="stream-timeline-step-summary"`) {
+		t.Fatalf("expected stream timeline step summary in body, got %q", body)
+	}
+	if !strings.Contains(body, `class="dpp-history-item"`) {
+		t.Fatalf("expected dpp history rail wrapper in body, got %q", body)
 	}
 	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(body, "<dd>1</dd>") {
 		t.Fatalf("expected inline traceability value in body, got %q", body)
 	}
 	if strings.Contains(body, ">Documents<") {
 		t.Fatalf("expected Documents section removed from body, got %q", body)
+	}
+	if strings.Contains(body, `class="stream-step-summary-org-mark"`) {
+		t.Fatalf("did not expect org mark on DPP page, got %q", body)
 	}
 }
 
@@ -432,6 +438,119 @@ func TestHandleDigitalLinkDPPHTMLShowsPrematureTermination(t *testing.T) {
 	}
 	if strings.Contains(body, "ended@example.com") || !strings.Contains(body, "user-1") {
 		t.Fatalf("expected DPP termination to keep user id, got %q", body)
+	}
+}
+
+func TestHandleDigitalLinkDPPHTMLStripsAppwriteOperatorPrefix(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
+
+	store := NewMemoryStore()
+	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				DoneBy: &Actor{ID: "appwrite:user-1", Role: "dep1"},
+				Data:   map[string]interface{}{"value": float64(1)},
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+	server := &Server{
+		store: store,
+		tmpl:  parseTestTemplates(t),
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "operator@example.com", Status: "active"}, nil
+			},
+		},
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "appwrite:") {
+		t.Fatalf("expected public DPP to strip appwrite prefix from operator, got %q", body)
+	}
+	if strings.Contains(body, "operator@example.com") || !strings.Contains(body, "user-1") {
+		t.Fatalf("expected public DPP operator id without email, got %q", body)
+	}
+}
+
+func TestHandleDigitalLinkDPPHTMLRendersOverrideSubstepValues(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
+
+	store := NewMemoryStore()
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State: "done",
+				Data:  map[string]interface{}{"value": "override-ok"},
+			},
+		},
+		Overrides: map[string]SubstepOverride{
+			"1_1": {
+				SubstepID: "1.1",
+				Schema:    map[string]interface{}{"type": "object"},
+				Reason:    "local source shape",
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+
+	tmpl := parseTestTemplates(t)
+	server := &Server{
+		store:     store,
+		tmpl:      tmpl,
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d body=%q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		"Completed with local form adaptation.",
+		"Reason: local source shape",
+		"<dt>value</dt>",
+		"<dd>override-ok</dd>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in DPP override body, got: %s", want, body)
+		}
 	}
 }
 

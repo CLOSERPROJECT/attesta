@@ -903,7 +903,7 @@ const requestActiveRoleChoice = (form, onSelected) => {
     dialog.setAttribute("open", "");
   }
   const checked = dialog.querySelector(
-    'input[data-active-role-option]:checked',
+    "input[data-active-role-option]:checked",
   );
   if (checked instanceof HTMLInputElement) {
     checked.focus();
@@ -1147,7 +1147,10 @@ document.body.addEventListener("toggle", (event) => {
       panel.open = false;
     }
     markSelectedSubstep(substepID);
-    focusNextActionInput();
+    const summary = target.querySelector(".substep-accordion-summary");
+    if (summary instanceof HTMLElement) {
+      summary.focus();
+    }
     return;
   }
   if (currentSelectedSubstep() === substepID) {
@@ -1178,7 +1181,7 @@ document.body.addEventListener("click", (event) => {
       return;
     }
     const selected = dialog.querySelector(
-      'input[data-active-role-option]:checked',
+      "input[data-active-role-option]:checked",
     );
     const error = dialog.querySelector("[data-active-role-error]");
     if (!(selected instanceof HTMLInputElement)) {

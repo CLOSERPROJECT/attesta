@@ -164,34 +164,6 @@ type SSEHub struct {
 	stream map[string]map[chan string]struct{}
 }
 
-type TimelineSubstep struct {
-	SubstepID    string
-	Title        string
-	Description  string
-	Selected     bool
-	Action       *ActionView
-	Palette      string
-	Status       string
-	StatusLabel  string
-	DoneBy       string
-	DoneRole     string
-	DoneAt       string
-	DisplayValue string
-	FileName     string
-	FileSHA256   string
-	FileURL      string
-}
-
-type TimelineStep struct {
-	StepID     string
-	Title      string
-	OrgSlug    string
-	OrgName    string
-	OrgLogoURL string
-	Expanded   bool
-	Substeps   []TimelineSubstep
-}
-
 type NotarizedAttachment struct {
 	AttachmentID string `json:"attachment_id"`
 	Filename     string `json:"filename"`
@@ -247,64 +219,6 @@ type NotarizedProcessTermination struct {
 	EndedBy   string `json:"ended_by,omitempty"`
 	EndedRole string `json:"ended_role,omitempty"`
 	SubstepID string `json:"substep_id,omitempty"`
-}
-
-type ActionView struct {
-	WorkflowKey    string
-	ProcessID      string
-	SubstepID      string
-	Title          string
-	Description    string
-	Role           string
-	RoleBadges     []ActionRoleBadge
-	MatchingRoles  []ActionRoleOption
-	RoleLabel      string
-	Palette        string
-	InputKey       string
-	InputType      string
-	FormSchema     string
-	FormUISchema   string
-	Status         string
-	DoneAt         string
-	DoneBy         string
-	DoneRole       string
-	Values         []ActionKV
-	Attachments    []ActionAttachmentView
-	Disabled       bool
-	ReadOnly       bool
-	Reason         string
-	DetailMessage  string
-	CanAdaptForm   bool
-	AdaptURL       string
-	FormataArchURL string
-	OverrideReason string
-	HasOverride    bool
-}
-
-type ActionRoleBadge struct {
-	ID      string
-	Label   string
-	Palette string
-}
-
-type ActionRoleOption struct {
-	Slug  string
-	Label string
-}
-
-type ActionKV struct {
-	Key   string
-	Value string
-}
-
-type ActionAttachmentView struct {
-	AttachmentID string
-	Key          string
-	Filename     string
-	URL          string
-	PreviewURL   string
-	PreviewKind  string
-	SHA256       string
 }
 
 type Department struct {
@@ -419,27 +333,6 @@ type HomeWorkflowPickerView struct {
 	WorkflowPickerView
 }
 
-type ActionListView struct {
-	WorkflowKey       string
-	WorkflowPath      string
-	ProcessID         string
-	CurrentUser       Actor
-	SelectedSubstepID string
-	ProcessDone       bool
-	Action            *ActionView
-	Error             string
-	Timeline          []TimelineStep
-	HideStatus        bool
-	DPPURL            string
-	DPPGS1            string
-	Attachments       []ProcessDownloadAttachment
-	CanTerminate      bool
-	TerminateAction   string
-	TerminateSubstep  string
-	TerminateRoles    []ActionRoleOption
-	Termination       *ProcessTerminationView
-}
-
 type ProcessListItem struct {
 	ID              string
 	Name            string
@@ -504,7 +397,7 @@ type HomeView struct {
 	NextPage            int
 	Processes           []ProcessListItem
 	ProcessGroups       []ProcessStatusGroup
-	Preview             ActionListView
+	Preview             StreamInstanceDetailView
 }
 
 type LoginView struct {
@@ -695,7 +588,7 @@ type ProcessPageView struct {
 	InstanceName string
 	Status       string
 	StatusLabel  string
-	ActionList   ActionListView
+	Detail       StreamInstanceDetailView
 	DPPURL       string
 	DPPGS1       string
 	Attachments  []ProcessDownloadAttachment
@@ -717,7 +610,7 @@ type DPPPageView struct {
 	Serial       string
 	IssuedAt     string
 	Workflow     WorkflowDef
-	Traceability []DPPTraceabilityStep
+	Traceability []TimelineStep
 	Integrity    DPPIntegrityView
 	Export       NotarizedProcessExport
 	Termination  *ProcessTerminationView
@@ -745,45 +638,6 @@ type DPPIntegrityHashView struct {
 type DPPIntegrityLeafView struct {
 	SubstepID string
 	Hash      DPPIntegrityHashView
-}
-
-type DPPTraceabilityStep struct {
-	StepID           string
-	Title            string
-	OrganizationName string
-	CompletedAt      string
-	CompletedAtHuman string
-	DetailsDialogID  string
-	Substeps         []DPPTraceabilitySubstep
-}
-
-type DPPTraceabilitySubstep struct {
-	SubstepID     string
-	Title         string
-	Description   string
-	Role          string
-	RoleBadges    []DPPTraceabilityRoleBadge
-	Palette       string
-	Status        string
-	Reason        string
-	DetailMessage string
-	DoneAt        string
-	DoneAtHuman   string
-	DoneBy        string
-	Digest        string
-	Values        []DPPTraceabilityValue
-	Attachments   []ActionAttachmentView
-}
-
-type DPPTraceabilityRoleBadge struct {
-	ID      string
-	Label   string
-	Palette string
-}
-
-type DPPTraceabilityValue struct {
-	Key   string
-	Value string
 }
 
 type SubstepOverrideEditorView struct {
@@ -1730,7 +1584,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 			if deriveProcessStatus(cfg.Workflow, &process) != "active" {
 				continue
 			}
-			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, key, actor, roleMeta, cfg.Roles); ok {
+			if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &process, key, actor, roleMeta, cfg.Roles); ok {
 				option.HasUserTurn = true
 				break
 			}
@@ -4968,7 +4822,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			LastDigestShort: lastDigest,
 		}
 		if item.Status == "active" {
-			if _, ok := nextAvailableAuthorizedAction(cfg.Workflow, &process, workflowKey, actor, roleMeta, cfg.Roles); ok {
+			if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &process, workflowKey, actor, roleMeta, cfg.Roles); ok {
 				item.Status = "available"
 				item.StatusLabel = processStatusLabel(item.Status)
 			}
@@ -5001,8 +4855,8 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		pageNumbers = append(pageNumbers, current)
 	}
 
-	preview := makeActionListReadOnly(
-		s.buildProcessActionListView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
+	preview := makeStreamInstanceDetailReadOnly(
+		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
 		"Preview only. Start an instance to submit data.",
 	)
 	preview.HideStatus = true
@@ -5220,59 +5074,9 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 }
 
-func (s *Server) buildProcessActionListView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ActionListView {
-	roleMeta := s.roleMetaIndex(ctx)
-	actions := buildActionList(cfg.Workflow, process, workflowKey, actor, onlyRole, roleMeta, cfg.Roles)
-	processDone := process != nil && isProcessClosed(cfg.Workflow, process)
-	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
-	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, roleMeta, cfg.Roles, organizationNameMap(cfg)), selected)
-	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
-	actions = s.applyDoneByEmailToActions(ctx, cfg.Workflow, actor, actions)
-	timeline = decorateTimelineActions(timeline, actions)
-
-	view := ActionListView{
-		WorkflowKey:       workflowKey,
-		WorkflowPath:      workflowPath(workflowKey),
-		ProcessID:         processIDString(process),
-		CurrentUser:       actor,
-		SelectedSubstepID: selected,
-		ProcessDone:       processDone,
-		Error:             message,
-		Timeline:          timeline,
-	}
-	if process != nil && !processDone {
-		if action, ok := nextAvailableAuthorizedAction(cfg.Workflow, process, workflowKey, actor, roleMeta, cfg.Roles); ok {
-			view.CanTerminate = true
-			view.TerminateAction = fmt.Sprintf("%s/process/%s/terminate", workflowPath(workflowKey), process.ID.Hex())
-			view.TerminateSubstep = action.SubstepID
-			view.TerminateRoles = append([]ActionRoleOption(nil), action.MatchingRoles...)
-		}
-	}
-	if action, ok := selectedActionBySubstep(actions, selected, processDone); ok {
-		view.Action = &action
-	}
-	if process != nil && process.Termination != nil {
-		view.Termination = processTerminationView(process.Termination)
-		view.Termination = s.applyDoneByEmailToTermination(ctx, cfg.Workflow, actor, view.Termination)
-	}
-
-	if processDone {
-		view.Attachments = buildProcessDownloadAttachments(workflowKey, process, collectProcessAttachments(cfg.Workflow, process))
-		if process != nil && process.DPP != nil {
-			view.DPPURL = digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
-			view.DPPGS1 = gs1ElementString(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
-		}
-	}
-	if view.Action != nil {
-		action := *view.Action
-		view.Action = &action
-	}
-	view.Timeline = s.applyDoneByEmailToTimeline(ctx, cfg.Workflow, actor, view.Timeline)
-	return view
-}
 
 func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
-	actionList := s.buildProcessActionListView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
+	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
 	processID := ""
 	instanceName := ""
 	status := processStatusActive
@@ -5298,10 +5102,10 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		InstanceName: instanceName,
 		Status:       status,
 		StatusLabel:  processStatusLabel(status),
-		ActionList:   actionList,
-		DPPURL:       actionList.DPPURL,
-		DPPGS1:       actionList.DPPGS1,
-		Attachments:  actionList.Attachments,
+		Detail:       detail,
+		DPPURL:       detail.DPPURL,
+		DPPGS1:       detail.DPPGS1,
+		Attachments:  detail.Attachments,
 	}
 }
 
@@ -5319,28 +5123,28 @@ func buildWorkflowPreviewProcess(def WorkflowDef, workflowKey string) *Process {
 	return process
 }
 
-func makeActionListReadOnly(view ActionListView, reason string) ActionListView {
+func makeStreamInstanceDetailReadOnly(view StreamInstanceDetailView, reason string) StreamInstanceDetailView {
 	reason = strings.TrimSpace(reason)
 	view.CanTerminate = false
 	view.TerminateAction = ""
 	view.TerminateSubstep = ""
 	view.TerminateRoles = nil
-	if view.Action != nil {
-		action := *view.Action
+	if view.SelectedBody != nil {
+		action := *view.SelectedBody
 		action.ReadOnly = true
 		action.Reason = reason
-		view.Action = &action
+		view.SelectedBody = &action
 	}
 	for stepIndex := range view.Timeline {
 		for substepIndex := range view.Timeline[stepIndex].Substeps {
-			action := view.Timeline[stepIndex].Substeps[substepIndex].Action
+			action := view.Timeline[stepIndex].Substeps[substepIndex].Body
 			if action == nil {
 				continue
 			}
 			actionCopy := *action
 			actionCopy.ReadOnly = true
 			actionCopy.Reason = reason
-			view.Timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
+			view.Timeline[stepIndex].Substeps[substepIndex].Body = &actionCopy
 		}
 	}
 	return view
@@ -5362,139 +5166,34 @@ func actorFromAccountUser(user *AccountUser, workflowKey string) Actor {
 	return actor
 }
 
-func viewerCanSeeDoneByEmail(def WorkflowDef, viewer Actor) bool {
-	orgSlug := strings.TrimSpace(viewer.OrgSlug)
-	if orgSlug == "" {
-		return false
-	}
-	for _, step := range def.Steps {
-		if strings.TrimSpace(step.OrganizationSlug) == orgSlug {
-			return true
-		}
-	}
-	return false
-}
 
-type userIdentityView struct {
-	email      string
-	fallbackID string
-}
 
-func (s *Server) lookupUserIdentityByActorID(ctx context.Context, actorID string, cache map[string]userIdentityView) (userIdentityView, bool) {
-	id := strings.TrimSpace(actorID)
-	if id == "" {
-		return userIdentityView{}, false
-	}
-	if identity, ok := cache[id]; ok {
-		return identity, strings.TrimSpace(identity.email) != "" || strings.TrimSpace(identity.fallbackID) != ""
-	}
-	if appwriteUserID, ok := parseAppwriteActorID(id); ok {
-		if s.identity == nil {
-			cache[id] = userIdentityView{}
-			return userIdentityView{}, false
-		}
-		user, err := s.identity.GetUserByID(ctx, appwriteUserID)
-		if err != nil {
-			cache[id] = userIdentityView{}
-			return userIdentityView{}, false
-		}
-		identity := userIdentityView{
-			email:      strings.TrimSpace(user.Email),
-			fallbackID: appwriteActorID(firstNonEmpty(user.ID, appwriteUserID)),
-		}
-		cache[id] = identity
-		return identity, identity.email != "" || identity.fallbackID != ""
-	}
-	cache[id] = userIdentityView{}
-	return userIdentityView{}, false
-}
 
-func (s *Server) applyDoneByEmailToActions(ctx context.Context, def WorkflowDef, viewer Actor, actions []ActionView) []ActionView {
-	if len(actions) == 0 {
-		return actions
-	}
-	canSeeEmail := viewerCanSeeDoneByEmail(def, viewer)
-	cache := map[string]userIdentityView{}
-	for idx := range actions {
-		identity, ok := s.lookupUserIdentityByActorID(ctx, actions[idx].DoneBy, cache)
-		if !ok {
-			continue
-		}
-		if canSeeEmail {
-			if strings.TrimSpace(identity.email) != "" {
-				actions[idx].DoneBy = identity.email
-			} else if strings.TrimSpace(identity.fallbackID) != "" {
-				actions[idx].DoneBy = identity.fallbackID
-			}
-			continue
-		}
-		if strings.TrimSpace(identity.fallbackID) != "" {
-			actions[idx].DoneBy = identity.fallbackID
-		}
-	}
-	return actions
-}
-
-func (s *Server) applyDoneByEmailToTimeline(ctx context.Context, def WorkflowDef, viewer Actor, timeline []TimelineStep) []TimelineStep {
-	if len(timeline) == 0 {
-		return timeline
-	}
-	canSeeEmail := viewerCanSeeDoneByEmail(def, viewer)
-	cache := map[string]userIdentityView{}
-	for stepIdx := range timeline {
-		for subIdx := range timeline[stepIdx].Substeps {
-			identity, ok := s.lookupUserIdentityByActorID(ctx, timeline[stepIdx].Substeps[subIdx].DoneBy, cache)
-			if !ok {
-				continue
-			}
-			if canSeeEmail {
-				if strings.TrimSpace(identity.email) != "" {
-					timeline[stepIdx].Substeps[subIdx].DoneBy = identity.email
-				} else if strings.TrimSpace(identity.fallbackID) != "" {
-					timeline[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
-				}
-				continue
-			}
-			if strings.TrimSpace(identity.fallbackID) != "" {
-				timeline[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
-			}
-		}
-	}
-	return timeline
-}
-
-func (s *Server) applyDoneByEmailToTermination(ctx context.Context, def WorkflowDef, viewer Actor, termination *ProcessTerminationView) *ProcessTerminationView {
-	if termination == nil {
-		return nil
-	}
-	identity, ok := s.lookupUserIdentityByActorID(ctx, termination.EndedBy, map[string]userIdentityView{})
-	if !ok {
-		return termination
-	}
-	mapped := *termination
-	if viewerCanSeeDoneByEmail(def, viewer) && strings.TrimSpace(identity.email) != "" {
-		mapped.EndedBy = identity.email
-		return &mapped
-	}
-	if strings.TrimSpace(identity.fallbackID) != "" {
-		mapped.EndedBy = identity.fallbackID
-	}
-	return &mapped
-}
-
-func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []DPPTraceabilityStep) []DPPTraceabilityStep {
+func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []TimelineStep) []TimelineStep {
 	if len(traceability) == 0 {
 		return traceability
 	}
 	cache := map[string]userIdentityView{}
 	for stepIdx := range traceability {
 		for subIdx := range traceability[stepIdx].Substeps {
-			identity, ok := s.lookupUserIdentityByActorID(ctx, traceability[stepIdx].Substeps[subIdx].DoneBy, cache)
-			if !ok {
+			sub := &traceability[stepIdx].Substeps[subIdx]
+			doneBy := strings.TrimSpace(sub.DoneBy)
+			if doneBy == "" && sub.Body != nil {
+				doneBy = strings.TrimSpace(sub.Body.DoneBy)
+			}
+			if doneBy == "" {
 				continue
 			}
-			if strings.TrimSpace(identity.fallbackID) != "" {
-				traceability[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
+			displayID := doneBy
+			if identity, ok := s.lookupUserIdentityByActorID(ctx, doneBy, cache); ok && strings.TrimSpace(identity.fallbackID) != "" {
+				displayID = identity.fallbackID
+			}
+			if userID, ok := parseAppwriteActorID(displayID); ok {
+				displayID = userID
+			}
+			sub.DoneBy = displayID
+			if sub.Body != nil {
+				sub.Body.DoneBy = displayID
 			}
 		}
 	}
@@ -5553,6 +5252,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		issuedAt = process.DPP.GeneratedAt.UTC().Format(time.RFC3339)
 	}
 	traceability := buildDPPTraceabilityView(cfg.Workflow, process, workflowKey, s.roleMetaIndex(r.Context()), cfg.Roles, organizationNameMap(cfg))
+	traceability = decorateTimelineOrganizationLogos(traceability, organizationLogoURLMap(r.Context(), s.identity))
 	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
@@ -5602,14 +5302,18 @@ func (s *Server) handleDigitalLinkDPPAttachment(w http.ResponseWriter, r *http.R
 	s.streamProcessAttachment(w, r, process, attachmentID)
 }
 
-func publicDPPTraceabilityAttachmentURLs(traceability []DPPTraceabilityStep, digitalLink string) []DPPTraceabilityStep {
+func publicDPPTraceabilityAttachmentURLs(traceability []TimelineStep, digitalLink string) []TimelineStep {
 	base := strings.TrimRight(strings.TrimSpace(digitalLink), "/")
 	if base == "" {
 		return traceability
 	}
 	for stepIndex := range traceability {
 		for substepIndex := range traceability[stepIndex].Substeps {
-			attachments := traceability[stepIndex].Substeps[substepIndex].Attachments
+			body := traceability[stepIndex].Substeps[substepIndex].Body
+			if body == nil {
+				continue
+			}
+			attachments := body.Attachments
 			for attachmentIndex := range attachments {
 				attachmentID := strings.TrimSpace(attachments[attachmentIndex].AttachmentID)
 				if attachmentID == "" {
@@ -5619,7 +5323,7 @@ func publicDPPTraceabilityAttachmentURLs(traceability []DPPTraceabilityStep, dig
 				attachments[attachmentIndex].URL = downloadURL
 				attachments[attachmentIndex].PreviewURL = actionAttachmentPreviewURL(downloadURL, attachments[attachmentIndex].PreviewKind)
 			}
-			traceability[stepIndex].Substeps[substepIndex].Attachments = attachments
+			body.Attachments = attachments
 		}
 	}
 	return traceability
@@ -6254,7 +5958,7 @@ func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	action, ok := nextAvailableAuthorizedAction(cfg.Workflow, process, workflowKey, actor, s.roleMetaIndex(r.Context()), cfg.Roles)
+	action, ok := nextAuthorizedSubstepBody(cfg.Workflow, process, workflowKey, actor, s.roleMetaIndex(r.Context()), cfg.Roles)
 	if !ok {
 		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
 		return
@@ -7016,14 +6720,6 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 	return out
 }
 
-func nextAvailableAuthorizedAction(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) (ActionView, bool) {
-	for _, action := range buildActionList(def, process, workflowKey, actor, false, roleIndex, cfgRoles) {
-		if action.Status == "available" && !action.Disabled {
-			return action, true
-		}
-	}
-	return ActionView{}, false
-}
 
 func organizationLogoURLMap(ctx context.Context, identity IdentityStore) map[string]string {
 	if identity == nil {
@@ -7053,79 +6749,6 @@ func organizationDisplayName(slug string, orgNames map[string]string) string {
 		return strings.TrimSpace(name)
 	}
 	return slug
-}
-
-func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []TimelineStep {
-	steps := sortedSteps(def)
-	substepOrgs := substepOrganizationMap(def)
-	availableMap := computeAvailability(def, process)
-	terminated := process != nil && process.Termination != nil
-	terminationSubstepID := ""
-	if terminated {
-		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
-	}
-	pastTermination := false
-
-	var timeline []TimelineStep
-	for _, step := range steps {
-		row := TimelineStep{
-			StepID:  step.StepID,
-			Title:   step.Title,
-			OrgSlug: strings.TrimSpace(step.OrganizationSlug),
-			OrgName: organizationDisplayName(step.OrganizationSlug, orgNames),
-		}
-		for _, sub := range sortedSubsteps(step) {
-			allowedRoles := substepRoles(sub)
-			primaryRole := sub.Role
-			if strings.TrimSpace(primaryRole) == "" && len(allowedRoles) > 0 {
-				primaryRole = allowedRoles[0]
-			}
-			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], primaryRole, roleIndex, cfgRoles)
-			entry := TimelineSubstep{
-				SubstepID: sub.SubstepID,
-				Title:     sub.Title,
-				Palette:   meta.Palette,
-			}
-			if process != nil {
-				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.State == "done" {
-					entry.Status = "done"
-					entry.Description = processStepDescription(progress, sub)
-					if progress.DoneBy != nil {
-						entry.DoneBy = progress.DoneBy.ID
-						entry.DoneRole = progress.DoneBy.Role
-						selectedRole := strings.TrimSpace(progress.DoneBy.Role)
-						if selectedRole != "" {
-							selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], selectedRole, roleIndex, cfgRoles)
-							entry.Palette = selectedMeta.Palette
-						}
-					}
-					if progress.DoneAt != nil {
-						entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
-					}
-					if value, ok := processStepDataValue(progress, sub); ok {
-						entry.DisplayValue = strings.TrimSpace(fmt.Sprintf("%v", value))
-					}
-				} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-					entry.Status = processStatusTerminated
-				} else if terminated && (pastTermination || terminationSubstepID == "") {
-					entry.Status = "skipped"
-				} else if availableMap[sub.SubstepID] {
-					entry.Status = "available"
-				} else {
-					entry.Status = "locked"
-				}
-			} else {
-				entry.Status = "locked"
-			}
-			entry.StatusLabel = processStatusLabel(entry.Status)
-			row.Substeps = append(row.Substeps, entry)
-			if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				pastTermination = true
-			}
-		}
-		timeline = append(timeline, row)
-	}
-	return timeline
 }
 
 type ProcessAttachmentExport struct {
@@ -7506,297 +7129,12 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 	return WorkflowSub{}, false
 }
 
-func buildActionList(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []ActionView {
-	var actions []ActionView
-	ordered := orderedSubsteps(def)
-	availMap := computeAvailability(def, process)
-	substepOrgs := substepOrganizationMap(def)
-	terminated := process != nil && process.Termination != nil
-	terminationSubstepID := ""
-	terminationReason := ""
-	if terminated {
-		terminationSubstepID = strings.TrimSpace(process.Termination.SubstepID)
-		terminationReason = strings.TrimSpace(process.Termination.Reason)
-	}
-	pastTermination := false
-	for _, sub := range ordered {
-		var override *SubstepOverride
-		if process != nil {
-			if item, ok := process.Overrides[sub.SubstepID]; ok {
-				itemCopy := item
-				override = &itemCopy
-			}
-		}
-		effective := effectiveSubstep(sub, override)
-		allowedRoles := substepRoles(sub)
-		ownedRoles := append([]string(nil), actor.RoleSlugs...)
-		if len(ownedRoles) == 0 && strings.TrimSpace(actor.Role) != "" {
-			ownedRoles = []string{strings.TrimSpace(actor.Role)}
-		}
-		matchingRoleSlugs := intersectRoles(allowedRoles, ownedRoles)
-		matchingRoles := make([]ActionRoleOption, 0, len(matchingRoleSlugs))
-		for _, role := range matchingRoleSlugs {
-			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], role, roleIndex, cfgRoles)
-			label := strings.TrimSpace(meta.Label)
-			if label == "" {
-				label = role
-			}
-			matchingRoles = append(matchingRoles, ActionRoleOption{
-				Slug:  role,
-				Label: label,
-			})
-		}
-		primaryRole := sub.Role
-		if primaryRole == "" && len(allowedRoles) > 0 {
-			primaryRole = allowedRoles[0]
-		}
-		roleBadges := make([]ActionRoleBadge, 0, len(allowedRoles))
-		for _, role := range allowedRoles {
-			meta := roleMetaForOrg(substepOrgs[sub.SubstepID], role, roleIndex, cfgRoles)
-			roleBadges = append(roleBadges, ActionRoleBadge{
-				ID:      role,
-				Label:   meta.Label,
-				Palette: meta.Palette,
-			})
-		}
-		if onlyRole && strings.TrimSpace(actor.Role) != "" && !containsRole(allowedRoles, actor.Role) {
-			continue
-		}
-		meta := roleMetaForOrg(substepOrgs[sub.SubstepID], primaryRole, roleIndex, cfgRoles)
-		role := primaryRole
-		roleLabel := meta.Label
-		palette := meta.Palette
-		status := "locked"
-		if process != nil {
-			if step, ok := process.Progress[sub.SubstepID]; ok && step.State == "done" {
-				status = "done"
-			} else if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-				status = processStatusTerminated
-			} else if terminated && (pastTermination || terminationSubstepID == "") {
-				status = "skipped"
-			} else if availMap[sub.SubstepID] {
-				status = "available"
-			}
-		}
-		stepOrgSlug := substepOrgs[sub.SubstepID]
-		orgAuthorized := stepOrgSlug == "" || strings.TrimSpace(actor.OrgSlug) == stepOrgSlug
-		disabled := status != "available" || len(matchingRoles) == 0 || !orgAuthorized
-		reason := ""
-		detailMessage := ""
-		if status == "locked" {
-			reason = "Locked by sequence"
-		} else if status == "done" {
-			reason = "Already completed"
-		} else if status == processStatusTerminated {
-			reason = "Stream ended early"
-			detailMessage = terminationReason
-			if detailMessage == "" {
-				detailMessage = "No reason provided."
-			}
-		} else if status == "skipped" {
-			reason = "Stream ended early"
-			detailMessage = "Step not completed because the stream was ended before this."
-		} else if !orgAuthorized {
-			reason = "Not authorized for organization"
-		} else if len(matchingRoles) == 0 {
-			reason = "Not authorized"
-		}
-		formSchema := ""
-		formUISchema := ""
-		doneAt := ""
-		doneBy := ""
-		doneRole := ""
-		description := strings.TrimSpace(sub.InputKey)
-		var values []ActionKV
-		var attachments []ActionAttachmentView
-		if status == "done" && process != nil {
-			if progress, ok := process.Progress[sub.SubstepID]; ok {
-				description = processStepDescription(progress, sub)
-				if progress.DoneAt != nil {
-					doneAt = humanReadableTraceabilityTime(*progress.DoneAt)
-				}
-				if progress.DoneBy != nil {
-					doneBy = strings.TrimSpace(progress.DoneBy.ID)
-					doneRole = strings.TrimSpace(progress.DoneBy.Role)
-					if doneRole != "" {
-						selectedMeta := roleMetaForOrg(substepOrgs[sub.SubstepID], doneRole, roleIndex, cfgRoles)
-						role = doneRole
-						roleBadges = []ActionRoleBadge{
-							{
-								ID:      doneRole,
-								Label:   selectedMeta.Label,
-								Palette: selectedMeta.Palette,
-							},
-						}
-						roleLabel = selectedMeta.Label
-						palette = selectedMeta.Palette
-					}
-				}
-				if value, ok := processStepDataValue(progress, sub); ok {
-					values = flattenDisplayValues("", value)
-				}
-				attachments = buildActionAttachments(workflowKey, process, progress.Data)
-			}
-		}
-		formSchema = marshalJSONCompact(effective.Schema)
-		formUISchema = marshalJSONCompact(effective.UISchema)
-		hasOverride := override != nil && strings.TrimSpace(override.SubstepID) != ""
-		overrideReason := ""
-		if hasOverride {
-			overrideReason = strings.TrimSpace(override.Reason)
-			if status == "done" {
-				detail := "Completed with local form adaptation."
-				if overrideReason != "" {
-					detail += "\nReason: " + overrideReason
-				}
-				reason = detail
-			}
-		}
-		canAdaptForm := status == "available" && !disabled && substepSupportsLocalOverride(sub)
-		adaptURL := ""
-		if canAdaptForm {
-			adaptURL = fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, processIDString(process), sub.SubstepID)
-		}
-		actions = append(actions, ActionView{
-			WorkflowKey:    workflowKey,
-			ProcessID:      processIDString(process),
-			SubstepID:      sub.SubstepID,
-			Title:          sub.Title,
-			Role:           role,
-			RoleBadges:     roleBadges,
-			MatchingRoles:  matchingRoles,
-			RoleLabel:      roleLabel,
-			Palette:        palette,
-			InputKey:       sub.InputKey,
-			Description:    description,
-			InputType:      sub.InputType,
-			FormSchema:     formSchema,
-			FormUISchema:   formUISchema,
-			Status:         status,
-			DoneAt:         doneAt,
-			DoneBy:         doneBy,
-			DoneRole:       doneRole,
-			Values:         values,
-			Attachments:    attachments,
-			Disabled:       disabled,
-			Reason:         reason,
-			DetailMessage:  detailMessage,
-			CanAdaptForm:   canAdaptForm,
-			AdaptURL:       adaptURL,
-			FormataArchURL: "",
-			OverrideReason: overrideReason,
-			HasOverride:    hasOverride,
-		})
-		if terminated && strings.TrimSpace(sub.SubstepID) == terminationSubstepID {
-			pastTermination = true
-		}
-	}
-	return actions
-}
 
-func resolveSelectedSubstepID(actions []ActionView, requested string, processDone bool) string {
-	if processDone || len(actions) == 0 {
-		return ""
-	}
-	requested = strings.TrimSpace(requested)
-	if requested != "" {
-		for _, action := range actions {
-			if action.SubstepID == requested {
-				return requested
-			}
-		}
-	}
-	for _, action := range actions {
-		if action.Status == "available" {
-			return action.SubstepID
-		}
-	}
-	return actions[0].SubstepID
-}
 
-func selectedActionBySubstep(actions []ActionView, selectedSubstepID string, processDone bool) (ActionView, bool) {
-	if processDone {
-		return ActionView{}, false
-	}
-	selectedSubstepID = strings.TrimSpace(selectedSubstepID)
-	if selectedSubstepID == "" {
-		if len(actions) == 0 {
-			return ActionView{}, false
-		}
-		return actions[0], true
-	}
-	for _, action := range actions {
-		if action.SubstepID == selectedSubstepID {
-			return action, true
-		}
-	}
-	return ActionView{}, false
-}
 
-func decorateTimelineSelection(timeline []TimelineStep, selectedSubstepID string) []TimelineStep {
-	selectedSubstepID = strings.TrimSpace(selectedSubstepID)
-	for stepIndex := range timeline {
-		expanded := false
-		for substepIndex := range timeline[stepIndex].Substeps {
-			selected := selectedSubstepID != "" && timeline[stepIndex].Substeps[substepIndex].SubstepID == selectedSubstepID
-			timeline[stepIndex].Substeps[substepIndex].Selected = selected
-			if selected {
-				expanded = true
-			}
-		}
-		timeline[stepIndex].Expanded = expanded
-	}
-	return timeline
-}
-
-func decorateTimelineActions(timeline []TimelineStep, actions []ActionView) []TimelineStep {
-	if len(timeline) == 0 || len(actions) == 0 {
-		return timeline
-	}
-	actionsBySubstep := make(map[string]ActionView, len(actions))
-	for _, action := range actions {
-		actionsBySubstep[strings.TrimSpace(action.SubstepID)] = action
-	}
-	for stepIndex := range timeline {
-		for substepIndex := range timeline[stepIndex].Substeps {
-			substepID := strings.TrimSpace(timeline[stepIndex].Substeps[substepIndex].SubstepID)
-			action, ok := actionsBySubstep[substepID]
-			if !ok {
-				continue
-			}
-			actionCopy := action
-			timeline[stepIndex].Substeps[substepIndex].Action = &actionCopy
-			switch action.Status {
-			case "done", "locked", processStatusTerminated, "skipped":
-				timeline[stepIndex].Substeps[substepIndex].Status = action.Status
-				timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel(action.Status)
-			case "available":
-				if action.Disabled {
-					timeline[stepIndex].Substeps[substepIndex].Status = "active"
-					timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel("active")
-				} else {
-					timeline[stepIndex].Substeps[substepIndex].Status = "available"
-					timeline[stepIndex].Substeps[substepIndex].StatusLabel = processStatusLabel("available")
-				}
-			}
-		}
-	}
-	return timeline
-}
-
-func decorateTimelineOrganizationLogos(timeline []TimelineStep, logoURLs map[string]string) []TimelineStep {
-	if len(timeline) == 0 || len(logoURLs) == 0 {
-		return timeline
-	}
-	for stepIndex := range timeline {
-		timeline[stepIndex].OrgLogoURL = strings.TrimSpace(logoURLs[strings.TrimSpace(timeline[stepIndex].OrgSlug)])
-	}
-	return timeline
-}
-
-func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
+func flattenDisplayValues(inputKey string, raw interface{}) []SubstepKV {
 	key := strings.TrimSpace(inputKey)
-	var out []ActionKV
+	var out []SubstepKV
 	collectDisplayValues(key, raw, &out)
 	if len(out) > 1 {
 		sort.Slice(out, func(i, j int) bool {
@@ -7806,7 +7144,7 @@ func flattenDisplayValues(inputKey string, raw interface{}) []ActionKV {
 	return out
 }
 
-func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
+func collectDisplayValues(path string, raw interface{}, out *[]SubstepKV) {
 	switch typed := raw.(type) {
 	case map[string]interface{}:
 		if isAttachmentMetaMap(typed) {
@@ -7848,7 +7186,7 @@ func collectDisplayValues(path string, raw interface{}, out *[]ActionKV) {
 		if strings.TrimSpace(key) == "" {
 			key = "value"
 		}
-		*out = append(*out, ActionKV{Key: key, Value: value})
+		*out = append(*out, SubstepKV{Key: key, Value: value})
 	}
 }
 
@@ -7904,12 +7242,12 @@ func isAttachmentMetaMap(payload map[string]interface{}) bool {
 	return attachmentMetaFromMap(payload) != nil
 }
 
-func buildActionAttachments(workflowKey string, process *Process, data map[string]interface{}) []ActionAttachmentView {
+func buildSubstepAttachments(workflowKey string, process *Process, data map[string]interface{}) []SubstepAttachmentView {
 	if process == nil {
 		return nil
 	}
 	seen := map[string]struct{}{}
-	attachments := make([]ActionAttachmentView, 0)
+	attachments := make([]SubstepAttachmentView, 0)
 	for _, item := range attachmentViewsFromValue(data) {
 		meta := item.Meta
 		id := strings.TrimSpace(meta.AttachmentID)
@@ -7922,7 +7260,7 @@ func buildActionAttachments(workflowKey string, process *Process, data map[strin
 		seen[id] = struct{}{}
 		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
 		previewKind := actionAttachmentPreviewKind(meta)
-		attachments = append(attachments, ActionAttachmentView{
+		attachments = append(attachments, SubstepAttachmentView{
 			AttachmentID: id,
 			Key:          item.Key,
 			Filename:     sanitizeAttachmentFilename(meta.Filename),

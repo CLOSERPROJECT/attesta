@@ -102,7 +102,7 @@ func testTemplates() *template.Template {
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.Palette}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{template "process_content.html" .}}{{end}}
-{{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}} {{.ActionList.Error}}{{with .ActionList.Action}}{{.SubstepID}}{{end}}{{end}}
+{{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}} {{.Detail.Error}}{{with .Detail.SelectedBody}}{{.SubstepID}}{{end}}{{end}}
 {{define "process_downloads"}}DOWNLOADS {{.ProcessID}} {{.DPPURL}}{{end}}
 {{define "substep_override_editor.html"}}OVERRIDE_EDITOR {{.SubstepID}} {{.FormataArchURL}} {{.SaveURL}} {{.Schema}} {{.UISchema}} {{.Reason}} {{.Error}}{{end}}
 {{define "process.html"}}{{template "layout.html" .}}{{end}}
