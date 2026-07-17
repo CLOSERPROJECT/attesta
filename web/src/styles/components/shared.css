@@ -182,6 +182,7 @@ svg.bi {
 
 .workflow-card-title {
   margin: 0;
+  font-weight: var(--font-medium);
   overflow-wrap: anywhere;
 }
 

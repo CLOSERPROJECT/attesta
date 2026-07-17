@@ -36,7 +36,7 @@
 .stream-step-summary-title {
   font-size: var(--text-base);
   line-height: 1.2;
-  font-weight: var(--font-bold);
+  font-weight: var(--font-semibold);
   color: var(--foreground);
   overflow-wrap: anywhere;
 }
