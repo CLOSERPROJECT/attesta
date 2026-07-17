@@ -4,60 +4,60 @@
   <div class="stack u-max-w-7xl u-mx-auto">
     {{ template "page_header" .Header }}
     <div class="home-workflow-grid" data-home-root>
-      <section class="panel org-admin-sidebar">
+      <section class="panel panel-sticky">
         <div class="panel-heading">
           <h2>Streams</h2>
           <p>Jump to instances by status.</p>
         </div>
-        <nav class="org-admin-sidebar-nav" aria-label="Stream status sections">
+        <nav class="sidebar-nav" aria-label="Stream status sections">
           {{ range .ProcessGroups }}
             {{ if eq .Status "available" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link is-active"
+                class="sidebar-nav-link is-active"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="page"
                 aria-label="Available streams"
                 title="Streams waiting for your input"
               >
-                <span class="org-admin-sidebar-link-title"> Available </span>
+                <span class="sidebar-nav-title"> Available </span>
               </button>
             {{ else if eq .Status "active" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="sidebar-nav-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="false"
                 aria-label="Active streams"
                 title="Streams waiting for someone else input"
               >
-                <span class="org-admin-sidebar-link-title"> Active </span>
+                <span class="sidebar-nav-title"> Active </span>
               </button>
             {{ else if eq .Status "done" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="sidebar-nav-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="false"
                 aria-label="Completed streams"
                 title="Streams completed successfully"
               >
-                <span class="org-admin-sidebar-link-title"> Done </span>
+                <span class="sidebar-nav-title"> Done </span>
               </button>
             {{ else if eq .Status "terminated" }}
               <button
                 type="button"
-                class="org-admin-sidebar-link"
+                class="sidebar-nav-link"
                 data-home-nav="{{ .Status }}"
                 aria-controls="{{ .PanelID }}"
                 aria-current="false"
                 aria-label="Terminated streams"
                 title="Streams terminated before completion"
               >
-                <span class="org-admin-sidebar-link-title"> Terminated </span>
+                <span class="sidebar-nav-title"> Terminated </span>
               </button>
             {{ end }}
           {{ end }}

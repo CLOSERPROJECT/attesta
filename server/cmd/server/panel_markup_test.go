@@ -236,7 +236,10 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="panel org-admin-sidebar"`,
+		`class="panel panel-sticky"`,
+		`class="sidebar-nav"`,
+		`class="sidebar-nav-link is-active"`,
+		`class="sidebar-nav-title"`,
 		`class="panel-head-actions"`,
 		`class="panel-actions"`,
 		"<h2>Stream instances</h2>",
@@ -249,7 +252,7 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		}
 	}
 
-	sidebarIdx := strings.Index(body, `class="panel org-admin-sidebar"`)
+	sidebarIdx := strings.Index(body, `class="panel panel-sticky"`)
 	headIdx := strings.Index(body, `class="panel-head-actions"`)
 	actionsIdx := strings.Index(body, `class="panel-actions"`)
 	headingIdx := strings.Index(body, "<h2>Stream instances</h2>")

@@ -20,6 +20,9 @@
  *
  * Inner block:
  *   div.panel-block[.panel-block-spaced]
+ *
+ * Modifiers:
+ *   section.panel.panel-sticky   (sticky rail at --xl-up)
  */
 
 .panel {
@@ -80,6 +83,13 @@
 
 .panel-block-spaced {
   margin-bottom: var(--space-3);
+}
+
+@media (--xl-up) {
+  .panel-sticky {
+    position: sticky;
+    top: 44px;
+  }
 }
 
 @media (--sm-down) {

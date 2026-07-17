@@ -11,7 +11,7 @@
     >
       <section
         class="panel{{ if not .NeedsOrganizationSetup }}
-          org-admin-sidebar
+          panel-sticky
         {{ end }}"
       >
         <div class="panel-heading">
@@ -77,41 +77,41 @@
         {{ end }}
         {{ if not .NeedsOrganizationSetup }}
           <nav
-            class="org-admin-sidebar-nav"
+            class="sidebar-nav"
             aria-label="Organization admin sections"
           >
             <button
               type="button"
-              class="org-admin-sidebar-link"
+              class="sidebar-nav-link"
               data-org-admin-nav="profile"
               aria-controls="org-admin-panel-profile"
             >
-              <span class="org-admin-sidebar-link-title"
+              <span class="sidebar-nav-title"
                 >Organization profile</span
               >
-              <span class="org-admin-sidebar-link-copy"
+              <span class="sidebar-nav-copy"
                 >Update your organization name and logo.</span
               >
             </button>
             <button
               type="button"
-              class="org-admin-sidebar-link"
+              class="sidebar-nav-link"
               data-org-admin-nav="roles"
               aria-controls="org-admin-panel-roles"
             >
-              <span class="org-admin-sidebar-link-title">Roles</span>
-              <span class="org-admin-sidebar-link-copy"
+              <span class="sidebar-nav-title">Roles</span>
+              <span class="sidebar-nav-copy"
                 >Manage the role catalog for your organization.</span
               >
             </button>
             <button
               type="button"
-              class="org-admin-sidebar-link"
+              class="sidebar-nav-link"
               data-org-admin-nav="members"
               aria-controls="org-admin-panel-members"
             >
-              <span class="org-admin-sidebar-link-title">Members</span>
-              <span class="org-admin-sidebar-link-copy"
+              <span class="sidebar-nav-title">Members</span>
+              <span class="sidebar-nav-copy"
                 >Invite people and update member access.</span
               >
             </button>
