@@ -102,9 +102,6 @@ Update the fonts section to:
 3. Confirm Network tab shows one fonts CSS request with `display=swap`, and no duplicate fetch from a CSS `@import`.
 4. Run `task css:lint` if that remains the usual CSS gate.
 
-## Non-goals
+## Amendment (2026-07-17)
 
-- Changing font sizes, line heights, or letter-spacing
-- Applying Space Grotesk to non-`h1` titles
-- Self-hosting or subsetting font files
-- Updating Formata’s Space Grotesk stack
+Sans face changed from **Lato** to **Inter**. Inter provides `400` / `500` / `600` / `700`, so weight tokens stay at their semantic values (`--font-medium: 500`, `--font-semibold: 600`, `--font-bold: 700`) with no Lato-style remap. Google Fonts load: `family=Inter:wght@400;500;600;700`.

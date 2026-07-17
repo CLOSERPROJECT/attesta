@@ -18,7 +18,7 @@ func TestLayoutLoadsGoogleFontsWithSwap(t *testing.T) {
 		`rel="preconnect" href="https://fonts.googleapis.com"`,
 		`rel="preconnect" href="https://fonts.gstatic.com" crossorigin`,
 		`fonts.googleapis.com/css2?`,
-		`family=Lato:wght@400;700;900`,
+		`family=Inter:wght@400;500;600;700`,
 		`family=Space+Grotesk:wght@600;700`,
 		`family=JetBrains+Mono:wght@500`,
 		`display=swap`,
