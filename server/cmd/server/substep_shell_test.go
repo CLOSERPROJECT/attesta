@@ -126,8 +126,11 @@ func TestSubstepShellSummaryIsFocusable(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	body := out.String()
-	if !strings.Contains(body, `class="substep-accordion-summary" tabindex="-1"`) {
-		t.Fatalf("expected focusable substep summary, got: %s", body)
+	if !strings.Contains(body, `class="substep-accordion-summary"`) {
+		t.Fatalf("expected substep summary, got: %s", body)
+	}
+	if strings.Contains(body, `tabindex="-1"`) {
+		t.Fatalf("substep summary must stay in tab order; got tabindex=-1: %s", body)
 	}
 }
 
