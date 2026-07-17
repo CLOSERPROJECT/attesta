@@ -312,6 +312,12 @@ func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
 	if step.Substeps[0].Body.DoneAt != "5 Mar 2026 at 14:30 UTC" {
 		t.Fatalf("substep DoneAt = %q, want human-readable time", step.Substeps[0].Body.DoneAt)
 	}
+	if step.Substeps[0].DoneBy != "qa@example.com" {
+		t.Fatalf("substep DoneBy = %q, want mirrored on timeline row", step.Substeps[0].DoneBy)
+	}
+	if step.Substeps[0].Body.DoneBy != "qa@example.com" {
+		t.Fatalf("body DoneBy = %q, want qa@example.com", step.Substeps[0].Body.DoneBy)
+	}
 }
 
 func TestBuildDPPTraceabilityViewFlattensFormataPayload(t *testing.T) {

@@ -441,6 +441,60 @@ func TestHandleDigitalLinkDPPHTMLShowsPrematureTermination(t *testing.T) {
 	}
 }
 
+func TestHandleDigitalLinkDPPHTMLStripsAppwriteOperatorPrefix(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
+
+	store := NewMemoryStore()
+	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
+	process := Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "workflow",
+		CreatedAt:   time.Now().UTC(),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {
+				State:  "done",
+				DoneAt: &doneAt,
+				DoneBy: &Actor{ID: "appwrite:user-1", Role: "dep1"},
+				Data:   map[string]interface{}{"value": float64(1)},
+			},
+		},
+		DPP: &ProcessDPP{
+			GTIN:        "09506000134352",
+			Lot:         "LOT-001",
+			Serial:      "SERIAL-001",
+			GeneratedAt: time.Now().UTC(),
+		},
+	}
+	store.SeedProcess(process)
+	server := &Server{
+		store: store,
+		tmpl:  parseTestTemplates(t),
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "operator@example.com", Status: "active"}, nil
+			},
+		},
+		configDir: tempDir,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	rr := httptest.NewRecorder()
+	server.handleDigitalLinkDPP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "appwrite:") {
+		t.Fatalf("expected public DPP to strip appwrite prefix from operator, got %q", body)
+	}
+	if strings.Contains(body, "operator@example.com") || !strings.Contains(body, "user-1") {
+		t.Fatalf("expected public DPP operator id without email, got %q", body)
+	}
+}
+
 func TestHandleDigitalLinkDPPHTMLRendersOverrideSubstepValues(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")

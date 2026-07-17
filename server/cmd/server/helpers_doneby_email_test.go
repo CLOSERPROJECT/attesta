@@ -167,20 +167,44 @@ func TestApplyDoneByIdentityFallbackToDPPTraceability(t *testing.T) {
 		{
 			Substeps: []TimelineSubstep{
 				{SubstepID: "1.1", DoneBy: "appwrite:user-1", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
-				{SubstepID: "1.15", DoneBy: "appwrite:user-1", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
+				{SubstepID: "1.15", DoneBy: "", Body: &SubstepBodyView{DoneBy: "appwrite:user-1"}},
 				{SubstepID: "1.2", DoneBy: "legacy-user", Body: &SubstepBodyView{DoneBy: "legacy-user"}},
 			},
 		},
 	}
 	mapped := server.applyDoneByIdentityFallbackToDPPTraceability(context.Background(), traceability)
-	if mapped[0].Substeps[0].DoneBy != "appwrite:user-1" {
-		t.Fatalf("mapped dpp doneBy = %q, want appwrite fallback id", mapped[0].Substeps[0].DoneBy)
+	if mapped[0].Substeps[0].DoneBy != "user-1" {
+		t.Fatalf("mapped dpp doneBy = %q, want stripped public id", mapped[0].Substeps[0].DoneBy)
 	}
-	if mapped[0].Substeps[1].DoneBy != "appwrite:user-1" {
-		t.Fatalf("mapped dpp doneBy = %q, want appwrite fallback id", mapped[0].Substeps[1].DoneBy)
+	if mapped[0].Substeps[0].Body == nil || mapped[0].Substeps[0].Body.DoneBy != "user-1" {
+		t.Fatalf("mapped dpp body doneBy = %#v, want stripped public id", mapped[0].Substeps[0].Body)
+	}
+	if mapped[0].Substeps[1].DoneBy != "user-1" {
+		t.Fatalf("body-only dpp doneBy = %q, want stripped public id", mapped[0].Substeps[1].DoneBy)
+	}
+	if mapped[0].Substeps[1].Body == nil || mapped[0].Substeps[1].Body.DoneBy != "user-1" {
+		t.Fatalf("body-only dpp body doneBy = %#v, want stripped public id", mapped[0].Substeps[1].Body)
 	}
 	if mapped[0].Substeps[2].DoneBy != "legacy-user" {
 		t.Fatalf("legacy dpp doneBy = %q, want unchanged legacy-user", mapped[0].Substeps[2].DoneBy)
+	}
+}
+
+func TestApplyDoneByIdentityFallbackToDPPTraceabilityStripsPrefixWithoutLookup(t *testing.T) {
+	server := &Server{}
+	traceability := []TimelineStep{
+		{
+			Substeps: []TimelineSubstep{
+				{SubstepID: "1.1", Body: &SubstepBodyView{DoneBy: "appwrite:orphan-user"}},
+			},
+		},
+	}
+	mapped := server.applyDoneByIdentityFallbackToDPPTraceability(context.Background(), traceability)
+	if mapped[0].Substeps[0].DoneBy != "orphan-user" {
+		t.Fatalf("doneBy = %q, want orphan-user", mapped[0].Substeps[0].DoneBy)
+	}
+	if mapped[0].Substeps[0].Body == nil || mapped[0].Substeps[0].Body.DoneBy != "orphan-user" {
+		t.Fatalf("body doneBy = %#v, want orphan-user", mapped[0].Substeps[0].Body)
 	}
 }
 

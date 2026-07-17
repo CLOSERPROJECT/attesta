@@ -5176,15 +5176,24 @@ func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Contex
 	cache := map[string]userIdentityView{}
 	for stepIdx := range traceability {
 		for subIdx := range traceability[stepIdx].Substeps {
-			identity, ok := s.lookupUserIdentityByActorID(ctx, traceability[stepIdx].Substeps[subIdx].DoneBy, cache)
-			if !ok {
+			sub := &traceability[stepIdx].Substeps[subIdx]
+			doneBy := strings.TrimSpace(sub.DoneBy)
+			if doneBy == "" && sub.Body != nil {
+				doneBy = strings.TrimSpace(sub.Body.DoneBy)
+			}
+			if doneBy == "" {
 				continue
 			}
-			if strings.TrimSpace(identity.fallbackID) != "" {
-				traceability[stepIdx].Substeps[subIdx].DoneBy = identity.fallbackID
-				if body := traceability[stepIdx].Substeps[subIdx].Body; body != nil {
-					body.DoneBy = identity.fallbackID
-				}
+			displayID := doneBy
+			if identity, ok := s.lookupUserIdentityByActorID(ctx, doneBy, cache); ok && strings.TrimSpace(identity.fallbackID) != "" {
+				displayID = identity.fallbackID
+			}
+			if userID, ok := parseAppwriteActorID(displayID); ok {
+				displayID = userID
+			}
+			sub.DoneBy = displayID
+			if sub.Body != nil {
+				sub.Body.DoneBy = displayID
 			}
 		}
 	}

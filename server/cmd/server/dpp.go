@@ -334,6 +334,8 @@ func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubste
 		SubstepID: sub.SubstepID,
 		Title:     sub.Title,
 		Selected:  false,
+		DoneBy:    doneBy,
+		DoneAt:    doneAtHuman,
 		Body:      &body,
 	}
 }
