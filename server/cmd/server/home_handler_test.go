@@ -660,18 +660,20 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	compactBody := strings.Join(strings.Fields(body), " ")
+	if !strings.Contains(body, `class="error`) {
+		t.Fatalf("expected error banner, got %q", body)
+	}
 	if !strings.Contains(body, "Stream configuration issue") {
-		t.Fatalf("expected validation panel heading, got %q", body)
+		t.Fatalf("expected validation heading inside error, got %q", body)
 	}
 	if !strings.Contains(body, "workflow references are invalid") {
 		t.Fatalf("expected validation error details, got %q", body)
 	}
-	if !strings.Contains(body, `action="/w/workflow/process/start"`) {
-		t.Fatalf("expected new stream form to remain present, got %q", body)
+	if strings.Contains(body, `class="home-workflow-grid"`) {
+		t.Fatalf("did not expect stream dashboard grid when config is invalid, got %q", body)
 	}
-	if !strings.Contains(compactBody, `class="btn btn-primary"`) || !strings.Contains(compactBody, `type="submit"`) || !strings.Contains(compactBody, `disabled`) || !strings.Contains(compactBody, `New instance`) {
-		t.Fatalf("expected new stream button to be disabled for invalid workflow, got %q", body)
+	if strings.Contains(body, `action="/w/workflow/process/start"`) || strings.Contains(body, "New instance") {
+		t.Fatalf("did not expect new instance controls when config is invalid, got %q", body)
 	}
 }
 

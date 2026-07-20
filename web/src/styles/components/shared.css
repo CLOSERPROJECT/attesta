@@ -139,6 +139,22 @@ svg.bi {
   white-space: pre-line;
 }
 
+.error--rich {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  white-space: normal;
+}
+
+.error--rich > :is(h1, h2, h3, h4, h5, h6, p) {
+  margin: 0;
+}
+
+.error--rich > .error-detail {
+  margin-top: var(--space-2);
+  white-space: pre-line;
+}
+
 .confirmation {
   background: var(--success-muted);
   color: var(--success-muted-foreground);
