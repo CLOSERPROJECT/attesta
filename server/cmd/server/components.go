@@ -2,6 +2,28 @@ package main
 
 import "strings"
 
+// StreamCardView is the view model for templates/components/stream_card.html.
+type StreamCardView struct {
+	Key               string
+	Name              string
+	Description       string
+	Counts            WorkflowProcessCounts
+	HasUserTurn       bool
+	CanClone          bool
+	CanEdit           bool
+	EditAction        string
+	EditRequiresPurge bool
+	CanDelete         bool
+	DeleteAction      string
+}
+
+// WorkflowProcessCounts holds process status totals shown on a stream card.
+type WorkflowProcessCounts struct {
+	NotStarted int
+	Started    int
+	Terminated int
+}
+
 // PageHeaderView is the view model for templates/components/page_header.html.
 type PageHeaderView struct {
 	BackHref    string

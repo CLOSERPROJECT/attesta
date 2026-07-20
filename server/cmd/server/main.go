@@ -283,26 +283,6 @@ type PageBase struct {
 	ShowLogout      bool
 }
 
-type WorkflowOption struct {
-	Key               string
-	Name              string
-	Description       string
-	Counts            WorkflowProcessCounts
-	HasUserTurn       bool
-	CanClone          bool
-	CanEdit           bool
-	EditAction        string
-	EditRequiresPurge bool
-	CanDelete         bool
-	DeleteAction      string
-}
-
-type WorkflowProcessCounts struct {
-	NotStarted int
-	Started    int
-	Terminated int
-}
-
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
@@ -323,7 +303,7 @@ type PublicCatalogRole struct {
 type WorkflowPickerView struct {
 	PageBase
 	Header               PageHeaderView
-	Workflows            []WorkflowOption
+	Workflows            []StreamCardView
 	ShowCreateStreamCard bool
 	Error                string
 	Confirmation         string
@@ -1526,7 +1506,7 @@ func homePickerMessage(r *http.Request, key string) string {
 	return strings.TrimSpace(r.URL.Query().Get(key))
 }
 
-func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]WorkflowOption, error) {
+func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]StreamCardView, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return nil, err
@@ -1551,10 +1531,10 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 		}
 	}
 	keys := sortedWorkflowKeys(catalog)
-	options := make([]WorkflowOption, 0, len(keys))
+	options := make([]StreamCardView, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
-		option := WorkflowOption{
+		option := StreamCardView{
 			Key:          key,
 			Name:         cfg.Workflow.Name,
 			Description:  strings.TrimSpace(cfg.Workflow.Description),

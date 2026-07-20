@@ -10,7 +10,7 @@
  * Shape (optional):
  *   btn-icon — square; uses effective height for width/height
  *
- * Context modifiers live in domain CSS (dialog-close, workflow-card-menu-trigger, …).
+ * Context modifiers live in domain CSS (dialog-close, stream-card-menu-trigger, …).
  */
 
 .btn {

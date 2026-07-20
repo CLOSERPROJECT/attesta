@@ -16,7 +16,7 @@ Styles load in this order from `web/src/styles.css`:
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
-| Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
+| Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, stream-card, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
 **Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
@@ -41,6 +41,7 @@ Org-admin forms and pickers live in `components/org-admin.css`, not the page mod
 | File | Prefix / scope | Templates |
 |------|----------------|-----------|
 | `components/page-header.css` | `.page-header-*` | `components/page_header.html` |
+| `components/stream-card.css` | `.stream-card-*` | `components/stream_card.html` |
 | `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
 | `components/stream-step-summary.css` | `.stream-step-summary-*` | `components/stream_step_summary.html` |
 | `components/stream-timeline.css` | `.stream-timeline-list`, `.stream-timeline-step*` | `components/stream_timeline.html` |
@@ -91,11 +92,12 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 |----------|-------------|-----------|
 | `layout.html` | `layout/index.css` | `components/shared.css` |
 | `components/page_header.html` | `components/page-header.css` | — |
+| `components/stream_card.html` | `components/stream-card.css` | `components/dialog.css` |
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
 | Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`) |
 | Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
-| `pages/home.html` | `pages/home.css` | `components/dialog.css`, `components/stream.css`, `layout/index.css` |
+| `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` | `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
@@ -324,7 +326,7 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 **Stack gap modifiers:** `.stack.u-gap-2` and `.stack.u-gap-4` override the default `var(--space-6)` stack gap.
 
-**Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.workflow-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
+**Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.stream-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
 
 ## Inline `style=` in templates
 

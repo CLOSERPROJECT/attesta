@@ -1108,7 +1108,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   const openDropdowns = document.querySelectorAll(
-    ".account-menu[open], .workflow-card-menu[open]",
+    ".account-menu[open], .stream-card-menu[open]",
   );
   for (const dropdown of openDropdowns) {
     if (!dropdown.contains(target)) {
