@@ -1,118 +1,3 @@
-.process-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: var(--space-3);
-}
-
-.process-item {
-  display: block;
-}
-
-.process-item-link {
-  padding: var(--space-3) var(--space-3);
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-  color: inherit;
-  text-decoration: none;
-}
-
-.process-available .process-item-link {
-  padding-left: 7px;
-  border-left: 6px solid var(--stream-available);
-  border-color: var(--stream-available);
-}
-
-.process-item-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 0 var(--space-2);
-}
-
-.process-item-link:hover,
-.process-item-link:focus-visible {
-  background-color: color-mix(in srgb, var(--primary) 10%, var(--card));
-  transform: translateY(-1px);
-  text-decoration: none;
-}
-
-.process-item-link:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.process-item-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 4px;
-  border: 1px solid currentcolor;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--stream-active);
-  background: color-mix(in srgb, currentcolor 8%, transparent);
-}
-
-.process-item-icon.status-available {
-  color: var(--stream-available);
-}
-
-.process-item-icon.status-done {
-  color: var(--stream-done);
-}
-
-.process-item-icon.status-terminated {
-  color: var(--stream-terminated);
-}
-
-.no-process-item {
-  padding: var(--space-3) var(--space-3);
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--foreground) 10%, var(--muted));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.process-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.process-title {
-  display: inline-flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.process-name {
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
-
-.process-id {
-  font-family: var(--font-mono);
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
-
-.process-title .process-id {
-  font-size: var(--text-xs);
-}
-
 .process-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -136,37 +21,6 @@
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--foreground);
-}
-
-.process-progress-line {
-  height: 4px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.process-progress-fill {
-  height: 100%;
-  background: var(--primary);
-  width: var(--progress, 0%);
-}
-
-.process-active .process-progress-fill {
-  height: 100%;
-  background: var(--stream-active);
-  width: var(--progress, 0%);
-}
-
-.process-done .process-progress-fill {
-  height: 100%;
-  background: var(--stream-done);
-  width: var(--progress, 0%);
-}
-
-.process-terminated .process-progress-fill {
-  height: 100%;
-  background: var(--stream-terminated);
-  width: var(--progress, 0%);
 }
 
 .status-tag {
@@ -207,24 +61,6 @@
   background: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
 }
 
-.process-meta {
-  display: flex;
-  place-items: center start;
-  gap: var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-}
-
-.process-meta > * {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.process-meta-primary {
-  font-weight: 600;
-  color: var(--foreground);
-}
-
 @media (--sm-down) {
   .stream-status-section-head {
     flex-direction: column;
@@ -246,24 +82,5 @@
     flex: 1 1 auto;
     min-width: 0;
     max-width: 100%;
-  }
-
-  .process-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-  }
-
-  .process-item-body {
-    padding-inline: 0;
-  }
-}
-
-@media (--md-down) {
-  .process-meta {
-    flex-direction: column;
-    align-items: start;
-    gap: var(--space-1);
-    margin-top: var(--space-2);
   }
 }

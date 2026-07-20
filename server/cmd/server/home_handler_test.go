@@ -1053,7 +1053,7 @@ func TestNormalizeHomePage(t *testing.T) {
 }
 
 func TestSortHomeProcessListByStatus(t *testing.T) {
-	items := []ProcessListItem{
+	items := []StreamInstanceCard{
 		{ID: "a", Status: "done", Percent: 100, CreatedAtTime: time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)},
 		{ID: "b", Status: "active", Percent: 10, CreatedAtTime: time.Date(2026, 2, 3, 11, 0, 0, 0, time.UTC)},
 	}

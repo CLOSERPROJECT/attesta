@@ -12,13 +12,13 @@ func TestSortHomeProcessList(t *testing.T) {
 	tests := []struct {
 		name    string
 		sortKey string
-		items   []ProcessListItem
+		items   []StreamInstanceCard
 		wantIDs []string
 	}{
 		{
 			name:    "time asc",
 			sortKey: "time_asc",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", CreatedAtTime: base.Add(2 * time.Hour)},
 				{ID: "b", CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", CreatedAtTime: base},
@@ -28,7 +28,7 @@ func TestSortHomeProcessList(t *testing.T) {
 		{
 			name:    "time desc default",
 			sortKey: "unknown",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", CreatedAtTime: base.Add(2 * time.Hour)},
 				{ID: "b", CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", CreatedAtTime: base},
@@ -38,7 +38,7 @@ func TestSortHomeProcessList(t *testing.T) {
 		{
 			name:    "progress asc with tie by recent time",
 			sortKey: "progress_asc",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", Percent: 20, CreatedAtTime: base.Add(2 * time.Hour)},
 				{ID: "b", Percent: 10, CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", Percent: 20, CreatedAtTime: base.Add(1 * time.Hour)},
@@ -48,7 +48,7 @@ func TestSortHomeProcessList(t *testing.T) {
 		{
 			name:    "progress desc with tie by recent time",
 			sortKey: "progress_desc",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", Percent: 80, CreatedAtTime: base.Add(2 * time.Hour)},
 				{ID: "b", Percent: 90, CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", Percent: 80, CreatedAtTime: base.Add(1 * time.Hour)},
@@ -58,7 +58,7 @@ func TestSortHomeProcessList(t *testing.T) {
 		{
 			name:    "status ordering with active first",
 			sortKey: "status",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", Status: "done", Percent: 100, CreatedAtTime: base},
 				{ID: "b", Status: "active", Percent: 20, CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", Status: "blocked", Percent: 10, CreatedAtTime: base.Add(1 * time.Hour)},
@@ -68,7 +68,7 @@ func TestSortHomeProcessList(t *testing.T) {
 		{
 			name:    "status ordering puts available before active",
 			sortKey: "status",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", Status: "done", Percent: 100, CreatedAtTime: base},
 				{ID: "b", Status: "active", Percent: 20, CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", Status: "available", Percent: 10, CreatedAtTime: base.Add(1 * time.Hour)},
@@ -78,7 +78,7 @@ func TestSortHomeProcessList(t *testing.T) {
 		{
 			name:    "status tie uses percent then time",
 			sortKey: "status",
-			items: []ProcessListItem{
+			items: []StreamInstanceCard{
 				{ID: "a", Status: "done", Percent: 20, CreatedAtTime: base},
 				{ID: "b", Status: "done", Percent: 90, CreatedAtTime: base.Add(-1 * time.Hour)},
 				{ID: "c", Status: "done", Percent: 20, CreatedAtTime: base.Add(1 * time.Hour)},
@@ -89,7 +89,7 @@ func TestSortHomeProcessList(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			items := append([]ProcessListItem(nil), tc.items...)
+			items := append([]StreamInstanceCard(nil), tc.items...)
 			sortHomeProcessList(items, tc.sortKey)
 			for i, wantID := range tc.wantIDs {
 				if items[i].ID != wantID {
