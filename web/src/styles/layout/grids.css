@@ -74,4 +74,8 @@
   .process-resources-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .process-resources-grid .layout-stack-separator {
+    gap: var(--space-8);
+  }
 }
