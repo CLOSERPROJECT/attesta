@@ -143,7 +143,7 @@
 
 {{ define "process_dpp" }}
   {{ if .DPPURL }}
-    <section class="panel dpp-downloads-section">
+    <section class="panel" id="process-dpp">
       <div class="panel-head-actions">
         <div class="panel-heading">
           <h2>Digital Product Passport</h2>
@@ -159,19 +159,49 @@
         </button>
       </div>
       <div class="stack u-gap-2">
-        <div>
-          <strong>GS1 Digital Link:</strong>
-          <a href="{{ .DPPURL }}"><code>{{ .DPPURL }}</code></a>
+        <div class="process-gs1-code-block">
+          <span class="process-gs1-code-label">GS1 Digital Link</span>
+          <div class="process-gs1-code-row">
+            <a
+              href="{{ .DPPURL }}"
+              class="process-gs1-code"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ .DPPURL }}</a
+            >
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon btn-xs js-copy-text"
+              data-copy-text="{{ .DPPURL }}"
+              data-copy-label="GS1 Digital Link"
+              aria-label="Copy GS1 Digital Link"
+            >
+              {{ template "icon-copy" . }}
+              {{ template "icon-copy-done" . }}
+            </button>
+          </div>
         </div>
         {{ if .DPPGS1 }}
-          <div>
-            <strong>GS1 (01/10/21):</strong>
-            <code>{{ .DPPGS1 }}</code>
+          <div class="process-gs1-code-block">
+            <span class="process-gs1-code-label">GS1 (01/10/21)</span>
+            <div class="process-gs1-code-row">
+              <span class="process-gs1-code">{{ .DPPGS1 }}</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-icon btn-xs js-copy-text"
+                data-copy-text="{{ .DPPGS1 }}"
+                data-copy-label="GS1 code"
+                aria-label="Copy GS1 (01/10/21) code"
+              >
+                {{ template "icon-copy" . }}
+                {{ template "icon-copy-done" . }}
+              </button>
+            </div>
           </div>
         {{ end }}
-
       </div>
     </section>
+    <hr class="u-divider-flush" />
   {{ end }}
 {{ end }}
 
