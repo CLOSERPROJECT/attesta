@@ -6,6 +6,10 @@
   .topbar {
     padding: var(--space-3) var(--space-4);
   }
+
+  .site-footer {
+    padding: var(--space-5) var(--space-4) var(--space-6);
+  }
 }
 
 @media (--xl-down) {
