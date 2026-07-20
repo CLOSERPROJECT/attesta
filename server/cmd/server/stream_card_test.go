@@ -13,7 +13,7 @@ func TestStreamCardTemplateRendersCoreFields(t *testing.T) {
 	card := StreamCardView{
 		Key:         "demo",
 		Name:        "Demo Stream",
-		Description: "Track a pilot batch end to end.",
+		Description: "Track a pilot batch end to end",
 		Counts: WorkflowProcessCounts{
 			NotStarted: 2,
 			Started:    1,
@@ -41,7 +41,7 @@ func TestStreamCardTemplateRendersCoreFields(t *testing.T) {
 		`class="btn btn-ghost btn-icon stream-card-menu-trigger"`,
 		`href="/w/demo/"`,
 		"Demo Stream",
-		"Track a pilot batch end to end.",
+		"Track a pilot batch end to end",
 		"<td>2</td>",
 		"<td>1</td>",
 		"<td>3</td>",

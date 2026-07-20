@@ -1,6 +1,6 @@
 workflow:
   name: Gallium recycling notarization
-  description: Workflow for intake, refinement, and QA of recycled gallium batches with notarized checkpoints.
+  description: Workflow for intake, refinement, and QA of recycled gallium batches with notarized checkpoints
   steps:
     - id: "1"
       title: Incoming intake
@@ -299,5 +299,5 @@ dpp:
   serialInputKey: ""
   serialStrategy: ""
   productName: Recycled Gallium Batch
-  productDescription: Gallium intake and refinement process with notarized checkpoints.
+  productDescription: Gallium intake and refinement process with notarized checkpoints
   ownerName: Attesta Demo Operator
