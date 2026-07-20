@@ -669,7 +669,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if !strings.Contains(body, "workflow references are invalid") {
 		t.Fatalf("expected validation error details, got %q", body)
 	}
-	if strings.Contains(body, `class="home-workflow-grid"`) {
+	if strings.Contains(body, `class="rail-layout`) || strings.Contains(body, `class="home-workflow-grid"`) {
 		t.Fatalf("did not expect stream dashboard grid when config is invalid, got %q", body)
 	}
 	if strings.Contains(body, `action="/w/workflow/process/start"`) || strings.Contains(body, "New instance") {

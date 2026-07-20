@@ -15,7 +15,7 @@ Styles load in this order from `web/src/styles.css`:
 | Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
-| Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
+| Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids + `.rail-layout`), `responsive.css` (shell breakpoint tweaks) |
 | Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, stream-card, stream-instance-card, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
@@ -98,10 +98,11 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `components/stream_instance_card.html` | `components/stream-instance-card.css` | `components/stream.css` (`.status-tag*`) |
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
-| Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`) |
+| Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`), `layout/grids.css` (`.rail-layout`) |
+| Inline rail shell (stream, org_admin) | `layout/grids.css` (`.rail-layout`) | `components/panel.css` (`.panel-sticky`), `components/sidebar-nav.css` |
 | Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
 | `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
-| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
+| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` | `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
@@ -109,7 +110,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `components/substep_shell.html` | `components/substep-shell.css` | `components/substep-body.css`, `role-palette.css` |
 | `components/substep_body.html` | `components/substep-body.css` | `components/dialog.css`, `components/forms.css`, `role-palette.css` |
 | `pages/dpp.html` | `pages/dpp.css` | `components/dpp_history_step.html`, `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
-| `pages/org_admin.html` | `pages/org-admin-page.css` | `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/org-admin.css`, `role-palette.css` |
+| `pages/org_admin.html` | `pages/org-admin-page.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/org-admin.css`, `role-palette.css` |
 | `pages/platform_admin.html` | `pages/platform-admin.css` | `components/dialog.css`, `components/shared.css` |
 | `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/button.css`, `components/shared.css` |
 | `attachment_carousel.html` | `components/substep-body.css` | — |
@@ -353,7 +354,8 @@ All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-s
 | Class | Use |
 |-------|-----|
 | `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Card sections — see `panel.css` header for markup tree (CSS-only component) |
-| `.panel-sticky` | Optional sticky rail modifier on `.panel` (active at `--xl-up`) |
+| `.panel-sticky` | Optional sticky rail modifier on `.panel` (active at `--md-up`) |
+| `.rail-layout`, `.rail-layout-ready`, `.rail-layout-main` | Sticky sidebar + main shell — see `layout/grids.css` (row at `--md-up`) |
 | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Section switcher tiles — see `sidebar-nav.css` header |
 | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Modal shells — see `dialog.css` header (CSS-only component) |
 | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Admin list rows with actions — see `list-row.css` header |

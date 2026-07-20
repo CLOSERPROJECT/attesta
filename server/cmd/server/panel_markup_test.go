@@ -236,6 +236,7 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
+		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
 		`class="sidebar-nav"`,
 		`class="sidebar-nav-link is-active"`,
@@ -263,14 +264,19 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		t.Fatalf("expected sidebar before instances header; panel-heading before panel-actions inside panel-head-actions")
 	}
 
-	mainStart := strings.Index(body, `class="home-workflow-panel-main"`)
+	railIdx := strings.Index(body, `class="rail-layout rail-layout-ready"`)
+	if railIdx == -1 || !(railIdx < sidebarIdx) {
+		t.Fatalf("expected rail-layout wrapping sticky sidebar")
+	}
+
+	mainStart := strings.Index(body, `class="rail-layout-main home-workflow-panel-main"`)
 	mainEnd := strings.Index(body, `class="stream-status-sections"`)
 	if mainStart == -1 || mainEnd == -1 || mainStart >= mainEnd {
-		t.Fatal("expected home-workflow-panel-main wrapping instances header")
+		t.Fatal("expected rail-layout-main wrapping instances header")
 	}
 	mainBlock := body[mainStart:mainEnd]
 	if strings.Contains(mainBlock, `<section class="panel"`) || strings.Contains(mainBlock, `<section class="panel `) {
-		t.Fatalf("home-workflow-panel-main must not wrap instances header in section.panel, got:\n%s", mainBlock)
+		t.Fatalf("rail-layout-main must not wrap instances header in section.panel, got:\n%s", mainBlock)
 	}
 }
 

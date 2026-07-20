@@ -5,8 +5,8 @@
   <div class="stack u-max-w-7xl u-mx-auto">
     {{ template "page_header" .Header }}
     <div
-      class="org-admin-grid{{ if not .NeedsOrganizationSetup }}
-        org-admin-grid-ready
+      class="rail-layout{{ if not .NeedsOrganizationSetup }}
+        rail-layout-ready
       {{ end }}"
     >
       <section
@@ -95,7 +95,7 @@
 
       {{ if not .NeedsOrganizationSetup }}
         <section
-          class="panel org-admin-panel-main"
+          class="panel rail-layout-main org-admin-panel-main"
           data-org-admin-shell
           data-org-admin-default-panel="{{ .ActivePanel }}"
         >

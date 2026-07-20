@@ -23,26 +23,15 @@
   }
 }
 
-.home-workflow-grid {
-  display: grid;
-  gap: var(--space-6);
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (--md-up) {
-  .home-workflow-grid {
-    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
-  }
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-4);
-}
-
-.org-admin-grid {
+/*
+ * Rail layout — sticky sidebar + main (stream dashboard, org admin).
+ * Side-by-side + sticky rail from --md-up (same breakpoint as .panel-sticky).
+ *
+ *   div.rail-layout[.rail-layout-ready]
+ *     section.panel.panel-sticky
+ *     .rail-layout-main
+ */
+.rail-layout {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
@@ -50,19 +39,27 @@
 }
 
 @media (--md-up) {
-  .org-admin-grid-ready {
+  .rail-layout-ready {
     flex-direction: row;
     align-items: start;
   }
 
-  .org-admin-grid-ready > .panel-sticky {
+  .rail-layout-ready > .panel-sticky {
     flex: 0 0 auto;
+    width: max-content;
+    max-width: 100%;
   }
 
-  .org-admin-grid-ready > .org-admin-panel-main {
+  .rail-layout-ready > .rail-layout-main {
     flex: 1 1 0;
     min-width: 0;
   }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
 }
 
 .process-resources-grid {
