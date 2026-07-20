@@ -30,7 +30,7 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-@media (--xl-up) {
+@media (--md-up) {
   .home-workflow-grid {
     grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
   }

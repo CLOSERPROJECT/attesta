@@ -22,7 +22,7 @@
  *   div.panel-block[.panel-block-spaced]
  *
  * Modifiers:
- *   section.panel.panel-sticky   (sticky rail at --xl-up)
+ *   section.panel.panel-sticky   (sticky rail at --md-up)
  */
 
 .panel {
@@ -82,7 +82,7 @@
   margin-bottom: var(--space-3);
 }
 
-@media (--xl-up) {
+@media (--md-up) {
   .panel-sticky {
     position: sticky;
     top: 44px;
