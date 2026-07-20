@@ -46,24 +46,13 @@
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+  flex-wrap: nowrap;
   margin-inline-start: auto;
   gap: var(--space-1);
+  white-space: nowrap;
 }
 
 .list-row > .error {
   flex: 1 1 100%;
   margin: 0;
-}
-
-@media (--sm-down) {
-  .list-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-3);
-  }
-
-  .list-row-actions {
-    margin-inline-start: 0;
-    justify-content: flex-start;
-  }
 }

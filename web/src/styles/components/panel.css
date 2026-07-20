@@ -50,6 +50,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-5);
+  flex-wrap: nowrap;
 
   button {
     flex-shrink: 0;
@@ -62,6 +63,7 @@
 
 .panel-head-actions .panel-heading {
   margin-bottom: 0;
+  min-width: 0;
 }
 
 .panel-actions {
@@ -84,23 +86,5 @@
   .panel-sticky {
     position: sticky;
     top: 44px;
-  }
-}
-
-@media (--md-down) {
-  .panel-head-actions {
-    flex-direction: column;
-
-    button {
-      width: 100%;
-    }
-
-    form {
-      width: 100%;
-    }
-
-    .panel-actions {
-      width: 100%;
-    }
   }
 }
