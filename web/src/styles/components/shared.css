@@ -50,6 +50,35 @@ svg.bi {
   color: var(--muted-foreground);
 }
 
+.field-label {
+  display: block;
+  margin: 0;
+  font-weight: var(--font-semibold);
+}
+
+.field-block {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.field-row > :not(button) {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.field-row > button {
+  flex: 0 0 auto;
+}
+
 .pill {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -139,6 +168,22 @@ svg.bi {
   white-space: pre-line;
 }
 
+.error--rich {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  white-space: normal;
+}
+
+.error--rich > :is(h1, h2, h3, h4, h5, h6, p) {
+  margin: 0;
+}
+
+.error--rich > .error-detail {
+  margin-top: var(--space-2);
+  white-space: pre-line;
+}
+
 .confirmation {
   background: var(--success-muted);
   color: var(--success-muted-foreground);
@@ -147,6 +192,33 @@ svg.bi {
   padding: var(--space-3) var(--space-3);
   border-radius: 4px;
   margin-block: 0;
+  white-space: pre-line;
+}
+
+.warning {
+  background: var(--warning-muted);
+  color: var(--warning-muted-foreground);
+  border: 1px solid
+    color-mix(in srgb, var(--warning-muted-foreground) 35%, transparent);
+  padding: var(--space-3) var(--space-3);
+  border-radius: 4px;
+  margin-block: 0;
+  white-space: pre-line;
+}
+
+.warning--rich {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  white-space: normal;
+}
+
+.warning--rich > :is(h1, h2, h3, h4, h5, h6, p) {
+  margin: 0;
+}
+
+.warning--rich > .warning-detail {
+  margin-top: var(--space-2);
   white-space: pre-line;
 }
 

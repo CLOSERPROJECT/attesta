@@ -27,7 +27,8 @@
   --font-semibold: 600;
   --font-bold: 700;
 
-  /* Spacing */
+  /* Spacing — 4px grid; --space-N ≈ N × 0.25rem */
+  --space-0.5: 1px;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -35,6 +36,11 @@
   --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-9: 2.25rem;
+  --space-10: 2.5rem;
+  --space-11: 2.75rem;
+  --space-12: 3rem;
 
   /* Buttons */
   --btn-height-xs: 1.75rem; /* 28px — dense icon actions */
@@ -45,13 +51,13 @@
   --btn-padding-x-sm: var(--space-2);
 
   /* Surfaces */
-  --background: linear-gradient(135deg, #f3f4ef 0%, #e9efe2 100%);
+  --background: rgb(248, 253, 252);
   --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
   --muted: #f8f9f4;
   --muted-foreground: #4f5d47;
-  --secondary: #fffaf2;
+  --secondary: #ffffff;
 
   /* Accent & semantic */
   --primary: #1e6f5c;
@@ -67,9 +73,10 @@
   --success-muted: #e6f4ea;
   --success-muted-foreground: var(--primary);
   --warning-muted: #fff7da;
+  --warning-muted-foreground: #a67f05;
 
   /* Borders & chips */
-  --border: #d9e0d0;
+  --border: #c5d0b5;
   --pill: #eff4e9;
   --tag: #eef2e6;
 
@@ -200,6 +207,7 @@
   --destructive-muted-foreground: #ffd1cc;
   --success-muted: rgb(87 194 166 / 12%);
   --warning-muted: rgb(242 198 79 / 12%);
+  --warning-muted-foreground: var(--highlight-foreground);
 
   /* Borders & chips */
   --border: rgb(236 241 235 / 14%);

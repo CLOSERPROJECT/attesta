@@ -253,7 +253,7 @@ func TestSubstepShellTemplateRendersMissingBodyMessage(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, "No data form configured for this substep.") {
+	if !strings.Contains(body, "No data form configured for this substep") {
 		t.Fatalf("expected missing-body fallback copy, got: %s", body)
 	}
 }

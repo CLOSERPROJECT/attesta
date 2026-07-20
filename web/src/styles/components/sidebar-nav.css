@@ -2,47 +2,51 @@
  * Sidebar nav — section switcher tiles (CSS-only component).
  *
  * nav.sidebar-nav
- *   button.sidebar-nav-link[.is-active]
+ *   a.sidebar-nav-link[.is-active]   (or button, on pages that still use buttons)
  *     span.sidebar-nav-title
  *     span.sidebar-nav-copy?   (optional subtitle)
  */
 
 .sidebar-nav {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: 100%;
+  gap: var(--space-1);
 }
 
 .sidebar-nav-link {
-  width: 100%;
-  display: grid;
-  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
   text-align: left;
+  text-decoration: none;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--muted);
+  border: 1px solid transparent;
+  background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
-}
-
-.sidebar-nav-link:hover {
-  border-color: var(--primary);
-  transform: translateY(-1px);
-}
-
-.sidebar-nav-link.is-active {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, var(--muted));
+    color 0.18s ease;
 }
 
 .sidebar-nav-title {
   font-weight: 500;
+  color: var(--foreground);
+}
+
+.sidebar-nav-link:hover,
+.sidebar-nav-link:focus,
+.sidebar-nav-link.is-active {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--primary) 8%, var(--background));
+}
+
+.sidebar-nav-link.is-active {
+  border-color: var(--primary);
 }
 
 .sidebar-nav-copy {

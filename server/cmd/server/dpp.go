@@ -294,7 +294,7 @@ func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubste
 		reason = "Stream ended early"
 		detailMessage = state.terminationReason
 		if detailMessage == "" {
-			detailMessage = "No reason provided."
+			detailMessage = "No reason provided"
 		}
 	case "skipped":
 		reason = "Stream ended early"

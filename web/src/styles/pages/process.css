@@ -2,11 +2,57 @@
   min-width: 0;
 }
 
+.process-termination-desktop {
+  display: none;
+}
+
+.process-steps-column {
+  min-width: 0;
+}
+
+#process-dpp .panel-head-actions,
+#process-downloads .panel-head-actions {
+  margin-bottom: var(--space-4);
+}
+
+#process-downloads .field-block:has(.process-attachments-list) > .field-label {
+  margin-bottom: var(--space-0.5);
+}
+
 .process-attachments-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
   gap: var(--space-2);
+}
+
+/* GS1 codes on the completed-process DPP panel */
+.field-row > .process-gs1-code {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.process-gs1-code {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
+}
+
+.field-row .js-copy-text [data-copy-icon-done] {
+  color: var(--primary);
+}
+
+@media (--md-up) {
+  .process-termination-mobile {
+    display: none;
+  }
+
+  .process-termination-desktop {
+    display: contents;
+  }
 }

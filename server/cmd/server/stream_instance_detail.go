@@ -38,8 +38,7 @@ func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeC
 		view.SelectedBody = &action
 	}
 	if process != nil && process.Termination != nil {
-		view.Termination = processTerminationView(process.Termination)
-		view.Termination = s.applyDoneByEmailToTermination(ctx, cfg.Workflow, actor, view.Termination)
+		view.Termination = s.buildStreamTerminationDetailsView(ctx, cfg.Workflow, actor, process.Termination)
 	}
 
 	if processDone {
@@ -99,4 +98,48 @@ func (s *Server) applyDoneByEmailToTermination(ctx context.Context, def Workflow
 		mapped.EndedBy = identity.fallbackID
 	}
 	return &mapped
+}
+
+func terminationEndedByDisplay(endedBy string) string {
+	trimmed := strings.TrimSpace(endedBy)
+	if userID, ok := parseAppwriteActorID(trimmed); ok {
+		return userID
+	}
+	return trimmed
+}
+
+func (s *Server) applyDoneByIdentityFallbackToTermination(ctx context.Context, termination *ProcessTerminationView) *ProcessTerminationView {
+	if termination == nil {
+		return nil
+	}
+	identity, ok := s.lookupUserIdentityByActorID(ctx, termination.EndedBy, map[string]userIdentityView{})
+	if !ok {
+		return termination
+	}
+	mapped := *termination
+	if strings.TrimSpace(identity.fallbackID) != "" {
+		mapped.EndedBy = identity.fallbackID
+	}
+	return &mapped
+}
+
+func (s *Server) buildStreamTerminationDetailsView(ctx context.Context, def WorkflowDef, viewer Actor, termination *ProcessTermination) *StreamTerminationDetailsView {
+	if termination == nil {
+		return nil
+	}
+	view := processTerminationView(termination)
+	if strings.TrimSpace(viewer.OrgSlug) == "" {
+		view = s.applyDoneByIdentityFallbackToTermination(ctx, view)
+	} else {
+		view = s.applyDoneByEmailToTermination(ctx, def, viewer, view)
+	}
+	if view == nil {
+		return nil
+	}
+	return &StreamTerminationDetailsView{
+		EndedAtHuman: view.EndedAtHuman,
+		EndedBy:      terminationEndedByDisplay(view.EndedBy),
+		SubstepID:    view.SubstepID,
+		Reason:       view.Reason,
+	}
 }

@@ -3,178 +3,171 @@
 {{ define "home_body" }}
   <div class="stack u-max-w-7xl u-mx-auto">
     {{ template "page_header" .Header }}
-    <div class="home-workflow-grid" data-home-root>
-      <section class="panel panel-sticky">
-        <div class="panel-heading">
-          <h2>Streams</h2>
-          <p>Jump to instances by status.</p>
-        </div>
-        <nav class="sidebar-nav" aria-label="Stream status sections">
-          {{ range .ProcessGroups }}
-            {{ if eq .Status "available" }}
-              <button
-                type="button"
-                class="sidebar-nav-link is-active"
-                data-home-nav="{{ .Status }}"
-                aria-controls="{{ .PanelID }}"
-                aria-current="page"
-                aria-label="Available streams"
-                title="Streams waiting for your input"
-              >
-                <span class="sidebar-nav-title"> Available </span>
-              </button>
-            {{ else if eq .Status "active" }}
-              <button
-                type="button"
-                class="sidebar-nav-link"
-                data-home-nav="{{ .Status }}"
-                aria-controls="{{ .PanelID }}"
-                aria-current="false"
-                aria-label="Active streams"
-                title="Streams waiting for someone else input"
-              >
-                <span class="sidebar-nav-title"> Active </span>
-              </button>
-            {{ else if eq .Status "done" }}
-              <button
-                type="button"
-                class="sidebar-nav-link"
-                data-home-nav="{{ .Status }}"
-                aria-controls="{{ .PanelID }}"
-                aria-current="false"
-                aria-label="Completed streams"
-                title="Streams completed successfully"
-              >
-                <span class="sidebar-nav-title"> Done </span>
-              </button>
-            {{ else if eq .Status "terminated" }}
-              <button
-                type="button"
-                class="sidebar-nav-link"
-                data-home-nav="{{ .Status }}"
-                aria-controls="{{ .PanelID }}"
-                aria-current="false"
-                aria-label="Terminated streams"
-                title="Streams terminated before completion"
-              >
-                <span class="sidebar-nav-title"> Terminated </span>
-              </button>
-            {{ end }}
-          {{ end }}
-        </nav>
-      </section>
-
-      <div class="home-workflow-panel-main">
-        <div class="panel-head-actions">
+    {{ if .Error }}
+      <div class="error error--rich">
+        <h3>Stream configuration issue</h3>
+        <p>
+          This stream cannot start new processes until its organization and role
+          references are fixed.
+        </p>
+        <div class="error-detail">{{ .Error }}</div>
+      </div>
+    {{ else }}
+      <div class="rail-layout rail-layout-ready" data-home-root>
+        <section class="panel panel-sticky">
           <div class="panel-heading">
-            <h2>Stream instances</h2>
-            <p>View and manage all instances of this stream.</p>
+            <h2>Streams</h2>
+            <p>Jump to instances by status</p>
           </div>
-          <div class="panel-actions">
-            <button
-              class="btn btn-secondary"
-              type="button"
-              data-home-nav="preview"
-              onclick="document.getElementById('stream-preview-dialog').showModal()"
-            >
-              {{ template "icon-eye" . }}
-              View preview
-            </button>
-            <button
-              class="btn btn-primary"
-              type="button"
-              onclick="document.getElementById('new-instance-dialog').showModal()"
-              {{ if .Error }}disabled{{ end }}
-            >
-              {{ template "icon-play" . }}
-              New instance
-            </button>
-          </div>
-        </div>
-        <dialog id="new-instance-dialog" class="dialog">
-          <div class="dialog-card">
-            <header class="dialog-head">
-              <div>
-                <h3 class="dialog-title">New instance</h3>
-                <p class="dialog-subtitle">
-                  Give this stream instance a brief name.
-                </p>
-              </div>
-              <button
-                type="button"
-                class="btn btn-ghost btn-icon dialog-close"
-                onclick="document.getElementById('new-instance-dialog').close()"
-              >
-                {{ template "icon-close" . }}
-              </button>
-            </header>
-            <form
-              method="post"
-              action="{{ .WorkflowPath }}/process/start"
-              class="input-form"
-            >
-              <div class="form-field">
-                <label for="instance-name">Instance name</label>
-                <input
-                  id="instance-name"
-                  name="name"
-                  type="text"
-                  maxlength="80"
-                  autocomplete="off"
-                />
-              </div>
-              <div class="dialog-actions">
-                <button class="btn btn-primary" type="submit">
-                  {{ template "icon-play" . }}
-                  Start instance
+          <nav class="sidebar-nav" aria-label="Stream status sections">
+            {{ range .ProcessGroups }}
+              {{ if eq .Status "available" }}
+                <button
+                  type="button"
+                  class="sidebar-nav-link is-active"
+                  data-home-nav="{{ .Status }}"
+                  aria-controls="{{ .PanelID }}"
+                  aria-current="page"
+                  aria-label="Available streams"
+                  title="Streams waiting for your input"
+                >
+                  <span class="sidebar-nav-title"> Available </span>
                 </button>
-              </div>
-            </form>
-          </div>
-        </dialog>
-        <dialog
-          id="stream-preview-dialog"
-          class="dialog"
-        >
-          <div class="dialog-card">
-            <header class="dialog-head">
-              <div>
-                <h3 class="dialog-title">Stream preview</h3>
-                <p class="dialog-subtitle">
-                  Inspect the stream timeline and form structure in read-only
-                  mode.
-                </p>
-              </div>
+              {{ else if eq .Status "active" }}
+                <button
+                  type="button"
+                  class="sidebar-nav-link"
+                  data-home-nav="{{ .Status }}"
+                  aria-controls="{{ .PanelID }}"
+                  aria-current="false"
+                  aria-label="Active streams"
+                  title="Streams waiting for someone else input"
+                >
+                  <span class="sidebar-nav-title"> Active </span>
+                </button>
+              {{ else if eq .Status "done" }}
+                <button
+                  type="button"
+                  class="sidebar-nav-link"
+                  data-home-nav="{{ .Status }}"
+                  aria-controls="{{ .PanelID }}"
+                  aria-current="false"
+                  aria-label="Completed streams"
+                  title="Streams completed successfully"
+                >
+                  <span class="sidebar-nav-title"> Done </span>
+                </button>
+              {{ else if eq .Status "terminated" }}
+                <button
+                  type="button"
+                  class="sidebar-nav-link"
+                  data-home-nav="{{ .Status }}"
+                  aria-controls="{{ .PanelID }}"
+                  aria-current="false"
+                  aria-label="Terminated streams"
+                  title="Streams terminated before completion"
+                >
+                  <span class="sidebar-nav-title"> Terminated </span>
+                </button>
+              {{ end }}
+            {{ end }}
+          </nav>
+        </section>
+
+        <div class="rail-layout-main home-workflow-panel-main">
+          <div class="panel-head-actions">
+            <div class="panel-heading">
+              <h2>Stream instances</h2>
+              <p>View and manage all instances of this stream</p>
+            </div>
+            <div class="panel-actions">
               <button
+                class="btn btn-secondary"
                 type="button"
-                class="btn btn-ghost btn-icon dialog-close"
-                onclick="document.getElementById('stream-preview-dialog').close()"
+                data-home-nav="preview"
+                onclick="document.getElementById('stream-preview-dialog').showModal()"
               >
-                {{ template "icon-close" . }}
+                {{ template "icon-eye" . }}
+                View preview
               </button>
-            </header>
-            <div class="stream-preview-body">
-              {{ template "stream_timeline" .Preview.StreamTimeline }}
+              <button
+                class="btn btn-primary"
+                type="button"
+                onclick="document.getElementById('new-instance-dialog').showModal()"
+              >
+                {{ template "icon-play" . }}
+                New instance
+              </button>
             </div>
           </div>
-        </dialog>
-        <div class="stream-status-sections">
-          {{ if .Error }}
-            <section
-              class="panel instances-panel"
-              id="home-panel-instances"
-              data-home-panel="instances"
-            >
-              <div class="panel-heading">
-                <h3>Stream configuration issue</h3>
-                <p>
-                  This stream cannot start new processes until its organization
-                  and role references are fixed.
-                </p>
+          <dialog id="new-instance-dialog" class="dialog">
+            <div class="dialog-card">
+              <header class="dialog-head">
+                <div>
+                  <h3 class="dialog-title">New instance</h3>
+                  <p class="dialog-subtitle">
+                    Give this stream instance a brief name
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-icon dialog-close"
+                  onclick="document.getElementById('new-instance-dialog').close()"
+                >
+                  {{ template "icon-close" . }}
+                </button>
+              </header>
+              <form
+                method="post"
+                action="{{ .WorkflowPath }}/process/start"
+                class="input-form"
+              >
+                <div class="form-field">
+                  <label for="instance-name">Instance name</label>
+                  <input
+                    id="instance-name"
+                    name="name"
+                    type="text"
+                    maxlength="80"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="dialog-actions">
+                  <button class="btn btn-primary" type="submit">
+                    {{ template "icon-play" . }}
+                    Start instance
+                  </button>
+                </div>
+              </form>
+            </div>
+          </dialog>
+          <dialog
+            id="stream-preview-dialog"
+            class="dialog"
+          >
+            <div class="dialog-card">
+              <header class="dialog-head">
+                <div>
+                  <h3 class="dialog-title">Stream preview</h3>
+                  <p class="dialog-subtitle">
+                    Inspect the stream timeline and form structure in read-only
+                    mode
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-icon dialog-close"
+                  onclick="document.getElementById('stream-preview-dialog').close()"
+                >
+                  {{ template "icon-close" . }}
+                </button>
+              </header>
+              <div class="stream-preview-body">
+                {{ template "stream_timeline" .Preview.StreamTimeline }}
               </div>
-              <div class="error">{{ .Error }}</div>
-            </section>
-          {{ else }}
+            </div>
+          </dialog>
+          <div class="stream-status-sections">
             {{ range .ProcessGroups }}
               <section
                 class="stream-status-section"
@@ -319,83 +312,83 @@
                 {{ end }}
               </section>
             {{ end }}
-          {{ end }}
+          </div>
         </div>
       </div>
-    </div>
 
-    <script>
-      (function () {
-        const homeRoot = document.querySelector("[data-home-root]");
-        if (!homeRoot) {
-          return;
-        }
-
-        const panels = Array.from(homeRoot.querySelectorAll("[data-home-panel]"));
-        const statusPanelNames = panels.map((panel) =>
-          (panel.getAttribute("data-home-panel") || "").trim(),
-        );
-
-        const defaultPanelName = statusPanelNames.includes("available")
-          ? "available"
-          : statusPanelNames[0] || "";
-
-        const initialPanelName = () => {
-          const hashPanelID = window.location.hash.replace(/^#/, "");
-          if (hashPanelID) {
-            const hashPanel = panels.find((panel) => panel.id === hashPanelID);
-            if (hashPanel) {
-              return (hashPanel.getAttribute("data-home-panel") || "").trim();
-            }
+      <script>
+        (function () {
+          const homeRoot = document.querySelector("[data-home-root]");
+          if (!homeRoot) {
+            return;
           }
 
-          const params = new URLSearchParams(window.location.search);
-          const queryPanel = statusPanelNames.find((panelName) => {
-            return (
-              params.has(panelName + "_page") || params.has(panelName + "_sort")
-            );
-          });
-          return queryPanel || defaultPanelName;
-        };
-
-        const showPanel = (panelName) => {
-          if (!statusPanelNames.includes(panelName)) {
-            panelName = defaultPanelName;
-          }
-
-          const buttons = Array.from(
-            homeRoot.querySelectorAll("[data-home-nav]"),
+          const panels = Array.from(homeRoot.querySelectorAll("[data-home-panel]"));
+          const statusPanelNames = panels.map((panel) =>
+            (panel.getAttribute("data-home-panel") || "").trim(),
           );
-          buttons.forEach((button) => {
-            const currentName = button.getAttribute("data-home-nav");
-            const isActive = currentName === panelName;
-            button.classList.toggle("is-active", isActive);
-            button.setAttribute("aria-current", isActive ? "page" : "false");
-          });
 
-          panels.forEach((panel) => {
-            const currentName = panel.getAttribute("data-home-panel");
-            panel.hidden = currentName !== panelName;
-          });
-        };
+          const defaultPanelName = statusPanelNames.includes("available")
+            ? "available"
+            : statusPanelNames[0] || "";
 
-        Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
-          (button) => {
-            button.addEventListener("click", () => {
-              const panelName = (
-                button.getAttribute("data-home-nav") || ""
-              ).trim();
-              if (panelName === "preview") {
-                return;
+          const initialPanelName = () => {
+            const hashPanelID = window.location.hash.replace(/^#/, "");
+            if (hashPanelID) {
+              const hashPanel = panels.find((panel) => panel.id === hashPanelID);
+              if (hashPanel) {
+                return (hashPanel.getAttribute("data-home-panel") || "").trim();
               }
-              showPanel(panelName);
-            });
-          },
-        );
+            }
 
-        showPanel(initialPanelName());
-      })();
-    </script>
+            const params = new URLSearchParams(window.location.search);
+            const queryPanel = statusPanelNames.find((panelName) => {
+              return (
+                params.has(panelName + "_page") || params.has(panelName + "_sort")
+              );
+            });
+            return queryPanel || defaultPanelName;
+          };
+
+          const showPanel = (panelName) => {
+            if (!statusPanelNames.includes(panelName)) {
+              panelName = defaultPanelName;
+            }
+
+            const buttons = Array.from(
+              homeRoot.querySelectorAll("[data-home-nav]"),
+            );
+            buttons.forEach((button) => {
+              const currentName = button.getAttribute("data-home-nav");
+              const isActive = currentName === panelName;
+              button.classList.toggle("is-active", isActive);
+              button.setAttribute("aria-current", isActive ? "page" : "false");
+            });
+
+            panels.forEach((panel) => {
+              const currentName = panel.getAttribute("data-home-panel");
+              panel.hidden = currentName !== panelName;
+            });
+          };
+
+          Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
+            (button) => {
+              button.addEventListener("click", () => {
+                const panelName = (
+                  button.getAttribute("data-home-nav") || ""
+                ).trim();
+                if (panelName === "preview") {
+                  return;
+                }
+                showPanel(panelName);
+              });
+            },
+          );
+
+          showPanel(initialPanelName());
+        })();
+      </script>
+    {{ end }}
   </div>
 {{ end }}
 

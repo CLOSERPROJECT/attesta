@@ -6,11 +6,13 @@
   .topbar {
     padding: var(--space-3) var(--space-4);
   }
-}
 
-@media (--xl-down) {
+  .site-footer {
+    padding: var(--space-5) var(--space-4) var(--space-6);
+  }
+
   .layout-stack-separator {
     border-top: 1px solid var(--border);
-    padding-top: var(--space-6);
+    padding-top: var(--space-12);
   }
 }

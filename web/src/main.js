@@ -573,6 +573,37 @@ const copyLinkValue = async (button) => {
   window.prompt(`Copy ${label}:`, absoluteURL);
 };
 
+const copyFeedbackTimers = new WeakMap();
+
+const showCopyFeedback = (button) => {
+  const defaultIcon = button.querySelector("[data-copy-icon-default]");
+  const doneIcon = button.querySelector("[data-copy-icon-done]");
+  const previousTimer = copyFeedbackTimers.get(button);
+  if (previousTimer) {
+    window.clearTimeout(previousTimer);
+  }
+
+  if (defaultIcon && doneIcon) {
+    defaultIcon.classList.add("icon-hidden");
+    doneIcon.classList.remove("icon-hidden");
+    const timer = window.setTimeout(() => {
+      defaultIcon.classList.remove("icon-hidden");
+      doneIcon.classList.add("icon-hidden");
+      copyFeedbackTimers.delete(button);
+    }, 1200);
+    copyFeedbackTimers.set(button, timer);
+    return;
+  }
+
+  const originalText = button.textContent || "Copy";
+  button.textContent = "Copied";
+  const timer = window.setTimeout(() => {
+    button.textContent = originalText;
+    copyFeedbackTimers.delete(button);
+  }, 1200);
+  copyFeedbackTimers.set(button, timer);
+};
+
 const copyTextValue = async (button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -585,11 +616,7 @@ const copyTextValue = async (button) => {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(value);
-      const originalText = button.textContent || "Copy";
-      button.textContent = "Copied";
-      window.setTimeout(() => {
-        button.textContent = originalText;
-      }, 1200);
+      showCopyFeedback(button);
       return;
     } catch (_err) {}
   }

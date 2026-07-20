@@ -12,7 +12,7 @@ func TestOrgAdminTemplateRendersSidebarPanels(t *testing.T) {
 	view := OrgAdminView{
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Create and manage roles and users",
+			Description: "Manage organization settings, roles, and members",
 			BackHref:    "/",
 		},
 		Organization: Organization{

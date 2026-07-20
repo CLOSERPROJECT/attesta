@@ -1,6 +1,6 @@
 workflow:
   name: Indium recycling audit
-  description: Shipment intake, inspection, and approval with traceable checkpoints.
+  description: Shipment intake, inspection, and approval with traceable checkpoints
   steps:
     - id: "1"
       title: Collection and dismantling of indium waste
@@ -489,5 +489,5 @@ dpp:
   serialInputKey: ""
   serialStrategy: process_id_hex
   productName: Indium recycling audit
-  productDescription: Shipment intake, inspection, and approval with traceable checkpoints.
+  productDescription: Shipment intake, inspection, and approval with traceable checkpoints
   ownerName: Attesta Demo Operator

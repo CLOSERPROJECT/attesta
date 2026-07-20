@@ -96,7 +96,7 @@
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@600;700&display=swap"
       />
       <script
         src="https://unpkg.com/htmx.org@1.9.12"
@@ -179,7 +179,7 @@
                       </a>
                     {{ end }}
                     {{ if .ShowMyOrgLink }}
-                      <a href="/org-admin/users" class="account-menu-item">
+                      <a href="/org-admin/profile" class="account-menu-item">
                         {{ template "icon-users-group" . }}
                         My Org
                       </a>
@@ -224,31 +224,33 @@
         {{ end }}
       </main>
       <footer class="site-footer">
-        <p>
-          © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
-          under the GNU AGPLv3.
-        </p>
-        <p>
-          CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
-          chips and microElectronics pRoduction, Project No. 101161109) is
-          funded by the European Union under the Interregional Innovation
-          Investments (I3) Instrument of the European Regional Development Fund,
-          managed by the European Innovation Council and SMEs Executive Agency
-          (EISMEA).
-        </p>
-        <p>
-          Even Closer (Project No. 101228240) is funded by the European Union
-          under the Interregional Innovation Investments (I3) Instrument of the
-          European Regional Development Fund, managed by the European Innovation
-          Council and SMEs Executive Agency (EISMEA).
-        </p>
-        <p>
-          This repository/website is part of CLOSER and Even Closer projects and has
-	  received funding from the European Union. Views and opinions expressed are
-          those of the author(s) only and do not necessarily reflect those of
-          the European Union or EISMEA. Neither the European Union nor the
-          granting authority can be held responsible for them.
-        </p>
+        <div class="u-mx-auto u-max-w-7xl muted">
+          <p>
+            © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
+            under the GNU AGPLv3.
+          </p>
+          <p>
+            CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
+            chips and microElectronics pRoduction, Project No. 101161109) is
+            funded by the European Union under the Interregional Innovation
+            Investments (I3) Instrument of the European Regional Development Fund,
+            managed by the European Innovation Council and SMEs Executive Agency
+            (EISMEA).
+          </p>
+          <p>
+            Even Closer (Project No. 101228240) is funded by the European Union
+            under the Interregional Innovation Investments (I3) Instrument of the
+            European Regional Development Fund, managed by the European Innovation
+            Council and SMEs Executive Agency (EISMEA).
+          </p>
+          <p>
+            This repository/website is part of CLOSER and Even Closer projects and has
+            received funding from the European Union. Views and opinions expressed are
+            those of the author(s) only and do not necessarily reflect those of
+            the European Union or EISMEA. Neither the European Union nor the
+            granting authority can be held responsible for them.
+          </p>
+        </div>
       </footer>
     </body>
   </html>

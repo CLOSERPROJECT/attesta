@@ -76,7 +76,7 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		server := &Server{tmpl: testTemplates(), now: func() time.Time { return now }}
 		rec := httptest.NewRecorder()
 
-		server.renderOrgAdminWithErrors(rec, &AccountUser{Email: "owner@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}, "", "/invite/token", OrgAdminErrors{
+		server.renderOrgAdminWithErrors(rec, nil, &AccountUser{Email: "owner@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}, "", "/invite/token", OrgAdminErrors{
 			Invite: " invite failed ",
 		})
 
@@ -101,7 +101,7 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 
-		server.renderOrgAdminWithErrors(rec, admin, "acme", "", OrgAdminErrors{})
+		server.renderOrgAdminWithErrors(rec, nil, admin, "acme", "", OrgAdminErrors{})
 
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
@@ -133,7 +133,7 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 
-		server.renderOrgAdminWithErrors(rec, admin, "acme", "/invite/token", OrgAdminErrors{Users: " user error "})
+		server.renderOrgAdminWithErrors(rec, nil, admin, "acme", "/invite/token", OrgAdminErrors{Users: " user error "})
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -175,7 +175,7 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 
-		server.renderOrgAdminWithErrors(rec, admin, "acme", "", OrgAdminErrors{})
+		server.renderOrgAdminWithErrors(rec, nil, admin, "acme", "", OrgAdminErrors{})
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -191,7 +191,7 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		server := &Server{tmpl: tmpl, now: func() time.Time { return now }}
 		rec := httptest.NewRecorder()
 
-		server.renderOrgAdminWithErrors(rec, &AccountUser{Email: "owner@example.com"}, "", "", OrgAdminErrors{})
+		server.renderOrgAdminWithErrors(rec, nil, &AccountUser{Email: "owner@example.com"}, "", "", OrgAdminErrors{})
 
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)

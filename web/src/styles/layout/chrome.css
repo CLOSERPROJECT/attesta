@@ -208,11 +208,15 @@
   padding: var(--space-5) 32px var(--space-6);
   border-top: 1px solid var(--border);
   background: var(--secondary);
+  color: var(--muted-foreground);
+}
+
+.site-footer > * {
+  opacity: 0.5;
 }
 
 .site-footer p {
   margin: 0 0 var(--space-2);
-  color: var(--muted-foreground);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
 }
@@ -232,6 +236,10 @@
 
 .stack.u-gap-4 {
   gap: var(--space-4);
+}
+
+.stack.u-gap-12 {
+  gap: var(--space-12);
 }
 
 .landing {

@@ -1,5 +1,31 @@
-.dpp-downloads-section code {
-  word-break: break-all;
+.dpp-page {
+  max-width: 80ch;
+}
+
+.dpp-ids {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.dpp-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: 5px var(--space-3);
+  color: var(--foreground);
+  background: var(--pill);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.dpp-history .panel-heading:has(+ .stream-termination-details) {
+  margin-bottom: var(--space-3);
+}
+
+.dpp-history .stream-termination-details {
+  margin-bottom: var(--space-6);
 }
 
 .dpp-integrity-root {
@@ -7,6 +33,10 @@
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+}
+
+.dpp-integrity-root strong {
+  font-family: var(--font-mono);
 }
 
 .dpp-integrity-list {
@@ -27,6 +57,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-all;
+  font-family: var(--font-mono);
 }
 
 .dpp-integrity-hash-button {
@@ -106,9 +137,6 @@
   min-width: 0;
 }
 
-.dpp-termination-meta {
-  margin: 3px 0 var(--space-5);
-}
 
 @media (--sm-down) {
   .dpp-history-item::before {

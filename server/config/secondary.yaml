@@ -159,5 +159,5 @@ dpp:
   serialInputKey: ""
   serialStrategy: process_id_hex
   productName: Gallium shipment audit
-  productDescription: Shipment intake, inspection, and approval with traceable checkpoints.
+  productDescription: Shipment intake, inspection, and approval with traceable checkpoints
   ownerName: Attesta Demo Operator

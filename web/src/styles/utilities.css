@@ -70,6 +70,10 @@
   gap: var(--space-4);
 }
 
+.u-gap-12 {
+  gap: var(--space-12);
+}
+
 .u-divider {
   margin: var(--space-6) 0;
   border: none;
@@ -83,6 +87,12 @@
 /* Replaces 20px-margin hr dividers in platform-admin invite dialogs. */
 .u-divider-5 {
   margin: var(--space-5) 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.u-divider-10 {
+  margin: var(--space-10) 0;
   border: none;
   border-top: 1px solid var(--border);
 }

@@ -12,7 +12,7 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 	view := OrgAdminView{
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Create and manage roles and users",
+			Description: "Manage organization settings, roles, and members",
 			BackHref:    "/",
 		},
 		Roles: []Role{
@@ -94,7 +94,7 @@ func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
 	view := OrgAdminView{
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Create and manage roles and users",
+			Description: "Manage organization settings, roles, and members",
 			BackHref:    "/",
 		},
 		InviteLink: "/invite/token-pending",

@@ -99,7 +99,7 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 			reason = "Stream ended early"
 			detailMessage = terminationReason
 			if detailMessage == "" {
-				detailMessage = "No reason provided."
+				detailMessage = "No reason provided"
 			}
 		} else if status == "skipped" {
 			reason = "Stream ended early"

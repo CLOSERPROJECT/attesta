@@ -1,5 +1,5 @@
 /*
- * Panel — card container and section headers (CSS-only component).
+ * Panel — layout container and section headers (CSS-only component).
  *
  * With actions (button, form, or action group):
  *   section.panel
@@ -22,15 +22,10 @@
  *   div.panel-block[.panel-block-spaced]
  *
  * Modifiers:
- *   section.panel.panel-sticky   (sticky rail at --xl-up)
+ *   section.panel.panel-sticky   (sticky rail at --md-up)
  */
 
 .panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: var(--space-5);
-  box-shadow: 0 10px 26px var(--shadow);
   min-width: 0;
 }
 
@@ -46,6 +41,7 @@
   p {
     color: var(--muted-foreground);
     margin: 3px 0 0;
+    text-wrap: balance;
   }
 }
 
@@ -55,6 +51,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-5);
+  flex-wrap: nowrap;
 
   button {
     flex-shrink: 0;
@@ -67,6 +64,7 @@
 
 .panel-head-actions .panel-heading {
   margin-bottom: 0;
+  min-width: 0;
 }
 
 .panel-actions {
@@ -85,33 +83,9 @@
   margin-bottom: var(--space-3);
 }
 
-@media (--xl-up) {
+@media (--md-up) {
   .panel-sticky {
     position: sticky;
     top: 44px;
-  }
-}
-
-@media (--sm-down) {
-  .panel {
-    padding: var(--space-4);
-  }
-}
-
-@media (--md-down) {
-  .panel-head-actions {
-    flex-direction: column;
-
-    button {
-      width: 100%;
-    }
-
-    form {
-      width: 100%;
-    }
-
-    .panel-actions {
-      width: 100%;
-    }
   }
 }
