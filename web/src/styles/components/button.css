@@ -154,3 +154,7 @@ a.btn:hover {
 .btn-icon .icon-svg {
   display: block;
 }
+
+.btn-icon .icon-svg.icon-hidden {
+  display: none;
+}
