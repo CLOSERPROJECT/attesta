@@ -2481,7 +2481,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		}
 		redirectTarget := "/"
 		if strings.TrimSpace(identityUser.OrgSlug) == "" {
-			redirectTarget = "/org-admin/users"
+			redirectTarget = "/org-admin/members"
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return

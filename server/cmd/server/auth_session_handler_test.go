@@ -219,7 +219,7 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/users"`) {
+	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/members"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
 	}
 }
@@ -581,8 +581,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/org-admin/users" {
-			t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/org-admin/members" {
+			t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 		}
 		if createdEmail != "new@example.com" || createdPassword != "secure-password" {
 			t.Fatalf("create account args = %q/%q", createdEmail, createdPassword)
