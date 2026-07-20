@@ -221,6 +221,11 @@ Canonical spacing tokens in `tokens.css` — a Tailwind-aligned scale on a 4px g
 | `--space-5` | `1.25rem` | 20 | Panel padding, section margins/gaps |
 | `--space-6` | `1.5rem` | 24 | Stack default gap |
 | `--space-7` | `1.75rem` | 28 | Large section rhythm |
+| `--space-8` | `2rem` | 32 | Section gaps, chrome padding |
+| `--space-9` | `2.25rem` | 36 | Generous section rhythm |
+| `--space-10` | `2.5rem` | 40 | Page-level spacing |
+| `--space-11` | `2.75rem` | 44 | Wide section rhythm |
+| `--space-12` | `3rem` | 48 | Multi-column grid gaps |
 
 The scale is monotonic: `--space-N` is always larger than `--space-(N-1)`. Do not reintroduce off-grid values (6/10/14/18px) or non-monotonic indices.
 

@@ -44,7 +44,7 @@
 
 .org-admin-grid {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-12);
   align-items: start;
 }
 

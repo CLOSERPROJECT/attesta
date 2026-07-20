@@ -1,5 +1,5 @@
 /*
- * Panel — card container and section headers (CSS-only component).
+ * Panel — layout container and section headers (CSS-only component).
  *
  * With actions (button, form, or action group):
  *   section.panel
@@ -26,11 +26,6 @@
  */
 
 .panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: var(--space-5);
-  box-shadow: 0 10px 26px var(--shadow);
   min-width: 0;
 }
 
@@ -89,12 +84,6 @@
   .panel-sticky {
     position: sticky;
     top: 44px;
-  }
-}
-
-@media (--sm-down) {
-  .panel {
-    padding: var(--space-4);
   }
 }
 

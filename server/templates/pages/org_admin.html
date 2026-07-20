@@ -14,18 +14,13 @@
           panel-sticky
         {{ end }}"
       >
-        <div class="panel-heading">
-          <h2>Organization profile</h2>
-          {{ if .NeedsOrganizationSetup }}
+        {{ if .NeedsOrganizationSetup }}
+          <div class="panel-heading">
             <p>
               Your org admin invite is not assigned to an organization yet.
               Create one now to continue.
             </p>
-          {{ else }}
-            <p>Switch between organization settings, roles, and members.</p>
-          {{ end }}
-        </div>
-        {{ if .NeedsOrganizationSetup }}
+          </div>
           <form
             method="post"
             action="/org-admin/users"
@@ -52,30 +47,6 @@
             <button class="btn btn-primary" type="submit">Create organization</button>
           </form>
         {{ else }}
-          <div class="org-profile-summary">
-            {{ if .OrganizationLogoURL }}
-              <img
-                src="{{ .OrganizationLogoURL }}"
-                alt="{{ .Organization.Name }} logo"
-                class="org-profile-logo"
-              />
-            {{ else }}
-              <span class="org-profile-logo-placeholder">
-                {{ template "icon-no-org" . }}
-              </span>
-            {{ end }}
-            <div class="org-profile-meta">
-              <p class="org-profile-name">
-                <strong>{{ .Organization.Name }}</strong>
-              </p>
-              <p class="muted org-profile-slug">
-                Slug:
-                {{ .Organization.Slug }}
-              </p>
-            </div>
-          </div>
-        {{ end }}
-        {{ if not .NeedsOrganizationSetup }}
           <nav
             class="sidebar-nav"
             aria-label="Organization admin sections"

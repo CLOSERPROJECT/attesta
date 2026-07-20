@@ -2023,7 +2023,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := HomeWorkflowPickerView{
 		WorkflowPickerView: WorkflowPickerView{
-			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
+			PageBase: s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Header: PageHeaderView{
 				Title:       "Choose a stream",
 				Description: "Select a stream to start or continue process tracking.",
@@ -3316,7 +3316,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	}
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
-		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		PageBase: s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		Header: PageHeaderView{
 			Title:       "Platform admin dashboard",
 			Description: "Create and manage organizations",
@@ -3780,10 +3780,10 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 
 	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
 		view := OrgAdminView{
-			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
+			PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
 			Header: PageHeaderView{
 				Title:       "Organization admin dashboard",
-				Description: "Create and manage roles and users",
+				Description: "Manage organization settings, roles, and members.",
 				BackHref:    "/",
 			},
 			NeedsOrganizationSetup: true,
@@ -3816,13 +3816,13 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
 
 	view := OrgAdminView{
-		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
+		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Create and manage roles and users",
+			Description: "Switch between organization settings, roles, and members.",
 			BackHref:    "/",
 		},
-		Organization: org,
+		Organization:           org,
 		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
 		NeedsOrganizationSetup: false,
 		OrganizationError:      errs.Organization,
@@ -4830,7 +4830,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	preview.HideStatus = true
 
 	view := HomeView{
-		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
+		PageBase: s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		Header: PageHeaderView{
 			Title:       cfg.Workflow.Name,
 			Description: strings.TrimSpace(cfg.Workflow.Description),
@@ -5042,7 +5042,6 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 	}
 }
 
-
 func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
 	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
 	processID := ""
@@ -5134,9 +5133,6 @@ func actorFromAccountUser(user *AccountUser, workflowKey string) Actor {
 	return actor
 }
 
-
-
-
 func (s *Server) applyDoneByIdentityFallbackToDPPTraceability(ctx context.Context, traceability []TimelineStep) []TimelineStep {
 	if len(traceability) == 0 {
 		return traceability
@@ -5224,7 +5220,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
-		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
+		PageBase: s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		Header: PageHeaderView{
 			Title:       "Digital Product Passport",
 			Description: "GS1 Digital Link landing page for product and stream traceability.",
@@ -6688,7 +6684,6 @@ func organizationNameMap(cfg RuntimeConfig) map[string]string {
 	return out
 }
 
-
 func organizationLogoURLMap(ctx context.Context, identity IdentityStore) map[string]string {
 	if identity == nil {
 		return map[string]string{}
@@ -7096,9 +7091,6 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 	}
 	return WorkflowSub{}, false
 }
-
-
-
 
 func flattenDisplayValues(inputKey string, raw interface{}) []SubstepKV {
 	key := strings.TrimSpace(inputKey)
