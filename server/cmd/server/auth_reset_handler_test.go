@@ -398,7 +398,7 @@ func TestHandleResetPageHidesAdminTopbarLinks(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/users"`) {
+	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/profile"`) {
 		t.Fatalf("expected reset page without admin nav links, got %q", body)
 	}
 }

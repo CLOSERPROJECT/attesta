@@ -1,4 +1,4 @@
-{{/* Used on /org-admin/users to render organization administration page */}}
+{{/* Used on /org-admin/profile, /org-admin/roles, and /org-admin/members */}}
 
 {{ define "org_admin_body" }}
 
@@ -51,11 +51,12 @@
             class="sidebar-nav"
             aria-label="Organization admin sections"
           >
-            <button
-              type="button"
-              class="sidebar-nav-link"
+            <a
+              href="/org-admin/profile"
+              class="sidebar-nav-link{{ if eq .ActivePanel "profile" }} is-active{{ end }}"
               data-org-admin-nav="profile"
               aria-controls="org-admin-panel-profile"
+              {{ if eq .ActivePanel "profile" }}aria-current="page"{{ end }}
             >
               <span class="sidebar-nav-title"
                 >Organization profile</span
@@ -63,29 +64,31 @@
               <span class="sidebar-nav-copy"
                 >Update your organization name and logo</span
               >
-            </button>
-            <button
-              type="button"
-              class="sidebar-nav-link"
+            </a>
+            <a
+              href="/org-admin/roles"
+              class="sidebar-nav-link{{ if eq .ActivePanel "roles" }} is-active{{ end }}"
               data-org-admin-nav="roles"
               aria-controls="org-admin-panel-roles"
+              {{ if eq .ActivePanel "roles" }}aria-current="page"{{ end }}
             >
               <span class="sidebar-nav-title">Roles</span>
               <span class="sidebar-nav-copy"
                 >Manage the role catalog for your organization</span
               >
-            </button>
-            <button
-              type="button"
-              class="sidebar-nav-link"
+            </a>
+            <a
+              href="/org-admin/members"
+              class="sidebar-nav-link{{ if eq .ActivePanel "members" }} is-active{{ end }}"
               data-org-admin-nav="members"
               aria-controls="org-admin-panel-members"
+              {{ if eq .ActivePanel "members" }}aria-current="page"{{ end }}
             >
               <span class="sidebar-nav-title">Members</span>
               <span class="sidebar-nav-copy"
                 >Invite people and update member access</span
               >
-            </button>
+            </a>
           </nav>
         {{ end }}
       </section>
@@ -94,18 +97,13 @@
         <section
           class="panel org-admin-panel-main"
           data-org-admin-shell
-          data-org-admin-default-panel="{{ if .RoleError }}
-            roles
-          {{ else if or .UsersError .InviteError .InviteLink }}
-            members
-          {{ else }}
-            profile
-          {{ end }}"
+          data-org-admin-default-panel="{{ .ActivePanel }}"
         >
           <section
             class="org-admin-panel-section"
             id="org-admin-panel-profile"
             data-org-admin-panel="profile"
+            {{ if ne .ActivePanel "profile" }}hidden{{ end }}
           >
             <div class="panel-heading">
               <h2>Organization profile</h2>
@@ -173,6 +171,7 @@
             class="org-admin-panel-section"
             id="org-admin-panel-roles"
             data-org-admin-panel="roles"
+            {{ if ne .ActivePanel "roles" }}hidden{{ end }}
           >
             <div class="panel-head-actions">
               <div class="panel-heading">
@@ -444,6 +443,7 @@
             class="org-admin-panel-section"
             id="org-admin-panel-members"
             data-org-admin-panel="members"
+            {{ if ne .ActivePanel "members" }}hidden{{ end }}
           >
             <div class="panel-head-actions">
               <div class="panel-heading">
@@ -864,10 +864,26 @@
   (function () {
     const orgAdminShell = document.querySelector("[data-org-admin-shell]");
     const orgAdminMobilePanelMedia = window.matchMedia("(max-width: 767px)");
-    const orgAdminStorageKey = "attesta_org_admin_panel";
     const orgAdminPanels = new Set(["profile", "roles", "members"]);
+    const orgAdminPanelPaths = {
+      profile: "/org-admin/profile",
+      roles: "/org-admin/roles",
+      members: "/org-admin/members",
+    };
+    const orgAdminPanelFromPath = (path) => {
+      switch (path) {
+        case "/org-admin/profile":
+          return "profile";
+        case "/org-admin/roles":
+          return "roles";
+        case "/org-admin/members":
+          return "members";
+        default:
+          return null;
+      }
+    };
     let activeOrgAdminPanel = "profile";
-    const setOrgAdminPanel = (panelName, persist = true) => {
+    const setOrgAdminPanel = (panelName) => {
       if (!orgAdminShell || !orgAdminPanels.has(panelName)) {
         return;
       }
@@ -877,21 +893,18 @@
         const currentName = panel.getAttribute("data-org-admin-panel");
         panel.hidden = currentName !== panelName;
       });
-      const navButtons = Array.from(document.querySelectorAll("[data-org-admin-nav]"));
-      navButtons.forEach((button) => {
-        const currentName = button.getAttribute("data-org-admin-nav");
+      const navLinks = Array.from(document.querySelectorAll("[data-org-admin-nav]"));
+      navLinks.forEach((link) => {
+        const currentName = link.getAttribute("data-org-admin-nav");
         const isActive = currentName === panelName;
-        button.classList.toggle("is-active", isActive);
-        button.setAttribute("aria-current", isActive ? "page" : "false");
+        link.classList.toggle("is-active", isActive);
+        if (isActive) {
+          link.setAttribute("aria-current", "page");
+        } else {
+          link.removeAttribute("aria-current");
+        }
       });
       orgAdminShell.setAttribute("data-org-admin-ready", "true");
-      if (!persist) {
-        return;
-      }
-      try {
-        window.sessionStorage.setItem(orgAdminStorageKey, panelName);
-      } catch (error) {
-      }
     };
     const focusOrgAdminPanel = () => {
       if (!orgAdminShell || !orgAdminMobilePanelMedia.matches) {
@@ -908,15 +921,9 @@
 
     if (orgAdminShell) {
       const preferredPanel = (() => {
-        try {
-          const storedPanel = window.sessionStorage.getItem(orgAdminStorageKey);
-          if (storedPanel && orgAdminPanels.has(storedPanel)) {
-            return storedPanel;
-          }
-        } catch (error) {
-        }
-        if (window.location.pathname === "/org-admin/roles") {
-          return "roles";
+        const pathPanel = orgAdminPanelFromPath(window.location.pathname);
+        if (pathPanel && orgAdminPanels.has(pathPanel)) {
+          return pathPanel;
         }
         const defaultPanel = (orgAdminShell.getAttribute("data-org-admin-default-panel") || "").trim();
         if (orgAdminPanels.has(defaultPanel)) {
@@ -924,22 +931,37 @@
         }
         return "profile";
       })();
-      Array.from(document.querySelectorAll("[data-org-admin-nav]")).forEach((button) => {
-        button.addEventListener("click", () => {
-          const panelName = (button.getAttribute("data-org-admin-nav") || "").trim();
+      Array.from(document.querySelectorAll("[data-org-admin-nav]")).forEach((link) => {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          const panelName = (link.getAttribute("data-org-admin-nav") || "").trim();
+          if (!orgAdminPanels.has(panelName)) {
+            return;
+          }
           setOrgAdminPanel(panelName);
+          const path = orgAdminPanelPaths[panelName];
+          if (window.location.pathname === path) {
+            window.history.replaceState({ orgAdminPanel: panelName }, "", path);
+          } else {
+            window.history.pushState({ orgAdminPanel: panelName }, "", path);
+          }
           focusOrgAdminPanel();
         });
       });
-      Array.from(document.querySelectorAll("[data-org-admin-shell] form")).forEach((form) => {
-        form.addEventListener("submit", () => {
-          try {
-            window.sessionStorage.setItem(orgAdminStorageKey, activeOrgAdminPanel);
-          } catch (error) {
-          }
-        });
+      window.addEventListener("popstate", (event) => {
+        const statePanel = event.state && event.state.orgAdminPanel;
+        const panelName =
+          (statePanel && orgAdminPanels.has(statePanel) && statePanel) ||
+          orgAdminPanelFromPath(window.location.pathname) ||
+          preferredPanel;
+        setOrgAdminPanel(panelName);
+        focusOrgAdminPanel();
       });
-      setOrgAdminPanel(preferredPanel, false);
+      setOrgAdminPanel(preferredPanel);
+      const preferredPath = orgAdminPanelPaths[preferredPanel];
+      if (preferredPath) {
+        window.history.replaceState({ orgAdminPanel: preferredPanel }, "", preferredPath);
+      }
     }
 
     const rolePalettePickers = Array.from(document.querySelectorAll("[data-role-palette-picker]"));

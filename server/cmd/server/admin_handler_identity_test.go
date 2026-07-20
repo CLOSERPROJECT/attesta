@@ -1906,8 +1906,8 @@ func TestHandleOrgAdminUsersCreateOrgWithIdentity(t *testing.T) {
 	if createSessionSecret != "session-1" || createName != "Fresh Org" {
 		t.Fatalf("create args = %q %q", createSessionSecret, createName)
 	}
-	if rec.Header().Get("Location") != "/org-admin/users" {
-		t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/org-admin/members" {
+		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 	}
 }
 
@@ -2084,8 +2084,8 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	if deletedLogoFileID != "logo-old" {
 		t.Fatalf("deleted logo = %q, want logo-old", deletedLogoFileID)
 	}
-	if rec.Header().Get("Location") != "/org-admin/users" {
-		t.Fatalf("location = %q, want /org-admin/users", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/org-admin/profile" {
+		t.Fatalf("location = %q, want /org-admin/profile", rec.Header().Get("Location"))
 	}
 }
 
@@ -2325,8 +2325,11 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 
 	server.handleOrgAdminUsers(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/org-admin/members" {
+		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 	}
 	if !hasIdentityLabel(users[1].Labels, identityOrgAdminLabel) || !containsRole(decodeIdentityRoleLabels(users[1].Labels), "approver") {
 		t.Fatalf("updated user labels = %#v", users[1].Labels)
@@ -2486,8 +2489,11 @@ func TestHandleOrgAdminUsersInviteWithIdentity(t *testing.T) {
 
 	server.handleOrgAdminUsers(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/org-admin/members" {
+		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 	}
 	if inviteCalls != 1 || len(invitedRoles) != 1 || invitedRoles[0] != "approver" || !invitedAdmin {
 		t.Fatalf("invite call = %d roles=%#v admin=%v", inviteCalls, invitedRoles, invitedAdmin)
@@ -2537,8 +2543,11 @@ func TestHandleOrgAdminUsersInviteIdentityDuplicatePending(t *testing.T) {
 
 	server.handleOrgAdminUsers(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/org-admin/members" {
+		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 	}
 	if inviteCalls != 0 {
 		t.Fatalf("invite calls = %d, want 0", inviteCalls)
@@ -2593,8 +2602,11 @@ func TestHandleOrgAdminUsersInviteIdentityExistingAndCrossOrg(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
 	server.handleOrgAdminUsers(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("existing member status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("existing member status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/org-admin/members" {
+		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 	}
 	if len(updatedUsers["user-2"]) != 1 || updatedUsers["user-2"][0] != encodeIdentityRoleLabel("approver") {
 		t.Fatalf("updated user labels = %#v", updatedUsers)
@@ -2663,8 +2675,11 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
 	server.handleOrgAdminUsers(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if rec.Header().Get("Location") != "/org-admin/members" {
+		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 	}
 	if len(deletedMemberships) != 1 || deletedMemberships[0] != "membership-2" {
 		t.Fatalf("deleted memberships = %#v", deletedMemberships)
@@ -2847,8 +2862,11 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminUsers(rec, req)
-		if rec.Code != http.StatusOK || updated != 1 {
-			t.Fatalf("pending update response = %d updated=%d body=%q", rec.Code, updated, rec.Body.String())
+		if rec.Code != http.StatusSeeOther || updated != 1 {
+			t.Fatalf("pending update response = %d updated=%d location=%q", rec.Code, updated, rec.Header().Get("Location"))
+		}
+		if rec.Header().Get("Location") != "/org-admin/members" {
+			t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
 		}
 	})
 
@@ -3754,8 +3772,11 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 		getReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		getRec := httptest.NewRecorder()
 		server.handleOrgAdminUsers(getRec, getReq)
-		if getRec.Code != http.StatusOK || !strings.Contains(getRec.Body.String(), "ORG_ADMIN acme") {
-			t.Fatalf("get response = %d %q", getRec.Code, getRec.Body.String())
+		if getRec.Code != http.StatusSeeOther {
+			t.Fatalf("get status = %d, want %d", getRec.Code, http.StatusSeeOther)
+		}
+		if getRec.Header().Get("Location") != "/org-admin/members" {
+			t.Fatalf("get location = %q, want /org-admin/members", getRec.Header().Get("Location"))
 		}
 
 		postReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=unsupported"))

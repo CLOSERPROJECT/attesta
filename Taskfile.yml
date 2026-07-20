@@ -11,6 +11,33 @@ tasks:
     cmds:
       - git submodule update --init --recursive
 
+  worktree:env:
+    desc: Symlink primary checkout .env into this (or given) worktree. Usage - task worktree:env [-- path]
+    cmds:
+      - bash deployment/scripts/worktree-env.sh {{.CLI_ARGS}}
+
+  worktree:add:
+    desc: Create .worktrees/<branch> worktree and symlink .env. Usage - task worktree:add -- <branch>
+    cmds:
+      - |
+          set -euo pipefail
+          branch="{{.CLI_ARGS}}"
+          if [ -z "${branch}" ]; then
+            echo "usage: task worktree:add -- <branch>" >&2
+            exit 1
+          fi
+          path=".worktrees/${branch}"
+          if [ -e "${path}" ]; then
+            echo "error: ${path} already exists" >&2
+            exit 1
+          fi
+          if git show-ref --verify --quiet "refs/heads/${branch}"; then
+            git worktree add "${path}" "${branch}"
+          else
+            git worktree add -b "${branch}" "${path}"
+          fi
+          bash deployment/scripts/worktree-env.sh "${path}"
+
   start:
     desc: Bring up infra and show status.
     cmds:
