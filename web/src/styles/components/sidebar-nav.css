@@ -8,13 +8,16 @@
  */
 
 .sidebar-nav {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: 100%;
   gap: var(--space-1);
 }
 
 .sidebar-nav-link {
-  width: 100%;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-2) var(--space-3);
   text-align: left;
   border-radius: 4px;
@@ -31,7 +34,7 @@
 
 .sidebar-nav-title {
   font-weight: 500;
-  color: var(--primary);
+  color: var(--foreground);
 }
 
 .sidebar-nav-link:hover,
