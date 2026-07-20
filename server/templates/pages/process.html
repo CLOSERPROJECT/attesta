@@ -21,7 +21,7 @@
     {{ if .Detail.ProcessDone }}
       <div class="process-resources-grid">
         {{ template "stream_timeline" .Detail.StreamTimeline }}
-        <div class="stack layout-stack-separator u-gap-4">
+        <div class="stack layout-stack-separator u-gap-12">
           {{ template "process_termination_details" .Detail }}
           {{ template "process_dpp" . }}
           {{ template "process_downloads" . }}

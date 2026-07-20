@@ -41,6 +41,7 @@
   p {
     color: var(--muted-foreground);
     margin: 3px 0 0;
+    text-wrap: balance;
   }
 }
 

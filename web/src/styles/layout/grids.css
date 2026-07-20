@@ -64,15 +64,14 @@
 
 .process-resources-grid {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-12);
   grid-template-columns: minmax(0, 1fr);
   justify-content: start;
   align-items: start;
 }
 
-@media (--lg-up) {
+@media (--md-up) {
   .process-resources-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
   }
 }

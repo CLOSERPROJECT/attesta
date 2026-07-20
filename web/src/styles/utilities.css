@@ -70,6 +70,10 @@
   gap: var(--space-4);
 }
 
+.u-gap-12 {
+  gap: var(--space-12);
+}
+
 .u-divider {
   margin: var(--space-6) 0;
   border: none;

@@ -10,11 +10,9 @@
   .site-footer {
     padding: var(--space-5) var(--space-4) var(--space-6);
   }
-}
 
-@media (--xl-down) {
   .layout-stack-separator {
     border-top: 1px solid var(--border);
-    padding-top: var(--space-6);
+    padding-top: var(--space-12);
   }
 }

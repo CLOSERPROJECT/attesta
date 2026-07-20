@@ -234,6 +234,10 @@
   gap: var(--space-4);
 }
 
+.stack.u-gap-12 {
+  gap: var(--space-12);
+}
+
 .landing {
   max-width: 520px;
 }
