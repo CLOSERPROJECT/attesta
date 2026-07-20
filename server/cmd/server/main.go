@@ -2481,7 +2481,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		}
 		redirectTarget := "/"
 		if strings.TrimSpace(identityUser.OrgSlug) == "" {
-			redirectTarget = "/org-admin/members"
+			redirectTarget = "/org-admin/profile"
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
@@ -4208,7 +4208,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, "/org-admin/profile", http.StatusSeeOther)
 		return
 	}
 	if r.Method != http.MethodPost {

@@ -39,7 +39,9 @@
 }
 
 .sidebar-nav-link:hover,
+.sidebar-nav-link:focus,
 .sidebar-nav-link.is-active {
+  text-decoration: none;
   background: color-mix(in srgb, var(--primary) 8%, var(--background));
 }
 

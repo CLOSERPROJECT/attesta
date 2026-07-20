@@ -57,7 +57,7 @@ func TestOrgAdminSectionURLHandlers(t *testing.T) {
 	now := time.Now().UTC()
 	server := orgAdminSectionURLTestServer(t, now)
 
-	t.Run("GET legacy users redirects to members", func(t *testing.T) {
+	t.Run("GET legacy users redirects to profile", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -67,8 +67,8 @@ func TestOrgAdminSectionURLHandlers(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if loc := rec.Header().Get("Location"); loc != "/org-admin/members" {
-			t.Fatalf("location = %q, want /org-admin/members", loc)
+		if loc := rec.Header().Get("Location"); loc != "/org-admin/profile" {
+			t.Fatalf("location = %q, want /org-admin/profile", loc)
 		}
 	})
 

@@ -476,7 +476,7 @@ var _ = Service("admin", func() {
 	Method("orgAdminUsers", func() {
 		Result(Empty)
 		HTTP(func() {
-			// Legacy entry: GET redirects to /org-admin/members.
+			// Legacy entry: GET redirects to /org-admin/profile.
 			GET("/org-admin/users")
 			Response(StatusSeeOther)
 			Response(StatusUnauthorized)
