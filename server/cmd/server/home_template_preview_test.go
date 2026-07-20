@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func testHomeProcessGroups(items ...ProcessListItem) []ProcessStatusGroup {
-	byStatus := map[string][]ProcessListItem{}
+func testHomeProcessGroups(items ...StreamInstanceCard) []ProcessStatusGroup {
+	byStatus := map[string][]StreamInstanceCard{}
 	for _, item := range items {
 		byStatus[item.Status] = append(byStatus[item.Status], item)
 	}
@@ -38,7 +38,7 @@ func testHomeProcessGroups(items ...ProcessListItem) []ProcessStatusGroup {
 func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	process := ProcessListItem{ID: "process-1", Name: "Pilot batch", Status: "active", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}
+	process := StreamInstanceCard{ID: "process-1", Name: "Pilot batch", Status: "active", DetailHref: "/w/workflow/process/process-1", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
@@ -51,7 +51,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			BackHref:    "/",
 		},
 		WorkflowDescription: "Previewable workflow",
-		Processes:           []ProcessListItem{process},
+		Processes:           []StreamInstanceCard{process},
 		ProcessGroups:       testHomeProcessGroups(process),
 		Preview: StreamInstanceDetailView{
 			HideStatus: true,
@@ -225,7 +225,7 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 				HasNextPage:     true,
 				PreviousURL:     "/w/workflow/?active_sort=status#stream-section-active",
 				NextURL:         "/w/workflow/?active_page=3&active_sort=status#stream-section-active",
-				Processes:       []ProcessListItem{{ID: "process-13", Status: "active", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}},
+				Processes:       []StreamInstanceCard{{ID: "process-13", Status: "active", DetailHref: "/w/workflow/process/process-13", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}},
 			},
 		},
 	}
@@ -264,9 +264,10 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 			Title:    "Demo workflow",
 			BackHref: "/",
 		},
-		ProcessGroups: testHomeProcessGroups(ProcessListItem{
+		ProcessGroups: testHomeProcessGroups(StreamInstanceCard{
 			ID:            "process-1",
 			Status:        "available",
+			DetailHref:    "/w/workflow/process/process-1",
 			Percent:       25,
 			DoneSubsteps:  1,
 			TotalSubsteps: 4,
@@ -281,7 +282,7 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	body := out.String()
 	compactBody := strings.Join(strings.Fields(body), " ")
 
-	if !strings.Contains(body, `class="process-item process-available"`) {
+	if !strings.Contains(body, `class="stream-instance-card stream-instance-card-available"`) {
 		t.Fatalf("expected available process class, got: %s", body)
 	}
 	if !strings.Contains(compactBody, `status-tag status-tag-compact status-available`) ||

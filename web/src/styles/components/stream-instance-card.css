@@ -1,0 +1,184 @@
+.stream-instance-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.stream-instance-card {
+  display: block;
+}
+
+.stream-instance-card-link {
+  padding: var(--space-3) var(--space-3);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+
+.stream-instance-card-available .stream-instance-card-link {
+  padding-left: 7px;
+  border-left: 6px solid var(--stream-available);
+  border-color: var(--stream-available);
+}
+
+.stream-instance-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+}
+
+.stream-instance-card-link:hover,
+.stream-instance-card-link:focus-visible {
+  background-color: color-mix(in srgb, var(--primary) 10%, var(--card));
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.stream-instance-card-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.stream-instance-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  border: 1px solid currentcolor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--stream-active);
+  background: color-mix(in srgb, currentcolor 8%, transparent);
+}
+
+.stream-instance-card-icon.status-available {
+  color: var(--stream-available);
+}
+
+.stream-instance-card-icon.status-done {
+  color: var(--stream-done);
+}
+
+.stream-instance-card-icon.status-terminated {
+  color: var(--stream-terminated);
+}
+
+.stream-instance-card-empty {
+  padding: var(--space-3) var(--space-3);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 10%, var(--muted));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stream-instance-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.stream-instance-card-title {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.stream-instance-card-name {
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.stream-instance-card-id {
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.stream-instance-card-title .stream-instance-card-id {
+  font-size: var(--text-xs);
+}
+
+.stream-instance-card-progress-line {
+  height: 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.stream-instance-card-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  width: var(--progress, 0%);
+}
+
+.stream-instance-card-active .stream-instance-card-progress-fill {
+  height: 100%;
+  background: var(--stream-active);
+  width: var(--progress, 0%);
+}
+
+.stream-instance-card-done .stream-instance-card-progress-fill {
+  height: 100%;
+  background: var(--stream-done);
+  width: var(--progress, 0%);
+}
+
+.stream-instance-card-terminated .stream-instance-card-progress-fill {
+  height: 100%;
+  background: var(--stream-terminated);
+  width: var(--progress, 0%);
+}
+
+.stream-instance-card-meta {
+  display: flex;
+  place-items: center start;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.stream-instance-card-meta > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.stream-instance-card-meta-primary {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+@media (--sm-down) {
+  .stream-instance-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .stream-instance-card-body {
+    padding-inline: 0;
+  }
+}
+
+@media (--md-down) {
+  .stream-instance-card-meta {
+    flex-direction: column;
+    align-items: start;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+  }
+}

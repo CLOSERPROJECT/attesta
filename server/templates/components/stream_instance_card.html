@@ -1,0 +1,60 @@
+{{ define "stream_instance_card" }}
+  <li class="stream-instance-card stream-instance-card-{{ .Status }}">
+    <a class="stream-instance-card-link" href="{{ .DetailHref }}">
+      <span
+        class="stream-instance-card-icon status-{{ .Status }}"
+        aria-hidden="true"
+      >
+        {{ if eq .Status "done" }}
+          {{ template "icon-check-circle" . }}
+        {{ else if eq .Status "terminated" }}
+          {{ template "icon-stop" . }}
+        {{ else if eq .Status "available" }}
+          {{ template "icon-play" . }}
+        {{ else }}
+          {{ template "icon-loading" . }}
+        {{ end }}
+      </span>
+      <div class="stream-instance-card-body">
+        <div class="stream-instance-card-head">
+          <span class="stream-instance-card-title">
+            {{ if .Name }}
+              <span class="stream-instance-card-name">{{ .Name }}</span>
+            {{ end }}
+            <span class="stream-instance-card-id">{{ .ID }}</span>
+          </span>
+          <span class="status-tag status-tag-compact status-{{ .Status }}"
+            >{{ if .StatusLabel }}
+              {{ .StatusLabel }}
+            {{ else }}
+              {{ .Status }}
+            {{ end }}</span
+          >
+        </div>
+        <div
+          class="stream-instance-card-progress-line"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="{{ .Percent }}"
+        >
+          <div
+            class="stream-instance-card-progress-fill"
+            style="--progress: {{ .Percent }}%;"
+          ></div>
+        </div>
+        <div class="stream-instance-card-meta">
+          <span class="stream-instance-card-meta-primary"
+            >{{ .DoneSubsteps }} /
+            {{ .TotalSubsteps }}
+            complete ({{ .Percent }}%)</span
+          >
+          <span>Created: {{ .CreatedAt }}</span>
+          {{ if .LastNotarizedAt }}
+            <span>Last notarized: {{ .LastNotarizedAt }}</span>
+          {{ end }}
+        </div>
+      </div>
+    </a>
+  </li>
+{{ end }}

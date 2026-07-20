@@ -313,20 +313,6 @@ type HomeWorkflowPickerView struct {
 	WorkflowPickerView
 }
 
-type ProcessListItem struct {
-	ID              string
-	Name            string
-	Status          string
-	StatusLabel     string
-	CreatedAt       string
-	CreatedAtTime   time.Time
-	DoneSubsteps    int
-	TotalSubsteps   int
-	Percent         int
-	LastNotarizedAt string
-	LastDigestShort string
-}
-
 type PaginationLink struct {
 	Page      int
 	URL       string
@@ -357,7 +343,7 @@ type ProcessStatusGroup struct {
 	NextPage        int
 	PreviousURL     string
 	NextURL         string
-	Processes       []ProcessListItem
+	Processes       []StreamInstanceCard
 }
 
 type HomeView struct {
@@ -375,7 +361,7 @@ type HomeView struct {
 	HasNextPage         bool
 	PreviousPage        int
 	NextPage            int
-	Processes           []ProcessListItem
+	Processes           []StreamInstanceCard
 	ProcessGroups       []ProcessStatusGroup
 	Preview             StreamInstanceDetailView
 }
@@ -1820,8 +1806,8 @@ func homePaginationURL(workflowPath string, sortValues map[string]string, pageVa
 	return target
 }
 
-func buildHomeProcessGroups(workflowPath string, processes []ProcessListItem, sortKey string, query url.Values) []ProcessStatusGroup {
-	byStatus := make(map[string][]ProcessListItem, len(homeProcessStatuses()))
+func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard, sortKey string, query url.Values) []ProcessStatusGroup {
+	byStatus := make(map[string][]StreamInstanceCard, len(homeProcessStatuses()))
 	pageValues := make(map[string]int, len(homeProcessStatuses()))
 	sortValues := make(map[string]string, len(homeProcessStatuses()))
 	for _, status := range homeProcessStatuses() {
@@ -1949,7 +1935,7 @@ func processProgressStats(def WorkflowDef, process *Process) (doneCount int, las
 	return doneCount, lastAt, lastDigestShort
 }
 
-func sortHomeProcessList(items []ProcessListItem, sortKey string) {
+func sortHomeProcessList(items []StreamInstanceCard, sortKey string) {
 	switch sortKey {
 	case "time_asc":
 		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.Before(items[j].CreatedAtTime) })
@@ -4778,8 +4764,9 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	roleMeta := s.roleMetaIndex(r.Context())
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
-	var processes []ProcessListItem
-	var filteredProcesses []ProcessListItem
+	var processes []StreamInstanceCard
+	var filteredProcesses []StreamInstanceCard
+	path := workflowPath(workflowKey)
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := deriveProcessStatus(cfg.Workflow, &process)
@@ -4788,11 +4775,12 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		if totalSubsteps > 0 {
 			percent = int(float64(doneCount) / float64(totalSubsteps) * 100)
 		}
-		item := ProcessListItem{
+		item := StreamInstanceCard{
 			ID:              process.ID.Hex(),
 			Name:            strings.TrimSpace(process.Name),
 			Status:          status,
 			StatusLabel:     processStatusLabel(status),
+			DetailHref:      path + "/process/" + process.ID.Hex(),
 			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtTime:   process.CreatedAt,
 			DoneSubsteps:    doneCount,
