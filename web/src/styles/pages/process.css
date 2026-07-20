@@ -2,6 +2,14 @@
   min-width: 0;
 }
 
+.process-termination-desktop {
+  display: none;
+}
+
+.process-steps-column {
+  min-width: 0;
+}
+
 #process-dpp .panel-head-actions,
 #process-downloads .panel-head-actions {
   margin-bottom: var(--space-4);
@@ -37,4 +45,14 @@
 
 .field-row .js-copy-text [data-copy-icon-done] {
   color: var(--primary);
+}
+
+@media (--md-up) {
+  .process-termination-mobile {
+    display: none;
+  }
+
+  .process-termination-desktop {
+    display: contents;
+  }
 }

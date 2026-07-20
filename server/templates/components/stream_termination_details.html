@@ -1,0 +1,40 @@
+{{/* Early stream termination warning banner with stacked metadata fields. */}}
+
+{{ define "stream_termination_details" }}
+  {{ if . }}
+    <div class="warning warning--rich stream-termination-details">
+      <h3 class="stream-termination-details-title">
+        {{ template "icon-warning" . }}
+        Stream ended early
+      </h3>
+      <dl class="stream-termination-details-fields">
+        {{ if .EndedAtHuman }}
+          <div class="stream-termination-details-field">
+            <dt class="field-label">Ended at</dt>
+            <dd>{{ .EndedAtHuman }}</dd>
+          </div>
+        {{ end }}
+        {{ if .EndedBy }}
+          <div class="stream-termination-details-field">
+            <dt class="field-label">Ended by</dt>
+            <dd>{{ .EndedBy }}</dd>
+          </div>
+        {{ end }}
+        {{ if .SubstepID }}
+          <div class="stream-termination-details-field">
+            <dt class="field-label">Current substep</dt>
+            <dd>{{ .SubstepID }}</dd>
+          </div>
+        {{ end }}
+        <div class="stream-termination-details-field">
+          <dt class="field-label">Reason</dt>
+          {{ if .Reason }}
+            <dd>{{ .Reason }}</dd>
+          {{ else }}
+            <dd class="muted">No reason provided</dd>
+          {{ end }}
+        </div>
+      </dl>
+    </div>
+  {{ end }}
+{{ end }}

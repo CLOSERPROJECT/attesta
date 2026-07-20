@@ -238,6 +238,14 @@ type StreamTimelineSubstepView struct {
 	HideStatus bool
 }
 
+// StreamTerminationDetailsView is the view model for templates/components/stream_termination_details.html.
+type StreamTerminationDetailsView struct {
+	EndedAtHuman string
+	EndedBy      string
+	SubstepID    string
+	Reason       string
+}
+
 // StreamInstanceDetailView is the HTMX/SSE partial payload for stream instance detail content.
 type StreamInstanceDetailView struct {
 	WorkflowKey       string
@@ -257,7 +265,7 @@ type StreamInstanceDetailView struct {
 	TerminateAction   string
 	TerminateSubstep  string
 	TerminateRoles    []SubstepRoleOption
-	Termination       *ProcessTerminationView
+	Termination       *StreamTerminationDetailsView
 }
 
 func (v StreamInstanceDetailView) StreamTimeline() StreamTimelineView {

@@ -580,7 +580,7 @@ type DPPPageView struct {
 	Traceability []TimelineStep
 	Integrity    DPPIntegrityView
 	Export       NotarizedProcessExport
-	Termination  *ProcessTerminationView
+	Termination  *StreamTerminationDetailsView
 }
 
 type ProcessTerminationView struct {
@@ -5273,7 +5273,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		Traceability: traceability,
 		Integrity:    buildDPPIntegrityView(export.Merkle),
 		Export:       export,
-		Termination:  processTerminationView(process.Termination),
+		Termination:  s.buildStreamTerminationDetailsView(r.Context(), cfg.Workflow, Actor{}, process.Termination),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "dpp.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

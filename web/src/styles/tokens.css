@@ -73,6 +73,7 @@
   --success-muted: #e6f4ea;
   --success-muted-foreground: var(--primary);
   --warning-muted: #fff7da;
+  --warning-muted-foreground: #a67f05;
 
   /* Borders & chips */
   --border: #c5d0b5;
@@ -206,6 +207,7 @@
   --destructive-muted-foreground: #ffd1cc;
   --success-muted: rgb(87 194 166 / 12%);
   --warning-muted: rgb(242 198 79 / 12%);
+  --warning-muted-foreground: var(--highlight-foreground);
 
   /* Borders & chips */
   --border: rgb(236 241 235 / 14%);

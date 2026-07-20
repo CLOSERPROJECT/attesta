@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -83,5 +86,35 @@ func TestApplyDoneByEmailHelpersNoopOnEmptyInput(t *testing.T) {
 	}
 	if got := server.applyDoneByEmailToTermination(t.Context(), def, Actor{OrgSlug: "org-a"}, nil); got != nil {
 		t.Fatalf("expected nil passthrough for nil termination, got %#v", got)
+	}
+}
+
+func TestBuildStreamTerminationDetailsViewResolvesIdentityByContext(t *testing.T) {
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "ended@example.com", Status: "active"}, nil
+			},
+		},
+	}
+	def := WorkflowDef{Steps: []WorkflowStep{{StepID: "1", OrganizationSlug: "org-a"}}}
+	termination := &ProcessTermination{
+		Reason:    "supplier cancelled",
+		EndedAt:   time.Date(2026, 3, 6, 9, 15, 0, 0, time.UTC),
+		Actor:     &Actor{ID: "appwrite:user-1", Role: "dep1"},
+		SubstepID: "1.2",
+	}
+
+	orgView := server.buildStreamTerminationDetailsView(t.Context(), def, Actor{OrgSlug: "org-a"}, termination)
+	if orgView == nil || orgView.EndedBy != "ended@example.com" {
+		t.Fatalf("org viewer endedBy = %#v, want email", orgView)
+	}
+
+	publicView := server.buildStreamTerminationDetailsView(t.Context(), def, Actor{}, termination)
+	if publicView == nil || publicView.EndedBy != "user-1" {
+		t.Fatalf("public viewer endedBy = %#v, want stripped user id", publicView)
+	}
+	if strings.Contains(publicView.EndedBy, "appwrite:") {
+		t.Fatalf("public viewer endedBy must not include appwrite prefix, got %q", publicView.EndedBy)
 	}
 }

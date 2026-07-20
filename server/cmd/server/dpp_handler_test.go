@@ -129,7 +129,7 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "GTIN|") || !strings.Contains(body, "Lot|") || !strings.Contains(body, "Serial|") {
+	if !strings.Contains(body, "GTIN: ") || !strings.Contains(body, "Lot: ") || !strings.Contains(body, "Serial: ") {
 		t.Fatalf("expected identifiers in body, got %q", body)
 	}
 	if !strings.Contains(body, "Merkle root:") {

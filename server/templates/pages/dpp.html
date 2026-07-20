@@ -1,73 +1,52 @@
 {{/* Used on /01/09506000134352/10/defaultProduct/21/.StreamID to render Digital Product Passport */}}
 
 {{ define "dpp_body" }}
-  <div class="stack u-max-w-7xl u-mx-auto">
+  <div class="stack dpp-page u-mx-auto">
     {{ template "page_header" .Header }}
     <section class="panel">
-      <div class="panel-head-actions">
-        <div class="panel-heading">
-          <h2>{{ .Workflow.Name }}</h2>
-          {{ if .Workflow.Description }}
-            <p>{{ .Workflow.Description }}</p>
-          {{ end }}
+      <div class="dpp-overview">
+        <div class="panel-head-actions">
+          <div class="panel-heading">
+            <h2>{{ .Workflow.Name }}</h2>
+            {{ if .Workflow.Description }}
+              <p>{{ .Workflow.Description }}</p>
+            {{ end }}
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary js-share-link"
+            data-share-url="{{ .DigitalLink }}"
+            data-share-label="DPP link"
+          >
+            {{ template "icon-share" . }}
+            Share DPP link
+          </button>
         </div>
-        <button
-          type="button"
-          class="btn btn-primary js-share-link"
-          data-share-url="{{ .DigitalLink }}"
-          data-share-label="DPP link"
-        >
-          {{ template "icon-share" . }}
-          Share DPP link
-        </button>
-      </div>
-      <div class="role-pill-row u-mb-4">
-        <span class="pill pill-accent">GTIN|{{ .GTIN }}</span>
-        <span class="pill pill-accent">Lot|{{ .Lot }}</span>
-        <span class="pill pill-accent">Serial|{{ .Serial }}</span>
-      </div>
-      {{ if .Termination }}
-        <hr class="u-divider" />
-        <div class="panel-block">
-          <h2 class="u-text-danger">Stream ended early</h2>
-          <p class="dpp-termination-meta">
-            {{ if .Termination.EndedAtHuman }}
-              Ended at
-              {{ .Termination.EndedAtHuman }}
-            {{ end }}
-            {{ if .Termination.EndedBy }}
-              by
-              {{ if and (ge (len .Termination.EndedBy) 9) (eq (slice .Termination.EndedBy 0 9) "appwrite:") }}
-                {{ slice .Termination.EndedBy 9 }}
-              {{ else }}
-                {{ .Termination.EndedBy }}
-              {{ end }}
-            {{ end }}
-            {{ if .Termination.SubstepID }}
-              while substep {{ .Termination.SubstepID }} was available
-            {{ end }}
-          </p>
-          {{ if .Termination.Reason }}
-            <dl class="substep-body-submitted-values">
-              <dt>Reason</dt>
-              <dd>{{ .Termination.Reason }}</dd>
-            </dl>
-          {{ else }}
-            <span class="muted">No reason provided</span>
-          {{ end }}
+        <div class="dpp-ids">
+          <span class="dpp-id">GTIN: {{ .GTIN }}</span>
+          <span class="dpp-id">Lot: {{ .Lot }}</span>
+          <span class="dpp-id">Serial: {{ .Serial }}</span>
         </div>
-      {{ end }}
-      <hr class="u-divider" />
-      <h2>History</h2>
-      <div class="dpp-history-list">
-        {{ range .Traceability }}
-          {{ template "dpp_history_step" (streamTimelineStep . true) }}
-        {{ end }}
       </div>
 
-      <hr class="u-divider" />
+      <hr class="u-divider-10" />
+      <div class="dpp-history">
+        <div class="panel-heading">
+          <h2>History</h2>
+        </div>
+        {{ template "stream_termination_details" .Termination }}
+        <div class="dpp-history-list">
+          {{ range .Traceability }}
+            {{ template "dpp_history_step" (streamTimelineStep . true) }}
+          {{ end }}
+        </div>
+      </div>
+
+      <hr class="u-divider-10" />
       <div class="dpp-integrity">
-        <h2>Integrity</h2>
+        <div class="panel-heading">
+          <h2>Integrity</h2>
+        </div>
         <div class="dpp-integrity-root">
           <strong>Merkle root:</strong>
           <code class="dpp-integrity-hash dpp-integrity-hash-full"
