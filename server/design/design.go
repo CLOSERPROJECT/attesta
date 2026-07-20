@@ -449,11 +449,36 @@ var _ = Service("admin", func() {
 		})
 	})
 
+	Method("orgAdminProfile", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/profile")
+			Response(StatusOK)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
+	Method("orgAdminMembers", func() {
+		Result(Empty)
+		HTTP(func() {
+			GET("/org-admin/members")
+			Response(StatusOK)
+			Response(StatusUnauthorized)
+			Response(StatusForbidden)
+			Response(StatusServiceUnavailable)
+			Response(StatusInternalServerError)
+		})
+	})
+
 	Method("orgAdminUsers", func() {
 		Result(Empty)
 		HTTP(func() {
+			// Legacy entry: GET redirects to /org-admin/members.
 			GET("/org-admin/users")
-			Response(StatusOK)
+			Response(StatusSeeOther)
 			Response(StatusUnauthorized)
 			Response(StatusForbidden)
 			Response(StatusServiceUnavailable)

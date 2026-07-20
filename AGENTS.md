@@ -15,7 +15,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
 - Stream dashboard is `/w/:key/` (lists stream instances for one stream). Legacy `/dashboard` and `/w/:key/dashboard` are not registered.
 - Admin consoles:
   - Platform admin: `/admin/orgs` (create/edit/delete orgs, upload logos, invite org admins)
-  - Org admin: `/org-admin/roles`, `/org-admin/users`
+  - Org admin: `/org-admin/profile`, `/org-admin/roles`, `/org-admin/members` (legacy `GET /org-admin/users` redirects to members)
 - Platform admin is env-driven (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). On startup the server ensures that account exists in Appwrite (`bootstrapPlatformAdminIdentity`). Cerbos policy `platform_admin_console` gates console access.
 - Auth/org state now lives in Appwrite:
   - orgs -> teams
@@ -25,10 +25,10 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
   - signup/login/reset -> Appwrite account/session/recovery flows
 - Global topbar now renders role-aware admin links on authenticated pages:
   - Platform admin sees `Orgs` (`/admin/orgs`)
-  - Org admin with org context sees `My Org` (`/org-admin/users`)
+  - Org admin with org context sees `My Org` (`/org-admin/members`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 - Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
-- `/org-admin/users` now supports:
+- Org admin members section (`/org-admin/members`; forms still `POST /org-admin/users`) supports:
   - invites with zero-to-many roles (`roles` multi-select, `intent=invite`)
   - "Invites I sent" with derived statuses (`pending`, `accepted`, `expired`)
   - user role editing (`intent=set_roles`) and soft-delete (`intent=delete_user`) with self-protection checks.
@@ -136,7 +136,7 @@ Global routes are registered in `Server.newMux()` (`server/cmd/server/main.go`).
 - `GET/POST /login`, `GET/POST /signup`, `POST /logout`
 - `GET /invite/…`, `GET/POST /reset`, `GET/POST /reset/…`
 - `GET/POST /admin/orgs`, `GET/POST /admin/orgs/` (platform admin org console; logo at `/admin/orgs/logo/:id`)
-- `GET/POST /org-admin/roles`, `/org-admin/users`, `/org-admin/formata-builder`, …
+- `GET /org-admin/profile`, `/org-admin/roles`, `/org-admin/members` (org settings sections); `GET /org-admin/users` → members; `POST /org-admin/users`, `POST /org-admin/roles`; `/org-admin/formata-builder`, …
 - `GET /01/…` — public DPP Digital Link
 - `GET /events` — legacy SSE mux entry (production UI uses workflow-scoped path below)
 
