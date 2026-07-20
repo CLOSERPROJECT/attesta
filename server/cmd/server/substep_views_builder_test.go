@@ -132,7 +132,7 @@ func TestBuildSubstepViewsTerminatedStreamWithoutReason(t *testing.T) {
 
 	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.1")
-	if action.DetailMessage != "No reason provided." {
+	if action.DetailMessage != "No reason provided" {
 		t.Fatalf("detail = %q, want no reason message", action.DetailMessage)
 	}
 }

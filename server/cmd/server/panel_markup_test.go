@@ -25,7 +25,7 @@ func TestProcessDownloadsPanelMarkup(t *testing.T) {
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Downloads</h2>",
-		"Export attachments and notarized data for this stream.",
+		"Export attachments and notarized data for this stream",
 		`class="btn btn-secondary js-download-link"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -63,7 +63,7 @@ func TestProcessDPPPanelMarkup(t *testing.T) {
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Digital Product Passport</h2>",
-		"GS1 Digital Link and DPP data for this stream.",
+		"GS1 Digital Link and DPP data for this stream",
 		`class="btn btn-primary"`,
 		"View DPP data",
 	} {
@@ -243,7 +243,7 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		`class="panel-head-actions"`,
 		`class="panel-actions"`,
 		"<h2>Stream instances</h2>",
-		"View and manage all instances of this stream.",
+		"View and manage all instances of this stream",
 		"View preview",
 		"New instance",
 	} {
@@ -280,7 +280,7 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	view := OrgAdminView{
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members.",
+			Description: "Manage organization settings, roles, and members",
 			BackHref:    "/",
 		},
 		Organization: Organization{

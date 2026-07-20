@@ -2026,7 +2026,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			PageBase: s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Header: PageHeaderView{
 				Title:       "Choose a stream",
-				Description: "Select a stream to start or continue process tracking.",
+				Description: "Select a stream to start or continue process tracking",
 			},
 			Workflows:            options,
 			ShowCreateStreamCard: showCreateStreamCard,
@@ -3783,7 +3783,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 			PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
 			Header: PageHeaderView{
 				Title:       "Organization admin dashboard",
-				Description: "Manage organization settings, roles, and members.",
+				Description: "Manage organization settings, roles, and members",
 				BackHref:    "/",
 			},
 			NeedsOrganizationSetup: true,
@@ -3819,7 +3819,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members.",
+			Description: "Manage organization settings, roles, and members",
 			BackHref:    "/",
 		},
 		Organization:           org,
@@ -5223,7 +5223,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		PageBase: s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		Header: PageHeaderView{
 			Title:       "Digital Product Passport",
-			Description: "GS1 Digital Link landing page for product and stream traceability.",
+			Description: "GS1 Digital Link landing page for product and stream traceability",
 		},
 		ProcessID:    process.ID.Hex(),
 		DigitalLink:  link,

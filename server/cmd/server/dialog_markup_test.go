@@ -46,7 +46,7 @@ func TestStreamPageNewInstanceDialogMarkup(t *testing.T) {
 		`class="dialog-subtitle"`,
 		`class="dialog-actions"`,
 		`class="dialog-title">New instance</h3>`,
-		"Give this stream instance a brief name.",
+		"Give this stream instance a brief name",
 		`class="btn btn-ghost btn-icon dialog-close"`,
 	} {
 		if !strings.Contains(dialog, want) {
@@ -98,7 +98,7 @@ func TestPlatformAdminCreateOrgDialogMarkup(t *testing.T) {
 		`class="dialog-title"`,
 		`class="dialog-subtitle"`,
 		`class="dialog-title">New organization</h3>`,
-		"Add a new organization to the platform.",
+		"Add a new organization to the platform",
 		`class="btn btn-ghost btn-icon dialog-close"`,
 		"Create organization",
 	} {

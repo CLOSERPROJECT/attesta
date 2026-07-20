@@ -45,7 +45,7 @@ func TestPageHeaderTemplateOmitsBackLinkWhenUnset(t *testing.T) {
 	var out bytes.Buffer
 	header := PageHeaderView{
 		Title:       "Choose a stream",
-		Description: "Select a stream to start or continue process tracking.",
+		Description: "Select a stream to start or continue process tracking",
 	}
 	if err := tmpl.ExecuteTemplate(&out, "page_header", header); err != nil {
 		t.Fatalf("render page_header template: %v", err)
