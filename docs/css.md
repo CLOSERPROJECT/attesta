@@ -160,7 +160,7 @@ Behavior hooks use a `js-*` class prefix alongside `data-*` where needed; do not
 - **Stylesheet modules** use `@media (--sm-down) { … }` (or other aliases). Do **not** repeat `@custom-media` or write `@media (width … 640px)` in component/page CSS.
 - **PostCSS:** `postcss-custom-media` (see `web/postcss.config.js`) expands aliases at build time; Vite runs PostCSS on the bundled CSS.
 
-**JS sync:** when JavaScript needs the same threshold as CSS, use the equivalent `matchMedia` query. Example: `--xl-down` `(width < 1280px)` ↔ `matchMedia("(max-width: 1279px)")` (as in `org_admin.html` for mobile panel switching). Keep JS literals aligned with the table above when adding new breakpoint checks.
+**JS sync:** when JavaScript needs the same threshold as CSS, use the equivalent `matchMedia` query. Example: `--md-down` `(width < 768px)` ↔ `matchMedia("(max-width: 767px)")` (as in `org_admin.html` for mobile panel scrolling). Keep JS literals aligned with the table above when adding new breakpoint checks.
 
 ### Font tokens
 

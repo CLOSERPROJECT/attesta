@@ -43,18 +43,25 @@
 }
 
 .org-admin-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-12);
-  align-items: start;
+  align-items: stretch;
 }
 
-.org-admin-grid-ready {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (--xl-up) {
+@media (--md-up) {
   .org-admin-grid-ready {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex-direction: row;
+    align-items: start;
+  }
+
+  .org-admin-grid-ready > .panel-sticky {
+    flex: 0 0 auto;
+  }
+
+  .org-admin-grid-ready > .org-admin-panel-main {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

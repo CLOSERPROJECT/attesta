@@ -14,7 +14,6 @@
 }
 
 .org-admin-panel-main {
-  grid-column: span 2;
   display: grid;
   gap: var(--space-7);
 }
@@ -85,9 +84,8 @@
   margin: 0;
 }
 
-@media (--xl-down) {
+@media (--md-down) {
   .org-admin-panel-main {
     scroll-margin-top: var(--space-3);
-    grid-column: auto;
   }
 }
