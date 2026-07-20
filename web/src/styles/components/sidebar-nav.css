@@ -16,7 +16,6 @@
 .sidebar-nav-link {
   width: 100%;
   display: grid;
-  gap: 2px;
   padding: var(--space-3) var(--space-4);
   text-align: left;
   border-radius: 4px;
@@ -43,7 +42,7 @@
 }
 
 .sidebar-nav-title {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .sidebar-nav-copy {
