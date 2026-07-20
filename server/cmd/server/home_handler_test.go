@@ -435,7 +435,7 @@ func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `workflow-card-turn-indicator`) {
+	if !strings.Contains(body, `stream-card-turn-indicator`) {
 		t.Fatalf("expected workflow turn indicator markup, got %q", body)
 	}
 	if !strings.Contains(body, `aria-label="Your turn pending in Main workflow"`) {
@@ -468,7 +468,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
-	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="workflow-card"`) {
+	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="stream-card"`) {
 		t.Fatalf("expected workflow card grid markup, got %q", body)
 	}
 	if !strings.Contains(body, `href="/w/workflow/"`) {
@@ -564,7 +564,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		if !strings.Contains(body, `href="/org-admin/formata-builder"`) {
 			t.Fatalf("expected create stream card for org admin, got %q", body)
 		}
-		if !strings.Contains(body, "workflow-card-cta") || !strings.Contains(body, "Create new stream") {
+		if !strings.Contains(body, "stream-card-cta") || !strings.Contains(body, "Create new stream") {
 			t.Fatalf("expected create stream card cta for org admin, got %q", body)
 		}
 	})
@@ -717,7 +717,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="btn btn-ghost btn-icon workflow-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for creator, got %q", body)
 		}
 		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -788,7 +788,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="btn btn-ghost btn-icon workflow-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for started stream, got %q", body)
 		}
 		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
@@ -803,10 +803,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect direct edit action for started stream, got %q", body)
 		}
-		if !strings.Contains(body, `class="workflow-card-menu-item workflow-card-menu-item-disabled"`) {
+		if !strings.Contains(body, `class="stream-card-menu-item stream-card-menu-item-disabled"`) {
 			t.Fatalf("expected disabled edit action for started stream, got %q", body)
 		}
-		if !strings.Contains(body, `class="workflow-card-menu-item workflow-card-menu-item-danger workflow-card-menu-item-disabled"`) {
+		if !strings.Contains(body, `class="stream-card-menu-item stream-card-menu-item-danger stream-card-menu-item-disabled"`) {
 			t.Fatalf("expected disabled delete action for started stream, got %q", body)
 		}
 	})
@@ -852,7 +852,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="btn btn-ghost btn-icon workflow-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -916,7 +916,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if strings.Contains(body, `workflow-card-menu-trigger`) {
+		if strings.Contains(body, `stream-card-menu-trigger`) {
 			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
 		}
 		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -925,7 +925,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect edit action without builder access, got %q", body)
 		}
-		if strings.Contains(body, `workflow-card-menu-item-danger workflow-card-menu-item-disabled`) {
+		if strings.Contains(body, `stream-card-menu-item-danger stream-card-menu-item-disabled`) {
 			t.Fatalf("did not expect delete action without builder access, got %q", body)
 		}
 	})
@@ -1053,7 +1053,7 @@ func TestNormalizeHomePage(t *testing.T) {
 }
 
 func TestSortHomeProcessListByStatus(t *testing.T) {
-	items := []ProcessListItem{
+	items := []StreamInstanceCard{
 		{ID: "a", Status: "done", Percent: 100, CreatedAtTime: time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)},
 		{ID: "b", Status: "active", Percent: 10, CreatedAtTime: time.Date(2026, 2, 3, 11, 0, 0, 0, time.UTC)},
 	}

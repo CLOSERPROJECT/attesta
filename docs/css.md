@@ -16,7 +16,7 @@ Styles load in this order from `web/src/styles.css`:
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
 | Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids), `responsive.css` (shell breakpoint tweaks) |
-| Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
+| Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, stream-card, stream-instance-card, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
 | Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
 
 **Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
@@ -41,6 +41,8 @@ Org-admin forms and pickers live in `components/org-admin.css`, not the page mod
 | File | Prefix / scope | Templates |
 |------|----------------|-----------|
 | `components/page-header.css` | `.page-header-*` | `components/page_header.html` |
+| `components/stream-card.css` | `.stream-card-*` | `components/stream_card.html` |
+| `components/stream-instance-card.css` | `.stream-instance-card-*` | `components/stream_instance_card.html` |
 | `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
 | `components/stream-step-summary.css` | `.stream-step-summary-*` | `components/stream_step_summary.html` |
 | `components/stream-timeline.css` | `.stream-timeline-list`, `.stream-timeline-step*` | `components/stream_timeline.html` |
@@ -50,6 +52,7 @@ Org-admin forms and pickers live in `components/org-admin.css`, not the page mod
 | `components/sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Inline markup per `sidebar-nav.css` header (CSS-only) |
 | `components/dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Inline markup per `dialog.css` header (CSS-only) |
 | `components/list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Inline markup per `list-row.css` header (CSS-only) |
+| `components/stream.css` | `.process-toolbar`, `.process-control`, `.status-tag*` | Inline markup in `pages/stream.html` (sort toolbar + status tags on cards) |
 
 ### CSS-only components
 
@@ -91,12 +94,14 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 |----------|-------------|-----------|
 | `layout.html` | `layout/index.css` | `components/shared.css` |
 | `components/page_header.html` | `components/page-header.css` | — |
+| `components/stream_card.html` | `components/stream-card.css` | `components/dialog.css` |
+| `components/stream_instance_card.html` | `components/stream-instance-card.css` | `components/stream.css` (`.status-tag*`) |
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
 | Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`) |
 | Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
-| `pages/home.html` | `pages/home.css` | `components/dialog.css`, `components/stream.css`, `layout/index.css` |
-| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
+| `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
+| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` | `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
@@ -117,7 +122,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `data-theme` | `main.js` on `<html>` | `tokens.css` (`[data-theme="dark"]`) |
 | `data-role-palette` | role badges, timeline substeps | `role-palette.css` |
 | `data-stream-status` | `stream.html` section heads | `role-palette.css` |
-| `data-progress` (via `style="--progress: …"`) | `stream.html` | `.process-progress-fill` in `components/stream.css` |
+| `data-progress` (via `style="--progress: …"`) | `components/stream_instance_card.html` | `.stream-instance-card-progress-fill` in `components/stream-instance-card.css` |
 | `data-org-admin-nav`, `data-org-admin-panel`, `data-org-admin-default-panel`, `data-org-admin-ready` | `org_admin.html` | `pages/org-admin-page.css`, inline script in `org_admin.html` |
 | `data-home-nav`, `data-home-panel` | `stream.html` | `main.js` (panel switching) |
 | `data-process-id`, `data-workflow-key`, `data-selected-substep`, `data-substep-id` | `process.html` | `main.js` (SSE refresh, accordion) |
@@ -324,7 +329,7 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 **Stack gap modifiers:** `.stack.u-gap-2` and `.stack.u-gap-4` override the default `var(--space-6)` stack gap.
 
-**Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.workflow-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
+**Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.stream-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
 
 ## Inline `style=` in templates
 
@@ -334,7 +339,7 @@ Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the 
 
 | Pattern | Example | Consumer |
 |---------|---------|----------|
-| Progress width | `style="--progress: {{ .Percent }}%;"` | `.process-progress-fill` via `width: var(--progress, 0%)` |
+| Progress width | `style="--progress: {{ .Percent }}%;"` | `.stream-instance-card-progress-fill` via `width: var(--progress, 0%)` |
 
 All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-stream-status`), not inline custom properties.
 

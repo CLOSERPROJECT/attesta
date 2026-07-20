@@ -283,26 +283,6 @@ type PageBase struct {
 	ShowLogout      bool
 }
 
-type WorkflowOption struct {
-	Key               string
-	Name              string
-	Description       string
-	Counts            WorkflowProcessCounts
-	HasUserTurn       bool
-	CanClone          bool
-	CanEdit           bool
-	EditAction        string
-	EditRequiresPurge bool
-	CanDelete         bool
-	DeleteAction      string
-}
-
-type WorkflowProcessCounts struct {
-	NotStarted int
-	Started    int
-	Terminated int
-}
-
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
@@ -323,7 +303,7 @@ type PublicCatalogRole struct {
 type WorkflowPickerView struct {
 	PageBase
 	Header               PageHeaderView
-	Workflows            []WorkflowOption
+	Workflows            []StreamCardView
 	ShowCreateStreamCard bool
 	Error                string
 	Confirmation         string
@@ -331,20 +311,6 @@ type WorkflowPickerView struct {
 
 type HomeWorkflowPickerView struct {
 	WorkflowPickerView
-}
-
-type ProcessListItem struct {
-	ID              string
-	Name            string
-	Status          string
-	StatusLabel     string
-	CreatedAt       string
-	CreatedAtTime   time.Time
-	DoneSubsteps    int
-	TotalSubsteps   int
-	Percent         int
-	LastNotarizedAt string
-	LastDigestShort string
 }
 
 type PaginationLink struct {
@@ -377,7 +343,7 @@ type ProcessStatusGroup struct {
 	NextPage        int
 	PreviousURL     string
 	NextURL         string
-	Processes       []ProcessListItem
+	Processes       []StreamInstanceCard
 }
 
 type HomeView struct {
@@ -395,7 +361,7 @@ type HomeView struct {
 	HasNextPage         bool
 	PreviousPage        int
 	NextPage            int
-	Processes           []ProcessListItem
+	Processes           []StreamInstanceCard
 	ProcessGroups       []ProcessStatusGroup
 	Preview             StreamInstanceDetailView
 }
@@ -1526,7 +1492,7 @@ func homePickerMessage(r *http.Request, key string) string {
 	return strings.TrimSpace(r.URL.Query().Get(key))
 }
 
-func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]WorkflowOption, error) {
+func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]StreamCardView, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return nil, err
@@ -1551,10 +1517,10 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Work
 		}
 	}
 	keys := sortedWorkflowKeys(catalog)
-	options := make([]WorkflowOption, 0, len(keys))
+	options := make([]StreamCardView, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
-		option := WorkflowOption{
+		option := StreamCardView{
 			Key:          key,
 			Name:         cfg.Workflow.Name,
 			Description:  strings.TrimSpace(cfg.Workflow.Description),
@@ -1840,8 +1806,8 @@ func homePaginationURL(workflowPath string, sortValues map[string]string, pageVa
 	return target
 }
 
-func buildHomeProcessGroups(workflowPath string, processes []ProcessListItem, sortKey string, query url.Values) []ProcessStatusGroup {
-	byStatus := make(map[string][]ProcessListItem, len(homeProcessStatuses()))
+func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard, sortKey string, query url.Values) []ProcessStatusGroup {
+	byStatus := make(map[string][]StreamInstanceCard, len(homeProcessStatuses()))
 	pageValues := make(map[string]int, len(homeProcessStatuses()))
 	sortValues := make(map[string]string, len(homeProcessStatuses()))
 	for _, status := range homeProcessStatuses() {
@@ -1969,7 +1935,7 @@ func processProgressStats(def WorkflowDef, process *Process) (doneCount int, las
 	return doneCount, lastAt, lastDigestShort
 }
 
-func sortHomeProcessList(items []ProcessListItem, sortKey string) {
+func sortHomeProcessList(items []StreamInstanceCard, sortKey string) {
 	switch sortKey {
 	case "time_asc":
 		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAtTime.Before(items[j].CreatedAtTime) })
@@ -4798,8 +4764,9 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	roleMeta := s.roleMetaIndex(r.Context())
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
-	var processes []ProcessListItem
-	var filteredProcesses []ProcessListItem
+	var processes []StreamInstanceCard
+	var filteredProcesses []StreamInstanceCard
+	path := workflowPath(workflowKey)
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := deriveProcessStatus(cfg.Workflow, &process)
@@ -4808,11 +4775,12 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		if totalSubsteps > 0 {
 			percent = int(float64(doneCount) / float64(totalSubsteps) * 100)
 		}
-		item := ProcessListItem{
+		item := StreamInstanceCard{
 			ID:              process.ID.Hex(),
 			Name:            strings.TrimSpace(process.Name),
 			Status:          status,
 			StatusLabel:     processStatusLabel(status),
+			DetailHref:      path + "/process/" + process.ID.Hex(),
 			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtTime:   process.CreatedAt,
 			DoneSubsteps:    doneCount,

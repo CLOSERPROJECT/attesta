@@ -84,6 +84,21 @@ Globs: `templates/*.html`, `templates/pages/*.html`, `templates/components/*.htm
 - `PageHeaderView` in `server/cmd/server/components.go`
 - Tests: `server/cmd/server/page_header_test.go`
 
+`stream_card` — home stream picker card:
+
+- `server/templates/components/stream_card.html`
+- `web/src/styles/components/stream-card.css`
+- `StreamCardView` in `server/cmd/server/components.go`
+- Tests: `server/cmd/server/stream_card_test.go`
+
+`stream_instance_card` — stream dashboard instance list row:
+
+- `server/templates/components/stream_instance_card.html`
+- `web/src/styles/components/stream-instance-card.css`
+- `StreamInstanceCard` in `server/cmd/server/components.go`
+- Tests: `server/cmd/server/stream_instance_card_test.go`
+- Shared status tags remain in `components/stream.css` (`.status-tag*`)
+
 Also see:
 
 - `substep_shell` — accordion chrome wrapping `substep_body` (`components/substep_shell.html`, `substep-shell.css`)
@@ -107,7 +122,7 @@ Before claiming done:
 
 ```bash
 cd server && go test ./cmd/server/ -count=1
-cd server && go test ./cmd/server/ -run 'PageHeader|DialogMarkup|ListRowMarkup' -count=1
+cd server && go test ./cmd/server/ -run 'PageHeader|StreamCard|DialogMarkup|ListRowMarkup' -count=1
 task css:lint
 ```
 

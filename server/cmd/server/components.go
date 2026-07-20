@@ -1,6 +1,31 @@
 package main
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
+
+// StreamCardView is the view model for templates/components/stream_card.html.
+type StreamCardView struct {
+	Key               string
+	Name              string
+	Description       string
+	Counts            WorkflowProcessCounts
+	HasUserTurn       bool
+	CanClone          bool
+	CanEdit           bool
+	EditAction        string
+	EditRequiresPurge bool
+	CanDelete         bool
+	DeleteAction      string
+}
+
+// WorkflowProcessCounts holds process status totals shown on a stream card.
+type WorkflowProcessCounts struct {
+	NotStarted int
+	Started    int
+	Terminated int
+}
 
 // PageHeaderView is the view model for templates/components/page_header.html.
 type PageHeaderView struct {
@@ -10,6 +35,22 @@ type PageHeaderView struct {
 	Subtitle    string
 	Description string
 	Meta        string
+}
+
+// StreamInstanceCard is the view model for templates/components/stream_instance_card.html.
+type StreamInstanceCard struct {
+	ID              string
+	Name            string
+	Status          string
+	StatusLabel     string
+	DetailHref      string
+	CreatedAt       string
+	CreatedAtTime   time.Time
+	DoneSubsteps    int
+	TotalSubsteps   int
+	Percent         int
+	LastNotarizedAt string
+	LastDigestShort string
 }
 
 // SubstepRoleBadge is a role pill on a substep body (preview/result modes).
