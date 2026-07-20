@@ -1,11 +1,10 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Code+Pro:wght@500&display=swap");
-
 :root {
   color-scheme: light;
 
   /* Fonts */
-  --font-sans: "Space Grotesk", system-ui, sans-serif;
-  --font-mono: "Source Code Pro", monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Font sizes */
   --text-xs: 0.75rem;

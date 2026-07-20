@@ -11,7 +11,7 @@ Styles load in this order from `web/src/styles.css`:
 | Layer | File | Contains |
 |-------|------|----------|
 | Breakpoints | `breakpoints.css` | Sole source of `@custom-media` aliases (Tailwind v3 widths) |
-| Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font import |
+| Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font/type tokens (Google Fonts load in `layout.html`) |
 | Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
 | Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
 | Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
@@ -161,10 +161,11 @@ Behavior hooks use a `js-*` class prefix alongside `data-*` where needed; do not
 
 | Token | Value |
 |-------|-------|
-| `--font-sans` | Space Grotesk stack (body, buttons, UI copy) |
-| `--font-mono` | Source Code Pro stack (hashes, codes) |
+| `--font-sans` | Inter stack (body, buttons, UI copy, `h2`–`h4`) |
+| `--font-display` | Space Grotesk stack (literal `h1` only) |
+| `--font-mono` | JetBrains Mono stack (hashes, codes, meta ids) |
 
-Google Fonts are imported in `tokens.css`. Use `var(--font-sans)` / `var(--font-mono)` in new CSS — do not repeat font family strings.
+Google Fonts load from `server/templates/layout.html` (`preconnect` + stylesheet `<link>` with `display=swap`). Do **not** `@import` fonts from `tokens.css`. Use `var(--font-sans)` / `var(--font-display)` / `var(--font-mono)` in new CSS — do not repeat font family strings.
 
 ### Type scale
 
@@ -173,8 +174,8 @@ Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index
 | Token | rem | px | Typical use |
 |-------|-----|----|-------------|
 | `--text-xs` | `0.75rem` | 12 | Captions, pills, compact tags, meta IDs |
-| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels |
-| `--text-base` | `1rem` | 16 | Body, inputs, buttons, default prose |
+| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels, buttons |
+| `--text-base` | `1rem` | 16 | Body, inputs, default prose |
 | `--text-lg` | `1.125rem` | 18 | Card titles, dialog titles, emphasis headings |
 | `--text-xl` | `1.25rem` | 20 | Section headings (`h2` in panels; `h3` for nested/subsection titles) |
 | `--text-2xl` | `1.5rem` | 24 | Large titles, emphasis page headings |
@@ -193,11 +194,12 @@ Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index
 
 | Token | Value | Loaded face |
 |-------|-------|-------------|
-| `--font-normal` | `400` | Space Grotesk 400 |
-| `--font-semibold` | `600` | Space Grotesk 600 |
-| `--font-bold` | `700` | Space Grotesk 700 |
+| `--font-normal` | `400` | Inter 400 |
+| `--font-medium` | `500` | Inter 500 |
+| `--font-semibold` | `600` | Inter 600 |
+| `--font-bold` | `700` | Inter 700 |
 
-**Heading defaults** are set in `reset.css` (`h1`–`h4`): `h1` → `--text-3xl`, `h2` → `--text-xl`, `h3` → `--text-lg`, `h4` → `--text-base`, all with `--font-semibold` and `--leading-tight`. Prefer tokens over raw `font-size` in component CSS; remove redundant heading `font-size` overrides when they only duplicate semantics.
+**Heading defaults** are set in `reset.css` (`h1`–`h4`): `h1` → `--text-3xl` + `--font-display`, `h2` → `--text-xl`, `h3` → `--text-lg`, `h4` → `--text-base`, all with `--font-semibold` and `--leading-tight`. Prefer tokens over raw `font-size` in component CSS; remove redundant heading `font-size` overrides when they only duplicate semantics.
 
 **Control sizing pattern:** buttons use the `btn` system in `button.css` (default height `--btn-height` / 36px). Form labels use `--text-sm` (`forms.css`); inputs use `--text-base`.
 

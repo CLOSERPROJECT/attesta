@@ -37,6 +37,7 @@ h4 {
 }
 
 h1 {
+  font-family: var(--font-display);
   font-size: var(--text-3xl);
 }
 

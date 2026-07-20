@@ -103,7 +103,7 @@
 .substep-title-heading {
   font-size: var(--text-base);
   line-height: 1.2;
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   color: var(--foreground);
   overflow-wrap: anywhere;
 }

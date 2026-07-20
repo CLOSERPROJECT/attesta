@@ -17,10 +17,10 @@ const syncFormataDarkMode = (theme) => {
 
 const formataShadowOverrides = `
   [data-slot="field-legend"] {
-    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-family: var(--font-sans);
   }
   [data-slot="field-description"] {
-    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-family: var(--font-sans);
     color: var(--formata-muted-foreground) !important;
     font-size: 13px;
   }
@@ -36,7 +36,7 @@ const formataShadowOverrides = `
     background: var(--formata-primary) !important;
     color: var(--primary-foreground) !important;
     border-color: var(--formata-primary) !important;
-    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
@@ -62,7 +62,7 @@ const formataShadowOverrides = `
     background: var(--card) !important;
     border-color: var(--border) !important;
     color: var(--foreground) !important;
-	  font-family: "Space Grotesk", system-ui, sans-serif !important;
+	  font-family: var(--font-sans) !important;
   }
   [data-slot="field-legend"]:has(#root__title) {
     display: none !important;
