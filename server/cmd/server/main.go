@@ -3819,7 +3819,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, user *AccountUs
 		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Switch between organization settings, roles, and members.",
+			Description: "Manage organization settings, roles, and members.",
 			BackHref:    "/",
 		},
 		Organization:           org,

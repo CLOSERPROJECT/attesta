@@ -12,7 +12,7 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 	view := OrgAdminView{
 		Header: PageHeaderView{
 			Title:       "Organization admin dashboard",
-			Description: "Switch between organization settings, roles, and members.",
+			Description: "Manage organization settings, roles, and members.",
 			BackHref:    "/",
 		},
 		RoleRows: []OrgAdminRoleRow{
