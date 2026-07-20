@@ -94,13 +94,7 @@
         <section
           class="panel org-admin-panel-main"
           data-org-admin-shell
-          data-org-admin-default-panel="{{ if .RoleError }}
-            roles
-          {{ else if or .UsersError .InviteError .InviteLink }}
-            members
-          {{ else }}
-            profile
-          {{ end }}"
+          data-org-admin-default-panel="{{ .ActivePanel }}"
         >
           <section
             class="org-admin-panel-section"
