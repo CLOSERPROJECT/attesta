@@ -20,7 +20,7 @@ func TestLayoutLoadsGoogleFontsWithSwap(t *testing.T) {
 		`fonts.googleapis.com/css2?`,
 		`family=Inter:wght@400;500;600;700`,
 		`family=Space+Grotesk:wght@600;700`,
-		`family=JetBrains+Mono:wght@500`,
+		`family=JetBrains+Mono:wght@400;500`,
 		`display=swap`,
 	} {
 		if !strings.Contains(body, want) {
