@@ -50,6 +50,35 @@ svg.bi {
   color: var(--muted-foreground);
 }
 
+.field-label {
+  display: block;
+  margin: 0;
+  font-weight: var(--font-semibold);
+}
+
+.field-block {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.field-row > :not(button) {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.field-row > button {
+  flex: 0 0 auto;
+}
+
 .pill {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
