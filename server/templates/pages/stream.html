@@ -1,7 +1,7 @@
 {{/* Used on /w/.WorkflowKey to render the stream page (home_body). */}}
 
 {{ define "home_body" }}
-  <div class="stack u-max-w-7xl u-mx-auto">
+  <div class="stack stream-page u-max-w-7xl u-mx-auto">
     <section class="page-header">
       {{ template "page_header_back" "/" }}
       {{ if .Error }}
@@ -53,70 +53,112 @@
     {{ else }}
       <div class="rail-layout rail-layout-ready" data-home-root>
         <section class="panel panel-sticky">
-          <div class="panel-heading">
-            <h2>Streams</h2>
-            <p>Jump to instances by status</p>
-          </div>
-          <nav class="sidebar-nav" aria-label="Stream status sections">
-            {{ range .ProcessGroups }}
-              {{ if eq .Status "available" }}
+          <div class="stream-status-filter">
+            <span
+              class="stream-status-rail-label"
+              id="stream-status-filter-label"
+            >
+              {{ template "icon-filter" . }}
+              Filter by status
+            </span>
+            <nav
+              class="stream-status-filter-nav"
+              aria-labelledby="stream-status-filter-label"
+            >
+              {{ range .ProcessGroups }}
                 <button
                   type="button"
-                  class="sidebar-nav-link is-active"
+                  class="stream-status-filter-option{{ if eq .Status $.StatusFilter }} is-active{{ end }}"
                   data-home-nav="{{ .Status }}"
                   aria-controls="{{ .PanelID }}"
-                  aria-current="page"
-                  aria-label="Available streams"
-                  title="Streams waiting for your input"
+                  aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}"
+                  {{ if eq .Status "all" }}
+                    aria-label="All streams"
+                    title="All stream instances"
+                  {{ else if eq .Status "available" }}
+                    aria-label="Available streams"
+                    title="Streams waiting for your input"
+                  {{ else if eq .Status "active" }}
+                    aria-label="Active streams"
+                    title="Streams waiting for someone else input"
+                  {{ else if eq .Status "done" }}
+                    aria-label="Completed streams"
+                    title="Streams completed successfully"
+                  {{ else if eq .Status "terminated" }}
+                    aria-label="Terminated streams"
+                    title="Streams terminated before completion"
+                  {{ end }}
                 >
-                  <span class="sidebar-nav-title"> Available </span>
-                </button>
-              {{ else if eq .Status "active" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="false"
-                  aria-label="Active streams"
-                  title="Streams waiting for someone else input"
-                >
-                  <span class="sidebar-nav-title"> Active </span>
-                </button>
-              {{ else if eq .Status "done" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="false"
-                  aria-label="Completed streams"
-                  title="Streams completed successfully"
-                >
-                  <span class="sidebar-nav-title"> Done </span>
-                </button>
-              {{ else if eq .Status "terminated" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="false"
-                  aria-label="Terminated streams"
-                  title="Streams terminated before completion"
-                >
-                  <span class="sidebar-nav-title"> Terminated </span>
+                  {{ template "status_tag" .Status }}
                 </button>
               {{ end }}
-            {{ end }}
-          </nav>
+            </nav>
+          </div>
+          {{ range .ProcessGroups }}
+            <form
+              method="get"
+              action="{{ $.WorkflowPath }}/"
+              class="stream-status-sort"
+              data-home-panel="{{ .Status }}"
+              {{ if ne .Status $.StatusFilter }}hidden{{ end }}
+            >
+              {{ range .SortFields }}
+                <input
+                  type="hidden"
+                  name="{{ .Name }}"
+                  value="{{ .Value }}"
+                />
+              {{ end }}
+              <label
+                class="stream-status-sort-control"
+                for="stream-sort-{{ .Status }}"
+              >
+                <span class="stream-status-rail-label">
+                  {{ template "icon-sort" . }}
+                  Sort by
+                </span>
+                <select
+                  id="stream-sort-{{ .Status }}"
+                  name="{{ .SortParam }}"
+                  onchange="this.form.submit()"
+                >
+                  <option
+                    value="time_desc"
+                    {{ if eq .Sort "time_desc" }}selected{{ end }}
+                  >
+                    Newest
+                  </option>
+                  <option
+                    value="time_asc"
+                    {{ if eq .Sort "time_asc" }}selected{{ end }}
+                  >
+                    Oldest
+                  </option>
+                  <option
+                    value="progress_desc"
+                    {{ if eq .Sort "progress_desc" }}selected{{ end }}
+                  >
+                    Most advanced
+                  </option>
+                  <option
+                    value="progress_asc"
+                    {{ if eq .Sort "progress_asc" }}selected{{ end }}
+                  >
+                    Least advanced
+                  </option>
+                  <option
+                    value="status"
+                    {{ if eq .Sort "status" }}selected{{ end }}
+                  >
+                    Status
+                  </option>
+                </select>
+              </label>
+            </form>
+          {{ end }}
         </section>
 
         <div class="rail-layout-main home-workflow-panel-main">
-          <div class="panel-heading">
-            <h2>Stream instances</h2>
-            <p>View and manage all instances of this stream</p>
-          </div>
           <dialog id="new-instance-dialog" class="dialog">
             <div class="dialog-card">
               <header class="dialog-head">
@@ -190,75 +232,24 @@
                 class="stream-status-section"
                 id="{{ .PanelID }}"
                 data-home-panel="{{ .Status }}"
-                {{ if ne .Status "available" }}hidden{{ end }}
+                {{ if ne .Status $.StatusFilter }}hidden{{ end }}
               >
-                <div class="stream-status-section-head" data-stream-status="{{ .Status }}">
+                <div class="stream-status-section-head">
                   <h3>
-                    {{ if eq .Status "available" }}
-                      Available
+                    {{ if eq .Status "all" }}
+                      All stream instances
+                    {{ else if eq .Status "available" }}
+                      Available stream instances
                     {{ else if eq .Status "active" }}
-                      Active
+                      Active stream instances
                     {{ else if eq .Status "done" }}
-                      Done
+                      Done stream instances
                     {{ else if eq .Status "terminated" }}
-                      Terminated
+                      Terminated stream instances
                     {{ else }}
                       {{ .Label }}
                     {{ end }}
                   </h3>
-                  <form
-                    method="get"
-                    action="{{ $.WorkflowPath }}/"
-                    class="process-toolbar stream-status-sort"
-                  >
-                    {{ range .SortFields }}
-                      <input
-                        type="hidden"
-                        name="{{ .Name }}"
-                        value="{{ .Value }}"
-                      />
-                    {{ end }}
-                    <label class="process-control">
-                      <span class="muted">
-                        {{ template "icon-sort" . }}
-                      </span>
-                      <select
-                        name="{{ .SortParam }}"
-                        onchange="this.form.submit()"
-                      >
-                        <option
-                          value="time_desc"
-                          {{ if eq .Sort "time_desc" }}selected{{ end }}
-                        >
-                          Newest
-                        </option>
-                        <option
-                          value="time_asc"
-                          {{ if eq .Sort "time_asc" }}selected{{ end }}
-                        >
-                          Oldest
-                        </option>
-                        <option
-                          value="progress_desc"
-                          {{ if eq .Sort "progress_desc" }}selected{{ end }}
-                        >
-                          Most advanced
-                        </option>
-                        <option
-                          value="progress_asc"
-                          {{ if eq .Sort "progress_asc" }}selected{{ end }}
-                        >
-                          Least advanced
-                        </option>
-                        <option
-                          value="status"
-                          {{ if eq .Sort "status" }}selected{{ end }}
-                        >
-                          Status
-                        </option>
-                      </select>
-                    </label>
-                  </form>
                 </div>
                 {{ if .Processes }}
                   <ul class="stream-instance-card-list">
@@ -269,26 +260,32 @@
                 {{ else }}
                   <div class="stream-instance-card-empty">
                     <p class="muted">
-                      No
-                      {{ if eq .Status "available" }}
-                        available
-                      {{ else if eq .Status "active" }}
-                        active
-                      {{ else if eq .Status "done" }}
-                        completed
-                      {{ else if eq .Status "terminated" }}
-                        terminated
+                      {{ if eq .Status "all" }}
+                        No instances
                       {{ else }}
-                        {{ .Label }}
+                        No
+                        {{ if eq .Status "available" }}
+                          available
+                        {{ else if eq .Status "active" }}
+                          active
+                        {{ else if eq .Status "done" }}
+                          completed
+                        {{ else if eq .Status "terminated" }}
+                          terminated
+                        {{ else }}
+                          {{ .Label }}
+                        {{ end }}
+                        instances
                       {{ end }}
-                      instances
                     </p>
                   </div>
                 {{ end }}
                 {{ if gt .TotalPages 1 }}
                   <nav
                     class="platform-admin-pagination platform-admin-pagination--inline"
-                    aria-label="{{ if eq .Status "available" }}
+                    aria-label="{{ if eq .Status "all" }}
+                      All
+                    {{ else if eq .Status "available" }}
                       Available
                     {{ else if eq .Status "active" }}
                       Active
@@ -345,11 +342,30 @@
             (panel.getAttribute("data-home-panel") || "").trim(),
           );
 
-          const defaultPanelName = statusPanelNames.includes("available")
-            ? "available"
+          const defaultPanelName = statusPanelNames.includes("all")
+            ? "all"
             : statusPanelNames[0] || "";
 
+          const syncFilterURL = (panelName) => {
+            try {
+              const url = new URL(window.location.href);
+              if (panelName && panelName !== "all") {
+                url.searchParams.set("filter", panelName);
+              } else {
+                url.searchParams.delete("filter");
+              }
+              url.hash = "";
+              window.history.replaceState({}, "", url);
+            } catch (_err) {}
+          };
+
           const initialPanelName = () => {
+            const params = new URLSearchParams(window.location.search);
+            const filterParam = (params.get("filter") || "").trim().toLowerCase();
+            if (statusPanelNames.includes(filterParam)) {
+              return filterParam;
+            }
+
             const hashPanelID = window.location.hash.replace(/^#/, "");
             if (hashPanelID) {
               const hashPanel = panels.find((panel) => panel.id === hashPanelID);
@@ -358,7 +374,6 @@
               }
             }
 
-            const params = new URLSearchParams(window.location.search);
             const queryPanel = statusPanelNames.find((panelName) => {
               return (
                 params.has(panelName + "_page") || params.has(panelName + "_sort")
@@ -367,7 +382,7 @@
             return queryPanel || defaultPanelName;
           };
 
-          const showPanel = (panelName) => {
+          const showPanel = (panelName, options = {}) => {
             if (!statusPanelNames.includes(panelName)) {
               panelName = defaultPanelName;
             }
@@ -386,6 +401,10 @@
               const currentName = panel.getAttribute("data-home-panel");
               panel.hidden = currentName !== panelName;
             });
+
+            if (options.syncURL) {
+              syncFilterURL(panelName);
+            }
           };
 
           Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
@@ -397,12 +416,12 @@
                 if (panelName === "preview") {
                   return;
                 }
-                showPanel(panelName);
+                showPanel(panelName, { syncURL: true });
               });
             },
           );
 
-          showPanel(initialPanelName());
+          showPanel(initialPanelName(), { syncURL: true });
         })();
       </script>
     {{ end }}

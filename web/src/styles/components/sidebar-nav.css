@@ -3,7 +3,7 @@
  *
  * nav.sidebar-nav
  *   a.sidebar-nav-link[.is-active]   (or button, on pages that still use buttons)
- *     span.sidebar-nav-title
+ *     span.sidebar-nav-title | status_tag micro-partial
  *     span.sidebar-nav-copy?   (optional subtitle)
  */
 
@@ -18,6 +18,7 @@
 .sidebar-nav-link {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   padding: var(--space-2) var(--space-3);
   text-align: left;
   text-decoration: none;
@@ -36,6 +37,10 @@
 .sidebar-nav-title {
   font-weight: 500;
   color: var(--foreground);
+}
+
+.sidebar-nav-link .status-tag {
+  align-self: flex-start;
 }
 
 .sidebar-nav-link:hover,

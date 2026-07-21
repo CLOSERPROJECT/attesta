@@ -157,6 +157,10 @@ const focusNextActionInput = () => {
 };
 
 const syncSelectedSubstepURL = (substepId = "") => {
+  // Process-page only: do not leak ?substep= onto stream dashboard URLs.
+  if (!processId) {
+    return;
+  }
   try {
     const url = new URL(window.location.href);
     if (substepId) {

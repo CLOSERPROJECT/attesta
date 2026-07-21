@@ -23,13 +23,7 @@
             {{ end }}
             <span class="stream-instance-card-id">{{ .ID }}</span>
           </span>
-          <span class="status-tag status-tag-compact status-{{ .Status }}"
-            >{{ if .StatusLabel }}
-              {{ .StatusLabel }}
-            {{ else }}
-              {{ .Status }}
-            {{ end }}</span
-          >
+          {{ template "status_tag" .Status }}
         </div>
         <div
           class="stream-instance-card-progress-line"

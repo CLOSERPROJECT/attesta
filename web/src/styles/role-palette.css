@@ -72,7 +72,8 @@
   --role-chroma: var(--muted-foreground);
 }
 
-.stream-status-section-head[data-stream-status="available"] { --stream-color: var(--stream-available); }
-.stream-status-section-head[data-stream-status="active"] { --stream-color: var(--stream-active); }
-.stream-status-section-head[data-stream-status="done"] { --stream-color: var(--stream-done); }
-.stream-status-section-head[data-stream-status="terminated"] { --stream-color: var(--stream-terminated); }
+[data-stream-status="all"] { --stream-color: var(--stream-all); }
+[data-stream-status="available"] { --stream-color: var(--stream-available); }
+[data-stream-status="active"] { --stream-color: var(--stream-active); }
+[data-stream-status="done"] { --stream-color: var(--stream-done); }
+[data-stream-status="terminated"] { --stream-color: var(--stream-terminated); }

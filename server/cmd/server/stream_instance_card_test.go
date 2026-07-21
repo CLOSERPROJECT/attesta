@@ -39,6 +39,8 @@ func TestStreamInstanceCardTemplateRendersDetailLink(t *testing.T) {
 		`class="stream-instance-card-meta"`,
 		`class="stream-instance-card-meta-primary"`,
 		`href="/w/workflow/process/process-1"`,
+		`class="status-tag status-tag-compact"`,
+		`data-stream-status="available"`,
 		"Pilot batch",
 		"process-1",
 		"complete (25%)",

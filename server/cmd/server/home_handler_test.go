@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1037,8 +1038,66 @@ func TestNormalizeHomeStatusFilter(t *testing.T) {
 	if got := normalizeHomeStatusFilter("ACTIVE"); got != "active" {
 		t.Fatalf("expected active, got %q", got)
 	}
+	if got := normalizeHomeStatusFilter("all"); got != "all" {
+		t.Fatalf("expected all, got %q", got)
+	}
 	if got := normalizeHomeStatusFilter("unknown"); got != "all" {
 		t.Fatalf("expected all for unknown, got %q", got)
+	}
+}
+
+func TestHomePaginationURLIncludesFilterAndOmitsHash(t *testing.T) {
+	sortValues := map[string]string{
+		"active_sort": "status",
+		"all_sort":    "time_desc",
+	}
+	pageValues := map[string]int{
+		"active_page": 2,
+		"all_page":    1,
+	}
+
+	got := homePaginationURL("/w/workflow", sortValues, pageValues, "active_page", 3, "active")
+	want := "/w/workflow/?active_page=3&active_sort=status&filter=active"
+	if got != want {
+		t.Fatalf("pagination url = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "#") {
+		t.Fatalf("did not expect hash in pagination url, got %q", got)
+	}
+
+	allURL := homePaginationURL("/w/workflow", sortValues, pageValues, "all_page", 1, "all")
+	if strings.Contains(allURL, "filter=") {
+		t.Fatalf("default filter should omit filter param, got %q", allURL)
+	}
+}
+
+func TestBuildHomeProcessGroupsPreservesFilterInSortFields(t *testing.T) {
+	groups := buildHomeProcessGroups("/w/workflow", []StreamInstanceCard{
+		{ID: "1", Status: "active"},
+		{ID: "2", Status: "done"},
+	}, "time_desc", url.Values{"done_sort": []string{"progress_desc"}})
+
+	var done *ProcessStatusGroup
+	for i := range groups {
+		if groups[i].Status == "done" {
+			done = &groups[i]
+			break
+		}
+	}
+	if done == nil {
+		t.Fatal("expected done process group")
+	}
+	foundFilter := false
+	for _, field := range done.SortFields {
+		if field.Name == "filter" && field.Value == "done" {
+			foundFilter = true
+		}
+	}
+	if !foundFilter {
+		t.Fatalf("expected filter=done in sort fields, got %#v", done.SortFields)
+	}
+	if !strings.Contains(done.NextURL, "filter=done") {
+		t.Fatalf("expected filter in pagination url, got %q", done.NextURL)
 	}
 }
 

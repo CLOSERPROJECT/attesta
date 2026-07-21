@@ -1,3 +1,9 @@
+.stream-page .page-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-10);
+  margin-bottom: var(--space-6);
+}
+
 .stream-status-sections {
   display: grid;
   gap: var(--space-5);
@@ -6,32 +12,97 @@
 .stream-status-section {
   scroll-margin-top: 44px;
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-5);
 }
 
 .stream-status-section[hidden] {
   display: none;
 }
 
-.stream-status-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: 4px;
-  border-left: 6px solid;
-  background: color-mix(in srgb, var(--stream-color) 50%, transparent);
-  border-color: var(--stream-color);
-}
-
 .stream-status-section-head h3 {
   margin: 0;
 }
 
+.stream-status-filter {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: var(--space-2);
+}
+
+.stream-status-filter-nav {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.stream-status-filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2);
+  text-align: left;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stream-status-filter-option.is-active::before {
+  content: "";
+  flex: 0 0 0.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.stream-status-filter-option:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--background));
+}
+
+.stream-status-rail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
 .stream-status-sort {
-  margin: 0;
-  justify-content: flex-start;
+  margin: var(--space-6) 0 0;
+  width: 100%;
+}
+
+.stream-status-sort[hidden] {
+  display: none;
+}
+
+.stream-status-sort-control {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.stream-status-sort-control select {
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
 }
 
 #stream-preview-dialog.dialog {
@@ -55,4 +126,39 @@
 .stream-preview-body {
   display: grid;
   gap: var(--space-4);
+}
+
+/* Closest tokens to ~640–900: sm-up (640+) through lg-down (<1024). */
+@media (--sm-up) and (--lg-down) {
+  .stream-page .page-header-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+}
+
+/* Single-column rail (< md): filter + sort side by side. */
+@media (--md-down) {
+  .stream-page .rail-layout-ready > .panel-sticky {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-8);
+  }
+
+  .stream-page .stream-status-filter {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .stream-page .stream-status-sort {
+    margin-top: 0;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .stream-page .stream-status-sort-control,
+  .stream-page .stream-status-sort-control select {
+    width: auto;
+  }
 }

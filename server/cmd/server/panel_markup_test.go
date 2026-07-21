@@ -260,14 +260,12 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	for _, want := range []string{
 		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
-		`class="sidebar-nav"`,
-		`class="sidebar-nav-link is-active"`,
-		`class="sidebar-nav-title"`,
+		`class="stream-status-filter-nav"`,
+		`class="stream-status-filter-option is-active"`,
+		`class="status-tag status-tag-compact"`,
+		`data-stream-status="all"`,
 		`class="page-header-head"`,
 		`class="page-header-actions"`,
-		`class="panel-heading"`,
-		"<h2>Stream instances</h2>",
-		"View and manage all instances of this stream",
 		"View preview",
 		"New instance",
 	} {
@@ -279,17 +277,33 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	if strings.Contains(body, `class="panel-head-actions"`) {
 		t.Fatalf("stream page header actions must not use panel-head-actions, got:\n%s", body)
 	}
+	if strings.Contains(body, "<h2>Stream instances</h2>") || strings.Contains(body, "View and manage all instances of this stream") {
+		t.Fatalf("stream instances panel heading must be removed, got:\n%s", body)
+	}
+	if strings.Contains(body, "<h2>Streams</h2>") || strings.Contains(body, "Jump to instances by status") {
+		t.Fatalf("streams sidebar panel heading must be removed, got:\n%s", body)
+	}
+
+	stickyStart := strings.Index(body, `class="panel panel-sticky"`)
+	stickyEnd := strings.Index(body, `class="rail-layout-main home-workflow-panel-main"`)
+	if stickyStart == -1 || stickyEnd == -1 || stickyStart >= stickyEnd {
+		t.Fatal("expected sticky sidebar before rail-layout-main")
+	}
+	stickyBlock := body[stickyStart:stickyEnd]
+	if strings.Contains(stickyBlock, `class="panel-heading"`) {
+		t.Fatalf("sticky sidebar must not include panel-heading, got:\n%s", stickyBlock)
+	}
 
 	headerActionsIdx := strings.Index(body, `class="page-header-actions"`)
 	previewIdx := strings.Index(body, "View preview")
 	newIdx := strings.Index(body, "New instance")
-	headingIdx := strings.Index(body, "<h2>Stream instances</h2>")
 	sidebarIdx := strings.Index(body, `class="panel panel-sticky"`)
-	if headerActionsIdx == -1 || previewIdx == -1 || newIdx == -1 || headingIdx == -1 || sidebarIdx == -1 {
-		t.Fatal("expected page-header-actions, preview/new buttons, stream instances heading, and sidebar panel")
+	mainIdx := strings.Index(body, `class="rail-layout-main home-workflow-panel-main"`)
+	if headerActionsIdx == -1 || previewIdx == -1 || newIdx == -1 || sidebarIdx == -1 || mainIdx == -1 {
+		t.Fatal("expected page-header-actions, preview/new buttons, sidebar panel, and rail-layout-main")
 	}
-	if !(headerActionsIdx < previewIdx && previewIdx < newIdx && newIdx < sidebarIdx && sidebarIdx < headingIdx) {
-		t.Fatalf("expected page-header-actions (with View preview / New instance) before sidebar and Stream instances heading")
+	if !(headerActionsIdx < previewIdx && previewIdx < newIdx && newIdx < sidebarIdx && sidebarIdx < mainIdx) {
+		t.Fatalf("expected page-header-actions (with View preview / New instance) before sidebar and rail-layout-main")
 	}
 
 	railIdx := strings.Index(body, `class="rail-layout rail-layout-ready"`)
@@ -300,11 +314,14 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	mainStart := strings.Index(body, `class="rail-layout-main home-workflow-panel-main"`)
 	mainEnd := strings.Index(body, `class="stream-status-sections"`)
 	if mainStart == -1 || mainEnd == -1 || mainStart >= mainEnd {
-		t.Fatal("expected rail-layout-main wrapping instances header")
+		t.Fatal("expected rail-layout-main wrapping stream status sections")
 	}
 	mainBlock := body[mainStart:mainEnd]
 	if strings.Contains(mainBlock, `<section class="panel"`) || strings.Contains(mainBlock, `<section class="panel `) {
-		t.Fatalf("rail-layout-main must not wrap instances header in section.panel, got:\n%s", mainBlock)
+		t.Fatalf("rail-layout-main must not wrap instances in section.panel, got:\n%s", mainBlock)
+	}
+	if strings.Contains(mainBlock, `class="panel-heading"`) {
+		t.Fatalf("rail-layout-main must not include panel-heading, got:\n%s", mainBlock)
 	}
 }
 
