@@ -28,7 +28,7 @@
   --font-bold: 700;
 
   /* Spacing — 4px grid; --space-N ≈ N × 0.25rem */
-  --space-0.5: 1px;
+  --space-px: 1px;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -51,13 +51,13 @@
   --btn-padding-x-sm: var(--space-2);
 
   /* Surfaces */
-  --background: rgb(248, 253, 252);
+  --background: rgb(248 253 252);
   --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
   --muted: #f8f9f4;
   --muted-foreground: #4f5d47;
-  --secondary: #ffffff;
+  --secondary: #fff;
 
   /* Accent & semantic */
   --primary: #1e6f5c;

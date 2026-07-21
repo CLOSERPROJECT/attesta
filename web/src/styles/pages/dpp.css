@@ -11,8 +11,7 @@
   grid-template-areas:
     "title actions"
     "copy copy";
-  column-gap: var(--space-6);
-  row-gap: var(--space-2);
+  gap: var(--space-2) var(--space-6);
   align-items: start;
 }
 
