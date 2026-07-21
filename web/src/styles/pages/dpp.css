@@ -1,5 +1,42 @@
 .dpp-page {
   max-width: 80ch;
+  gap: 0;
+}
+
+/* Title + actions share a row; description + ids full-width under title.
+   At --sm-down, actions move below the copy block. */
+.dpp-page .page-header-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title actions"
+    "copy copy";
+  column-gap: var(--space-6);
+  row-gap: var(--space-2);
+  align-items: start;
+}
+
+.dpp-page .page-header-head > .page-header-body {
+  grid-area: title;
+  min-width: 0;
+}
+
+.dpp-page .page-header-head > .dpp-page-header-copy {
+  grid-area: copy;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.dpp-page .page-header-head > .dpp-page-header-copy > p {
+  margin: 0;
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+.dpp-page .page-header-head > .page-header-actions {
+  grid-area: actions;
 }
 
 .dpp-ids {
@@ -7,13 +44,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-1);
-  margin-bottom: var(--space-4);
 }
 
 .dpp-id {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  padding: 5px var(--space-3);
+  padding: var(--space-1) var(--space-2);
   color: var(--foreground);
   background: var(--pill);
   border: 1px solid var(--border);
@@ -137,8 +173,20 @@
   min-width: 0;
 }
 
-
 @media (--sm-down) {
+  .dpp-page .page-header-head {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "copy"
+      "actions";
+  }
+
+  .dpp-page .page-header-head > .page-header-actions {
+    justify-content: flex-start;
+    padding-top: var(--space-8);
+  }
+
   .dpp-history-item::before {
     left: 9px;
   }

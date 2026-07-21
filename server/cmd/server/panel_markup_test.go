@@ -147,15 +147,21 @@ func TestDPPBodyPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
+		`class="page-header-head"`,
+		`class="page-header-subtitle"`,
+		`class="dpp-page-header-copy"`,
+		`class="dpp-ids"`,
+		"<h1>",
+		"Demo workflow",
+		"Digital Product Passport",
+		`class="page-header-actions"`,
 		`class="panel"`,
-		`class="dpp-overview"`,
-		`class="panel-head-actions"`,
-		`class="panel-heading"`,
-		"<h2>Demo workflow</h2>",
 		`class="btn btn-primary js-share-link"`,
 		"Share DPP link",
-		"GTIN: 09506000134352",
-		"Serial: SN1",
+		"GTIN",
+		"09506000134352",
+		"Serial",
+		"SN1",
 		`class="dpp-history"`,
 		"<h2>History</h2>",
 		`class="dpp-integrity"`,
@@ -166,20 +172,36 @@ func TestDPPBodyPanelMarkup(t *testing.T) {
 		}
 	}
 
-	overviewIdx := strings.Index(body, `class="dpp-overview"`)
-	headIdx := strings.Index(body, `class="panel-head-actions"`)
-	headingIdx := strings.Index(body, `class="panel-heading"`)
+	if strings.Contains(body, `class="panel-head-actions"`) {
+		t.Fatalf("dpp share action must not use panel-head-actions, got:\n%s", body)
+	}
+	if strings.Contains(body, `class="dpp-overview"`) {
+		t.Fatalf("dpp ids must live in page header, not dpp-overview, got:\n%s", body)
+	}
+	if strings.Contains(body, `class="page-header-titles"`) {
+		t.Fatalf("page-header subtitle must be a span inside h1, not page-header-titles, got:\n%s", body)
+	}
+	if strings.Contains(body, "<h2>Demo workflow</h2>") {
+		t.Fatalf("workflow title must live in page header, not overview h2, got:\n%s", body)
+	}
+
+	titleIdx := strings.Index(body, "Demo workflow")
+	subtitleIdx := strings.Index(body, `class="page-header-subtitle"`)
+	copyIdx := strings.Index(body, `class="dpp-page-header-copy"`)
+	descIdx := strings.Index(body, "GS1 Digital Link landing page")
+	idsIdx := strings.Index(body, `class="dpp-ids"`)
+	headerActionsIdx := strings.Index(body, `class="page-header-actions"`)
 	btnIdx := strings.Index(body, `class="btn btn-primary js-share-link"`)
 	historyIdx := strings.Index(body, `class="dpp-history"`)
 	integrityIdx := strings.Index(body, `class="dpp-integrity"`)
-	if overviewIdx == -1 || headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
-		t.Fatal("expected dpp-overview, panel-head-actions, panel-heading, and action button")
+	if titleIdx == -1 || subtitleIdx == -1 || copyIdx == -1 || descIdx == -1 || idsIdx == -1 || headerActionsIdx == -1 || btnIdx == -1 {
+		t.Fatal("expected page-header title, copy (description + ids), and share button")
 	}
-	if !(overviewIdx < headIdx && headIdx < headingIdx && headingIdx < btnIdx) {
-		t.Fatalf("expected panel-heading before action button inside panel-head-actions block")
+	if !(titleIdx < subtitleIdx && subtitleIdx < copyIdx && copyIdx < descIdx && descIdx < idsIdx && idsIdx < headerActionsIdx && headerActionsIdx < btnIdx) {
+		t.Fatalf("expected title, then copy (description then ids), then page-header-actions")
 	}
-	if historyIdx == -1 || integrityIdx == -1 || !(overviewIdx < historyIdx && historyIdx < integrityIdx) {
-		t.Fatalf("expected dpp-overview, then dpp-history, then dpp-integrity section wrappers")
+	if historyIdx == -1 || integrityIdx == -1 || !(btnIdx < historyIdx && historyIdx < integrityIdx) {
+		t.Fatalf("expected page header, then dpp-history, then dpp-integrity")
 	}
 }
 
@@ -241,8 +263,9 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		`class="sidebar-nav"`,
 		`class="sidebar-nav-link is-active"`,
 		`class="sidebar-nav-title"`,
-		`class="panel-head-actions"`,
-		`class="panel-actions"`,
+		`class="page-header-head"`,
+		`class="page-header-actions"`,
+		`class="panel-heading"`,
 		"<h2>Stream instances</h2>",
 		"View and manage all instances of this stream",
 		"View preview",
@@ -253,15 +276,20 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		}
 	}
 
-	sidebarIdx := strings.Index(body, `class="panel panel-sticky"`)
-	headIdx := strings.Index(body, `class="panel-head-actions"`)
-	actionsIdx := strings.Index(body, `class="panel-actions"`)
-	headingIdx := strings.Index(body, "<h2>Stream instances</h2>")
-	if sidebarIdx == -1 || headIdx == -1 || actionsIdx == -1 || headingIdx == -1 {
-		t.Fatal("expected sidebar panel, panel-head-actions, panel-actions, and stream instances heading")
+	if strings.Contains(body, `class="panel-head-actions"`) {
+		t.Fatalf("stream page header actions must not use panel-head-actions, got:\n%s", body)
 	}
-	if !(sidebarIdx < headIdx && headIdx < headingIdx && headingIdx < actionsIdx) {
-		t.Fatalf("expected sidebar before instances header; panel-heading before panel-actions inside panel-head-actions")
+
+	headerActionsIdx := strings.Index(body, `class="page-header-actions"`)
+	previewIdx := strings.Index(body, "View preview")
+	newIdx := strings.Index(body, "New instance")
+	headingIdx := strings.Index(body, "<h2>Stream instances</h2>")
+	sidebarIdx := strings.Index(body, `class="panel panel-sticky"`)
+	if headerActionsIdx == -1 || previewIdx == -1 || newIdx == -1 || headingIdx == -1 || sidebarIdx == -1 {
+		t.Fatal("expected page-header-actions, preview/new buttons, stream instances heading, and sidebar panel")
+	}
+	if !(headerActionsIdx < previewIdx && previewIdx < newIdx && newIdx < sidebarIdx && sidebarIdx < headingIdx) {
+		t.Fatalf("expected page-header-actions (with View preview / New instance) before sidebar and Stream instances heading")
 	}
 
 	railIdx := strings.Index(body, `class="rail-layout rail-layout-ready"`)
