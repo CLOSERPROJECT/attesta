@@ -262,6 +262,8 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
 		`class="stream-status-filter-nav"`,
+		`class="stream-status-filter-select"`,
+		`data-home-filter-select`,
 		`class="stream-status-filter-option is-active"`,
 		`class="status-tag status-tag-compact"`,
 		`data-stream-status="all"`,

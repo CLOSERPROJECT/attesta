@@ -119,6 +119,8 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		}
 	}
 	if !strings.Contains(compactBody, `aria-labelledby="stream-status-filter-label"`) ||
+		!strings.Contains(compactBody, `data-home-filter-select`) ||
+		!strings.Contains(compactBody, `class="stream-status-filter-select"`) ||
 		!strings.Contains(compactBody, `Filter by status`) {
 		t.Fatalf("expected stream status filter label, got: %s", body)
 	}

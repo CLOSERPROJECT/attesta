@@ -148,7 +148,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `data-stream-status` | `status_tag` micro-partial; `stream.html` section heads | `role-palette.css` (`--stream-color`) |
 | `data-progress` (via `style="--progress: …"`) | `components/stream_instance_card.html` | `.stream-instance-card-progress-fill` in `components/stream-instance-card.css` |
 | `data-org-admin-nav`, `data-org-admin-panel`, `data-org-admin-default-panel`, `data-org-admin-ready` | `org_admin.html` | `pages/org-admin-page.css`, inline script in `org_admin.html` |
-| `data-home-nav`, `data-home-panel` | `stream.html` | inline script in `stream.html` (panel switching + `?filter=` / `?sort=` / `?page=` sync) |
+| `data-home-nav`, `data-home-panel`, `data-home-filter-select` | `stream.html` | inline script in `stream.html` (panel switching + `?filter=` / `?sort=` / `?page=` sync; select is `--md-down` twin of filter nav) |
 | `data-process-id`, `data-workflow-key`, `data-selected-substep`, `data-substep-id` | `process.html` | `main.js` (SSE refresh, accordion) |
 | `data-formata-*`, `data-active-role-*` | `components/substep_body.html` | `main.js` (Formata embed, role picker) |
 | `data-override-url` | `components/substep_body.html` | `main.js` (substep override editor) |
