@@ -16,7 +16,10 @@ func TestStreamPageNewInstanceDialogMarkup(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		ProcessGroups: testHomeProcessGroups(),
+		StatusFilter:  "all",
+		Sort:          "time_desc",
+		FilterOptions: testHomeFilterOptions(),
+		ProcessGroups: testHomeActiveProcessGroups(nil, "all", "time_desc", 1),
 	}
 	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
 		t.Fatalf("render home_body: %v", err)
@@ -175,7 +178,10 @@ func TestStreamPreviewDialogPageScopedMarkup(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		ProcessGroups: testHomeProcessGroups(),
+		StatusFilter:  "all",
+		Sort:          "time_desc",
+		FilterOptions: testHomeFilterOptions(),
+		ProcessGroups: testHomeActiveProcessGroups(nil, "all", "time_desc", 1),
 	}
 	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
 		t.Fatalf("render home_body: %v", err)

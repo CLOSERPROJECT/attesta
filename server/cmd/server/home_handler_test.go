@@ -1275,6 +1275,239 @@ func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
 	}
 }
 
+func TestHandleWorkflowHomeHTMXReturnsPartial(t *testing.T) {
+	store := NewMemoryStore()
+	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+
+	activeID := primitive.NewObjectID()
+	active := Process{
+		ID:          activeID,
+		WorkflowKey: "workflow",
+		Name:        "Pilot batch",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		Status:      "",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-110 * time.Minute))},
+			"1_2": {State: "done", DoneAt: ptrTime(now.Add(-100 * time.Minute)), Data: map[string]interface{}{"note": "alpha"}},
+			"1_3": {State: "pending"},
+			"2_1": {State: "pending"},
+			"2_2": {State: "pending"},
+			"3_1": {State: "pending"},
+			"3_2": {State: "pending"},
+		},
+	}
+
+	doneID := primitive.NewObjectID()
+	done := Process{
+		ID:          doneID,
+		WorkflowKey: "workflow",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-70 * time.Minute))},
+			"1_2": {State: "done", DoneAt: ptrTime(now.Add(-60 * time.Minute))},
+			"1_3": {State: "done", DoneAt: ptrTime(now.Add(-50 * time.Minute))},
+			"2_1": {State: "done", DoneAt: ptrTime(now.Add(-40 * time.Minute))},
+			"2_2": {State: "done", DoneAt: ptrTime(now.Add(-30 * time.Minute))},
+			"3_1": {State: "done", DoneAt: ptrTime(now.Add(-20 * time.Minute))},
+			"3_2": {State: "done", DoneAt: ptrTime(now.Add(-10 * time.Minute))},
+		},
+	}
+
+	store.SeedProcess(active)
+	store.SeedProcess(done)
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			cfg := testRuntimeConfig()
+			cfg.Workflow.Description = "Demo workflow description"
+			return cfg, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req.Header.Set("HX-Request", "true")
+	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "workflow",
+		Cfg: testRuntimeConfig(),
+	}))
+	rec := httptest.NewRecorder()
+	server.handleWorkflowHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="stream-dashboard-results"`) {
+		t.Fatalf("expected HTMX results root, got %q", body)
+	}
+	if strings.Contains(body, "data-home-root") {
+		t.Fatalf("did not expect full page chrome in HTMX partial, got %q", body)
+	}
+	if !strings.Contains(body, "PROC 2 SORT time_desc FILTER all") {
+		t.Fatalf("expected active process list in partial, got %q", body)
+	}
+	if !strings.Contains(body, activeID.Hex()+":Pilot batch:available:28") {
+		t.Fatalf("expected process in HTMX partial, got %q", body)
+	}
+}
+
+func TestHandleWorkflowHomeHTMXFiltersAndPaginates(t *testing.T) {
+	store := NewMemoryStore()
+	base := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+
+	activeID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          activeID,
+		WorkflowKey: "workflow",
+		CreatedAt:   base.Add(-2 * time.Hour),
+		Status:      "active",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(base.Add(-110 * time.Minute))},
+		},
+	})
+
+	doneID := primitive.NewObjectID()
+	store.SeedProcess(Process{
+		ID:          doneID,
+		WorkflowKey: "workflow",
+		CreatedAt:   base.Add(-1 * time.Hour),
+		Status:      "done",
+		Progress: map[string]ProcessStep{
+			"1_1": {State: "done", DoneAt: ptrTime(base.Add(-70 * time.Minute))},
+			"1_2": {State: "done", DoneAt: ptrTime(base.Add(-60 * time.Minute))},
+			"1_3": {State: "done", DoneAt: ptrTime(base.Add(-50 * time.Minute))},
+			"2_1": {State: "done", DoneAt: ptrTime(base.Add(-40 * time.Minute))},
+			"2_2": {State: "done", DoneAt: ptrTime(base.Add(-30 * time.Minute))},
+			"3_1": {State: "done", DoneAt: ptrTime(base.Add(-20 * time.Minute))},
+			"3_2": {State: "done", DoneAt: ptrTime(base.Add(-10 * time.Minute))},
+		},
+	})
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		tmpl:       homeTestTemplates(),
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	t.Run("filter", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+		req.Header.Set("HX-Request", "true")
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+		rec := httptest.NewRecorder()
+		server.handleWorkflowHome(rec, req)
+
+		body := rec.Body.String()
+		if !strings.Contains(body, "PROC 1 SORT time_desc FILTER done") {
+			t.Fatalf("expected done filter in HTMX partial, got %q", body)
+		}
+		if !strings.Contains(body, doneID.Hex()+"::done:100") {
+			t.Fatalf("expected done process in HTMX partial, got %q", body)
+		}
+		if strings.Contains(body, activeID.Hex()+"::active") {
+			t.Fatalf("did not expect active process in done HTMX partial, got %q", body)
+		}
+	})
+
+	t.Run("page", func(t *testing.T) {
+		pageStore := NewMemoryStore()
+		pageBase := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
+		expectedPageTwoID := ""
+		for i := 0; i < homeProcessesPerPage+1; i++ {
+			processID := primitive.NewObjectID()
+			if i == homeProcessesPerPage {
+				expectedPageTwoID = processID.Hex()
+			}
+			pageStore.SeedProcess(Process{
+				ID:          processID,
+				WorkflowKey: "workflow",
+				CreatedAt:   pageBase.Add(-time.Duration(i) * time.Minute),
+				Status:      "active",
+				Progress: map[string]ProcessStep{
+					"1_1": {State: "done", DoneAt: ptrTime(pageBase.Add(-time.Duration(i) * time.Minute))},
+				},
+			})
+		}
+		pageServer := &Server{
+			authorizer: fakeAuthorizer{},
+			store:      pageStore,
+			tmpl:       homeTestTemplates(),
+			configProvider: func() (RuntimeConfig, error) {
+				return testRuntimeConfig(), nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/w/workflow/?page=2", nil)
+		req.Header.Set("HX-Request", "true")
+		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
+			Key: "workflow",
+			Cfg: testRuntimeConfig(),
+		}))
+		rec := httptest.NewRecorder()
+		pageServer.handleWorkflowHome(rec, req)
+
+		body := rec.Body.String()
+		if !strings.Contains(body, "PROC 1 SORT time_desc FILTER all PAGE 2/2") {
+			t.Fatalf("expected paginated all filter in HTMX partial, got %q", body)
+		}
+		if !strings.Contains(body, expectedPageTwoID+"::available") {
+			t.Fatalf("expected last process on page 2, got %q", body)
+		}
+	})
+}
+
+func TestBuildHomeFilterOptionsIncludesAllStatuses(t *testing.T) {
+	options := buildHomeFilterOptions([]StreamInstanceCard{
+		{ID: "1", Status: "active"},
+		{ID: "2", Status: "done"},
+		{ID: "3", Status: "available"},
+	})
+	if len(options) != len(homeProcessStatuses()) {
+		t.Fatalf("expected %d filter options, got %d", len(homeProcessStatuses()), len(options))
+	}
+	for _, option := range options {
+		if len(option.Processes) != 0 {
+			t.Fatalf("expected empty processes on filter option %q, got %d", option.Status, len(option.Processes))
+		}
+		if option.PanelID == "" || option.NavAriaLabel == "" || option.NavTitle == "" {
+			t.Fatalf("expected nav metadata on filter option %q, got %#v", option.Status, option)
+		}
+	}
+	var allOption *ProcessStatusGroup
+	for i := range options {
+		if options[i].Status == "all" {
+			allOption = &options[i]
+			break
+		}
+	}
+	if allOption == nil || allOption.TotalCount != 3 {
+		t.Fatalf("expected all filter count 3, got %#v", allOption)
+	}
+}
+
+func TestBuildHomeActiveProcessGroupBuildsSingleStatus(t *testing.T) {
+	group := buildHomeActiveProcessGroup("/w/workflow", []StreamInstanceCard{
+		{ID: "1", Status: "active"},
+		{ID: "2", Status: "done"},
+	}, "done", "time_desc", 1)
+	if group.Status != "done" {
+		t.Fatalf("expected done group, got %q", group.Status)
+	}
+	if len(group.Processes) != 1 || group.Processes[0].ID != "2" {
+		t.Fatalf("expected one done process, got %#v", group.Processes)
+	}
+}
+
 func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
@@ -1283,6 +1516,12 @@ func homeTestTemplates() *template.Template {
 PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}{{ end }}{{ end }}
 {{end}}
 {{define "stream.html"}}{{template "layout.html" .}}{{end}}
+{{define "stream_dashboard_results"}}
+<div id="stream-dashboard-results">
+{{ $filter := .StatusFilter }}{{ range .ProcessGroups }}{{ if eq .Status $filter }}PROC {{len .Processes}} SORT {{.Sort}} FILTER {{$filter}} PAGE {{.CurrentPage}}/{{.TotalPages}}
+PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}{{ end }}{{ end }}
+</div>
+{{end}}
 `))
 }
 

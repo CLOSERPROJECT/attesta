@@ -6,6 +6,20 @@ import (
 	"testing"
 )
 
+func testHomeFilterOptions(items ...StreamInstanceCard) []ProcessStatusGroup {
+	return buildHomeFilterOptions(items)
+}
+
+func testHomeActiveProcessGroups(items []StreamInstanceCard, statusFilter, sortKey string, page int) []ProcessStatusGroup {
+	if sortKey == "" {
+		sortKey = "time_desc"
+	}
+	if statusFilter == "" {
+		statusFilter = "all"
+	}
+	return []ProcessStatusGroup{buildHomeActiveProcessGroup("/w/workflow", items, statusFilter, sortKey, page)}
+}
+
 func testHomeProcessGroups(items ...StreamInstanceCard) []ProcessStatusGroup {
 	byStatus := map[string][]StreamInstanceCard{}
 	for _, item := range items {
@@ -56,6 +70,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	process := StreamInstanceCard{ID: "process-1", Name: "Pilot batch", Status: "active", DetailHref: "/w/workflow/process/process-1", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}
+	items := []StreamInstanceCard{process}
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
@@ -64,7 +79,9 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		},
 		WorkflowDescription: "Previewable workflow",
 		StatusFilter:        "all",
-		ProcessGroups:       testHomeProcessGroups(process),
+		Sort:                "time_desc",
+		FilterOptions:       testHomeFilterOptions(items...),
+		ProcessGroups:       testHomeActiveProcessGroups(items, "all", "time_desc", 1),
 		Preview: StreamInstanceDetailView{
 			HideStatus: true,
 			Timeline: []TimelineStep{
@@ -103,19 +120,18 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, marker := range []string{
-		`data-home-nav="all"`,
-		`data-home-nav="available"`,
-		`data-home-nav="active"`,
-		`data-home-nav="done"`,
-		`data-home-nav="terminated"`,
-		`data-home-nav="preview"`,
+		`id="stream-dashboard-results"`,
+		`hx-get="/w/workflow/"`,
+		`filter=available`,
+		`filter=active`,
+		`filter=done`,
+		`filter=terminated`,
 		`id="stream-preview-dialog"`,
 		`class="dialog-card"`,
 		`class="stream-preview-body"`,
 		`id="new-instance-dialog"`,
 		`name="name"`,
 		`Pilot batch`,
-		`data-home-root`,
 		`data-formata-disabled="true"`,
 		`Preview only. Start an instance to submit data.`,
 	} {
@@ -124,23 +140,17 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		}
 	}
 	if !strings.Contains(compactBody, `aria-labelledby="stream-status-filter-label"`) ||
-		!strings.Contains(compactBody, `data-home-filter-select`) ||
 		!strings.Contains(compactBody, `class="stream-status-filter-select"`) ||
 		!strings.Contains(compactBody, `Filter by status`) {
 		t.Fatalf("expected stream status filter label, got: %s", body)
 	}
 	for _, marker := range []string{
-		`id="stream-section-all" data-home-panel="all"`,
-		`id="stream-section-available" data-home-panel="available" hidden`,
-		`id="stream-section-active" data-home-panel="active" hidden`,
-		`id="stream-section-done" data-home-panel="done" hidden`,
-		`id="stream-section-terminated" data-home-panel="terminated" hidden`,
-		`panels.forEach((panel)`,
-		`panel.hidden = currentName !== panelName`,
-		`url.searchParams.set("filter", panelName)`,
+		`id="stream-section-all"`,
+		`class="stream-status-filter-option is-active"`,
+		`hx-target="#stream-dashboard-results"`,
 	} {
 		if !strings.Contains(compactBody, marker) {
-			t.Fatalf("expected single visible stream status marker %q, got: %s", marker, body)
+			t.Fatalf("expected stream dashboard HTMX marker %q, got: %s", marker, body)
 		}
 	}
 	if strings.Contains(body, `scrollIntoView`) {
@@ -169,7 +179,9 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 		},
 		WorkflowDescription: "Previewable workflow",
 		StatusFilter:        "all",
-		ProcessGroups:       testHomeProcessGroups(),
+		Sort:                "time_desc",
+		FilterOptions:       testHomeFilterOptions(),
+		ProcessGroups:       testHomeActiveProcessGroups(nil, "all", "time_desc", 1),
 	}
 
 	var out bytes.Buffer
@@ -181,14 +193,14 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 
 	for _, marker := range []string{
 		`No instances`,
-		`No available instances`,
-		`No active instances`,
-		`No completed instances`,
-		`No terminated instances`,
 	} {
 		if !strings.Contains(compactBody, marker) {
 			t.Fatalf("expected empty status marker %q, got: %s", marker, body)
 		}
+	}
+	if !strings.Contains(compactBody, `filter=available`) ||
+		!strings.Contains(compactBody, `filter=done`) {
+		t.Fatalf("expected filter nav links for all statuses, got: %s", body)
 	}
 }
 
@@ -203,46 +215,10 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 		},
 		Sort:         "status",
 		StatusFilter: "active",
+		FilterOptions: buildHomeFilterOptions([]StreamInstanceCard{
+			{ID: "process-13", Status: "active"},
+		}),
 		ProcessGroups: []ProcessStatusGroup{
-			{
-				Status:              "all",
-				Label:               "All",
-				NavAriaLabel:        "All streams",
-				NavTitle:            "All stream instances",
-				Heading:             "All stream instances",
-				EmptyMessage:        "No instances",
-				PaginationAriaLabel: "All stream instances pagination",
-				PanelID:             "stream-section-all",
-				TotalCount:          0,
-				Sort:                "status",
-				CurrentPage:         1,
-				TotalPages:          1,
-				PageNumbers:         []int{1},
-				PageLinks:           []PaginationLink{{Page: 1, URL: "/w/workflow/?sort=status", IsCurrent: true}},
-				PreviousURL:         "/w/workflow/?sort=status",
-				NextURL:             "/w/workflow/?sort=status",
-				Processes:           nil,
-			},
-			{
-				Status:              "available",
-				Label:               "Available",
-				NavAriaLabel:        "Available streams",
-				NavTitle:            "Streams waiting for your input",
-				Heading:             "Available stream instances",
-				EmptyMessage:        "No available instances",
-				PaginationAriaLabel: "Available stream instances pagination",
-				PanelID:             "stream-section-available",
-				TotalCount:          0,
-				Sort:                "status",
-				SortFields:          []QueryInput{{Name: "filter", Value: "available"}},
-				CurrentPage:         1,
-				TotalPages:          1,
-				PageNumbers:         []int{1},
-				PageLinks:           []PaginationLink{{Page: 1, URL: "/w/workflow/?filter=available&sort=status", IsCurrent: true}},
-				PreviousURL:         "/w/workflow/?filter=available&sort=status",
-				NextURL:             "/w/workflow/?filter=available&sort=status",
-				Processes:           nil,
-			},
 			{
 				Status:              "active",
 				Label:               "Active",
@@ -314,6 +290,9 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	if strings.Contains(compactBody, `#stream-section-`) {
 		t.Fatalf("did not expect hash anchors on pagination links, got: %s", body)
 	}
+	if !strings.Contains(compactBody, `hx-get="/w/workflow/?filter=active&amp;page=3&amp;sort=status"`) {
+		t.Fatalf("expected HTMX pagination link, got: %s", body)
+	}
 }
 
 func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
@@ -326,7 +305,7 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 			WorkflowName: "Demo workflow",
 		},
 		StatusFilter: "all",
-		ProcessGroups: testHomeProcessGroups(StreamInstanceCard{
+		FilterOptions: testHomeFilterOptions(StreamInstanceCard{
 			ID:            "process-1",
 			Status:        "available",
 			DetailHref:    "/w/workflow/process/process-1",
@@ -335,6 +314,17 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 			TotalSubsteps: 4,
 			CreatedAt:     "1 Mar 2026 at 10:00 UTC",
 		}),
+		ProcessGroups: testHomeActiveProcessGroups([]StreamInstanceCard{
+			{
+				ID:            "process-1",
+				Status:        "available",
+				DetailHref:    "/w/workflow/process/process-1",
+				Percent:       25,
+				DoneSubsteps:  1,
+				TotalSubsteps: 4,
+				CreatedAt:     "1 Mar 2026 at 10:00 UTC",
+			},
+		}, "all", "time_desc", 1),
 	}
 
 	var out bytes.Buffer

@@ -251,7 +251,9 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 			WorkflowName: "Demo workflow",
 		},
 		StatusFilter:  "all",
-		ProcessGroups: testHomeProcessGroups(),
+		Sort:          "time_desc",
+		FilterOptions: testHomeFilterOptions(),
+		ProcessGroups: testHomeActiveProcessGroups(nil, "all", "time_desc", 1),
 	}
 	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
 		t.Fatalf("render home_body: %v", err)
@@ -259,11 +261,11 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
+		`id="stream-dashboard-results"`,
 		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
 		`class="stream-status-filter-nav"`,
 		`class="stream-status-filter-select"`,
-		`data-home-filter-select`,
 		`class="stream-status-filter-option is-active"`,
 		`class="status-tag status-tag-compact"`,
 		`data-stream-status="all"`,
@@ -315,9 +317,9 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	}
 
 	mainStart := strings.Index(body, `class="rail-layout-main home-workflow-panel-main"`)
-	mainEnd := strings.Index(body, `class="stream-status-sections"`)
+	mainEnd := strings.Index(body, `class="stream-status-section"`)
 	if mainStart == -1 || mainEnd == -1 || mainStart >= mainEnd {
-		t.Fatal("expected rail-layout-main wrapping stream status sections")
+		t.Fatal("expected rail-layout-main wrapping stream status section")
 	}
 	mainBlock := body[mainStart:mainEnd]
 	if strings.Contains(mainBlock, `<section class="panel"`) || strings.Contains(mainBlock, `<section class="panel `) {
