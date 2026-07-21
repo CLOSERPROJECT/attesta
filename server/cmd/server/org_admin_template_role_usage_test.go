@@ -10,11 +10,6 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
-		Header: PageHeaderView{
-			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members",
-			BackHref:    "/",
-		},
 		RoleRows: []OrgAdminRoleRow{
 			{
 				Slug:    "approver",

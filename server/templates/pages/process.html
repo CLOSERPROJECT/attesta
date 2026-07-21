@@ -12,7 +12,26 @@
 {{ end }} {{ define "process_content.html" }} {{ template "error_banner.html"
 .Detail }}
 <div class="stack">
-  {{ template "page_header" .Header }} {{ if .Detail.ProcessDone }}
+  <section class="page-header">
+    {{ template "page_header_back" (printf "/w/%s/" .WorkflowKey) }}
+    <div class="page-header-body">
+      {{ if .InstanceName }}
+        <div class="page-header-titles">
+          <h1>{{ .WorkflowName }}</h1>
+          <h1 aria-hidden="true">-</h1>
+          <h1 class="page-header-subtitle">{{ .InstanceName }}</h1>
+        </div>
+      {{ else }}
+        <h1>{{ .WorkflowName }}</h1>
+      {{ end }}
+      {{ if .ProcessID }}
+        <p class="page-header-meta">
+          <span class="page-header-meta-id">{{ .ProcessID }}</span>
+        </p>
+      {{ end }}
+    </div>
+  </section>
+  {{ if .Detail.ProcessDone }}
   <div class="process-resources-grid">
     <div class="process-steps-column stack u-gap-4">
       {{ if .Detail.Termination }}

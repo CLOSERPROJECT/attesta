@@ -10,11 +10,6 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
-		Header: PageHeaderView{
-			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members",
-			BackHref:    "/",
-		},
 		Organization: Organization{Name: "Acme Org", Slug: "acme-org"},
 		RoleRows: []OrgAdminRoleRow{
 			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", InUse: false},
@@ -81,11 +76,6 @@ func TestPlatformAdminListRowMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := PlatformAdminView{
-		Header: PageHeaderView{
-			Title:       "Platform admin dashboard",
-			Description: "Create and manage organizations",
-			BackHref:    "/",
-		},
 		Organizations: []PlatformAdminOrganizationRow{
 			{
 				Name:                    "Accepted Org",

@@ -302,7 +302,6 @@ type PublicCatalogRole struct {
 
 type WorkflowPickerView struct {
 	PageBase
-	Header               PageHeaderView
 	Workflows            []StreamCardView
 	ShowCreateStreamCard bool
 	Error                string
@@ -348,7 +347,6 @@ type ProcessStatusGroup struct {
 
 type HomeView struct {
 	PageBase
-	Header              PageHeaderView
 	WorkflowDescription string
 	Error               string
 	CanStartProcess     bool
@@ -413,7 +411,6 @@ type AboutView struct {
 
 type PlatformAdminView struct {
 	PageBase
-	Header                   PageHeaderView
 	SearchQuery              string
 	CurrentPage              int
 	TotalPages               int
@@ -458,7 +455,6 @@ type PlatformAdminErrors struct {
 
 type OrgAdminView struct {
 	PageBase
-	Header                 PageHeaderView
 	ActivePanel            string
 	Organization           Organization
 	OrganizationLogoURL    string
@@ -550,7 +546,6 @@ func (e *WorkflowRefValidationError) Error() string {
 
 type ProcessPageView struct {
 	PageBase
-	Header       PageHeaderView
 	ProcessID    string
 	InstanceName string
 	Status       string
@@ -569,7 +564,6 @@ type ProcessDownloadAttachment struct {
 
 type DPPPageView struct {
 	PageBase
-	Header       PageHeaderView
 	ProcessID    string
 	DigitalLink  string
 	GTIN         string
@@ -2024,11 +2018,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := HomeWorkflowPickerView{
 		WorkflowPickerView: WorkflowPickerView{
-			PageBase: s.pageBaseForUser(user, "home_picker_body", "", ""),
-			Header: PageHeaderView{
-				Title:       "Choose a stream",
-				Description: "Select a stream to start or continue process tracking",
-			},
+			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
 			Workflows:            options,
 			ShowCreateStreamCard: showCreateStreamCard,
 			Error:                homePickerMessage(r, "error"),
@@ -3320,11 +3310,6 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
 		PageBase: s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		Header: PageHeaderView{
-			Title:       "Platform admin dashboard",
-			Description: "Create and manage organizations",
-			BackHref:    "/",
-		},
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
 		TotalPages:               totalPages,
@@ -3801,11 +3786,6 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
 		view := OrgAdminView{
 			PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
-			Header: PageHeaderView{
-				Title:       "Organization admin dashboard",
-				Description: "Manage organization settings, roles, and members",
-				BackHref:    "/",
-			},
 			ActivePanel:            activePanel,
 			NeedsOrganizationSetup: true,
 			OrganizationError:      errs.Organization,
@@ -3838,11 +3818,6 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 
 	view := OrgAdminView{
 		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
-		Header: PageHeaderView{
-			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members",
-			BackHref:    "/",
-		},
 		ActivePanel:            activePanel,
 		Organization:           org,
 		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
@@ -4869,11 +4844,6 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 
 	view := HomeView{
 		PageBase: s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
-		Header: PageHeaderView{
-			Title:       cfg.Workflow.Name,
-			Description: strings.TrimSpace(cfg.Workflow.Description),
-			BackHref:    "/",
-		},
 		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
 		Error:               workflowError,
 		CanStartProcess:     workflowError == "",
@@ -5090,19 +5060,8 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		instanceName = strings.TrimSpace(process.Name)
 		status = deriveProcessStatus(cfg.Workflow, process)
 	}
-	header := PageHeaderView{
-		Title:    cfg.Workflow.Name,
-		BackHref: workflowPath(workflowKey) + "/",
-	}
-	if instanceName != "" {
-		header.Subtitle = instanceName
-	}
-	if processID != "" {
-		header.Meta = processID
-	}
 	return ProcessPageView{
 		PageBase:     pageBase,
-		Header:       header,
 		ProcessID:    processID,
 		InstanceName: instanceName,
 		Status:       status,
@@ -5259,10 +5218,6 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
 		PageBase: s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
-		Header: PageHeaderView{
-			Title:       "Digital Product Passport",
-			Description: "GS1 Digital Link landing page for product and stream traceability",
-		},
 		ProcessID:    process.ID.Hex(),
 		DigitalLink:  link,
 		GTIN:         gtin,

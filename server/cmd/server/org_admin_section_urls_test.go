@@ -187,10 +187,6 @@ func assertOrgAdminActivePanel(t *testing.T, body, panel string) {
 func TestOrgAdminActivePanelTemplateRendering(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	base := OrgAdminView{
-		Header: PageHeaderView{
-			Title:    "Organization admin dashboard",
-			BackHref: "/",
-		},
 		Organization: Organization{Name: "Acme Org", Slug: "acme"},
 	}
 

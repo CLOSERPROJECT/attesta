@@ -16,11 +16,6 @@ func TestStreamPageNewInstanceDialogMarkup(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		Header: PageHeaderView{
-			Title:       "Demo workflow",
-			Description: "Previewable workflow",
-			BackHref:    "/",
-		},
 		ProcessGroups: testHomeProcessGroups(),
 	}
 	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
@@ -70,11 +65,6 @@ func TestPlatformAdminCreateOrgDialogMarkup(t *testing.T) {
 
 	var out bytes.Buffer
 	view := PlatformAdminView{
-		Header: PageHeaderView{
-			Title:       "Platform admin dashboard",
-			Description: "Create and manage organizations",
-			BackHref:    "/",
-		},
 	}
 	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
 		t.Fatalf("render platform_admin_body: %v", err)
@@ -184,11 +174,6 @@ func TestStreamPreviewDialogPageScopedMarkup(t *testing.T) {
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
-		},
-		Header: PageHeaderView{
-			Title:       "Demo workflow",
-			Description: "Previewable workflow",
-			BackHref:    "/",
 		},
 		ProcessGroups: testHomeProcessGroups(),
 	}

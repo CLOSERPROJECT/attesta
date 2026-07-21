@@ -59,7 +59,8 @@ func TestProcessDPPPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="panel dpp-downloads-section"`,
+		`class="panel"`,
+		`id="process-dpp"`,
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Digital Product Passport</h2>",
@@ -126,10 +127,6 @@ func TestDPPBodyPanelMarkup(t *testing.T) {
 
 	var out bytes.Buffer
 	view := DPPPageView{
-		Header: PageHeaderView{
-			Title:    "Demo workflow",
-			BackHref: "/",
-		},
 		DigitalLink: "https://example.com/01/09506000134352/10/LOT1/21/SN1",
 		GTIN:        "09506000134352",
 		Lot:         "LOT1",
@@ -191,11 +188,6 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 
 	var out bytes.Buffer
 	view := PlatformAdminView{
-		Header: PageHeaderView{
-			Title:       "Platform admin dashboard",
-			Description: "Create and manage organizations",
-			BackHref:    "/",
-		},
 	}
 	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
 		t.Fatalf("render platform_admin_body: %v", err)
@@ -235,11 +227,6 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
-		},
-		Header: PageHeaderView{
-			Title:       "Demo workflow",
-			Description: "Previewable workflow",
-			BackHref:    "/",
 		},
 		ProcessGroups: testHomeProcessGroups(),
 	}
@@ -297,11 +284,6 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
-		Header: PageHeaderView{
-			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members",
-			BackHref:    "/",
-		},
 		Organization: Organization{
 			Name: "Acme Org",
 			Slug: "acme-org",

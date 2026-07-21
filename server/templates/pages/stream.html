@@ -2,7 +2,15 @@
 
 {{ define "home_body" }}
   <div class="stack u-max-w-7xl u-mx-auto">
-    {{ template "page_header" .Header }}
+    <section class="page-header">
+      {{ template "page_header_back" "/" }}
+      <div class="page-header-body">
+        <h1>{{ .WorkflowName }}</h1>
+        {{ if .WorkflowDescription }}
+          <p>{{ .WorkflowDescription }}</p>
+        {{ end }}
+      </div>
+    </section>
     {{ if .Error }}
       <div class="error error--rich">
         <h3>Stream configuration issue</h3>

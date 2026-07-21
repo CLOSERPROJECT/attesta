@@ -10,11 +10,6 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
-		Header: PageHeaderView{
-			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members",
-			BackHref:    "/",
-		},
 		Roles: []Role{
 			{Slug: "org-admin", Name: "Org Admin"},
 			{Slug: "qa-reviewer", Name: "QA Reviewer"},
@@ -92,11 +87,6 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	view := OrgAdminView{
-		Header: PageHeaderView{
-			Title:       "Organization admin dashboard",
-			Description: "Manage organization settings, roles, and members",
-			BackHref:    "/",
-		},
 		InviteLink: "/invite/token-pending",
 	}
 

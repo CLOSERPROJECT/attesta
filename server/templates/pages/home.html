@@ -2,7 +2,12 @@
 
 {{ define "home_picker_body" }}
   <section class="stack u-max-w-7xl u-mx-auto">
-    {{ template "page_header" .Header }}
+    <section class="page-header">
+      <div class="page-header-body">
+        <h1>Choose a stream</h1>
+        <p>Select a stream to start or continue process tracking</p>
+      </div>
+    </section>
     {{ if .Confirmation }}
       <p class="confirmation">{{ .Confirmation }}</p>
     {{ end }}

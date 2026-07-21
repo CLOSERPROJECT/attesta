@@ -1,3 +1,14 @@
+/*
+ * Page header — page title chrome (CSS-only component).
+ *
+ *   section.page-header
+ *     a.page-header-back?            (from template page_header_back; href via pipeline)
+ *     div.page-header-body
+ *       h1 | div.page-header-titles  (titles row: h1 + optional h1.page-header-subtitle)
+ *       p?                           (description)
+ *       p.page-header-meta?          (meta line; span.page-header-meta-id)
+ */
+
 .page-header {
   width: 100%;
   padding: var(--space-5) 0;
@@ -6,6 +17,7 @@
   align-items: start;
   gap: var(--space-3);
 }
+
 
 .page-header-back {
   display: inline-flex;
