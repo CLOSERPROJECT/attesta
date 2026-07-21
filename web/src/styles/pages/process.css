@@ -32,7 +32,7 @@
 }
 
 #process-downloads .field-block:has(.process-attachments-list) > .field-label {
-  margin-bottom: var(--space-0.5);
+  margin-bottom: var(--space-px);
 }
 
 .process-attachments-list {

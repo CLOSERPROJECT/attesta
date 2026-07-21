@@ -176,6 +176,7 @@
   .stream-status-filter-select selectedcontent .status-tag {
     padding-block: 0;
     line-height: inherit;
+
     /* Inset ring stays inside the tag box so the select does not clip it. */
     border: 0;
     box-shadow: inset 0 0 0 1px var(--stream-color);
