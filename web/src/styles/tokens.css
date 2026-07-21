@@ -56,7 +56,7 @@
   --card: #fff;
   --card-foreground: var(--foreground);
   --muted: #f8f9f4;
-  --muted-foreground: #4f5d47;
+  --muted-foreground: #737973;
   --secondary: #fff;
 
   /* Accent & semantic */
@@ -192,7 +192,7 @@
   --foreground: #ecf1eb;
   --card: #151c17;
   --muted: rgb(255 255 255 / 4%);
-  --muted-foreground: #a6b2a2;
+  --muted-foreground: #b2b7b2;
   --secondary: #0f1411;
 
   /* Accent & semantic */

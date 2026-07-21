@@ -169,14 +169,27 @@
   min-width: 0;
 }
 
-.substep-meta strong {
-  color: inherit;
-  font-weight: var(--font-medium);
-}
-
-.substep-meta > * {
+.substep-meta-time,
+.substep-meta-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.substep-meta-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+.substep-meta-icon .icon-svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
 }
 
 .substep-details {

@@ -206,10 +206,7 @@ func gs1ElementString(gtin, lot, serial string) string {
 func buildDPPTraceabilityView(def WorkflowDef, process *Process, workflowKey string, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole, orgNames map[string]string) []TimelineStep {
 	return buildTimelineSteps(def, process, orgNames, workflowKey, roleIndex, cfgRoles, timelineStepsOptions{
 		emptyIfNilProcess: true,
-		decorateStep: func(row *TimelineStep) {
-			row.Summary.HideOrgMark = true
-		},
-		buildSubstep: buildDPPTraceabilitySubstep,
+		buildSubstep:      buildDPPTraceabilitySubstep,
 	})
 }
 
