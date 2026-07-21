@@ -90,6 +90,7 @@ func TestProcessTerminationDetailsPanelMarkup(t *testing.T) {
 	var out bytes.Buffer
 	view := StreamTerminationDetailsView{
 		Reason:       "Pilot ended early",
+		EndedAt:      "2026-03-05T14:30:00Z",
 		EndedAtHuman: "5 Mar 2026 at 14:30 UTC",
 		EndedBy:      "user-1",
 		SubstepID:    "2.1",

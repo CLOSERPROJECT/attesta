@@ -35,11 +35,13 @@ type StreamInstanceCard struct {
 	StatusLabel     string
 	DetailHref      string
 	CreatedAt       string
+	CreatedAtISO    string
 	CreatedAtTime   time.Time
 	DoneSubsteps    int
 	TotalSubsteps   int
 	Percent         int
 	LastNotarizedAt string
+	LastNotarizedAtISO string
 	LastDigestShort string
 }
 
@@ -114,6 +116,7 @@ type SubstepBodyView struct {
 	Status           string
 	Mode             SubstepBodyMode
 	DoneAt         string
+	DoneAtISO      string
 	DoneBy         string
 	DoneRole       string
 	Values         []SubstepKV
@@ -156,6 +159,7 @@ type SubstepShellDisplay struct {
 	StatusLabel string
 	Palette     string
 	DoneAt      string
+	DoneAtISO   string
 	DoneBy      string
 }
 
@@ -170,6 +174,7 @@ func substepShellDisplay(sub TimelineSubstep) SubstepShellDisplay {
 			StatusLabel: processStatusLabel(status),
 			Palette:     sub.Body.Palette,
 			DoneAt:      sub.Body.DoneAt,
+			DoneAtISO:   sub.Body.DoneAtISO,
 			DoneBy:      sub.Body.DoneBy,
 		}
 	}
@@ -182,6 +187,7 @@ func substepShellDisplay(sub TimelineSubstep) SubstepShellDisplay {
 		StatusLabel: label,
 		Palette:     sub.Palette,
 		DoneAt:      sub.DoneAt,
+		DoneAtISO:   sub.DoneAtISO,
 		DoneBy:      sub.DoneBy,
 	}
 }
@@ -200,6 +206,7 @@ type TimelineSubstep struct {
 	DoneBy      string
 	DoneRole    string
 	DoneAt      string
+	DoneAtISO   string
 }
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.
@@ -230,6 +237,7 @@ type StreamTimelineSubstepView struct {
 
 // StreamTerminationDetailsView is the view model for templates/components/stream_termination_details.html.
 type StreamTerminationDetailsView struct {
+	EndedAt      string
 	EndedAtHuman string
 	EndedBy      string
 	SubstepID    string

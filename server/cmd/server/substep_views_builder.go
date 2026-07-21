@@ -112,6 +112,7 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 		formSchema := ""
 		formUISchema := ""
 		doneAt := ""
+		doneAtISO := ""
 		doneBy := ""
 		doneRole := ""
 		description := strings.TrimSpace(sub.InputKey)
@@ -122,6 +123,7 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 				description = processStepDescription(progress, sub)
 				if progress.DoneAt != nil {
 					doneAt = humanReadableTraceabilityTime(*progress.DoneAt)
+					doneAtISO = rfc3339UTC(*progress.DoneAt)
 				}
 				if progress.DoneBy != nil {
 					doneBy = strings.TrimSpace(progress.DoneBy.ID)
@@ -182,6 +184,7 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 			FormUISchema:   formUISchema,
 			Status:         status,
 			DoneAt:         doneAt,
+			DoneAtISO:      doneAtISO,
 			DoneBy:         doneBy,
 			DoneRole:       doneRole,
 			Values:         values,

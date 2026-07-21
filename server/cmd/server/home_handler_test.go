@@ -1267,11 +1267,17 @@ func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Created: 3 Feb 2026 at 10:00 UTC") {
+	if !strings.Contains(body, "Created:") || !strings.Contains(body, "3 Feb 2026 at 10:00 UTC") {
 		t.Fatalf("expected human readable created date, got %q", body)
 	}
-	if !strings.Contains(body, "Last notarized: 3 Feb 2026 at 11:30 UTC") {
+	if !strings.Contains(body, `datetime="2026-02-03T10:00:00Z"`) {
+		t.Fatalf("expected created datetime ISO, got %q", body)
+	}
+	if !strings.Contains(body, "Last notarized:") || !strings.Contains(body, "3 Feb 2026 at 11:30 UTC") {
 		t.Fatalf("expected human readable last notarized date, got %q", body)
+	}
+	if !strings.Contains(body, `datetime="2026-02-03T11:30:00Z"`) {
+		t.Fatalf("expected last notarized datetime ISO, got %q", body)
 	}
 }
 

@@ -137,6 +137,7 @@ func (s *Server) buildStreamTerminationDetailsView(ctx context.Context, def Work
 		return nil
 	}
 	return &StreamTerminationDetailsView{
+		EndedAt:      view.EndedAt,
 		EndedAtHuman: view.EndedAtHuman,
 		EndedBy:      terminationEndedByDisplay(view.EndedBy),
 		SubstepID:    view.SubstepID,

@@ -111,7 +111,7 @@ func buildTimeline(def WorkflowDef, process *Process, workflowKey string, roleIn
 	})
 }
 
-func buildTimelineSubstepShellBody(ctx timelineSubstepBuildContext, palette, doneBy, doneAtHuman string) SubstepBodyView {
+func buildTimelineSubstepShellBody(ctx timelineSubstepBuildContext, palette, doneBy, doneAtHuman, doneAtISO string) SubstepBodyView {
 	status := ctx.status
 	disabled := false
 	if status == "available" {
@@ -125,6 +125,7 @@ func buildTimelineSubstepShellBody(ctx timelineSubstepBuildContext, palette, don
 		Palette:   palette,
 		DoneBy:    doneBy,
 		DoneAt:    doneAtHuman,
+		DoneAtISO: doneAtISO,
 		Disabled:  disabled,
 	}
 }
@@ -156,12 +157,14 @@ func buildTimelineSubstep(ctx timelineSubstepBuildContext) TimelineSubstep {
 		}
 		if progress.DoneAt != nil {
 			entry.DoneAt = humanReadableTraceabilityTime(*progress.DoneAt)
+			entry.DoneAtISO = rfc3339UTC(*progress.DoneAt)
 		}
 	}
 	entry.StatusLabel = processStatusLabel(entry.Status)
 	doneBy := entry.DoneBy
 	doneAt := entry.DoneAt
-	shellBody := buildTimelineSubstepShellBody(ctx, entry.Palette, doneBy, doneAt)
+	doneAtISO := entry.DoneAtISO
+	shellBody := buildTimelineSubstepShellBody(ctx, entry.Palette, doneBy, doneAt, doneAtISO)
 	entry.Body = &shellBody
 	return entry
 }

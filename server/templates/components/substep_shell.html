@@ -20,7 +20,8 @@
               <div class="substep-meta">
                 {{ if $shell.DoneAt }}
                   <span class="substep-meta-time"
-                    ><strong>Completed at:</strong> {{ $shell.DoneAt }}</span
+                    ><strong>Completed at:</strong>
+                    {{ template "local_datetime" (dict "ISO" $shell.DoneAtISO "Human" $shell.DoneAt) }}</span
                   >
                 {{ end }}
                 {{ if $shell.DoneBy }}

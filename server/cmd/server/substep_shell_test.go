@@ -192,6 +192,7 @@ func TestSubstepShellTemplateRendersDoneSubstepMetaFromBody(t *testing.T) {
 	view.Substep.DoneBy = ""
 	view.Substep.Body.Status = "done"
 	view.Substep.Body.DoneAt = "5 Mar 2026 at 14:30 UTC"
+	view.Substep.Body.DoneAtISO = "2026-03-05T14:30:00Z"
 	view.Substep.Body.DoneBy = "alice@example.com"
 
 	var out bytes.Buffer
@@ -202,6 +203,8 @@ func TestSubstepShellTemplateRendersDoneSubstepMetaFromBody(t *testing.T) {
 
 	for _, want := range []string{
 		`class="substep-meta"`,
+		`class="js-local-datetime"`,
+		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
 		"alice@example.com",
 	} {
@@ -218,6 +221,7 @@ func TestSubstepShellTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 	view.Substep.Body = nil
 	view.Substep.Status = "done"
 	view.Substep.DoneAt = "5 Mar 2026 at 14:30 UTC"
+	view.Substep.DoneAtISO = "2026-03-05T14:30:00Z"
 	view.Substep.DoneBy = "alice@example.com"
 
 	var out bytes.Buffer
@@ -231,6 +235,8 @@ func TestSubstepShellTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 		`class="substep-meta-time"`,
 		`class="substep-meta-actor"`,
 		"<strong>Completed at:</strong>",
+		`class="js-local-datetime"`,
+		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
 		"<strong>Operator:</strong>",
 		"alice@example.com",

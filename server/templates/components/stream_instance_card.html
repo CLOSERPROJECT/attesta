@@ -43,9 +43,15 @@
             {{ .TotalSubsteps }}
             complete ({{ .Percent }}%)</span
           >
-          <span>Created: {{ .CreatedAt }}</span>
+          <span
+            >Created:
+            {{ template "local_datetime" (dict "ISO" .CreatedAtISO "Human" .CreatedAt) }}</span
+          >
           {{ if .LastNotarizedAt }}
-            <span>Last notarized: {{ .LastNotarizedAt }}</span>
+            <span
+              >Last notarized:
+              {{ template "local_datetime" (dict "ISO" .LastNotarizedAtISO "Human" .LastNotarizedAt) }}</span
+            >
           {{ end }}
         </div>
       </div>

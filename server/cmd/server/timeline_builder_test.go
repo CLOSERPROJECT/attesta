@@ -374,6 +374,9 @@ func TestBuildTimelineSubstepAttachesMinimalShellBody(t *testing.T) {
 	if entry.Body.DoneAt != "5 Mar 2026 at 14:30 UTC" {
 		t.Fatalf("body doneAt = %q", entry.Body.DoneAt)
 	}
+	if entry.Body.DoneAtISO != "2026-03-05T14:30:00Z" {
+		t.Fatalf("body doneAtISO = %q", entry.Body.DoneAtISO)
+	}
 }
 
 func TestSubstepShellDisplayRequiresBody(t *testing.T) {

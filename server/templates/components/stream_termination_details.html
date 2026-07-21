@@ -11,7 +11,9 @@
         {{ if .EndedAtHuman }}
           <div class="stream-termination-details-field">
             <dt class="field-label">Ended at</dt>
-            <dd>{{ .EndedAtHuman }}</dd>
+            <dd>
+              {{ template "local_datetime" (dict "ISO" .EndedAt "Human" .EndedAtHuman) }}
+            </dd>
           </div>
         {{ end }}
         {{ if .EndedBy }}

@@ -20,6 +20,7 @@ func TestStreamInstanceCardTemplateRendersDetailLink(t *testing.T) {
 		DoneSubsteps:  1,
 		TotalSubsteps: 4,
 		CreatedAt:     "1 Mar 2026 at 10:00 UTC",
+		CreatedAtISO:  "2026-03-01T10:00:00Z",
 	}
 	if err := tmpl.ExecuteTemplate(&out, "stream_instance_card", card); err != nil {
 		t.Fatalf("render stream_instance_card template: %v", err)
@@ -41,6 +42,8 @@ func TestStreamInstanceCardTemplateRendersDetailLink(t *testing.T) {
 		`href="/w/workflow/process/process-1"`,
 		`class="status-tag status-tag-compact"`,
 		`data-stream-status="available"`,
+		`class="js-local-datetime"`,
+		`datetime="2026-03-01T10:00:00Z"`,
 		"Pilot batch",
 		"process-1",
 		"complete (25%)",

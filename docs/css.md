@@ -86,6 +86,7 @@ Reused **markup patterns** backed by namespaced CSS, with **no** full Go templat
 | `button.css` | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-ghost-danger`, `.btn-danger`, `.btn-outline`, `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon` | See file header in `web/src/styles/components/button.css` |
 | `list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | See file header in `web/src/styles/components/list-row.css` |
 | `tip.css` | `.tip` | See file header in `web/src/styles/components/tip.css`; micro-partial `components/tip.html` |
+| — | `local_datetime` | Micro-partial `components/local_datetime.html`: `time.js-local-datetime[datetime]` + UTC human fallback; client formats in `web/src/main.js` |
 
 **Page header** — CSS-only. Inline the markup tree in page templates (no `PageHeaderView`, no full `page_header` define). Optional trail uses the full `breadcrumbs` component: `{{ template "breadcrumbs" .Breadcrumbs }}` with `BreadcrumbsView` assembled in Go (`BreadcrumbItem.Href` empty ⇒ current page). When right actions are needed, wrap `page-header-body` + `page-header-actions` in `div.page-header-head` (same idea as panel head-actions); omit the head wrapper when there are no actions. Process-instance ID under the title is **not** part of this component — it uses `.process-header-meta` / `.process-header-meta-id` in `pages/process.css`.
 

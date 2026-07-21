@@ -1925,9 +1925,9 @@ func countWorkflowSubsteps(def WorkflowDef) int {
 	return count
 }
 
-func processProgressStats(def WorkflowDef, process *Process) (doneCount int, lastAt string, lastDigestShort string) {
+func processProgressStats(def WorkflowDef, process *Process) (doneCount int, lastDoneAt time.Time, lastDigestShort string) {
 	if process == nil {
-		return 0, "", ""
+		return 0, time.Time{}, ""
 	}
 	var latest time.Time
 	first := true
@@ -1954,9 +1954,9 @@ func processProgressStats(def WorkflowDef, process *Process) (doneCount int, las
 		}
 	}
 	if !first {
-		lastAt = humanReadableTraceabilityTime(latest)
+		lastDoneAt = latest
 	}
-	return doneCount, lastAt, lastDigestShort
+	return doneCount, lastDoneAt, lastDigestShort
 }
 
 func sortHomeProcessList(items []StreamInstanceCard, sortKey string) {
@@ -4793,24 +4793,26 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := deriveProcessStatus(cfg.Workflow, &process)
-		doneCount, lastAt, lastDigest := processProgressStats(cfg.Workflow, &process)
+		doneCount, lastDoneAt, lastDigest := processProgressStats(cfg.Workflow, &process)
 		percent := 0
 		if totalSubsteps > 0 {
 			percent = int(float64(doneCount) / float64(totalSubsteps) * 100)
 		}
 		item := StreamInstanceCard{
-			ID:              process.ID.Hex(),
-			Name:            strings.TrimSpace(process.Name),
-			Status:          status,
-			StatusLabel:     processStatusLabel(status),
-			DetailHref:      path + "/process/" + process.ID.Hex(),
-			CreatedAt:       humanReadableTraceabilityTime(process.CreatedAt),
-			CreatedAtTime:   process.CreatedAt,
-			DoneSubsteps:    doneCount,
-			TotalSubsteps:   totalSubsteps,
-			Percent:         percent,
-			LastNotarizedAt: lastAt,
-			LastDigestShort: lastDigest,
+			ID:                 process.ID.Hex(),
+			Name:               strings.TrimSpace(process.Name),
+			Status:             status,
+			StatusLabel:        processStatusLabel(status),
+			DetailHref:         path + "/process/" + process.ID.Hex(),
+			CreatedAt:          humanReadableTraceabilityTime(process.CreatedAt),
+			CreatedAtISO:       rfc3339UTC(process.CreatedAt),
+			CreatedAtTime:      process.CreatedAt,
+			DoneSubsteps:       doneCount,
+			TotalSubsteps:      totalSubsteps,
+			Percent:            percent,
+			LastNotarizedAt:    humanReadableTraceabilityTime(lastDoneAt),
+			LastNotarizedAtISO: rfc3339UTC(lastDoneAt),
+			LastDigestShort:    lastDigest,
 		}
 		if item.Status == "active" {
 			if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &process, workflowKey, actor, roleMeta, cfg.Roles); ok {
