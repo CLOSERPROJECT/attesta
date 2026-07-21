@@ -40,7 +40,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-6);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 
   button {
     flex-shrink: 0;
@@ -52,6 +52,7 @@
 }
 
 .page-header-body {
+  flex: 1 1 auto;
   justify-self: start;
   margin: 0;
   min-width: 0;
@@ -72,10 +73,18 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
-  flex-wrap: wrap;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
 }
 
 .page-header-subtitle {
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
+}
+
+@media (--sm-down) {
+  .page-header-head,
+  .page-header-actions {
+    flex-wrap: wrap;
+  }
 }
