@@ -23,7 +23,6 @@
             <button
               class="btn btn-secondary"
               type="button"
-              data-home-nav="preview"
               onclick="document.getElementById('stream-preview-dialog').showModal()"
             >
               {{ template "icon-eye" . }}
@@ -51,353 +50,277 @@
         <div class="error-detail">{{ .Error }}</div>
       </div>
     {{ else }}
-      <div class="rail-layout rail-layout-ready" data-home-root>
-        <section class="panel panel-sticky">
-          <div class="stream-status-filter">
-            <span
-              class="stream-status-rail-label"
-              id="stream-status-filter-label"
-            >
-              {{ template "icon-filter" . }}
-              Filter by status
-            </span>
-            <nav
-              class="stream-status-filter-nav"
-              aria-labelledby="stream-status-filter-label"
-            >
-              {{ range .ProcessGroups }}
-                <button
-                  type="button"
-                  class="stream-status-filter-option{{ if eq .Status $.StatusFilter }} is-active{{ end }}"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}"
-                  aria-label="{{ .NavAriaLabel }}"
-                  title="{{ .NavTitle }}"
-                >
-                  {{ template "status_tag" .Status }}
-                </button>
-              {{ end }}
-            </nav>
-            <select
-              id="stream-status-filter-select"
-              class="stream-status-filter-select"
-              aria-labelledby="stream-status-filter-label"
-              data-home-filter-select
-            >
-              <button type="button">
-                <selectedcontent></selectedcontent>
-              </button>
-              {{ range .ProcessGroups }}
-                <option
-                  value="{{ .Status }}"
-                  {{ if eq .Status $.StatusFilter }}selected{{ end }}
-                >
-                  {{ template "status_tag" .Status }}
-                </option>
-              {{ end }}
-            </select>
-          </div>
-          {{ range .ProcessGroups }}
-            <form
-              method="get"
-              action="{{ $.WorkflowPath }}/"
-              class="stream-status-sort"
-              data-home-panel="{{ .Status }}"
-              {{ if ne .Status $.StatusFilter }}hidden{{ end }}
-            >
-              {{ range .SortFields }}
-                <input
-                  type="hidden"
-                  name="{{ .Name }}"
-                  value="{{ .Value }}"
-                />
-              {{ end }}
-              <label
-                class="stream-status-sort-control"
-                for="stream-sort-{{ .Status }}"
-              >
-                <span class="stream-status-rail-label">
-                  {{ template "icon-sort" . }}
-                  Sort by
-                </span>
-                <select
-                  id="stream-sort-{{ .Status }}"
-                  name="sort"
-                  onchange="this.form.submit()"
-                >
-                  <option
-                    value="time_desc"
-                    {{ if eq .Sort "time_desc" }}selected{{ end }}
-                  >
-                    Newest
-                  </option>
-                  <option
-                    value="time_asc"
-                    {{ if eq .Sort "time_asc" }}selected{{ end }}
-                  >
-                    Oldest
-                  </option>
-                  <option
-                    value="progress_desc"
-                    {{ if eq .Sort "progress_desc" }}selected{{ end }}
-                  >
-                    Most advanced
-                  </option>
-                  <option
-                    value="progress_asc"
-                    {{ if eq .Sort "progress_asc" }}selected{{ end }}
-                  >
-                    Least advanced
-                  </option>
-                  <option
-                    value="status"
-                    {{ if eq .Sort "status" }}selected{{ end }}
-                  >
-                    Status
-                  </option>
-                </select>
-              </label>
-            </form>
-          {{ end }}
-        </section>
-
-        <div class="rail-layout-main home-workflow-panel-main">
-          <dialog id="new-instance-dialog" class="dialog">
-            <div class="dialog-card">
-              <header class="dialog-head">
-                <div>
-                  <h3 class="dialog-title">New instance</h3>
-                  <p class="dialog-subtitle">
-                    Give this stream instance a brief name
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-icon dialog-close"
-                  onclick="document.getElementById('new-instance-dialog').close()"
-                >
-                  {{ template "icon-close" . }}
-                </button>
-              </header>
-              <form
-                method="post"
-                action="{{ .WorkflowPath }}/process/start"
-                class="input-form"
-              >
-                <div class="form-field">
-                  <label for="instance-name">Instance name</label>
-                  <input
-                    id="instance-name"
-                    name="name"
-                    type="text"
-                    maxlength="80"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="dialog-actions">
-                  <button class="btn btn-primary" type="submit">
-                    {{ template "icon-play" . }}
-                    Start instance
-                  </button>
-                </div>
-              </form>
+      <dialog id="new-instance-dialog" class="dialog">
+        <div class="dialog-card">
+          <header class="dialog-head">
+            <div>
+              <h3 class="dialog-title">New instance</h3>
+              <p class="dialog-subtitle">
+                Give this stream instance a brief name
+              </p>
             </div>
-          </dialog>
-          <dialog
-            id="stream-preview-dialog"
-            class="dialog"
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon dialog-close"
+              onclick="document.getElementById('new-instance-dialog').close()"
+            >
+              {{ template "icon-close" . }}
+            </button>
+          </header>
+          <form
+            method="post"
+            action="{{ .WorkflowPath }}/process/start"
+            class="input-form"
           >
-            <div class="dialog-card">
-              <header class="dialog-head">
-                <div>
-                  <h3 class="dialog-title">Stream preview</h3>
-                  <p class="dialog-subtitle">
-                    Inspect the stream timeline and form structure in read-only
-                    mode
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-icon dialog-close"
-                  onclick="document.getElementById('stream-preview-dialog').close()"
-                >
-                  {{ template "icon-close" . }}
-                </button>
-              </header>
-              <div class="stream-preview-body">
-                {{ template "stream_timeline" .Preview.StreamTimeline }}
-              </div>
+            <div class="form-field">
+              <label for="instance-name">Instance name</label>
+              <input
+                id="instance-name"
+                name="name"
+                type="text"
+                maxlength="80"
+                autocomplete="off"
+              />
             </div>
-          </dialog>
-          <div class="stream-status-sections">
-            {{ range .ProcessGroups }}
-              <section
-                class="stream-status-section"
-                id="{{ .PanelID }}"
-                data-home-panel="{{ .Status }}"
-                {{ if ne .Status $.StatusFilter }}hidden{{ end }}
-              >
-                <div class="stream-status-section-head">
-                  <h3>{{ .Heading }}</h3>
-                </div>
-                {{ if .Processes }}
-                  <ul class="stream-instance-card-list">
-                    {{ range .Processes }}
-                      {{ template "stream_instance_card" . }}
-                    {{ end }}
-                  </ul>
-                {{ else }}
-                  <div class="stream-instance-card-empty">
-                    <p class="muted">{{ .EmptyMessage }}</p>
-                  </div>
-                {{ end }}
-                {{ if gt .TotalPages 1 }}
-                  <nav
-                    class="platform-admin-pagination platform-admin-pagination--inline"
-                    aria-label="{{ .PaginationAriaLabel }}"
-                  >
-                    <div class="platform-admin-pagination-pages">
-                      <a
-                        class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
-                        href="{{ .PreviousURL }}"
-                      >
-                        {{ template "icon-chevron-left" . }}
-                      </a>
-                      {{ range .PageLinks }}
-                        <a
-                          class="{{ if .IsCurrent }}
-                            btn btn-primary
-                          {{ else }}
-                            btn btn-secondary
-                          {{ end }}"
-                          href="{{ .URL }}"
-                          >{{ .Page }}</a
-                        >
-                      {{ end }}
-                      <a
-                        class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
-                        href="{{ .NextURL }}"
-                      >
-                        {{ template "icon-chevron-right" . }}
-                      </a>
-                    </div>
-                  </nav>
-                {{ end }}
-              </section>
-            {{ end }}
+            <div class="dialog-actions">
+              <button class="btn btn-primary" type="submit">
+                {{ template "icon-play" . }}
+                Start instance
+              </button>
+            </div>
+          </form>
+        </div>
+      </dialog>
+      <dialog id="stream-preview-dialog" class="dialog">
+        <div class="dialog-card">
+          <header class="dialog-head">
+            <div>
+              <h3 class="dialog-title">Stream preview</h3>
+              <p class="dialog-subtitle">
+                Inspect the stream timeline and form structure in read-only mode
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon dialog-close"
+              onclick="document.getElementById('stream-preview-dialog').close()"
+            >
+              {{ template "icon-close" . }}
+            </button>
+          </header>
+          <div class="stream-preview-body">
+            {{ template "stream_timeline" .Preview.StreamTimeline }}
           </div>
         </div>
-      </div>
+      </dialog>
 
-      <script>
-        (function () {
-          const homeRoot = document.querySelector("[data-home-root]");
-          if (!homeRoot) {
-            return;
-          }
-
-          const panels = Array.from(homeRoot.querySelectorAll("[data-home-panel]"));
-          const statusPanelNames = panels.map((panel) =>
-            (panel.getAttribute("data-home-panel") || "").trim(),
-          );
-
-          const defaultPanelName = statusPanelNames.includes("all")
-            ? "all"
-            : statusPanelNames[0] || "";
-
-          const syncFilterURL = (panelName) => {
-            try {
-              const url = new URL(window.location.href);
-              if (panelName && panelName !== "all") {
-                url.searchParams.set("filter", panelName);
-              } else {
-                url.searchParams.delete("filter");
-              }
-              url.searchParams.delete("page");
-              url.hash = "";
-              window.history.replaceState({}, "", url);
-            } catch (_err) {}
-          };
-
-          const initialPanelName = () => {
-            const params = new URLSearchParams(window.location.search);
-            const filterParam = (params.get("filter") || "").trim().toLowerCase();
-            if (statusPanelNames.includes(filterParam)) {
-              return filterParam;
-            }
-
-            const hashPanelID = window.location.hash.replace(/^#/, "");
-            if (hashPanelID) {
-              const hashPanel = panels.find((panel) => panel.id === hashPanelID);
-              if (hashPanel) {
-                return (hashPanel.getAttribute("data-home-panel") || "").trim();
-              }
-            }
-
-            return defaultPanelName;
-          };
-
-          const filterSelect = homeRoot.querySelector(
-            "[data-home-filter-select]",
-          );
-
-          const showPanel = (panelName, options = {}) => {
-            if (!statusPanelNames.includes(panelName)) {
-              panelName = defaultPanelName;
-            }
-
-            const buttons = Array.from(
-              homeRoot.querySelectorAll("[data-home-nav]"),
-            );
-            buttons.forEach((button) => {
-              const currentName = button.getAttribute("data-home-nav");
-              const isActive = currentName === panelName;
-              button.classList.toggle("is-active", isActive);
-              button.setAttribute("aria-current", isActive ? "page" : "false");
-            });
-
-            panels.forEach((panel) => {
-              const currentName = panel.getAttribute("data-home-panel");
-              panel.hidden = currentName !== panelName;
-            });
-
-            if (filterSelect && statusPanelNames.includes(panelName)) {
-              filterSelect.value = panelName;
-            }
-
-            if (options.syncURL) {
-              syncFilterURL(panelName);
-            }
-          };
-
-          Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
-            (button) => {
-              button.addEventListener("click", () => {
-                const panelName = (
-                  button.getAttribute("data-home-nav") || ""
-                ).trim();
-                if (panelName === "preview") {
-                  return;
-                }
-                showPanel(panelName, { syncURL: true });
-              });
-            },
-          );
-
-          if (filterSelect) {
-            filterSelect.addEventListener("change", () => {
-              showPanel(
-                (filterSelect.value || "").trim(),
-                { syncURL: true },
-              );
-            });
-          }
-
-          showPanel(initialPanelName(), { syncURL: true });
-        })();
-      </script>
+      {{ template "stream_dashboard_results" . }}
     {{ end }}
+  </div>
+{{ end }}
+
+{{ define "stream_dashboard_results" }}
+  <div id="stream-dashboard-results" class="rail-layout rail-layout-ready">
+    <section class="panel panel-sticky">
+      <div class="stream-status-filter">
+        <span class="stream-status-rail-label" id="stream-status-filter-label">
+          {{ template "icon-filter" . }}
+          Filter by status
+        </span>
+        <nav
+          class="stream-status-filter-nav"
+          aria-labelledby="stream-status-filter-label"
+        >
+          {{ range .FilterOptions }}
+            <a
+              class="stream-status-filter-option{{ if eq .Status $.StatusFilter }} is-active{{ end }}"
+              href="{{ $.WorkflowPath }}/{{- if or (ne .Status "all") (ne $.Sort "time_desc") -}}
+                ?{{- if ne .Status "all" -}}
+                  filter={{ .Status }}{{- if ne $.Sort "time_desc" -}}&{{ end -}}
+                {{- end -}}{{- if ne $.Sort "time_desc" -}}
+                  sort={{ $.Sort }}
+                {{- end -}}
+              {{- end -}}"
+              hx-get="{{ $.WorkflowPath }}/{{- if or (ne .Status "all") (ne $.Sort "time_desc") -}}
+                ?{{- if ne .Status "all" -}}
+                  filter={{ .Status }}{{- if ne $.Sort "time_desc" -}}&{{ end -}}
+                {{- end -}}{{- if ne $.Sort "time_desc" -}}
+                  sort={{ $.Sort }}
+                {{- end -}}
+              {{- end -}}"
+              hx-target="#stream-dashboard-results"
+              hx-select="#stream-dashboard-results"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              aria-controls="{{ .PanelID }}"
+              aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}"
+              aria-label="{{ .NavAriaLabel }}"
+              title="{{ .NavTitle }}"
+            >
+              {{ template "status_tag" .Status }}
+            </a>
+          {{ end }}
+        </nav>
+        <form
+          method="get"
+          action="{{ .WorkflowPath }}/"
+          hx-get="{{ .WorkflowPath }}/"
+          hx-target="#stream-dashboard-results"
+          hx-select="#stream-dashboard-results"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-trigger="change from:#stream-status-filter-select"
+        >
+          {{ if ne .Sort "time_desc" }}
+            <input type="hidden" name="sort" value="{{ .Sort }}" />
+          {{ end }}
+          <select
+            id="stream-status-filter-select"
+            class="stream-status-filter-select"
+            name="filter"
+            aria-labelledby="stream-status-filter-label"
+          >
+            <button type="button">
+              <selectedcontent></selectedcontent>
+            </button>
+            {{ range .FilterOptions }}
+              <option
+                value="{{ .Status }}"
+                {{ if eq .Status $.StatusFilter }}selected{{ end }}
+              >
+                {{ template "status_tag" .Status }}
+              </option>
+            {{ end }}
+          </select>
+        </form>
+      </div>
+      {{ range .ProcessGroups }}
+          <form
+            method="get"
+            action="{{ $.WorkflowPath }}/"
+            class="stream-status-sort"
+            hx-get="{{ $.WorkflowPath }}/"
+            hx-target="#stream-dashboard-results"
+            hx-select="#stream-dashboard-results"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+            hx-trigger="change from:select"
+          >
+            {{ range .SortFields }}
+              <input type="hidden" name="{{ .Name }}" value="{{ .Value }}" />
+            {{ end }}
+            <label
+              class="stream-status-sort-control"
+              for="stream-sort-{{ .Status }}"
+            >
+              <span class="stream-status-rail-label">
+                {{ template "icon-sort" . }}
+                Sort by
+              </span>
+              <select id="stream-sort-{{ .Status }}" name="sort">
+                <option
+                  value="time_desc"
+                  {{ if eq .Sort "time_desc" }}selected{{ end }}
+                >
+                  Newest
+                </option>
+                <option
+                  value="time_asc"
+                  {{ if eq .Sort "time_asc" }}selected{{ end }}
+                >
+                  Oldest
+                </option>
+                <option
+                  value="progress_desc"
+                  {{ if eq .Sort "progress_desc" }}selected{{ end }}
+                >
+                  Most advanced
+                </option>
+                <option
+                  value="progress_asc"
+                  {{ if eq .Sort "progress_asc" }}selected{{ end }}
+                >
+                  Least advanced
+                </option>
+                <option
+                  value="status"
+                  {{ if eq .Sort "status" }}selected{{ end }}
+                >
+                  Status
+                </option>
+              </select>
+            </label>
+          </form>
+      {{ end }}
+    </section>
+
+    <div class="rail-layout-main home-workflow-panel-main">
+      {{ range .ProcessGroups }}
+          <section class="stream-status-section" id="{{ .PanelID }}">
+            <div class="stream-status-section-head">
+              <h3>{{ .Heading }}</h3>
+            </div>
+            {{ if .Processes }}
+              <ul class="stream-instance-card-list">
+                {{ range .Processes }}
+                  {{ template "stream_instance_card" . }}
+                {{ end }}
+              </ul>
+            {{ else }}
+              <div class="stream-instance-card-empty">
+                <p class="muted">{{ .EmptyMessage }}</p>
+              </div>
+            {{ end }}
+            {{ if gt .TotalPages 1 }}
+              <nav
+                class="platform-admin-pagination platform-admin-pagination--inline"
+                aria-label="{{ .PaginationAriaLabel }}"
+              >
+                <div class="platform-admin-pagination-pages">
+                  <a
+                    class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
+                    href="{{ .PreviousURL }}"
+                    hx-get="{{ .PreviousURL }}"
+                    hx-target="#stream-dashboard-results"
+                    hx-select="#stream-dashboard-results"
+                    hx-swap="outerHTML"
+                    hx-push-url="true"
+                  >
+                    {{ template "icon-chevron-left" . }}
+                  </a>
+                  {{ range .PageLinks }}
+                    <a
+                      class="{{ if .IsCurrent }}
+                        btn btn-primary
+                      {{ else }}
+                        btn btn-secondary
+                      {{ end }}"
+                      href="{{ .URL }}"
+                      hx-get="{{ .URL }}"
+                      hx-target="#stream-dashboard-results"
+                      hx-select="#stream-dashboard-results"
+                      hx-swap="outerHTML"
+                      hx-push-url="true"
+                      >{{ .Page }}</a
+                    >
+                  {{ end }}
+                  <a
+                    class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
+                    href="{{ .NextURL }}"
+                    hx-get="{{ .NextURL }}"
+                    hx-target="#stream-dashboard-results"
+                    hx-select="#stream-dashboard-results"
+                    hx-swap="outerHTML"
+                    hx-push-url="true"
+                  >
+                    {{ template "icon-chevron-right" . }}
+                  </a>
+                </div>
+              </nav>
+            {{ end }}
+          </section>
+      {{ end }}
+    </div>
   </div>
 {{ end }}
 
