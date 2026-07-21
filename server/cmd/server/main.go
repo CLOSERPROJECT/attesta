@@ -1448,6 +1448,8 @@ func isProcessClosed(def WorkflowDef, process *Process) bool {
 
 func processStatusLabel(status string) string {
 	switch strings.TrimSpace(status) {
+	case "all":
+		return "All"
 	case processStatusTerminated:
 		return "TERMINATED"
 	default:
@@ -1756,7 +1758,7 @@ func normalizeHomeSortKey(value string) string {
 
 func normalizeHomeStatusFilter(value string) string {
 	switch strings.TrimSpace(strings.ToLower(value)) {
-	case "available", processStatusActive, processStatusDone, processStatusTerminated:
+	case "all", "available", processStatusActive, processStatusDone, processStatusTerminated:
 		return strings.TrimSpace(strings.ToLower(value))
 	default:
 		return "all"
@@ -1764,7 +1766,7 @@ func normalizeHomeStatusFilter(value string) string {
 }
 
 func homeProcessStatuses() []string {
-	return []string{"available", processStatusActive, processStatusDone, processStatusTerminated}
+	return []string{"all", "available", processStatusActive, processStatusDone, processStatusTerminated}
 }
 
 func homeProcessStatusPageParam(status string) string {
@@ -1816,7 +1818,12 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 
 	groups := make([]ProcessStatusGroup, 0, len(homeProcessStatuses()))
 	for _, status := range homeProcessStatuses() {
-		items := byStatus[status]
+		var items []StreamInstanceCard
+		if status == "all" {
+			items = append([]StreamInstanceCard(nil), processes...)
+		} else {
+			items = byStatus[status]
+		}
 		pageParam := homeProcessStatusPageParam(status)
 		sortParam := homeProcessStatusSortParam(status)
 		groupSort := normalizeHomeSortKey(sortValues[sortParam])

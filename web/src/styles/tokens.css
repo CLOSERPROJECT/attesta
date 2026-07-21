@@ -173,6 +173,7 @@
   --substep-skipped-muted: #f2f0ed;
 
   /* Stream */
+  --stream-all: var(--muted-foreground);
   --stream-available: var(--primary);
   --stream-active: light-dark(#5385d1, #7aa3e8);
   --stream-done: light-dark(#b3b3b3, #6e6e6e);

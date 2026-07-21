@@ -72,6 +72,7 @@
   --role-chroma: var(--muted-foreground);
 }
 
+[data-stream-status="all"] { --stream-color: var(--stream-all); }
 [data-stream-status="available"] { --stream-color: var(--stream-available); }
 [data-stream-status="active"] { --stream-color: var(--stream-active); }
 [data-stream-status="done"] { --stream-color: var(--stream-done); }

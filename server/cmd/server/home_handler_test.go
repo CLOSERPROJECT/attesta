@@ -1037,6 +1037,9 @@ func TestNormalizeHomeStatusFilter(t *testing.T) {
 	if got := normalizeHomeStatusFilter("ACTIVE"); got != "active" {
 		t.Fatalf("expected active, got %q", got)
 	}
+	if got := normalizeHomeStatusFilter("all"); got != "all" {
+		t.Fatalf("expected all, got %q", got)
+	}
 	if got := normalizeHomeStatusFilter("unknown"); got != "all" {
 		t.Fatalf("expected all for unknown, got %q", got)
 	}
