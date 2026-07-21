@@ -1777,8 +1777,12 @@ func homeProcessStatusSortParam(status string) string {
 	return status + "_sort"
 }
 
-func homePaginationURL(workflowPath string, sortValues map[string]string, pageValues map[string]int, pageParam string, page int, anchor string) string {
+func homePaginationURL(workflowPath string, sortValues map[string]string, pageValues map[string]int, pageParam string, page int, filter string) string {
 	values := url.Values{}
+	filter = normalizeHomeStatusFilter(filter)
+	if filter != "all" {
+		values.Set("filter", filter)
+	}
 	for _, status := range homeProcessStatuses() {
 		sortParam := homeProcessStatusSortParam(status)
 		if sortValue := normalizeHomeSortKey(sortValues[sortParam]); sortValue != "time_desc" {
@@ -1796,9 +1800,6 @@ func homePaginationURL(workflowPath string, sortValues map[string]string, pageVa
 	target := strings.TrimRight(workflowPath, "/") + "/"
 	if encoded := values.Encode(); encoded != "" {
 		target += "?" + encoded
-	}
-	if anchor != "" {
-		target += "#" + anchor
 	}
 	return target
 }
@@ -1849,13 +1850,16 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 			pageNumbers = append(pageNumbers, page)
 			pageLinks = append(pageLinks, PaginationLink{
 				Page:      page,
-				URL:       homePaginationURL(workflowPath, sortValues, pageValues, pageParam, page, panelID),
+				URL:       homePaginationURL(workflowPath, sortValues, pageValues, pageParam, page, status),
 				IsCurrent: page == currentPage,
 			})
 		}
 		previousPage := max(currentPage-1, 1)
 		nextPage := min(currentPage+1, totalPages)
-		sortFields := make([]QueryInput, 0, len(homeProcessStatuses())*2)
+		sortFields := make([]QueryInput, 0, len(homeProcessStatuses())*2+1)
+		if status != "all" {
+			sortFields = append(sortFields, QueryInput{Name: "filter", Value: status})
+		}
 		for _, otherStatus := range homeProcessStatuses() {
 			otherSortParam := homeProcessStatusSortParam(otherStatus)
 			if otherSortParam != sortParam {
@@ -1887,8 +1891,8 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 			HasNextPage:     currentPage < totalPages,
 			PreviousPage:    previousPage,
 			NextPage:        nextPage,
-			PreviousURL:     homePaginationURL(workflowPath, sortValues, pageValues, pageParam, previousPage, panelID),
-			NextURL:         homePaginationURL(workflowPath, sortValues, pageValues, pageParam, nextPage, panelID),
+			PreviousURL:     homePaginationURL(workflowPath, sortValues, pageValues, pageParam, previousPage, status),
+			NextURL:         homePaginationURL(workflowPath, sortValues, pageValues, pageParam, nextPage, status),
 			Processes:       pagedItems,
 		})
 	}
@@ -5100,14 +5104,13 @@ func makeStreamInstanceDetailReadOnly(view StreamInstanceDetailView, reason stri
 	view.TerminateAction = ""
 	view.TerminateSubstep = ""
 	view.TerminateRoles = nil
-	if view.SelectedBody != nil {
-		action := *view.SelectedBody
-		action.ReadOnly = true
-		action.Reason = reason
-		view.SelectedBody = &action
-	}
+	// Preview/read-only timelines should not auto-open a substep (avoids ?substep= URL sync).
+	view.SelectedSubstepID = ""
+	view.SelectedBody = nil
 	for stepIndex := range view.Timeline {
+		view.Timeline[stepIndex].Expanded = false
 		for substepIndex := range view.Timeline[stepIndex].Substeps {
+			view.Timeline[stepIndex].Substeps[substepIndex].Selected = false
 			action := view.Timeline[stepIndex].Substeps[substepIndex].Body
 			if action == nil {
 				continue

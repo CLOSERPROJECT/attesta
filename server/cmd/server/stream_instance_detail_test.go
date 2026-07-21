@@ -9,6 +9,48 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestMakeStreamInstanceDetailReadOnlyClearsSelection(t *testing.T) {
+	view := StreamInstanceDetailView{
+		SelectedSubstepID: "1.1",
+		SelectedBody: &SubstepBodyView{
+			SubstepID: "1.1",
+			Title:     "Record input",
+			Status:    "available",
+		},
+		Timeline: []TimelineStep{{
+			Expanded: true,
+			Substeps: []TimelineSubstep{{
+				SubstepID: "1.1",
+				Title:     "Record input",
+				Selected:  true,
+				Body: &SubstepBodyView{
+					SubstepID: "1.1",
+					Title:     "Record input",
+					Status:    "available",
+				},
+			}},
+		}},
+	}
+
+	got := makeStreamInstanceDetailReadOnly(view, "Preview only.")
+	if got.SelectedSubstepID != "" {
+		t.Fatalf("SelectedSubstepID = %q, want empty", got.SelectedSubstepID)
+	}
+	if got.SelectedBody != nil {
+		t.Fatalf("SelectedBody = %#v, want nil", got.SelectedBody)
+	}
+	if got.Timeline[0].Expanded {
+		t.Fatal("expected timeline step to be collapsed")
+	}
+	if got.Timeline[0].Substeps[0].Selected {
+		t.Fatal("expected timeline substep to be unselected")
+	}
+	body := got.Timeline[0].Substeps[0].Body
+	if body == nil || !body.ReadOnly || body.Reason != "Preview only." {
+		t.Fatalf("expected read-only body with reason, got %#v", body)
+	}
+}
+
 func TestBuildStreamInstanceDetailViewDoesNotFilterByCurrentActiveRole(t *testing.T) {
 	process := &Process{
 		ID: primitive.NewObjectID(),

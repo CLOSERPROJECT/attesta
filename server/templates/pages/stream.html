@@ -68,10 +68,10 @@
               {{ range .ProcessGroups }}
                 <button
                   type="button"
-                  class="stream-status-filter-option{{ if eq .Status "all" }} is-active{{ end }}"
+                  class="stream-status-filter-option{{ if eq .Status $.StatusFilter }} is-active{{ end }}"
                   data-home-nav="{{ .Status }}"
                   aria-controls="{{ .PanelID }}"
-                  aria-current="{{ if eq .Status "all" }}page{{ else }}false{{ end }}"
+                  aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}"
                   {{ if eq .Status "all" }}
                     aria-label="All streams"
                     title="All stream instances"
@@ -100,7 +100,7 @@
               action="{{ $.WorkflowPath }}/"
               class="stream-status-sort"
               data-home-panel="{{ .Status }}"
-              {{ if ne .Status "all" }}hidden{{ end }}
+              {{ if ne .Status $.StatusFilter }}hidden{{ end }}
             >
               {{ range .SortFields }}
                 <input
@@ -232,7 +232,7 @@
                 class="stream-status-section"
                 id="{{ .PanelID }}"
                 data-home-panel="{{ .Status }}"
-                {{ if ne .Status "all" }}hidden{{ end }}
+                {{ if ne .Status $.StatusFilter }}hidden{{ end }}
               >
                 <div class="stream-status-section-head">
                   <h3>
@@ -346,7 +346,26 @@
             ? "all"
             : statusPanelNames[0] || "";
 
+          const syncFilterURL = (panelName) => {
+            try {
+              const url = new URL(window.location.href);
+              if (panelName && panelName !== "all") {
+                url.searchParams.set("filter", panelName);
+              } else {
+                url.searchParams.delete("filter");
+              }
+              url.hash = "";
+              window.history.replaceState({}, "", url);
+            } catch (_err) {}
+          };
+
           const initialPanelName = () => {
+            const params = new URLSearchParams(window.location.search);
+            const filterParam = (params.get("filter") || "").trim().toLowerCase();
+            if (statusPanelNames.includes(filterParam)) {
+              return filterParam;
+            }
+
             const hashPanelID = window.location.hash.replace(/^#/, "");
             if (hashPanelID) {
               const hashPanel = panels.find((panel) => panel.id === hashPanelID);
@@ -355,7 +374,6 @@
               }
             }
 
-            const params = new URLSearchParams(window.location.search);
             const queryPanel = statusPanelNames.find((panelName) => {
               return (
                 params.has(panelName + "_page") || params.has(panelName + "_sort")
@@ -364,7 +382,7 @@
             return queryPanel || defaultPanelName;
           };
 
-          const showPanel = (panelName) => {
+          const showPanel = (panelName, options = {}) => {
             if (!statusPanelNames.includes(panelName)) {
               panelName = defaultPanelName;
             }
@@ -383,6 +401,10 @@
               const currentName = panel.getAttribute("data-home-panel");
               panel.hidden = currentName !== panelName;
             });
+
+            if (options.syncURL) {
+              syncFilterURL(panelName);
+            }
           };
 
           Array.from(homeRoot.querySelectorAll("[data-home-nav]")).forEach(
@@ -394,12 +416,12 @@
                 if (panelName === "preview") {
                   return;
                 }
-                showPanel(panelName);
+                showPanel(panelName, { syncURL: true });
               });
             },
           );
 
-          showPanel(initialPanelName());
+          showPanel(initialPanelName(), { syncURL: true });
         })();
       </script>
     {{ end }}
