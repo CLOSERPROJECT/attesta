@@ -1,3 +1,9 @@
+.stream-page .page-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-10);
+  margin-bottom: var(--space-6);
+}
+
 .stream-status-sections {
   display: grid;
   gap: var(--space-5);
@@ -120,4 +126,13 @@
 .stream-preview-body {
   display: grid;
   gap: var(--space-4);
+}
+
+/* Closest tokens to ~640–900: sm-up (640+) through lg-down (<1024). */
+@media (--sm-up) and (--lg-down) {
+  .stream-page .page-header-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
 }
