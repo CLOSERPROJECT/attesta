@@ -127,6 +127,7 @@ Also see:
 - `button` — composable controls (`.btn` + variants/sizes/`btn-icon` in `web/src/styles/components/button.css`)
 - `list-row` — bordered list item with main + actions (`.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` in `web/src/styles/components/list-row.css`); inline markup in `org_admin.html`, `platform_admin.html`
 - `tip` — inverted hover/focus label with caret (`.tip` in `web/src/styles/components/tip.css`); micro-partial `server/templates/components/tip.html` via `{{ template "tip" (dict "Tooltip" "…" …) }}` (`ImgSrc`/`ImgClass` or `Icon`/`InnerClass`; optional `Class`, `AriaLabel`, `Role`). `Icon` is any template define name, executed via the `render` template func.
+- `local_datetime` — micro-partial `server/templates/components/local_datetime.html` via `{{ template "local_datetime" (dict "ISO" "…" "Human" "…") }}`; client `formatLocalDateTimes` in `web/src/main.js` rewrites to `dd/mm/yyyy at HH:mm` in the viewer timezone.
 
 ## Docs and verification
 

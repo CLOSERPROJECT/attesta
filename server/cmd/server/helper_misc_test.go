@@ -21,6 +21,16 @@ func TestHumanReadableTraceabilityTime(t *testing.T) {
 	}
 }
 
+func TestRFC3339UTC(t *testing.T) {
+	if got := rfc3339UTC(time.Time{}); got != "" {
+		t.Fatalf("rfc3339UTC(zero) = %q, want empty", got)
+	}
+	value := time.Date(2026, 3, 5, 14, 30, 0, 0, time.FixedZone("CET", 3600))
+	if got := rfc3339UTC(value); got != "2026-03-05T13:30:00Z" {
+		t.Fatalf("rfc3339UTC() = %q", got)
+	}
+}
+
 func TestShortHashLabel(t *testing.T) {
 	if got := shortHashLabel("  abcdef12345  "); got != "abcdef1" {
 		t.Fatalf("shortHashLabel(long) = %q, want abcdef1", got)

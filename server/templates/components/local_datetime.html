@@ -1,0 +1,8 @@
+{{/* Local datetime: ISO in datetime=, UTC human fallback text; JS rewrites to local dd/mm/yyyy at HH:mm. */}}
+{{ define "local_datetime" }}
+  {{- if .ISO -}}
+    <time class="js-local-datetime" datetime="{{ .ISO }}">{{ .Human }}</time>
+  {{- else -}}
+    {{ .Human }}
+  {{- end -}}
+{{ end }}

@@ -249,6 +249,7 @@ func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubste
 	detailMessage := ""
 	reason := ""
 	doneAtHuman := ""
+	doneAtISO := ""
 	doneBy := ""
 	palette := meta.Palette
 	var values []SubstepKV
@@ -272,6 +273,7 @@ func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubste
 		}
 		if progress.DoneAt != nil {
 			doneAtHuman = humanReadableTraceabilityTime(*progress.DoneAt)
+			doneAtISO = rfc3339UTC(*progress.DoneAt)
 		}
 		if progress.DoneBy != nil {
 			doneBy = progress.DoneBy.ID
@@ -319,6 +321,7 @@ func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubste
 		FormUISchema:   marshalJSONCompact(effective.UISchema),
 		Status:         status,
 		DoneAt:         doneAtHuman,
+		DoneAtISO:      doneAtISO,
 		DoneBy:         doneBy,
 		Values:         values,
 		Attachments:    attachments,
@@ -336,6 +339,7 @@ func buildDPPTraceabilitySubstep(ctx timelineSubstepBuildContext) TimelineSubste
 		Selected:  false,
 		DoneBy:    doneBy,
 		DoneAt:    doneAtHuman,
+		DoneAtISO: doneAtISO,
 		Body:      &body,
 	}
 }
@@ -345,6 +349,13 @@ func humanReadableTraceabilityTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format("2 Jan 2006 at 15:04 MST")
+}
+
+func rfc3339UTC(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 func dppTraceValues(sub WorkflowSub, progress ProcessStep) []SubstepKV {

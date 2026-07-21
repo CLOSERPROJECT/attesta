@@ -38,6 +38,7 @@ func TestStepSummaryTemplateRendersExtendedMetadata(t *testing.T) {
 		"Acme Org",
 		`data-tooltip="Completed at"`,
 		`aria-label="Completed at"`,
+		`class="js-local-datetime"`,
 		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
 		`data-tooltip="Steps"`,

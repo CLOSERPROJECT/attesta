@@ -36,7 +36,7 @@
               "Class" "stream-step-summary-meta-icon"
               "Icon" "icon-clock"
             ) }}
-            <time datetime="{{ .CompletedAt }}">{{ .CompletedAtHuman }}</time>
+            {{ template "local_datetime" (dict "ISO" .CompletedAt "Human" .CompletedAtHuman) }}
           </span>
         {{ end }}
         {{ if .SubstepCount }}

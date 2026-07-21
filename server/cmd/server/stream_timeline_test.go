@@ -148,6 +148,7 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaFromBody(t *testing.T) {
 	view.Timeline[0].Substeps[0].DoneBy = ""
 	view.Timeline[0].Substeps[0].Body.Status = "done"
 	view.Timeline[0].Substeps[0].Body.DoneAt = "5 Mar 2026 at 14:30 UTC"
+	view.Timeline[0].Substeps[0].Body.DoneAtISO = "2026-03-05T14:30:00Z"
 	view.Timeline[0].Substeps[0].Body.DoneBy = "alice@example.com"
 
 	var out bytes.Buffer
@@ -158,6 +159,8 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaFromBody(t *testing.T) {
 
 	for _, want := range []string{
 		`class="substep-meta"`,
+		`class="js-local-datetime"`,
+		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
 		"alice@example.com",
 	} {
@@ -174,6 +177,7 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 	view.Timeline[0].Substeps[0].Body = nil
 	view.Timeline[0].Substeps[0].Status = "done"
 	view.Timeline[0].Substeps[0].DoneAt = "5 Mar 2026 at 14:30 UTC"
+	view.Timeline[0].Substeps[0].DoneAtISO = "2026-03-05T14:30:00Z"
 	view.Timeline[0].Substeps[0].DoneBy = "alice@example.com"
 
 	var out bytes.Buffer
@@ -187,6 +191,8 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 		`class="substep-meta-time"`,
 		`class="substep-meta-actor"`,
 		"<strong>Completed at:</strong>",
+		`class="js-local-datetime"`,
+		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
 		"<strong>Operator:</strong>",
 		"alice@example.com",

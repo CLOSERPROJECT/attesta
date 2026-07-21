@@ -3,6 +3,34 @@ import "./styles.css";
 const themeStorageKey = "attesta_theme";
 const themeToggle = document.getElementById("theme-toggle");
 
+const pad2 = (value) => String(value).padStart(2, "0");
+
+/** Format an ISO datetime as dd/mm/yyyy at HH:mm in the viewer's local timezone. */
+const formatLocalDateTimeLabel = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()} at ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+};
+
+const formatLocalDateTimes = (root = document) => {
+  const scope = root instanceof Element || root instanceof Document ? root : document;
+  for (const node of scope.querySelectorAll("time.js-local-datetime[datetime]")) {
+    if (!(node instanceof HTMLTimeElement)) {
+      continue;
+    }
+    const iso = (node.getAttribute("datetime") || "").trim();
+    if (!iso) {
+      continue;
+    }
+    const label = formatLocalDateTimeLabel(iso);
+    if (label) {
+      node.textContent = label;
+    }
+  }
+};
+
 const syncFormataDarkMode = (theme) => {
   const isDark = theme === "dark";
   const components = document.querySelectorAll("formata-form.js-formata-form");
@@ -237,6 +265,7 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     }
     const html = await response.text();
     processPageContent.innerHTML = html;
+    formatLocalDateTimes(processPageContent);
     await initializeFormataForms(processPageContent);
     markSelectedSubstep(currentSelectedSubstep());
     focusNextActionInput();
@@ -1128,6 +1157,7 @@ if (processId && workflowKey && processPageContent) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  formatLocalDateTimes(document);
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
   focusNextActionInput();
@@ -1149,6 +1179,9 @@ document.addEventListener("click", (event) => {
 });
 
 document.body.addEventListener("htmx:afterSwap", (event) => {
+  if (event.target instanceof Element) {
+    formatLocalDateTimes(event.target);
+  }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
     markSelectedSubstep(currentSelectedSubstep());
@@ -1408,6 +1441,7 @@ if (deptRoot) {
         }
         const html = await response.text();
         dashboard.innerHTML = html;
+        formatLocalDateTimes(dashboard);
       } catch (err) {
         // keep UI responsive even if SSE fails
       }

@@ -11,6 +11,7 @@ func TestStreamTerminationDetailsTemplateRendersFields(t *testing.T) {
 
 	var out bytes.Buffer
 	view := StreamTerminationDetailsView{
+		EndedAt:      "2026-03-05T14:30:00Z",
 		EndedAtHuman: "5 Mar 2026 at 14:30 UTC",
 		EndedBy:      "operator@example.com",
 		SubstepID:    "2.1",
@@ -28,6 +29,8 @@ func TestStreamTerminationDetailsTemplateRendersFields(t *testing.T) {
 		`d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"`,
 		`class="stream-termination-details-fields"`,
 		">Ended at</dt>",
+		`class="js-local-datetime"`,
+		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
 		">Ended by</dt>",
 		"operator@example.com",
