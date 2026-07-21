@@ -1045,6 +1045,24 @@ func TestNormalizeHomeStatusFilter(t *testing.T) {
 	}
 }
 
+func TestHomeProcessStatusCopy(t *testing.T) {
+	navAria, navTitle, heading, empty, pagination := homeProcessStatusCopy("available")
+	if navAria != "Available streams" || navTitle != "Streams waiting for your input" {
+		t.Fatalf("unexpected available nav copy: %q / %q", navAria, navTitle)
+	}
+	if heading != "Available stream instances" || empty != "No available instances" {
+		t.Fatalf("unexpected available section copy: %q / %q", heading, empty)
+	}
+	if pagination != "Available stream instances pagination" {
+		t.Fatalf("unexpected available pagination label: %q", pagination)
+	}
+
+	_, _, heading, empty, _ = homeProcessStatusCopy("all")
+	if heading != "All stream instances" || empty != "No instances" {
+		t.Fatalf("unexpected all section copy: %q / %q", heading, empty)
+	}
+}
+
 func TestHomePaginationURLUsesGlobalSortAndPage(t *testing.T) {
 	got := homePaginationURL("/w/workflow", "active", "status", 3)
 	want := "/w/workflow/?filter=active&page=3&sort=status"
@@ -1100,6 +1118,12 @@ func TestBuildHomeProcessGroupsUsesGlobalSortAndFilterFields(t *testing.T) {
 	}
 	if !strings.Contains(done.NextURL, "sort=progress_desc") {
 		t.Fatalf("expected sort=progress_desc in pagination url, got %q", done.NextURL)
+	}
+	if done.Heading != "Done stream instances" || done.EmptyMessage != "No completed instances" {
+		t.Fatalf("expected done status copy on group, got heading=%q empty=%q", done.Heading, done.EmptyMessage)
+	}
+	if done.NavAriaLabel != "Completed streams" || done.PaginationAriaLabel != "Done stream instances pagination" {
+		t.Fatalf("expected done nav/pagination copy, got aria=%q pagination=%q", done.NavAriaLabel, done.PaginationAriaLabel)
 	}
 }
 
@@ -1255,8 +1279,8 @@ func homeTestTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_body" .}}{{end}}
 {{define "home_body"}}
-PROC {{len .Processes}} SORT {{.Sort}} FILTER {{.StatusFilter}} PAGE {{.CurrentPage}}/{{.TotalPages}} DESC {{.WorkflowDescription}}
-PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}
+{{ $filter := .StatusFilter }}{{ range .ProcessGroups }}{{ if eq .Status $filter }}PROC {{len .Processes}} SORT {{.Sort}} FILTER {{$filter}} PAGE {{.CurrentPage}}/{{.TotalPages}} DESC {{$.WorkflowDescription}}
+PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}{{ end }}{{ end }}
 {{end}}
 {{define "stream.html"}}{{template "layout.html" .}}{{end}}
 `))

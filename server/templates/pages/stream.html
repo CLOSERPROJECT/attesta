@@ -72,22 +72,8 @@
                   data-home-nav="{{ .Status }}"
                   aria-controls="{{ .PanelID }}"
                   aria-current="{{ if eq .Status $.StatusFilter }}page{{ else }}false{{ end }}"
-                  {{ if eq .Status "all" }}
-                    aria-label="All streams"
-                    title="All stream instances"
-                  {{ else if eq .Status "available" }}
-                    aria-label="Available streams"
-                    title="Streams waiting for your input"
-                  {{ else if eq .Status "active" }}
-                    aria-label="Active streams"
-                    title="Streams waiting for someone else input"
-                  {{ else if eq .Status "done" }}
-                    aria-label="Completed streams"
-                    title="Streams completed successfully"
-                  {{ else if eq .Status "terminated" }}
-                    aria-label="Terminated streams"
-                    title="Streams terminated before completion"
-                  {{ end }}
+                  aria-label="{{ .NavAriaLabel }}"
+                  title="{{ .NavTitle }}"
                 >
                   {{ template "status_tag" .Status }}
                 </button>
@@ -253,21 +239,7 @@
                 {{ if ne .Status $.StatusFilter }}hidden{{ end }}
               >
                 <div class="stream-status-section-head">
-                  <h3>
-                    {{ if eq .Status "all" }}
-                      All stream instances
-                    {{ else if eq .Status "available" }}
-                      Available stream instances
-                    {{ else if eq .Status "active" }}
-                      Active stream instances
-                    {{ else if eq .Status "done" }}
-                      Done stream instances
-                    {{ else if eq .Status "terminated" }}
-                      Terminated stream instances
-                    {{ else }}
-                      {{ .Label }}
-                    {{ end }}
-                  </h3>
+                  <h3>{{ .Heading }}</h3>
                 </div>
                 {{ if .Processes }}
                   <ul class="stream-instance-card-list">
@@ -277,43 +249,13 @@
                   </ul>
                 {{ else }}
                   <div class="stream-instance-card-empty">
-                    <p class="muted">
-                      {{ if eq .Status "all" }}
-                        No instances
-                      {{ else }}
-                        No
-                        {{ if eq .Status "available" }}
-                          available
-                        {{ else if eq .Status "active" }}
-                          active
-                        {{ else if eq .Status "done" }}
-                          completed
-                        {{ else if eq .Status "terminated" }}
-                          terminated
-                        {{ else }}
-                          {{ .Label }}
-                        {{ end }}
-                        instances
-                      {{ end }}
-                    </p>
+                    <p class="muted">{{ .EmptyMessage }}</p>
                   </div>
                 {{ end }}
                 {{ if gt .TotalPages 1 }}
                   <nav
                     class="platform-admin-pagination platform-admin-pagination--inline"
-                    aria-label="{{ if eq .Status "all" }}
-                      All
-                    {{ else if eq .Status "available" }}
-                      Available
-                    {{ else if eq .Status "active" }}
-                      Active
-                    {{ else if eq .Status "done" }}
-                      Done
-                    {{ else if eq .Status "terminated" }}
-                      Terminated
-                    {{ else }}
-                      {{ .Label }}
-                    {{ end }} stream instances pagination"
+                    aria-label="{{ .PaginationAriaLabel }}"
                   >
                     <div class="platform-admin-pagination-pages">
                       <a
