@@ -29,7 +29,7 @@ func TestParseTemplates(t *testing.T) {
 
 	for _, name := range []string{
 		"layout.html",
-		"page_header_back",
+		"breadcrumbs",
 		"home_body",
 		"process_body",
 		"stream.html",
