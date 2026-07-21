@@ -234,18 +234,18 @@
                 data-home-panel="{{ .Status }}"
                 {{ if ne .Status "all" }}hidden{{ end }}
               >
-                <div class="stream-status-section-head" data-stream-status="{{ .Status }}">
+                <div class="stream-status-section-head">
                   <h3>
                     {{ if eq .Status "all" }}
-                      All
+                      All stream instances
                     {{ else if eq .Status "available" }}
-                      Available
+                      Available stream instances
                     {{ else if eq .Status "active" }}
-                      Active
+                      Active stream instances
                     {{ else if eq .Status "done" }}
-                      Done
+                      Done stream instances
                     {{ else if eq .Status "terminated" }}
-                      Terminated
+                      Terminated stream instances
                     {{ else }}
                       {{ .Label }}
                     {{ end }}
