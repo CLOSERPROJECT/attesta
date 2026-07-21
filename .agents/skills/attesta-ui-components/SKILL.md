@@ -109,7 +109,7 @@ Globs: `templates/*.html`, `templates/pages/*.html`, `templates/components/*.htm
 - `BreadcrumbItem` / `BreadcrumbsView` in `server/cmd/server/components.go`
 - Builders: `server/cmd/server/breadcrumbs.go` (`buildStreamBreadcrumbs`, `buildProcessBreadcrumbs`, …)
 - Tests: `server/cmd/server/breadcrumbs_test.go`, `breadcrumbs_template_test.go`
-- Call site: `{{ template "breadcrumbs" .Breadcrumbs }}` (empty `Href` ⇒ current non-link)
+- Call site: `{{ template "breadcrumbs" .Breadcrumbs }}` (`Current: true` on last crumb ⇒ `aria-current="page"`; every crumb is a link)
 
 Also see:
 

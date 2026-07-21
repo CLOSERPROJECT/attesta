@@ -4,7 +4,7 @@
  *   nav.breadcrumbs
  *     ol.breadcrumbs-list
  *       li.breadcrumbs-item
- *         a.breadcrumbs-link | span.breadcrumbs-current
+ *         a.breadcrumbs-link  (+ aria-current="page" on current)
  */
 
 .breadcrumbs {
@@ -32,21 +32,24 @@
 
 .breadcrumbs-item:not(:last-child)::after {
   content: "/";
-  color: var(--muted-foreground);
+  color: color-mix(in srgb, var(--muted-foreground) 55%, var(--background));
   font-weight: var(--font-normal);
 }
 
-.breadcrumbs-link {
-  color: var(--muted-foreground);
-  font-weight: var(--font-semibold);
+/* Mix toward background (not transparent — transparent pulls toward black in srgb).
+ * Beat reset `a { color: var(--primary) }` for link / visited / current. */
+.breadcrumbs a.breadcrumbs-link,
+.breadcrumbs a.breadcrumbs-link:link,
+.breadcrumbs a.breadcrumbs-link:visited,
+.breadcrumbs a.breadcrumbs-link:hover,
+.breadcrumbs a.breadcrumbs-link:active,
+.breadcrumbs a.breadcrumbs-link[aria-current="page"],
+.breadcrumbs .breadcrumbs-current {
+  color: color-mix(in srgb, var(--muted-foreground) 55%, var(--background));
+  font-weight: var(--font-normal);
   text-decoration: none;
 }
 
-.breadcrumbs-link:hover {
+.breadcrumbs a.breadcrumbs-link:hover {
   text-decoration: underline;
-}
-
-.breadcrumbs-current {
-  color: inherit;
-  font-weight: var(--font-normal);
 }

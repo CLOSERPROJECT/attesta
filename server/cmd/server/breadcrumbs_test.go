@@ -12,7 +12,7 @@ func TestBuildStreamBreadcrumbs(t *testing.T) {
 	if got.Items[0].Label != "Streams" || got.Items[0].Href != "/" {
 		t.Fatalf("root = %+v", got.Items[0])
 	}
-	if got.Items[1].Label != "Alpha Stream" || got.Items[1].Href != "" {
+	if got.Items[1].Label != "Alpha Stream" || got.Items[1].Href != "/w/wf-a/" || !got.Items[1].Current {
 		t.Fatalf("current = %+v", got.Items[1])
 	}
 }
@@ -32,7 +32,7 @@ func TestBuildProcessBreadcrumbsUsesInstanceName(t *testing.T) {
 	if got.Items[1].Label != "Alpha Stream" || got.Items[1].Href != "/w/wf-a/" {
 		t.Fatalf("stream crumb = %+v", got.Items[1])
 	}
-	if got.Items[2].Label != "Instance: Batch 1" || got.Items[2].Href != "" {
+	if got.Items[2].Label != "Instance: Batch 1" || got.Items[2].Href != "/w/wf-a/process/abc123" || !got.Items[2].Current {
 		t.Fatalf("instance crumb = %+v", got.Items[2])
 	}
 }
@@ -52,23 +52,26 @@ func TestBuildOrgAdminBreadcrumbs(t *testing.T) {
 	if got.Items[1].Label != "Organization admin" || got.Items[1].Href != "/org-admin/profile" {
 		t.Fatalf("middle = %+v", got.Items[1])
 	}
-	if got.Items[2].Label != "Members" || got.Items[2].Href != "" {
+	if got.Items[2].Label != "Members" || got.Items[2].Href != "/org-admin/members" || !got.Items[2].Current {
 		t.Fatalf("section = %+v", got.Items[2])
 	}
 }
 
 func TestBuildOrgAdminBreadcrumbsSections(t *testing.T) {
-	cases := map[string]string{
-		"profile": "Profile",
-		"roles":   "Roles",
-		"members": "Members",
-		"":        "Profile",
-		"other":   "Profile",
+	cases := map[string]struct {
+		label string
+		href  string
+	}{
+		"profile": {label: "Profile", href: "/org-admin/profile"},
+		"roles":   {label: "Roles", href: "/org-admin/roles"},
+		"members": {label: "Members", href: "/org-admin/members"},
+		"":        {label: "Profile", href: "/org-admin/profile"},
+		"other":   {label: "Profile", href: "/org-admin/profile"},
 	}
 	for panel, want := range cases {
 		got := buildOrgAdminBreadcrumbs(panel)
-		if got.Items[2].Label != want {
-			t.Fatalf("panel %q: label = %q, want %q", panel, got.Items[2].Label, want)
+		if got.Items[2].Label != want.label || got.Items[2].Href != want.href {
+			t.Fatalf("panel %q: got %+v, want label=%q href=%q", panel, got.Items[2], want.label, want.href)
 		}
 	}
 }
@@ -78,7 +81,7 @@ func TestBuildPlatformAdminBreadcrumbs(t *testing.T) {
 	if len(got.Items) != 2 {
 		t.Fatalf("len(Items) = %d, want 2", len(got.Items))
 	}
-	if got.Items[1].Label != "Platform admin" || got.Items[1].Href != "" {
+	if got.Items[1].Label != "Platform admin" || got.Items[1].Href != "/admin/orgs" || !got.Items[1].Current {
 		t.Fatalf("current = %+v", got.Items[1])
 	}
 }

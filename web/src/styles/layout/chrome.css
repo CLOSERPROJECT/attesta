@@ -203,6 +203,10 @@
   padding: var(--space-7) 32px 60px;
 }
 
+.page:has(.breadcrumbs) {
+  padding-top: var(--space-4);
+}
+
 .site-footer {
   margin-top: auto;
   padding: var(--space-5) 32px var(--space-6);

@@ -13,7 +13,7 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 	view := BreadcrumbsView{Items: []BreadcrumbItem{
 		{Label: "Streams", Href: "/"},
 		{Label: "Alpha", Href: "/w/alpha/"},
-		{Label: "Instance: Batch 1", Href: ""},
+		{Label: "Instance: Batch 1", Href: "/w/alpha/process/abc123", Current: true},
 	}}
 	if err := tmpl.ExecuteTemplate(&out, "breadcrumbs", view); err != nil {
 		t.Fatalf("render breadcrumbs: %v", err)
@@ -26,6 +26,7 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 		">Streams<",
 		`href="/w/alpha/"`,
 		">Alpha<",
+		`href="/w/alpha/process/abc123"`,
 		`aria-current="page"`,
 		"Instance: Batch 1",
 	} {
@@ -33,8 +34,8 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 			t.Fatalf("expected %q in breadcrumbs, got:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `href="">`) {
-		t.Fatalf("current crumb must not be an empty-href link, got:\n%s", body)
+	if strings.Contains(body, "breadcrumbs-current") || strings.Contains(body, "<span") {
+		t.Fatalf("expected current crumb to be a link, got:\n%s", body)
 	}
 }
 
@@ -76,6 +77,7 @@ func TestProcessPageHeaderRendersBreadcrumbs(t *testing.T) {
 		">Streams<",
 		">Alpha Stream<",
 		"Instance: Batch 1",
+		`href="/w/wf-a/process/abc123"`,
 		`aria-current="page"`,
 	} {
 		if !strings.Contains(body, want) {

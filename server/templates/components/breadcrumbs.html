@@ -4,11 +4,11 @@
       <ol class="breadcrumbs-list">
         {{ range .Items }}
           <li class="breadcrumbs-item">
-            {{ if .Href }}
-              <a class="breadcrumbs-link" href="{{ .Href }}">{{ .Label }}</a>
-            {{ else }}
-              <span class="breadcrumbs-current" aria-current="page">{{ .Label }}</span>
-            {{ end }}
+            <a
+              class="breadcrumbs-link"
+              href="{{ .Href }}"
+              {{ if .Current }}aria-current="page"{{ end }}
+            >{{ .Label }}</a>
           </li>
         {{ end }}
       </ol>
