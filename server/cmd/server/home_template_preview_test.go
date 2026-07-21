@@ -286,7 +286,7 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	if !strings.Contains(body, `class="stream-instance-card stream-instance-card-available"`) {
 		t.Fatalf("expected available process class, got: %s", body)
 	}
-	if !strings.Contains(compactBody, `status-tag status-tag-compact status-available`) ||
+	if !strings.Contains(compactBody, `class="status-tag status-tag-compact" data-stream-status="available"`) ||
 		!strings.Contains(compactBody, `available`) {
 		t.Fatalf("expected available status tag, got: %s", body)
 	}

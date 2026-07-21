@@ -52,7 +52,7 @@ Org-admin forms and pickers live in `components/org-admin.css`, not the page mod
 | `components/sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Inline markup per `sidebar-nav.css` header (CSS-only) |
 | `components/dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Inline markup per `dialog.css` header (CSS-only) |
 | `components/list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Inline markup per `list-row.css` header (CSS-only) |
-| `components/stream.css` | `.process-toolbar`, `.process-control`, `.status-tag*` | Inline markup in `pages/stream.html` (sort toolbar + status tags on cards) |
+| `components/stream.css` | `.process-toolbar`, `.process-control`, `.status-tag*` | Sort toolbar in `pages/stream.html`; status pills via micro-partial `status_tag` |
 
 ### CSS-only components
 
@@ -74,7 +74,7 @@ Reused **markup patterns** backed by namespaced CSS, with **no** full Go templat
 1. Create `web/src/styles/components/{name}.css` with a markup-tree comment at the top.
 2. Import it from `web/src/styles/components.css`.
 3. Add a row to the table below.
-4. Do **not** create a matching `templates/components/{name}.html` unless it graduates (narrow micro-partials such as `page_header_back` are the exception, not the rule).
+4. Do **not** create a matching `templates/components/{name}.html` unless it graduates (narrow micro-partials such as `page_header_back` and `status_tag` are the exception, not the rule).
 
 | Module | Primary classes | Markup contract |
 |--------|-----------------|-----------------|
@@ -118,7 +118,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `layout.html` | `layout/index.css` | `components/shared.css` |
 | Inline page headers (home, stream, process, dpp, org_admin, platform_admin, …) | `components/page-header.css` | `components/page_header.html` (`page_header_back` only) |
 | `components/stream_card.html` | `components/stream-card.css` | `components/dialog.css` |
-| `components/stream_instance_card.html` | `components/stream-instance-card.css` | `components/stream.css` (`.status-tag*`) |
+| `components/stream_instance_card.html` | `components/stream-instance-card.css` | `components/stream.css` (`.status-tag*` via `status_tag` micro-partial) |
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
 | Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`), `layout/grids.css` (`.rail-layout`) |
@@ -145,7 +145,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 |-----------|--------|-------------|
 | `data-theme` | `main.js` on `<html>` | `tokens.css` (`[data-theme="dark"]`) |
 | `data-role-palette` | role badges, timeline substeps | `role-palette.css` |
-| `data-stream-status` | `stream.html` section heads | `role-palette.css` |
+| `data-stream-status` | `status_tag` micro-partial; `stream.html` section heads | `role-palette.css` (`--stream-color`) |
 | `data-progress` (via `style="--progress: …"`) | `components/stream_instance_card.html` | `.stream-instance-card-progress-fill` in `components/stream-instance-card.css` |
 | `data-org-admin-nav`, `data-org-admin-panel`, `data-org-admin-default-panel`, `data-org-admin-ready` | `org_admin.html` | `pages/org-admin-page.css`, inline script in `org_admin.html` |
 | `data-home-nav`, `data-home-panel` | `stream.html` | `main.js` (panel switching) |
@@ -324,7 +324,13 @@ Role pills on `process`, `substep_body`, `dpp`, and `org_admin` use:
 
 Timeline substeps use the same attribute on `.substep`. Appearance is a soft-badge: text/border from the bg token with a 10% tint background (`color-mix`). The org-admin palette picker sets transient `--swatch-bg` on preview swatches only (not on role pill rows).
 
-Stream status uses `data-stream-status="{{ .Status }}"` on `.stream-status-section-head` (mapped in `role-palette.css`).
+Stream status uses `data-stream-status="{{ .Status }}"` (mapped in `role-palette.css` to `--stream-color`). Section heads and the `status_tag` micro-partial both set it; `.status-tag` consumes `var(--stream-color)`.
+
+```html
+{{ template "status_tag" .Status }}
+```
+
+renders `<span class="status-tag status-tag-compact" data-stream-status="…">…</span>` (pipeline is the status string).
 
 Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
 

@@ -29,35 +29,12 @@
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  border: 1px solid var(--border);
+  border: 1px solid var(--stream-color);
+  color: var(--stream-color);
+  background-color: color-mix(in srgb, var(--stream-color) 5%, transparent);
 }
 
 .status-tag-compact {
   padding: 1px var(--space-2);
   font-size: var(--text-xs);
 }
-
-.status-tag.status-active {
-  border-color: var(--stream-active);
-  color: var(--stream-active);
-  background-color: color-mix(in srgb, var(--stream-active) 5%, transparent);
-}
-
-.status-tag.status-available {
-  color: var(--stream-available);
-  border-color: var(--stream-available);
-  background-color: color-mix(in srgb, var(--stream-available) 5%, transparent);
-}
-
-.status-tag.status-done {
-  color: var(--stream-done);
-  border-color: var(--stream-done);
-  background-color: color-mix(in srgb, var(--stream-done) 5%, transparent);
-}
-
-.status-tag.status-terminated {
-  color: var(--stream-terminated);
-  border-color: var(--stream-terminated);
-  background: color-mix(in srgb, var(--stream-terminated) 5%, transparent);
-}
-

@@ -75,19 +75,7 @@
                   title="Streams terminated before completion"
                 {{ end }}
               >
-                <span class="sidebar-nav-title">
-                  {{ if eq .Status "available" }}
-                    Available
-                  {{ else if eq .Status "active" }}
-                    Active
-                  {{ else if eq .Status "done" }}
-                    Done
-                  {{ else if eq .Status "terminated" }}
-                    Terminated
-                  {{ else }}
-                    {{ .Label }}
-                  {{ end }}
-                </span>
+                {{ template "status_tag" .Status }}
               </button>
             {{ end }}
           </nav>
