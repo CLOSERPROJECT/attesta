@@ -327,9 +327,7 @@ type ProcessStatusGroup struct {
 	Status          string
 	Label           string
 	PanelID         string
-	PageParam       string
 	Sort            string
-	SortParam       string
 	SortFields      []QueryInput
 	TotalCount      int
 	CurrentPage     int
@@ -1769,33 +1767,18 @@ func homeProcessStatuses() []string {
 	return []string{"all", "available", processStatusActive, processStatusDone, processStatusTerminated}
 }
 
-func homeProcessStatusPageParam(status string) string {
-	return status + "_page"
-}
-
-func homeProcessStatusSortParam(status string) string {
-	return status + "_sort"
-}
-
-func homePaginationURL(workflowPath string, sortValues map[string]string, pageValues map[string]int, pageParam string, page int, filter string) string {
+func homePaginationURL(workflowPath, filter, sort string, page int) string {
 	values := url.Values{}
 	filter = normalizeHomeStatusFilter(filter)
 	if filter != "all" {
 		values.Set("filter", filter)
 	}
-	for _, status := range homeProcessStatuses() {
-		sortParam := homeProcessStatusSortParam(status)
-		if sortValue := normalizeHomeSortKey(sortValues[sortParam]); sortValue != "time_desc" {
-			values.Set(sortParam, sortValue)
-		}
-		param := homeProcessStatusPageParam(status)
-		value := pageValues[param]
-		if param == pageParam {
-			value = page
-		}
-		if value > 1 {
-			values.Set(param, strconv.Itoa(value))
-		}
+	sort = normalizeHomeSortKey(sort)
+	if sort != "time_desc" {
+		values.Set("sort", sort)
+	}
+	if page > 1 {
+		values.Set("page", strconv.Itoa(page))
 	}
 	target := strings.TrimRight(workflowPath, "/") + "/"
 	if encoded := values.Encode(); encoded != "" {
@@ -1804,15 +1787,9 @@ func homePaginationURL(workflowPath string, sortValues map[string]string, pageVa
 	return target
 }
 
-func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard, sortKey string, query url.Values) []ProcessStatusGroup {
+func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard, sortKey string, page int) []ProcessStatusGroup {
+	sortKey = normalizeHomeSortKey(sortKey)
 	byStatus := make(map[string][]StreamInstanceCard, len(homeProcessStatuses()))
-	pageValues := make(map[string]int, len(homeProcessStatuses()))
-	sortValues := make(map[string]string, len(homeProcessStatuses()))
-	for _, status := range homeProcessStatuses() {
-		pageValues[homeProcessStatusPageParam(status)] = parsePositiveInt(query.Get(homeProcessStatusPageParam(status)), 1)
-		sortParam := homeProcessStatusSortParam(status)
-		sortValues[sortParam] = normalizeHomeSortKey(firstNonEmpty(query.Get(sortParam), sortKey))
-	}
 	for _, process := range processes {
 		byStatus[process.Status] = append(byStatus[process.Status], process)
 	}
@@ -1825,12 +1802,8 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 		} else {
 			items = byStatus[status]
 		}
-		pageParam := homeProcessStatusPageParam(status)
-		sortParam := homeProcessStatusSortParam(status)
-		groupSort := normalizeHomeSortKey(sortValues[sortParam])
-		sortHomeProcessList(items, groupSort)
-		currentPage := normalizeHomePage(pageValues[pageParam], len(items))
-		pageValues[pageParam] = currentPage
+		sortHomeProcessList(items, sortKey)
+		currentPage := normalizeHomePage(page, len(items))
 		totalPages := 1
 		if len(items) > 0 {
 			totalPages = (len(items) + homeProcessesPerPage - 1) / homeProcessesPerPage
@@ -1846,41 +1819,25 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 		pageNumbers := make([]int, 0, totalPages)
 		pageLinks := make([]PaginationLink, 0, totalPages)
 		panelID := "stream-section-" + status
-		for page := 1; page <= totalPages; page++ {
-			pageNumbers = append(pageNumbers, page)
+		for pageNum := 1; pageNum <= totalPages; pageNum++ {
+			pageNumbers = append(pageNumbers, pageNum)
 			pageLinks = append(pageLinks, PaginationLink{
-				Page:      page,
-				URL:       homePaginationURL(workflowPath, sortValues, pageValues, pageParam, page, status),
-				IsCurrent: page == currentPage,
+				Page:      pageNum,
+				URL:       homePaginationURL(workflowPath, status, sortKey, pageNum),
+				IsCurrent: pageNum == currentPage,
 			})
 		}
 		previousPage := max(currentPage-1, 1)
 		nextPage := min(currentPage+1, totalPages)
-		sortFields := make([]QueryInput, 0, len(homeProcessStatuses())*2+1)
+		var sortFields []QueryInput
 		if status != "all" {
-			sortFields = append(sortFields, QueryInput{Name: "filter", Value: status})
-		}
-		for _, otherStatus := range homeProcessStatuses() {
-			otherSortParam := homeProcessStatusSortParam(otherStatus)
-			if otherSortParam != sortParam {
-				if otherSort := normalizeHomeSortKey(sortValues[otherSortParam]); otherSort != "time_desc" {
-					sortFields = append(sortFields, QueryInput{Name: otherSortParam, Value: otherSort})
-				}
-			}
-			otherPageParam := homeProcessStatusPageParam(otherStatus)
-			if otherPageParam != pageParam {
-				if otherPage := pageValues[otherPageParam]; otherPage > 1 {
-					sortFields = append(sortFields, QueryInput{Name: otherPageParam, Value: strconv.Itoa(otherPage)})
-				}
-			}
+			sortFields = []QueryInput{{Name: "filter", Value: status}}
 		}
 		groups = append(groups, ProcessStatusGroup{
 			Status:          status,
 			Label:           processStatusLabel(status),
 			PanelID:         panelID,
-			PageParam:       pageParam,
-			Sort:            groupSort,
-			SortParam:       sortParam,
+			Sort:            sortKey,
 			SortFields:      sortFields,
 			TotalCount:      len(items),
 			CurrentPage:     currentPage,
@@ -1891,8 +1848,8 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 			HasNextPage:     currentPage < totalPages,
 			PreviousPage:    previousPage,
 			NextPage:        nextPage,
-			PreviousURL:     homePaginationURL(workflowPath, sortValues, pageValues, pageParam, previousPage, status),
-			NextURL:         homePaginationURL(workflowPath, sortValues, pageValues, pageParam, nextPage, status),
+			PreviousURL:     homePaginationURL(workflowPath, status, sortKey, previousPage),
+			NextURL:         homePaginationURL(workflowPath, status, sortKey, nextPage),
 			Processes:       pagedItems,
 		})
 	}
@@ -4827,7 +4784,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 
 	sortHomeProcessList(processes, sortKey)
 	sortHomeProcessList(filteredProcesses, sortKey)
-	processGroups := buildHomeProcessGroups(workflowPath(workflowKey), processes, sortKey, r.URL.Query())
+	processGroups := buildHomeProcessGroups(workflowPath(workflowKey), processes, sortKey, page)
 
 	currentPage := normalizeHomePage(page, len(filteredProcesses))
 	start := (currentPage - 1) * homeProcessesPerPage

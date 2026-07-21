@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1046,36 +1045,30 @@ func TestNormalizeHomeStatusFilter(t *testing.T) {
 	}
 }
 
-func TestHomePaginationURLIncludesFilterAndOmitsHash(t *testing.T) {
-	sortValues := map[string]string{
-		"active_sort": "status",
-		"all_sort":    "time_desc",
-	}
-	pageValues := map[string]int{
-		"active_page": 2,
-		"all_page":    1,
-	}
-
-	got := homePaginationURL("/w/workflow", sortValues, pageValues, "active_page", 3, "active")
-	want := "/w/workflow/?active_page=3&active_sort=status&filter=active"
+func TestHomePaginationURLUsesGlobalSortAndPage(t *testing.T) {
+	got := homePaginationURL("/w/workflow", "active", "status", 3)
+	want := "/w/workflow/?filter=active&page=3&sort=status"
 	if got != want {
 		t.Fatalf("pagination url = %q, want %q", got, want)
 	}
 	if strings.Contains(got, "#") {
 		t.Fatalf("did not expect hash in pagination url, got %q", got)
 	}
+	if strings.Contains(got, "_sort=") || strings.Contains(got, "_page=") {
+		t.Fatalf("did not expect per-status sort/page params, got %q", got)
+	}
 
-	allURL := homePaginationURL("/w/workflow", sortValues, pageValues, "all_page", 1, "all")
-	if strings.Contains(allURL, "filter=") {
-		t.Fatalf("default filter should omit filter param, got %q", allURL)
+	allURL := homePaginationURL("/w/workflow", "all", "time_desc", 1)
+	if allURL != "/w/workflow/" {
+		t.Fatalf("defaults should omit query params, got %q", allURL)
 	}
 }
 
-func TestBuildHomeProcessGroupsPreservesFilterInSortFields(t *testing.T) {
+func TestBuildHomeProcessGroupsUsesGlobalSortAndFilterFields(t *testing.T) {
 	groups := buildHomeProcessGroups("/w/workflow", []StreamInstanceCard{
 		{ID: "1", Status: "active"},
 		{ID: "2", Status: "done"},
-	}, "time_desc", url.Values{"done_sort": []string{"progress_desc"}})
+	}, "progress_desc", 1)
 
 	var done *ProcessStatusGroup
 	for i := range groups {
@@ -1087,10 +1080,16 @@ func TestBuildHomeProcessGroupsPreservesFilterInSortFields(t *testing.T) {
 	if done == nil {
 		t.Fatal("expected done process group")
 	}
+	if done.Sort != "progress_desc" {
+		t.Fatalf("expected shared sort progress_desc, got %q", done.Sort)
+	}
 	foundFilter := false
 	for _, field := range done.SortFields {
 		if field.Name == "filter" && field.Value == "done" {
 			foundFilter = true
+		}
+		if strings.HasSuffix(field.Name, "_sort") || strings.HasSuffix(field.Name, "_page") {
+			t.Fatalf("did not expect legacy sort/page field %#v", field)
 		}
 	}
 	if !foundFilter {
@@ -1098,6 +1097,9 @@ func TestBuildHomeProcessGroupsPreservesFilterInSortFields(t *testing.T) {
 	}
 	if !strings.Contains(done.NextURL, "filter=done") {
 		t.Fatalf("expected filter in pagination url, got %q", done.NextURL)
+	}
+	if !strings.Contains(done.NextURL, "sort=progress_desc") {
+		t.Fatalf("expected sort=progress_desc in pagination url, got %q", done.NextURL)
 	}
 }
 
