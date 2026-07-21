@@ -126,6 +126,7 @@ Also see:
 - `dialog` — modal shell (`.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … in `web/src/styles/components/dialog.css`); destructive titles stack `.dialog-title u-text-danger`; inline markup in `process.html`, `stream.html`, `home.html`, `org_admin.html`, `platform_admin.html`, `components/substep_body.html`
 - `button` — composable controls (`.btn` + variants/sizes/`btn-icon` in `web/src/styles/components/button.css`)
 - `list-row` — bordered list item with main + actions (`.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` in `web/src/styles/components/list-row.css`); inline markup in `org_admin.html`, `platform_admin.html`
+- `tip` — inverted hover/focus label with caret (`.tip` in `web/src/styles/components/tip.css`); micro-partial `server/templates/components/tip.html` via `{{ template "tip" (dict "Tooltip" "…" …) }}` (`ImgSrc`/`ImgClass` or `Icon`/`InnerClass`; optional `Class`, `AriaLabel`, `Role`). `Icon` is any template define name, executed via the `render` template func.
 
 ## Docs and verification
 

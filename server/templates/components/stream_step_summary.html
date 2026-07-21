@@ -3,40 +3,51 @@
 {{ define "stream_step_summary" }}
   <div class="stream-step-summary-main">
     <span class="pill pill-step-number pill-panel">{{ .StepID }}</span>
-    {{ if not .HideOrgMark }}
-      {{ if .OrgLogoURL }}
-        <img
-          src="{{ .OrgLogoURL }}"
-          alt=""
-          class="stream-step-summary-org-mark"
-        />
-      {{ else }}
-        <span class="stream-step-summary-org-mark">
-          {{ template "icon-no-org" . }}
-        </span>
-      {{ end }}
-    {{ end }}
     <span class="stream-step-summary-copy">
       <span class="stream-step-summary-title">{{ .Title }}</span>
       <div class="stream-step-summary-meta">
-        <span
-          ><strong>Organization:</strong>
+        <span class="stream-step-summary-org">
+          {{ if not .HideOrgMark }}
+            {{ if .OrgLogoURL }}
+              {{ template "tip" (dict
+                "Tooltip" "Organization"
+                "ImgSrc" .OrgLogoURL
+                "ImgClass" "stream-step-summary-org-mark"
+              ) }}
+            {{ else }}
+              {{ template "tip" (dict
+                "Tooltip" "Organization"
+                "Role" "img"
+                "Class" "stream-step-summary-meta-icon"
+                "Icon" "icon-building-grid"
+              ) }}
+            {{ end }}
+          {{ end }}
           {{ if .OrganizationName }}
             {{ .OrganizationName }}
           {{ else }}
             No organization
-          {{ end }}</span
-        >
+          {{ end }}
+        </span>
         {{ if .CompletedAtHuman }}
-          <span
-            ><strong>Completed at:</strong>
-            <time datetime="{{ .CompletedAt }}">{{ .CompletedAtHuman }}</time></span
-          >
+          <span class="stream-step-summary-meta-item">
+            {{ template "tip" (dict
+              "Tooltip" "Completed at"
+              "Class" "stream-step-summary-meta-icon"
+              "Icon" "icon-clock"
+            ) }}
+            <time datetime="{{ .CompletedAt }}">{{ .CompletedAtHuman }}</time>
+          </span>
         {{ end }}
         {{ if .SubstepCount }}
-          <span
-            ><strong>Substeps:</strong> {{ .SubstepCount }}</span
-          >
+          <span class="stream-step-summary-meta-item">
+            {{ template "tip" (dict
+              "Tooltip" "Steps"
+              "Class" "stream-step-summary-meta-icon"
+              "Icon" "icon-list"
+            ) }}
+            {{ .SubstepCount }}
+          </span>
         {{ end }}
       </div>
     </span>

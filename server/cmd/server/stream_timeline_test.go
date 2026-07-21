@@ -53,6 +53,8 @@ func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
 		`class="stream-timeline-step-summary"`,
 		`class="stream-step-summary-org-mark"`,
 		`src="https://example.com/logo.png"`,
+		`class="tip"`,
+		`data-tooltip="Organization"`,
 		`class="stream-timeline-substeps"`,
 		`class="substep substep-available"`,
 		`class="substep-accordion js-process-substep-panel"`,
@@ -61,9 +63,8 @@ func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
 		`class="stream-step-summary-meta"`,
 		`<span class="status" aria-label="Status: available">available</span>`,
 		"Production",
-		"<strong>Organization:</strong>",
 		"Acme Org",
-		"<strong>Substeps:</strong>",
+		`data-tooltip="Steps"`,
 		"Capture batch data",
 	} {
 		if !strings.Contains(body, want) {
@@ -113,11 +114,11 @@ func TestStreamTimelineTemplateRendersOrgLogoFallback(t *testing.T) {
 	if strings.Contains(body, `src="https://example.com/logo.png"`) {
 		t.Fatalf("did not expect org logo img when URL empty, got: %s", body)
 	}
-	if !strings.Contains(body, `class="stream-step-summary-org-mark"`) {
-		t.Fatalf("expected org mark fallback container, got: %s", body)
+	if strings.Contains(body, `class="stream-step-summary-org-mark"`) {
+		t.Fatalf("did not expect org mark square for building fallback, got: %s", body)
 	}
 	if !strings.Contains(body, `class="icon-svg"`) {
-		t.Fatalf("expected icon-no-org fallback svg, got: %s", body)
+		t.Fatalf("expected building icon fallback svg, got: %s", body)
 	}
 }
 
