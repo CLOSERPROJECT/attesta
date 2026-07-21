@@ -3,7 +3,13 @@
 {{ define "platform_admin_body" }}
 
   <div class="stack u-max-w-7xl u-mx-auto">
-    {{ template "page_header" .Header }}
+    <section class="page-header">
+      {{ template "page_header_back" "/" }}
+      <div class="page-header-body">
+        <h1>Platform admin dashboard</h1>
+        <p>Create and manage organizations</p>
+      </div>
+    </section>
 
     <section class="panel">
       <div class="panel-head-actions">

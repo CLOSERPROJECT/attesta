@@ -10,11 +10,6 @@ func TestPlatformAdminTemplateOrganizationInviteAndPagination(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := PlatformAdminView{
-		Header: PageHeaderView{
-			Title:       "Platform admin dashboard",
-			Description: "Create and manage organizations",
-			BackHref:    "/",
-		},
 		CurrentPage: 1,
 		TotalPages:  3,
 		PageNumbers: []int{1, 2, 3},

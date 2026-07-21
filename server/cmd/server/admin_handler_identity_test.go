@@ -3775,8 +3775,8 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 		if getRec.Code != http.StatusSeeOther {
 			t.Fatalf("get status = %d, want %d", getRec.Code, http.StatusSeeOther)
 		}
-		if getRec.Header().Get("Location") != "/org-admin/members" {
-			t.Fatalf("get location = %q, want /org-admin/members", getRec.Header().Get("Location"))
+		if getRec.Header().Get("Location") != "/org-admin/profile" {
+			t.Fatalf("get location = %q, want /org-admin/profile", getRec.Header().Get("Location"))
 		}
 
 		postReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=unsupported"))

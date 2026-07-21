@@ -1,93 +1,101 @@
-{{/* Used on /01/09506000134352/10/defaultProduct/21/.StreamID to render Digital Product Passport */}}
-
-{{ define "dpp_body" }}
-  <div class="stack dpp-page u-mx-auto">
-    {{ template "page_header" .Header }}
-    <section class="panel">
-      <div class="dpp-overview">
-        <div class="panel-head-actions">
-          <div class="panel-heading">
-            <h2>{{ .Workflow.Name }}</h2>
-            {{ if .Workflow.Description }}
-              <p>{{ .Workflow.Description }}</p>
-            {{ end }}
-          </div>
-          <button
-            type="button"
-            class="btn btn-primary js-share-link"
-            data-share-url="{{ .DigitalLink }}"
-            data-share-label="DPP link"
-          >
-            {{ template "icon-share" . }}
-            Share DPP link
-          </button>
-        </div>
+{{/* Used on /01/09506000134352/10/defaultProduct/21/.StreamID to render Digital
+Product Passport */}} {{ define "dpp_body" }}
+<div class="stack dpp-page u-mx-auto">
+  <section class="page-header">
+    <div class="page-header-head">
+      <div class="page-header-body">
+        <h1>
+          {{ .Workflow.Name }}
+          <br />
+          <span class="page-header-subtitle">Digital Product Passport</span>
+        </h1>
+      </div>
+      <div class="dpp-page-header-copy">
+        {{ if .Workflow.Description }}
+          <p>
+            {{ .Workflow.Description }}
+            This Digital Product Passport is a GS1 Digital Link landing page for
+            product and stream traceability.
+          </p>
+        {{ else }}
+          <p>
+            This Digital Product Passport is a GS1 Digital Link landing page for
+            product and stream traceability.
+          </p>
+        {{ end }}
         <div class="dpp-ids">
-          <span class="dpp-id">GTIN: {{ .GTIN }}</span>
-          <span class="dpp-id">Lot: {{ .Lot }}</span>
-          <span class="dpp-id">Serial: {{ .Serial }}</span>
+          <span class="dpp-id"><strong>GTIN</strong> {{ .GTIN }}</span>
+          <span class="dpp-id"><strong>Lot</strong> {{ .Lot }}</span>
+          <span class="dpp-id"><strong>Serial</strong> {{ .Serial }}</span>
         </div>
       </div>
-
-      <hr class="u-divider-10" />
-      <div class="dpp-history">
-        <div class="panel-heading">
-          <h2>History</h2>
-        </div>
-        {{ template "stream_termination_details" .Termination }}
-        <div class="dpp-history-list">
-          {{ range .Traceability }}
-            {{ template "dpp_history_step" (streamTimelineStep . true) }}
-          {{ end }}
-        </div>
+      <div class="page-header-actions">
+        <button
+          type="button"
+          class="btn btn-primary js-share-link"
+          data-share-url="{{ .DigitalLink }}"
+          data-share-label="DPP link"
+        >
+          {{ template "icon-share" . }} Share DPP link
+        </button>
       </div>
+    </div>
+  </section>
+  <hr class="u-divider-10" />
+  <section class="panel">
+    <div class="dpp-history">
+      <div class="panel-heading">
+        <h2>History</h2>
+      </div>
+      {{ template "stream_termination_details" .Termination }}
+      <div class="dpp-history-list">
+        {{ range .Traceability }} {{ template "dpp_history_step"
+        (streamTimelineStep . true) }} {{ end }}
+      </div>
+    </div>
 
-      <hr class="u-divider-10" />
-      <div class="dpp-integrity">
-        <div class="panel-heading">
-          <h2>Integrity</h2>
-        </div>
-        <div class="dpp-integrity-root">
-          <strong>Merkle root:</strong>
+    <hr class="u-divider-10" />
+    <div class="dpp-integrity">
+      <div class="panel-heading">
+        <h2>Integrity</h2>
+      </div>
+      <div class="dpp-integrity-root">
+        <strong>Merkle root:</strong>
+        <code class="dpp-integrity-hash dpp-integrity-hash-full"
+          >{{ .Integrity.Root.Full }}</code
+        >
+        <button
+          type="button"
+          class="dpp-integrity-hash-button js-copy-text"
+          data-copy-text="{{ .Integrity.Root.Full }}"
+          data-copy-label="merkle root"
+          aria-label="Copy full merkle root hash"
+          title="{{ .Integrity.Root.Full }}"
+        >
+          {{ .Integrity.Root.Short }}
+        </button>
+      </div>
+      <ul class="dpp-integrity-list">
+        {{ range .Integrity.Leaves }}
+        <li class="dpp-integrity-item">
+          <code>{{ .SubstepID }}</code>
           <code class="dpp-integrity-hash dpp-integrity-hash-full"
-            >{{ .Integrity.Root.Full }}</code
+            >{{ .Hash.Full }}</code
           >
           <button
             type="button"
             class="dpp-integrity-hash-button js-copy-text"
-            data-copy-text="{{ .Integrity.Root.Full }}"
-            data-copy-label="merkle root"
-            aria-label="Copy full merkle root hash"
-            title="{{ .Integrity.Root.Full }}"
+            data-copy-text="{{ .Hash.Full }}"
+            data-copy-label="substep hash"
+            aria-label="Copy full hash for substep {{ .SubstepID }}"
+            title="{{ .Hash.Full }}"
           >
-            {{ .Integrity.Root.Short }}
+            {{ .Hash.Short }}
           </button>
-        </div>
-        <ul class="dpp-integrity-list">
-          {{ range .Integrity.Leaves }}
-            <li class="dpp-integrity-item">
-              <code>{{ .SubstepID }}</code>
-              <code class="dpp-integrity-hash dpp-integrity-hash-full"
-                >{{ .Hash.Full }}</code
-              >
-              <button
-                type="button"
-                class="dpp-integrity-hash-button js-copy-text"
-                data-copy-text="{{ .Hash.Full }}"
-                data-copy-label="substep hash"
-                aria-label="Copy full hash for substep {{ .SubstepID }}"
-                title="{{ .Hash.Full }}"
-              >
-                {{ .Hash.Short }}
-              </button>
-            </li>
-          {{ end }}
-        </ul>
-      </div>
-    </section>
-  </div>
-{{ end }}
-
-{{ define "dpp.html" }}
-  {{ template "layout.html" . }}
-{{ end }}
+        </li>
+        {{ end }}
+      </ul>
+    </div>
+  </section>
+</div>
+{{ end }} {{ define "dpp.html" }} {{ template "layout.html" . }} {{ end }}

@@ -16,12 +16,12 @@ description: >-
 | Tier | Template | CSS | Go view struct |
 |------|----------|-----|----------------|
 | **Full component** | `components/{name}.html` | `components/{name}.css` when ~10+ namespaced rules | Dedicated type in `components.go` |
-| **CSS-only component** | **None** — inline HTML in page templates | `components/{name}.css` with markup-tree header comment | **None** |
+| **CSS-only component** | **None** (or a narrow micro-partial) — inline HTML in page templates | `components/{name}.css` with markup-tree header comment | **None** |
 | **Cluster / primitive** | inline | `shared.css`, `forms.css`, … | none |
 
 **Full component** — all apply: reused 2+ pages or HTMX/SSE target; namespaced CSS; stable field set assembled in Go.
 
-**CSS-only component** — reused markup tree + related selectors; no mode dispatch; see `docs/css.md` → CSS-only components. Example: panel section headers → `panel.css` (read file header for markup).
+**CSS-only component** — reused markup tree + related selectors; no mode dispatch; see `docs/css.md` → CSS-only components. Example: panel section headers → `panel.css` (read file header for markup). Page headers → `page-header.css` (inline in pages; optional `page_header_back` micro-partial).
 
 **Cluster instead:**
 
@@ -45,10 +45,10 @@ Separate **reused** styles (`components/`) from **page-specific** styles (`pages
 
 ## Naming
 
-- **Template define name = file stem** (basename without `.html`): `page_header.html` → `{{ define "page_header" }}`.
+- **Template define name = file stem** (basename without `.html`): `stream_card.html` → `{{ define "stream_card" }}`. Micro-partials may share a file (e.g. `page_header.html` defines `page_header_back` only).
 - Page wrappers: `{page}.html` define wrapping `layout.html` (e.g. `process.html`).
 - Page body blocks: `{page}_body` define (e.g. `process_body`).
-- CSS class prefix: kebab-case matching the component (`page-header-*` for `page_header`).
+- CSS class prefix: kebab-case matching the component (`page-header-*` for page header; `stream-card-*` for `stream_card`).
 
 ## Go conventions
 
@@ -57,15 +57,25 @@ Separate **reused** styles (`components/`) from **page-specific** styles (`pages
 - **No** page-specific preset functions in shared component code (e.g. no `streamPageHeader()`).
 - Extract a constructor only when there is real logic (validation, computed fields); page-specific constructors belong in peeled files (`stream_instance_detail.go`, `substep_views_builder.go`, …) or future `page_*.go`, not `components.go`.
 - Split a type out of `components.go` only when it grows non-trivial logic or large isolated tests (~80–100+ lines).
+- **CSS-only components** (page header, panel, dialog, list-row, …) have **no** shared view struct. Put title/description/meta strings on the page view (or inline in the template) and render the markup tree in the page template.
 
-Example:
+Example (full component):
 
 ```go
-Header: PageHeaderView{
-    Title:       cfg.Workflow.Name,
+Card: StreamCardView{
+    Key:         cfg.Workflow.Key,
+    Name:        cfg.Workflow.Name,
     Description: strings.TrimSpace(cfg.Workflow.Description),
-    BackHref:    "/",
 },
+```
+
+Example (CSS-only page header — fields on the page view, markup inlined in the page template):
+
+```go
+// Page view fields used by inlined page-header markup (no PageHeaderView).
+Title:       cfg.Workflow.Name,
+Description: strings.TrimSpace(cfg.Workflow.Description),
+BackHref:    "/", // passed to {{ template "page_header_back" .BackHref }}
 ```
 
 ## Template loading
@@ -76,13 +86,6 @@ Header: PageHeaderView{
 Globs: `templates/*.html`, `templates/pages/*.html`, `templates/components/*.html`.
 
 ## Reference implementations
-
-`page_header` — first migrated component:
-
-- `server/templates/components/page_header.html`
-- `web/src/styles/components/page-header.css`
-- `PageHeaderView` in `server/cmd/server/components.go`
-- Tests: `server/cmd/server/page_header_test.go`
 
 `stream_card` — home stream picker card:
 
@@ -107,6 +110,7 @@ Also see:
 
 ### CSS-only components
 
+- `page-header` — page chrome title block (`web/src/styles/components/page-header.css`); inline markup in page templates under `server/templates/pages/`; **no** `PageHeaderView` / full `page_header` define. Heading-only: `page-header-body` directly under `section.page-header`. With actions: `page-header-head` wraps `page-header-body` + `page-header-actions`. **Exception:** micro-partial `page_header_back` in `server/templates/components/page_header.html` — pipeline is href **string**; fixed label `Back`; uses `icon-back`; `<a class="page-header-back" href="{{ . }}">`. Call site: `{{ template "page_header_back" "/" }}` or `{{ template "page_header_back" (printf "/w/%s/" .WorkflowKey) }}`
 - `panel` — card container and section headers (`web/src/styles/components/panel.css`); optional `.panel-sticky`; inline markup in `process.html`, `stream.html`, `dpp.html`, `org_admin.html`, `platform_admin.html`
 - `sidebar-nav` — section switcher tiles (`.sidebar-nav`, `.sidebar-nav-link`, … in `web/src/styles/components/sidebar-nav.css`); inline markup in `stream.html`, `org_admin.html`
 - `dialog` — modal shell (`.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … in `web/src/styles/components/dialog.css`); destructive titles stack `.dialog-title u-text-danger`; inline markup in `process.html`, `stream.html`, `home.html`, `org_admin.html`, `platform_admin.html`, `components/substep_body.html`
@@ -122,7 +126,7 @@ Before claiming done:
 
 ```bash
 cd server && go test ./cmd/server/ -count=1
-cd server && go test ./cmd/server/ -run 'PageHeader|StreamCard|DialogMarkup|ListRowMarkup' -count=1
+cd server && go test ./cmd/server/ -run 'PageHeaderBack|StreamCard|DialogMarkup|ListRowMarkup' -count=1
 task css:lint
 ```
 

@@ -45,11 +45,6 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		Header: PageHeaderView{
-			Title:       "Demo workflow",
-			Description: "Previewable workflow",
-			BackHref:    "/",
-		},
 		WorkflowDescription: "Previewable workflow",
 		Processes:           []StreamInstanceCard{process},
 		ProcessGroups:       testHomeProcessGroups(process),
@@ -151,11 +146,6 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		Header: PageHeaderView{
-			Title:       "Demo workflow",
-			Description: "Previewable workflow",
-			BackHref:    "/",
-		},
 		WorkflowDescription: "Previewable workflow",
 		ProcessGroups:       testHomeProcessGroups(),
 	}
@@ -187,10 +177,6 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
-		},
-		Header: PageHeaderView{
-			Title:    "Demo workflow",
-			BackHref: "/",
 		},
 		Sort:         "status",
 		StatusFilter: "active",
@@ -259,10 +245,6 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
-		},
-		Header: PageHeaderView{
-			Title:    "Demo workflow",
-			BackHref: "/",
 		},
 		ProcessGroups: testHomeProcessGroups(StreamInstanceCard{
 			ID:            "process-1",

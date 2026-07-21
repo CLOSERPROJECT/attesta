@@ -3,7 +3,13 @@
 {{ define "org_admin_body" }}
 
   <div class="stack u-max-w-7xl u-mx-auto">
-    {{ template "page_header" .Header }}
+    <section class="page-header">
+      {{ template "page_header_back" "/" }}
+      <div class="page-header-body">
+        <h1>Organization admin dashboard</h1>
+        <p>Manage organization settings, roles, and members</p>
+      </div>
+    </section>
     <div
       class="rail-layout{{ if not .NeedsOrganizationSetup }}
         rail-layout-ready
