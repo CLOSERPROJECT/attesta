@@ -1,0 +1,52 @@
+/*
+ * Breadcrumbs — hierarchical page trail (full component).
+ *
+ *   nav.breadcrumbs
+ *     ol.breadcrumbs-list
+ *       li.breadcrumbs-item
+ *         a.breadcrumbs-link | span.breadcrumbs-current
+ */
+
+.breadcrumbs {
+  width: 100%;
+}
+
+.breadcrumbs-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.breadcrumbs-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.breadcrumbs-item:not(:last-child)::after {
+  content: "/";
+  color: var(--muted-foreground);
+  font-weight: var(--font-normal);
+}
+
+.breadcrumbs-link {
+  color: var(--muted-foreground);
+  font-weight: var(--font-semibold);
+  text-decoration: none;
+}
+
+.breadcrumbs-link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbs-current {
+  color: inherit;
+  font-weight: var(--font-normal);
+}

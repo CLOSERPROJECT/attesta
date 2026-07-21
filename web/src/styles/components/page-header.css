@@ -3,14 +3,14 @@
  *
  * Heading only (no actions):
  *   section.page-header
- *     a.page-header-back?            (from template page_header_back; href via pipeline)
+ *     nav.breadcrumbs?               (from template breadcrumbs)
  *     div.page-header-body
  *       h1                           (title; optional span[aria-hidden] + span.page-header-subtitle)
  *       p?                           (description)
  *
  * With actions:
  *   section.page-header
- *     a.page-header-back?
+ *     nav.breadcrumbs?
  *     div.page-header-head
  *       div.page-header-body
  *         …                          (same as above)
@@ -25,13 +25,6 @@
   flex-direction: column;
   align-items: start;
   gap: var(--space-3);
-}
-
-.page-header-back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-weight: var(--font-semibold);
 }
 
 .page-header-head {
