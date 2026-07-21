@@ -224,6 +224,14 @@
 
 /* Single-column rail (< md): filter + sort side by side. */
 @media (--md-down) {
+  .stream-page.stack {
+    gap: var(--space-4);
+  }
+
+  .stream-page .rail-layout {
+    gap: var(--space-10);
+  }
+
   .stream-page .rail-layout-ready > .panel-sticky {
     display: flex;
     flex-direction: row;
