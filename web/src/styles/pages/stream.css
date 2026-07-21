@@ -136,3 +136,29 @@
     gap: var(--space-2);
   }
 }
+
+/* Single-column rail (< md): filter + sort side by side. */
+@media (--md-down) {
+  .stream-page .rail-layout-ready > .panel-sticky {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-8);
+  }
+
+  .stream-page .stream-status-filter {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .stream-page .stream-status-sort {
+    margin-top: 0;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .stream-page .stream-status-sort-control,
+  .stream-page .stream-status-sort-control select {
+    width: auto;
+  }
+}
