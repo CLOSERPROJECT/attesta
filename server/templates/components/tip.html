@@ -15,10 +15,7 @@
       />
     {{ else if .Icon }}
       {{ if .InnerClass }}<span class="{{ .InnerClass }}">{{ end }}
-      {{ if eq .Icon "icon-clock" }}{{ template "icon-clock" . }}
-      {{ else if eq .Icon "icon-list" }}{{ template "icon-list" . }}
-      {{ else if eq .Icon "icon-building-grid" }}{{ template "icon-building-grid" . }}
-      {{ end }}
+      {{ render .Icon . }}
       {{ if .InnerClass }}</span>{{ end }}
     {{ end }}
   </span>

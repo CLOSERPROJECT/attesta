@@ -8,7 +8,8 @@
  *     img? | span.inner? > icon | icon
  *
  * Dict keys: Tooltip (required), Class?, AriaLabel?, Role?,
- *            ImgSrc?, ImgClass?, Icon? (template name), InnerClass?
+ *            ImgSrc?, ImgClass?, Icon? (any template define name via render),
+ *            InnerClass?
  */
 
 .tip {

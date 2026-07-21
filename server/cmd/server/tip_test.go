@@ -60,3 +60,33 @@ func TestTipTemplateRendersImageHost(t *testing.T) {
 		}
 	}
 }
+
+func TestTipTemplateRendersArbitraryIconDefine(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	data := map[string]any{
+		"Tooltip": "Search",
+		"Icon":    "icon-search",
+	}
+	if err := tmpl.ExecuteTemplate(&out, "tip", data); err != nil {
+		t.Fatalf("render tip template: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, `class="icon-svg`) {
+		t.Fatalf("expected icon-search svg via render, got: %s", body)
+	}
+}
+
+func TestTipTemplateUnknownIconErrors(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	data := map[string]any{
+		"Tooltip": "Missing",
+		"Icon":    "icon-does-not-exist",
+	}
+	if err := tmpl.ExecuteTemplate(&out, "tip", data); err == nil {
+		t.Fatal("expected error for unknown icon define")
+	}
+}

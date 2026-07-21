@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"path/filepath"
@@ -44,8 +45,22 @@ func templateFuncs() template.FuncMap {
 	}
 }
 
+// withTemplateFuncs registers shared funcs plus render, which executes a named
+// template by string (Go's {{ template }} action only accepts constant names).
+func withTemplateFuncs(tmpl *template.Template) *template.Template {
+	funcs := templateFuncs()
+	funcs["render"] = func(name string, data any) (template.HTML, error) {
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+			return "", err
+		}
+		return template.HTML(buf.String()), nil
+	}
+	return tmpl.Funcs(funcs)
+}
+
 func parseTemplates() (*template.Template, error) {
-	tmpl := template.New("").Funcs(templateFuncs())
+	tmpl := withTemplateFuncs(template.New(""))
 	var err error
 	for _, pattern := range templateGlobPatterns {
 		tmpl, err = tmpl.ParseGlob(pattern)
@@ -58,7 +73,7 @@ func parseTemplates() (*template.Template, error) {
 
 func parseTestTemplates(t testing.TB) *template.Template {
 	t.Helper()
-	tmpl := template.New("").Funcs(templateFuncs())
+	tmpl := withTemplateFuncs(template.New(""))
 	for _, pattern := range templateGlobPatterns {
 		fullPattern := filepath.Join("..", "..", pattern)
 		var err error
