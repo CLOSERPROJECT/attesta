@@ -40,7 +40,7 @@ Org-admin forms and pickers live in `components/org-admin.css`, not the page mod
 
 | File | Prefix / scope | Templates |
 |------|----------------|-----------|
-| `components/page-header.css` | `.page-header`, `.page-header-*` | Inline markup per `page-header.css` header (CSS-only); micro-partial `page_header_back` |
+| `components/page-header.css` | `.page-header`, `.page-header-*` | Inline markup per `page-header.css` header (CSS-only); micro-partial `page_header_back`; optional `.page-header-actions` |
 | `components/stream-card.css` | `.stream-card-*` | `components/stream_card.html` |
 | `components/stream-instance-card.css` | `.stream-instance-card-*` | `components/stream_instance_card.html` |
 | `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
@@ -78,29 +78,33 @@ Reused **markup patterns** backed by namespaced CSS, with **no** full Go templat
 
 | Module | Primary classes | Markup contract |
 |--------|-----------------|-----------------|
-| `page-header.css` | `.page-header`, `.page-header-back`, `.page-header-body`, `.page-header-titles`, `.page-header-subtitle`, `.page-header-meta`, `.page-header-meta-id` | See file header in `web/src/styles/components/page-header.css`; intended tree below |
+| `page-header.css` | `.page-header`, `.page-header-back`, `.page-header-head`, `.page-header-body`, `.page-header-actions`, `.page-header-subtitle` | See file header in `web/src/styles/components/page-header.css`; intended tree below |
 | `panel.css` | `.panel`, `.panel-sticky`, `.panel-heading`, `.panel-head-actions`, `.panel-actions`, `.panel-block` | See file header in `web/src/styles/components/panel.css` |
 | `sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | See file header in `web/src/styles/components/sidebar-nav.css` |
 | `dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions` | See file header in `web/src/styles/components/dialog.css` |
 | `button.css` | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-ghost-danger`, `.btn-danger`, `.btn-outline`, `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon` | See file header in `web/src/styles/components/button.css` |
 | `list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | See file header in `web/src/styles/components/list-row.css` |
 
-**Page header** — CSS-only. Inline the markup tree in page templates (no `PageHeaderView`, no full `page_header` define). Optional back link uses the micro-partial `page_header_back` in `server/templates/components/page_header.html`: pipeline is an href **string**; fixed label `Back`; includes `icon-back`; renders `<a class="page-header-back" href="{{ . }}">…</a>`. Call sites: `{{ template "page_header_back" "/" }}` or `{{ template "page_header_back" (printf "/w/%s/" .WorkflowKey) }}`.
+**Page header** — CSS-only. Inline the markup tree in page templates (no `PageHeaderView`, no full `page_header` define). Optional back link uses the micro-partial `page_header_back` in `server/templates/components/page_header.html`: pipeline is an href **string**; fixed label `Back`; includes `icon-back`; renders `<a class="page-header-back" href="{{ . }}">…</a>`. Call sites: `{{ template "page_header_back" "/" }}` or `{{ template "page_header_back" (printf "/w/%s/" .WorkflowKey) }}`. When right actions are needed, wrap `page-header-body` + `page-header-actions` in `div.page-header-head` (same idea as panel head-actions); omit the head wrapper when there are no actions. Process-instance ID under the title is **not** part of this component — it uses `.process-header-meta` / `.process-header-meta-id` in `pages/process.css`.
 
 Intended markup contract (also the target CSS file header comment):
 
 ```
+Heading only:
 section.page-header
-  a.page-header-back?                 (via {{ template "page_header_back" href }})
+  a.page-header-back?
   div.page-header-body
-    h1                                (title only)
-    | div.page-header-titles          (title + subtitle)
-        h1
-        h1[aria-hidden="true"]        ("-")
-        h1.page-header-subtitle
-    p?                                (description)
-    p.page-header-meta?
-      span.page-header-meta-id
+    h1                              (optional span[aria-hidden] + span.page-header-subtitle)
+    p?
+
+With actions:
+section.page-header
+  a.page-header-back?
+  div.page-header-head
+    div.page-header-body
+      …
+    div.page-header-actions
+      button | form | …
 ```
 
 **Dialog placement:** generic shell in `dialog.css`; `#stream-preview-dialog` sizing in `pages/stream.css`; org-admin role pill wrapper in `org-admin.css`. Destructive titles use `u-text-danger` (color only) stacked on `.dialog-title`. Wide shell modifier `.dialog-wide` deferred until a second page needs it.
@@ -122,7 +126,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
 | `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
-| `pages/process.html` | `pages/process.css` | `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
+| `pages/process.html` | `pages/process.css` (incl. `.process-header-meta*`) | `components/page-header.css`, `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/dpp_history_step.html` | `pages/dpp.css` (`.dpp-history-*`) | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
@@ -372,7 +376,7 @@ All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-s
 
 | Class | Use |
 |-------|-----|
-| `.page-header`, `.page-header-back`, `.page-header-body`, … | Page chrome title block — see `page-header.css` header (CSS-only; back via `page_header_back`) |
+| `.page-header`, `.page-header-back`, `.page-header-head`, `.page-header-body`, `.page-header-actions`, … | Page chrome title block — see `page-header.css` header (CSS-only; back via `page_header_back`) |
 | `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Card sections — see `panel.css` header for markup tree (CSS-only component) |
 | `.panel-sticky` | Optional sticky rail modifier on `.panel` (active at `--md-up`) |
 | `.rail-layout`, `.rail-layout-ready`, `.rail-layout-main` | Sticky sidebar + main shell — see `layout/grids.css` (row at `--md-up`) |
