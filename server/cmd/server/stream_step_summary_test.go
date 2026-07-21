@@ -30,19 +30,26 @@ func TestStepSummaryTemplateRendersExtendedMetadata(t *testing.T) {
 		`class="stream-step-summary-main"`,
 		`class="stream-step-summary-org-mark"`,
 		`src="https://example.com/logo.png"`,
+		`class="tip"`,
+		`data-tooltip="Organization"`,
 		`class="stream-step-summary-title"`,
 		`class="stream-step-summary-meta"`,
-		"<strong>Organization:</strong>",
+		`stream-step-summary-meta-icon`,
 		"Acme Org",
-		"<strong>Completed at:</strong>",
+		`data-tooltip="Completed at"`,
+		`aria-label="Completed at"`,
+		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
-		"<strong>Substeps:</strong>",
-		"Substeps:</strong> 3",
+		`data-tooltip="Steps"`,
+		`aria-label="Steps"`,
 		"Production",
 	} {
 		if !strings.Contains(compactBody, want) {
 			t.Fatalf("expected %q in rendered step summary, got: %s", want, body)
 		}
+	}
+	if !strings.Contains(compactBody, `</span> 3 </span>`) {
+		t.Fatalf("expected substep count 3 after Steps icon, got: %s", body)
 	}
 }
 
@@ -83,17 +90,20 @@ func TestStepSummaryTemplateOmitsOptionalFields(t *testing.T) {
 	}
 	body := out.String()
 
-	if strings.Contains(body, "Completed at:") {
-		t.Fatalf("did not expect completed-at line, got: %s", body)
+	if strings.Contains(body, `data-tooltip="Completed at"`) {
+		t.Fatalf("did not expect completed-at meta, got: %s", body)
 	}
-	if strings.Contains(body, "Substeps:") {
-		t.Fatalf("did not expect substep count line, got: %s", body)
+	if strings.Contains(body, `data-tooltip="Steps"`) {
+		t.Fatalf("did not expect substep count meta, got: %s", body)
 	}
 	if !strings.Contains(body, "No organization") {
 		t.Fatalf("expected no-organization fallback, got: %s", body)
 	}
-	if !strings.Contains(body, `class="icon-svg icon-svg-lg"`) {
-		t.Fatalf("expected org logo fallback icon, got: %s", body)
+	if strings.Contains(body, `class="stream-step-summary-org-mark"`) {
+		t.Fatalf("did not expect org mark square for building fallback, got: %s", body)
+	}
+	if !strings.Contains(body, `class="icon-svg icon-svg-md"`) {
+		t.Fatalf("expected building icon fallback, got: %s", body)
 	}
 }
 

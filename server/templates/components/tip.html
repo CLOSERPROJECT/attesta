@@ -1,0 +1,25 @@
+{{/* Tip host with CSS caret tooltip. See tip.css for markup contract. */}}
+{{ define "tip" }}
+  <span
+    class="tip{{ if .Class }} {{ .Class }}{{ end }}"
+    data-tooltip="{{ .Tooltip }}"
+    aria-label="{{ if .AriaLabel }}{{ .AriaLabel }}{{ else }}{{ .Tooltip }}{{ end }}"
+    {{ if .Role }}role="{{ .Role }}"{{ end }}
+    tabindex="0"
+  >
+    {{ if .ImgSrc }}
+      <img
+        src="{{ .ImgSrc }}"
+        alt=""
+        {{ if .ImgClass }}class="{{ .ImgClass }}"{{ end }}
+      />
+    {{ else if .Icon }}
+      {{ if .InnerClass }}<span class="{{ .InnerClass }}">{{ end }}
+      {{ if eq .Icon "icon-clock" }}{{ template "icon-clock" . }}
+      {{ else if eq .Icon "icon-list" }}{{ template "icon-list" . }}
+      {{ else if eq .Icon "icon-building-grid" }}{{ template "icon-building-grid" . }}
+      {{ end }}
+      {{ if .InnerClass }}</span>{{ end }}
+    {{ end }}
+  </span>
+{{ end }}

@@ -85,6 +85,7 @@ Reused **markup patterns** backed by namespaced CSS, with **no** full Go templat
 | `dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions` | See file header in `web/src/styles/components/dialog.css` |
 | `button.css` | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-ghost-danger`, `.btn-danger`, `.btn-outline`, `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon` | See file header in `web/src/styles/components/button.css` |
 | `list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | See file header in `web/src/styles/components/list-row.css` |
+| `tip.css` | `.tip` | See file header in `web/src/styles/components/tip.css`; micro-partial `components/tip.html` |
 
 **Page header** — CSS-only. Inline the markup tree in page templates (no `PageHeaderView`, no full `page_header` define). Optional trail uses the full `breadcrumbs` component: `{{ template "breadcrumbs" .Breadcrumbs }}` with `BreadcrumbsView` assembled in Go (`BreadcrumbItem.Href` empty ⇒ current page). When right actions are needed, wrap `page-header-body` + `page-header-actions` in `div.page-header-head` (same idea as panel head-actions); omit the head wrapper when there are no actions. Process-instance ID under the title is **not** part of this component — it uses `.process-header-meta` / `.process-header-meta-id` in `pages/process.css`.
 
@@ -129,7 +130,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
 | `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` (incl. `.process-header-meta*`) | `components/page-header.css`, `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
-| `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
+| `components/stream_step_summary.html` | `components/stream-step-summary.css` | `components/tip.css` (`tip` micro-partial) |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/dpp_history_step.html` | `pages/dpp.css` (`.dpp-history-*`) | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/substep_shell.html` | `components/substep-shell.css` | `components/substep-body.css`, `role-palette.css` |
