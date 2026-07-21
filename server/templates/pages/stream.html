@@ -53,70 +53,104 @@
     {{ else }}
       <div class="rail-layout rail-layout-ready" data-home-root>
         <section class="panel panel-sticky">
-          <div class="panel-heading">
-            <h2>Streams</h2>
-            <p>Jump to instances by status</p>
-          </div>
           <nav class="sidebar-nav" aria-label="Stream status sections">
             {{ range .ProcessGroups }}
-              {{ if eq .Status "available" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link is-active"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="page"
+              <button
+                type="button"
+                class="sidebar-nav-link{{ if eq .Status "available" }} is-active{{ end }}"
+                data-home-nav="{{ .Status }}"
+                aria-controls="{{ .PanelID }}"
+                aria-current="{{ if eq .Status "available" }}page{{ else }}false{{ end }}"
+                {{ if eq .Status "available" }}
                   aria-label="Available streams"
                   title="Streams waiting for your input"
-                >
-                  <span class="sidebar-nav-title"> Available </span>
-                </button>
-              {{ else if eq .Status "active" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="false"
+                {{ else if eq .Status "active" }}
                   aria-label="Active streams"
                   title="Streams waiting for someone else input"
-                >
-                  <span class="sidebar-nav-title"> Active </span>
-                </button>
-              {{ else if eq .Status "done" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="false"
+                {{ else if eq .Status "done" }}
                   aria-label="Completed streams"
                   title="Streams completed successfully"
-                >
-                  <span class="sidebar-nav-title"> Done </span>
-                </button>
-              {{ else if eq .Status "terminated" }}
-                <button
-                  type="button"
-                  class="sidebar-nav-link"
-                  data-home-nav="{{ .Status }}"
-                  aria-controls="{{ .PanelID }}"
-                  aria-current="false"
+                {{ else if eq .Status "terminated" }}
                   aria-label="Terminated streams"
                   title="Streams terminated before completion"
-                >
-                  <span class="sidebar-nav-title"> Terminated </span>
-                </button>
-              {{ end }}
+                {{ end }}
+              >
+                <span class="sidebar-nav-title">
+                  {{ if eq .Status "available" }}
+                    Available
+                  {{ else if eq .Status "active" }}
+                    Active
+                  {{ else if eq .Status "done" }}
+                    Done
+                  {{ else if eq .Status "terminated" }}
+                    Terminated
+                  {{ else }}
+                    {{ .Label }}
+                  {{ end }}
+                </span>
+              </button>
             {{ end }}
           </nav>
+          {{ range .ProcessGroups }}
+            <form
+              method="get"
+              action="{{ $.WorkflowPath }}/"
+              class="process-toolbar stream-status-sort"
+              data-home-panel="{{ .Status }}"
+              {{ if ne .Status "available" }}hidden{{ end }}
+            >
+              {{ range .SortFields }}
+                <input
+                  type="hidden"
+                  name="{{ .Name }}"
+                  value="{{ .Value }}"
+                />
+              {{ end }}
+              <label class="process-control">
+                <span class="muted">
+                  {{ template "icon-sort" . }}
+                </span>
+                <select
+                  name="{{ .SortParam }}"
+                  onchange="this.form.submit()"
+                >
+                  <option
+                    value="time_desc"
+                    {{ if eq .Sort "time_desc" }}selected{{ end }}
+                  >
+                    Newest
+                  </option>
+                  <option
+                    value="time_asc"
+                    {{ if eq .Sort "time_asc" }}selected{{ end }}
+                  >
+                    Oldest
+                  </option>
+                  <option
+                    value="progress_desc"
+                    {{ if eq .Sort "progress_desc" }}selected{{ end }}
+                  >
+                    Most advanced
+                  </option>
+                  <option
+                    value="progress_asc"
+                    {{ if eq .Sort "progress_asc" }}selected{{ end }}
+                  >
+                    Least advanced
+                  </option>
+                  <option
+                    value="status"
+                    {{ if eq .Sort "status" }}selected{{ end }}
+                  >
+                    Status
+                  </option>
+                </select>
+              </label>
+            </form>
+          {{ end }}
         </section>
 
         <div class="rail-layout-main home-workflow-panel-main">
-          <div class="panel-heading">
-            <h2>Stream instances</h2>
-            <p>View and manage all instances of this stream</p>
-          </div>
           <dialog id="new-instance-dialog" class="dialog">
             <div class="dialog-card">
               <header class="dialog-head">
@@ -206,59 +240,6 @@
                       {{ .Label }}
                     {{ end }}
                   </h3>
-                  <form
-                    method="get"
-                    action="{{ $.WorkflowPath }}/"
-                    class="process-toolbar stream-status-sort"
-                  >
-                    {{ range .SortFields }}
-                      <input
-                        type="hidden"
-                        name="{{ .Name }}"
-                        value="{{ .Value }}"
-                      />
-                    {{ end }}
-                    <label class="process-control">
-                      <span class="muted">
-                        {{ template "icon-sort" . }}
-                      </span>
-                      <select
-                        name="{{ .SortParam }}"
-                        onchange="this.form.submit()"
-                      >
-                        <option
-                          value="time_desc"
-                          {{ if eq .Sort "time_desc" }}selected{{ end }}
-                        >
-                          Newest
-                        </option>
-                        <option
-                          value="time_asc"
-                          {{ if eq .Sort "time_asc" }}selected{{ end }}
-                        >
-                          Oldest
-                        </option>
-                        <option
-                          value="progress_desc"
-                          {{ if eq .Sort "progress_desc" }}selected{{ end }}
-                        >
-                          Most advanced
-                        </option>
-                        <option
-                          value="progress_asc"
-                          {{ if eq .Sort "progress_asc" }}selected{{ end }}
-                        >
-                          Least advanced
-                        </option>
-                        <option
-                          value="status"
-                          {{ if eq .Sort "status" }}selected{{ end }}
-                        >
-                          Status
-                        </option>
-                      </select>
-                    </label>
-                  </form>
                 </div>
                 {{ if .Processes }}
                   <ul class="stream-instance-card-list">

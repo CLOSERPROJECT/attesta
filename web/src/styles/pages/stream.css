@@ -30,8 +30,24 @@
 }
 
 .stream-status-sort {
-  margin: 0;
+  margin: var(--space-4) 0 0;
   justify-content: flex-start;
+  width: 100%;
+}
+
+.stream-status-sort[hidden] {
+  display: none;
+}
+
+.stream-status-sort .process-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.stream-status-sort select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 #stream-preview-dialog.dialog {

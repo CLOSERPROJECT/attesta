@@ -232,6 +232,25 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	if !strings.Contains(compactBody, `select name="active_sort"`) {
 		t.Fatalf("expected active group sort select, got: %s", body)
 	}
+	stickyStart := strings.Index(compactBody, `class="panel panel-sticky"`)
+	stickyEnd := strings.Index(compactBody, `class="rail-layout-main home-workflow-panel-main"`)
+	if stickyStart == -1 || stickyEnd == -1 || stickyStart >= stickyEnd {
+		t.Fatal("expected sticky sidebar before rail-layout-main")
+	}
+	stickyBlock := compactBody[stickyStart:stickyEnd]
+	navIdx := strings.Index(stickyBlock, `aria-label="Stream status sections"`)
+	sortIdx := strings.Index(stickyBlock, `select name="active_sort"`)
+	if navIdx == -1 || sortIdx == -1 || !(navIdx < sortIdx) {
+		t.Fatalf("expected status sort control below sidebar-nav inside sticky panel, got:\n%s", stickyBlock)
+	}
+	sectionStart := strings.Index(compactBody, `id="stream-section-active"`)
+	sectionEnd := strings.Index(compactBody, `Active stream instances pagination`)
+	if sectionStart == -1 || sectionEnd == -1 || sectionStart >= sectionEnd {
+		t.Fatal("expected active status section")
+	}
+	if strings.Contains(compactBody[sectionStart:sectionEnd], `select name="active_sort"`) {
+		t.Fatalf("status sort must not remain in stream status section, got:\n%s", compactBody[sectionStart:sectionEnd])
+	}
 	if !strings.Contains(compactBody, `#stream-section-active`) {
 		t.Fatalf("expected pagination links to target active section, got: %s", body)
 	}
