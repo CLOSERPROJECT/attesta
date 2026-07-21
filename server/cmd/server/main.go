@@ -355,6 +355,7 @@ type HomeView struct {
 	Error               string
 	Sort                string
 	StatusFilter        string
+	FilterOptions       []ProcessStatusGroup
 	ProcessGroups       []ProcessStatusGroup
 	Preview             StreamInstanceDetailView
 }
@@ -1805,77 +1806,113 @@ func homePaginationURL(workflowPath, filter, sort string, page int) string {
 	return target
 }
 
-func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard, sortKey string, page int) []ProcessStatusGroup {
-	sortKey = normalizeHomeSortKey(sortKey)
+func homeProcessesByStatus(processes []StreamInstanceCard) map[string][]StreamInstanceCard {
 	byStatus := make(map[string][]StreamInstanceCard, len(homeProcessStatuses()))
 	for _, process := range processes {
 		byStatus[process.Status] = append(byStatus[process.Status], process)
 	}
+	return byStatus
+}
 
+func homeProcessItemsForStatus(processes []StreamInstanceCard, byStatus map[string][]StreamInstanceCard, status string) []StreamInstanceCard {
+	if status == "all" {
+		return append([]StreamInstanceCard(nil), processes...)
+	}
+	items := byStatus[status]
+	if len(items) == 0 {
+		return nil
+	}
+	return append([]StreamInstanceCard(nil), items...)
+}
+
+func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInstanceCard, byStatus map[string][]StreamInstanceCard, status, sortKey string, page int) ProcessStatusGroup {
+	sortKey = normalizeHomeSortKey(sortKey)
+	items := homeProcessItemsForStatus(processes, byStatus, status)
+	sortHomeProcessList(items, sortKey)
+	currentPage := normalizeHomePage(page, len(items))
+	totalPages := 1
+	if len(items) > 0 {
+		totalPages = (len(items) + homeProcessesPerPage - 1) / homeProcessesPerPage
+	}
+	start := (currentPage - 1) * homeProcessesPerPage
+	end := min(start+homeProcessesPerPage, len(items))
+	pagedItems := items
+	if start < len(items) {
+		pagedItems = items[start:end]
+	} else if len(items) > 0 {
+		pagedItems = items[:0]
+	}
+	pageNumbers := make([]int, 0, totalPages)
+	pageLinks := make([]PaginationLink, 0, totalPages)
+	panelID := "stream-section-" + status
+	for pageNum := 1; pageNum <= totalPages; pageNum++ {
+		pageNumbers = append(pageNumbers, pageNum)
+		pageLinks = append(pageLinks, PaginationLink{
+			Page:      pageNum,
+			URL:       homePaginationURL(workflowPath, status, sortKey, pageNum),
+			IsCurrent: pageNum == currentPage,
+		})
+	}
+	previousPage := max(currentPage-1, 1)
+	nextPage := min(currentPage+1, totalPages)
+	var sortFields []QueryInput
+	if status != "all" {
+		sortFields = []QueryInput{{Name: "filter", Value: status}}
+	}
+	navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel := homeProcessStatusCopy(status)
+	return ProcessStatusGroup{
+		Status:              status,
+		Label:               processStatusLabel(status),
+		NavAriaLabel:        navAriaLabel,
+		NavTitle:            navTitle,
+		Heading:             heading,
+		EmptyMessage:        emptyMessage,
+		PaginationAriaLabel: paginationAriaLabel,
+		PanelID:             panelID,
+		Sort:                sortKey,
+		SortFields:          sortFields,
+		TotalCount:          len(items),
+		CurrentPage:         currentPage,
+		TotalPages:          totalPages,
+		PageNumbers:         pageNumbers,
+		PageLinks:           pageLinks,
+		HasPreviousPage:     currentPage > 1,
+		HasNextPage:         currentPage < totalPages,
+		PreviousPage:        previousPage,
+		NextPage:            nextPage,
+		PreviousURL:         homePaginationURL(workflowPath, status, sortKey, previousPage),
+		NextURL:             homePaginationURL(workflowPath, status, sortKey, nextPage),
+		Processes:           pagedItems,
+	}
+}
+
+func buildHomeFilterOptions(processes []StreamInstanceCard) []ProcessStatusGroup {
+	byStatus := homeProcessesByStatus(processes)
 	groups := make([]ProcessStatusGroup, 0, len(homeProcessStatuses()))
 	for _, status := range homeProcessStatuses() {
-		var items []StreamInstanceCard
-		if status == "all" {
-			items = append([]StreamInstanceCard(nil), processes...)
-		} else {
-			items = byStatus[status]
-		}
-		sortHomeProcessList(items, sortKey)
-		currentPage := normalizeHomePage(page, len(items))
-		totalPages := 1
-		if len(items) > 0 {
-			totalPages = (len(items) + homeProcessesPerPage - 1) / homeProcessesPerPage
-		}
-		start := (currentPage - 1) * homeProcessesPerPage
-		end := min(start+homeProcessesPerPage, len(items))
-		pagedItems := items
-		if start < len(items) {
-			pagedItems = items[start:end]
-		} else if len(items) > 0 {
-			pagedItems = items[:0]
-		}
-		pageNumbers := make([]int, 0, totalPages)
-		pageLinks := make([]PaginationLink, 0, totalPages)
-		panelID := "stream-section-" + status
-		for pageNum := 1; pageNum <= totalPages; pageNum++ {
-			pageNumbers = append(pageNumbers, pageNum)
-			pageLinks = append(pageLinks, PaginationLink{
-				Page:      pageNum,
-				URL:       homePaginationURL(workflowPath, status, sortKey, pageNum),
-				IsCurrent: pageNum == currentPage,
-			})
-		}
-		previousPage := max(currentPage-1, 1)
-		nextPage := min(currentPage+1, totalPages)
-		var sortFields []QueryInput
-		if status != "all" {
-			sortFields = []QueryInput{{Name: "filter", Value: status}}
-		}
-		navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel := homeProcessStatusCopy(status)
+		navAriaLabel, navTitle, _, _, _ := homeProcessStatusCopy(status)
 		groups = append(groups, ProcessStatusGroup{
-			Status:              status,
-			Label:               processStatusLabel(status),
-			NavAriaLabel:        navAriaLabel,
-			NavTitle:            navTitle,
-			Heading:             heading,
-			EmptyMessage:        emptyMessage,
-			PaginationAriaLabel: paginationAriaLabel,
-			PanelID:             panelID,
-			Sort:                sortKey,
-			SortFields:          sortFields,
-			TotalCount:          len(items),
-			CurrentPage:         currentPage,
-			TotalPages:          totalPages,
-			PageNumbers:         pageNumbers,
-			PageLinks:           pageLinks,
-			HasPreviousPage:     currentPage > 1,
-			HasNextPage:         currentPage < totalPages,
-			PreviousPage:        previousPage,
-			NextPage:            nextPage,
-			PreviousURL:         homePaginationURL(workflowPath, status, sortKey, previousPage),
-			NextURL:             homePaginationURL(workflowPath, status, sortKey, nextPage),
-			Processes:           pagedItems,
+			Status:       status,
+			Label:        processStatusLabel(status),
+			NavAriaLabel: navAriaLabel,
+			NavTitle:     navTitle,
+			PanelID:      "stream-section-" + status,
+			TotalCount:   len(homeProcessItemsForStatus(processes, byStatus, status)),
 		})
+	}
+	return groups
+}
+
+func buildHomeActiveProcessGroup(workflowPath string, processes []StreamInstanceCard, statusFilter, sortKey string, page int) ProcessStatusGroup {
+	byStatus := homeProcessesByStatus(processes)
+	return buildHomeProcessGroupForStatus(workflowPath, processes, byStatus, normalizeHomeStatusFilter(statusFilter), sortKey, page)
+}
+
+func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard, sortKey string, page int) []ProcessStatusGroup {
+	byStatus := homeProcessesByStatus(processes)
+	groups := make([]ProcessStatusGroup, 0, len(homeProcessStatuses()))
+	for _, status := range homeProcessStatuses() {
+		groups = append(groups, buildHomeProcessGroupForStatus(workflowPath, processes, byStatus, status, sortKey, page))
 	}
 	return groups
 }
@@ -4732,28 +4769,7 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 	redirectHomeWithMessage(w, r, "confirmation", cfg.Workflow.Name+" was deleted.")
 }
 
-func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, err := s.selectedWorkflowUnvalidated(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ctx := r.Context()
-	workflowError := homePickerMessage(r, "error")
-	if validationErr := s.validateWorkflowRefs(ctx, cfg); validationErr != nil {
-		var refErr *WorkflowRefValidationError
-		if !errors.As(validationErr, &refErr) {
-			http.Error(w, validationErr.Error(), http.StatusInternalServerError)
-			return
-		}
-		if workflowError == "" {
-			workflowError = refErr.Error()
-		}
-	}
+func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, user *AccountUser, workflowKey string, cfg RuntimeConfig, workflowError string) HomeView {
 	sortKey := normalizeHomeSortKey(strings.TrimSpace(r.URL.Query().Get("sort")))
 	statusFilter := normalizeHomeStatusFilter(r.URL.Query().Get("filter"))
 	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
@@ -4769,7 +4785,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			actor.Role = actor.RoleSlugs[0]
 		}
 	}
-	roleMeta := s.roleMetaIndex(r.Context())
+	roleMeta := s.roleMetaIndex(ctx)
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []StreamInstanceCard
@@ -4805,7 +4821,8 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 		processes = append(processes, item)
 	}
 
-	processGroups := buildHomeProcessGroups(workflowPath(workflowKey), processes, sortKey, page)
+	filterOptions := buildHomeFilterOptions(processes)
+	activeGroup := buildHomeActiveProcessGroup(path, processes, statusFilter, sortKey, page)
 
 	preview := makeStreamInstanceDetailReadOnly(
 		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
@@ -4813,19 +4830,60 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	)
 	preview.HideStatus = true
 
-	view := HomeView{
+	return HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		Breadcrumbs:         buildStreamBreadcrumbs(workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
 		Error:               workflowError,
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
-		ProcessGroups:       processGroups,
+		FilterOptions:       filterOptions,
+		ProcessGroups:       []ProcessStatusGroup{activeGroup},
 		Preview:             preview,
 	}
+}
+
+func (s *Server) renderStreamDashboard(w http.ResponseWriter, view HomeView) {
 	if err := s.tmpl.ExecuteTemplate(w, "stream.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) renderStreamDashboardResults(w http.ResponseWriter, view HomeView) {
+	if err := s.tmpl.ExecuteTemplate(w, "stream_dashboard_results", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
+	user, _, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, err := s.selectedWorkflowUnvalidated(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := r.Context()
+	workflowError := homePickerMessage(r, "error")
+	if validationErr := s.validateWorkflowRefs(ctx, cfg); validationErr != nil {
+		var refErr *WorkflowRefValidationError
+		if !errors.As(validationErr, &refErr) {
+			http.Error(w, validationErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		if workflowError == "" {
+			workflowError = refErr.Error()
+		}
+	}
+
+	view := s.buildWorkflowHomeView(ctx, r, user, workflowKey, cfg, workflowError)
+	if isHTMXRequest(r) {
+		s.renderStreamDashboardResults(w, view)
+		return
+	}
+	s.renderStreamDashboard(w, view)
 }
 
 func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {

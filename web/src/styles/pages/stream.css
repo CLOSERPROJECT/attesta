@@ -60,6 +60,7 @@
   min-width: 0;
   padding: var(--space-2);
   text-align: left;
+  text-decoration: none;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -79,6 +80,7 @@
 
 .stream-status-filter-option:hover {
   background: color-mix(in srgb, var(--primary) 8%, var(--background));
+  text-decoration: none;
 }
 
 .stream-status-rail-label {

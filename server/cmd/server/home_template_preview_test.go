@@ -6,50 +6,22 @@ import (
 	"testing"
 )
 
-func testHomeProcessGroups(items ...StreamInstanceCard) []ProcessStatusGroup {
-	byStatus := map[string][]StreamInstanceCard{}
-	for _, item := range items {
-		byStatus[item.Status] = append(byStatus[item.Status], item)
+func testHomeFilterOptions(items ...StreamInstanceCard) []ProcessStatusGroup {
+	return buildHomeFilterOptions(items)
+}
+
+func testHomeActiveProcessGroups(items []StreamInstanceCard, statusFilter, sortKey string, page int) []ProcessStatusGroup {
+	if sortKey == "" {
+		sortKey = "time_desc"
 	}
-	groups := make([]ProcessStatusGroup, 0, len(homeProcessStatuses()))
-	for _, status := range homeProcessStatuses() {
-		processes := byStatus[status]
-		if status == "all" {
-			processes = append([]StreamInstanceCard(nil), items...)
-		}
-		totalPages := 1
-		panelURL := "/w/workflow/"
-		if status != "all" {
-			panelURL = "/w/workflow/?filter=" + status
-		}
-		pageLinks := []PaginationLink{{Page: 1, URL: panelURL, IsCurrent: true}}
-		var sortFields []QueryInput
-		if status != "all" {
-			sortFields = []QueryInput{{Name: "filter", Value: status}}
-		}
-		navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel := homeProcessStatusCopy(status)
-		groups = append(groups, ProcessStatusGroup{
-			Status:              status,
-			Label:               processStatusLabel(status),
-			NavAriaLabel:        navAriaLabel,
-			NavTitle:            navTitle,
-			Heading:             heading,
-			EmptyMessage:        emptyMessage,
-			PaginationAriaLabel: paginationAriaLabel,
-			PanelID:             "stream-section-" + status,
-			TotalCount:          len(processes),
-			Sort:                "time_desc",
-			SortFields:          sortFields,
-			CurrentPage:         1,
-			TotalPages:          totalPages,
-			PageNumbers:         []int{1},
-			PageLinks:           pageLinks,
-			PreviousURL:         panelURL,
-			NextURL:             panelURL,
-			Processes:           processes,
-		})
+	if statusFilter == "" {
+		statusFilter = "all"
 	}
-	return groups
+	return []ProcessStatusGroup{buildHomeActiveProcessGroup("/w/workflow", items, statusFilter, sortKey, page)}
+}
+
+func testHomeActiveGroup(statusFilter string, items ...StreamInstanceCard) []ProcessStatusGroup {
+	return testHomeActiveProcessGroups(items, statusFilter, "time_desc", 1)
 }
 
 func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
@@ -63,8 +35,10 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			WorkflowName: "Demo workflow",
 		},
 		WorkflowDescription: "Previewable workflow",
+		Sort:                "time_desc",
 		StatusFilter:        "all",
-		ProcessGroups:       testHomeProcessGroups(process),
+		FilterOptions:       testHomeFilterOptions(process),
+		ProcessGroups:       testHomeActiveGroup("all", process),
 		Preview: StreamInstanceDetailView{
 			HideStatus: true,
 			Timeline: []TimelineStep{
@@ -103,19 +77,15 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, marker := range []string{
-		`data-home-nav="all"`,
-		`data-home-nav="available"`,
-		`data-home-nav="active"`,
-		`data-home-nav="done"`,
-		`data-home-nav="terminated"`,
-		`data-home-nav="preview"`,
+		`id="stream-dashboard-results"`,
+		`hx-target="#stream-dashboard-results"`,
+		`hx-push-url="true"`,
 		`id="stream-preview-dialog"`,
 		`class="dialog-card"`,
 		`class="stream-preview-body"`,
 		`id="new-instance-dialog"`,
 		`name="name"`,
 		`Pilot batch`,
-		`data-home-root`,
 		`data-formata-disabled="true"`,
 		`Preview only. Start an instance to submit data.`,
 	} {
@@ -124,23 +94,32 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 		}
 	}
 	if !strings.Contains(compactBody, `aria-labelledby="stream-status-filter-label"`) ||
-		!strings.Contains(compactBody, `data-home-filter-select`) ||
 		!strings.Contains(compactBody, `class="stream-status-filter-select"`) ||
 		!strings.Contains(compactBody, `Filter by status`) {
 		t.Fatalf("expected stream status filter label, got: %s", body)
 	}
+	for _, status := range []string{"all", "available", "active", "done", "terminated"} {
+		if !strings.Contains(compactBody, `aria-controls="stream-section-`+status+`"`) {
+			t.Fatalf("expected filter option for %q, got: %s", status, body)
+		}
+	}
+	if !strings.Contains(compactBody, `id="stream-section-all"`) {
+		t.Fatalf("expected active all section, got: %s", body)
+	}
+	for _, status := range []string{"available", "active", "done", "terminated"} {
+		if strings.Contains(compactBody, `id="stream-section-`+status+`"`) {
+			t.Fatalf("did not expect inactive section %q in HTMX results, got: %s", status, body)
+		}
+	}
 	for _, marker := range []string{
-		`id="stream-section-all" data-home-panel="all"`,
-		`id="stream-section-available" data-home-panel="available" hidden`,
-		`id="stream-section-active" data-home-panel="active" hidden`,
-		`id="stream-section-done" data-home-panel="done" hidden`,
-		`id="stream-section-terminated" data-home-panel="terminated" hidden`,
+		`data-home-root`,
+		`data-home-nav=`,
 		`panels.forEach((panel)`,
 		`panel.hidden = currentName !== panelName`,
 		`url.searchParams.set("filter", panelName)`,
 	} {
-		if !strings.Contains(compactBody, marker) {
-			t.Fatalf("expected single visible stream status marker %q, got: %s", marker, body)
+		if strings.Contains(body, marker) {
+			t.Fatalf("did not expect legacy client panel marker %q, got: %s", marker, body)
 		}
 	}
 	if strings.Contains(body, `scrollIntoView`) {
@@ -168,8 +147,10 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 			WorkflowName: "Demo workflow",
 		},
 		WorkflowDescription: "Previewable workflow",
+		Sort:                "time_desc",
 		StatusFilter:        "all",
-		ProcessGroups:       testHomeProcessGroups(),
+		FilterOptions:       testHomeFilterOptions(),
+		ProcessGroups:       testHomeActiveGroup("all"),
 	}
 
 	var out bytes.Buffer
@@ -179,15 +160,17 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 	body := out.String()
 	compactBody := strings.Join(strings.Fields(body), " ")
 
+	if !strings.Contains(compactBody, `No instances`) {
+		t.Fatalf("expected empty all-status marker, got: %s", body)
+	}
 	for _, marker := range []string{
-		`No instances`,
 		`No available instances`,
 		`No active instances`,
 		`No completed instances`,
 		`No terminated instances`,
 	} {
-		if !strings.Contains(compactBody, marker) {
-			t.Fatalf("expected empty status marker %q, got: %s", marker, body)
+		if strings.Contains(compactBody, marker) {
+			t.Fatalf("did not expect inactive empty marker %q, got: %s", marker, body)
 		}
 	}
 }
@@ -201,48 +184,10 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		Sort:         "status",
-		StatusFilter: "active",
+		Sort:          "status",
+		StatusFilter:  "active",
+		FilterOptions: testHomeFilterOptions(),
 		ProcessGroups: []ProcessStatusGroup{
-			{
-				Status:              "all",
-				Label:               "All",
-				NavAriaLabel:        "All streams",
-				NavTitle:            "All stream instances",
-				Heading:             "All stream instances",
-				EmptyMessage:        "No instances",
-				PaginationAriaLabel: "All stream instances pagination",
-				PanelID:             "stream-section-all",
-				TotalCount:          0,
-				Sort:                "status",
-				CurrentPage:         1,
-				TotalPages:          1,
-				PageNumbers:         []int{1},
-				PageLinks:           []PaginationLink{{Page: 1, URL: "/w/workflow/?sort=status", IsCurrent: true}},
-				PreviousURL:         "/w/workflow/?sort=status",
-				NextURL:             "/w/workflow/?sort=status",
-				Processes:           nil,
-			},
-			{
-				Status:              "available",
-				Label:               "Available",
-				NavAriaLabel:        "Available streams",
-				NavTitle:            "Streams waiting for your input",
-				Heading:             "Available stream instances",
-				EmptyMessage:        "No available instances",
-				PaginationAriaLabel: "Available stream instances pagination",
-				PanelID:             "stream-section-available",
-				TotalCount:          0,
-				Sort:                "status",
-				SortFields:          []QueryInput{{Name: "filter", Value: "available"}},
-				CurrentPage:         1,
-				TotalPages:          1,
-				PageNumbers:         []int{1},
-				PageLinks:           []PaginationLink{{Page: 1, URL: "/w/workflow/?filter=available&sort=status", IsCurrent: true}},
-				PreviousURL:         "/w/workflow/?filter=available&sort=status",
-				NextURL:             "/w/workflow/?filter=available&sort=status",
-				Processes:           nil,
-			},
 			{
 				Status:              "active",
 				Label:               "Active",
@@ -280,6 +225,9 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	}
 	if !strings.Contains(compactBody, `/w/workflow/?filter=active&amp;page=3&amp;sort=status`) {
 		t.Fatalf("expected pagination to preserve filter, sort and page, got: %s", body)
+	}
+	if !strings.Contains(compactBody, `hx-get="/w/workflow/?filter=active&amp;page=3&amp;sort=status"`) {
+		t.Fatalf("expected pagination hx-get, got: %s", body)
 	}
 	if !strings.Contains(compactBody, `name="sort"`) {
 		t.Fatalf("expected global sort select, got: %s", body)
@@ -319,22 +267,25 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
+	item := StreamInstanceCard{
+		ID:            "process-1",
+		Status:        "available",
+		DetailHref:    "/w/workflow/process/process-1",
+		Percent:       25,
+		DoneSubsteps:  1,
+		TotalSubsteps: 4,
+		CreatedAt:     "1 Mar 2026 at 10:00 UTC",
+	}
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
-		StatusFilter: "all",
-		ProcessGroups: testHomeProcessGroups(StreamInstanceCard{
-			ID:            "process-1",
-			Status:        "available",
-			DetailHref:    "/w/workflow/process/process-1",
-			Percent:       25,
-			DoneSubsteps:  1,
-			TotalSubsteps: 4,
-			CreatedAt:     "1 Mar 2026 at 10:00 UTC",
-		}),
+		Sort:          "time_desc",
+		StatusFilter:  "all",
+		FilterOptions: testHomeFilterOptions(item),
+		ProcessGroups: testHomeActiveGroup("all", item),
 	}
 
 	var out bytes.Buffer
