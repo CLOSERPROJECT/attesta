@@ -1,12 +1,21 @@
 /*
  * Page header — page title chrome (CSS-only component).
  *
+ * Heading only (no actions):
  *   section.page-header
  *     a.page-header-back?            (from template page_header_back; href via pipeline)
  *     div.page-header-body
- *       h1 | div.page-header-titles  (titles row: h1 + optional h1.page-header-subtitle)
+ *       h1                           (title; optional span[aria-hidden] + span.page-header-subtitle)
  *       p?                           (description)
- *       p.page-header-meta?          (meta line; span.page-header-meta-id)
+ *
+ * With actions:
+ *   section.page-header
+ *     a.page-header-back?
+ *     div.page-header-head
+ *       div.page-header-body
+ *         …                          (same as above)
+ *       div.page-header-actions
+ *         button | form | …
  */
 
 .page-header {
@@ -18,7 +27,6 @@
   gap: var(--space-3);
 }
 
-
 .page-header-back {
   display: inline-flex;
   align-items: center;
@@ -26,9 +34,27 @@
   font-weight: var(--font-semibold);
 }
 
+.page-header-head {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+
+  button {
+    flex-shrink: 0;
+  }
+
+  form {
+    flex-shrink: 0;
+  }
+}
+
 .page-header-body {
   justify-self: start;
   margin: 0;
+  min-width: 0;
 
   h1 {
     margin: 0;
@@ -41,28 +67,15 @@
   }
 }
 
-.page-header-titles {
-  display: flex;
+.page-header-actions {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: flex-end;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .page-header-subtitle {
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
-
-.page-header-meta {
-  display: inline-flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.page-header-meta-id {
-  font-family: var(--font-mono);
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
 }

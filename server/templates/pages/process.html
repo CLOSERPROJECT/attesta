@@ -15,18 +15,16 @@
   <section class="page-header">
     {{ template "page_header_back" (printf "/w/%s/" .WorkflowKey) }}
     <div class="page-header-body">
-      {{ if .InstanceName }}
-        <div class="page-header-titles">
-          <h1>{{ .WorkflowName }}</h1>
-          <h1 aria-hidden="true">-</h1>
-          <h1 class="page-header-subtitle">{{ .InstanceName }}</h1>
-        </div>
-      {{ else }}
-        <h1>{{ .WorkflowName }}</h1>
-      {{ end }}
+      <h1>
+        {{ .WorkflowName }}
+        {{ if .InstanceName }}
+          <span aria-hidden="true">-</span>
+          <span class="page-header-subtitle">{{ .InstanceName }}</span>
+        {{ end }}
+      </h1>
       {{ if .ProcessID }}
-        <p class="page-header-meta">
-          <span class="page-header-meta-id">{{ .ProcessID }}</span>
+        <p class="process-header-meta">
+          <span class="process-header-meta-id">{{ .ProcessID }}</span>
         </p>
       {{ end }}
     </div>
