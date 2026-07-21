@@ -134,7 +134,7 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | `components/tip.css` (`tip` micro-partial) |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
 | `components/dpp_history_step.html` | `pages/dpp.css` (`.dpp-history-*`) | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
-| `components/substep_shell.html` | `components/substep-shell.css` | `components/substep-body.css`, `role-palette.css` |
+| `components/substep_shell.html` | `components/substep-shell.css` | `components/substep-body.css`, `components/tip.css` (`tip` micro-partial), `role-palette.css` |
 | `components/substep_body.html` | `components/substep-body.css` | `components/dialog.css`, `components/forms.css`, `role-palette.css` |
 | `pages/dpp.html` | `pages/dpp.css` | `components/dpp_history_step.html`, `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
 | `pages/org_admin.html` | `pages/org-admin-page.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/org-admin.css`, `role-palette.css` |

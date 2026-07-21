@@ -190,11 +190,12 @@ func TestStreamTimelineTemplateRendersDoneSubstepMetaClasses(t *testing.T) {
 		`class="substep-meta"`,
 		`class="substep-meta-time"`,
 		`class="substep-meta-actor"`,
-		"<strong>Completed at:</strong>",
+		`class="tip`,
+		`data-tooltip="Completed at"`,
 		`class="js-local-datetime"`,
 		`datetime="2026-03-05T14:30:00Z"`,
 		"5 Mar 2026 at 14:30 UTC",
-		"<strong>Operator:</strong>",
+		`data-tooltip="Operator"`,
 		"alice@example.com",
 	} {
 		if !strings.Contains(body, want) {

@@ -297,8 +297,8 @@ func TestBuildDPPTraceabilityViewIncludesStepSummaryMetadata(t *testing.T) {
 	if step.Summary.OrganizationName != "Acme Org" {
 		t.Fatalf("organization name = %q, want Acme Org", step.Summary.OrganizationName)
 	}
-	if !step.Summary.HideOrgMark {
-		t.Fatal("expected HideOrgMark on DPP traceability steps")
+	if step.Summary.HideOrgMark {
+		t.Fatal("did not expect HideOrgMark on DPP traceability steps")
 	}
 	if step.Summary.CompletedAt != "2026-03-05T14:30:00Z" {
 		t.Fatalf("completedAt = %q, want RFC3339", step.Summary.CompletedAt)

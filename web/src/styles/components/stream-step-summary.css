@@ -49,6 +49,7 @@
 .stream-step-summary-meta-icon .icon-svg {
   width: 14px;
   height: 14px;
+  opacity: 0.6;
 }
 
 .stream-step-summary-org-mark {
