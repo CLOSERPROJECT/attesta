@@ -93,6 +93,24 @@
                 </button>
               {{ end }}
             </nav>
+            <select
+              id="stream-status-filter-select"
+              class="stream-status-filter-select"
+              aria-labelledby="stream-status-filter-label"
+              data-home-filter-select
+            >
+              <button type="button">
+                <selectedcontent></selectedcontent>
+              </button>
+              {{ range .ProcessGroups }}
+                <option
+                  value="{{ .Status }}"
+                  {{ if eq .Status $.StatusFilter }}selected{{ end }}
+                >
+                  {{ template "status_tag" .Status }}
+                </option>
+              {{ end }}
+            </select>
           </div>
           {{ range .ProcessGroups }}
             <form
@@ -119,7 +137,7 @@
                 </span>
                 <select
                   id="stream-sort-{{ .Status }}"
-                  name="{{ .SortParam }}"
+                  name="sort"
                   onchange="this.form.submit()"
                 >
                   <option
@@ -354,6 +372,7 @@
               } else {
                 url.searchParams.delete("filter");
               }
+              url.searchParams.delete("page");
               url.hash = "";
               window.history.replaceState({}, "", url);
             } catch (_err) {}
@@ -374,13 +393,12 @@
               }
             }
 
-            const queryPanel = statusPanelNames.find((panelName) => {
-              return (
-                params.has(panelName + "_page") || params.has(panelName + "_sort")
-              );
-            });
-            return queryPanel || defaultPanelName;
+            return defaultPanelName;
           };
+
+          const filterSelect = homeRoot.querySelector(
+            "[data-home-filter-select]",
+          );
 
           const showPanel = (panelName, options = {}) => {
             if (!statusPanelNames.includes(panelName)) {
@@ -402,6 +420,10 @@
               panel.hidden = currentName !== panelName;
             });
 
+            if (filterSelect && statusPanelNames.includes(panelName)) {
+              filterSelect.value = panelName;
+            }
+
             if (options.syncURL) {
               syncFilterURL(panelName);
             }
@@ -420,6 +442,15 @@
               });
             },
           );
+
+          if (filterSelect) {
+            filterSelect.addEventListener("change", () => {
+              showPanel(
+                (filterSelect.value || "").trim(),
+                { syncURL: true },
+              );
+            });
+          }
 
           showPanel(initialPanelName(), { syncURL: true });
         })();

@@ -32,9 +32,24 @@
 }
 
 .stream-status-filter-nav {
-  display: flex;
+  display: none;
   flex-direction: column;
   width: 100%;
+}
+
+.stream-status-filter-select,
+.stream-status-sort-control select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
 }
 
 .stream-status-filter-option {
@@ -93,16 +108,86 @@
   font-size: var(--text-sm);
 }
 
-.stream-status-sort-control select {
-  width: 100%;
-  min-width: 0;
-  font-family: inherit;
-  font-size: var(--text-sm);
-  padding: var(--space-2) var(--space-3);
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--foreground);
+@supports (appearance: base-select) {
+  .stream-status-filter-select,
+  .stream-status-filter-select::picker(select) {
+    appearance: base-select;
+  }
+
+  .stream-status-filter-select {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+
+  .stream-status-filter-select:hover {
+    background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  }
+
+  .stream-status-filter-select:open {
+    border-color: var(--primary);
+  }
+
+  .stream-status-filter-select::picker-icon {
+    color: var(--muted-foreground);
+  }
+
+  .stream-status-filter-select::picker(select) {
+    margin-top: var(--space-1);
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    color: var(--foreground);
+  }
+
+  .stream-status-filter-select option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .stream-status-filter-select option:hover,
+  .stream-status-filter-select option:focus-visible {
+    background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  }
+
+  .stream-status-filter-select option:checked {
+    background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  }
+
+  .stream-status-filter-select option::checkmark {
+    display: none;
+  }
+
+  .stream-status-filter-select selectedcontent {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    line-height: 1.25;
+  }
+
+  .stream-status-filter-select selectedcontent .status-tag {
+    padding-block: 0;
+    line-height: inherit;
+    /* Inset ring stays inside the tag box so the select does not clip it. */
+    border: 0;
+    box-shadow: inset 0 0 0 1px var(--stream-color);
+  }
+}
+
+@media (--md-up) {
+  .stream-status-filter-nav {
+    display: flex;
+  }
+
+  .stream-status-filter-select {
+    display: none;
+  }
 }
 
 #stream-preview-dialog.dialog {
@@ -139,6 +224,14 @@
 
 /* Single-column rail (< md): filter + sort side by side. */
 @media (--md-down) {
+  .stream-page.stack {
+    gap: var(--space-4);
+  }
+
+  .stream-page .rail-layout {
+    gap: var(--space-10);
+  }
+
   .stream-page .rail-layout-ready > .panel-sticky {
     display: flex;
     flex-direction: row;
@@ -146,19 +239,21 @@
     gap: var(--space-8);
   }
 
-  .stream-page .stream-status-filter {
+  .stream-page .stream-status-filter,
+  .stream-page .stream-status-sort {
     width: auto;
     flex: 0 0 auto;
+    min-width: 0;
   }
 
   .stream-page .stream-status-sort {
     margin-top: 0;
-    width: auto;
-    flex: 0 0 auto;
   }
 
   .stream-page .stream-status-sort-control,
-  .stream-page .stream-status-sort-control select {
+  .stream-page .stream-status-sort-control select,
+  .stream-page .stream-status-filter-select {
     width: auto;
+    min-width: 10rem;
   }
 }

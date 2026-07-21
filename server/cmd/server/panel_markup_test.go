@@ -250,6 +250,7 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 			WorkflowPath: "/w/workflow",
 			WorkflowName: "Demo workflow",
 		},
+		StatusFilter:  "all",
 		ProcessGroups: testHomeProcessGroups(),
 	}
 	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
@@ -261,6 +262,8 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
 		`class="stream-status-filter-nav"`,
+		`class="stream-status-filter-select"`,
+		`data-home-filter-select`,
 		`class="stream-status-filter-option is-active"`,
 		`class="status-tag status-tag-compact"`,
 		`data-stream-status="all"`,
