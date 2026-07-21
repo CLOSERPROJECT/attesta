@@ -260,10 +260,10 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	for _, want := range []string{
 		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
-		`class="sidebar-nav"`,
-		`class="sidebar-nav-link is-active"`,
+		`class="stream-status-filter-nav"`,
+		`class="stream-status-filter-option is-active"`,
 		`class="status-tag status-tag-compact"`,
-		`data-stream-status="available"`,
+		`data-stream-status="all"`,
 		`class="page-header-head"`,
 		`class="page-header-actions"`,
 		"View preview",

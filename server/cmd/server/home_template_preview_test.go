@@ -14,6 +14,9 @@ func testHomeProcessGroups(items ...StreamInstanceCard) []ProcessStatusGroup {
 	groups := make([]ProcessStatusGroup, 0, len(homeProcessStatuses()))
 	for _, status := range homeProcessStatuses() {
 		processes := byStatus[status]
+		if status == "all" {
+			processes = append([]StreamInstanceCard(nil), items...)
+		}
 		totalPages := 1
 		pageLinks := []PaginationLink{{Page: 1, URL: "/w/workflow/#stream-section-" + status, IsCurrent: true}}
 		groups = append(groups, ProcessStatusGroup{
@@ -88,6 +91,7 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, marker := range []string{
+		`data-home-nav="all"`,
 		`data-home-nav="available"`,
 		`data-home-nav="active"`,
 		`data-home-nav="done"`,
@@ -107,11 +111,13 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			t.Fatalf("expected marker %q in output, got: %s", marker, body)
 		}
 	}
-	if !strings.Contains(compactBody, `aria-label="Stream status sections"`) {
-		t.Fatalf("expected stream status sidebar, got: %s", body)
+	if !strings.Contains(compactBody, `aria-labelledby="stream-status-filter-label"`) ||
+		!strings.Contains(compactBody, `Filter by status`) {
+		t.Fatalf("expected stream status filter label, got: %s", body)
 	}
 	for _, marker := range []string{
-		`id="stream-section-available" data-home-panel="available"`,
+		`id="stream-section-all" data-home-panel="all"`,
+		`id="stream-section-available" data-home-panel="available" hidden`,
 		`id="stream-section-active" data-home-panel="active" hidden`,
 		`id="stream-section-done" data-home-panel="done" hidden`,
 		`id="stream-section-terminated" data-home-panel="terminated" hidden`,
@@ -158,6 +164,7 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, marker := range []string{
+		`No instances`,
 		`No available instances`,
 		`No active instances`,
 		`No completed instances`,
@@ -181,6 +188,21 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 		Sort:         "status",
 		StatusFilter: "active",
 		ProcessGroups: []ProcessStatusGroup{
+			{
+				Status:      "all",
+				Label:       "All",
+				PanelID:     "stream-section-all",
+				TotalCount:  0,
+				Sort:        "time_desc",
+				SortParam:   "all_sort",
+				CurrentPage: 1,
+				TotalPages:  1,
+				PageNumbers: []int{1},
+				PageLinks:   []PaginationLink{{Page: 1, URL: "/w/workflow/#stream-section-all", IsCurrent: true}},
+				PreviousURL: "/w/workflow/#stream-section-all",
+				NextURL:     "/w/workflow/#stream-section-all",
+				Processes:   nil,
+			},
 			{
 				Status:      "available",
 				Label:       "Available",
@@ -229,8 +251,13 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	if !strings.Contains(compactBody, `/w/workflow/?active_page=3&amp;active_sort=status#stream-section-active`) {
 		t.Fatalf("expected pagination to preserve sort and active page, got: %s", body)
 	}
-	if !strings.Contains(compactBody, `select name="active_sort"`) {
+	if !strings.Contains(compactBody, `name="active_sort"`) {
 		t.Fatalf("expected active group sort select, got: %s", body)
+	}
+	if !strings.Contains(compactBody, `class="stream-status-sort-control"`) ||
+		!strings.Contains(compactBody, `stream-status-rail-label`) ||
+		!strings.Contains(compactBody, `Sort by`) {
+		t.Fatalf("expected stream-status-sort-control with Sort by label, got: %s", body)
 	}
 	stickyStart := strings.Index(compactBody, `class="panel panel-sticky"`)
 	stickyEnd := strings.Index(compactBody, `class="rail-layout-main home-workflow-panel-main"`)
@@ -238,10 +265,10 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 		t.Fatal("expected sticky sidebar before rail-layout-main")
 	}
 	stickyBlock := compactBody[stickyStart:stickyEnd]
-	navIdx := strings.Index(stickyBlock, `aria-label="Stream status sections"`)
-	sortIdx := strings.Index(stickyBlock, `select name="active_sort"`)
+	navIdx := strings.Index(stickyBlock, `aria-labelledby="stream-status-filter-label"`)
+	sortIdx := strings.Index(stickyBlock, `name="active_sort"`)
 	if navIdx == -1 || sortIdx == -1 || !(navIdx < sortIdx) {
-		t.Fatalf("expected status sort control below sidebar-nav inside sticky panel, got:\n%s", stickyBlock)
+		t.Fatalf("expected status sort control below stream-status-filter-nav inside sticky panel, got:\n%s", stickyBlock)
 	}
 	sectionStart := strings.Index(compactBody, `id="stream-section-active"`)
 	sectionEnd := strings.Index(compactBody, `Active stream instances pagination`)

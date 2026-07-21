@@ -121,11 +121,11 @@ Other partials (`icons.html`, …) still live at `server/templates/` root until 
 | `components/stream_instance_card.html` | `components/stream-instance-card.css` | `components/stream.css` (`.status-tag*` via `status_tag` micro-partial) |
 | Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
 | Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
-| Inline sidebar nav (stream, org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`), `layout/grids.css` (`.rail-layout`) |
-| Inline rail shell (stream, org_admin) | `layout/grids.css` (`.rail-layout`) | `components/panel.css` (`.panel-sticky`), `components/sidebar-nav.css` |
+| Inline sidebar nav (org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`), `layout/grids.css` (`.rail-layout`) |
+| Inline rail shell (stream, org_admin) | `layout/grids.css` (`.rail-layout`) | `components/panel.css` (`.panel-sticky`); org_admin also `components/sidebar-nav.css` |
 | Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
 | `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
-| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
+| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
 | `pages/process.html` | `pages/process.css` (incl. `.process-header-meta*`) | `components/page-header.css`, `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
 | `components/stream_step_summary.html` | `components/stream-step-summary.css` | — |
 | `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
