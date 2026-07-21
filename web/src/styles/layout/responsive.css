@@ -3,6 +3,10 @@
     padding: var(--space-4) var(--space-4) 32px;
   }
 
+  .page:has(.breadcrumbs) {
+    padding-top: var(--space-2);
+  }
+
   .topbar {
     padding: var(--space-3) var(--space-4);
   }

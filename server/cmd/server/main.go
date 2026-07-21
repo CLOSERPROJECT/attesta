@@ -350,6 +350,7 @@ type ProcessStatusGroup struct {
 
 type HomeView struct {
 	PageBase
+	Breadcrumbs         BreadcrumbsView
 	WorkflowDescription string
 	Error               string
 	Sort                string
@@ -405,6 +406,7 @@ type AboutView struct {
 
 type PlatformAdminView struct {
 	PageBase
+	Breadcrumbs              BreadcrumbsView
 	SearchQuery              string
 	CurrentPage              int
 	TotalPages               int
@@ -449,6 +451,7 @@ type PlatformAdminErrors struct {
 
 type OrgAdminView struct {
 	PageBase
+	Breadcrumbs            BreadcrumbsView
 	ActivePanel            string
 	Organization           Organization
 	OrganizationLogoURL    string
@@ -540,6 +543,7 @@ func (e *WorkflowRefValidationError) Error() string {
 
 type ProcessPageView struct {
 	PageBase
+	Breadcrumbs  BreadcrumbsView
 	ProcessID    string
 	InstanceName string
 	Status       string
@@ -3298,6 +3302,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
 		PageBase: s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		Breadcrumbs:              buildPlatformAdminBreadcrumbs(),
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
 		TotalPages:               totalPages,
@@ -3774,6 +3779,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
 		view := OrgAdminView{
 			PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
+			Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 			ActivePanel:            activePanel,
 			NeedsOrganizationSetup: true,
 			OrganizationError:      errs.Organization,
@@ -3806,6 +3812,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 
 	view := OrgAdminView{
 		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
+		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 		ActivePanel:            activePanel,
 		Organization:           org,
 		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
@@ -4808,6 +4815,7 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 
 	view := HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
+		Breadcrumbs:         buildStreamBreadcrumbs(workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
 		Error:               workflowError,
 		Sort:                sortKey,
@@ -5017,6 +5025,7 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 	}
 	return ProcessPageView{
 		PageBase:     pageBase,
+		Breadcrumbs:  buildProcessBreadcrumbs(workflowKey, pageBase.WorkflowName, instanceName, processID),
 		ProcessID:    processID,
 		InstanceName: instanceName,
 		Status:       status,

@@ -264,3 +264,15 @@ func (v StreamInstanceDetailView) StreamTimeline() StreamTimelineView {
 		HideStatus: v.HideStatus,
 	}
 }
+
+// BreadcrumbItem is one crumb in templates/components/breadcrumbs.html.
+type BreadcrumbItem struct {
+	Label   string
+	Href    string
+	Current bool // true => last crumb; still a link, with aria-current="page"
+}
+
+// BreadcrumbsView is the view model for templates/components/breadcrumbs.html.
+type BreadcrumbsView struct {
+	Items []BreadcrumbItem
+}
