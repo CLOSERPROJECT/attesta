@@ -324,40 +324,36 @@ type QueryInput struct {
 }
 
 type ProcessStatusGroup struct {
-	Status          string
-	Label           string
-	PanelID         string
-	Sort            string
-	SortFields      []QueryInput
-	TotalCount      int
-	CurrentPage     int
-	TotalPages      int
-	PageNumbers     []int
-	PageLinks       []PaginationLink
-	HasPreviousPage bool
-	HasNextPage     bool
-	PreviousPage    int
-	NextPage        int
-	PreviousURL     string
-	NextURL         string
-	Processes       []StreamInstanceCard
+	Status              string
+	Label               string
+	NavAriaLabel        string
+	NavTitle            string
+	Heading             string
+	EmptyMessage        string
+	PaginationAriaLabel string
+	PanelID             string
+	Sort                string
+	SortFields          []QueryInput
+	TotalCount          int
+	CurrentPage         int
+	TotalPages          int
+	PageNumbers         []int
+	PageLinks           []PaginationLink
+	HasPreviousPage     bool
+	HasNextPage         bool
+	PreviousPage        int
+	NextPage            int
+	PreviousURL         string
+	NextURL             string
+	Processes           []StreamInstanceCard
 }
 
 type HomeView struct {
 	PageBase
 	WorkflowDescription string
 	Error               string
-	CanStartProcess     bool
 	Sort                string
 	StatusFilter        string
-	CurrentPage         int
-	TotalPages          int
-	PageNumbers         []int
-	HasPreviousPage     bool
-	HasNextPage         bool
-	PreviousPage        int
-	NextPage            int
-	Processes           []StreamInstanceCard
 	ProcessGroups       []ProcessStatusGroup
 	Preview             StreamInstanceDetailView
 }
@@ -1767,6 +1763,24 @@ func homeProcessStatuses() []string {
 	return []string{"all", "available", processStatusActive, processStatusDone, processStatusTerminated}
 }
 
+func homeProcessStatusCopy(status string) (navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel string) {
+	switch strings.TrimSpace(status) {
+	case "all":
+		return "All streams", "All stream instances", "All stream instances", "No instances", "All stream instances pagination"
+	case "available":
+		return "Available streams", "Streams waiting for your input", "Available stream instances", "No available instances", "Available stream instances pagination"
+	case processStatusActive:
+		return "Active streams", "Streams waiting for someone else input", "Active stream instances", "No active instances", "Active stream instances pagination"
+	case processStatusDone:
+		return "Completed streams", "Streams completed successfully", "Done stream instances", "No completed instances", "Done stream instances pagination"
+	case processStatusTerminated:
+		return "Terminated streams", "Streams terminated before completion", "Terminated stream instances", "No terminated instances", "Terminated stream instances pagination"
+	default:
+		label := processStatusLabel(status)
+		return label, label, label, "No " + label + " instances", label + " stream instances pagination"
+	}
+}
+
 func homePaginationURL(workflowPath, filter, sort string, page int) string {
 	values := url.Values{}
 	filter = normalizeHomeStatusFilter(filter)
@@ -1833,24 +1847,30 @@ func buildHomeProcessGroups(workflowPath string, processes []StreamInstanceCard,
 		if status != "all" {
 			sortFields = []QueryInput{{Name: "filter", Value: status}}
 		}
+		navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel := homeProcessStatusCopy(status)
 		groups = append(groups, ProcessStatusGroup{
-			Status:          status,
-			Label:           processStatusLabel(status),
-			PanelID:         panelID,
-			Sort:            sortKey,
-			SortFields:      sortFields,
-			TotalCount:      len(items),
-			CurrentPage:     currentPage,
-			TotalPages:      totalPages,
-			PageNumbers:     pageNumbers,
-			PageLinks:       pageLinks,
-			HasPreviousPage: currentPage > 1,
-			HasNextPage:     currentPage < totalPages,
-			PreviousPage:    previousPage,
-			NextPage:        nextPage,
-			PreviousURL:     homePaginationURL(workflowPath, status, sortKey, previousPage),
-			NextURL:         homePaginationURL(workflowPath, status, sortKey, nextPage),
-			Processes:       pagedItems,
+			Status:              status,
+			Label:               processStatusLabel(status),
+			NavAriaLabel:        navAriaLabel,
+			NavTitle:            navTitle,
+			Heading:             heading,
+			EmptyMessage:        emptyMessage,
+			PaginationAriaLabel: paginationAriaLabel,
+			PanelID:             panelID,
+			Sort:                sortKey,
+			SortFields:          sortFields,
+			TotalCount:          len(items),
+			CurrentPage:         currentPage,
+			TotalPages:          totalPages,
+			PageNumbers:         pageNumbers,
+			PageLinks:           pageLinks,
+			HasPreviousPage:     currentPage > 1,
+			HasNextPage:         currentPage < totalPages,
+			PreviousPage:        previousPage,
+			NextPage:            nextPage,
+			PreviousURL:         homePaginationURL(workflowPath, status, sortKey, previousPage),
+			NextURL:             homePaginationURL(workflowPath, status, sortKey, nextPage),
+			Processes:           pagedItems,
 		})
 	}
 	return groups
@@ -4746,7 +4766,6 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []StreamInstanceCard
-	var filteredProcesses []StreamInstanceCard
 	path := workflowPath(workflowKey)
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
@@ -4777,32 +4796,9 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		processes = append(processes, item)
-		if statusFilter == "all" || item.Status == statusFilter {
-			filteredProcesses = append(filteredProcesses, item)
-		}
 	}
 
-	sortHomeProcessList(processes, sortKey)
-	sortHomeProcessList(filteredProcesses, sortKey)
 	processGroups := buildHomeProcessGroups(workflowPath(workflowKey), processes, sortKey, page)
-
-	currentPage := normalizeHomePage(page, len(filteredProcesses))
-	start := (currentPage - 1) * homeProcessesPerPage
-	end := min(start+homeProcessesPerPage, len(filteredProcesses))
-	pagedProcesses := filteredProcesses
-	if start < len(filteredProcesses) {
-		pagedProcesses = filteredProcesses[start:end]
-	} else if len(filteredProcesses) > 0 {
-		pagedProcesses = filteredProcesses[:0]
-	}
-	totalPages := 1
-	if len(filteredProcesses) > 0 {
-		totalPages = (len(filteredProcesses) + homeProcessesPerPage - 1) / homeProcessesPerPage
-	}
-	pageNumbers := make([]int, 0, totalPages)
-	for current := 1; current <= totalPages; current++ {
-		pageNumbers = append(pageNumbers, current)
-	}
 
 	preview := makeStreamInstanceDetailReadOnly(
 		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
@@ -4811,20 +4807,11 @@ func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
 	preview.HideStatus = true
 
 	view := HomeView{
-		PageBase: s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
+		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
 		Error:               workflowError,
-		CanStartProcess:     workflowError == "",
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
-		CurrentPage:         currentPage,
-		TotalPages:          totalPages,
-		PageNumbers:         pageNumbers,
-		HasPreviousPage:     currentPage > 1,
-		HasNextPage:         currentPage < totalPages,
-		PreviousPage:        max(currentPage-1, 1),
-		NextPage:            min(currentPage+1, totalPages),
-		Processes:           pagedProcesses,
 		ProcessGroups:       processGroups,
 		Preview:             preview,
 	}
