@@ -136,8 +136,14 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if strings.Contains(body, "/formata-arch/") {
 			t.Fatalf("expected rewritten js body, still contains legacy prefix")
 		}
+		if strings.Contains(body, "/org-admin/formata-builder") {
+			t.Fatalf("expected rewritten js body, still contains legacy org-admin API prefix")
+		}
+		if !strings.Contains(body, "/my/organization/formata-builder") {
+			t.Fatalf("expected rewritten js body to contain /my/organization/formata-builder API prefix")
+		}
 		if !strings.Contains(body, "/my/organization/formata-builder/") {
-			t.Fatalf("expected rewritten js body to contain org-admin prefix")
+			t.Fatalf("expected rewritten js body to contain org-admin asset prefix")
 		}
 		if !strings.Contains(rec.Header().Get("Content-Type"), "javascript") {
 			t.Fatalf("content-type = %q, want javascript content type", rec.Header().Get("Content-Type"))

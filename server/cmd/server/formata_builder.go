@@ -480,6 +480,7 @@ func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Requ
 	}
 	if shouldRewriteFormataAssetContent(cleaned, contentType) {
 		data = bytes.ReplaceAll(data, []byte("/formata-arch/"), []byte(mountPath+"/"))
+		data = bytes.ReplaceAll(data, []byte("/org-admin/formata-builder"), []byte(mountPath))
 		if injectOverrides && (strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") || strings.EqualFold(path.Ext(cleaned), ".html")) {
 			data = injectFormataBuilderOverrides(data)
 		}

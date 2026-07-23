@@ -216,3 +216,20 @@ func TestLegacyOrgAdminRoutesReturnNotFound(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
+
+func TestMyOrganizationProfileRouteViaMux(t *testing.T) {
+	server := orgAdminSectionURLTestServer(t, time.Now().UTC())
+	mux := server.newMux()
+
+	req := httptest.NewRequest(http.MethodGet, "/my/organization/profile", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("status = %d, want route registered (not 404)", rec.Code)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
