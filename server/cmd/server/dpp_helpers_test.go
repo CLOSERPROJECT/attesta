@@ -450,8 +450,8 @@ func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
 				{
 					Body: &SubstepBodyView{
 						Attachments: []SubstepAttachmentView{
-							{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
-							{Filename: "legacy.pdf", URL: "/w/workflow/process/p1/attachment/legacy/file"},
+							{AttachmentID: "file 1", URL: "/my/streams/workflow/instance/p1/attachment/file%201/file", PreviewKind: "document"},
+							{Filename: "legacy.pdf", URL: "/my/streams/workflow/instance/p1/attachment/legacy/file"},
 						},
 					},
 				},
@@ -467,7 +467,7 @@ func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
 	if attachment.PreviewURL != attachment.URL+"?inline=1#page=1&toolbar=0&navpanes=0&view=FitH" {
 		t.Fatalf("preview URL = %q", attachment.PreviewURL)
 	}
-	if got := mapped[0].Substeps[0].Body.Attachments[1].URL; got != "/w/workflow/process/p1/attachment/legacy/file" {
+	if got := mapped[0].Substeps[0].Body.Attachments[1].URL; got != "/my/streams/workflow/instance/p1/attachment/legacy/file" {
 		t.Fatalf("attachment without ID URL changed to %q", got)
 	}
 
@@ -477,14 +477,14 @@ func TestPublicDPPTraceabilityAttachmentURLs(t *testing.T) {
 				{
 					Body: &SubstepBodyView{
 						Attachments: []SubstepAttachmentView{
-							{AttachmentID: "file 1", URL: "/w/workflow/process/p1/attachment/file%201/file", PreviewKind: "document"},
+							{AttachmentID: "file 1", URL: "/my/streams/workflow/instance/p1/attachment/file%201/file", PreviewKind: "document"},
 						},
 					},
 				},
 			},
 		},
 	}, " ")
-	if unchanged[0].Substeps[0].Body.Attachments[0].URL != "/w/workflow/process/p1/attachment/file%201/file" {
+	if unchanged[0].Substeps[0].Body.Attachments[0].URL != "/my/streams/workflow/instance/p1/attachment/file%201/file" {
 		t.Fatalf("blank digital link changed URL to %q", unchanged[0].Substeps[0].Body.Attachments[0].URL)
 	}
 }

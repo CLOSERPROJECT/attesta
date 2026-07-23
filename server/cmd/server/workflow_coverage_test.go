@@ -86,18 +86,30 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 	}
 }
 
-func TestLegacyWorkflowMountReturns404(t *testing.T) {
+func TestLegacyRoutesGone(t *testing.T) {
 	server := &Server{
 		store: NewMemoryStore(),
 		tmpl:  testTemplates(),
 		sse:   newSSEHub(),
 	}
+	mux := server.newMux()
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
-	rec := httptest.NewRecorder()
-	server.newMux().ServeHTTP(rec, req)
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	cases := []string{
+		"/w/workflow/",
+		"/w/workflow/process/abc",
+		"/org-admin/profile",
+		"/dashboard",
+		"/dashboard/streams/workflow",
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+			}
+		})
 	}
 }
 

@@ -48,7 +48,7 @@ func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 		Attachments: []SubstepAttachmentView{
 			{
 				Key:      "photo",
-				URL:      "/w/workflow/process/process-1/substep/1.1/file?id=abc",
+				URL:      "/my/streams/workflow/instance/process-1/attachment/abc/file",
 				Filename: "photo.jpg",
 			},
 		},

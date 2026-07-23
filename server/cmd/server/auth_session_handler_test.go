@@ -62,7 +62,7 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	form := url.Values{}
 	form.Set("email", "u1@example.com")
 	form.Set("password", "secure-password")
-	form.Set("next", "/w/workflow/")
+	form.Set("next", "/my/streams/workflow/")
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -72,8 +72,8 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/w/workflow/" {
-		t.Fatalf("location = %q, want /w/workflow/", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/streams/workflow/" {
+		t.Fatalf("location = %q, want /my/streams/workflow/", rec.Header().Get("Location"))
 	}
 	cookies := rec.Result().Cookies()
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" {

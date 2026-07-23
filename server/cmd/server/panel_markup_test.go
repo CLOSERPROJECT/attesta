@@ -11,7 +11,7 @@ func TestProcessDownloadsPanelMarkup(t *testing.T) {
 
 	var out bytes.Buffer
 	view := ProcessPageView{
-		PageBase:  PageBase{WorkflowPath: "/w/demo"},
+		PageBase:  PageBase{WorkflowPath: "/my/streams/demo"},
 		ProcessID: "proc-1",
 	}
 	if err := tmpl.ExecuteTemplate(&out, "process_downloads", view); err != nil {
@@ -49,7 +49,7 @@ func TestProcessDPPPanelMarkup(t *testing.T) {
 
 	var out bytes.Buffer
 	view := ProcessPageView{
-		PageBase: PageBase{WorkflowPath: "/w/demo"},
+		PageBase: PageBase{WorkflowPath: "/my/streams/demo"},
 		DPPURL:   "https://example.com/01/01234567890123/10/LOT1/21/SN1",
 		DPPGS1:   "01/01234567890123/10/LOT1/21/SN1",
 	}
@@ -248,7 +248,7 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		StatusFilter:  "all",

@@ -114,8 +114,8 @@ func TestHandleInvitePasswordUpdatesCurrentPassword(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != appHomePath {
+		t.Fatalf("location = %q, want %s", rec.Header().Get("Location"), appHomePath)
 	}
 	if updatedSecret != "invite-session" || updatedPassword != "this-is-strong-enough" {
 		t.Fatalf("updated = %q/%q", updatedSecret, updatedPassword)

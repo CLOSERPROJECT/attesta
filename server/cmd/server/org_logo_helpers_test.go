@@ -28,7 +28,7 @@ func organizationLogoRequest(t *testing.T, filename, contentType string, data []
 		t.Fatalf("writer.Close error: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", &body)
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	if err := req.ParseMultipartForm(int64(body.Len())); err != nil {
 		t.Fatalf("ParseMultipartForm error: %v", err)

@@ -285,7 +285,7 @@ func TestRequireOrgAdmin(t *testing.T) {
 	}
 
 	t.Run("unauthenticated redirects", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)
 		rec := httptest.NewRecorder()
 		if _, ok := server.requireOrgAdmin(rec, req); ok {
 			t.Fatal("expected requireOrgAdmin to fail")
@@ -296,7 +296,7 @@ func TestRequireOrgAdmin(t *testing.T) {
 	})
 
 	t.Run("non admin forbidden", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-member"})
 		rec := httptest.NewRecorder()
 		if _, ok := server.requireOrgAdmin(rec, req); ok {
@@ -308,7 +308,7 @@ func TestRequireOrgAdmin(t *testing.T) {
 	})
 
 	t.Run("admin allowed", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-admin"})
 		rec := httptest.NewRecorder()
 		user, ok := server.requireOrgAdmin(rec, req)

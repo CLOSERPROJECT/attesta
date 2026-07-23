@@ -705,7 +705,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if strings.Contains(body, `class="rail-layout`) || strings.Contains(body, `class="home-workflow-grid"`) {
 		t.Fatalf("did not expect stream dashboard grid when config is invalid, got %q", body)
 	}
-	if strings.Contains(body, `action="/my/streams/workflow/process/start"`) || strings.Contains(body, "New instance") {
+	if strings.Contains(body, `action="/my/streams/workflow/instance/start"`) || strings.Contains(body, "New instance") {
 		t.Fatalf("did not expect new instance controls when config is invalid, got %q", body)
 	}
 }

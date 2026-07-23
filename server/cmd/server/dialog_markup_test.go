@@ -13,7 +13,7 @@ func TestStreamPageNewInstanceDialogMarkup(t *testing.T) {
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		StatusFilter:  "all",
@@ -114,14 +114,14 @@ func TestProcessTerminateDialogMarkup(t *testing.T) {
 	view := ProcessPageView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 		},
 		ProcessID: "process-1",
 		Detail: StreamInstanceDetailView{
 			WorkflowKey:      "workflow",
 			ProcessID:        "process-1",
 			CanTerminate:     true,
-			TerminateAction:  "/w/workflow/process/process-1/terminate",
+			TerminateAction:  "/my/streams/workflow/instance/process-1/terminate",
 			TerminateSubstep: "2.1",
 		},
 	}
@@ -150,7 +150,7 @@ func TestProcessTerminateDialogMarkup(t *testing.T) {
 		"Danger zone - End stream early",
 		"Available substep",
 		"2.1",
-		`action="/w/workflow/process/process-1/terminate"`,
+		`action="/my/streams/workflow/instance/process-1/terminate"`,
 	} {
 		if !strings.Contains(dialog, want) {
 			t.Fatalf("expected %q in terminate-process dialog markup, got:\n%s", want, dialog)
@@ -175,7 +175,7 @@ func TestStreamPreviewDialogPageScopedMarkup(t *testing.T) {
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		StatusFilter:  "all",

@@ -3367,7 +3367,7 @@ func TestHandleOrgAdminLogoIdentityBranches(t *testing.T) {
 		}{
 			{
 				name:     "blank id",
-				path:     "/org-admin/logo/",
+				path:     "/logo/",
 				identity: &fakeIdentityStore{},
 			},
 			{

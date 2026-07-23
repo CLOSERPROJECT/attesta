@@ -2627,7 +2627,7 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	} else if err != nil {
 		logRequestError(r, err, "failed to load invited user after accepting invite")
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 }
 
 func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
@@ -2687,7 +2687,7 @@ func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to update password", err, "failed to update invited user password for %s", user.Email)
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
