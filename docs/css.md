@@ -49,34 +49,13 @@ Root templates still pending migration (`error_banner.html`, `icons.html`, `role
 
 ## CSS-only components
 
-Reused markup + namespaced CSS, **no** full Go template partial / view struct. Inline HTML in pages; the CSS file header is the markup contract.
+When to choose CSS-only vs full vs cluster: `.agents/skills/attesta-ui-components`.
 
-**Use when:** 2+ pages; coherent selector family; no mode dispatch / HTMX swap target.  
-**Otherwise:** full component + view struct, or a cluster file.
+Markup contract = the CSS file header (e.g. `page-header.css`, `panel.css`, `dialog.css`). Inline HTML in pages; no shared view struct. Micro-partial exceptions: `status_tag`, `tip`, `local_datetime`.
 
-**Add one:** create `components/{name}.css` with a markup-tree header; import from `components.css`. Do not add `templates/components/{name}.html` unless it graduates (`status_tag`, `tip`, `local_datetime` are the narrow micro-partial exceptions).
+**Add one:** create `components/{name}.css` with a markup-tree header; import from `components.css`. Do not add `templates/components/{name}.html` unless it graduates.
 
-**Page header** (worked example): CSS-only — no `PageHeaderView`. Optional trail via full `breadcrumbs` (`Current: true` on last crumb; every crumb still has `Href`). With actions, wrap body + actions in `.page-header-head`; omit the head when there are no actions. Process-instance ID under the title is `.process-header-meta*` in `pages/process.css`, not page-header.
-
-```
-Heading only:
-section.page-header
-  nav.breadcrumbs?
-  div.page-header-body
-    h1                              (optional span[aria-hidden] + span.page-header-subtitle)
-    p?
-
-With actions:
-section.page-header
-  nav.breadcrumbs?
-  div.page-header-head
-    div.page-header-body
-      …
-    div.page-header-actions
-      button | form | …
-```
-
-Other CSS-only modules (`panel`, `dialog`, `sidebar-nav`, `button`, `list-row`, …): read the matching file header. Page-scoped dialog sizing stays in page CSS (e.g. `#stream-preview-dialog` in `pages/stream.css`). Destructive dialog titles stack `.dialog-title u-text-danger`.
+**Notes:** Process-instance ID under the title is `.process-header-meta*` in `pages/process.css`, not page-header. Page-scoped dialog sizing stays in page CSS (e.g. `#stream-preview-dialog` in `pages/stream.css`). Destructive dialog titles stack `.dialog-title u-text-danger`.
 
 ## Theming
 
@@ -196,9 +175,7 @@ task css:lint
 
 ## Adding new UI
 
-1. Prefer an existing component, CSS-only module, or `u-*`.
-2. New domain styles → component or page module (stem rule + barrel import).
-3. Tokens for color; run `task css:lint` before the PR.
+Follow `.agents/skills/attesta-ui-components` (tier → place → tracer). Then run `task css:lint`.
 
 ## Out of scope
 

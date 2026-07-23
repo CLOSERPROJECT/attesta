@@ -22,7 +22,7 @@ Done when: you can name the **tier** and why the other two do not fit.
 
 Choose **full** when reused on 2+ pages or it is an HTMX/SSE swap target, with a stable field set assembled in Go.
 
-Choose **CSS-only** when the markup tree is reused, selectors form one family, and there is no mode dispatch / swap target. Examples: `page-header`, `panel`, `dialog`, `list-row`. Markup contract lives in the CSS file header and `docs/css.md`.
+Choose **CSS-only** when the markup tree is reused, selectors form one family, and there is no mode dispatch / swap target. Examples: `page-header`, `panel`, `dialog`, `list-row`. Markup contract lives in the CSS file header; layer/stem rules in `docs/css.md`.
 
 Choose **cluster** for single-class primitives (`.muted`, `.pill`), domain widget groups, or one-off markup with no dedicated styles.
 
@@ -85,7 +85,7 @@ Done when: the new or changed piece mirrors a same-tier neighbor (paths, define,
 
 Other full neighbors (same layout pattern): `stream_instance_card`, `stream_termination_details`, `breadcrumbs` (`Current: true` on last crumb; every crumb still has `Href`), `substep_shell` / `substep_body`, `dpp_history_step`.
 
-**CSS-only / micro-partial:** copy markup from an existing page or micro-partial (`status_tag`, `tip`, `local_datetime`); read the CSS file header + `docs/css.md` for the contract — do not invent a shared view struct.
+**CSS-only / micro-partial:** copy markup from an existing page or micro-partial (`status_tag`, `tip`, `local_datetime`); read the CSS file header for the contract — do not invent a shared view struct.
 
 ## 4. Done when
 
