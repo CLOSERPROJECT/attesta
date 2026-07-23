@@ -1294,7 +1294,7 @@ func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Reques
 }
 
 func workflowPath(key string) string {
-	return "/w/" + strings.TrimSpace(key)
+	return streamPath(key)
 }
 
 func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
