@@ -7,7 +7,7 @@ This repo is a small end-to-end demo:
 - **Frontend**: Vite-built JS/CSS bundle, plus **HTMX** in templates and **SSE** for live updates.
 - **Authorization**: **Cerbos** policy engine for “can complete substep” checks.
 
-See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling).
+See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (CSS rules), `.agents/skills/attesta-ui-components` (extract/place UI components).
 
 ## Current auth/org status (2026-07)
 - Demo impersonation has been removed from production code paths.
@@ -41,6 +41,7 @@ When acting as a coding agent in this repository:
 - Do not refactor for style or architecture unless explicitly requested
 - Match existing patterns, even if they are imperfect
 - Read `docs/css.md` before changing templates or styles in `web/src/styles/`
+- Use `.agents/skills/attesta-ui-components` when extracting or placing templates, view structs, or component CSS
 - Read relevant code before making changes (especially `server/cmd/server/main.go`)
 - Ask before making breaking changes to routes, workflow config, or persistence
 
@@ -205,9 +206,9 @@ Download endpoint `handleDownloadProcessAttachment` streams GridFS content and s
 
 ## Templates and static assets
 - Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`. Custom funcs in `templateFuncs()` include `dict` for inline map literals and typed wrappers such as `streamTimelineStep` / `streamTimelineSubstep` (e.g. `{{ template "stream_timeline_step" (streamTimelineStep . $.HideStatus) }}`).
-- **Template define names** match the file stem (no extension): e.g. `components/stream_card.html` → `{{ define "stream_card" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated.
+- **Template define names** match the file stem (no extension): e.g. `components/stream_card.html` → `{{ define "stream_card" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated. Primary CSS uses the same stem under `web/src/styles/components/` or `pages/` (underscore → kebab); exceptions in `docs/css.md`.
 - **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`SubstepBodyView`, `StreamInstanceDetailView`, `StreamCardView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page/view assembly is partially peeled (`stream_instance_detail.go`, `substep_views_builder.go`, `timeline_builder.go`); remaining handlers stay in `main.go`.
-- **Component tiers:** full template components (`templates/components/` + view struct in `components.go`); **CSS-only components** (see `docs/css.md`) — reused markup with a dedicated CSS module and inline HTML, no full template partial (examples: page-header in `page-header.css`, panel in `panel.css`, dialog in `dialog.css`, list-row in `list-row.css`); primitives in `shared.css`. Full component example for trails: `breadcrumbs` (`breadcrumbs.html` + `BreadcrumbsView`). Migrate one at a time.
+- **Component tiers** (full / CSS-only / cluster): see `.agents/skills/attesta-ui-components`. CSS-only markup contracts and layer rules: `docs/css.md`. Migrate one component at a time.
 - Substep bodies (`server/templates/components/substep_body.html`) dispatch on explicit **`Mode`** (`preview`|`actionable`|`result`|`message`) via `effectiveSubstepBodyMode`; builders set `SubstepBodyView.Mode` (`resolveSubstepBodyMode` in `components.go`).
 - Stream timeline (`server/templates/components/stream_timeline.html`) renders the step/substep accordion tree on stream instance detail and stream dashboard preview; inner define `stream_timeline_step` calls `substep_shell` via `(streamTimelineSubstep . $.HideStatus)`; `substep_shell` dispatches to `substep_body` with `TimelineSubstep.Body` (`*SubstepBodyView`).
 - Stream instance detail partial (`stream_instance_detail_content`) is built by `buildStreamInstanceDetailView` in `stream_instance_detail.go` and exposed on `ProcessPageView.Detail` (`StreamInstanceDetailView`).
