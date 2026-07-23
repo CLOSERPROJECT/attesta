@@ -11,8 +11,8 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 
 	var out bytes.Buffer
 	view := BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: appHomePath},
-		{Label: "Alpha", Href: streamPath("alpha")},
+		{Label: "Dashboard", Href: appHomePath},
+		{Label: "Stream: Alpha", Href: streamPath("alpha")},
 		{Label: "Instance: Batch 1", Href: streamInstancePath("alpha", "abc123"), Current: true},
 	}}
 	if err := tmpl.ExecuteTemplate(&out, "breadcrumbs", view); err != nil {
@@ -23,9 +23,9 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 		`aria-label="Breadcrumb"`,
 		`class="breadcrumbs"`,
 		`href="/my"`,
-		">Streams<",
+		">Dashboard<",
 		`href="/my/streams/alpha"`,
-		">Alpha<",
+		">Stream: Alpha<",
 		`href="/my/streams/alpha/instance/abc123"`,
 		`aria-current="page"`,
 		"Instance: Batch 1",
@@ -74,8 +74,8 @@ func TestProcessPageHeaderRendersBreadcrumbs(t *testing.T) {
 	body := out.String()
 	for _, want := range []string{
 		`class="breadcrumbs"`,
-		">Streams<",
-		">Alpha Stream<",
+		">Dashboard<",
+		">Stream: Alpha Stream<",
 		"Instance: Batch 1",
 		`href="/my/streams/wf-a/instance/abc123"`,
 		`aria-current="page"`,

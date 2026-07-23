@@ -5,7 +5,7 @@ import "strings"
 func buildStreamBreadcrumbs(workflowKey, workflowName string) BreadcrumbsView {
 	key := strings.TrimSpace(workflowKey)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: appHomePath},
+		{Label: "Dashboard", Href: appHomePath},
 		{Label: streamCrumbLabel(workflowName, key), Href: streamPath(key), Current: true},
 	}}
 }
@@ -14,7 +14,7 @@ func buildProcessBreadcrumbs(workflowKey, workflowName, instanceName, processID 
 	key := strings.TrimSpace(workflowKey)
 	id := strings.TrimSpace(processID)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: appHomePath},
+		{Label: "Dashboard", Href: appHomePath},
 		{Label: streamCrumbLabel(workflowName, key), Href: streamPath(key)},
 		{Label: processInstanceCrumbLabel(instanceName, id), Href: streamInstancePath(key, id), Current: true},
 	}}
@@ -23,7 +23,7 @@ func buildProcessBreadcrumbs(workflowKey, workflowName, instanceName, processID 
 func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	section := strings.TrimSpace(activePanel)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: appHomePath},
+		{Label: "Dashboard", Href: appHomePath},
 		{Label: "Organization admin", Href: organizationPath("profile")},
 		{Label: orgAdminSectionLabel(section), Href: organizationPath(orgAdminSectionRest(section)), Current: true},
 	}}
@@ -31,16 +31,16 @@ func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 
 func buildPlatformAdminBreadcrumbs() BreadcrumbsView {
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: appHomePath},
+		{Label: "Dashboard", Href: appHomePath},
 		{Label: "Platform admin", Href: "/admin/orgs", Current: true},
 	}}
 }
 
 func streamCrumbLabel(workflowName, workflowKey string) string {
 	if name := strings.TrimSpace(workflowName); name != "" {
-		return name
+		return "Stream: " + name
 	}
-	return strings.TrimSpace(workflowKey)
+	return "Stream: " + strings.TrimSpace(workflowKey)
 }
 
 func processInstanceCrumbLabel(instanceName, processID string) string {
