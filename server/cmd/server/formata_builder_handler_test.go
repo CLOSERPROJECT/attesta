@@ -881,3 +881,20 @@ func findFirstBuilderAssetPath(t *testing.T, body, pattern string) string {
 	}
 	return matches[1]
 }
+
+func TestInjectFormataBuilderOverridesIdempotent(t *testing.T) {
+	in := []byte(`<html><head><style data-attesta-formata-builder-overrides></style></head></html>`)
+	got := injectFormataBuilderOverrides(in)
+	if string(got) != string(in) {
+		t.Fatalf("expected unchanged when overrides already present")
+	}
+}
+
+func TestShouldRewriteFormataAssetContent(t *testing.T) {
+	if !shouldRewriteFormataAssetContent("app.js", "application/octet-stream") {
+		t.Fatal("expected true for .js extension fallback")
+	}
+	if shouldRewriteFormataAssetContent("logo.png", "image/png") {
+		t.Fatal("expected false for non-rewritable asset")
+	}
+}

@@ -25,7 +25,7 @@ func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	return BreadcrumbsView{Items: []BreadcrumbItem{
 		{Label: "Dashboard", Href: appHomePath},
 		{Label: "Organization admin", Href: organizationPath("profile")},
-		{Label: orgAdminSectionLabel(section), Href: organizationPath(orgAdminSectionRest(section)), Current: true},
+		{Label: orgAdminSectionLabel(section), Href: orgAdminSectionHref(section), Current: true},
 	}}
 }
 

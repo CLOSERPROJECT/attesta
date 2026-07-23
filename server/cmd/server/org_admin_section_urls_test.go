@@ -233,3 +233,24 @@ func TestMyOrganizationProfileRouteViaMux(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
+
+func TestUnknownMyRoutesReturnNotFound(t *testing.T) {
+	server := orgAdminSectionURLTestServer(t, time.Now().UTC())
+	mux := server.newMux()
+
+	cases := []string{
+		"/my/not-a-page",
+		"/my/organization/not-a-section",
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+			}
+		})
+	}
+}

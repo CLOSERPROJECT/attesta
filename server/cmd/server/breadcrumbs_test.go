@@ -79,6 +79,9 @@ func TestBuildOrgAdminBreadcrumbsSections(t *testing.T) {
 		if got.Items[2].Label != want.label || got.Items[2].Href != want.href {
 			t.Fatalf("panel %q: got %+v, want label=%q href=%q", panel, got.Items[2], want.label, want.href)
 		}
+		if href := orgAdminSectionHref(panel); href != want.href {
+			t.Fatalf("orgAdminSectionHref(%q) = %q, want %q", panel, href, want.href)
+		}
 	}
 }
 
