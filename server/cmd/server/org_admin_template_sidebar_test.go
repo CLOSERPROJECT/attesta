@@ -14,7 +14,7 @@ func TestOrgAdminTemplateRendersSidebarPanels(t *testing.T) {
 			Name: "Acme Org",
 			Slug: "acme-org",
 		},
-		OrganizationLogoURL: "/org-admin/logo/logo-1",
+		OrganizationLogoURL: "/my/organization/logo/logo-1",
 		Roles: []Role{
 			{Slug: "qa-reviewer", Name: "QA Reviewer"},
 		},

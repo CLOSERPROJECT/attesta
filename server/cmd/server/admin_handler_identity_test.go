@@ -1893,7 +1893,7 @@ func TestHandleOrgAdminUsersCreateOrgWithIdentity(t *testing.T) {
 	form := url.Values{}
 	form.Set("intent", "create_org")
 	form.Set("name", "Fresh Org")
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -1906,8 +1906,8 @@ func TestHandleOrgAdminUsersCreateOrgWithIdentity(t *testing.T) {
 	if createSessionSecret != "session-1" || createName != "Fresh Org" {
 		t.Fatalf("create args = %q %q", createSessionSecret, createName)
 	}
-	if rec.Header().Get("Location") != "/org-admin/members" {
-		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 	}
 }
 
@@ -1947,7 +1947,7 @@ func TestHandleOrgAdminUsersCreateOrgIdentityValidation(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2062,7 +2062,7 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 		t.Fatalf("writer.Close error: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader(body.String()))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader(body.String()))
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2084,8 +2084,8 @@ func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	if deletedLogoFileID != "logo-old" {
 		t.Fatalf("deleted logo = %q, want logo-old", deletedLogoFileID)
 	}
-	if rec.Header().Get("Location") != "/org-admin/profile" {
-		t.Fatalf("location = %q, want /org-admin/profile", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/profile" {
+		t.Fatalf("location = %q, want /my/organization/profile", rec.Header().Get("Location"))
 	}
 }
 
@@ -2127,7 +2127,7 @@ func TestHandleOrgAdminLogoWithIdentity(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/org-admin/logo/logo-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/logo/logo-1", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
 
@@ -2189,7 +2189,7 @@ func TestHandleOrgAdminRolesWithIdentity(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Approver&palette=blue"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=Approver&palette=blue"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2241,7 +2241,7 @@ func TestHandleOrgAdminRolesSlugifiesAndTruncatesName(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA+Reviewer!!!1234567890123456789012345678901234567890&palette=blue"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=QA+Reviewer!!!1234567890123456789012345678901234567890&palette=blue"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2318,7 +2318,7 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 	}
 
 	targetID := "user-2"
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId="+targetID+"&roles=approver&roles=org-admin"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId="+targetID+"&roles=approver&roles=org-admin"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2328,15 +2328,15 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/org-admin/members" {
-		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 	}
 	if !hasIdentityLabel(users[1].Labels, identityOrgAdminLabel) || !containsRole(decodeIdentityRoleLabels(users[1].Labels), "approver") {
 		t.Fatalf("updated user labels = %#v", users[1].Labels)
 	}
 
 	selfID := "user-1"
-	selfReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId="+selfID+"&roles=approver"))
+	selfReq := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId="+selfID+"&roles=approver"))
 	selfReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	selfReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	selfRec := httptest.NewRecorder()
@@ -2409,7 +2409,7 @@ func TestHandleOrgAdminUsersSetRolesHidesPlatformAdmin(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2482,7 +2482,7 @@ func TestHandleOrgAdminUsersInviteWithIdentity(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver&roles=org-admin"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver&roles=org-admin"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2492,8 +2492,8 @@ func TestHandleOrgAdminUsersInviteWithIdentity(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/org-admin/members" {
-		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 	}
 	if inviteCalls != 1 || len(invitedRoles) != 1 || invitedRoles[0] != "approver" || !invitedAdmin {
 		t.Fatalf("invite call = %d roles=%#v admin=%v", inviteCalls, invitedRoles, invitedAdmin)
@@ -2536,7 +2536,7 @@ func TestHandleOrgAdminUsersInviteIdentityDuplicatePending(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2546,8 +2546,8 @@ func TestHandleOrgAdminUsersInviteIdentityDuplicatePending(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/org-admin/members" {
-		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 	}
 	if inviteCalls != 0 {
 		t.Fatalf("invite calls = %d, want 0", inviteCalls)
@@ -2597,7 +2597,7 @@ func TestHandleOrgAdminUsersInviteIdentityExistingAndCrossOrg(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=member%40example.com&roles=approver"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=member%40example.com&roles=approver"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2605,14 +2605,14 @@ func TestHandleOrgAdminUsersInviteIdentityExistingAndCrossOrg(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("existing member status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/org-admin/members" {
-		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 	}
 	if len(updatedUsers["user-2"]) != 1 || updatedUsers["user-2"][0] != encodeIdentityRoleLabel("approver") {
 		t.Fatalf("updated user labels = %#v", updatedUsers)
 	}
 
-	reqOther := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=other%40example.com&roles=approver"))
+	reqOther := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=other%40example.com&roles=approver"))
 	reqOther.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	reqOther.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	recOther := httptest.NewRecorder()
@@ -2670,7 +2670,7 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 	}
 
 	targetID := "user-2"
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId="+targetID))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_user&userId="+targetID))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2678,8 +2678,8 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/org-admin/members" {
-		t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 	}
 	if len(deletedMemberships) != 1 || deletedMemberships[0] != "membership-2" {
 		t.Fatalf("deleted memberships = %#v", deletedMemberships)
@@ -2690,11 +2690,11 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 }
 
 func TestIdentityOrgAdminHelpers(t *testing.T) {
-	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)); !strings.Contains(got, "/invite/accept") {
+	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)); !strings.Contains(got, "/invite/accept") {
 		t.Fatalf("invite redirect = %q", got)
 	}
 	t.Setenv("APPWRITE_INVITE_REDIRECT_URL", "https://app.example/invite/accept")
-	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)); got != "https://app.example/invite/accept" {
+	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)); got != "https://app.example/invite/accept" {
 		t.Fatalf("configured invite redirect = %q", got)
 	}
 	if _, err := sessionSecretFromRequest(httptest.NewRequest(http.MethodGet, "/", nil)); err == nil {
@@ -2758,7 +2758,7 @@ func TestHandleOrgAdminUsersDeleteUserHidesPlatformAdmin(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_user&userId=user-2"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2808,7 +2808,7 @@ func TestHandleOrgAdminRolesIdentityErrors(t *testing.T) {
 		}
 	}
 
-	reqDup := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=QA+Reviewer&palette=blue"))
+	reqDup := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=QA+Reviewer&palette=blue"))
 	reqDup.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	reqDup.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	recDup := httptest.NewRecorder()
@@ -2817,7 +2817,7 @@ func TestHandleOrgAdminRolesIdentityErrors(t *testing.T) {
 		t.Fatalf("duplicate role response = %d %q", recDup.Code, recDup.Body.String())
 	}
 
-	reqFail := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Approver&palette=blue"))
+	reqFail := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=Approver&palette=blue"))
 	reqFail.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	reqFail.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	recFail := httptest.NewRecorder()
@@ -2857,7 +2857,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2865,8 +2865,8 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		if rec.Code != http.StatusSeeOther || updated != 1 {
 			t.Fatalf("pending update response = %d updated=%d location=%q", rec.Code, updated, rec.Header().Get("Location"))
 		}
-		if rec.Header().Get("Location") != "/org-admin/members" {
-			t.Fatalf("location = %q, want /org-admin/members", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/my/organization/members" {
+			t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
 		}
 	})
 
@@ -2875,7 +2875,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) { return nil, nil }
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=missing&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=missing&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2892,7 +2892,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-1"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_user&userId=user-1"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2906,7 +2906,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		fake := baseIdentity()
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com&roles=missing"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=user%40example.com&roles=missing"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2924,7 +2924,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=user%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2944,7 +2944,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver&roles=org-admin"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver&roles=org-admin"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2964,7 +2964,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -2991,7 +2991,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3028,7 +3028,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		_ = writer.Close()
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader(body.String()))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader(body.String()))
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3054,7 +3054,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Other+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=update_org&name=Other+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3075,7 +3075,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Updated+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=update_org&name=Updated+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3099,7 +3099,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3116,7 +3116,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=user%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3136,7 +3136,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=pending%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3156,7 +3156,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=member%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=member%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3177,7 +3177,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3212,7 +3212,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 			log.SetPrefix(oldPrefix)
 		})
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3237,7 +3237,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=set_roles&userId=user-2&roles=missing"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-2&roles=missing"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3258,7 +3258,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=delete_user&userId=user-2"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_user&userId=user-2"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3275,7 +3275,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=update_org&name=Updated+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=update_org&name=Updated+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3350,7 +3350,7 @@ func TestHandleOrgAdminLogoIdentityBranches(t *testing.T) {
 
 	t.Run("method not allowed", func(t *testing.T) {
 		server := baseServer(&fakeIdentityStore{})
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodPost, "/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminLogo(rec, req)
@@ -3372,14 +3372,14 @@ func TestHandleOrgAdminLogoIdentityBranches(t *testing.T) {
 			},
 			{
 				name: "org missing",
-				path: "/org-admin/logo/logo-1",
+				path: "/logo/logo-1",
 				identity: &fakeIdentityStore{
 					getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) { return nil, ErrIdentityNotFound },
 				},
 			},
 			{
 				name: "id mismatch",
-				path: "/org-admin/logo/logo-1",
+				path: "/logo/logo-1",
 				identity: &fakeIdentityStore{
 					getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 						org := IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org", LogoFileID: "other-logo"}
@@ -3389,7 +3389,7 @@ func TestHandleOrgAdminLogoIdentityBranches(t *testing.T) {
 			},
 			{
 				name: "load error",
-				path: "/org-admin/logo/logo-1",
+				path: "/logo/logo-1",
 				identity: &fakeIdentityStore{
 					getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
 						org := IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org", LogoFileID: "logo-1"}
@@ -3425,7 +3425,7 @@ func TestHandleOrgAdminLogoIdentityBranches(t *testing.T) {
 				return IdentityFile{ID: fileID, Filename: "logo.bin", Data: []byte("BIN")}, nil
 			},
 		})
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodGet, "/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminLogo(rec, req)
@@ -3480,7 +3480,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			&IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"},
 			nil,
 		)
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/roles", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/roles", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminRoles(rec, req)
@@ -3495,7 +3495,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			nil,
 			nil,
 		)
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=Approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3511,7 +3511,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			&IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"},
 			nil,
 		)
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("palette=blue"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("palette=blue"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3525,7 +3525,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			nil,
 			nil,
 		)
-		req2 := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Approver"))
+		req2 := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=Approver"))
 		req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req2.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec2 := httptest.NewRecorder()
@@ -3541,7 +3541,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			&IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"},
 			nil,
 		)
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=%21%21%21&palette=blue"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=%21%21%21&palette=blue"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3558,7 +3558,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			org,
 			nil,
 		)
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("name=Escalations"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("name=Escalations"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3603,7 +3603,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("intent=set_role&role_slug=qa-reviewer&name=Lead+Reviewer"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("intent=set_role&role_slug=qa-reviewer&name=Lead+Reviewer"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3657,7 +3657,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("intent=delete_role&role_slug=approver"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("intent=delete_role&role_slug=approver"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3705,7 +3705,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		reqEdit := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("intent=set_role&role_slug=approver&name=Lead+Approver"))
+		reqEdit := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("intent=set_role&role_slug=approver&name=Lead+Approver"))
 		reqEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		reqEdit.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recEdit := httptest.NewRecorder()
@@ -3714,7 +3714,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			t.Fatalf("edit response = %d %q", recEdit.Code, recEdit.Body.String())
 		}
 
-		reqDelete := httptest.NewRequest(http.MethodPost, "/org-admin/roles", strings.NewReader("intent=delete_role&role_slug=approver"))
+		reqDelete := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("intent=delete_role&role_slug=approver"))
 		reqDelete.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		reqDelete.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recDelete := httptest.NewRecorder()
@@ -3730,7 +3730,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 			&IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"},
 			nil,
 		)
-		req := httptest.NewRequest(http.MethodPut, "/org-admin/roles", nil)
+		req := httptest.NewRequest(http.MethodPut, "/my/organization/roles", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminRoles(rec, req)
@@ -3768,18 +3768,18 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 
 	t.Run("get and unsupported action", func(t *testing.T) {
 		server := baseServer(IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"})
-		getReq := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		getReq := httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)
 		getReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		getRec := httptest.NewRecorder()
 		server.handleOrgAdminUsers(getRec, getReq)
 		if getRec.Code != http.StatusSeeOther {
 			t.Fatalf("get status = %d, want %d", getRec.Code, http.StatusSeeOther)
 		}
-		if getRec.Header().Get("Location") != "/org-admin/profile" {
-			t.Fatalf("get location = %q, want /org-admin/profile", getRec.Header().Get("Location"))
+		if getRec.Header().Get("Location") != "/my/organization/profile" {
+			t.Fatalf("get location = %q, want /my/organization/profile", getRec.Header().Get("Location"))
 		}
 
-		postReq := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=unsupported"))
+		postReq := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=unsupported"))
 		postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		postReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		postRec := httptest.NewRecorder()
@@ -3800,7 +3800,7 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 			{body: "intent=delete_user", want: "user is required"},
 		}
 		for _, tc := range tests {
-			req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader(tc.body))
+			req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 			rec := httptest.NewRecorder()
@@ -3814,7 +3814,7 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 	t.Run("create org validation without org context", func(t *testing.T) {
 		server := baseServer(IdentityUser{ID: "user-1", Email: "owner@example.com", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"})
 
-		reqInvite := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=invite&email=user%40example.com"))
+		reqInvite := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=user%40example.com"))
 		reqInvite.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		reqInvite.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recInvite := httptest.NewRecorder()
@@ -3823,7 +3823,7 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 			t.Fatalf("invite response = %d %q", recInvite.Code, recInvite.Body.String())
 		}
 
-		reqCreate := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=create_org"))
+		reqCreate := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=create_org"))
 		reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		reqCreate.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recCreate := httptest.NewRecorder()
@@ -3835,7 +3835,7 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 
 	t.Run("create org rejected when org already exists", func(t *testing.T) {
 		server := baseServer(IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"})
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
@@ -3889,7 +3889,7 @@ func TestHandleOrgAdminUsersIdentityMultipartLogoValidation(t *testing.T) {
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close error: %v", err)
 		}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", &body)
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", &body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		return req
@@ -3922,7 +3922,7 @@ func TestHandleOrgAdminUsersIdentityMultipartLogoValidation(t *testing.T) {
 	})
 
 	t.Run("invalid multipart form", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", strings.NewReader("--broken"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("--broken"))
 		req.Header.Set("Content-Type", "multipart/form-data; boundary=missing")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()

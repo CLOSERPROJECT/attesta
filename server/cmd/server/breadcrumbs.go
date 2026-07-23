@@ -24,7 +24,7 @@ func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	section := strings.TrimSpace(activePanel)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
 		{Label: "Streams", Href: "/"},
-		{Label: "Organization admin", Href: "/org-admin/profile"},
+		{Label: "Organization admin", Href: organizationPath("profile")},
 		{Label: orgAdminSectionLabel(section), Href: orgAdminSectionHref(section), Current: true},
 	}}
 }
@@ -64,10 +64,10 @@ func orgAdminSectionLabel(activePanel string) string {
 func orgAdminSectionHref(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
 	case "roles":
-		return "/org-admin/roles"
+		return organizationPath("roles")
 	case "members":
-		return "/org-admin/members"
+		return organizationPath("members")
 	default:
-		return "/org-admin/profile"
+		return organizationPath("profile")
 	}
 }

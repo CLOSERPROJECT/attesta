@@ -23,7 +23,7 @@ func TestStreamCardTemplateRendersCoreFields(t *testing.T) {
 		CanClone:    true,
 		CanEdit:     true,
 		CanDelete:   true,
-		EditAction:  "/org-admin/formata-builder?stream=demo",
+		EditAction:  "/my/organization/formata-builder?stream=demo",
 		DeleteAction: "/my/streams/demo/delete",
 	}
 	if err := tmpl.ExecuteTemplate(&out, "stream_card", card); err != nil {
@@ -64,7 +64,7 @@ func TestStreamCardCreateTemplateRendersCTA(t *testing.T) {
 	for _, want := range []string{
 		`class="stream-card stream-card-create"`,
 		`class="stream-card-cta"`,
-		`href="/org-admin/formata-builder"`,
+		`href="/my/organization/formata-builder"`,
 		"Create new stream",
 	} {
 		if !strings.Contains(body, want) {

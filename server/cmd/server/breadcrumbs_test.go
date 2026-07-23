@@ -49,10 +49,10 @@ func TestBuildOrgAdminBreadcrumbs(t *testing.T) {
 	if len(got.Items) != 3 {
 		t.Fatalf("len(Items) = %d, want 3", len(got.Items))
 	}
-	if got.Items[1].Label != "Organization admin" || got.Items[1].Href != "/org-admin/profile" {
+	if got.Items[1].Label != "Organization admin" || got.Items[1].Href != "/my/organization/profile" {
 		t.Fatalf("middle = %+v", got.Items[1])
 	}
-	if got.Items[2].Label != "Members" || got.Items[2].Href != "/org-admin/members" || !got.Items[2].Current {
+	if got.Items[2].Label != "Members" || got.Items[2].Href != "/my/organization/members" || !got.Items[2].Current {
 		t.Fatalf("section = %+v", got.Items[2])
 	}
 }
@@ -62,11 +62,11 @@ func TestBuildOrgAdminBreadcrumbsSections(t *testing.T) {
 		label string
 		href  string
 	}{
-		"profile": {label: "Profile", href: "/org-admin/profile"},
-		"roles":   {label: "Roles", href: "/org-admin/roles"},
-		"members": {label: "Members", href: "/org-admin/members"},
-		"":        {label: "Profile", href: "/org-admin/profile"},
-		"other":   {label: "Profile", href: "/org-admin/profile"},
+		"profile": {label: "Profile", href: "/my/organization/profile"},
+		"roles":   {label: "Roles", href: "/my/organization/roles"},
+		"members": {label: "Members", href: "/my/organization/members"},
+		"":        {label: "Profile", href: "/my/organization/profile"},
+		"other":   {label: "Profile", href: "/my/organization/profile"},
 	}
 	for panel, want := range cases {
 		got := buildOrgAdminBreadcrumbs(panel)

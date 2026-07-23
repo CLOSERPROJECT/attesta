@@ -1517,7 +1517,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Stre
 			Name:         cfg.Workflow.Name,
 			Description:  strings.TrimSpace(cfg.Workflow.Description),
 			Counts:       WorkflowProcessCounts{},
-			EditAction:   "/org-admin/formata-builder?stream=" + key,
+			EditAction:   organizationPath("formata-builder?stream=" + key),
 			DeleteAction: streamPath(key) + "/delete",
 		}
 		if s.store == nil {
@@ -2081,6 +2081,30 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 	case rest == "streams" || strings.HasPrefix(rest, "streams/"):
 		s.handleStreamRoutes(w, cloneRequestWithPath(r, "/"+rest))
 		return
+	case rest == "organization" || strings.HasPrefix(rest, "organization/"):
+		s.handleOrganizationRoutes(w, cloneRequestWithPath(r, "/"+rest))
+		return
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleOrganizationRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/organization")
+	switch {
+	case path == "/profile" || path == "/profile/":
+		s.handleOrgAdminPage(w, r)
+	case path == "/roles" || path == "/roles/":
+		s.handleOrgAdminRoles(w, r)
+	case path == "/members" || path == "/members/":
+		s.handleOrgAdminPage(w, r)
+	case path == "/users" || path == "/users/":
+		s.handleOrgAdminUsers(w, r)
+	case strings.HasPrefix(path, "/logo/"):
+		s.handleOrgAdminLogo(w, cloneRequestWithPath(r, path))
+	case path == "/formata-builder" || strings.HasPrefix(path, "/formata-builder/"):
+		suffix := strings.TrimPrefix(path, "/formata-builder")
+		s.handleOrgAdminFormataBuilder(w, cloneRequestWithPath(r, organizationPath("formata-builder"+suffix)))
 	default:
 		http.NotFound(w, r)
 	}
@@ -2232,13 +2256,6 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
-	mux.HandleFunc("/org-admin/profile", s.handleOrgAdminPage)
-	mux.HandleFunc("/org-admin/roles", s.handleOrgAdminRoles)
-	mux.HandleFunc("/org-admin/members", s.handleOrgAdminPage)
-	mux.HandleFunc("/org-admin/logo/", s.handleOrgAdminLogo)
-	mux.HandleFunc("/org-admin/users", s.handleOrgAdminUsers)
-	mux.HandleFunc("/org-admin/formata-builder", s.handleOrgAdminFormataBuilder)
-	mux.HandleFunc("/org-admin/formata-builder/", s.handleOrgAdminFormataBuilder)
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
@@ -2528,7 +2545,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		}
 		redirectTarget := appHomePath
 		if strings.TrimSpace(identityUser.OrgSlug) == "" {
-			redirectTarget = "/org-admin/profile"
+			redirectTarget = organizationPath("profile")
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
@@ -3668,11 +3685,11 @@ func resolveOrgAdminActivePanel(r *http.Request, errs OrgAdminErrors, inviteLink
 	}
 	if r != nil {
 		switch r.URL.Path {
-		case "/org-admin/roles":
+		case organizationPath("roles"):
 			return "roles"
-		case "/org-admin/members":
+		case organizationPath("members"):
 			return "members"
-		case "/org-admin/profile":
+		case organizationPath("profile"):
 			return "profile"
 		}
 	}
@@ -3880,7 +3897,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 		ActivePanel:            activePanel,
 		Organization:           org,
-		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
+		OrganizationLogoURL:    organizationPath("logo/" + strings.TrimSpace(org.LogoAttachmentID)),
 		NeedsOrganizationSetup: false,
 		OrganizationError:      errs.Organization,
 		RoleError:              errs.Role,
@@ -3915,7 +3932,7 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/org-admin/logo/"), "/")
+	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/logo/"), "/")
 	if logoID == "" {
 		http.NotFound(w, r)
 		return
@@ -4226,7 +4243,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "unsupported action"})
 			return
 		}
-		http.Redirect(w, r, "/org-admin/roles", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("roles"), http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -4243,7 +4260,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		http.Redirect(w, r, "/org-admin/profile", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("profile"), http.StatusSeeOther)
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -4322,7 +4339,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 		return
 	}
 
@@ -4385,7 +4402,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 					s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for invited member %s in organization %s", membership.UserID, admin.OrgSlug)
 					return
 				}
-				http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
 			if roleSlugsKey(append(append([]string{}, membership.RoleSlugs...), func() []string {
@@ -4394,7 +4411,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				}
 				return nil
 			}()...)) == roleSlugsKey(selectedRoles) {
-				http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
 			sessionSecret, err := sessionSecretFromRequest(r)
@@ -4406,7 +4423,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to update membership %s in organization %s", membership.ID, admin.OrgSlug)
 				return
 			}
-			http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+			http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 			return
 		}
 		existingUser, err := s.identity.GetUserByEmail(r.Context(), email)
@@ -4426,7 +4443,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for existing user %s in organization %s", existingUser.ID, admin.OrgSlug)
 				return
 			}
-			http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+			http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 			return
 		case err != nil && !errors.Is(err, ErrIdentityNotFound):
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"}, err, "failed to look up existing user %s during invite", email)
@@ -4441,7 +4458,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to create invite for %s in organization %s", email, admin.OrgSlug)
 			return
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	case "update_org":
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
@@ -4501,7 +4518,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				log.Printf("failed to delete previous organization logo %q: %v", previousLogoFileID, err)
 			}
 		}
-		http.Redirect(w, r, "/org-admin/profile", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("profile"), http.StatusSeeOther)
 	case "set_roles":
 		userID := strings.TrimSpace(r.FormValue("userId"))
 		if userID == "" {
@@ -4575,7 +4592,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to update user roles"}, err, "failed to update labels for user %s in organization %s", target.ID, admin.OrgSlug)
 			return
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	case "delete_user":
 		userID := strings.TrimSpace(r.FormValue("userId"))
 		if userID == "" {
@@ -4634,7 +4651,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	default:
 		s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "unsupported action"})
 	}

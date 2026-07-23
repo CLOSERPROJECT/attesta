@@ -41,7 +41,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	}
 
 	t.Run("unauthenticated redirects to login", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder", nil)
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusSeeOther {
@@ -50,7 +50,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("org admin can load builder", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -61,7 +61,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 			t.Fatalf("expected html response body, got %q", body)
 		}
-		if !strings.Contains(body, "/org-admin/formata-builder/assets/") {
+		if !strings.Contains(body, "/my/organization/formata-builder/assets/") {
 			t.Fatalf("expected rewritten asset prefix in html, got %q", body)
 		}
 		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
@@ -73,7 +73,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("org admin can load nested route fallback", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/editor/home", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/editor/home", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -84,7 +84,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 			t.Fatalf("expected html fallback body, got %q", body)
 		}
-		if !strings.Contains(body, "/org-admin/formata-builder/assets/") {
+		if !strings.Contains(body, "/my/organization/formata-builder/assets/") {
 			t.Fatalf("expected rewritten asset prefix in fallback html, got %q", body)
 		}
 		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
@@ -93,7 +93,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("missing static asset returns not found", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/assets/app.js", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/assets/app.js", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -103,7 +103,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("public icon asset is served", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/vite.svg", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/vite.svg", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -116,14 +116,14 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("js assets are rewritten from legacy absolute prefix", func(t *testing.T) {
-		indexReq := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
+		indexReq := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder", nil)
 		indexReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		indexRec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(indexRec, indexReq)
 		if indexRec.Code != http.StatusOK {
 			t.Fatalf("index status = %d, want %d", indexRec.Code, http.StatusOK)
 		}
-		jsPath := findFirstBuilderAssetPath(t, indexRec.Body.String(), `src="(/org-admin/formata-builder/assets/[^"]+\.js)"`)
+		jsPath := findFirstBuilderAssetPath(t, indexRec.Body.String(), `src="(/my/organization/formata-builder/assets/[^"]+\.js)"`)
 
 		req := httptest.NewRequest(http.MethodGet, jsPath, nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
@@ -136,7 +136,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 		if strings.Contains(body, "/formata-arch/") {
 			t.Fatalf("expected rewritten js body, still contains legacy prefix")
 		}
-		if !strings.Contains(body, "/org-admin/formata-builder/") {
+		if !strings.Contains(body, "/my/organization/formata-builder/") {
 			t.Fatalf("expected rewritten js body to contain org-admin prefix")
 		}
 		if !strings.Contains(rec.Header().Get("Content-Type"), "javascript") {
@@ -145,14 +145,14 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("css assets are served with stylesheet content type", func(t *testing.T) {
-		indexReq := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder", nil)
+		indexReq := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder", nil)
 		indexReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		indexRec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(indexRec, indexReq)
 		if indexRec.Code != http.StatusOK {
 			t.Fatalf("index status = %d, want %d", indexRec.Code, http.StatusOK)
 		}
-		cssPath := findFirstBuilderAssetPath(t, indexRec.Body.String(), `href="(/org-admin/formata-builder/assets/[^"]+\.css)"`)
+		cssPath := findFirstBuilderAssetPath(t, indexRec.Body.String(), `href="(/my/organization/formata-builder/assets/[^"]+\.css)"`)
 
 		req := httptest.NewRequest(http.MethodGet, cssPath, nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
@@ -167,7 +167,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("method not allowed", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPut, "/org-admin/formata-builder", nil)
+		req := httptest.NewRequest(http.MethodPut, "/my/organization/formata-builder", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -187,7 +187,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 			t.Fatalf("SaveFormataBuilderStream error: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+saved.ID.Hex(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/"+saved.ID.Hex(), nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -233,7 +233,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 			Progress:    map[string]ProcessStep{},
 		})
 
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+saved.ID.Hex(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/"+saved.ID.Hex(), nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -272,7 +272,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 			Progress:    map[string]ProcessStep{"1_1": {State: "done"}},
 		})
 
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+saved.ID.Hex(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/"+saved.ID.Hex(), nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -294,7 +294,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("stream json rejects invalid id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/bad-id", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/bad-id", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -304,7 +304,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 	})
 
 	t.Run("stream json returns not found for unknown stream", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+primitive.NewObjectID().Hex(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/"+primitive.NewObjectID().Hex(), nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -324,7 +324,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 			t.Fatalf("SaveFormataBuilderStream error: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+saved.ID.Hex(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/"+saved.ID.Hex(), nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -341,7 +341,7 @@ func TestHandleOrgAdminFormataBuilderGet(t *testing.T) {
 			now:         time.Now,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/formata-builder/stream/"+primitive.NewObjectID().Hex(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/formata-builder/stream/"+primitive.NewObjectID().Hex(), nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		serverWithoutStore.handleOrgAdminFormataBuilder(rec, req)
@@ -389,7 +389,7 @@ func TestHandleEmbeddedFormataArchAuthenticatedUser(t *testing.T) {
 		if !strings.Contains(body, "/formata-arch/assets/") {
 			t.Fatalf("expected same-origin formata-arch asset prefix, got %q", body)
 		}
-		if strings.Contains(body, "/org-admin/formata-builder/assets/") {
+		if strings.Contains(body, "/my/organization/formata-builder/assets/") {
 			t.Fatalf("did not expect org-admin asset prefix, got %q", body)
 		}
 		if !strings.Contains(body, "data-attesta-formata-builder-overrides") {
@@ -444,7 +444,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	}
 
 	t.Run("unauthenticated is unauthorized", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("stream"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder", strings.NewReader("stream"))
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusUnauthorized {
@@ -453,7 +453,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("forbidden for non admin role", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("stream"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder", strings.NewReader("stream"))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-plain"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -463,7 +463,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("org admin can save stream", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader(`{"nodes":[]}`))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder", strings.NewReader(`{"nodes":[]}`))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -497,7 +497,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			t.Fatalf("SaveFormataBuilderStream error: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Updated stream")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Updated stream")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -532,7 +532,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			Progress:    map[string]ProcessStep{},
 		})
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex()+"&new=true", strings.NewReader(workflowStreamYAML("Cloned stream")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex()+"&new=true", strings.NewReader(workflowStreamYAML("Cloned stream")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -595,7 +595,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			Progress:    map[string]ProcessStep{},
 		})
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Should fail")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Should fail")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -623,7 +623,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			t.Fatalf("SaveFormataBuilderStream error: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Should fail")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Should fail")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -650,7 +650,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			Progress:    map[string]ProcessStep{},
 		})
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Platform updated stream")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Platform updated stream")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -675,7 +675,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("rejects non-root post path", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder/assets/app.js", strings.NewReader(`{"nodes":[]}`))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder/assets/app.js", strings.NewReader(`{"nodes":[]}`))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -685,7 +685,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("rejects empty stream body", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("   \n\t"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder", strings.NewReader("   \n\t"))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -696,7 +696,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 
 	t.Run("rejects oversized stream body", func(t *testing.T) {
 		t.Setenv("FORMATA_STREAM_MAX_BYTES", "8")
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader("0123456789"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder", strings.NewReader("0123456789"))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -706,7 +706,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("rejects invalid stream id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream=bad-id", strings.NewReader(workflowStreamYAML("Invalid stream id")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream=bad-id", strings.NewReader(workflowStreamYAML("Invalid stream id")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -716,7 +716,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 	})
 
 	t.Run("rejects missing stream id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder?stream="+primitive.NewObjectID().Hex(), strings.NewReader(workflowStreamYAML("Missing stream")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+primitive.NewObjectID().Hex(), strings.NewReader(workflowStreamYAML("Missing stream")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
@@ -733,7 +733,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			now:         time.Now,
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/formata-builder", strings.NewReader(workflowStreamYAML("No store")))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder", strings.NewReader(workflowStreamYAML("No store")))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: orgAdminSession})
 		rec := httptest.NewRecorder()
 		serverWithoutStore.handleOrgAdminFormataBuilder(rec, req)

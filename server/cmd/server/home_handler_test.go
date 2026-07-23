@@ -594,7 +594,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `href="/org-admin/formata-builder"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder"`) {
 			t.Fatalf("expected create stream card for org admin, got %q", body)
 		}
 		if !strings.Contains(body, "stream-card-cta") || !strings.Contains(body, "Create new stream") {
@@ -630,7 +630,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder"`) {
+		if strings.Contains(rec.Body.String(), `href="/my/organization/formata-builder"`) {
 			t.Fatalf("did not expect create stream card for non org admin, got %q", rec.Body.String())
 		}
 	})
@@ -755,10 +755,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for creator, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("expected clone action for creator, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected edit action for creator, got %q", body)
 		}
 		if strings.Contains(body, `id="edit-workflow-`+stream.ID.Hex()+`"`) {
@@ -773,7 +773,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for creator, got %q", body)
 		}
-		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if !strings.Contains(rec.Body.String(), `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected edit button for creator, got %q", rec.Body.String())
 		}
 	})
@@ -832,10 +832,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("did not expect delete button for started stream, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("expected clone action for started stream, got %q", body)
 		}
-		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect direct edit action for started stream, got %q", body)
 		}
 		if !strings.Contains(body, `class="stream-card-menu-item stream-card-menu-item-disabled"`) {
@@ -890,7 +890,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for platform admin, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("expected clone action for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `id="edit-workflow-`+stream.ID.Hex()+`"`) {
@@ -899,7 +899,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `onclick="document.getElementById('edit-workflow-`+stream.ID.Hex()+`').showModal()"`) {
 			t.Fatalf("expected edit warning dialog trigger for platform admin, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected edit dialog continue action for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
@@ -954,10 +954,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `stream-card-menu-trigger`) {
 			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
 		}
-		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("did not expect clone action without builder access, got %q", body)
 		}
-		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect edit action without builder access, got %q", body)
 		}
 		if strings.Contains(body, `stream-card-menu-item-danger stream-card-menu-item-disabled`) {

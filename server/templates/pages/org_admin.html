@@ -1,4 +1,4 @@
-{{/* Used on /org-admin/profile, /org-admin/roles, and /org-admin/members */}}
+{{/* Used on /my/organization/profile, /my/organization/roles, and /my/organization/members */}}
 
 {{ define "org_admin_body" }}
 
@@ -29,7 +29,7 @@
           </div>
           <form
             method="post"
-            action="/org-admin/users"
+            action="/my/organization/users"
             class="input-form"
             enctype="multipart/form-data"
           >
@@ -58,7 +58,7 @@
             aria-label="Organization admin sections"
           >
             <a
-              href="/org-admin/profile"
+              href="/my/organization/profile"
               class="sidebar-nav-link{{ if eq .ActivePanel "profile" }} is-active{{ end }}"
               data-org-admin-nav="profile"
               aria-controls="org-admin-panel-profile"
@@ -72,7 +72,7 @@
               >
             </a>
             <a
-              href="/org-admin/roles"
+              href="/my/organization/roles"
               class="sidebar-nav-link{{ if eq .ActivePanel "roles" }} is-active{{ end }}"
               data-org-admin-nav="roles"
               aria-controls="org-admin-panel-roles"
@@ -84,7 +84,7 @@
               >
             </a>
             <a
-              href="/org-admin/members"
+              href="/my/organization/members"
               class="sidebar-nav-link{{ if eq .ActivePanel "members" }} is-active{{ end }}"
               data-org-admin-nav="members"
               aria-controls="org-admin-panel-members"
@@ -139,7 +139,7 @@
             </div>
             <form
               method="post"
-              action="/org-admin/users"
+              action="/my/organization/users"
               class="input-form org-profile-form"
               enctype="multipart/form-data"
             >
@@ -281,7 +281,7 @@
                           </div>
                           <form
                             method="post"
-                            action="/org-admin/roles"
+                            action="/my/organization/roles"
                             class="input-form"
                           >
                             <input
@@ -414,7 +414,7 @@
                           {{ end }}
                           <form
                             method="post"
-                            action="/org-admin/roles"
+                            action="/my/organization/roles"
                             class="input-form"
                           >
                             <input
@@ -537,7 +537,7 @@
 
                         <form
                           method="post"
-                          action="/org-admin/users"
+                          action="/my/organization/users"
                           class="input-form"
                         >
                           <input
@@ -651,7 +651,7 @@
                         </p>
                         <form
                           method="post"
-                          action="/org-admin/users"
+                          action="/my/organization/users"
                           class="input-form"
                         >
                           <input
@@ -703,7 +703,7 @@
                 </button>
               </header>
 
-              <form method="post" action="/org-admin/roles" class="input-form">
+              <form method="post" action="/my/organization/roles" class="input-form">
                 <input type="hidden" name="intent" value="create_role" />
                 <div class="form-field">
                   <label for="role-name">Role name</label>
@@ -793,7 +793,7 @@
                 </button>
               </header>
 
-              <form method="post" action="/org-admin/users" class="input-form">
+              <form method="post" action="/my/organization/users" class="input-form">
                 <input type="hidden" name="intent" value="invite" />
                 <div class="form-field">
                   <label for="user-email">Email</label>
@@ -872,17 +872,17 @@
     const orgAdminMobilePanelMedia = window.matchMedia("(max-width: 767px)");
     const orgAdminPanels = new Set(["profile", "roles", "members"]);
     const orgAdminPanelPaths = {
-      profile: "/org-admin/profile",
-      roles: "/org-admin/roles",
-      members: "/org-admin/members",
+      profile: "/my/organization/profile",
+      roles: "/my/organization/roles",
+      members: "/my/organization/members",
     };
     const orgAdminPanelFromPath = (path) => {
       switch (path) {
-        case "/org-admin/profile":
+        case "/my/organization/profile":
           return "profile";
-        case "/org-admin/roles":
+        case "/my/organization/roles":
           return "roles";
-        case "/org-admin/members":
+        case "/my/organization/members":
           return "members";
         default:
           return null;
