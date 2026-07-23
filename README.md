@@ -127,8 +127,26 @@ Open:
 To run the backend on another port:
 
 ```bash
-PORT=3001 task dev
+PORT=3001 VITE_PORT=5174 task dev
 ```
+
+### Git worktrees
+
+Linked worktrees under `.worktrees/` share one Docker stack (Mongo, Appwrite, Cerbos, Mailpit) and the primary checkout’s `.env` (symlinked). Each worktree gets its own `.env.local` with `PORT` and `VITE_PORT`.
+
+```bash
+task worktree:add -- my-feature
+task start   # once, from any checkout; no-op if already up
+cd .worktrees/my-feature
+task dev     # prints http://localhost:<PORT>
+```
+
+Notes:
+
+- `task stop` / `task reset` affect **all** worktrees (shared infra).
+- Cerbos policies mounted into the running stack come from the **primary** checkout.
+- Override ports with `PORT=3001 VITE_PORT=5174 task dev` when needed.
+- Parallel `task dev` in two worktrees works when their `.env.local` ports differ.
 
 **[🔝 back to top](#toc)**
 

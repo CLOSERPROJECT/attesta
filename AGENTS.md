@@ -107,6 +107,28 @@ Taskfile shortcut:
 task start
 ```
 
+Host-dev (air + Vite HMR; shared infra + per-checkout ports):
+```bash
+task dev
+```
+
+### Git worktrees
+Linked checkouts live under `.worktrees/` (gitignored). Prefer Taskfile over raw `git worktree add`:
+
+```bash
+task worktree:add -- <branch>   # create, symlink primary .env, init submodules, write .env.local ports
+cd .worktrees/<branch>
+task start                      # shared stack; no-op if already healthy (Compose always from primary)
+task dev                        # prints http://localhost:<PORT> (Vite on VITE_PORT)
+```
+
+Constraints agents must respect:
+- **One shared Docker stack** (Mongo / Appwrite / Cerbos / Mailpit). Do not invent per-worktree Compose projects.
+- Per-checkout ports live in gitignored `.env.local` (`PORT`, `VITE_PORT`). Open the URL `task dev` prints; override with `PORT=… VITE_PORT=…` when needed.
+- `task stop` / `task reset` / `task purge` affect **all** worktrees.
+- Cerbos policy bind-mounts come from the **primary** checkout while the stack is up.
+- Details: README “Git worktrees”; scripts under `deployment/scripts/` (`worktree-env.sh`, `worktree-ports.sh`, `infra-up.sh`, `dev-env.sh`, `dev-stop-local.sh`).
+
 ## Runtime configuration
 Backend environment variables are read in `main()` (`server/cmd/server/main.go` env bootstrap). Common vars:
 - `MONGODB_URI` (default `mongodb://localhost:27017`)
@@ -229,3 +251,4 @@ Observed Dockerfiles:
 ## Known gotchas / inconsistencies (as checked in this repo)
 - `DOCKER.md` lists Cerbos image `ghcr.io/cerbos/cerbos:0.39.0`, but `deployment/docker-compose.local.yaml` and `deployment/Dockerfile.cerbos` use **0.50.0**.
 - `Taskfile.yml` includes a `cerbos-health` task that runs `curl`.
+- Host-dev from a linked worktree: do not hardcode `:3000` / `:5173` — use `.env.local` (or printed `task dev` URL). Do not run a second Compose stack from the worktree path.

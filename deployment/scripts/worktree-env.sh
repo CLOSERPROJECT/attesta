@@ -4,6 +4,7 @@
 #   deployment/scripts/worktree-env.sh              # current git toplevel
 #   deployment/scripts/worktree-env.sh /path/to/wt  # explicit worktree root
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 main_root="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
 if [[ -z "${main_root}" || ! -d "${main_root}" ]]; then
@@ -30,6 +31,7 @@ if [[ -L "${dst}" ]]; then
   current="$(readlink "${dst}")"
   if [[ "${current}" == "${src}" ]]; then
     echo "ok: ${dst} already linked to ${src}"
+    bash "$SCRIPT_DIR/worktree-ports.sh" "$target_root"
     exit 0
   fi
   echo "error: ${dst} is a symlink to ${current}, not ${src}" >&2
@@ -38,8 +40,10 @@ fi
 
 if [[ -e "${dst}" ]]; then
   echo "ok: ${dst} already exists (not replacing a real file)"
+  bash "$SCRIPT_DIR/worktree-ports.sh" "$target_root"
   exit 0
 fi
 
 ln -s "${src}" "${dst}"
 echo "linked ${dst} -> ${src}"
+bash "$SCRIPT_DIR/worktree-ports.sh" "$target_root"

@@ -12,12 +12,12 @@ tasks:
       - git submodule update --init --recursive
 
   worktree:env:
-    desc: Symlink primary checkout .env into this (or given) worktree. Usage - task worktree:env [-- path]
+    desc: Symlink primary .env and ensure .env.local ports. Usage - task worktree:env [-- path]
     cmds:
       - bash deployment/scripts/worktree-env.sh {{.CLI_ARGS}}
 
   worktree:add:
-    desc: Create .worktrees/<branch> worktree and symlink .env. Usage - task worktree:add -- <branch>
+    desc: Create .worktrees/<branch>, link .env, init submodules, assign ports. Usage - task worktree:add -- <branch>
     cmds:
       - |
           set -euo pipefail
@@ -37,27 +37,31 @@ tasks:
             git worktree add -b "${branch}" "${path}"
           fi
           bash deployment/scripts/worktree-env.sh "${path}"
+          git -C "${path}" submodule update --init --recursive
+          # ports already ensured by worktree-env.sh; print URL from .env.local
+          port="$(awk -F= '/^PORT=/ { print $2; exit }' "${path}/.env.local")"
+          echo "worktree ready: ${path}"
+          echo "  open http://localhost:${port}"
+          echo "  infra is shared — run 'task start' once from primary if needed"
 
   start:
-    desc: Bring up infra and show status.
+    desc: Bring up shared infra from primary (no-op if already healthy).
     cmds:
-      - docker compose -f deployment/docker-compose.local.yaml up -d
-      - docker compose -f deployment/docker-compose.local.yaml ps
+      - bash deployment/scripts/infra-up.sh
 
   start:build:
-    desc: Bring up infra (build images) and show status.
+    desc: Bring up shared infra with image rebuild (from primary).
     cmds:
       - task: submodule:init
-      - docker compose -f deployment/docker-compose.local.yaml up -d --build
-      - docker compose -f deployment/docker-compose.local.yaml ps
+      - bash deployment/scripts/infra-up.sh --build
 
   stop:
-    desc: Stop services and keep volumes.
+    desc: Stop shared infra for all worktrees (keeps volumes).
     cmds:
       - docker compose -f deployment/docker-compose.local.yaml down
 
   reset:
-    desc: Stop services and remove volumes.
+    desc: Stop shared infra and remove volumes (affects all worktrees).
     cmds:
       - docker compose -f deployment/docker-compose.local.yaml down -v
 
@@ -89,12 +93,14 @@ tasks:
       - docker exec closer-mongodb mongosh --eval "db.adminCommand('ping')"
 
   dev:
-    desc: Hot reload backend + frontend (Go via air, Vite HMR).
+    desc: Hot reload backend + frontend (shared infra; per-checkout ports via .env.local).
     cmds:
       - task: start
       - |
           sh -c '
-          docker compose -f deployment/docker-compose.local.yaml stop attesta
+          set -euo pipefail
+          primary="$(git worktree list --porcelain | awk "/^worktree / { print substr(\$0, 10); exit }")"
+          docker compose -f "$primary/deployment/docker-compose.local.yaml" stop attesta
           task dev:server &
           server_pid=$!
           task dev:web &
@@ -103,42 +109,34 @@ tasks:
           '
 
   dev:server:
-    desc: Hot reload Go server.
+    desc: Hot reload Go server (ports from .env.local; macOS-safe restart).
     cmds:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
-      - |
-          sh -c '
-          repo_root="$PWD"
-          for pid in $(pgrep -f "air -c \\.air\\.toml" || true); do
-            cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
-            if [ "$cwd" = "$repo_root/server" ]; then
-              kill "$pid" >/dev/null 2>&1 || true
-            fi
-          done
-          for pid in $(pgrep -f "$repo_root/server/tmp/attesta-server" || true); do
-            kill "$pid" >/dev/null 2>&1 || true
-          done
-          sleep 1
-          '
+      - bash deployment/scripts/dev-stop-local.sh
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
       - |
-          sh -c '
-          export $(grep -v "^#" .env | xargs)
-          port="${PORT:-3000}"
-          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:${port}/invite/accept}"
-          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:${port}/reset/confirm}"
+          bash -c '
+          set -euo pipefail
+          source deployment/scripts/dev-env.sh
+          bash deployment/scripts/dev-stop-local.sh --ports-only
           cd server
           bin="$(go env GOBIN)"
           if [ -z "$bin" ]; then bin="$(go env GOPATH)/bin"; fi
-          VITE_DEV_SERVER=http://localhost:5173 "$bin/air" -c .air.toml
+          "$bin/air" -c .air.toml
           '
 
   dev:web:
-    desc: Vite dev server (HMR).
+    desc: Vite dev server (HMR) on VITE_PORT from .env.local.
     cmds:
       - sh -c 'cd web && npm install'
-      - sh -c 'cd web && npm run dev'
+      - |
+          bash -c '
+          set -euo pipefail
+          source deployment/scripts/dev-env.sh
+          cd web
+          npm run dev -- --port "$VITE_PORT" --strictPort
+          '
 
   run:server:
     desc: Generate Goa artifacts, sync Go deps, and run the backend on localhost:3000.
