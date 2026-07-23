@@ -222,6 +222,9 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/my/organization/profile"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
 	}
+	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected login page without Login topbar link, got %q", body)
+	}
 }
 
 func TestHandleLoginPageShowsSignupWhenEnabled(t *testing.T) {

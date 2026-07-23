@@ -32,3 +32,24 @@ func TestLayoutLoadsGoogleFontsWithSwap(t *testing.T) {
 		t.Fatalf("expected Source Code Pro to be removed from layout fonts, got:\n%s", body)
 	}
 }
+
+func TestLayoutShowsAccountMenuWhenLoggedIn(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var rendered bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&rendered, "layout.html", PageBase{ShowLogout: true}); err != nil {
+		t.Fatalf("ExecuteTemplate() error = %v", err)
+	}
+	body := rendered.String()
+	if !strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected account menu when logged in, got:\n%s", body)
+	}
+	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected Dashboard under account menu when logged in, got:\n%s", body)
+	}
+	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action">Dashboard`) {
+		t.Fatalf("expected Dashboard inside menu, not topbar button, got:\n%s", body)
+	}
+	if strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected no Login link when logged in, got:\n%s", body)
+	}
+}

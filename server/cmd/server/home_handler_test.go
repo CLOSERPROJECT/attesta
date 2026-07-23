@@ -17,7 +17,7 @@ import (
 func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	server := &Server{
 		store: NewMemoryStore(),
-		tmpl:  testTemplates(),
+		tmpl:  parseTestTemplates(t),
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -27,6 +27,60 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	}
 	if loc := rec.Header().Get("Location"); loc != "" {
 		t.Fatalf("unexpected redirect to %q", loc)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected Login link on public home, got %q", body)
+	}
+	if !strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected Login styled as ghost nav button, got %q", body)
+	}
+	if strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected no account menu on public home, got %q", body)
+	}
+	if strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
+	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  parseTestTemplates(t),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				if sessionSecret != "session-public-home" {
+					return IdentitySession{}, ErrIdentityUnauthorized
+				}
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "user@example.com", Status: "active"}, nil
+			},
+		},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-public-home"})
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected account menu when logged in, got %q", body)
+	}
+	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected Dashboard item under account menu when logged in, got %q", body)
+	}
+	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action">Dashboard`) {
+		t.Fatalf("expected Dashboard inside menu, not topbar button, got %q", body)
+	}
+	if strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected no Login link when logged in, got %q", body)
 	}
 }
 

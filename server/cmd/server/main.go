@@ -2028,9 +2028,13 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	base := s.pageBase("public_home_body", "", "")
+	if user, _, err := s.currentUser(r); err == nil {
+		base = s.pageBaseForUser(user, "public_home_body", "", "")
+	}
 	view := struct {
 		PageBase
-	}{PageBase: s.pageBase("public_home_body", "", "")}
+	}{PageBase: base}
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
