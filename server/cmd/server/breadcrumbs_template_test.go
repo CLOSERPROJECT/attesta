@@ -11,9 +11,9 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 
 	var out bytes.Buffer
 	view := BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
-		{Label: "Alpha", Href: "/w/alpha/"},
-		{Label: "Instance: Batch 1", Href: "/w/alpha/process/abc123", Current: true},
+		{Label: "Streams", Href: appHomePath},
+		{Label: "Alpha", Href: streamPath("alpha")},
+		{Label: "Instance: Batch 1", Href: streamInstancePath("alpha", "abc123"), Current: true},
 	}}
 	if err := tmpl.ExecuteTemplate(&out, "breadcrumbs", view); err != nil {
 		t.Fatalf("render breadcrumbs: %v", err)
@@ -22,11 +22,11 @@ func TestBreadcrumbsTemplateRendersLinksAndCurrent(t *testing.T) {
 	for _, want := range []string{
 		`aria-label="Breadcrumb"`,
 		`class="breadcrumbs"`,
-		`href="/"`,
+		`href="/my"`,
 		">Streams<",
-		`href="/w/alpha/"`,
+		`href="/my/streams/alpha"`,
 		">Alpha<",
-		`href="/w/alpha/process/abc123"`,
+		`href="/my/streams/alpha/instance/abc123"`,
 		`aria-current="page"`,
 		"Instance: Batch 1",
 	} {
@@ -77,7 +77,7 @@ func TestProcessPageHeaderRendersBreadcrumbs(t *testing.T) {
 		">Streams<",
 		">Alpha Stream<",
 		"Instance: Batch 1",
-		`href="/w/wf-a/process/abc123"`,
+		`href="/my/streams/wf-a/instance/abc123"`,
 		`aria-current="page"`,
 	} {
 		if !strings.Contains(body, want) {

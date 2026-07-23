@@ -5,8 +5,8 @@ import "strings"
 func buildStreamBreadcrumbs(workflowKey, workflowName string) BreadcrumbsView {
 	key := strings.TrimSpace(workflowKey)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
-		{Label: streamCrumbLabel(workflowName, key), Href: "/w/" + key + "/", Current: true},
+		{Label: "Streams", Href: appHomePath},
+		{Label: streamCrumbLabel(workflowName, key), Href: streamPath(key), Current: true},
 	}}
 }
 
@@ -14,24 +14,24 @@ func buildProcessBreadcrumbs(workflowKey, workflowName, instanceName, processID 
 	key := strings.TrimSpace(workflowKey)
 	id := strings.TrimSpace(processID)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
-		{Label: streamCrumbLabel(workflowName, key), Href: "/w/" + key + "/"},
-		{Label: processInstanceCrumbLabel(instanceName, id), Href: "/w/" + key + "/process/" + id, Current: true},
+		{Label: "Streams", Href: appHomePath},
+		{Label: streamCrumbLabel(workflowName, key), Href: streamPath(key)},
+		{Label: processInstanceCrumbLabel(instanceName, id), Href: streamInstancePath(key, id), Current: true},
 	}}
 }
 
 func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	section := strings.TrimSpace(activePanel)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
+		{Label: "Streams", Href: appHomePath},
 		{Label: "Organization admin", Href: organizationPath("profile")},
-		{Label: orgAdminSectionLabel(section), Href: orgAdminSectionHref(section), Current: true},
+		{Label: orgAdminSectionLabel(section), Href: organizationPath(orgAdminSectionRest(section)), Current: true},
 	}}
 }
 
 func buildPlatformAdminBreadcrumbs() BreadcrumbsView {
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
+		{Label: "Streams", Href: appHomePath},
 		{Label: "Platform admin", Href: "/admin/orgs", Current: true},
 	}}
 }
@@ -61,13 +61,17 @@ func orgAdminSectionLabel(activePanel string) string {
 	}
 }
 
-func orgAdminSectionHref(activePanel string) string {
+func orgAdminSectionRest(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
 	case "roles":
-		return organizationPath("roles")
+		return "roles"
 	case "members":
-		return organizationPath("members")
+		return "members"
 	default:
-		return organizationPath("profile")
+		return "profile"
 	}
+}
+
+func orgAdminSectionHref(activePanel string) string {
+	return organizationPath(orgAdminSectionRest(activePanel))
 }
