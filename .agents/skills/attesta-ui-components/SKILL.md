@@ -19,9 +19,9 @@ description: >-
 | **CSS-only component** | **None** (or a narrow micro-partial) — inline HTML in page templates | `components/{name}.css` with markup-tree header comment | **None** |
 | **Cluster / primitive** | inline | `shared.css`, `forms.css`, … | none |
 
-**Full component** — all apply: reused 2+ pages or HTMX/SSE target; namespaced CSS; stable field set assembled in Go.
+**Full component** — reused 2+ pages or HTMX/SSE target; namespaced CSS; stable field set assembled in Go.
 
-**CSS-only component** — reused markup tree + related selectors; no mode dispatch; see `docs/css.md` → CSS-only components. Example: panel section headers → `panel.css` (read file header for markup). Page headers → `page-header.css` (inline in pages; optional trail via full `breadcrumbs` component).
+**CSS-only component** — reused markup tree + related selectors; no mode dispatch; see `docs/css.md` → CSS-only components. Examples: `panel.css`, `page-header.css` (optional trail via full `breadcrumbs`).
 
 **Cluster instead:**
 
@@ -33,31 +33,31 @@ Migrate **one component at a time**. Do not move every partial in one pass.
 
 ## File layout
 
-| Layer | Shared components | Full pages | Not yet migrated |
-|-------|-------------------|------------|------------------|
-| Templates | `server/templates/components/{name}.html` | `server/templates/pages/{name}.html` | `server/templates/{name}.html` (root) |
-| CSS | `web/src/styles/components/{name}.css` | `web/src/styles/pages/{name}.css` | cluster files at `components/` |
-| Go view structs | `server/cmd/server/components.go` | handlers and page structs mostly in `main.go` | peeled view assembly: `stream_instance_detail.go`, `substep_views_builder.go`, `timeline_builder.go` |
+| Layer | Shared components | Full pages | Still at templates root |
+|-------|-------------------|------------|-------------------------|
+| Templates | `server/templates/components/{name}.html` | `server/templates/pages/{name}.html` | `error_banner.html`, `icons.html`, `attachment_carousel.html`, `role_palette_options.html`, `substep_override_editor.html` |
+| CSS | `web/src/styles/components/{name}.css` | `web/src/styles/pages/{name}.css` | cluster files under `components/` (`shared`, `forms`, …) |
+| Go view structs | `server/cmd/server/components.go` | handlers/page structs mostly in `main.go` | peeled assembly: `stream_instance_detail.go`, `substep_views_builder.go`, `timeline_builder.go`, `breadcrumbs.go` |
 
 `layout.html` stays at `server/templates/layout.html`.
 
-Separate **reused** styles (`components/`) from **page-specific** styles (`pages/`). A selector lives in exactly one layer (see `docs/css.md`).
+Separate **reused** styles (`components/`) from **page-specific** styles (`pages/`). A selector lives in exactly one layer — architecture and module index: `docs/css.md`.
 
 ## Naming
 
 - **Template define name = file stem** (basename without `.html`): `stream_card.html` → `{{ define "stream_card" }}`. Micro-partials may share a file (e.g. `status_tag.html` defines `status_tag` only).
 - Page wrappers: `{page}.html` define wrapping `layout.html` (e.g. `process.html`).
 - Page body blocks: `{page}_body` define (e.g. `process_body`).
-- CSS class prefix: kebab-case matching the component (`page-header-*` for page header; `stream-card-*` for `stream_card`; `breadcrumbs-*` for `breadcrumbs`).
+- CSS class prefix: kebab-case matching the component (`page-header-*`, `stream-card-*`, `breadcrumbs-*`).
 
 ## Go conventions
 
 - All shared component view DTOs in **one** `components.go` file.
 - **No** fluent `With*` methods on simple DTOs; use struct literals at call sites.
 - **No** page-specific preset functions in shared component code (e.g. no `streamPageHeader()`).
-- Extract a constructor only when there is real logic (validation, computed fields); page-specific constructors belong in peeled files (`stream_instance_detail.go`, `substep_views_builder.go`, …) or future `page_*.go`, not `components.go`. Trail builders such as `buildProcessBreadcrumbs` live in `breadcrumbs.go` next to the component.
+- Extract a constructor only when there is real logic; page-specific constructors belong in peeled files or future `page_*.go`, not `components.go`. Trail builders such as `buildProcessBreadcrumbs` live in `breadcrumbs.go`.
 - Split a type out of `components.go` only when it grows non-trivial logic or large isolated tests (~80–100+ lines).
-- **CSS-only components** (page header, panel, dialog, list-row, …) have **no** shared view struct. Put title/description/meta strings on the page view (or inline in the template) and render the markup tree in the page template.
+- **CSS-only components** have **no** shared view struct. Put title/description/meta on the page view (or inline) and render the markup tree in the page template.
 
 Example (full component):
 
@@ -91,43 +91,52 @@ Globs: `templates/*.html`, `templates/pages/*.html`, `templates/components/*.htm
 
 - `server/templates/components/stream_card.html`
 - `web/src/styles/components/stream-card.css`
-- `StreamCardView` in `server/cmd/server/components.go`
-- Tests: `server/cmd/server/stream_card_test.go`
+- `StreamCardView` in `components.go`
+- Tests: `stream_card_test.go`
 
 `stream_instance_card` — stream dashboard instance list row:
 
 - `server/templates/components/stream_instance_card.html`
 - `web/src/styles/components/stream-instance-card.css`
-- `StreamInstanceCard` in `server/cmd/server/components.go`
-- Tests: `server/cmd/server/stream_instance_card_test.go`
+- `StreamInstanceCard` in `components.go`
+- Tests: `stream_instance_card_test.go`
 - Shared status tags remain in `components/stream.css` (`.status-tag*`)
+
+`stream_termination_details` — early-termination warning banner:
+
+- `server/templates/components/stream_termination_details.html`
+- `web/src/styles/components/stream-termination-details.css`
+- `StreamTerminationDetailsView` in `components.go`
+- Builder: `buildStreamTerminationDetailsView` in `stream_instance_detail.go`
+- Tests: `stream_termination_details_test.go`
+- Call sites: `process.html`, `dpp.html`
 
 `breadcrumbs` — hierarchical page trail in page headers:
 
 - `server/templates/components/breadcrumbs.html`
 - `web/src/styles/components/breadcrumbs.css`
-- `BreadcrumbItem` / `BreadcrumbsView` in `server/cmd/server/components.go`
-- Builders: `server/cmd/server/breadcrumbs.go` (`buildStreamBreadcrumbs`, `buildProcessBreadcrumbs`, …)
-- Tests: `server/cmd/server/breadcrumbs_test.go`, `breadcrumbs_template_test.go`
+- `BreadcrumbItem` / `BreadcrumbsView` in `components.go`
+- Builders: `breadcrumbs.go` (`buildStreamBreadcrumbs`, `buildProcessBreadcrumbs`, …)
+- Tests: `breadcrumbs_test.go`, `breadcrumbs_template_test.go`
 - Call site: `{{ template "breadcrumbs" .Breadcrumbs }}` (`Current: true` on last crumb ⇒ `aria-current="page"`; every crumb is a link)
 
 Also see:
 
-- `substep_shell` — accordion chrome wrapping `substep_body` (`components/substep_shell.html`, `substep-shell.css`)
+- `substep_shell` — accordion chrome wrapping `substep_body`
 - `substep_body` — inner panel with explicit `SubstepBodyView.Mode` dispatch
 - `dpp_history_step` — DPP traceability rail wrapper around `stream_timeline_step`
 
-### CSS-only components
+### CSS-only / micro-partials
 
-- `page-header` — page chrome title block (`web/src/styles/components/page-header.css`); inline markup in page templates under `server/templates/pages/`; **no** `PageHeaderView` / full `page_header` define. Heading-only: `page-header-body` directly under `section.page-header`. With actions: `page-header-head` wraps `page-header-body` + `page-header-actions`. Optional trail: `{{ template "breadcrumbs" .Breadcrumbs }}` (full component above).
-- `status_tag` — stream status pill micro-partial (`server/templates/components/status_tag.html`); pipeline is status **string**; renders `<span class="status-tag status-tag-compact" data-stream-status="{{ . }}">`; colors from `data-stream-status` → `--stream-color` in `role-palette.css` / `.status-tag` in `stream.css`. Call site: `{{ template "status_tag" .Status }}`
-- `panel` — card container and section headers (`web/src/styles/components/panel.css`); optional `.panel-sticky`; inline markup in `process.html`, `stream.html`, `dpp.html`, `org_admin.html`, `platform_admin.html`
-- `sidebar-nav` — section switcher tiles (`.sidebar-nav`, `.sidebar-nav-link`, … in `web/src/styles/components/sidebar-nav.css`); inline markup in `org_admin.html`. Stream status filter uses bespoke `.stream-status-filter-*` in `pages/stream.css`, not this component.
-- `dialog` — modal shell (`.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … in `web/src/styles/components/dialog.css`); destructive titles stack `.dialog-title u-text-danger`; inline markup in `process.html`, `stream.html`, `home.html`, `org_admin.html`, `platform_admin.html`, `components/substep_body.html`
-- `button` — composable controls (`.btn` + variants/sizes/`btn-icon` in `web/src/styles/components/button.css`)
-- `list-row` — bordered list item with main + actions (`.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` in `web/src/styles/components/list-row.css`); inline markup in `org_admin.html`, `platform_admin.html`
-- `tip` — inverted hover/focus label with caret (`.tip` in `web/src/styles/components/tip.css`); micro-partial `server/templates/components/tip.html` via `{{ template "tip" (dict "Tooltip" "…" …) }}` (`ImgSrc`/`ImgClass` or `Icon`/`InnerClass`; optional `Class`, `AriaLabel`, `Role`). `Icon` is any template define name, executed via the `render` template func.
-- `local_datetime` — micro-partial `server/templates/components/local_datetime.html` via `{{ template "local_datetime" (dict "ISO" "…" "Human" "…") }}`; client `formatLocalDateTimes` in `web/src/main.js` rewrites to `dd/mm/yyyy at HH:mm` in the viewer timezone.
+- `page-header` — `page-header.css`; inline in pages; **no** `PageHeaderView`. Heading-only: `page-header-body` under `section.page-header`. With actions: `page-header-head` wraps body + actions. Optional trail: `breadcrumbs` (above).
+- `status_tag` — `status_tag.html`; pipeline is status **string**; `data-stream-status` → `--stream-color` / `.status-tag` in `stream.css`. Call: `{{ template "status_tag" .Status }}`
+- `panel` — `panel.css`; optional `.panel-sticky`; inline on process/stream/dpp/org_admin/platform_admin
+- `sidebar-nav` — `sidebar-nav.css`; inline in `org_admin.html`. Stream status filter uses `.stream-status-filter-*` in `pages/stream.css`, not this component.
+- `dialog` — `dialog.css`; destructive titles stack `.dialog-title u-text-danger`; inline on process/stream/home/org_admin/platform_admin/`substep_body`
+- `button` — `.btn` + variants in `button.css`
+- `list-row` — `list-row.css`; inline on org_admin / platform_admin
+- `tip` — `tip.css` + `tip.html` via `{{ template "tip" (dict …) }}` (`ImgSrc`/`ImgClass` or `Icon`/`InnerClass`; optional `Class`, `AriaLabel`, `Role`). `Icon` is any template define name via the `render` func.
+- `local_datetime` — `local_datetime.html` via `{{ template "local_datetime" (dict "ISO" "…" "Human" "…") }}`; client `formatLocalDateTimes` in `main.js`.
 
 ## Docs and verification
 
@@ -138,12 +147,12 @@ Before claiming done:
 
 ```bash
 cd server && go test ./cmd/server/ -count=1
-cd server && go test ./cmd/server/ -run 'Breadcrumbs|StreamCard|DialogMarkup|ListRowMarkup' -count=1
+cd server && go test ./cmd/server/ -run 'Breadcrumbs|StreamCard|StreamInstance|StreamTermination|DialogMarkup|ListRowMarkup|PanelMarkup' -count=1
 task css:lint
 ```
 
 ## Out of scope (for now)
 
 - Further peeling of `page_*.go` from `main.go`
-- `ErrorBannerView` until a handler passes it
-- Renaming legacy partial defines (`action_detail_content.html`, `role-palette-options`, …) — align when each partial is migrated
+- `ErrorBannerView` / migrating `error_banner.html` (legacy define name) until a handler owns a proper DTO
+- Renaming legacy defines such as `role-palette-options` — align when each partial is migrated
