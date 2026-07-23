@@ -177,21 +177,6 @@ var _ = Service("workflow", func() {
 		})
 	})
 
-	Method("downloadSubstepFile", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "process_id", String)
-			Field(3, "substep_id", String)
-			Required("workflow_key", "process_id", "substep_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/my/streams/{workflow_key}/instance/{process_id}/substep/{substep_id}/file")
-			Response(StatusOK)
-			Response(StatusNotFound)
-		})
-	})
-
 	Method("downloadAttachmentFile", func() {
 		Payload(func() {
 			Field(1, "workflow_key", String)
@@ -654,6 +639,25 @@ var _ = Service("dpp", func() {
 		HTTP(func() {
 			GET("/01/{gtin}/10/{lot}/21/{serial}")
 			Param("format")
+			Response(StatusOK)
+			Response(StatusNotFound)
+		})
+	})
+
+	Method("downloadAttachmentFile", func() {
+		Description("Public attachment download for a DPP Digital Link.")
+		Payload(func() {
+			Field(1, "gtin", String)
+			Field(2, "lot", String)
+			Field(3, "serial", String)
+			Field(4, "attachment_id", String)
+			Field(5, "inline", String)
+			Required("gtin", "lot", "serial", "attachment_id")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/01/{gtin}/10/{lot}/21/{serial}/attachment/{attachment_id}/file")
+			Param("inline")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
