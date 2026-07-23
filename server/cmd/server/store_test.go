@@ -52,8 +52,8 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, rr.Code)
 	}
 	location := rr.Header().Get("Location")
-	if !strings.HasPrefix(location, "/w/workflow/process/") {
-		t.Fatalf("expected redirect location /w/workflow/process/:id, got %q", location)
+	if !strings.HasPrefix(location, "/my/streams/workflow/instance/") {
+		t.Fatalf("expected redirect location /my/streams/workflow/instance/:id, got %q", location)
 	}
 
 	processes, err := store.ListRecentProcessesByWorkflow(t.Context(), "workflow", 10)

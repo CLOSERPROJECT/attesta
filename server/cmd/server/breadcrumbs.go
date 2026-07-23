@@ -5,8 +5,8 @@ import "strings"
 func buildStreamBreadcrumbs(workflowKey, workflowName string) BreadcrumbsView {
 	key := strings.TrimSpace(workflowKey)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
-		{Label: streamCrumbLabel(workflowName, key), Href: "/w/" + key + "/", Current: true},
+		{Label: "Dashboard", Href: appHomePath},
+		{Label: streamCrumbLabel(workflowName, key), Href: streamPath(key), Current: true},
 	}}
 }
 
@@ -14,33 +14,33 @@ func buildProcessBreadcrumbs(workflowKey, workflowName, instanceName, processID 
 	key := strings.TrimSpace(workflowKey)
 	id := strings.TrimSpace(processID)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
-		{Label: streamCrumbLabel(workflowName, key), Href: "/w/" + key + "/"},
-		{Label: processInstanceCrumbLabel(instanceName, id), Href: "/w/" + key + "/process/" + id, Current: true},
+		{Label: "Dashboard", Href: appHomePath},
+		{Label: streamCrumbLabel(workflowName, key), Href: streamPath(key)},
+		{Label: processInstanceCrumbLabel(instanceName, id), Href: streamInstancePath(key, id), Current: true},
 	}}
 }
 
 func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	section := strings.TrimSpace(activePanel)
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
-		{Label: "Organization admin", Href: "/org-admin/profile"},
+		{Label: "Dashboard", Href: appHomePath},
+		{Label: "Organization admin", Href: organizationPath("profile")},
 		{Label: orgAdminSectionLabel(section), Href: orgAdminSectionHref(section), Current: true},
 	}}
 }
 
 func buildPlatformAdminBreadcrumbs() BreadcrumbsView {
 	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Streams", Href: "/"},
+		{Label: "Dashboard", Href: appHomePath},
 		{Label: "Platform admin", Href: "/admin/orgs", Current: true},
 	}}
 }
 
 func streamCrumbLabel(workflowName, workflowKey string) string {
 	if name := strings.TrimSpace(workflowName); name != "" {
-		return name
+		return "Stream: " + name
 	}
-	return strings.TrimSpace(workflowKey)
+	return "Stream: " + strings.TrimSpace(workflowKey)
 }
 
 func processInstanceCrumbLabel(instanceName, processID string) string {
@@ -61,13 +61,17 @@ func orgAdminSectionLabel(activePanel string) string {
 	}
 }
 
-func orgAdminSectionHref(activePanel string) string {
+func orgAdminSectionRest(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
 	case "roles":
-		return "/org-admin/roles"
+		return "roles"
 	case "members":
-		return "/org-admin/members"
+		return "members"
 	default:
-		return "/org-admin/profile"
+		return "profile"
 	}
+}
+
+func orgAdminSectionHref(activePanel string) string {
+	return organizationPath(orgAdminSectionRest(activePanel))
 }

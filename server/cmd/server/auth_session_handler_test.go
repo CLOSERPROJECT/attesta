@@ -29,7 +29,7 @@ func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 		tmpl:        testTemplates(),
 		enforceAuth: true,
 	}
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 
 	server.handleHome(rec, req)
@@ -38,8 +38,8 @@ func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	location := rec.Header().Get("Location")
-	if location != "/login?next=%2F" {
-		t.Fatalf("location = %q, want /login?next=%%2F", location)
+	if location != "/login?next=%2Fmy" {
+		t.Fatalf("location = %q, want /login?next=%%2Fmy", location)
 	}
 }
 
@@ -62,7 +62,7 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	form := url.Values{}
 	form.Set("email", "u1@example.com")
 	form.Set("password", "secure-password")
-	form.Set("next", "/w/workflow/")
+	form.Set("next", "/my/streams/workflow/")
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -72,8 +72,8 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/w/workflow/" {
-		t.Fatalf("location = %q, want /w/workflow/", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my/streams/workflow/" {
+		t.Fatalf("location = %q, want /my/streams/workflow/", rec.Header().Get("Location"))
 	}
 	cookies := rec.Result().Cookies()
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" {
@@ -219,8 +219,11 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/profile"`) {
+	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/my/organization/profile"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
+	}
+	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected login page without Login topbar link, got %q", body)
 	}
 }
 
@@ -284,8 +287,8 @@ func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my" {
+		t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 	}
 }
 
@@ -508,8 +511,8 @@ func TestHandleSignupRedirectsAuthenticatedUser(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my" {
+		t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 	}
 }
 
@@ -581,8 +584,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/org-admin/profile" {
-			t.Fatalf("location = %q, want /org-admin/profile", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/my/organization/profile" {
+			t.Fatalf("location = %q, want /my/organization/profile", rec.Header().Get("Location"))
 		}
 		if createdEmail != "new@example.com" || createdPassword != "secure-password" {
 			t.Fatalf("create account args = %q/%q", createdEmail, createdPassword)
@@ -621,8 +624,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/" {
-			t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/my" {
+			t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 		}
 	})
 }

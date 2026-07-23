@@ -38,8 +38,8 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != appHomePath {
+		t.Fatalf("location = %q, want %s", rec.Header().Get("Location"), appHomePath)
 	}
 	cookies := rec.Result().Cookies()
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" || cookies[0].Value != "invite-session" {

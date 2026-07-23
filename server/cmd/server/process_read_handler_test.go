@@ -39,7 +39,7 @@ func TestHandleProcessContentPartialSelectsSubstepInTimeline(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/content?substep=1.2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/content?substep=1.2", nil)
 	rec := httptest.NewRecorder()
 	server.handleProcessRoutes(rec, req)
 
@@ -68,7 +68,7 @@ func TestHandleProcessPageAndContentSuccess(t *testing.T) {
 		},
 	}
 
-	pageReq := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex(), nil)
+	pageReq := httptest.NewRequest(http.MethodGet, "/instance/"+id.Hex(), nil)
 	pageRec := httptest.NewRecorder()
 	server.handleProcessRoutes(pageRec, pageReq)
 	if pageRec.Code != http.StatusOK {
@@ -81,7 +81,7 @@ func TestHandleProcessPageAndContentSuccess(t *testing.T) {
 		t.Fatalf("expected process content in page response, got %q", pageRec.Body.String())
 	}
 
-	contentReq := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/content", nil)
+	contentReq := httptest.NewRequest(http.MethodGet, "/instance/"+id.Hex()+"/content", nil)
 	contentRec := httptest.NewRecorder()
 	server.handleProcessRoutes(contentRec, contentReq)
 	if contentRec.Code != http.StatusOK {
@@ -101,7 +101,7 @@ func TestHandleProcessPageNotFoundCases(t *testing.T) {
 		},
 	}
 
-	badIDReq := httptest.NewRequest(http.MethodGet, "/process/not-an-id", nil)
+	badIDReq := httptest.NewRequest(http.MethodGet, "/instance/not-an-id", nil)
 	badIDRec := httptest.NewRecorder()
 	server.handleProcessRoutes(badIDRec, badIDReq)
 	if badIDRec.Code != http.StatusNotFound {
@@ -109,7 +109,7 @@ func TestHandleProcessPageNotFoundCases(t *testing.T) {
 	}
 
 	missingID := primitive.NewObjectID().Hex()
-	missingReq := httptest.NewRequest(http.MethodGet, "/process/"+missingID, nil)
+	missingReq := httptest.NewRequest(http.MethodGet, "/instance/"+missingID, nil)
 	missingRec := httptest.NewRecorder()
 	server.handleProcessRoutes(missingRec, missingReq)
 	if missingRec.Code != http.StatusNotFound {
@@ -126,7 +126,7 @@ func TestHandleProcessContentNotFoundCases(t *testing.T) {
 		},
 	}
 
-	badIDReq := httptest.NewRequest(http.MethodGet, "/process/not-an-id/content", nil)
+	badIDReq := httptest.NewRequest(http.MethodGet, "/instance/not-an-id/content", nil)
 	badIDRec := httptest.NewRecorder()
 	server.handleProcessRoutes(badIDRec, badIDReq)
 	if badIDRec.Code != http.StatusNotFound {
@@ -134,7 +134,7 @@ func TestHandleProcessContentNotFoundCases(t *testing.T) {
 	}
 
 	missingID := primitive.NewObjectID().Hex()
-	missingReq := httptest.NewRequest(http.MethodGet, "/process/"+missingID+"/content", nil)
+	missingReq := httptest.NewRequest(http.MethodGet, "/instance/"+missingID+"/content", nil)
 	missingRec := httptest.NewRecorder()
 	server.handleProcessRoutes(missingRec, missingReq)
 	if missingRec.Code != http.StatusNotFound {
@@ -154,7 +154,7 @@ func TestHandleProcessPageTemplateErrorReturns500(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+id.Hex(), nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -175,7 +175,7 @@ func TestHandleProcessContentTemplateErrorReturns500(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+id.Hex()+"/content", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+id.Hex()+"/content", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -203,7 +203,7 @@ func TestHandleProcessRoutesRejectsWorkflowMismatch(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex(), nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -244,7 +244,7 @@ func TestHandleProcessPageIncludesDPPLinkWhenPresent(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex(), nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -287,7 +287,7 @@ func TestHandleProcessPageRendersDPPLabel(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex(), nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -329,7 +329,7 @@ func TestHandleProcessDownloadsPartialExcludesDPPSection(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/downloads", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -376,7 +376,7 @@ func TestHandleProcessDownloadsPartialBackfillsDPPForDoneProcess(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/downloads", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 	if rr.Code != http.StatusOK {
@@ -408,7 +408,7 @@ func TestHandleProcessDownloadsPartialNotFoundAndMismatch(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/process/"+primitive.NewObjectID().Hex()+"/downloads", nil)
+		req := httptest.NewRequest(http.MethodGet, "/instance/"+primitive.NewObjectID().Hex()+"/downloads", nil)
 		rr := httptest.NewRecorder()
 		server.handleProcessRoutes(rr, req)
 		if rr.Code != http.StatusNotFound {
@@ -433,7 +433,7 @@ func TestHandleProcessDownloadsPartialNotFoundAndMismatch(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+		req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/downloads", nil)
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
 			Cfg: testRuntimeConfig(),
@@ -466,7 +466,7 @@ func TestHandleProcessDownloadsPartialTemplateAndConfigErrors(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+		req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/downloads", nil)
 		rr := httptest.NewRecorder()
 		server.handleProcessRoutes(rr, req)
 		if rr.Code != http.StatusInternalServerError {
@@ -483,7 +483,7 @@ func TestHandleProcessDownloadsPartialTemplateAndConfigErrors(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/downloads", nil)
+		req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/downloads", nil)
 		rr := httptest.NewRecorder()
 		server.handleProcessRoutes(rr, req)
 		if rr.Code != http.StatusInternalServerError {

@@ -47,7 +47,7 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 }
 
 func TestCloneRequestWithSelectedSubstepUpdatesQuery(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/process/123/content?substep=1.1&filter=active", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/123/content?substep=1.1&filter=active", nil)
 
 	cleared := cloneRequestWithSelectedSubstep(req, "")
 	if got := cleared.URL.Query().Get("substep"); got != "" {
@@ -70,7 +70,7 @@ func TestCloneRequestWithSelectedSubstepUpdatesQuery(t *testing.T) {
 }
 
 func TestCloneRequestWithSelectedSubstepHandlesNilURL(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/process/123/content", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/123/content", nil)
 	req.URL = nil
 	req.RequestURI = ""
 
@@ -149,7 +149,7 @@ func TestDecorateTimelineActionsMapsUnauthorizedAvailableToActive(t *testing.T) 
 
 func TestHandleProcessActionsRouteRemoved(t *testing.T) {
 	server := &Server{store: NewMemoryStore(), tmpl: testTemplates()}
-	req := httptest.NewRequest(http.MethodGet, "/process/507f1f77bcf86cd799439011/actions", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/507f1f77bcf86cd799439011/actions", nil)
 	rec := httptest.NewRecorder()
 
 	server.handleProcessRoutes(rec, req)

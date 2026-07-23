@@ -4,7 +4,7 @@
   <div class="stream-card-shell">
     <div class="stream-card">
       <div class="stream-card-head">
-        <a class="stream-card-title-link" href="/w/{{ .Key }}/">
+        <a class="stream-card-title-link" href="/my/streams/{{ .Key }}/">
           <h2 class="stream-card-title">{{ .Name }}</h2>
         </a>
         {{ if .CanClone }}
@@ -70,7 +70,7 @@
           </details>
         {{ end }}
       </div>
-      <a class="stream-card-body" href="/w/{{ .Key }}/">
+      <a class="stream-card-body" href="/my/streams/{{ .Key }}/">
         <p
           class="stream-card-description{{ if not .Description }}
             is-empty
@@ -191,7 +191,7 @@
 {{ define "stream_card_create" }}
   <a
     class="stream-card stream-card-create"
-    href="/org-admin/formata-builder"
+    href="/my/organization/formata-builder"
   >
     <span class="stream-card-cta">
       {{ template "icon-plus" . }}

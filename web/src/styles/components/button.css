@@ -69,7 +69,7 @@ a.btn:hover {
 .btn-ghost {
   background: transparent;
   border-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--foreground);
 }
 
 .btn-ghost:hover:not(:disabled, .is-disabled) {

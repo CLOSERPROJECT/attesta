@@ -68,7 +68,7 @@ func TestBuildSubstepViewsDoneFileAttachments(t *testing.T) {
 		t.Fatalf("expected 1 attachment, got %d", len(action.Attachments))
 	}
 	got := action.Attachments[0]
-	wantURL := "/w/workflow/process/" + processID.Hex() + "/attachment/" + attachmentID + "/file"
+	wantURL := "/my/streams/workflow/instance/" + processID.Hex() + "/attachment/" + attachmentID + "/file"
 	if got.URL != wantURL {
 		t.Fatalf("expected URL %q, got %q", wantURL, got.URL)
 	}
@@ -203,7 +203,7 @@ func TestBuildSubstepViewsDoneFormataValuesAndAttachments(t *testing.T) {
 	if len(action.Attachments) != 1 {
 		t.Fatalf("expected one nested attachment, got %#v", action.Attachments)
 	}
-	wantURL := "/w/workflow/process/" + processID.Hex() + "/attachment/" + attachmentID + "/file"
+	wantURL := "/my/streams/workflow/instance/" + processID.Hex() + "/attachment/" + attachmentID + "/file"
 	if action.Attachments[0].URL != wantURL {
 		t.Fatalf("expected URL %q, got %q", wantURL, action.Attachments[0].URL)
 	}

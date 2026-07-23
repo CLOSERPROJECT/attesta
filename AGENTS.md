@@ -12,10 +12,12 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
 ## Current auth/org status (2026-07)
 - Demo impersonation has been removed from production code paths.
 - Session auth is active (`attesta_session` cookie). Regular users store an Appwrite session secret; platform admin uses a separate env-derived session value (`platform-admin:…`).
-- Stream dashboard is `/w/:key/` (lists stream instances for one stream). Legacy `/dashboard` and `/w/:key/dashboard` are not registered.
+- Public homepage is `/` (marketing/landing). Authenticated stream picker is `/my` (`appHomePath`). No auto-redirect from `/` to `/my` when logged in.
+- Stream dashboard is `/my/streams/:key/` (lists stream instances for one stream).
+- Legacy `/w/`, `/org-admin/`, `/dashboard`, and `/w/:key/dashboard` are not registered (hard cut → 404).
 - Admin consoles:
   - Platform admin: `/admin/orgs` (create/edit/delete orgs, upload logos, invite org admins)
-  - Org admin: `/org-admin/profile`, `/org-admin/roles`, `/org-admin/members` (legacy `GET /org-admin/users` redirects to profile)
+  - Org admin: `/my/organization/profile`, `/my/organization/roles`, `/my/organization/members` (forms `POST /my/organization/users`, `POST /my/organization/roles`)
 - Platform admin is env-driven (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). On startup the server ensures that account exists in Appwrite (`bootstrapPlatformAdminIdentity`). Cerbos policy `platform_admin_console` gates console access.
 - Auth/org state now lives in Appwrite:
   - orgs -> teams
@@ -25,10 +27,10 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (main app styling)
   - signup/login/reset -> Appwrite account/session/recovery flows
 - Global topbar now renders role-aware admin links on authenticated pages:
   - Platform admin sees `Orgs` (`/admin/orgs`)
-  - Org admin with org context sees `My Org` (`/org-admin/profile`)
+  - Org admin with org context sees `My Org` (`/my/organization/profile`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 - Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
-- Org admin members section (`/org-admin/members`; forms still `POST /org-admin/users`) supports:
+- Org admin members section (`/my/organization/members`; forms still `POST /my/organization/users`) supports:
   - invites with zero-to-many roles (`roles` multi-select, `intent=invite`)
   - "Invites I sent" with derived statuses (`pending`, `accepted`, `expired`)
   - user role editing (`intent=set_roles`) and soft-delete (`intent=delete_user`) with self-protection checks.
@@ -151,31 +153,36 @@ Workflow YAML lives under `server/config/` (and optional `WORKFLOW_CONFIG_DIR`).
 
 ## Backend architecture notes (what to know before changing things)
 ### HTTP routes
-Global routes are registered in `Server.newMux()` (`server/cmd/server/main.go`). Workflow-scoped routes mount at `/w/` via `handleWorkflowRoutes` → `handleProcessRoutes`.
+Global routes are registered in `Server.newMux()` (`server/cmd/server/main.go`). Authenticated app routes mount at `/my/` via `handleMyRoutes` → `handleStreamRoutes` / `handleOrganizationRoutes` → `handleProcessRoutes`. URL helpers live in `paths.go` (`appHomePath`, `streamPath`, `streamInstancePath`, `organizationPath`).
 
-**Global (non-workflow):**
-- `GET /` — stream picker (`handleHome`)
-- `GET/POST /login`, `GET/POST /signup`, `POST /logout`
+**Global (public / auth entry):**
+- `GET /` — public homepage (`handlePublicHome`)
+- `GET/POST /login`, `GET/POST /signup`, `POST /logout` (login default redirect → `/my`)
 - `GET /invite/…`, `GET/POST /reset`, `GET/POST /reset/…`
 - `GET/POST /admin/orgs`, `GET/POST /admin/orgs/` (platform admin org console; logo at `/admin/orgs/logo/:id`)
-- `GET /org-admin/profile`, `/org-admin/roles`, `/org-admin/members` (org settings sections); `GET /org-admin/users` → profile; `POST /org-admin/users`, `POST /org-admin/roles`; `/org-admin/formata-builder`, …
+- `GET /organization/logo/:slug` — public org logo asset
 - `GET /01/…` — public DPP Digital Link
-- `GET /events` — legacy SSE mux entry (production UI uses workflow-scoped path below)
+- `GET /events` — legacy SSE mux entry (production UI uses stream-scoped path below)
 
-**Workflow-scoped (`/w/:key/…`):**
-- `GET /w/:key/` — stream dashboard (instance list + timeline preview)
-- `POST /w/:key/process/start`
-- `GET /w/:key/process/:id` — stream instance detail page
-- `GET /w/:key/process/:id/content` — HTMX/SSE content partial (replaces old `/timeline`)
-- `GET /w/:key/process/:id/downloads` — downloads partial
-- `POST /w/:key/process/:id/terminate`
-- `POST /w/:key/process/:id/substep/:substepId/complete`
-- `GET/POST /w/:key/process/:id/substep/:substepId/override`
-- `GET /w/:key/process/:id/attachment/:attachmentId/file` — attachment download
-- Export downloads: `files.zip`, `notarized.json`, `merkle.json` under `/w/:key/process/:id/…`
-- `GET /w/:key/events?processId=…` or `?role=…` — workflow-scoped SSE (used by `web/src/main.js`)
+**Authenticated (`/my/…`):**
+- `GET /my` — stream picker (`handleHome`)
+- `GET /my/organization/profile`, `/my/organization/roles`, `/my/organization/members` (org settings sections); `POST /my/organization/users`, `POST /my/organization/roles`; `/my/organization/formata-builder`, …
 
-Legacy `/dashboard` and `/w/:key/dashboard` return 404 (`workflow_coverage_test`).
+**Stream-scoped (`/my/streams/:key/…`):**
+- `GET /my/streams/:key/` — stream dashboard (instance list + timeline preview)
+- `POST /my/streams/:key/instance/start`
+- `GET /my/streams/:key/instance/:id` — stream instance detail page
+- `GET /my/streams/:key/instance/:id/content` — HTMX/SSE content partial (replaces old `/timeline`)
+- `GET /my/streams/:key/instance/:id/downloads` — downloads partial
+- `POST /my/streams/:key/instance/:id/terminate`
+- `POST /my/streams/:key/instance/:id/substep/:substepId/complete`
+- `GET/POST /my/streams/:key/instance/:id/substep/:substepId/override`
+- `GET /my/streams/:key/instance/:id/attachment/:attachmentId/file` — attachment download
+- Export downloads: `files.zip`, `notarized.json`, `merkle.json` under `/my/streams/:key/instance/:id/…`
+- `GET /my/streams/:key/events?processId=…` or `?role=…` — stream-scoped SSE (used by `web/src/main.js`)
+- `POST /my/streams/:key/delete` — delete saved Formata stream (when permitted)
+
+Legacy `/w/`, `/org-admin/`, `/dashboard`, and `/w/:key/dashboard` return 404 (`TestLegacyRoutesGone`, `TestLegacyOrgAdminRoutesReturnNotFound`).
 
 ### Actor/role identity
 Session auth via `attesta_session` cookie:
@@ -212,7 +219,7 @@ Download endpoint `handleDownloadProcessAttachment` streams GridFS content and s
 - Backend emits:
   - `event: process-updated` for process streams
   - `event: role-updated` for role dashboards
-  (see `handleEvents()` in `main.go`; workflow-scoped at `/w/:key/events`).
+  (see `handleEvents()` in `main.go`; stream-scoped at `/my/streams/:key/events`).
 - Frontend listens via `EventSource` and refreshes partial HTML via `fetch()` (`web/src/main.js`).
 
 ### DPP / GS1 Digital Link

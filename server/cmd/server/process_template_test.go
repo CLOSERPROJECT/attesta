@@ -14,7 +14,7 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 			Body:         "process_body",
 			WorkflowKey:  "workflow",
 			WorkflowName: "Main Workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 		},
 		ProcessID:    "process-1",
 		InstanceName: "Pilot batch",

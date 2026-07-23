@@ -114,8 +114,8 @@ func TestHandleInvitePasswordUpdatesCurrentPassword(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != appHomePath {
+		t.Fatalf("location = %q, want %s", rec.Header().Get("Location"), appHomePath)
 	}
 	if updatedSecret != "invite-session" || updatedPassword != "this-is-strong-enough" {
 		t.Fatalf("updated = %q/%q", updatedSecret, updatedPassword)
@@ -398,7 +398,7 @@ func TestHandleResetPageHidesAdminTopbarLinks(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/org-admin/profile"`) {
+	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/my/organization/profile"`) {
 		t.Fatalf("expected reset page without admin nav links, got %q", body)
 	}
 }

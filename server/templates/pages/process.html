@@ -1,4 +1,4 @@
-{{/* Used on /w/.WorkflowKey/process/.ProcessID to render process details page
+{{/* Used on /my/streams/.WorkflowKey/instance/.ProcessID to render process details page
 */}} {{ define "process_body" }}
 <div
   id="process-page"
@@ -129,7 +129,7 @@
     <button
       type="button"
       class="btn btn-secondary js-download-link"
-      data-download-url="{{ .WorkflowPath }}/process/{{ .ProcessID }}/files.zip"
+      data-download-url="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/files.zip"
     >
       {{ template "icon-download" . }} Download all files
     </button>
@@ -139,7 +139,7 @@
       <span class="field-label">Notarized stream data</span>
       <div class="field-row">
         <a
-          href="{{ .WorkflowPath }}/process/{{ .ProcessID }}/notarized.json"
+          href="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/notarized.json"
           target="_blank"
           rel="noopener noreferrer"
           >notarized.json</a
@@ -147,7 +147,7 @@
         <button
           type="button"
           class="btn btn-ghost btn-icon btn-xs js-download-link"
-          data-download-url="{{ .WorkflowPath }}/process/{{ .ProcessID }}/notarized.json"
+          data-download-url="{{ .WorkflowPath }}/instance/{{ .ProcessID }}/notarized.json"
           aria-label="Download notarized.json"
         >
           {{ template "icon-download" . }}

@@ -249,8 +249,9 @@ func formataBuilderStreamMaxBytes() int64 {
 
 func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Request) {
 	pathValue := strings.TrimSpace(r.URL.Path)
-	isRootPath := pathValue == "/org-admin/formata-builder" || pathValue == "/org-admin/formata-builder/"
-	streamPath, isStreamPath := strings.CutPrefix(pathValue, "/org-admin/formata-builder/stream/")
+	builderPath := organizationPath("formata-builder")
+	isRootPath := pathValue == builderPath || pathValue == builderPath+"/"
+	streamPath, isStreamPath := strings.CutPrefix(pathValue, builderPath+"/stream/")
 
 	switch r.Method {
 	case http.MethodGet:
@@ -271,7 +272,7 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			s.handleOrgAdminFormataBuilderStream(w, r, strings.TrimSpace(streamPath), user)
 			return
 		}
-		s.serveEmbeddedFormataBuilder(w, r, "/org-admin/formata-builder", isRootPath, true)
+		s.serveEmbeddedFormataBuilder(w, r, builderPath, isRootPath, true)
 		return
 	case http.MethodPost:
 		if !isRootPath {
@@ -479,6 +480,7 @@ func (s *Server) serveEmbeddedFormataBuilder(w http.ResponseWriter, r *http.Requ
 	}
 	if shouldRewriteFormataAssetContent(cleaned, contentType) {
 		data = bytes.ReplaceAll(data, []byte("/formata-arch/"), []byte(mountPath+"/"))
+		data = bytes.ReplaceAll(data, []byte("/org-admin/formata-builder"), []byte(mountPath))
 		if injectOverrides && (strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") || strings.EqualFold(path.Ext(cleaned), ".html")) {
 			data = injectFormataBuilderOverrides(data)
 		}

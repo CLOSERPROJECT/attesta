@@ -13,12 +13,22 @@ var _ = API("attesta", func() {
 })
 
 var _ = Service("workflow", func() {
-	Description("Workflow-scoped process, workflow management, and event endpoints.")
+	Description("Workflow-scoped process, workflow management, and event endpoints under /my/streams.")
 
 	Method("home", func() {
+		Description("Public homepage (unauthenticated landing page).")
 		Result(Empty)
 		HTTP(func() {
 			GET("/")
+			Response(StatusOK)
+		})
+	})
+
+	Method("appHome", func() {
+		Description("Authenticated app home (stream picker).")
+		Result(Empty)
+		HTTP(func() {
+			GET("/my")
 			Response(StatusOK)
 		})
 	})
@@ -30,7 +40,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}")
+			GET("/my/streams/{workflow_key}")
 			Response(StatusOK)
 		})
 	})
@@ -42,7 +52,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			POST("/w/{workflow_key}/process/start")
+			POST("/my/streams/{workflow_key}/instance/start")
 			Response(StatusSeeOther)
 			Response(StatusBadRequest)
 			Response(StatusInternalServerError)
@@ -56,7 +66,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			POST("/w/{workflow_key}/delete")
+			POST("/my/streams/{workflow_key}/delete")
 			Response(StatusSeeOther)
 			Response(StatusForbidden)
 			Response(StatusNotFound)
@@ -72,7 +82,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}")
+			GET("/my/streams/{workflow_key}/instance/{process_id}")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
@@ -87,7 +97,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/content")
+			GET("/my/streams/{workflow_key}/instance/{process_id}/content")
 			Param("substep")
 			Response(StatusOK)
 			Response(StatusNotFound)
@@ -102,7 +112,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/downloads")
+			GET("/my/streams/{workflow_key}/instance/{process_id}/downloads")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
@@ -116,7 +126,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/files.zip")
+			GET("/my/streams/{workflow_key}/instance/{process_id}/files.zip")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
@@ -130,7 +140,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/notarized.json")
+			GET("/my/streams/{workflow_key}/instance/{process_id}/notarized.json")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
@@ -144,7 +154,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/merkle.json")
+			GET("/my/streams/{workflow_key}/instance/{process_id}/merkle.json")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})
@@ -159,25 +169,10 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			POST("/w/{workflow_key}/process/{process_id}/substep/{substep_id}/complete")
+			POST("/my/streams/{workflow_key}/instance/{process_id}/substep/{substep_id}/complete")
 			Response(StatusOK)
 			Response(StatusConflict)
 			Response(StatusForbidden)
-			Response(StatusNotFound)
-		})
-	})
-
-	Method("downloadSubstepFile", func() {
-		Payload(func() {
-			Field(1, "workflow_key", String)
-			Field(2, "process_id", String)
-			Field(3, "substep_id", String)
-			Required("workflow_key", "process_id", "substep_id")
-		})
-		Result(Empty)
-		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/substep/{substep_id}/file")
-			Response(StatusOK)
 			Response(StatusNotFound)
 		})
 	})
@@ -192,7 +187,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/process/{process_id}/attachment/{attachment_id}/file")
+			GET("/my/streams/{workflow_key}/instance/{process_id}/attachment/{attachment_id}/file")
 			Param("inline")
 			Response(StatusOK)
 			Response(StatusNotFound)
@@ -206,7 +201,7 @@ var _ = Service("workflow", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/w/{workflow_key}/events")
+			GET("/my/streams/{workflow_key}/events")
 			Response(StatusOK)
 			Response(StatusBadRequest)
 		})
@@ -452,7 +447,7 @@ var _ = Service("admin", func() {
 	Method("orgAdminProfile", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/org-admin/profile")
+			GET("/my/organization/profile")
 			Response(StatusOK)
 			Response(StatusUnauthorized)
 			Response(StatusForbidden)
@@ -464,7 +459,7 @@ var _ = Service("admin", func() {
 	Method("orgAdminMembers", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/org-admin/members")
+			GET("/my/organization/members")
 			Response(StatusOK)
 			Response(StatusUnauthorized)
 			Response(StatusForbidden)
@@ -476,8 +471,8 @@ var _ = Service("admin", func() {
 	Method("orgAdminUsers", func() {
 		Result(Empty)
 		HTTP(func() {
-			// Legacy entry: GET redirects to /org-admin/profile.
-			GET("/org-admin/users")
+			// Legacy entry: GET redirects to /my/organization/profile.
+			GET("/my/organization/users")
 			Response(StatusSeeOther)
 			Response(StatusUnauthorized)
 			Response(StatusForbidden)
@@ -489,7 +484,7 @@ var _ = Service("admin", func() {
 	Method("orgAdminUserAction", func() {
 		Result(Empty)
 		HTTP(func() {
-			POST("/org-admin/users")
+			POST("/my/organization/users")
 			Response(StatusOK)
 			Response(StatusSeeOther)
 			Response(StatusBadRequest)
@@ -503,7 +498,7 @@ var _ = Service("admin", func() {
 	Method("orgAdminRoles", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/org-admin/roles")
+			GET("/my/organization/roles")
 			Response(StatusOK)
 			Response(StatusUnauthorized)
 			Response(StatusForbidden)
@@ -514,7 +509,7 @@ var _ = Service("admin", func() {
 	Method("orgAdminRoleAction", func() {
 		Result(Empty)
 		HTTP(func() {
-			POST("/org-admin/roles")
+			POST("/my/organization/roles")
 			Response(StatusSeeOther)
 			Response(StatusBadRequest)
 			Response(StatusUnauthorized)
@@ -531,7 +526,7 @@ var _ = Service("admin", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/org-admin/logo/{logo_id}")
+			GET("/my/organization/logo/{logo_id}")
 			Response(StatusOK)
 			Response(StatusNotFound)
 			Response(StatusUnauthorized)
@@ -560,7 +555,7 @@ var _ = Service("formata_builder", func() {
 	Method("builderApp", func() {
 		Result(Empty)
 		HTTP(func() {
-			GET("/org-admin/formata-builder")
+			GET("/my/organization/formata-builder")
 			Response(StatusOK)
 			Response(StatusForbidden)
 			Response(StatusUnauthorized)
@@ -577,7 +572,7 @@ var _ = Service("formata_builder", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/org-admin/formata-builder/{asset_path}")
+			GET("/my/organization/formata-builder/{asset_path}")
 			Response(StatusOK)
 			Response(StatusForbidden)
 			Response(StatusUnauthorized)
@@ -594,7 +589,7 @@ var _ = Service("formata_builder", func() {
 		})
 		Result(Any)
 		HTTP(func() {
-			GET("/org-admin/formata-builder/stream/{stream_id}")
+			GET("/my/organization/formata-builder/stream/{stream_id}")
 			Response(StatusOK)
 			Response(StatusForbidden)
 			Response(StatusUnauthorized)
@@ -613,7 +608,7 @@ var _ = Service("formata_builder", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			POST("/org-admin/formata-builder")
+			POST("/my/organization/formata-builder")
 			Param("stream")
 			Param("new")
 			Body("body")
@@ -644,6 +639,25 @@ var _ = Service("dpp", func() {
 		HTTP(func() {
 			GET("/01/{gtin}/10/{lot}/21/{serial}")
 			Param("format")
+			Response(StatusOK)
+			Response(StatusNotFound)
+		})
+	})
+
+	Method("downloadAttachmentFile", func() {
+		Description("Public attachment download for a DPP Digital Link.")
+		Payload(func() {
+			Field(1, "gtin", String)
+			Field(2, "lot", String)
+			Field(3, "serial", String)
+			Field(4, "attachment_id", String)
+			Field(5, "inline", String)
+			Required("gtin", "lot", "serial", "attachment_id")
+		})
+		Result(Empty)
+		HTTP(func() {
+			GET("/01/{gtin}/10/{lot}/21/{serial}/attachment/{attachment_id}/file")
+			Param("inline")
 			Response(StatusOK)
 			Response(StatusNotFound)
 		})

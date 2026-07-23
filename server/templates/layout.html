@@ -172,6 +172,10 @@
                     </p>
                   </section>
                   <section class="account-menu-section">
+                    <a href="/my" class="account-menu-item">
+                      {{ template "icon-layout-dashboard" . }}
+                      Dashboard
+                    </a>
                     {{ if .ShowOrgsLink }}
                       <a href="/admin/orgs" class="account-menu-item">
                         {{ template "icon-building-grid" . }}
@@ -179,7 +183,7 @@
                       </a>
                     {{ end }}
                     {{ if .ShowMyOrgLink }}
-                      <a href="/org-admin/profile" class="account-menu-item">
+                      <a href="/my/organization/profile" class="account-menu-item">
                         {{ template "icon-users-group" . }}
                         My organization
                       </a>
@@ -196,6 +200,11 @@
                   </section>
                 </div>
               </details>
+            {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
+              <a href="/login" class="btn btn-ghost btn-lg nav-action">
+                {{ template "icon-log-in" . }}
+                Login
+              </a>
             {{ end }}
           </nav>
         </div>
@@ -203,8 +212,12 @@
       <main class="page">
         {{ if eq .Body "home_picker_body" }}
           {{ template "home_picker_body" . }}
+        {{ else if eq .Body "public_home_body" }}
+          {{ template "public_home_body" . }}
         {{ else if eq .Body "login_body" }}
           {{ template "login_body" . }}
+        {{ else if eq .Body "signup_body" }}
+          {{ template "signup_body" . }}
         {{ else if eq .Body "invite_body" }}
           {{ template "invite_body" . }}
         {{ else if eq .Body "reset_request_body" }}

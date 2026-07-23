@@ -250,7 +250,7 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     return;
   }
   const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
-  const url = `/w/${workflowKey}/process/${processId}/content${query}`;
+  const url = `/my/streams/${workflowKey}/instance/${processId}/content${query}`;
   if (window.htmx?.ajax) {
     window.htmx.ajax("GET", url, {
       target: "#process-page-content",
@@ -1144,7 +1144,7 @@ const initializeFormataForms = async (container = document) => {
 
 if (processId && workflowKey && processPageContent) {
   const source = new EventSource(
-    `/w/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`,
+    `/my/streams/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`,
   );
   source.addEventListener("process-updated", () => {
     if (skipNextProcessUpdatedEvent) {
@@ -1429,12 +1429,12 @@ if (deptRoot) {
   const dashboard = document.getElementById("dept-dashboard");
   if (role && deptWorkflowKey && dashboard) {
     const source = new EventSource(
-      `/w/${deptWorkflowKey}/events?workflow=${deptWorkflowKey}&role=${role}`,
+      `/my/streams/${deptWorkflowKey}/events?workflow=${deptWorkflowKey}&role=${role}`,
     );
     source.addEventListener("role-updated", async () => {
       try {
         const response = await fetch(
-          `/w/${deptWorkflowKey}/backoffice/${role}/partial`,
+          `/my/streams/${deptWorkflowKey}/backoffice/${role}/partial`,
         );
         if (!response.ok) {
           return;

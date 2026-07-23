@@ -1293,10 +1293,6 @@ func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Reques
 	s.renderOrgAdminWithErrors(w, r, user, orgSlug, inviteLink, errs)
 }
 
-func workflowPath(key string) string {
-	return "/w/" + strings.TrimSpace(key)
-}
-
 func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	base := PageBase{
 		Body:          body,
@@ -1305,7 +1301,7 @@ func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 		WorkflowName:  strings.TrimSpace(workflowName),
 	}
 	if base.WorkflowKey != "" {
-		base.WorkflowPath = workflowPath(base.WorkflowKey)
+		base.WorkflowPath = streamPath(base.WorkflowKey)
 	}
 	return base
 }
@@ -1521,8 +1517,8 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Stre
 			Name:         cfg.Workflow.Name,
 			Description:  strings.TrimSpace(cfg.Workflow.Description),
 			Counts:       WorkflowProcessCounts{},
-			EditAction:   "/org-admin/formata-builder?stream=" + key,
-			DeleteAction: workflowPath(key) + "/delete",
+			EditAction:   organizationPath("formata-builder?stream=" + key),
+			DeleteAction: streamPath(key) + "/delete",
 		}
 		if s.store == nil {
 			options = append(options, option)
@@ -2009,7 +2005,7 @@ func homeProcessStatusRank(status string) int {
 }
 
 func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, message string) {
-	target := "/"
+	target := appHomePath
 	trimmedKey := strings.TrimSpace(key)
 	trimmedMessage := strings.TrimSpace(message)
 	if trimmedKey != "" && trimmedMessage != "" {
@@ -2019,7 +2015,7 @@ func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, messag
 }
 
 func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, workflowKey, message string) {
-	target := workflowPath(workflowKey) + "/"
+	target := streamPath(workflowKey) + "/"
 	trimmedMessage := strings.TrimSpace(message)
 	if trimmedMessage != "" {
 		target += "?" + url.Values{"error": []string{trimmedMessage}}.Encode()
@@ -2027,8 +2023,26 @@ func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, wor
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	base := s.pageBase("public_home_body", "", "")
+	if user, _, err := s.currentUser(r); err == nil {
+		base = s.pageBaseForUser(user, "public_home_body", "", "")
+	}
+	view := struct {
+		PageBase
+	}{PageBase: base}
+	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimSpace(r.URL.Path)
+	if path != appHomePath && path != appHomePath+"/" {
 		http.NotFound(w, r)
 		return
 	}
@@ -2056,6 +2070,47 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
+	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/my"), "/")
+	switch {
+	case rest == "":
+		s.handleHome(w, cloneRequestWithPath(r, appHomePath))
+		return
+	case rest == "streams" || strings.HasPrefix(rest, "streams/"):
+		s.handleStreamRoutes(w, cloneRequestWithPath(r, "/"+rest))
+		return
+	case rest == "organization" || strings.HasPrefix(rest, "organization/"):
+		s.handleOrganizationRoutes(w, cloneRequestWithPath(r, "/"+rest))
+		return
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleOrganizationRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/organization")
+	switch {
+	case path == "/profile" || path == "/profile/":
+		s.handleOrgAdminPage(w, r)
+	case path == "/roles" || path == "/roles/":
+		s.handleOrgAdminRoles(w, r)
+	case path == "/members" || path == "/members/":
+		s.handleOrgAdminPage(w, r)
+	case path == "/users" || path == "/users/":
+		s.handleOrgAdminUsers(w, r)
+	case strings.HasPrefix(path, "/logo/"):
+		s.handleOrgAdminLogo(w, cloneRequestWithPath(r, path))
+	case path == "/formata-builder" || strings.HasPrefix(path, "/formata-builder/"):
+		suffix := strings.TrimPrefix(path, "/formata-builder")
+		s.handleOrgAdminFormataBuilder(w, cloneRequestWithPath(r, organizationPath("formata-builder"+suffix)))
+	default:
+		http.NotFound(w, r)
 	}
 }
 
@@ -2205,18 +2260,12 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
-	mux.HandleFunc("/org-admin/profile", s.handleOrgAdminPage)
-	mux.HandleFunc("/org-admin/roles", s.handleOrgAdminRoles)
-	mux.HandleFunc("/org-admin/members", s.handleOrgAdminPage)
-	mux.HandleFunc("/org-admin/logo/", s.handleOrgAdminLogo)
-	mux.HandleFunc("/org-admin/users", s.handleOrgAdminUsers)
-	mux.HandleFunc("/org-admin/formata-builder", s.handleOrgAdminFormataBuilder)
-	mux.HandleFunc("/org-admin/formata-builder/", s.handleOrgAdminFormataBuilder)
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
-	mux.HandleFunc("/w/", s.handleWorkflowRoutes)
-	mux.HandleFunc("/", s.handleHome)
+	mux.HandleFunc("/my", s.handleHome)
+	mux.HandleFunc("/my/", s.handleMyRoutes)
+	mux.HandleFunc("/", s.handlePublicHome)
 	mux.HandleFunc("/events", s.handleEvents)
 	return mux
 }
@@ -2361,13 +2410,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if s.enforceAuth {
 			if _, _, err := s.currentUser(r); err == nil {
-				http.Redirect(w, r, "/", http.StatusSeeOther)
+				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 				return
 			}
 		}
 		view := LoginView{
 			PageBase:     s.pageBase("login_body", "", ""),
-			Next:         safeNextPath(r, "/"),
+			Next:         safeNextPath(r, appHomePath),
 			Confirmation: loginNoticeMessage(requestNotice(r)),
 			ShowSignup:   anyoneCanCreateAccount(),
 		}
@@ -2382,7 +2431,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		password := strings.TrimSpace(r.FormValue("password"))
-		next := safeNextPath(r, "/")
+		next := safeNextPath(r, appHomePath)
 
 		if adminEmail, adminPassword, ok := platformAdminCredentials(); ok && strings.EqualFold(email, adminEmail) {
 			if subtle.ConstantTimeCompare([]byte(password), []byte(adminPassword)) != 1 {
@@ -2451,7 +2500,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if s.enforceAuth {
 			if _, _, err := s.currentUser(r); err == nil {
-				http.Redirect(w, r, "/", http.StatusSeeOther)
+				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 				return
 			}
 		}
@@ -2498,9 +2547,9 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to load signed up user %s", email)
 			return
 		}
-		redirectTarget := "/"
+		redirectTarget := appHomePath
 		if strings.TrimSpace(identityUser.OrgSlug) == "" {
-			redirectTarget = "/org-admin/profile"
+			redirectTarget = organizationPath("profile")
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
@@ -2582,7 +2631,7 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	} else if err != nil {
 		logRequestError(r, err, "failed to load invited user after accepting invite")
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 }
 
 func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
@@ -2642,7 +2691,7 @@ func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to update password", err, "failed to update invited user password for %s", user.Email)
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -3640,11 +3689,11 @@ func resolveOrgAdminActivePanel(r *http.Request, errs OrgAdminErrors, inviteLink
 	}
 	if r != nil {
 		switch r.URL.Path {
-		case "/org-admin/roles":
+		case organizationPath("roles"):
 			return "roles"
-		case "/org-admin/members":
+		case organizationPath("members"):
 			return "members"
-		case "/org-admin/profile":
+		case organizationPath("profile"):
 			return "profile"
 		}
 	}
@@ -3852,7 +3901,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 		ActivePanel:            activePanel,
 		Organization:           org,
-		OrganizationLogoURL:    "/org-admin/logo/" + strings.TrimSpace(org.LogoAttachmentID),
+		OrganizationLogoURL:    organizationPath("logo/" + strings.TrimSpace(org.LogoAttachmentID)),
 		NeedsOrganizationSetup: false,
 		OrganizationError:      errs.Organization,
 		RoleError:              errs.Role,
@@ -3887,7 +3936,7 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/org-admin/logo/"), "/")
+	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/logo/"), "/")
 	if logoID == "" {
 		http.NotFound(w, r)
 		return
@@ -4198,7 +4247,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "unsupported action"})
 			return
 		}
-		http.Redirect(w, r, "/org-admin/roles", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("roles"), http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -4215,7 +4264,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		http.Redirect(w, r, "/org-admin/profile", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("profile"), http.StatusSeeOther)
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -4294,7 +4343,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 		return
 	}
 
@@ -4357,7 +4406,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 					s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for invited member %s in organization %s", membership.UserID, admin.OrgSlug)
 					return
 				}
-				http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
 			if roleSlugsKey(append(append([]string{}, membership.RoleSlugs...), func() []string {
@@ -4366,7 +4415,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				}
 				return nil
 			}()...)) == roleSlugsKey(selectedRoles) {
-				http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
 			sessionSecret, err := sessionSecretFromRequest(r)
@@ -4378,7 +4427,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to update membership %s in organization %s", membership.ID, admin.OrgSlug)
 				return
 			}
-			http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+			http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 			return
 		}
 		existingUser, err := s.identity.GetUserByEmail(r.Context(), email)
@@ -4398,7 +4447,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for existing user %s in organization %s", existingUser.ID, admin.OrgSlug)
 				return
 			}
-			http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+			http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 			return
 		case err != nil && !errors.Is(err, ErrIdentityNotFound):
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"}, err, "failed to look up existing user %s during invite", email)
@@ -4413,7 +4462,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to create invite for %s in organization %s", email, admin.OrgSlug)
 			return
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	case "update_org":
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
@@ -4473,7 +4522,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				log.Printf("failed to delete previous organization logo %q: %v", previousLogoFileID, err)
 			}
 		}
-		http.Redirect(w, r, "/org-admin/profile", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("profile"), http.StatusSeeOther)
 	case "set_roles":
 		userID := strings.TrimSpace(r.FormValue("userId"))
 		if userID == "" {
@@ -4547,7 +4596,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to update user roles"}, err, "failed to update labels for user %s in organization %s", target.ID, admin.OrgSlug)
 			return
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	case "delete_user":
 		userID := strings.TrimSpace(r.FormValue("userId"))
 		if userID == "" {
@@ -4606,7 +4655,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		http.Redirect(w, r, "/org-admin/members", http.StatusSeeOther)
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	default:
 		s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "unsupported action"})
 	}
@@ -4643,11 +4692,8 @@ func cloneRequestWithSelectedSubstep(r *http.Request, substepID string) *http.Re
 	return clone
 }
 
-func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
-		return
-	}
-	path := strings.TrimPrefix(r.URL.Path, "/w/")
+func (s *Server) handleStreamRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/streams/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
 		http.NotFound(w, r)
@@ -4667,19 +4713,19 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkflowHome(w, scopedReq)
 		return
 	}
-	rest := "/" + strings.Join(parts[1:], "/")
+	tail := "/" + strings.Join(parts[1:], "/")
 	switch {
-	case rest == "/process/start":
-		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, rest))
+	case tail == "/instance/start":
+		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, tail))
 		return
-	case rest == "/delete":
-		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, rest))
+	case tail == "/delete":
+		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, tail))
 		return
-	case strings.HasPrefix(rest, "/process/"):
-		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, rest))
+	case strings.HasPrefix(tail, "/instance/"):
+		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, tail))
 		return
-	case rest == "/events":
-		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
+	case tail == "/events":
+		s.handleEvents(w, cloneRequestWithPath(scopedReq, tail))
 		return
 	default:
 		http.NotFound(w, r)
@@ -4789,7 +4835,7 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []StreamInstanceCard
-	path := workflowPath(workflowKey)
+	path := streamPath(workflowKey)
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := deriveProcessStatus(cfg.Workflow, &process)
@@ -4803,7 +4849,7 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 			Name:               strings.TrimSpace(process.Name),
 			Status:             status,
 			StatusLabel:        processStatusLabel(status),
-			DetailHref:         path + "/process/" + process.ID.Hex(),
+			DetailHref:         streamInstancePath(workflowKey, process.ID.Hex()),
 			CreatedAt:          humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtISO:       rfc3339UTC(process.CreatedAt),
 			CreatedAtTime:      process.CreatedAt,
@@ -4920,7 +4966,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	for _, role := range s.roles(cfg) {
 		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
-	http.Redirect(w, r, fmt.Sprintf("%s/process/%s", workflowPath(workflowKey), id.Hex()), http.StatusSeeOther)
+	http.Redirect(w, r, streamInstancePath(workflowKey, id.Hex()), http.StatusSeeOther)
 }
 
 const maxProcessNameRunes = 80
@@ -4967,7 +5013,7 @@ func (s *Server) processBelongsToWorkflow(process *Process, workflowKey string) 
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/process/")
+	path := strings.TrimPrefix(r.URL.Path, "/instance/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || parts[0] == "" {
 		http.NotFound(w, r)
@@ -5651,7 +5697,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 		UISchema:       marshalJSONCompact(effective.UISchema),
 		Reason:         strings.TrimSpace(override.Reason),
 		FormataArchURL: strings.TrimRight(strings.TrimSpace(s.formataArchURL), "/"),
-		SaveURL:        fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, process.ID.Hex(), canonical.SubstepID),
+		SaveURL:        streamInstancePath(workflowKey, process.ID.Hex()) + "/substep/" + canonical.SubstepID + "/override",
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.ExecuteTemplate(w, "substep_override_editor.html", view); err != nil {
@@ -6794,7 +6840,7 @@ func buildProcessDownloadAttachments(workflowKey string, process *Process, files
 		views = append(views, ProcessDownloadAttachment{
 			SubstepID: file.SubstepID,
 			Filename:  sanitizeAttachmentFilename(file.Filename),
-			URL:       fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), file.AttachmentID),
+			URL:       fmt.Sprintf("%s/attachment/%s/file", streamInstancePath(workflowKey, process.ID.Hex()), file.AttachmentID),
 		})
 	}
 	return views
@@ -7234,7 +7280,7 @@ func buildSubstepAttachments(workflowKey string, process *Process, data map[stri
 			continue
 		}
 		seen[id] = struct{}{}
-		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
+		downloadURL := fmt.Sprintf("%s/attachment/%s/file", streamInstancePath(workflowKey, process.ID.Hex()), id)
 		previewKind := actionAttachmentPreviewKind(meta)
 		attachments = append(attachments, SubstepAttachmentView{
 			AttachmentID: id,

@@ -17,7 +17,7 @@ func testHomeActiveProcessGroups(items []StreamInstanceCard, statusFilter, sortK
 	if statusFilter == "" {
 		statusFilter = "all"
 	}
-	return []ProcessStatusGroup{buildHomeActiveProcessGroup("/w/workflow", items, statusFilter, sortKey, page)}
+	return []ProcessStatusGroup{buildHomeActiveProcessGroup("/my/streams/workflow", items, statusFilter, sortKey, page)}
 }
 
 func testHomeActiveGroup(statusFilter string, items ...StreamInstanceCard) []ProcessStatusGroup {
@@ -27,11 +27,11 @@ func testHomeActiveGroup(statusFilter string, items ...StreamInstanceCard) []Pro
 func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
-	process := StreamInstanceCard{ID: "process-1", Name: "Pilot batch", Status: "active", DetailHref: "/w/workflow/process/process-1", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}
+	process := StreamInstanceCard{ID: "process-1", Name: "Pilot batch", Status: "active", DetailHref: "/my/streams/workflow/instance/process-1", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		WorkflowDescription: "Previewable workflow",
@@ -143,7 +143,7 @@ func TestHomeTemplateRendersEmptyStatusSections(t *testing.T) {
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		WorkflowDescription: "Previewable workflow",
@@ -181,7 +181,7 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		Sort:          "status",
@@ -203,12 +203,12 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 				CurrentPage:         2,
 				TotalPages:          3,
 				PageNumbers:         []int{1, 2, 3},
-				PageLinks:           []PaginationLink{{Page: 1, URL: "/w/workflow/?filter=active&sort=status"}, {Page: 2, URL: "/w/workflow/?filter=active&page=2&sort=status", IsCurrent: true}, {Page: 3, URL: "/w/workflow/?filter=active&page=3&sort=status"}},
+				PageLinks:           []PaginationLink{{Page: 1, URL: "/my/streams/workflow/?filter=active&sort=status"}, {Page: 2, URL: "/my/streams/workflow/?filter=active&page=2&sort=status", IsCurrent: true}, {Page: 3, URL: "/my/streams/workflow/?filter=active&page=3&sort=status"}},
 				HasPreviousPage:     true,
 				HasNextPage:         true,
-				PreviousURL:         "/w/workflow/?filter=active&sort=status",
-				NextURL:             "/w/workflow/?filter=active&page=3&sort=status",
-				Processes:           []StreamInstanceCard{{ID: "process-13", Status: "active", DetailHref: "/w/workflow/process/process-13", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}},
+				PreviousURL:         "/my/streams/workflow/?filter=active&sort=status",
+				NextURL:             "/my/streams/workflow/?filter=active&page=3&sort=status",
+				Processes:           []StreamInstanceCard{{ID: "process-13", Status: "active", DetailHref: "/my/streams/workflow/instance/process-13", Percent: 25, DoneSubsteps: 1, TotalSubsteps: 4, CreatedAt: "1 Mar 2026 at 10:00 UTC"}},
 			},
 		},
 	}
@@ -223,10 +223,10 @@ func TestHomeTemplateRendersStatusPagination(t *testing.T) {
 	if !strings.Contains(compactBody, `Active stream instances pagination`) {
 		t.Fatalf("expected active stream instances pagination nav, got: %s", body)
 	}
-	if !strings.Contains(compactBody, `/w/workflow/?filter=active&amp;page=3&amp;sort=status`) {
+	if !strings.Contains(compactBody, `/my/streams/workflow/?filter=active&amp;page=3&amp;sort=status`) {
 		t.Fatalf("expected pagination to preserve filter, sort and page, got: %s", body)
 	}
-	if !strings.Contains(compactBody, `hx-get="/w/workflow/?filter=active&amp;page=3&amp;sort=status"`) {
+	if !strings.Contains(compactBody, `hx-get="/my/streams/workflow/?filter=active&amp;page=3&amp;sort=status"`) {
 		t.Fatalf("expected pagination hx-get, got: %s", body)
 	}
 	if !strings.Contains(compactBody, `name="sort"`) {
@@ -270,7 +270,7 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	item := StreamInstanceCard{
 		ID:            "process-1",
 		Status:        "available",
-		DetailHref:    "/w/workflow/process/process-1",
+		DetailHref:    "/my/streams/workflow/instance/process-1",
 		Percent:       25,
 		DoneSubsteps:  1,
 		TotalSubsteps: 4,
@@ -279,7 +279,7 @@ func TestHomeTemplateHighlightsProcessWhenItIsUsersTurn(t *testing.T) {
 	view := HomeView{
 		PageBase: PageBase{
 			WorkflowKey:  "workflow",
-			WorkflowPath: "/w/workflow",
+			WorkflowPath: "/my/streams/workflow",
 			WorkflowName: "Demo workflow",
 		},
 		Sort:          "time_desc",

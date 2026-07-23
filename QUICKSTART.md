@@ -31,7 +31,7 @@ docker compose -f deployment/docker-compose.local.yaml up -d attesta
 ## Migration Notes
 - Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
 - Existing Mongo invite and password-reset tokens are not migrated. Re-issue any still-needed invite or reset from the Appwrite-backed Attesta flows.
-- If you are cutting over an existing demo dataset, migrate organizations, roles, and active users into Appwrite before relying on `/org-admin/*`.
+- If you are cutting over an existing demo dataset, migrate organizations, roles, and active users into Appwrite before relying on `/my/organization/*`.
 
 ## Build frontend assets
 ```bash
@@ -49,11 +49,12 @@ go run ./cmd/server
 
 ## Open the demo
 - Appwrite Console: http://localhost
-- Home: http://localhost:3030
+- Public homepage: http://localhost:3030/
+- Stream picker (after login): http://localhost:3030/my
 - Backoffice: http://localhost:3030/backoffice
 - Mailpit: http://localhost:8025
 
-The entry pages are workflow pickers. Business routes are workflow-scoped under `/w/{workflowKey}/...`.
+After login, the stream picker is at `/my`. Stream and instance routes live under `/my/streams/{workflowKey}/...` (legacy `/w/` and `/org-admin/` paths return 404).
 
 ## Configure DPP Digital Link (optional)
 Edit `server/config/workflow.yaml` and add:

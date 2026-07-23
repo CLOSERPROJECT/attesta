@@ -58,7 +58,7 @@ func TestOrgAdminSectionURLHandlers(t *testing.T) {
 	server := orgAdminSectionURLTestServer(t, now)
 
 	t.Run("GET legacy users redirects to profile", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 
@@ -67,13 +67,13 @@ func TestOrgAdminSectionURLHandlers(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if loc := rec.Header().Get("Location"); loc != "/org-admin/profile" {
-			t.Fatalf("location = %q, want /org-admin/profile", loc)
+		if loc := rec.Header().Get("Location"); loc != "/my/organization/profile" {
+			t.Fatalf("location = %q, want /my/organization/profile", loc)
 		}
 	})
 
 	t.Run("GET profile renders active profile panel", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/profile", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/profile", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 
@@ -87,7 +87,7 @@ func TestOrgAdminSectionURLHandlers(t *testing.T) {
 	})
 
 	t.Run("GET members renders active members panel", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/members", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/members", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 
@@ -101,7 +101,7 @@ func TestOrgAdminSectionURLHandlers(t *testing.T) {
 	})
 
 	t.Run("GET roles renders active roles panel", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/org-admin/roles", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/roles", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 
@@ -120,10 +120,10 @@ func TestResolveOrgAdminActivePanelFromPath(t *testing.T) {
 		path string
 		want string
 	}{
-		{path: "/org-admin/profile", want: "profile"},
-		{path: "/org-admin/members", want: "members"},
-		{path: "/org-admin/roles", want: "roles"},
-		{path: "/org-admin/users", want: "profile"},
+		{path: "/my/organization/profile", want: "profile"},
+		{path: "/my/organization/members", want: "members"},
+		{path: "/my/organization/roles", want: "roles"},
+		{path: "/my/organization/users", want: "profile"},
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
@@ -139,7 +139,7 @@ func assertOrgAdminActivePanel(t *testing.T, body, panel string) {
 	if !strings.Contains(body, `class="sidebar-nav-link is-active"`) {
 		t.Fatalf("expected active sidebar nav link for %q", panel)
 	}
-	if !strings.Contains(body, `href="/org-admin/`+panel+`"`) {
+	if !strings.Contains(body, `href="/my/organization/`+panel+`"`) {
 		t.Fatalf("expected nav href for %q panel", panel)
 	}
 	if !strings.Contains(body, `data-org-admin-default-panel="`+panel+`"`) {
@@ -199,6 +199,58 @@ func TestOrgAdminActivePanelTemplateRendering(t *testing.T) {
 				t.Fatalf("render org admin template: %v", err)
 			}
 			assertOrgAdminActivePanel(t, out.String(), panel)
+		})
+	}
+}
+
+func TestLegacyOrgAdminRoutesReturnNotFound(t *testing.T) {
+	server := orgAdminSectionURLTestServer(t, time.Now().UTC())
+	mux := server.newMux()
+
+	req := httptest.NewRequest(http.MethodGet, "/org-admin/profile", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestMyOrganizationProfileRouteViaMux(t *testing.T) {
+	server := orgAdminSectionURLTestServer(t, time.Now().UTC())
+	mux := server.newMux()
+
+	req := httptest.NewRequest(http.MethodGet, "/my/organization/profile", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("status = %d, want route registered (not 404)", rec.Code)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestUnknownMyRoutesReturnNotFound(t *testing.T) {
+	server := orgAdminSectionURLTestServer(t, time.Now().UTC())
+	mux := server.newMux()
+
+	cases := []string{
+		"/my/not-a-page",
+		"/my/organization/not-a-section",
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+			}
 		})
 	}
 }

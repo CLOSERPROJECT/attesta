@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"strings"
 )
 
@@ -18,7 +17,7 @@ func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeC
 
 	view := StreamInstanceDetailView{
 		WorkflowKey:       workflowKey,
-		WorkflowPath:      workflowPath(workflowKey),
+		WorkflowPath:      streamPath(workflowKey),
 		ProcessID:         processIDString(process),
 		CurrentUser:       actor,
 		SelectedSubstepID: selected,
@@ -29,7 +28,7 @@ func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeC
 	if process != nil && !processDone {
 		if action, ok := nextAuthorizedSubstepBody(cfg.Workflow, process, workflowKey, actor, roleMeta, cfg.Roles); ok {
 			view.CanTerminate = true
-			view.TerminateAction = fmt.Sprintf("%s/process/%s/terminate", workflowPath(workflowKey), process.ID.Hex())
+			view.TerminateAction = streamInstancePath(workflowKey, process.ID.Hex()) + "/terminate"
 			view.TerminateSubstep = action.SubstepID
 			view.TerminateRoles = append([]SubstepRoleOption(nil), action.MatchingRoles...)
 		}

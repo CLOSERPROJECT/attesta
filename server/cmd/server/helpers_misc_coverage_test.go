@@ -187,7 +187,7 @@ func TestOrganizationLogoAdditionalBranches(t *testing.T) {
 		authorizer: fakeAuthorizer{}}
 
 	t.Run("no multipart form", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", nil)
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", nil)
 		upload, errMsg := server.readOrganizationLogoUpload(req)
 		if upload != nil || errMsg != "" {
 			t.Fatalf("upload=%#v errMsg=%q", upload, errMsg)
@@ -209,7 +209,7 @@ func TestOrganizationLogoAdditionalBranches(t *testing.T) {
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close error: %v", err)
 		}
-		req := httptest.NewRequest(http.MethodPost, "/org-admin/users", &body)
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", &body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		if err := req.ParseMultipartForm(int64(body.Len())); err != nil {
 			t.Fatalf("ParseMultipartForm error: %v", err)

@@ -76,9 +76,9 @@
     class="substep-body-form"
     {{ if not .ReadOnly }}
       method="post"
-      action="/w/{{ .WorkflowKey }}/process/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
+      action="/my/streams/{{ .WorkflowKey }}/instance/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
       data-formata-substep="true"
-      data-formata-post="/w/{{ .WorkflowKey }}/process/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
+      data-formata-post="/my/streams/{{ .WorkflowKey }}/instance/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
       {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }}
         data-active-role-dialog="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
       {{ end }}

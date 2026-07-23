@@ -15,7 +15,7 @@ func TestStreamInstanceCardTemplateRendersDetailLink(t *testing.T) {
 		Name:          "Pilot batch",
 		Status:        "available",
 		StatusLabel:   "Available",
-		DetailHref:    "/w/workflow/process/process-1",
+		DetailHref:    "/my/streams/workflow/instance/process-1",
 		Percent:       25,
 		DoneSubsteps:  1,
 		TotalSubsteps: 4,
@@ -39,7 +39,7 @@ func TestStreamInstanceCardTemplateRendersDetailLink(t *testing.T) {
 		`class="stream-instance-card-progress-fill"`,
 		`class="stream-instance-card-meta"`,
 		`class="stream-instance-card-meta-primary"`,
-		`href="/w/workflow/process/process-1"`,
+		`href="/my/streams/workflow/instance/process-1"`,
 		`class="status-tag status-tag-compact"`,
 		`data-stream-status="available"`,
 		`class="js-local-datetime"`,
@@ -74,7 +74,7 @@ func TestStreamInstanceCardTemplateRendersStatusIcon(t *testing.T) {
 			card := StreamInstanceCard{
 				ID:         "process-1",
 				Status:     tc.status,
-				DetailHref: "/w/workflow/process/process-1",
+				DetailHref: "/my/streams/workflow/instance/process-1",
 			}
 			if err := tmpl.ExecuteTemplate(&out, "stream_instance_card", card); err != nil {
 				t.Fatalf("render stream_instance_card template: %v", err)

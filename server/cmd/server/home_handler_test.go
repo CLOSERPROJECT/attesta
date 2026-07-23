@@ -14,6 +14,93 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  parseTestTemplates(t),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("unexpected redirect to %q", loc)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected Login link on public home, got %q", body)
+	}
+	if !strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected Login styled as ghost nav button, got %q", body)
+	}
+	if strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected no account menu on public home, got %q", body)
+	}
+	if strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
+	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  parseTestTemplates(t),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				if sessionSecret != "session-public-home" {
+					return IdentitySession{}, ErrIdentityUnauthorized
+				}
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "user@example.com", Status: "active"}, nil
+			},
+		},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-public-home"})
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected account menu when logged in, got %q", body)
+	}
+	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected Dashboard item under account menu when logged in, got %q", body)
+	}
+	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action">Dashboard`) {
+		t.Fatalf("expected Dashboard inside menu, not topbar button, got %q", body)
+	}
+	if strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected no Login link when logged in, got %q", body)
+	}
+}
+
+func TestHandleHomeRequiresAuthAtMy(t *testing.T) {
+	server := &Server{
+		store:       NewMemoryStore(),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want redirect", rec.Code)
+	}
+	if got := rec.Header().Get("Location"); !strings.HasPrefix(got, "/login?next=") {
+		t.Fatalf("location = %q", got)
+	}
+}
+
 func TestHandleHomeListsProcesses(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
@@ -67,7 +154,7 @@ func TestHandleHomeListsProcesses(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	cfg := testRuntimeConfig()
 	cfg.Workflow.Description = "Demo workflow description"
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
@@ -140,7 +227,7 @@ func TestHandleHomeFiltersProcessesByStatus(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?filter=done", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -194,7 +281,7 @@ func TestHandleHomePaginatesProcesses(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?page=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?page=2", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -226,7 +313,7 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -376,7 +463,7 @@ func TestHandleHomePickerMarksWorkflowCardsWithMyTurn(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
@@ -426,7 +513,7 @@ func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
@@ -455,7 +542,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -471,10 +558,10 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="stream-card"`) {
 		t.Fatalf("expected workflow card grid markup, got %q", body)
 	}
-	if !strings.Contains(body, `href="/w/workflow/"`) {
+	if !strings.Contains(body, `href="/my/streams/workflow/"`) {
 		t.Fatalf("expected scoped workflow href for workflow key, got %q", body)
 	}
-	if !strings.Contains(body, `href="/w/secondary/"`) {
+	if !strings.Contains(body, `href="/my/streams/secondary/"`) {
 		t.Fatalf("expected scoped workflow href for secondary key, got %q", body)
 	}
 	if !strings.Contains(body, "Main workflow description") {
@@ -509,7 +596,7 @@ func TestHandleWorkflowHomeMarksProcessesWithMyTurn(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -552,7 +639,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			enforceAuth: true,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -561,7 +648,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `href="/org-admin/formata-builder"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder"`) {
 			t.Fatalf("expected create stream card for org admin, got %q", body)
 		}
 		if !strings.Contains(body, "stream-card-cta") || !strings.Contains(body, "Create new stream") {
@@ -589,7 +676,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			enforceAuth: true,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -597,7 +684,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder"`) {
+		if strings.Contains(rec.Body.String(), `href="/my/organization/formata-builder"`) {
 			t.Fatalf("did not expect create stream card for non org admin, got %q", rec.Body.String())
 		}
 	})
@@ -647,7 +734,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
@@ -672,7 +759,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if strings.Contains(body, `class="rail-layout`) || strings.Contains(body, `class="home-workflow-grid"`) {
 		t.Fatalf("did not expect stream dashboard grid when config is invalid, got %q", body)
 	}
-	if strings.Contains(body, `action="/w/workflow/process/start"`) || strings.Contains(body, "New instance") {
+	if strings.Contains(body, `action="/my/streams/workflow/instance/start"`) || strings.Contains(body, "New instance") {
 		t.Fatalf("did not expect new instance controls when config is invalid, got %q", body)
 	}
 }
@@ -710,7 +797,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -722,10 +809,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for creator, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("expected clone action for creator, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected edit action for creator, got %q", body)
 		}
 		if strings.Contains(body, `id="edit-workflow-`+stream.ID.Hex()+`"`) {
@@ -737,10 +824,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `onclick="document.getElementById('delete-workflow-`+stream.ID.Hex()+`').showModal()"`) {
 			t.Fatalf("expected delete dialog trigger for creator, got %q", body)
 		}
-		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+		if !strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for creator, got %q", body)
 		}
-		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if !strings.Contains(rec.Body.String(), `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected edit button for creator, got %q", rec.Body.String())
 		}
 	})
@@ -781,7 +868,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -796,13 +883,13 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect delete dialog for started stream, got %q", body)
 		}
-		if strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+		if strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("did not expect delete button for started stream, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("expected clone action for started stream, got %q", body)
 		}
-		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect direct edit action for started stream, got %q", body)
 		}
 		if !strings.Contains(body, `class="stream-card-menu-item stream-card-menu-item-disabled"`) {
@@ -845,7 +932,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -857,7 +944,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for platform admin, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("expected clone action for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `id="edit-workflow-`+stream.ID.Hex()+`"`) {
@@ -866,7 +953,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `onclick="document.getElementById('edit-workflow-`+stream.ID.Hex()+`').showModal()"`) {
 			t.Fatalf("expected edit warning dialog trigger for platform admin, got %q", body)
 		}
-		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("expected edit dialog continue action for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
@@ -875,7 +962,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `onclick="document.getElementById('delete-workflow-`+stream.ID.Hex()+`').showModal()"`) {
 			t.Fatalf("expected delete dialog trigger for platform admin, got %q", body)
 		}
-		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+		if !strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for platform admin, got %q", body)
 		}
 	})
@@ -909,7 +996,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -921,10 +1008,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `stream-card-menu-trigger`) {
 			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
 		}
-		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
+		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
 			t.Fatalf("did not expect clone action without builder access, got %q", body)
 		}
-		if strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
+		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect edit action without builder access, got %q", body)
 		}
 		if strings.Contains(body, `stream-card-menu-item-danger stream-card-menu-item-disabled`) {
@@ -1005,7 +1092,7 @@ func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 		store:      store,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -1064,8 +1151,8 @@ func TestHomeProcessStatusCopy(t *testing.T) {
 }
 
 func TestHomePaginationURLUsesGlobalSortAndPage(t *testing.T) {
-	got := homePaginationURL("/w/workflow", "active", "status", 3)
-	want := "/w/workflow/?filter=active&page=3&sort=status"
+	got := homePaginationURL("/my/streams/workflow", "active", "status", 3)
+	want := "/my/streams/workflow/?filter=active&page=3&sort=status"
 	if got != want {
 		t.Fatalf("pagination url = %q, want %q", got, want)
 	}
@@ -1076,14 +1163,14 @@ func TestHomePaginationURLUsesGlobalSortAndPage(t *testing.T) {
 		t.Fatalf("did not expect per-status sort/page params, got %q", got)
 	}
 
-	allURL := homePaginationURL("/w/workflow", "all", "time_desc", 1)
-	if allURL != "/w/workflow/" {
+	allURL := homePaginationURL("/my/streams/workflow", "all", "time_desc", 1)
+	if allURL != "/my/streams/workflow/" {
 		t.Fatalf("defaults should omit query params, got %q", allURL)
 	}
 }
 
 func TestBuildHomeProcessGroupsUsesGlobalSortAndFilterFields(t *testing.T) {
-	groups := buildHomeProcessGroups("/w/workflow", []StreamInstanceCard{
+	groups := buildHomeProcessGroups("/my/streams/workflow", []StreamInstanceCard{
 		{ID: "1", Status: "active"},
 		{ID: "2", Status: "done"},
 	}, "progress_desc", 1)
@@ -1158,7 +1245,7 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 			configDir:  t.TempDir(),
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -1179,7 +1266,7 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -1198,7 +1285,7 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 		rec := httptest.NewRecorder()
 		server.handleWorkflowHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -1215,7 +1302,7 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 				return testRuntimeConfig(), nil
 			},
 		}
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
 			Cfg: testRuntimeConfig(),
@@ -1254,7 +1341,7 @@ func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -1334,7 +1421,7 @@ func TestHandleWorkflowHomeHTMXReturnsPartial(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req.Header.Set("HX-Request", "true")
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
@@ -1404,7 +1491,7 @@ func TestHandleWorkflowHomeHTMXFiltersAndPaginates(t *testing.T) {
 	}
 
 	t.Run("filter", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?filter=done", nil)
 		req.Header.Set("HX-Request", "true")
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
@@ -1453,7 +1540,7 @@ func TestHandleWorkflowHomeHTMXFiltersAndPaginates(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/?page=2", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?page=2", nil)
 		req.Header.Set("HX-Request", "true")
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
@@ -1502,7 +1589,7 @@ func TestBuildHomeFilterOptionsIncludesAllStatuses(t *testing.T) {
 }
 
 func TestBuildHomeActiveProcessGroupBuildsSingleStatus(t *testing.T) {
-	group := buildHomeActiveProcessGroup("/w/workflow", []StreamInstanceCard{
+	group := buildHomeActiveProcessGroup("/my/streams/workflow", []StreamInstanceCard{
 		{ID: "1", Status: "active"},
 		{ID: "2", Status: "done"},
 	}, "done", "time_desc", 1)

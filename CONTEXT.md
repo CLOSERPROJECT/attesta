@@ -27,15 +27,15 @@ The view of one stream instance: its timeline (steps and substeps), completion c
 _Avoid_: Process page, action list
 
 **Stream picker**:
-The screen at `/` where an operator chooses which stream (blueprint) to open.
+The authenticated screen at `/my` where an operator chooses which stream (blueprint) to open. Public marketing content lives at `/` and does not redirect logged-in users to `/my`.
 _Avoid_: Home, workflow picker
 
 **Stream dashboard**:
-The screen at `/w/:key/` listing stream instances for one stream, with status navigation and a read-only timeline preview.
+The screen at `/my/streams/:key/` listing stream instances for one stream, with status navigation and a read-only timeline preview.
 _Avoid_: Home, workflow home
 
 **Stream instance detail page**:
-The full page at `/w/:key/process/:id`. Comprises a stable outer shell (process metadata, SSE hooks) and an inner **content partial** swapped via HTMX/SSE after substep completion or live updates.
+The full page at `/my/streams/:key/instance/:id`. Comprises a stable outer shell (process metadata, SSE hooks) and an inner **content partial** swapped via HTMX/SSE after substep completion or live updates.
 _Avoid_: Process page
 
 ### Stream instance detail UI
