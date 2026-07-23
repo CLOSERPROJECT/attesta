@@ -45,7 +45,7 @@ func TestHandleDownloadProcessAttachmentAllowsAnonymousAccess(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -96,7 +96,7 @@ func TestHandleDownloadProcessAttachmentReturns404ForProcessMismatch(t *testing.
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 
@@ -138,7 +138,7 @@ func TestHandleDownloadProcessAttachmentSupportsInlinePreview(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file?inline=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID.Hex()+"/attachment/"+attachment.ID.Hex()+"/file?inline=1", nil)
 	rr := httptest.NewRecorder()
 	server.handleProcessRoutes(rr, req)
 

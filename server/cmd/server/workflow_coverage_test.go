@@ -66,23 +66,38 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 		path   string
 		want   int
 	}{
-		{name: "missing key", method: http.MethodGet, path: "/w/", want: http.StatusNotFound},
-		{name: "unknown tail", method: http.MethodGet, path: "/w/workflow/unknown", want: http.StatusNotFound},
-		{name: "events validation", method: http.MethodGet, path: "/w/workflow/events", want: http.StatusBadRequest},
-		{name: "start method guard", method: http.MethodGet, path: "/w/workflow/process/start", want: http.StatusMethodNotAllowed},
-		{name: "backoffice unknown role", method: http.MethodGet, path: "/w/workflow/backoffice/unknown", want: http.StatusNotFound},
-		{name: "dashboard removed", method: http.MethodGet, path: "/w/workflow/dashboard", want: http.StatusNotFound},
+		{name: "missing key", method: http.MethodGet, path: "/streams/", want: http.StatusNotFound},
+		{name: "unknown tail", method: http.MethodGet, path: "/streams/workflow/unknown", want: http.StatusNotFound},
+		{name: "events validation", method: http.MethodGet, path: "/streams/workflow/events", want: http.StatusBadRequest},
+		{name: "start method guard", method: http.MethodGet, path: "/streams/workflow/instance/start", want: http.StatusMethodNotAllowed},
+		{name: "backoffice unknown role", method: http.MethodGet, path: "/streams/workflow/backoffice/unknown", want: http.StatusNotFound},
+		{name: "dashboard removed", method: http.MethodGet, path: "/streams/workflow/dashboard", want: http.StatusNotFound},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(tc.method, tc.path, nil)
 			rec := httptest.NewRecorder()
-			server.handleWorkflowRoutes(rec, req)
+			server.handleStreamRoutes(rec, req)
 			if rec.Code != tc.want {
 				t.Fatalf("status = %d, want %d", rec.Code, tc.want)
 			}
 		})
+	}
+}
+
+func TestLegacyWorkflowMountReturns404(t *testing.T) {
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  testTemplates(),
+		sse:   newSSEHub(),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	rec := httptest.NewRecorder()
+	server.newMux().ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
 
@@ -163,7 +178,7 @@ func TestSelectedWorkflowUsesContextValueWhenPresent(t *testing.T) {
 		enforceAuth: false,
 	}
 	cfg := testRuntimeConfig()
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow", nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/workflow", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "from-context",
 		Cfg: cfg,

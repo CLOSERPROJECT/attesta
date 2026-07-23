@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -165,7 +164,7 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 		canAdaptForm := status == "available" && !disabled && substepSupportsLocalOverride(sub)
 		adaptURL := ""
 		if canAdaptForm {
-			adaptURL = fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, processIDString(process), sub.SubstepID)
+			adaptURL = streamInstancePath(workflowKey, processIDString(process)) + "/substep/" + sub.SubstepID + "/override"
 		}
 		actions = append(actions, withSubstepBodyMode(SubstepBodyView{
 			WorkflowKey:    workflowKey,

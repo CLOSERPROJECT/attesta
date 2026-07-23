@@ -100,7 +100,7 @@ func TestHandleHomeListsProcesses(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	cfg := testRuntimeConfig()
 	cfg.Workflow.Description = "Demo workflow description"
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
@@ -173,7 +173,7 @@ func TestHandleHomeFiltersProcessesByStatus(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?filter=done", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -227,7 +227,7 @@ func TestHandleHomePaginatesProcesses(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/?page=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?page=2", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -504,10 +504,10 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="stream-card"`) {
 		t.Fatalf("expected workflow card grid markup, got %q", body)
 	}
-	if !strings.Contains(body, `href="/w/workflow/"`) {
+	if !strings.Contains(body, `href="/my/streams/workflow/"`) {
 		t.Fatalf("expected scoped workflow href for workflow key, got %q", body)
 	}
-	if !strings.Contains(body, `href="/w/secondary/"`) {
+	if !strings.Contains(body, `href="/my/streams/secondary/"`) {
 		t.Fatalf("expected scoped workflow href for secondary key, got %q", body)
 	}
 	if !strings.Contains(body, "Main workflow description") {
@@ -542,7 +542,7 @@ func TestHandleWorkflowHomeMarksProcessesWithMyTurn(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -680,7 +680,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
@@ -705,7 +705,7 @@ func TestHandleWorkflowHomeRendersValidationState(t *testing.T) {
 	if strings.Contains(body, `class="rail-layout`) || strings.Contains(body, `class="home-workflow-grid"`) {
 		t.Fatalf("did not expect stream dashboard grid when config is invalid, got %q", body)
 	}
-	if strings.Contains(body, `action="/w/workflow/process/start"`) || strings.Contains(body, "New instance") {
+	if strings.Contains(body, `action="/my/streams/workflow/process/start"`) || strings.Contains(body, "New instance") {
 		t.Fatalf("did not expect new instance controls when config is invalid, got %q", body)
 	}
 }
@@ -1097,8 +1097,8 @@ func TestHomeProcessStatusCopy(t *testing.T) {
 }
 
 func TestHomePaginationURLUsesGlobalSortAndPage(t *testing.T) {
-	got := homePaginationURL("/w/workflow", "active", "status", 3)
-	want := "/w/workflow/?filter=active&page=3&sort=status"
+	got := homePaginationURL("/my/streams/workflow", "active", "status", 3)
+	want := "/my/streams/workflow/?filter=active&page=3&sort=status"
 	if got != want {
 		t.Fatalf("pagination url = %q, want %q", got, want)
 	}
@@ -1109,14 +1109,14 @@ func TestHomePaginationURLUsesGlobalSortAndPage(t *testing.T) {
 		t.Fatalf("did not expect per-status sort/page params, got %q", got)
 	}
 
-	allURL := homePaginationURL("/w/workflow", "all", "time_desc", 1)
-	if allURL != "/w/workflow/" {
+	allURL := homePaginationURL("/my/streams/workflow", "all", "time_desc", 1)
+	if allURL != "/my/streams/workflow/" {
 		t.Fatalf("defaults should omit query params, got %q", allURL)
 	}
 }
 
 func TestBuildHomeProcessGroupsUsesGlobalSortAndFilterFields(t *testing.T) {
-	groups := buildHomeProcessGroups("/w/workflow", []StreamInstanceCard{
+	groups := buildHomeProcessGroups("/my/streams/workflow", []StreamInstanceCard{
 		{ID: "1", Status: "active"},
 		{ID: "2", Status: "done"},
 	}, "progress_desc", 1)
@@ -1231,7 +1231,7 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 		rec := httptest.NewRecorder()
 		server.handleWorkflowHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -1248,7 +1248,7 @@ func TestHandleWorkflowHomeErrorPaths(t *testing.T) {
 				return testRuntimeConfig(), nil
 			},
 		}
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
 			Cfg: testRuntimeConfig(),
@@ -1287,7 +1287,7 @@ func TestHandleWorkflowHomeUsesHumanReadableProcessDates(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
 		Cfg: testRuntimeConfig(),
@@ -1367,7 +1367,7 @@ func TestHandleWorkflowHomeHTMXReturnsPartial(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
 	req.Header.Set("HX-Request", "true")
 	req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 		Key: "workflow",
@@ -1437,7 +1437,7 @@ func TestHandleWorkflowHomeHTMXFiltersAndPaginates(t *testing.T) {
 	}
 
 	t.Run("filter", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/?filter=done", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?filter=done", nil)
 		req.Header.Set("HX-Request", "true")
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
@@ -1486,7 +1486,7 @@ func TestHandleWorkflowHomeHTMXFiltersAndPaginates(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/w/workflow/?page=2", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/?page=2", nil)
 		req.Header.Set("HX-Request", "true")
 		req = req.WithContext(context.WithValue(req.Context(), workflowContextKey{}, workflowContextValue{
 			Key: "workflow",
@@ -1535,7 +1535,7 @@ func TestBuildHomeFilterOptionsIncludesAllStatuses(t *testing.T) {
 }
 
 func TestBuildHomeActiveProcessGroupBuildsSingleStatus(t *testing.T) {
-	group := buildHomeActiveProcessGroup("/w/workflow", []StreamInstanceCard{
+	group := buildHomeActiveProcessGroup("/my/streams/workflow", []StreamInstanceCard{
 		{ID: "1", Status: "active"},
 		{ID: "2", Status: "done"},
 	}, "done", "time_desc", 1)

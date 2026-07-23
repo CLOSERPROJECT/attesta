@@ -48,10 +48,10 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			t.Fatalf("workflowByKey: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
@@ -101,10 +101,10 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
@@ -163,10 +163,10 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
@@ -221,10 +221,10 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusBadGateway {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
@@ -269,10 +269,10 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
@@ -400,11 +400,11 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-has-err"})
 		rec := httptest.NewRecorder()
 
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
@@ -429,11 +429,11 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-no-authorizer"})
 		rec := httptest.NewRecorder()
 
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusBadGateway {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
@@ -470,11 +470,11 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
@@ -502,11 +502,11 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-non-creator"})
 		rec := httptest.NewRecorder()
 
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
@@ -538,11 +538,11 @@ func TestHandleDeleteWorkflow(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/w/"+saved.ID.Hex()+"/delete", nil)
+		req := httptest.NewRequest(http.MethodPost, "/streams/"+saved.ID.Hex()+"/delete", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-delete-stream-err"})
 		rec := httptest.NewRecorder()
 
-		server.handleWorkflowRoutes(rec, req)
+		server.handleStreamRoutes(rec, req)
 
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)

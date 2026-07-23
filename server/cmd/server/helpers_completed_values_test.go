@@ -150,7 +150,7 @@ func TestBuildSubstepAttachmentsAndDownloadViews(t *testing.T) {
 	if attachments[1].Key != "[3]" || attachments[1].Filename != "alpha.pdf" {
 		t.Fatalf("expected sanitized filename and key, got %#v", attachments[1])
 	}
-	if !strings.Contains(attachments[0].URL, "/w/workflow/process/"+processID.Hex()+"/attachment/") {
+	if !strings.Contains(attachments[0].URL, "/my/streams/workflow/instance/"+processID.Hex()+"/attachment/") {
 		t.Fatalf("unexpected attachment url: %q", attachments[0].URL)
 	}
 

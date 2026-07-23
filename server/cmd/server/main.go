@@ -1293,10 +1293,6 @@ func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Reques
 	s.renderOrgAdminWithErrors(w, r, user, orgSlug, inviteLink, errs)
 }
 
-func workflowPath(key string) string {
-	return streamPath(key)
-}
-
 func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	base := PageBase{
 		Body:          body,
@@ -1305,7 +1301,7 @@ func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 		WorkflowName:  strings.TrimSpace(workflowName),
 	}
 	if base.WorkflowKey != "" {
-		base.WorkflowPath = workflowPath(base.WorkflowKey)
+		base.WorkflowPath = streamPath(base.WorkflowKey)
 	}
 	return base
 }
@@ -1522,7 +1518,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Stre
 			Description:  strings.TrimSpace(cfg.Workflow.Description),
 			Counts:       WorkflowProcessCounts{},
 			EditAction:   "/org-admin/formata-builder?stream=" + key,
-			DeleteAction: workflowPath(key) + "/delete",
+			DeleteAction: streamPath(key) + "/delete",
 		}
 		if s.store == nil {
 			options = append(options, option)
@@ -2019,7 +2015,7 @@ func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, messag
 }
 
 func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, workflowKey, message string) {
-	target := workflowPath(workflowKey) + "/"
+	target := streamPath(workflowKey) + "/"
 	trimmedMessage := strings.TrimSpace(message)
 	if trimmedMessage != "" {
 		target += "?" + url.Values{"error": []string{trimmedMessage}}.Encode()
@@ -2077,13 +2073,17 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
 		return
 	}
-	rest := strings.TrimPrefix(r.URL.Path, "/my")
-	rest = strings.TrimPrefix(rest, "/")
-	if rest == "" {
-		s.handleHome(w, r)
+	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/my"), "/")
+	switch {
+	case rest == "":
+		s.handleHome(w, cloneRequestWithPath(r, appHomePath))
 		return
+	case rest == "streams" || strings.HasPrefix(rest, "streams/"):
+		s.handleStreamRoutes(w, cloneRequestWithPath(r, "/"+rest))
+		return
+	default:
+		http.NotFound(w, r)
 	}
-	http.NotFound(w, r)
 }
 
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
@@ -2242,7 +2242,6 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
-	mux.HandleFunc("/w/", s.handleWorkflowRoutes)
 	mux.HandleFunc("/my", s.handleHome)
 	mux.HandleFunc("/my/", s.handleMyRoutes)
 	mux.HandleFunc("/", s.handlePublicHome)
@@ -4672,11 +4671,8 @@ func cloneRequestWithSelectedSubstep(r *http.Request, substepID string) *http.Re
 	return clone
 }
 
-func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
-		return
-	}
-	path := strings.TrimPrefix(r.URL.Path, "/w/")
+func (s *Server) handleStreamRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/streams/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
 		http.NotFound(w, r)
@@ -4696,19 +4692,19 @@ func (s *Server) handleWorkflowRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkflowHome(w, scopedReq)
 		return
 	}
-	rest := "/" + strings.Join(parts[1:], "/")
+	tail := "/" + strings.Join(parts[1:], "/")
 	switch {
-	case rest == "/process/start":
-		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, rest))
+	case tail == "/instance/start":
+		s.handleStartProcess(w, cloneRequestWithPath(scopedReq, tail))
 		return
-	case rest == "/delete":
-		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, rest))
+	case tail == "/delete":
+		s.handleDeleteWorkflow(w, cloneRequestWithPath(scopedReq, tail))
 		return
-	case strings.HasPrefix(rest, "/process/"):
-		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, rest))
+	case strings.HasPrefix(tail, "/instance/"):
+		s.handleProcessRoutes(w, cloneRequestWithPath(scopedReq, tail))
 		return
-	case rest == "/events":
-		s.handleEvents(w, cloneRequestWithPath(scopedReq, rest))
+	case tail == "/events":
+		s.handleEvents(w, cloneRequestWithPath(scopedReq, tail))
 		return
 	default:
 		http.NotFound(w, r)
@@ -4818,7 +4814,7 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 
 	totalSubsteps := countWorkflowSubsteps(cfg.Workflow)
 	var processes []StreamInstanceCard
-	path := workflowPath(workflowKey)
+	path := streamPath(workflowKey)
 	for _, process := range processesRaw {
 		process.Progress = normalizeProgressKeys(process.Progress)
 		status := deriveProcessStatus(cfg.Workflow, &process)
@@ -4832,7 +4828,7 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 			Name:               strings.TrimSpace(process.Name),
 			Status:             status,
 			StatusLabel:        processStatusLabel(status),
-			DetailHref:         path + "/process/" + process.ID.Hex(),
+			DetailHref:         streamInstancePath(workflowKey, process.ID.Hex()),
 			CreatedAt:          humanReadableTraceabilityTime(process.CreatedAt),
 			CreatedAtISO:       rfc3339UTC(process.CreatedAt),
 			CreatedAtTime:      process.CreatedAt,
@@ -4949,7 +4945,7 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	for _, role := range s.roles(cfg) {
 		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
-	http.Redirect(w, r, fmt.Sprintf("%s/process/%s", workflowPath(workflowKey), id.Hex()), http.StatusSeeOther)
+	http.Redirect(w, r, streamInstancePath(workflowKey, id.Hex()), http.StatusSeeOther)
 }
 
 const maxProcessNameRunes = 80
@@ -4996,7 +4992,7 @@ func (s *Server) processBelongsToWorkflow(process *Process, workflowKey string) 
 }
 
 func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/process/")
+	path := strings.TrimPrefix(r.URL.Path, "/instance/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || parts[0] == "" {
 		http.NotFound(w, r)
@@ -5680,7 +5676,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 		UISchema:       marshalJSONCompact(effective.UISchema),
 		Reason:         strings.TrimSpace(override.Reason),
 		FormataArchURL: strings.TrimRight(strings.TrimSpace(s.formataArchURL), "/"),
-		SaveURL:        fmt.Sprintf("/w/%s/process/%s/substep/%s/override", workflowKey, process.ID.Hex(), canonical.SubstepID),
+		SaveURL:        streamInstancePath(workflowKey, process.ID.Hex()) + "/substep/" + canonical.SubstepID + "/override",
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.ExecuteTemplate(w, "substep_override_editor.html", view); err != nil {
@@ -6823,7 +6819,7 @@ func buildProcessDownloadAttachments(workflowKey string, process *Process, files
 		views = append(views, ProcessDownloadAttachment{
 			SubstepID: file.SubstepID,
 			Filename:  sanitizeAttachmentFilename(file.Filename),
-			URL:       fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), file.AttachmentID),
+			URL:       fmt.Sprintf("%s/attachment/%s/file", streamInstancePath(workflowKey, process.ID.Hex()), file.AttachmentID),
 		})
 	}
 	return views
@@ -7263,7 +7259,7 @@ func buildSubstepAttachments(workflowKey string, process *Process, data map[stri
 			continue
 		}
 		seen[id] = struct{}{}
-		downloadURL := fmt.Sprintf("%s/process/%s/attachment/%s/file", workflowPath(workflowKey), process.ID.Hex(), id)
+		downloadURL := fmt.Sprintf("%s/attachment/%s/file", streamInstancePath(workflowKey, process.ID.Hex()), id)
 		previewKind := actionAttachmentPreviewKind(meta)
 		attachments = append(attachments, SubstepAttachmentView{
 			AttachmentID: id,

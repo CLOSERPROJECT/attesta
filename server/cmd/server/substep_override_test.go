@@ -133,7 +133,7 @@ func TestAuthorizeSubstepOverrideRequestBranches(t *testing.T) {
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 	cfg := testFormataRuntimeConfig()
 	user := &AccountUser{Email: "u1@example.com", RoleSlugs: []string{"dep1"}}
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID+"/substep/1.2/override", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID+"/substep/1.2/override", nil)
 	if _, _, _, _, status, _, ok := server.authorizeSubstepOverrideRequest(req, user, "workflow", cfg, processID, "1.2"); ok || status != http.StatusConflict {
 		t.Fatalf("locked status = %d ok=%v, want conflict false", status, ok)
 	}
@@ -194,7 +194,7 @@ func TestGetSubstepOverrideRendersFormataURLAndTargetData(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 	server.formataArchURL = "https://forms.example.test"
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID+"/substep/1.1/override", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID+"/substep/1.1/override", nil)
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
 	rr := httptest.NewRecorder()
 	server.handleGetSubstepOverride(rr, req, processID, "1.1")
@@ -202,7 +202,7 @@ func TestGetSubstepOverrideRendersFormataURLAndTargetData(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "https://forms.example.test") || !strings.Contains(body, "/process/"+processID+"/substep/1.1/override") {
+	if !strings.Contains(body, "https://forms.example.test") || !strings.Contains(body, "/instance/"+processID+"/substep/1.1/override") {
 		t.Fatalf("editor body missing formata url/save route: %s", body)
 	}
 }
@@ -210,7 +210,7 @@ func TestGetSubstepOverrideRendersFormataURLAndTargetData(t *testing.T) {
 func TestGetSubstepOverrideAllowsSameOriginBuilderWhenFormataURLMissing(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-	req := httptest.NewRequest(http.MethodGet, "/process/"+processID+"/substep/1.1/override", nil)
+	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID+"/substep/1.1/override", nil)
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
 	rr := httptest.NewRecorder()
 	server.handleGetSubstepOverride(rr, req, processID, "1.1")
@@ -227,7 +227,7 @@ func TestGetSubstepOverrideReturnsRequestErrors(t *testing.T) {
 		store := NewMemoryStore()
 		server, _, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 		missingID := primitive.NewObjectID().Hex()
-		req := httptest.NewRequest(http.MethodGet, "/process/"+missingID+"/substep/1.1/override", nil)
+		req := httptest.NewRequest(http.MethodGet, "/instance/"+missingID+"/substep/1.1/override", nil)
 		req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
 		rr := httptest.NewRecorder()
 		server.handleGetSubstepOverride(rr, req, missingID, "1.1")
@@ -242,7 +242,7 @@ func TestGetSubstepOverrideReturnsRequestErrors(t *testing.T) {
 		cfg := testFormataRuntimeConfig()
 		cfg.Workflow.Steps[0].Substep[0].InputType = "plain"
 		server.configProvider = func() (RuntimeConfig, error) { return cfg, nil }
-		req := httptest.NewRequest(http.MethodGet, "/process/"+processID+"/substep/1.1/override", nil)
+		req := httptest.NewRequest(http.MethodGet, "/instance/"+processID+"/substep/1.1/override", nil)
 		req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
 		rr := httptest.NewRecorder()
 		server.handleGetSubstepOverride(rr, req, processID, "1.1")
@@ -346,7 +346,7 @@ func saveSubstepOverrideForTest(t *testing.T, server *Server, processID, substep
 
 func postSubstepOverrideForTest(t *testing.T, server *Server, processID, substepID, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/process/"+processID+"/substep/"+substepID+"/override", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/instance/"+processID+"/substep/"+substepID+"/override", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
 	rr := httptest.NewRecorder()

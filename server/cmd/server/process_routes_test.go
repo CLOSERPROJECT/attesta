@@ -49,12 +49,12 @@ func TestHandleProcessRoutesDispatchesEndpoints(t *testing.T) {
 		wantStatus int
 		wantBody   string
 	}{
-		{name: "process page", method: http.MethodGet, path: "/process/" + process.ID.Hex(), wantStatus: http.StatusOK, wantBody: "PROCESS"},
-		{name: "process content", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/content", wantStatus: http.StatusOK, wantBody: "PROCESS_CONTENT"},
-		{name: "notarized export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/notarized.json", wantStatus: http.StatusOK},
-		{name: "merkle export", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/merkle.json", wantStatus: http.StatusOK},
-		{name: "all files zip", method: http.MethodGet, path: "/process/" + process.ID.Hex() + "/files.zip", wantStatus: http.StatusOK},
-		{name: "complete substep", method: http.MethodPost, path: "/process/" + process.ID.Hex() + "/substep/1.1/complete", body: "value=%7B%22status%22%3A%22ok%22%7D", wantStatus: http.StatusOK, wantBody: "PROCESS " + process.ID.Hex()},
+		{name: "process page", method: http.MethodGet, path: "/instance/" + process.ID.Hex(), wantStatus: http.StatusOK, wantBody: "PROCESS"},
+		{name: "process content", method: http.MethodGet, path: "/instance/" + process.ID.Hex() + "/content", wantStatus: http.StatusOK, wantBody: "PROCESS_CONTENT"},
+		{name: "notarized export", method: http.MethodGet, path: "/instance/" + process.ID.Hex() + "/notarized.json", wantStatus: http.StatusOK},
+		{name: "merkle export", method: http.MethodGet, path: "/instance/" + process.ID.Hex() + "/merkle.json", wantStatus: http.StatusOK},
+		{name: "all files zip", method: http.MethodGet, path: "/instance/" + process.ID.Hex() + "/files.zip", wantStatus: http.StatusOK},
+		{name: "complete substep", method: http.MethodPost, path: "/instance/" + process.ID.Hex() + "/substep/1.1/complete", body: "value=%7B%22status%22%3A%22ok%22%7D", wantStatus: http.StatusOK, wantBody: "PROCESS " + process.ID.Hex()},
 	}
 
 	for _, tc := range tests {
@@ -89,10 +89,10 @@ func TestHandleProcessRoutesReturns404ForInvalidPaths(t *testing.T) {
 		method string
 		path   string
 	}{
-		{name: "missing process id", method: http.MethodGet, path: "/process/"},
-		{name: "wrong method for process page", method: http.MethodPost, path: "/process/" + primitive.NewObjectID().Hex()},
-		{name: "wrong method for complete", method: http.MethodGet, path: "/process/" + primitive.NewObjectID().Hex() + "/substep/1.1/complete"},
-		{name: "unknown path", method: http.MethodGet, path: "/process/" + primitive.NewObjectID().Hex() + "/unknown"},
+		{name: "missing process id", method: http.MethodGet, path: "/instance/"},
+		{name: "wrong method for process page", method: http.MethodPost, path: "/instance/" + primitive.NewObjectID().Hex()},
+		{name: "wrong method for complete", method: http.MethodGet, path: "/instance/" + primitive.NewObjectID().Hex() + "/substep/1.1/complete"},
+		{name: "unknown path", method: http.MethodGet, path: "/instance/" + primitive.NewObjectID().Hex() + "/unknown"},
 	}
 
 	for _, tc := range tests {
@@ -132,16 +132,16 @@ func TestHandleWorkflowRoutesDispatchAndUnknownWorkflow(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	okReq := httptest.NewRequest(http.MethodGet, "/w/workflow/process/"+process.ID.Hex(), nil)
+	okReq := httptest.NewRequest(http.MethodGet, "/streams/workflow/instance/"+process.ID.Hex(), nil)
 	okRec := httptest.NewRecorder()
-	server.handleWorkflowRoutes(okRec, okReq)
+	server.handleStreamRoutes(okRec, okReq)
 	if okRec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", okRec.Code, http.StatusOK)
 	}
 
-	missingReq := httptest.NewRequest(http.MethodGet, "/w/missing/process/"+process.ID.Hex(), nil)
+	missingReq := httptest.NewRequest(http.MethodGet, "/streams/missing/instance/"+process.ID.Hex(), nil)
 	missingRec := httptest.NewRecorder()
-	server.handleWorkflowRoutes(missingRec, missingReq)
+	server.handleStreamRoutes(missingRec, missingReq)
 	if missingRec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", missingRec.Code, http.StatusNotFound)
 	}
@@ -160,30 +160,30 @@ func TestHandleWorkflowRoutesAdditionalBranches(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	reqMissingWorkflow := httptest.NewRequest(http.MethodGet, "/w/", nil)
+	reqMissingWorkflow := httptest.NewRequest(http.MethodGet, "/streams/", nil)
 	recMissingWorkflow := httptest.NewRecorder()
-	server.handleWorkflowRoutes(recMissingWorkflow, reqMissingWorkflow)
+	server.handleStreamRoutes(recMissingWorkflow, reqMissingWorkflow)
 	if recMissingWorkflow.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recMissingWorkflow.Code, http.StatusNotFound)
 	}
 
-	reqWorkflowHome := httptest.NewRequest(http.MethodGet, "/w/workflow/", nil)
+	reqWorkflowHome := httptest.NewRequest(http.MethodGet, "/streams/workflow/", nil)
 	recWorkflowHome := httptest.NewRecorder()
-	server.handleWorkflowRoutes(recWorkflowHome, reqWorkflowHome)
+	server.handleStreamRoutes(recWorkflowHome, reqWorkflowHome)
 	if recWorkflowHome.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recWorkflowHome.Code, http.StatusOK)
 	}
 
-	reqUnknown := httptest.NewRequest(http.MethodGet, "/w/workflow/unknown", nil)
+	reqUnknown := httptest.NewRequest(http.MethodGet, "/streams/workflow/unknown", nil)
 	recUnknown := httptest.NewRecorder()
-	server.handleWorkflowRoutes(recUnknown, reqUnknown)
+	server.handleStreamRoutes(recUnknown, reqUnknown)
 	if recUnknown.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recUnknown.Code, http.StatusNotFound)
 	}
 
-	reqEvents := httptest.NewRequest(http.MethodGet, "/w/workflow/events?role=qa", nil)
+	reqEvents := httptest.NewRequest(http.MethodGet, "/streams/workflow/events?role=qa", nil)
 	recEvents := httptest.NewRecorder()
-	server.handleWorkflowRoutes(recEvents, reqEvents)
+	server.handleStreamRoutes(recEvents, reqEvents)
 	if recEvents.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recEvents.Code, http.StatusBadRequest)
 	}
@@ -227,10 +227,10 @@ func TestHandleWorkflowRoutesRedirectsInvalidWorkflowToWorkflowHome(t *testing.T
 		configDir:   tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow/process/"+process.ID.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/workflow/instance/"+process.ID.Hex(), nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
-	server.handleWorkflowRoutes(rec, req)
+	server.handleStreamRoutes(rec, req)
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
@@ -240,8 +240,8 @@ func TestHandleWorkflowRoutesRedirectsInvalidWorkflowToWorkflowHome(t *testing.T
 	if err != nil {
 		t.Fatalf("parse location: %v", err)
 	}
-	if parsed.Path != "/w/workflow/" {
-		t.Fatalf("redirect path = %q, want %q", parsed.Path, "/w/workflow/")
+	if parsed.Path != "/my/streams/workflow/" {
+		t.Fatalf("redirect path = %q, want %q", parsed.Path, "/my/streams/workflow/")
 	}
 	if got := parsed.Query().Get("error"); !strings.Contains(got, "workflow references are invalid") {
 		t.Fatalf("redirect error = %q, want workflow validation message", got)
@@ -255,9 +255,9 @@ func TestHandleWorkflowRoutesRequiresAuthWhenEnabled(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/w/workflow", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow", nil)
 	rec := httptest.NewRecorder()
-	server.handleWorkflowRoutes(rec, req)
+	server.handleMyRoutes(rec, req)
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
