@@ -74,6 +74,7 @@ func testTemplates() *template.Template {
 	{{define "layout.html"}}
 	  NAV Home Backoffice{{if .ShowOrgsLink}} Orgs{{end}}{{if .ShowMyOrgLink}} MyOrg{{end}} |
 	  {{if eq .Body "home_picker_body"}}{{template "home_picker_body" .}}
+	  {{else if eq .Body "public_home_body"}}{{template "public_home_body" .}}
 	  {{else if eq .Body "signup_body"}}{{template "signup_body" .}}
 	  {{else if eq .Body "platform_admin_body"}}{{template "platform_admin_body" .}}
 	  {{else if eq .Body "dashboard_body"}}{{template "dashboard_body" .}}
@@ -88,6 +89,8 @@ func testTemplates() *template.Template {
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
 	{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
+	{{define "public_home_body"}}PUBLIC_HOME{{end}}
+	{{define "public_home.html"}}{{template "layout.html" .}}{{end}}
 	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}
 	{{define "signup.html"}}{{template "layout.html" .}}{{end}}
 	{{define "platform_admin_body"}}PLATFORM_ADMIN ORGS {{len .Organizations}} {{.Confirmation}}{{if .Error}} {{.Error}}{{end}}{{end}}

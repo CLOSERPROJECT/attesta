@@ -14,6 +14,39 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  testTemplates(),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("unexpected redirect to %q", loc)
+	}
+}
+
+func TestHandleHomeRequiresAuthAtMy(t *testing.T) {
+	server := &Server{
+		store:       NewMemoryStore(),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want redirect", rec.Code)
+	}
+	if got := rec.Header().Get("Location"); !strings.HasPrefix(got, "/login?next=") {
+		t.Fatalf("location = %q", got)
+	}
+}
+
 func TestHandleHomeListsProcesses(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
@@ -226,7 +259,7 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -376,7 +409,7 @@ func TestHandleHomePickerMarksWorkflowCardsWithMyTurn(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
@@ -426,7 +459,7 @@ func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
@@ -455,7 +488,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -552,7 +585,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			enforceAuth: true,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -589,7 +622,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			enforceAuth: true,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -710,7 +743,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -737,7 +770,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `onclick="document.getElementById('delete-workflow-`+stream.ID.Hex()+`').showModal()"`) {
 			t.Fatalf("expected delete dialog trigger for creator, got %q", body)
 		}
-		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+		if !strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for creator, got %q", body)
 		}
 		if !strings.Contains(rec.Body.String(), `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`"`) {
@@ -781,7 +814,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -796,7 +829,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect delete dialog for started stream, got %q", body)
 		}
-		if strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+		if strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("did not expect delete button for started stream, got %q", body)
 		}
 		if !strings.Contains(body, `href="/org-admin/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -845,7 +878,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -875,7 +908,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if !strings.Contains(body, `onclick="document.getElementById('delete-workflow-`+stream.ID.Hex()+`').showModal()"`) {
 			t.Fatalf("expected delete dialog trigger for platform admin, got %q", body)
 		}
-		if !strings.Contains(body, `action="/w/`+stream.ID.Hex()+`/delete"`) {
+		if !strings.Contains(body, `action="/my/streams/`+stream.ID.Hex()+`/delete"`) {
 			t.Fatalf("expected delete form action for platform admin, got %q", body)
 		}
 	})
@@ -909,7 +942,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
@@ -1005,7 +1038,7 @@ func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 		store:      store,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -1158,7 +1191,7 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 			configDir:  t.TempDir(),
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -1179,7 +1212,7 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 			},
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/my", nil)
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {

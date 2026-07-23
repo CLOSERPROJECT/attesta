@@ -2009,7 +2009,7 @@ func homeProcessStatusRank(status string) int {
 }
 
 func redirectHomeWithMessage(w http.ResponseWriter, r *http.Request, key, message string) {
-	target := "/"
+	target := appHomePath
 	trimmedKey := strings.TrimSpace(key)
 	trimmedMessage := strings.TrimSpace(message)
 	if trimmedKey != "" && trimmedMessage != "" {
@@ -2027,8 +2027,22 @@ func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, wor
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	view := struct {
+		PageBase
+	}{PageBase: s.pageBase("public_home_body", "", "")}
+	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimSpace(r.URL.Path)
+	if path != appHomePath && path != appHomePath+"/" {
 		http.NotFound(w, r)
 		return
 	}
@@ -2057,6 +2071,19 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
+	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+		return
+	}
+	rest := strings.TrimPrefix(r.URL.Path, "/my")
+	rest = strings.TrimPrefix(rest, "/")
+	if rest == "" {
+		s.handleHome(w, r)
+		return
+	}
+	http.NotFound(w, r)
 }
 
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
@@ -2216,7 +2243,9 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
 	mux.HandleFunc("/w/", s.handleWorkflowRoutes)
-	mux.HandleFunc("/", s.handleHome)
+	mux.HandleFunc("/my", s.handleHome)
+	mux.HandleFunc("/my/", s.handleMyRoutes)
+	mux.HandleFunc("/", s.handlePublicHome)
 	mux.HandleFunc("/events", s.handleEvents)
 	return mux
 }
@@ -2361,13 +2390,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if s.enforceAuth {
 			if _, _, err := s.currentUser(r); err == nil {
-				http.Redirect(w, r, "/", http.StatusSeeOther)
+				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 				return
 			}
 		}
 		view := LoginView{
 			PageBase:     s.pageBase("login_body", "", ""),
-			Next:         safeNextPath(r, "/"),
+			Next:         safeNextPath(r, appHomePath),
 			Confirmation: loginNoticeMessage(requestNotice(r)),
 			ShowSignup:   anyoneCanCreateAccount(),
 		}
@@ -2382,7 +2411,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		password := strings.TrimSpace(r.FormValue("password"))
-		next := safeNextPath(r, "/")
+		next := safeNextPath(r, appHomePath)
 
 		if adminEmail, adminPassword, ok := platformAdminCredentials(); ok && strings.EqualFold(email, adminEmail) {
 			if subtle.ConstantTimeCompare([]byte(password), []byte(adminPassword)) != 1 {
@@ -2451,7 +2480,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if s.enforceAuth {
 			if _, _, err := s.currentUser(r); err == nil {
-				http.Redirect(w, r, "/", http.StatusSeeOther)
+				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 				return
 			}
 		}
@@ -2498,7 +2527,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to load signed up user %s", email)
 			return
 		}
-		redirectTarget := "/"
+		redirectTarget := appHomePath
 		if strings.TrimSpace(identityUser.OrgSlug) == "" {
 			redirectTarget = "/org-admin/profile"
 		}

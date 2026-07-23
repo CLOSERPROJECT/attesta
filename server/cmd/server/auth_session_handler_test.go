@@ -29,7 +29,7 @@ func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 		tmpl:        testTemplates(),
 		enforceAuth: true,
 	}
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
 	rec := httptest.NewRecorder()
 
 	server.handleHome(rec, req)
@@ -38,8 +38,8 @@ func TestHandleHomeRedirectsToLoginWhenUnauthenticated(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	location := rec.Header().Get("Location")
-	if location != "/login?next=%2F" {
-		t.Fatalf("location = %q, want /login?next=%%2F", location)
+	if location != "/login?next=%2Fmy" {
+		t.Fatalf("location = %q, want /login?next=%%2Fmy", location)
 	}
 }
 
@@ -284,8 +284,8 @@ func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my" {
+		t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 	}
 }
 
@@ -508,8 +508,8 @@ func TestHandleSignupRedirectsAuthenticatedUser(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/my" {
+		t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 	}
 }
 
@@ -621,8 +621,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/" {
-			t.Fatalf("location = %q, want /", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/my" {
+			t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 		}
 	})
 }
