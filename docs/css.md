@@ -1,435 +1,183 @@
 # CSS style guide (main Attesta app)
 
-Source of truth for styling the server-rendered Attesta UI: CSS architecture, theming, role palettes, template rules, and lint.
+Rules for styling the server-rendered Attesta UI.
 
 **Scope:** `web/src/styles/`, `server/templates/**/*.html`. Formata embed and Formata Builder (`formata-arch/`) are out of scope.
 
+**Extract / place components:** `.agents/skills/attesta-ui-components/SKILL.md`.  
+**Token values:** open `web/src/styles/tokens.css` (and `utilities.css` for `u-*`) — this doc does not mirror those catalogs.
+
 ## Layer stack
 
-Styles load in this order from `web/src/styles.css`:
+Load order from `web/src/styles.css`:
 
-| Layer | File | Contains |
-|-------|------|----------|
-| Breakpoints | `breakpoints.css` | Sole source of `@custom-media` aliases (Tailwind v3 widths) |
-| Tokens | `tokens.css` | `:root`, `[data-theme="dark"]`, font/type tokens (Google Fonts load in `layout.html`) |
-| Role palette | `role-palette.css` | `data-role-palette` and `data-stream-status` attribute maps |
-| Reset | `reset.css` | `*`, `body`, `a`, `button`, heading defaults, focus rings, reduced motion |
-| Utilities | `utilities.css` | `u-*` spacing/typography/layout primitives |
-| Layout | `layout/index.css` | Barrel: `chrome.css` (topbar, nav, stack, footer), `grids.css` (page grids + `.rail-layout`), `responsive.css` (shell breakpoint tweaks) |
-| Components | `components.css` | Barrel importing `components/*.css` (panel, dialog, page-header, breadcrumbs, stream-card, stream-instance-card, substep-shell, stream-timeline, forms, org-admin, stream, shared) |
-| Pages | `pages.css` | Barrel importing `pages/*.css` (DPP, home, stream, process, org-admin shell, platform admin) |
+1. `breakpoints.css` — sole `@custom-media` definitions  
+2. `tokens.css` — `:root`, `[data-theme="dark"]`, type/spacing tokens  
+3. `role-palette.css` — `data-role-palette` / `data-stream-status` maps  
+4. `reset.css`  
+5. `utilities.css` — `u-*`  
+6. `layout/index.css` — chrome, grids (`.rail-layout`), responsive shell  
+7. `components.css` — barrel; live import list is the file itself  
+8. `pages.css` — barrel; live import list is the file itself  
 
-**Placement rule:** token → utility → layout shell/grids → component → page. A selector lives in exactly one layer.
+**Placement:** token → utility → layout → component → page. A selector lives in exactly one layer.
 
-**Responsive placement:** co-locate `@media (--…)` blocks at the **bottom** of the owning module (component or page CSS). Shared page chrome and grid breakpoint behavior belongs in `layout/` (`grids.css`, `responsive.css`), not in separate breakpoint files.
+**Responsive:** co-locate `@media (--…)` at the **bottom** of the owning module. Shared chrome/grid breakpoints belong in `layout/` (`grids.css`, `responsive.css`).
 
-### Page modules (`pages/`)
+## Stem naming
 
-| File | Prefix / scope | Templates |
-|------|----------------|-----------|
-| `pages/process.css` | `.process-*` | `pages/process.html` |
-| `pages/dpp.css` | `.dpp-*` | `pages/dpp.html` |
-| `pages/home.css` | `.home-*`, `.preview-panel`, `.instances-panel` | `pages/home.html`, `pages/stream.html` (nav panels) |
-| `pages/stream.css` | `.stream-*` | `pages/stream.html` |
-| `pages/org-admin-page.css` | `.org-admin-*`, `.org-profile-*` (page shell) | `pages/org_admin.html` |
-| `pages/platform-admin.css` | `.platform-admin-*` | `pages/platform_admin.html` |
+Primary CSS for a template is the same **stem** under `components/` or `pages/` (underscore → kebab):
 
-Org-admin forms and pickers live in `components/org-admin.css`, not the page module. App-wide modal shells live in `components/dialog.css`.
+- `components/stream_card.html` → `components/stream-card.css` (classes `.stream-card-*`)
+- `pages/process.html` → `pages/process.css` (classes `.process-*`)
 
-### Component modules (`components/`)
+If there is no matching CSS file, the markup is **CSS-only** (inline in the page; contract in the CSS file header) or a **cluster** (`shared.css`, `forms.css`, `org-admin.css`, `stream.css`).
 
-| File | Prefix / scope | Templates |
-|------|----------------|-----------|
-| `components/page-header.css` | `.page-header`, `.page-header-*` | Inline markup per `page-header.css` header (CSS-only); optional `nav.breadcrumbs` via full `breadcrumbs` component; optional `.page-header-actions` |
-| `components/breadcrumbs.css` | `.breadcrumbs`, `.breadcrumbs-*` | `components/breadcrumbs.html` |
-| `components/stream-card.css` | `.stream-card-*` | `components/stream_card.html` |
-| `components/stream-instance-card.css` | `.stream-instance-card-*` | `components/stream_instance_card.html` |
-| `components/substep-body.css` | `.substep-body-*` | `components/substep_body.html`, `attachment_carousel.html` |
-| `components/stream-step-summary.css` | `.stream-step-summary-*` | `components/stream_step_summary.html` |
-| `components/stream-timeline.css` | `.stream-timeline-list`, `.stream-timeline-step*` | `components/stream_timeline.html` |
-| `components/substep-shell.css` | `.substep*`, accordion shell | `components/substep_shell.html` |
-| `components/substep-override.css` | `.substep-override-*`, `.js-open-substep-override` | `substep_override_editor.html` |
-| `components/panel.css` | `.panel`, `.panel-sticky`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Inline markup per `panel.css` header (CSS-only) |
-| `components/sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Inline markup per `sidebar-nav.css` header (CSS-only) |
-| `components/dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Inline markup per `dialog.css` header (CSS-only) |
-| `components/list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Inline markup per `list-row.css` header (CSS-only) |
-| `components/stream.css` | `.process-toolbar`, `.process-control`, `.status-tag*` | Sort toolbar in `pages/stream.html`; status pills via micro-partial `status_tag` |
+Import new component/page modules from the matching barrel (`components.css` / `pages.css`).
 
-### CSS-only components
+### Exceptions (not inventable from the stem)
 
-Reused **markup patterns** backed by namespaced CSS, with **no** full Go template partial / view struct. Templates inline the HTML under `server/templates/pages/`; the CSS file header comment is the markup contract.
+- `pages/home.css` also styles stream dashboard nav panels used by `pages/stream.html`
+- `pages/org-admin-page.css` ↔ `pages/org_admin.html` (page shell); widgets/pickers stay in `components/org-admin.css`
+- `components/stream.css` is a cluster (sort toolbar, `.status-tag*` via `status_tag`) — not paired 1:1 with a `stream_*.html` component
+- `components/dpp_history_step.html` styles live under `pages/dpp.css` (`.dpp-history-*`)
+- `attachment_carousel.html` (templates root) → `components/substep-body.css`
+- `substep_override_editor.html` (templates root) → `components/substep-override.css`
+- Auth pages (`login`, `signup`, `invite`, `reset_*`) → `components/forms.css` (no per-page CSS module)
 
-**Use when:**
+Root templates still pending migration (`error_banner.html`, `icons.html`, `role_palette_options.html`, …) live under `server/templates/`. Migrate one at a time when a task needs them.
 
-- The pattern is reused on 2+ pages
-- Selectors form a coherent family (3+ related rules)
-- Data varies only in text/attributes at the call site (no mode dispatch, no HTMX partial target)
+## CSS-only components
 
-**Do not use when:**
+When to choose CSS-only vs full vs cluster: `.agents/skills/attesta-ui-components`.
 
-- Go assembles a stable field set → full template component + view struct (e.g. `stream_card`, `substep_body`)
-- The partial is an HTMX/SSE swap target → extract to `components/{name}.html`
+Markup contract = the CSS file header (e.g. `page-header.css`, `panel.css`, `dialog.css`). Inline HTML in pages; no shared view struct. Micro-partial exceptions: `status_tag`, `tip`, `local_datetime`.
 
-**Adding one:**
+**Add one:** create `components/{name}.css` with a markup-tree header; import from `components.css`. Do not add `templates/components/{name}.html` unless it graduates.
 
-1. Create `web/src/styles/components/{name}.css` with a markup-tree comment at the top.
-2. Import it from `web/src/styles/components.css`.
-3. Add a row to the table below.
-4. Do **not** create a matching `templates/components/{name}.html` unless it graduates (narrow micro-partials such as `status_tag` are the exception, not the rule).
-
-| Module | Primary classes | Markup contract |
-|--------|-----------------|-----------------|
-| `page-header.css` | `.page-header`, `.page-header-head`, `.page-header-body`, `.page-header-actions`, `.page-header-subtitle` | See file header in `web/src/styles/components/page-header.css`; intended tree below |
-| `panel.css` | `.panel`, `.panel-sticky`, `.panel-heading`, `.panel-head-actions`, `.panel-actions`, `.panel-block` | See file header in `web/src/styles/components/panel.css` |
-| `sidebar-nav.css` | `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | See file header in `web/src/styles/components/sidebar-nav.css` |
-| `dialog.css` | `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions` | See file header in `web/src/styles/components/dialog.css` |
-| `button.css` | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-ghost-danger`, `.btn-danger`, `.btn-outline`, `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon` | See file header in `web/src/styles/components/button.css` |
-| `list-row.css` | `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | See file header in `web/src/styles/components/list-row.css` |
-| `tip.css` | `.tip` | See file header in `web/src/styles/components/tip.css`; micro-partial `components/tip.html` |
-| — | `local_datetime` | Micro-partial `components/local_datetime.html`: `time.js-local-datetime[datetime]` + UTC human fallback; client formats in `web/src/main.js` |
-
-**Page header** — CSS-only. Inline the markup tree in page templates (no `PageHeaderView`, no full `page_header` define). Optional trail uses the full `breadcrumbs` component: `{{ template "breadcrumbs" .Breadcrumbs }}` with `BreadcrumbsView` assembled in Go (`BreadcrumbItem.Href` empty ⇒ current page). When right actions are needed, wrap `page-header-body` + `page-header-actions` in `div.page-header-head` (same idea as panel head-actions); omit the head wrapper when there are no actions. Process-instance ID under the title is **not** part of this component — it uses `.process-header-meta` / `.process-header-meta-id` in `pages/process.css`.
-
-Intended markup contract (also the target CSS file header comment):
-
-```
-Heading only:
-section.page-header
-  nav.breadcrumbs?
-  div.page-header-body
-    h1                              (optional span[aria-hidden] + span.page-header-subtitle)
-    p?
-
-With actions:
-section.page-header
-  nav.breadcrumbs?
-  div.page-header-head
-    div.page-header-body
-      …
-    div.page-header-actions
-      button | form | …
-```
-
-**Dialog placement:** generic shell in `dialog.css`; `#stream-preview-dialog` sizing in `pages/stream.css`; org-admin role pill wrapper in `org-admin.css`. Destructive titles use `u-text-danger` (color only) stacked on `.dialog-title`. Wide shell modifier `.dialog-wide` deferred until a second page needs it.
-
-Other partials (`icons.html`, …) still live at `server/templates/` root until migrated one by one. Split reused styles into `components/` and page-specific styles into `pages/`.
-
-### Template ↔ CSS index
-
-| Template | Primary CSS | Also uses |
-|----------|-------------|-----------|
-| `layout.html` | `layout/index.css` | `components/shared.css` |
-| Inline page headers (home, stream, process, dpp, org_admin, platform_admin, …) | `components/page-header.css` | Optional `components/breadcrumbs.html` + `components/breadcrumbs.css` |
-| `components/breadcrumbs.html` | `components/breadcrumbs.css` | — |
-| `components/stream_card.html` | `components/stream-card.css` | `components/dialog.css` |
-| `components/stream_instance_card.html` | `components/stream-instance-card.css` | `components/stream.css` (`.status-tag*` via `status_tag` micro-partial) |
-| Inline panel sections (process, stream, dpp, org_admin, platform_admin) | `components/panel.css` | `components/button.css`, `components/shared.css` (`.muted`); optional `.panel-sticky` |
-| Inline dialog modals (process, stream, home, org_admin, platform_admin, substep_body) | `components/dialog.css` | `pages/stream.css` (#stream-preview-dialog), `components/org-admin.css` (role pill), `components/substep-body.css` (active-role spacing), `components/forms.css` |
-| Inline sidebar nav (org_admin) | `components/sidebar-nav.css` | `components/panel.css` (`.panel-sticky`), `layout/grids.css` (`.rail-layout`) |
-| Inline rail shell (stream, org_admin) | `layout/grids.css` (`.rail-layout`) | `components/panel.css` (`.panel-sticky`); org_admin also `components/sidebar-nav.css` |
-| Inline list rows (org_admin roles/users, platform_admin orgs) | `components/list-row.css` | `components/button.css`; domain: `org-admin.css` (`.user-email`, `.user-tags`), `pages/platform-admin.css` (copy/status) |
-| `pages/home.html` | `pages/home.css` | `components/stream-card.css`, `components/dialog.css`, `components/stream.css`, `layout/index.css` |
-| `pages/stream.html` | `pages/home.css`, `pages/stream.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/panel.css`, `components/stream-instance-card.css`, `components/stream.css`, `components/stream-timeline.css`, `role-palette.css` |
-| `pages/process.html` | `pages/process.css` (incl. `.process-header-meta*`) | `components/page-header.css`, `components/dialog.css`, `components/substep-shell.css`, `components/stream-timeline.css`, `components/substep-body.css`, `layout/responsive.css` (`.layout-stack-separator`), `role-palette.css` |
-| `components/stream_step_summary.html` | `components/stream-step-summary.css` | `components/tip.css` (`tip` micro-partial) |
-| `components/stream_timeline.html` | `components/stream-timeline.css` | `components/stream-step-summary.css`, `components/substep-body.css`, `role-palette.css` |
-| `components/dpp_history_step.html` | `pages/dpp.css` (`.dpp-history-*`) | `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
-| `components/substep_shell.html` | `components/substep-shell.css` | `components/substep-body.css`, `components/tip.css` (`tip` micro-partial), `role-palette.css` |
-| `components/substep_body.html` | `components/substep-body.css` | `components/dialog.css`, `components/forms.css`, `role-palette.css` |
-| `pages/dpp.html` | `pages/dpp.css` | `components/dpp_history_step.html`, `components/stream-timeline.css`, `components/stream-step-summary.css`, `components/substep-shell.css`, `components/substep-body.css`, `role-palette.css` |
-| `pages/org_admin.html` | `pages/org-admin-page.css` | `layout/grids.css` (`.rail-layout`), `components/dialog.css`, `components/sidebar-nav.css`, `components/panel.css`, `components/org-admin.css`, `role-palette.css` |
-| `pages/platform_admin.html` | `pages/platform-admin.css` | `components/dialog.css`, `components/shared.css` |
-| `pages/login.html`, `pages/signup.html`, `pages/invite.html`, `pages/reset_*.html` | `components/forms.css` | `components/button.css`, `components/shared.css` |
-| `attachment_carousel.html` | `components/substep-body.css` | — |
-| `substep_override_editor.html` | `components/substep-override.css` | — |
-
-### `data-*` contract (templates → CSS / JS)
-
-| Attribute | Set in | Consumed by |
-|-----------|--------|-------------|
-| `data-theme` | `main.js` on `<html>` | `tokens.css` (`[data-theme="dark"]`) |
-| `data-role-palette` | role badges, timeline substeps | `role-palette.css` |
-| `data-stream-status` | `status_tag` micro-partial; `stream.html` section heads | `role-palette.css` (`--stream-color`) |
-| `data-progress` (via `style="--progress: …"`) | `components/stream_instance_card.html` | `.stream-instance-card-progress-fill` in `components/stream-instance-card.css` |
-| `data-org-admin-nav`, `data-org-admin-panel`, `data-org-admin-default-panel`, `data-org-admin-ready` | `org_admin.html` | `pages/org-admin-page.css`, inline script in `org_admin.html` |
-| `data-home-nav`, `data-home-panel`, `data-home-filter-select` | `stream.html` | inline script in `stream.html` (panel switching + `?filter=` / `?sort=` / `?page=` sync; select is `--md-down` twin of filter nav) |
-| `data-process-id`, `data-workflow-key`, `data-selected-substep`, `data-substep-id` | `process.html` | `main.js` (SSE refresh, accordion) |
-| `data-formata-*`, `data-active-role-*` | `components/substep_body.html` | `main.js` (Formata embed, role picker) |
-| `data-override-url` | `components/substep_body.html` | `main.js` (substep override editor) |
-| `data-carousel-*` | `attachment_carousel.html` | `main.js`, `components/substep-body.css` |
-| `data-copy-text`, `data-copy-label` | `dpp.html` | `main.js` (clipboard) |
-| `data-share-url`, `data-share-label` | `dpp.html` | `main.js` (share link) |
-| `data-target` | password visibility toggles | `main.js` |
-| `data-value`, `data-label`, `data-selected` | org-admin role pickers | `components/org-admin.css`, inline script |
-| `data-role-color` | `role_palette_options.html` | org-admin palette picker script |
-
-Behavior hooks use a `js-*` class prefix alongside `data-*` where needed; do not style `js-*` classes in CSS.
+**Notes:** Process-instance ID under the title is `.process-header-meta*` in `pages/process.css`, not page-header. Page-scoped dialog sizing stays in page CSS (e.g. `#stream-preview-dialog` in `pages/stream.css`). Destructive dialog titles stack `.dialog-title u-text-danger`.
 
 ## Theming
 
-- Light/dark mode toggles `data-theme="light|dark"` on `<html>` (see `web/src/main.js`).
-- Use design tokens (`var(--foreground)`, `var(--card)`, `var(--primary)`, etc.) — do not hardcode hex/rgb in templates or new CSS.
-- Role hue and stream status tokens use CSS `light-dark()` in `:root`; `[data-theme="dark"]` keeps only non-role overrides.
-- Token names follow shadcn-style `{role}` + `{role}-foreground` pairs (see `tokens.css`).
+- Light/dark: `data-theme="light|dark"` on `<html>` (`web/src/main.js`).
+- Use tokens (`var(--foreground)`, `var(--card)`, `var(--primary)`, …) — no hardcoded hex/rgb in templates or new CSS.
+- Role / stream hues use `light-dark()` in `:root`; `[data-theme="dark"]` keeps only non-role overrides.
+- Token names follow shadcn-style `{role}` + `{role}-foreground` pairs.
 
 ### Breakpoints
 
-**Tailwind v3 widths** (sm → 2xl) are the canonical thresholds:
+Tailwind v3 widths; aliases only in `breakpoints.css`:
 
-| Tailwind | Width | `@custom-media` up | `@custom-media` down |
-|----------|-------|--------------------|----------------------|
-| sm | 640px | `--sm-up` `(width >= 640px)` | `--sm-down` `(width < 640px)` |
+| Tailwind | Width | up | down |
+|----------|-------|----|------|
+| sm | 640px | `--sm-up` | `--sm-down` |
 | md | 768px | `--md-up` | `--md-down` |
 | lg | 1024px | `--lg-up` | `--lg-down` |
 | xl | 1280px | `--xl-up` | `--xl-down` |
 | 2xl | 1536px | `--2xl-up` | — |
 
-- **`breakpoints.css`** is imported first in `styles.css` and is the **only** file that may define `@custom-media`.
-- **Stylesheet modules** use `@media (--sm-down) { … }` (or other aliases). Do **not** repeat `@custom-media` or write `@media (width … 640px)` in component/page CSS.
-- **PostCSS:** `postcss-custom-media` (see `web/postcss.config.js`) expands aliases at build time; Vite runs PostCSS on the bundled CSS.
+Modules use `@media (--sm-down) { … }`. Never redefine `@custom-media` or write `@media (width … 640px)` in component/page CSS. PostCSS (`postcss-custom-media`) expands aliases at build time.
 
-**JS sync:** when JavaScript needs the same threshold as CSS, use the equivalent `matchMedia` query. Example: `--md-down` `(width < 768px)` ↔ `matchMedia("(max-width: 767px)")` (as in `org_admin.html` for mobile panel scrolling). Keep JS literals aligned with the table above when adding new breakpoint checks.
+**JS sync:** `--md-down` ↔ `matchMedia("(max-width: 767px)")` (as in `org_admin.html`). Keep new JS literals aligned with the table.
 
-### Font tokens
-
-| Token | Value |
-|-------|-------|
-| `--font-sans` | Inter stack (body, buttons, UI copy, `h2`–`h4`) |
-| `--font-display` | Space Grotesk stack (literal `h1` only) |
-| `--font-mono` | JetBrains Mono stack (hashes, codes, meta ids) |
-
-Google Fonts load from `server/templates/layout.html` (`preconnect` + stylesheet `<link>` with `display=swap`). Do **not** `@import` fonts from `tokens.css`. Use `var(--font-sans)` / `var(--font-display)` / `var(--font-mono)` in new CSS — do not repeat font family strings.
-
-### Type scale
-
-Canonical type tokens in `tokens.css` — Tailwind-aligned, rem-based. The index tracks size: `--text-sm` = `0.875rem` = 14px.
-
-| Token | rem | px | Typical use |
-|-------|-----|----|-------------|
-| `--text-xs` | `0.75rem` | 12 | Captions, pills, compact tags, meta IDs |
-| `--text-sm` | `0.875rem` | 14 | Labels, secondary UI, toolbar copy, form labels, buttons |
-| `--text-base` | `1rem` | 16 | Body, inputs, default prose |
-| `--text-lg` | `1.125rem` | 18 | Card titles, dialog titles, emphasis headings |
-| `--text-xl` | `1.25rem` | 20 | Section headings (`h2` in panels; `h3` for nested/subsection titles) |
-| `--text-2xl` | `1.5rem` | 24 | Large titles, emphasis page headings |
-| `--text-3xl` | `1.875rem` | 30 | Page titles (`h1` default) |
-
-**Line-height tokens**
-
-| Token | Value | Use |
-|-------|-------|-----|
-| `--leading-none` | `1` | Pills, single-line badges |
-| `--leading-tight` | `1.25` | Headings, compact titles |
-| `--leading-normal` | `1.5` | Body, form fields, paragraphs |
-| `--leading-relaxed` | `1.625` | Long-form muted copy (rare) |
-
-**Weight tokens**
-
-| Token | Value | Loaded face |
-|-------|-------|-------------|
-| `--font-normal` | `400` | Inter 400 |
-| `--font-medium` | `500` | Inter 500 |
-| `--font-semibold` | `600` | Inter 600 |
-| `--font-bold` | `700` | Inter 700 |
-
-**Heading defaults** are set in `reset.css` (`h1`–`h4`): `h1` → `--text-3xl` + `--font-display`, `h2` → `--text-xl`, `h3` → `--text-lg`, `h4` → `--text-base`, all with `--font-semibold` and `--leading-tight`. Prefer tokens over raw `font-size` in component CSS; remove redundant heading `font-size` overrides when they only duplicate semantics.
-
-**Control sizing pattern:** buttons use the `btn` system in `button.css` (default height `--btn-height` / 36px). Form labels use `--text-sm` (`forms.css`); inputs use `--text-base`.
-
-### Spacing scale
-
-Canonical spacing tokens in `tokens.css` — a Tailwind-aligned scale on a 4px grid, expressed in `rem` (migrate incrementally; legacy `px` literals remain valid). The index tracks size: `--space-N` ≈ `N × 4px` (`--space-4` = `1rem` = 16px):
-
-| Token | Value | px | Typical use |
-|-------|-------|----|-------------|
-| `--space-1` | `0.25rem` | 4 | Tight inline gaps |
-| `--space-2` | `0.5rem` | 8 | Default small gap, compact lists |
-| `--space-3` | `0.75rem` | 12 | Card padding, compact control padding |
-| `--space-4` | `1rem` | 16 | Grid gaps, card/list item padding |
-| `--space-5` | `1.25rem` | 20 | Panel padding, section margins/gaps |
-| `--space-6` | `1.5rem` | 24 | Stack default gap |
-| `--space-7` | `1.75rem` | 28 | Large section rhythm |
-| `--space-8` | `2rem` | 32 | Section gaps, chrome padding |
-| `--space-9` | `2.25rem` | 36 | Generous section rhythm |
-| `--space-10` | `2.5rem` | 40 | Page-level spacing |
-| `--space-11` | `2.75rem` | 44 | Wide section rhythm |
-| `--space-12` | `3rem` | 48 | Multi-column grid gaps |
-
-The scale is monotonic: `--space-N` is always larger than `--space-(N-1)`. Do not reintroduce off-grid values (6/10/14/18px) or non-monotonic indices.
-
-Prefer `u-*` utilities or component classes over raw `px` in templates. New page CSS should use spacing tokens where practical.
-
-**Intentional `px` exceptions** (not on the spacing scale): layout dimensions (`width`/`height`), `border-radius`, `border-width`, scroll anchors (`44px`, `140px`), and composite padding with off-scale values (e.g. `32px` horizontal chrome). Use type tokens for `font-size` — not raw `px`.
-
-### Elevation and backdrop tokens
+### Fonts and type
 
 | Token | Use |
 |-------|-----|
-| `--shadow` | Default panel shadow |
-| `--shadow-elevated` | Raised controls (carousel nav) |
-| `--shadow-dropdown` | Floating menus |
-| `--backdrop-modal` | Dialog `::backdrop` tint |
-| `--backdrop-fullscreen` | Fullscreen modal backdrop |
-| `--inset-highlight` | Inset top edge on gradient fields |
+| `--font-sans` | Body, buttons, UI copy, `h2`–`h4` (Inter) |
+| `--font-display` | Literal `h1` only (Space Grotesk) |
+| `--font-mono` | Hashes, codes, meta ids (JetBrains Mono) |
 
-### Documented color literal exceptions
+Google Fonts load from `layout.html` — do not `@import` fonts from `tokens.css`.
 
-No compositional color literals remain outside `tokens.css`. If you need a new shadow or backdrop tint, add a semantic token in `tokens.css` rather than an inline `rgb()`.
+Type / weight / leading tokens live in `tokens.css`. Heading defaults in `reset.css`: `h1` → `--text-3xl` + `--font-display`; `h2` → `--text-xl`; `h3` → `--text-lg`; `h4` → `--text-base`; all `--font-semibold` + `--leading-tight`. Prefer tokens over raw `font-size`.
+
+Buttons: `button.css` (default height `--btn-height`). Form labels `--text-sm`; inputs `--text-base`.
+
+### Spacing and elevation
+
+`--space-1` … `--space-12` on a 4px grid in `tokens.css`. Prefer `u-*` or component classes over raw `px` in templates.
+
+**`px` exceptions:** layout dimensions, `border-radius`, `border-width`, scroll anchors, composite off-scale padding. Use type tokens for `font-size`.
+
+Shadows / backdrops (`--shadow*`, `--backdrop-*`, `--inset-highlight`): define new tints as tokens in `tokens.css`, not inline `rgb()`.
 
 ## Role palette
 
-Role badge colors are resolved at runtime from **Appwrite team prefs**, not from workflow YAML or inline CSS values.
-
-### Data flow
+Runtime colors come from **Appwrite team prefs**, not workflow YAML or inline CSS.
 
 ```
-Appwrite team prefs          Backend (roleMetaIndex)          Templates + CSS
-{ slug, name, palette }  →   (orgSlug, roleSlug) → key   →   data-role-palette="blue"
-                                                                      ↓
-                                                             role-palette.css → --role-*
+Appwrite { slug, name, palette }  →  backend (orgSlug, roleSlug)  →  data-role-palette="blue"
+                                                                         ↓
+                                                                role-palette.css → --role-*
 ```
 
 | Layer | Responsibility |
 |-------|----------------|
-| Appwrite | Canonical store: `{ slug, name, palette }` where `palette` is a named key (`blue`, `emerald`, …) |
-| Backend | Resolves org-scoped `(orgSlug, roleSlug)` to a palette key; never emits `var(--role-*-*)` strings to workflow templates |
-| Workflow YAML | Slug/org/name for validation only; `color` fields are ignored by Go |
-| Templates | Set `data-role-palette="{{ .Palette }}"` on `.role-pill` and timeline substeps |
-| `tokens.css` + `role-palette.css` | Single source of appearance; maps palette key → `--role-*` tokens |
+| Appwrite | Canonical named `palette` key |
+| Backend | Resolve `(orgSlug, roleSlug)` → key; never emit `var(--role-*-*)` to templates |
+| Workflow YAML | Slug/org/name only; `color` ignored by Go |
+| Templates | `data-role-palette="{{ .Palette }}"` on `.role-pill` / timeline substeps |
+| `tokens.css` + `role-palette.css` | Appearance |
 
-### Storage and API
-
-- **Writes** persist `palette` only (no `color`).
-- **Reads** use `palette` when present; legacy rows with `color` CSS var strings fall back to `rolePaletteKeyFromStyle()`.
-- **`GET /api/catalog`** returns `palette` per role (no `color`).
-- **Unknown or missing role** → palette key `"fallback"` (not YAML-embedded colors).
-
-### Lookup rules
-
-Resolution is org-scoped via `(orgSlug, roleSlug)`:
-
-| Caller context | Lookup key |
-|----------------|------------|
-| Substep on a step with `organization: <org>` | `(stepOrg, roleSlug)` |
-| Substep with no step org; role unique in workflow | first org from config or identity catalog containing the slug |
-| Unknown org or missing role in Appwrite | `"fallback"`; label from slug |
-
-Key backend symbols: `roleMetaIndex`, `roleMetaFor`, `rolePaletteKeyFromStyle` in `server/cmd/server/`.
-
-### Frontend styling
-
-17 named palette keys (`red`, `orange`, `amber`, … `rose`) are defined in `rolePaletteStyles` / `rolePaletteKeys` (Go) and mapped in `role-palette.css`. `TestRolePaletteKeysMatchCSS` keeps Go and CSS keys in sync.
-
-Role pills on `process`, `substep_body`, `dpp`, and `org_admin` use:
+Writes persist `palette` only; legacy `color` CSS-var strings fall back via `rolePaletteKeyFromStyle()`. `GET /api/catalog` returns `palette`. Unknown → `"fallback"`. Lookup: step `organization:` → `(stepOrg, roleSlug)`; else first org containing the slug. Keys stay in sync via `TestRolePaletteKeysMatchCSS`.
 
 ```html
 <span class="role-pill" data-role-palette="{{ .Palette }}">{{ .Label }}</span>
-```
-
-Timeline substeps use the same attribute on `.substep`. Appearance is a soft-badge: text/border from the bg token with a 10% tint background (`color-mix`). The org-admin palette picker sets transient `--swatch-bg` on preview swatches only (not on role pill rows).
-
-Stream status uses `data-stream-status="{{ .Status }}"` (mapped in `role-palette.css` to `--stream-color`). Section heads and the `status_tag` micro-partial both set it; `.status-tag` consumes `var(--stream-color)`.
-
-```html
 {{ template "status_tag" .Status }}
 ```
 
-renders `<span class="status-tag status-tag-compact" data-stream-status="…">…</span>` (pipeline is the status string).
+`status_tag` (pipeline = status string) sets `data-stream-status`; `.status-tag` uses `var(--stream-color)`. Static presets: `.pill-accent`, `.pill-panel`.
 
-Static pill presets use CSS classes instead: `.pill-accent`, `.pill-panel`.
+## Shared `data-*` (CSS theming)
+
+| Attribute | Consumer |
+|-----------|----------|
+| `data-theme` | `tokens.css` |
+| `data-role-palette` | `role-palette.css` |
+| `data-stream-status` | `role-palette.css` → `--stream-color` |
+| `style="--progress: …%"` | `.stream-instance-card-progress-fill` only |
+
+Page-local hooks (`data-org-admin-*`, `data-home-*`, `data-process-id`, `data-formata-*`, carousel/copy/share, …) stay next to their template / `main.js` — do not catalog them here.
+
+Behavior hooks may use a `js-*` class alongside `data-*`; **never style `js-*` in CSS**.
 
 ## Utilities (`u-*`)
 
-Generic, domain-agnostic helpers in `utilities.css`. Add a new utility when the same spacing or typography pattern appears in multiple templates.
+Generic, domain-agnostic helpers in `utilities.css`. Add a `u-*` when the same spacing/typography pattern appears in multiple templates; prefer component classes for domain patterns. New utilities get a one-line PR justification.
 
-| Class | Effect |
-|-------|--------|
-| `u-mx-auto` | `margin-inline: auto` |
-| `u-max-w-prose` | `max-width: 65ch` |
-| `u-max-w-7xl` | `max-width: 80rem` |
-| `u-m-0` | `margin: 0` |
-| `u-mb-2` | `margin-bottom: var(--space-2)` (8px) |
-| `u-mb-4` | `margin-bottom: var(--space-4)` (16px) |
-| `u-mb-5` | `margin-bottom: var(--space-5)` (20px) |
-| `u-ml-1` | `margin-left: var(--space-1)` (4px) |
-| `u-pre-line` | `white-space: pre-line` |
-| `u-text-xs` | `font-size: var(--text-xs)` |
-| `u-text-sm` | `font-size: var(--text-sm); font-weight: var(--font-semibold)` |
-| `u-text-base` | `font-size: var(--text-base)` |
-| `u-text-lg` | `font-size: var(--text-lg)` |
-| `u-flex` | `display: flex` |
-| `u-flex-center` | `display: flex; align-items: center` |
-| `u-gap-2` | `gap: var(--space-2)` (8px) |
-| `u-gap-4` | `gap: var(--space-4)` (16px) |
-| `u-divider` | Horizontal rule, `var(--space-6)` vertical margin |
-| `u-divider-flush` | `<hr>` with `margin: 0` |
-| `u-divider-5` | Horizontal rule, `var(--space-5)` vertical margin |
-| `u-text-danger` | `color: var(--destructive)` |
-
-**Stack gap modifiers:** `.stack.u-gap-2` and `.stack.u-gap-4` override the default `var(--space-6)` stack gap.
-
-**Prefer component classes** for domain-specific patterns (e.g. `.role-pill-label`, `.stream-card-footer`). New `u-*` utilities should include a one-line justification in the PR.
+`.stack.u-gap-*` overrides the default stack gap (`var(--space-6)`).
 
 ## Inline `style=` in templates
 
-**Do not** use inline styles for static layout, spacing, or typography. Use utilities or component classes.
+No inline styles for static layout, spacing, or typography.
 
-**Allowed** inline styles — runtime values from Go template data:
+**Allowed** (runtime from Go):
 
 | Pattern | Example | Consumer |
 |---------|---------|----------|
-| Progress width | `style="--progress: {{ .Percent }}%;"` | `.stream-instance-card-progress-fill` via `width: var(--progress, 0%)` |
+| Progress width | `style="--progress: {{ .Percent }}%;"` | `.stream-instance-card-progress-fill` |
 
-All other dynamic theming uses `data-*` attributes (`data-role-palette`, `data-stream-status`), not inline custom properties.
+All other dynamic theming uses `data-*`, not inline custom properties.
 
-## Common component classes
-
-| Class | Use |
-|-------|-----|
-| `.page-header`, `.page-header-head`, `.page-header-body`, `.page-header-actions`, … | Page chrome title block — see `page-header.css` header (CSS-only; trail via `breadcrumbs`) |
-| `.breadcrumbs`, `.breadcrumbs-list`, `.breadcrumbs-item`, `.breadcrumbs-link`, `.breadcrumbs-current` | Hierarchical page trail — see `breadcrumbs.css` / `breadcrumbs.html` |
-| `.panel`, `.panel-heading`, `.panel-head-actions`, `.panel-block` | Card sections — see `panel.css` header for markup tree (CSS-only component) |
-| `.panel-sticky` | Optional sticky rail modifier on `.panel` (active at `--md-up`) |
-| `.rail-layout`, `.rail-layout-ready`, `.rail-layout-main` | Sticky sidebar + main shell — see `layout/grids.css` (row at `--md-up`) |
-| `.sidebar-nav`, `.sidebar-nav-link`, `.sidebar-nav-title`, `.sidebar-nav-copy` | Section switcher tiles — see `sidebar-nav.css` header |
-| `.dialog`, `.dialog-card`, `.dialog-head`, `.dialog-actions`, … | Modal shells — see `dialog.css` header (CSS-only component) |
-| `.list-rows`, `.list-row`, `.list-row-main`, `.list-row-actions` | Admin list rows with actions — see `list-row.css` header |
-| `.stack` | Vertical rhythm |
-| `.muted` | Secondary text color |
-| `.pill`, `.role-pill` | Badges; pair with `data-role-palette` for role colors |
-| `.is-disabled` | Disabled pagination / non-interactive controls |
-| `.pagination-btn` | Chevron pagination buttons |
-| `.site-footer` | Page footer (no inline styles) |
-
-## Build
+## Build and lint
 
 ```bash
-cd web && npm run build   # produces web/dist/assets/main.css
-```
-
-Go serves the bundle at `/static/`.
-
-## Lint
-
-```bash
+cd web && npm run build   # → web/dist/assets/main.css (served at /static/)
 task css:lint
 ```
 
-Runs three checks:
+`task css:lint`:
 
-1. **Template inline styles** — `deployment/scripts/check-template-inline-styles.sh` fails on disallowed `style=` attributes in `server/templates/` (allowed patterns listed above).
-2. **Breakpoint guard** — `deployment/scripts/check-css-breakpoints.sh` fails when any file under `web/src/styles/` (except `breakpoints.css`) contains `@media (width …)` with literal `px` values; use `@media (--sm-down)` etc. instead.
-3. **stylelint** — CSS rules on `web/src/styles/**/*.css` (no hex/rgb outside `tokens.css`, no new `!important`).
+1. Template inline styles — `deployment/scripts/check-template-inline-styles.sh`
+2. Breakpoint guard — no literal `@media (width … px)` outside `breakpoints.css`
+3. stylelint — no hex/rgb outside `tokens.css`, no new `!important`
 
 ## Adding new UI
 
-1. Check for an existing component class, CSS-only module (**CSS-only components** above), or utility.
-2. If spacing/typography repeats across templates, add a `u-*` utility.
-3. If the pattern is domain-specific, add a component or page class (see **Page modules**).
-4. Use tokens for colors; never hardcode hex in templates.
-5. Run `task css:lint` before opening a PR.
+Follow `.agents/skills/attesta-ui-components` (tier → place → tracer). Then run `task css:lint`.
 
-## Out of scope / known gaps
+## Out of scope
 
-- **Formata embed** shadow-DOM styling in `web/src/main.js` (`!important` overrides) — separate effort; not covered here.
-- **Adding a new palette key** requires updates to `rolePaletteStyles`, `role-palette.css`, and the org-admin palette picker — not Go string passthrough to templates.
+- Formata embed shadow-DOM styling in `web/src/main.js`
+- New palette key → `rolePaletteStyles`, `role-palette.css`, and the org-admin picker (not Go string passthrough)
