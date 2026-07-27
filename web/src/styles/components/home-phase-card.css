@@ -1,0 +1,66 @@
+/*
+ * Home phase card — numbered overview tile (CSS-only component).
+ *
+ * article.home-phase-card
+ *   div.home-phase-card-top
+ *     span.home-phase-card-icon
+ *       img
+ *     span.home-phase-card-num
+ *   h3
+ *   p
+ */
+
+.home-phase-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.home-phase-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.home-phase-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--background);
+  overflow: hidden;
+}
+
+.home-phase-card-icon img {
+  width: 24px;
+  height: 24px;
+}
+
+.home-phase-card-num {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  line-height: 2.25rem;
+  color: var(--primary);
+  opacity: 0.3;
+}
+
+.home-phase-card h3 {
+  font-size: var(--text-lg);
+  line-height: 1.75rem;
+}
+
+.home-phase-card > p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+}
