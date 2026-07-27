@@ -105,111 +105,113 @@
       ></script>
     </head>
     <body>
-      <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
-        <div class="topbar-content u-mx-auto u-max-w-7xl">
-          <div class="topbar-brand-row">
-            <a class="brand" href="/" aria-label="Attesta">
-              {{ if .ViteDevServer }}
-                <img
-                  class="brand-logo brand-logo-on-light"
-                  src="{{ .ViteDevServer }}/brand/attesta-lockup-on-light.svg"
-                  alt=""
-                  aria-hidden="true"
-                />
-                <img
-                  class="brand-logo brand-logo-on-dark"
-                  src="{{ .ViteDevServer }}/brand/attesta-lockup-on-dark.svg"
-                  alt=""
-                  aria-hidden="true"
-                />
-              {{ else }}
-                <img
-                  class="brand-logo brand-logo-on-light"
-                  src="/static/brand/attesta-lockup-on-light.svg"
-                  alt=""
-                  aria-hidden="true"
-                />
-                <img
-                  class="brand-logo brand-logo-on-dark"
-                  src="/static/brand/attesta-lockup-on-dark.svg"
-                  alt=""
-                  aria-hidden="true"
-                />
-              {{ end }}
-            </a>
-            {{ if .IsPlatformAdmin }}
-              <span class="topbar-pa-label">Platform Admin</span>
-            {{ end }}
-          </div>
-          <nav class="nav">
-            <button
-              type="button"
-              class="btn btn-outline btn-icon btn-lg nav-action theme-toggle"
-              id="theme-toggle"
-              aria-label="Toggle theme"
-              title="Toggle theme"
-            >
-              {{ template "icon-theme-moon" . }}
-              {{ template "icon-theme-sun" . }}
-            </button>
-            {{ if .ShowLogout }}
-              <details class="account-menu">
-                <summary
-                  class="btn btn-outline btn-icon btn-lg nav-action account-trigger"
-                  aria-label="Open account menu"
-                >
-                  {{ template "icon-account" . }}
-                </summary>
-                <div class="account-dropdown">
-                  <section class="account-menu-section">
-                    <p class="account-menu-label">Signed in as</p>
-                    <p class="account-menu-email">
-                      {{ if .UserEmail }}
-                        {{ .UserEmail }}
-                      {{ else }}
-                        Account
-                      {{ end }}
-                    </p>
-                  </section>
-                  <section class="account-menu-section">
-                    <a href="/my" class="account-menu-item">
-                      {{ template "icon-layout-dashboard" . }}
-                      Dashboard
-                    </a>
-                    {{ if .ShowOrgsLink }}
-                      <a href="/admin/orgs" class="account-menu-item">
-                        {{ template "icon-building-grid" . }}
-                        Orgs
-                      </a>
-                    {{ end }}
-                    {{ if .ShowMyOrgLink }}
-                      <a href="/my/organization/profile" class="account-menu-item">
-                        {{ template "icon-users-group" . }}
-                        My organization
-                      </a>
-                    {{ end }}
-                    <form method="post" action="/logout">
-                      <button
-                        type="submit"
-                        class="account-menu-item account-menu-item-danger"
-                      >
-                        {{ template "icon-sign-out" . }}
-                        Sign out
-                      </button>
-                    </form>
-                  </section>
-                </div>
-              </details>
-            {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
-              <a href="/login" class="btn btn-ghost btn-lg nav-action">
-                {{ template "icon-log-in" . }}
-                Login
+      {{ if ne .Body "public_home_body" }}
+        <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
+          <div class="topbar-content u-mx-auto u-max-w-7xl">
+            <div class="topbar-brand-row">
+              <a class="brand" href="/" aria-label="Attesta">
+                {{ if .ViteDevServer }}
+                  <img
+                    class="brand-logo brand-logo-on-light"
+                    src="{{ .ViteDevServer }}/brand/attesta-lockup-on-light.svg"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <img
+                    class="brand-logo brand-logo-on-dark"
+                    src="{{ .ViteDevServer }}/brand/attesta-lockup-on-dark.svg"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                {{ else }}
+                  <img
+                    class="brand-logo brand-logo-on-light"
+                    src="/static/brand/attesta-lockup-on-light.svg"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <img
+                    class="brand-logo brand-logo-on-dark"
+                    src="/static/brand/attesta-lockup-on-dark.svg"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                {{ end }}
               </a>
-            {{ end }}
-          </nav>
-        </div>
-      </header>
-      <main class="page">
+              {{ if .IsPlatformAdmin }}
+                <span class="topbar-pa-label">Platform Admin</span>
+              {{ end }}
+            </div>
+            <nav class="nav">
+              <button
+                type="button"
+                class="btn btn-outline btn-icon btn-lg nav-action theme-toggle"
+                id="theme-toggle"
+                aria-label="Toggle theme"
+                title="Toggle theme"
+              >
+                {{ template "icon-theme-moon" . }}
+                {{ template "icon-theme-sun" . }}
+              </button>
+              {{ if .ShowLogout }}
+                <details class="account-menu">
+                  <summary
+                    class="btn btn-outline btn-icon btn-lg nav-action account-trigger"
+                    aria-label="Open account menu"
+                  >
+                    {{ template "icon-account" . }}
+                  </summary>
+                  <div class="account-dropdown">
+                    <section class="account-menu-section">
+                      <p class="account-menu-label">Signed in as</p>
+                      <p class="account-menu-email">
+                        {{ if .UserEmail }}
+                          {{ .UserEmail }}
+                        {{ else }}
+                          Account
+                        {{ end }}
+                      </p>
+                    </section>
+                    <section class="account-menu-section">
+                      <a href="/my" class="account-menu-item">
+                        {{ template "icon-layout-dashboard" . }}
+                        Dashboard
+                      </a>
+                      {{ if .ShowOrgsLink }}
+                        <a href="/admin/orgs" class="account-menu-item">
+                          {{ template "icon-building-grid" . }}
+                          Orgs
+                        </a>
+                      {{ end }}
+                      {{ if .ShowMyOrgLink }}
+                        <a href="/my/organization/profile" class="account-menu-item">
+                          {{ template "icon-users-group" . }}
+                          My organization
+                        </a>
+                      {{ end }}
+                      <form method="post" action="/logout">
+                        <button
+                          type="submit"
+                          class="account-menu-item account-menu-item-danger"
+                        >
+                          {{ template "icon-sign-out" . }}
+                          Sign out
+                        </button>
+                      </form>
+                    </section>
+                  </div>
+                </details>
+              {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
+                <a href="/login" class="btn btn-ghost btn-lg nav-action">
+                  {{ template "icon-log-in" . }}
+                  Login
+                </a>
+              {{ end }}
+            </nav>
+          </div>
+        </header>
+      {{ end }}
+      <main class="page{{ if eq .Body "public_home_body" }} page-landing{{ end }}">
         {{ if eq .Body "home_picker_body" }}
           {{ template "home_picker_body" . }}
         {{ else if eq .Body "public_home_body" }}
@@ -236,35 +238,37 @@
           {{ template "dpp_body" . }}
         {{ end }}
       </main>
-      <footer class="site-footer">
-        <div class="u-mx-auto u-max-w-7xl muted">
-          <p>
-            © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
-            under the GNU AGPLv3.
-          </p>
-          <p>
-            CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
-            chips and microElectronics pRoduction, Project No. 101161109) is
-            funded by the European Union under the Interregional Innovation
-            Investments (I3) Instrument of the European Regional Development Fund,
-            managed by the European Innovation Council and SMEs Executive Agency
-            (EISMEA).
-          </p>
-          <p>
-            Even Closer (Project No. 101228240) is funded by the European Union
-            under the Interregional Innovation Investments (I3) Instrument of the
-            European Regional Development Fund, managed by the European Innovation
-            Council and SMEs Executive Agency (EISMEA).
-          </p>
-          <p>
-            This repository/website is part of CLOSER and Even Closer projects and has
-            received funding from the European Union. Views and opinions expressed are
-            those of the author(s) only and do not necessarily reflect those of
-            the European Union or EISMEA. Neither the European Union nor the
-            granting authority can be held responsible for them.
-          </p>
-        </div>
-      </footer>
+      {{ if ne .Body "public_home_body" }}
+        <footer class="site-footer">
+          <div class="u-mx-auto u-max-w-7xl muted">
+            <p>
+              © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
+              under the GNU AGPLv3.
+            </p>
+            <p>
+              CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
+              chips and microElectronics pRoduction, Project No. 101161109) is
+              funded by the European Union under the Interregional Innovation
+              Investments (I3) Instrument of the European Regional Development Fund,
+              managed by the European Innovation Council and SMEs Executive Agency
+              (EISMEA).
+            </p>
+            <p>
+              Even Closer (Project No. 101228240) is funded by the European Union
+              under the Interregional Innovation Investments (I3) Instrument of the
+              European Regional Development Fund, managed by the European Innovation
+              Council and SMEs Executive Agency (EISMEA).
+            </p>
+            <p>
+              This repository/website is part of CLOSER and Even Closer projects and has
+              received funding from the European Union. Views and opinions expressed are
+              those of the author(s) only and do not necessarily reflect those of
+              the European Union or EISMEA. Neither the European Union nor the
+              granting authority can be held responsible for them.
+            </p>
+          </div>
+        </footer>
+      {{ end }}
     </body>
   </html>
 {{ end }}

@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestHandlePublicHomeRedirectsToMy(t *testing.T) {
+func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	server := &Server{
 		store: NewMemoryStore(),
 		tmpl:  parseTestTemplates(t),
@@ -22,15 +22,34 @@ func TestHandlePublicHomeRedirectsToMy(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	server.handlePublicHome(rec, req)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
 	}
-	if got := rec.Header().Get("Location"); got != appHomePath {
-		t.Fatalf("location = %q, want %q", got, appHomePath)
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("unexpected redirect to %q", loc)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected Sign In link on public home, got %q", body)
+	}
+	if !strings.Contains(body, `class="public-home-signin btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected landing Sign In styled as ghost nav button, got %q", body)
+	}
+	if !strings.Contains(body, `class="public-home"`) {
+		t.Fatalf("expected public landing markup, got %q", body)
+	}
+	if !strings.Contains(body, "Verified traceability for supply chains") {
+		t.Fatalf("expected landing hero copy, got %q", body)
+	}
+	if strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected no account menu on public home, got %q", body)
+	}
+	if strings.Contains(body, `>Dashboard</a>`) {
+		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
 	}
 }
 
-func TestHandlePublicHomeRedirectsToMyWhenLoggedIn(t *testing.T) {
+func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
 	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
 	server := &Server{
 		store: NewMemoryStore(),
@@ -53,11 +72,21 @@ func TestHandlePublicHomeRedirectsToMyWhenLoggedIn(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-public-home"})
 	rec := httptest.NewRecorder()
 	server.handlePublicHome(rec, req)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
 	}
-	if got := rec.Header().Get("Location"); got != appHomePath {
-		t.Fatalf("location = %q, want %q", got, appHomePath)
+	body := rec.Body.String()
+	if !strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected account menu when logged in, got %q", body)
+	}
+	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected Dashboard when logged in, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-signin btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected no Sign In CTA when logged in, got %q", body)
+	}
+	if strings.Contains(body, `>Sign In</a>`) || strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected no Sign In/Login link when logged in, got %q", body)
 	}
 }
 
