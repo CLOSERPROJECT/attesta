@@ -2049,12 +2049,6 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 const publicHomeStreamCardLimit = 6
 const publicHomeStreamOrgAvatarLimit = 4
 
-// Stub metrics for public stream cards until real activity/instance derivation exists (#179).
-const (
-	publicHomeStreamInstanceCountStub = 28
-	publicHomeStreamActivityStub      = "all completed"
-)
-
 func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
@@ -2080,13 +2074,32 @@ func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView,
 			})
 		}
 		orgs, overflow := publicStreamCardOrganizations(cfg.Organizations, logoURLs)
+		instanceCount := 0
+		allCompleted := false
+		if s.store != nil {
+			processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
+			if listErr != nil {
+				return nil, listErr
+			}
+			instanceCount = len(processes)
+			if instanceCount > 0 {
+				active := 0
+				for i := range processes {
+					processes[i].Progress = normalizeProgressKeys(processes[i].Progress)
+					if deriveProcessStatus(cfg.Workflow, &processes[i]) == processStatusActive {
+						active++
+					}
+				}
+				allCompleted = active == 0
+			}
+		}
 		cards = append(cards, PublicStreamCardView{
 			Name:                  cfg.Workflow.Name,
 			Description:           strings.TrimSpace(cfg.Workflow.Description),
 			Steps:                 stepViews,
 			PassportEnabled:       cfg.DPP.Enabled,
-			InstanceCount:         publicHomeStreamInstanceCountStub,
-			ActivityLabel:         publicHomeStreamActivityStub,
+			InstanceCount:         instanceCount,
+			AllCompleted:          allCompleted,
 			Organizations:         orgs,
 			OrganizationsOverflow: overflow,
 		})

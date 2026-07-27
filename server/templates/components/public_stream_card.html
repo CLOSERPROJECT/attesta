@@ -1,4 +1,4 @@
-{{/* Public homepage stream card: name, description, Stream badge, optional passport badge, step preview, metrics stubs, org avatars. Not a link. */}}
+{{/* Public homepage stream card: name, description, Stream badge, optional passport badge, step preview, live instance metrics, org avatars. Not a link. */}}
 
 {{ define "public_stream_card" }}
   <article class="public-stream-card">
@@ -36,9 +36,26 @@
     {{ end }}
     <div class="public-stream-card-foot">
       <div class="public-stream-card-metrics">
-        <span>{{ .InstanceCount }}</span>
-        {{ if .ActivityLabel }}
-          <span class="public-stream-card-metric">{{ .ActivityLabel }}</span>
+        {{ if eq .InstanceCount 0 }}
+          <span class="public-stream-card-metric">
+            {{ template "icon-layers-2" . }}
+            no instances yet
+          </span>
+        {{ else if .AllCompleted }}
+          <span class="public-stream-card-metric">
+            {{ template "icon-layers-2" . }}
+            {{ if eq .InstanceCount 1 }}1 instance{{ else }}{{ .InstanceCount }} instances{{ end }}
+          </span>
+          <span class="public-stream-card-metric">
+            {{ template "icon-check-circle" . }}
+            all completed
+          </span>
+        {{ else }}
+          {{/* Active-now chip is #183; until then show instance count only. */}}
+          <span class="public-stream-card-metric">
+            {{ template "icon-layers-2" . }}
+            {{ if eq .InstanceCount 1 }}1 instance{{ else }}{{ .InstanceCount }} instances{{ end }}
+          </span>
         {{ end }}
       </div>
       {{ if .Organizations }}

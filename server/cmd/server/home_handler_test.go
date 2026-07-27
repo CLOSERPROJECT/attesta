@@ -312,8 +312,7 @@ users:
 		">BE<",
 		`<strong>Organizations</strong>`,
 		`class="public-stream-card-metrics"`,
-		">28<",
-		"all completed",
+		"no instances yet",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in public home body, got %q", want, body)
@@ -322,8 +321,100 @@ users:
 	if strings.Contains(body, "Stream Instances") {
 		t.Fatalf("footer must not say Stream Instances, got %q", body)
 	}
+	if strings.Contains(body, ">28<") {
+		t.Fatalf("stub instance count must not appear, got %q", body)
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("empty catalog stream must not show all-completed chip, got %q", body)
+	}
 	if strings.Contains(body, `src="/organization/logo/beta"`) {
 		t.Fatalf("beta without logo must use initials, not logo url, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersNoInstancesYetWhenStreamHasNoProcesses(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "empty.yaml"), "Empty Metrics Stream", "string", "No processes yet")
+
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"Empty Metrics Stream",
+		"no instances yet",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, ">28<") {
+		t.Fatalf("stub instance count must not appear, got %q", body)
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("empty stream must not show all-completed chip, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done and terminated only")
+
+	store := NewMemoryStore()
+	now := time.Now().UTC()
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-2 * time.Minute),
+		Status:      processStatusDone,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-time.Minute),
+		Status:      processStatusTerminated,
+	})
+
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"Settled Metrics Stream",
+		"2 instances",
+		"all completed",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`d="m9 12 2 2 4-4"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, ">28<") {
+		t.Fatalf("stub instance count must not appear, got %q", body)
+	}
+	if strings.Contains(body, "no instances yet") {
+		t.Fatalf("settled stream must not show empty label, got %q", body)
+	}
+	if strings.Count(body, `class="public-stream-card-metric"`) != 2 {
+		t.Fatalf("settled metrics must render exactly two chips, got %q", body)
 	}
 }
 

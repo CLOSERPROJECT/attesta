@@ -40,7 +40,7 @@ type PublicStreamCardView struct {
 	Steps                 []PublicStreamCardStepView
 	PassportEnabled       bool
 	InstanceCount         int
-	ActivityLabel         string
+	AllCompleted          bool // true when T>=1 and no active instances (settled)
 	Organizations         []PublicStreamCardOrgView
 	OrganizationsOverflow int // count beyond the first four avatars; 0 when none
 }

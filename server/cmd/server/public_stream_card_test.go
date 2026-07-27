@@ -213,6 +213,109 @@ func TestPublicStreamCardTemplateRendersOrgOverflowCount(t *testing.T) {
 	}
 }
 
+func TestPublicStreamCardTemplateRendersEmptyMetricsAsSingleLayersChip(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	card := PublicStreamCardView{
+		Name:          "Empty Stream",
+		InstanceCount: 0,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render public_stream_card template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`class="public-stream-card-metrics"`,
+		`class="public-stream-card-metric"`,
+		"no instances yet",
+		// icon-layers-2 path
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in empty metrics layout, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("empty metrics must not show all-completed chip, got: %s", body)
+	}
+	if strings.Contains(body, `d="m9 12 2 2 4-4"`) {
+		t.Fatalf("empty metrics must not render check-circle icon, got: %s", body)
+	}
+	if strings.Count(body, `class="public-stream-card-metric"`) != 1 {
+		t.Fatalf("empty metrics must render exactly one chip, got: %s", body)
+	}
+}
+
+func TestPublicStreamCardTemplateRendersOneInstanceAllCompletedMetrics(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	card := PublicStreamCardView{
+		Name:          "Settled Stream",
+		InstanceCount: 1,
+		AllCompleted:  true,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render public_stream_card template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`class="public-stream-card-metric"`,
+		"1 instance",
+		"all completed",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`d="m9 12 2 2 4-4"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in all-completed metrics layout, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "1 instances") {
+		t.Fatalf("singular count must not use plural label, got: %s", body)
+	}
+	if strings.Contains(body, "no instances yet") {
+		t.Fatalf("settled metrics must not show empty label, got: %s", body)
+	}
+	if strings.Count(body, `class="public-stream-card-metric"`) != 2 {
+		t.Fatalf("all-completed metrics must render exactly two chips, got: %s", body)
+	}
+}
+
+func TestPublicStreamCardTemplateRendersPluralInstancesAllCompletedMetrics(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	card := PublicStreamCardView{
+		Name:          "Settled Stream",
+		InstanceCount: 2,
+		AllCompleted:  true,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render public_stream_card template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		"2 instances",
+		"all completed",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`d="m9 12 2 2 4-4"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in plural all-completed metrics, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "2 instance<") || strings.Contains(body, "2 instance\n") || strings.Contains(body, ">2 instance<") {
+		t.Fatalf("plural count must use instances label, got: %s", body)
+	}
+	if strings.Count(body, `class="public-stream-card-metric"`) != 2 {
+		t.Fatalf("all-completed metrics must render exactly two chips, got: %s", body)
+	}
+}
+
 func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
@@ -220,7 +323,7 @@ func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing
 	card := PublicStreamCardView{
 		Name:          "PV Module Tracing",
 		InstanceCount: 28,
-		ActivityLabel: "all completed",
+		AllCompleted:  true,
 		Organizations: []PublicStreamCardOrgView{
 			{Name: "Acme Corp", Initials: "AC"},
 		},
@@ -232,8 +335,10 @@ func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing
 
 	for _, want := range []string{
 		`class="public-stream-card-metrics"`,
-		">28<",
+		"28 instances",
 		"all completed",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`d="m9 12 2 2 4-4"`,
 		`<strong>Organizations</strong>`,
 	} {
 		if !strings.Contains(body, want) {
