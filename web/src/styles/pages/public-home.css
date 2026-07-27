@@ -8,6 +8,7 @@
  *   footer.public-home-footer
  *
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
+ * Feature tiles use CSS-only component .home-feature-card (components/home-feature-card.css).
  */
 
 .public-home {
@@ -492,46 +493,6 @@
   grid-template-columns: 1fr;
   gap: var(--space-6);
   width: 100%;
-}
-
-.public-home-feature-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-height: 240px;
-  padding: var(--space-8);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-}
-
-.public-home-feature-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: var(--muted);
-  font-size: var(--text-xl);
-  line-height: 1.75rem;
-}
-
-.public-home-feature-card h3 {
-  font-size: var(--text-base);
-  font-weight: var(--font-normal);
-  line-height: 1.5rem;
-}
-
-.public-home-feature-card > p {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-}
-
-.public-home-feature-card > h3 + p {
-  margin-top: calc(var(--space-2) * -1);
 }
 
 .public-home-dev {
