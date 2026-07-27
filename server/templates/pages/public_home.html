@@ -1,11 +1,533 @@
 {{ define "public_home_body" }}
-  <section class="stack u-max-w-7xl u-mx-auto">
-    <section class="page-header">
-      <div class="page-header-body">
-        <h1>Attesta</h1>
+  {{ $asset := "/static/brand/landing" }}
+  {{ if .ViteDevServer }}{{ $asset = printf "%s/brand/landing" .ViteDevServer }}{{ end }}
+  {{ $brand := "/static/brand/attesta-lockup-on-dark.svg" }}
+  {{ if .ViteDevServer }}{{ $brand = printf "%s/brand/attesta-lockup-on-dark.svg" .ViteDevServer }}{{ end }}
+
+  <div class="public-home" data-landing>
+    <header class="public-home-header">
+      <a class="public-home-brand" href="/" aria-label="Attesta">
+        <img class="public-home-logo" src="{{ $brand }}" alt="" width="132" height="44" />
+      </a>
+      <nav class="public-home-nav" aria-label="Marketing">
+        <a href="#streams">Product</a>
+        <a href="#how-it-works">Solutions</a>
+        <a href="#features">Pricing</a>
+        <a href="#developers">Docs</a>
+      </nav>
+      <div class="public-home-header-cta">
+        {{ if .ShowLogout }}
+          <details class="account-menu public-home-account">
+            <summary class="public-home-signin" aria-label="Open account menu">
+              {{ if .UserEmail }}{{ .UserEmail }}{{ else }}Account{{ end }}
+            </summary>
+            <div class="account-dropdown">
+              <section class="account-menu-section">
+                <p class="account-menu-label">Signed in as</p>
+                <p class="account-menu-email">
+                  {{ if .UserEmail }}{{ .UserEmail }}{{ else }}Account{{ end }}
+                </p>
+              </section>
+              <section class="account-menu-section">
+                <a href="/my" class="account-menu-item">Dashboard</a>
+                {{ if .ShowOrgsLink }}
+                  <a href="/admin/orgs" class="account-menu-item">Orgs</a>
+                {{ end }}
+                {{ if .ShowMyOrgLink }}
+                  <a href="/my/organization/profile" class="account-menu-item">My organization</a>
+                {{ end }}
+                <form method="post" action="/logout">
+                  <button type="submit" class="account-menu-item account-menu-item-danger">
+                    Sign out
+                  </button>
+                </form>
+              </section>
+            </div>
+          </details>
+          <a class="public-home-btn public-home-btn-primary" href="/my">Dashboard</a>
+        {{ else }}
+          <a class="public-home-signin btn btn-ghost btn-lg nav-action" href="/login">Sign In</a>
+          <a class="public-home-btn public-home-btn-primary" href="/signup">Get Started</a>
+        {{ end }}
+      </div>
+    </header>
+
+    <section class="public-home-hero">
+      <p class="public-home-label">Attesta supply chain framework 2.0</p>
+      <div class="public-home-hero-copy">
+        <h1>Verified traceability for supply chains</h1>
+        <p>
+          Attesta turns multi-party regulated streams into tamper-evident digital
+          records — from raw material intake to GS1 Digital Product Passports.
+        </p>
+      </div>
+      <div class="public-home-hero-cta">
+        <a class="public-home-btn public-home-btn-primary" href="#how-it-works">How it works</a>
+        <a class="public-home-btn public-home-btn-secondary" href="/signup">Book a Demo</a>
       </div>
     </section>
-  </section>
+
+    <section class="public-home-streams" id="streams">
+      <div class="public-home-section-head public-home-section-head-center">
+        <p class="public-home-label">Stream Categories</p>
+        <h2>Explore Public Streams</h2>
+      </div>
+
+      <div class="public-home-tabs" data-landing-tabs>
+        <button type="button" class="public-home-tabs-arrow js-landing-tabs-prev" aria-label="Scroll categories left">‹</button>
+        <div class="public-home-tabs-scroll js-landing-tabs-scroll" role="tablist" aria-label="Stream categories">
+          <button type="button" class="public-home-tab is-active" role="tab" aria-selected="true">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-compliance.svg" alt="" width="20" height="20" />
+            </span>
+            Compliance &amp; Quality
+          </button>
+          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-supply.svg" alt="" width="20" height="20" />
+            </span>
+            Supply Chain
+          </button>
+          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-workflow.svg" alt="" width="20" height="20" />
+            </span>
+            Workflow &amp; Operations
+          </button>
+          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-data.svg" alt="" width="20" height="20" />
+            </span>
+            Data &amp; Documentation
+          </button>
+          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-people.svg" alt="" width="20" height="20" />
+            </span>
+            People &amp; Identity
+          </button>
+          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-recycling.svg" alt="" width="20" height="20" />
+            </span>
+            Recycling &amp; Recovery
+          </button>
+          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
+            <span class="public-home-tab-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-cat-materials.svg" alt="" width="20" height="20" />
+            </span>
+            Critical Materials
+          </button>
+        </div>
+        <button type="button" class="public-home-tabs-arrow js-landing-tabs-next" aria-label="Scroll categories right">›</button>
+      </div>
+
+      <div class="public-home-stream-grid">
+        <article class="public-home-stream-card">
+          <div class="public-home-stream-card-main">
+            <div class="public-home-stream-card-header">
+              <h3>PV Module Tracing</h3>
+              <div class="public-home-stream-badges">
+                <span class="public-home-badge">Quality Control</span>
+                <span class="public-home-badge public-home-badge-passport">Product Passport</span>
+              </div>
+              <p>End-to-end tracing of photovoltaic modules, from cells to final panels, with compliance verification.</p>
+            </div>
+            <div class="public-home-stream-steps">
+              <div class="public-home-stream-steps-head"><strong>Steps</strong> <span>1</span></div>
+              <div class="public-home-stream-step">
+                <span>Rohstoffbeschaffung und Qualitätsprüfung</span>
+                <span>6 actions</span>
+              </div>
+            </div>
+          </div>
+          <div class="public-home-stream-card-foot">
+            <div class="public-home-stream-metrics">
+              <span>1 step</span>
+              <span class="public-home-stream-metric">
+                <img src="{{ $asset }}/icon-activity.svg" alt="" width="14" height="14" />
+                all completed
+              </span>
+            </div>
+            <hr class="public-home-rule" />
+            <div class="public-home-stream-instances">
+              <div class="public-home-stream-steps-head"><strong>Stream Instances</strong> <span>28</span></div>
+              <div class="public-home-avatars">
+                <img src="{{ $asset }}/avatar-1.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-2.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-3.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-4.png" alt="" width="32" height="32" />
+                <span class="public-home-avatar-more">+24</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="public-home-stream-card">
+          <div class="public-home-stream-card-main">
+            <div class="public-home-stream-card-header">
+              <h3>Indium recycling recovery</h3>
+              <div class="public-home-stream-badges">
+                <span class="public-home-badge">Certification</span>
+              </div>
+              <p>Indium recovery process from electronic waste, with lot and supplier traceability.</p>
+            </div>
+            <div class="public-home-stream-steps">
+              <div class="public-home-stream-steps-head"><strong>Steps</strong> <span>7</span></div>
+              <div class="public-home-stream-step">
+                <span>Rohstoffbeschaffung und Qualitätsprüfung</span>
+                <span>6 actions</span>
+              </div>
+              <p class="public-home-stream-more">+6 more</p>
+            </div>
+          </div>
+          <div class="public-home-stream-card-foot">
+            <div class="public-home-stream-metrics">
+              <span>2 steps</span>
+              <span class="public-home-stream-metric">
+                <img src="{{ $asset }}/icon-activity-active.svg" alt="" width="14" height="14" />
+                2 active now
+              </span>
+            </div>
+            <hr class="public-home-rule" />
+            <div class="public-home-stream-instances">
+              <div class="public-home-stream-steps-head"><strong>Stream Instances</strong> <span>28</span></div>
+              <div class="public-home-avatars">
+                <img src="{{ $asset }}/avatar-5.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-6.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-7.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-8.png" alt="" width="32" height="32" />
+                <span class="public-home-avatar-more">+13</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="public-home-stream-card">
+          <div class="public-home-stream-card-main">
+            <div class="public-home-stream-card-header">
+              <h3>Gallium shipment audit</h3>
+              <div class="public-home-stream-badges">
+                <span class="public-home-badge">Inspection</span>
+                <span class="public-home-badge public-home-badge-passport">Product Passport</span>
+              </div>
+              <p>Complete monitoring of the gallium supply chain, from quality checks to final delivery.</p>
+            </div>
+            <div class="public-home-stream-steps">
+              <div class="public-home-stream-steps-head"><strong>Steps</strong> <span>7</span></div>
+              <div class="public-home-stream-step">
+                <span>Rohstoffbeschaffung und Qualitätsprüfung</span>
+                <span>6 actions</span>
+              </div>
+              <p class="public-home-stream-more">+6 more</p>
+            </div>
+          </div>
+          <div class="public-home-stream-card-foot">
+            <div class="public-home-stream-metrics">
+              <span>1 step</span>
+              <span class="public-home-stream-metric">
+                <img src="{{ $asset }}/icon-activity.svg" alt="" width="14" height="14" />
+                all completed
+              </span>
+            </div>
+            <hr class="public-home-rule" />
+            <div class="public-home-stream-instances">
+              <div class="public-home-stream-steps-head"><strong>Stream Instances</strong> <span>28</span></div>
+              <div class="public-home-avatars">
+                <img src="{{ $asset }}/avatar-1.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-2.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-3.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-4.png" alt="" width="32" height="32" />
+                <span class="public-home-avatar-more">+24</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="public-home-stream-card">
+          <div class="public-home-stream-card-main">
+            <div class="public-home-stream-card-header">
+              <h3>Indium recycling recovery</h3>
+              <div class="public-home-stream-badges">
+                <span class="public-home-badge">Certification</span>
+              </div>
+              <p>Indium recovery process from electronic waste, with lot and supplier traceability.</p>
+            </div>
+            <div class="public-home-stream-steps">
+              <div class="public-home-stream-steps-head"><strong>Steps</strong> <span>7</span></div>
+              <div class="public-home-stream-step">
+                <span>Rohstoffbeschaffung und Qualitätsprüfung</span>
+                <span>6 actions</span>
+              </div>
+              <p class="public-home-stream-more">+6 more</p>
+            </div>
+          </div>
+          <div class="public-home-stream-card-foot">
+            <div class="public-home-stream-metrics">
+              <span>2 steps</span>
+              <span class="public-home-stream-metric">
+                <img src="{{ $asset }}/icon-activity-active.svg" alt="" width="14" height="14" />
+                2 active now
+              </span>
+            </div>
+            <hr class="public-home-rule" />
+            <div class="public-home-stream-instances">
+              <div class="public-home-stream-steps-head"><strong>Stream Instances</strong> <span>28</span></div>
+              <div class="public-home-avatars">
+                <img src="{{ $asset }}/avatar-5.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-6.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-7.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-8.png" alt="" width="32" height="32" />
+                <span class="public-home-avatar-more">+13</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="public-home-stream-card">
+          <div class="public-home-stream-card-main">
+            <div class="public-home-stream-card-header">
+              <h3>Gallium shipment audit</h3>
+              <div class="public-home-stream-badges">
+                <span class="public-home-badge">Inspection</span>
+                <span class="public-home-badge public-home-badge-passport">Product Passport</span>
+              </div>
+              <p>Complete monitoring of the gallium supply chain, from quality checks to final delivery.</p>
+            </div>
+            <div class="public-home-stream-steps">
+              <div class="public-home-stream-steps-head"><strong>Steps</strong> <span>7</span></div>
+              <div class="public-home-stream-step">
+                <span>Rohstoffbeschaffung und Qualitätsprüfung</span>
+                <span>6 actions</span>
+              </div>
+              <p class="public-home-stream-more">+6 more</p>
+            </div>
+          </div>
+          <div class="public-home-stream-card-foot">
+            <div class="public-home-stream-metrics">
+              <span>1 step</span>
+              <span class="public-home-stream-metric">
+                <img src="{{ $asset }}/icon-activity.svg" alt="" width="14" height="14" />
+                all completed
+              </span>
+            </div>
+            <hr class="public-home-rule" />
+            <div class="public-home-stream-instances">
+              <div class="public-home-stream-steps-head"><strong>Stream Instances</strong> <span>28</span></div>
+              <div class="public-home-avatars">
+                <img src="{{ $asset }}/avatar-1.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-2.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-3.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-4.png" alt="" width="32" height="32" />
+                <span class="public-home-avatar-more">+24</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="public-home-stream-card">
+          <div class="public-home-stream-card-main">
+            <div class="public-home-stream-card-header">
+              <h3>PV Module Tracing</h3>
+              <div class="public-home-stream-badges">
+                <span class="public-home-badge">Quality Control</span>
+                <span class="public-home-badge public-home-badge-passport">Product Passport</span>
+              </div>
+              <p>End-to-end tracing of photovoltaic modules, from cells to final panels, with compliance verification.</p>
+            </div>
+            <div class="public-home-stream-steps">
+              <div class="public-home-stream-steps-head"><strong>Steps</strong> <span>1</span></div>
+              <div class="public-home-stream-step">
+                <span>Rohstoffbeschaffung und Qualitätsprüfung</span>
+                <span>6 actions</span>
+              </div>
+            </div>
+          </div>
+          <div class="public-home-stream-card-foot">
+            <div class="public-home-stream-metrics">
+              <span>1 step</span>
+              <span class="public-home-stream-metric">
+                <img src="{{ $asset }}/icon-activity.svg" alt="" width="14" height="14" />
+                all completed
+              </span>
+            </div>
+            <hr class="public-home-rule" />
+            <div class="public-home-stream-instances">
+              <div class="public-home-stream-steps-head"><strong>Stream Instances</strong> <span>28</span></div>
+              <div class="public-home-avatars">
+                <img src="{{ $asset }}/avatar-1.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-2.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-3.png" alt="" width="32" height="32" />
+                <img src="{{ $asset }}/avatar-4.png" alt="" width="32" height="32" />
+                <span class="public-home-avatar-more">+24</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <a class="public-home-btn public-home-btn-primary" href="/signup">See all streams</a>
+    </section>
+
+    <section class="public-home-process" id="how-it-works">
+      <div class="public-home-section-head public-home-section-head-center">
+        <p class="public-home-label">Process Overview</p>
+        <h2>Tamper-evident by design</h2>
+      </div>
+      <div class="public-home-process-grid">
+        <article class="public-home-process-card">
+          <div class="public-home-process-top">
+            <span class="public-home-process-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-plus.svg" alt="" width="24" height="24" />
+            </span>
+            <span class="public-home-process-num">01</span>
+          </div>
+          <h3>Create Stream</h3>
+          <p>Organization templates batch parameters or inspection guidelines via schema-gated API or clean form views.</p>
+        </article>
+        <article class="public-home-process-card">
+          <div class="public-home-process-top">
+            <span class="public-home-process-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-track.svg" alt="" width="24" height="24" />
+            </span>
+            <span class="public-home-process-num">02</span>
+          </div>
+          <h3>Track Progress</h3>
+          <p>Cerbos policies validate role capabilities and step-order as batches shift across physical processing handlers.</p>
+        </article>
+        <article class="public-home-process-card">
+          <div class="public-home-process-top">
+            <span class="public-home-process-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-check.svg" alt="" width="24" height="24" />
+            </span>
+            <span class="public-home-process-num">03</span>
+          </div>
+          <h3>Verify &amp; DPP</h3>
+          <p>Record hash state is written to the cryptographic registry, automatically producing a GS1 Digital Product Passport Link.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="public-home-features" id="features">
+      <div class="public-home-section-head">
+        <p class="public-home-label">Core Capabilities</p>
+        <h2>Built for the complexity of regulated material recovery</h2>
+      </div>
+      <div class="public-home-feature-grid">
+        <article class="public-home-feature-card">
+          <span class="public-home-feature-icon" aria-hidden="true">🔐</span>
+          <h3>Role-gated actions</h3>
+          <p>Cerbos identity policies enforce rigorous standard action patterns across multiple untrusted processors.</p>
+        </article>
+        <article class="public-home-feature-card">
+          <span class="public-home-feature-icon" aria-hidden="true">🧾</span>
+          <h3>Structured YAML workflows</h3>
+          <p>Deploy easily customizable material paths corresponding to regional battery and recycling parameters.</p>
+        </article>
+        <article class="public-home-feature-card">
+          <span class="public-home-feature-icon" aria-hidden="true">📎</span>
+          <h3>Cryptographic evidence</h3>
+          <p>All inspection pictures, certifications, and chemical labs are bound to the immutable stream hash.</p>
+        </article>
+        <article class="public-home-feature-card">
+          <span class="public-home-feature-icon" aria-hidden="true">⚡</span>
+          <h3>HTMX Live Timelines</h3>
+          <p>Real-time Server-Sent Events push stream logs directly to coordinator dashboards instantly.</p>
+        </article>
+        <article class="public-home-feature-card">
+          <span class="public-home-feature-icon" aria-hidden="true">🪪</span>
+          <h3>GS1 Digital Link</h3>
+          <p>Publish ready passports for regulators and end-users with seamless QR and URI integration.</p>
+        </article>
+        <article class="public-home-feature-card">
+          <span class="public-home-feature-icon" aria-hidden="true">📡</span>
+          <h3>API First Architecture</h3>
+          <p>Every workflow capability is documented directly via OpenAPI framework specs for custom ERP hooks.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="public-home-dev" id="developers">
+      <div class="public-home-section-head">
+        <p class="public-home-label">Developer-First</p>
+        <h2>Robust APIs for supply chains</h2>
+      </div>
+      <div class="public-home-dev-row">
+        <div class="public-home-dev-copy">
+          <p>
+            Connect Attesta directly into your legacy ERP, chemical laboratory software,
+            or WEEE tracking hubs using our fully documented REST hooks and OpenAPI specifications.
+          </p>
+          <div class="public-home-stats">
+            <div>
+              <p class="public-home-stat-value">100%</p>
+              <p class="public-home-stat-label">OpenAPI Coverage</p>
+            </div>
+            <div>
+              <p class="public-home-stat-value">GS1</p>
+              <p class="public-home-stat-label">Native Digital Link Support</p>
+            </div>
+          </div>
+          <div class="public-home-dev-cta">
+            <a class="public-home-btn public-home-btn-primary" href="#developers">Explore Documentation</a>
+            <a class="public-home-btn public-home-btn-ghost" href="https://github.com/forkbomb/attesta" rel="noopener noreferrer">View Github Specs</a>
+          </div>
+        </div>
+        <pre class="public-home-code" tabindex="0"><code><span class="public-home-code-accent">GET /streams/69b299c8/dpp</span>
+{
+  "dpp_url": "https://attesta.eu/01/05012345678900/21/A1B2C3D4",
+  "status": "notarized",
+  <span class="public-home-code-accent">"seal_hash": "sha256:8f2a...c190"</span>
+}</code></pre>
+      </div>
+    </section>
+
+    <footer class="public-home-footer">
+      <div class="public-home-footer-top">
+        <div class="public-home-footer-brand">
+          <img class="public-home-logo" src="{{ $brand }}" alt="Attesta" width="132" height="44" />
+          <p>Decentralized stream traceability for regulated and high-stakes raw material recovery loops.</p>
+        </div>
+        <div class="public-home-footer-cols">
+          <div>
+            <p class="public-home-footer-heading">Platform</p>
+            <a href="#streams">Streams</a>
+            <a href="#features">Pricing</a>
+            <a href="#how-it-works">Security</a>
+          </div>
+          <div>
+            <p class="public-home-footer-heading">Developer</p>
+            <a href="#developers">OpenAPI Specs</a>
+            <a href="https://github.com/forkbomb/attesta" rel="noopener noreferrer">GitHub</a>
+            <a href="#developers">API Docs</a>
+          </div>
+          <div>
+            <p class="public-home-footer-heading">Enterprise</p>
+            <a href="https://closer-project.eu/" rel="noopener noreferrer">EU CLOSER</a>
+            <a href="#developers">EIC Grants</a>
+            <a href="/signup">Contact</a>
+          </div>
+        </div>
+      </div>
+      <div class="public-home-footer-bottom">
+        <hr class="public-home-rule" />
+        <div class="public-home-footer-meta">
+          <p>© 2026 Forkbomb bv. All rights reserved. Supported by EIC.</p>
+          <div class="public-home-socials">
+            <a href="https://x.com/" aria-label="X (Twitter)" rel="noopener noreferrer">
+              <img src="{{ $asset }}/icon-twitter.svg" alt="" width="18" height="18" />
+            </a>
+            <a href="https://www.linkedin.com/" aria-label="LinkedIn" rel="noopener noreferrer">
+              <img src="{{ $asset }}/icon-linkedin.svg" alt="" width="18" height="18" />
+            </a>
+            <a href="https://github.com/forkbomb/attesta" aria-label="GitHub" rel="noopener noreferrer">
+              <img src="{{ $asset }}/icon-github.svg" alt="" width="18" height="18" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
 {{ end }}
 
 {{ define "public_home.html" }}

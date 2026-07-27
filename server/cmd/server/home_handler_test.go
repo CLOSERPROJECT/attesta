@@ -30,15 +30,21 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, `href="/login"`) {
-		t.Fatalf("expected Login link on public home, got %q", body)
+		t.Fatalf("expected Sign In link on public home, got %q", body)
 	}
-	if !strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
-		t.Fatalf("expected Login styled as ghost nav button, got %q", body)
+	if !strings.Contains(body, `class="public-home-signin btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected landing Sign In styled as ghost nav button, got %q", body)
+	}
+	if !strings.Contains(body, `class="public-home"`) {
+		t.Fatalf("expected public landing markup, got %q", body)
+	}
+	if !strings.Contains(body, "Verified traceability for supply chains") {
+		t.Fatalf("expected landing hero copy, got %q", body)
 	}
 	if strings.Contains(body, `account-menu`) {
 		t.Fatalf("expected no account menu on public home, got %q", body)
 	}
-	if strings.Contains(body, "Dashboard") {
+	if strings.Contains(body, `>Dashboard</a>`) {
 		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
 	}
 }
@@ -74,13 +80,13 @@ func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
 		t.Fatalf("expected account menu when logged in, got %q", body)
 	}
 	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
-		t.Fatalf("expected Dashboard item under account menu when logged in, got %q", body)
+		t.Fatalf("expected Dashboard when logged in, got %q", body)
 	}
-	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action">Dashboard`) {
-		t.Fatalf("expected Dashboard inside menu, not topbar button, got %q", body)
+	if strings.Contains(body, `class="public-home-signin btn btn-ghost btn-lg nav-action"`) {
+		t.Fatalf("expected no Sign In CTA when logged in, got %q", body)
 	}
-	if strings.Contains(body, `>Login</a>`) {
-		t.Fatalf("expected no Login link when logged in, got %q", body)
+	if strings.Contains(body, `>Sign In</a>`) || strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected no Sign In/Login link when logged in, got %q", body)
 	}
 }
 
