@@ -20,10 +20,18 @@ type StreamCardView struct {
 	DeleteAction      string
 }
 
+// PublicStreamCardStepView is one blueprint step row on a public stream card.
+type PublicStreamCardStepView struct {
+	Title        string
+	SubstepCount int
+}
+
 // PublicStreamCardView is the view model for templates/components/public_stream_card.html.
 type PublicStreamCardView struct {
-	Name        string
-	Description string
+	Name            string
+	Description     string
+	Steps           []PublicStreamCardStepView
+	PassportEnabled bool
 }
 
 // WorkflowProcessCounts holds process status totals shown on a stream card.

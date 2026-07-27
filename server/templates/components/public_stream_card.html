@@ -1,4 +1,4 @@
-{{/* Public homepage stream card: name, description, and static Stream badge. Not a link. */}}
+{{/* Public homepage stream card: name, description, Stream badge, optional passport badge, step preview. Not a link. */}}
 
 {{ define "public_stream_card" }}
   <article class="public-stream-card">
@@ -6,10 +6,33 @@
       <h3 class="public-stream-card-title">{{ .Name }}</h3>
       <div class="public-stream-card-badges">
         <span class="public-stream-card-badge">Stream</span>
+        {{ if .PassportEnabled }}
+          <span class="public-stream-card-badge" data-category="passport">Product Passport</span>
+        {{ end }}
       </div>
       {{ if .Description }}
         <p class="public-stream-card-description">{{ .Description }}</p>
       {{ end }}
     </div>
+    {{ if .Steps }}
+      <div class="public-stream-card-steps">
+        <div class="public-stream-card-steps-head"><strong>Steps</strong> <span>{{ len .Steps }}</span></div>
+        <div class="public-stream-card-steps-list">
+          {{ range .Steps }}
+            <div class="public-stream-card-step">
+              <span>{{ .Title }}</span>
+              <span class="public-stream-card-step-meta">
+                <span>{{ .SubstepCount }}</span>
+                {{ template "tip" (dict
+                  "Tooltip" "Actions"
+                  "Class" "public-stream-card-step-icon"
+                  "Icon" "icon-list"
+                ) }}
+              </span>
+            </div>
+          {{ end }}
+        </div>
+      </div>
+    {{ end }}
   </article>
 {{ end }}

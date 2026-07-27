@@ -4,8 +4,13 @@
  * article.public-stream-card
  *   .public-stream-card-header
  *     h3.public-stream-card-title
- *     .public-stream-card-badges > span.public-stream-card-badge
+ *     .public-stream-card-badges > span.public-stream-card-badge[+data-category]
  *     p.public-stream-card-description
+ *   .public-stream-card-steps
+ *     .public-stream-card-steps-head
+ *     .public-stream-card-steps-list
+ *       .public-stream-card-step > span + span.public-stream-card-step-meta
+ *         (count + tip.public-stream-card-step-icon > icon-list)
  */
 
 .public-stream-card {
@@ -68,4 +73,73 @@
   background: var(--category-color);
   border-color: var(--category-color);
   color: var(--card);
+}
+
+.public-stream-card-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.public-stream-card-steps-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.public-stream-card-steps-head strong {
+  font-weight: var(--font-semibold);
+}
+
+.public-stream-card-steps-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-block: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+}
+
+.public-stream-card-step {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+}
+
+.public-stream-card-step > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-stream-card-step > span:last-child {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.public-stream-card-step-meta {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.public-stream-card-step-icon {
+  color: var(--muted-foreground);
+}
+
+.public-stream-card-step-icon .icon-svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
 }

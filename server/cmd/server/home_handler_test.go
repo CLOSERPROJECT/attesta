@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -116,6 +117,132 @@ func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 	}
 	if strings.Contains(body, "PV Module Tracing") {
 		t.Fatalf("expected no hard-coded Figma stream tiles, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersStreamStepPreviewFromCatalog(t *testing.T) {
+	tempDir := t.TempDir()
+	content := `workflow:
+  name: "Catalog Trace Stream"
+  description: "Catalog step preview fixture"
+  steps:
+    - id: "1"
+      title: "Incoming intake"
+      order: 1
+      organization: "org1"
+      substeps:
+        - id: "1.1"
+          title: "Record lot"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "lot"
+          inputType: "formata"
+          schema:
+            type: object
+        - id: "1.2"
+          title: "Attach photo"
+          order: 2
+          roles: ["dep1"]
+          inputKey: "photo"
+          inputType: "formata"
+          schema:
+            type: object
+    - id: "2"
+      title: "Quality check"
+      order: 2
+      organization: "org1"
+      substeps:
+        - id: "2.1"
+          title: "Approve"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "ok"
+          inputType: "formata"
+          schema:
+            type: object
+organizations:
+  - slug: "org1"
+    name: "Organization 1"
+roles:
+  - orgSlug: "org1"
+    slug: "dep1"
+    name: "Department 1"
+users:
+  - id: "u1"
+    name: "User 1"
+    departmentId: "dep1"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "trace.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Catalog Trace Stream",
+		`class="public-stream-card-steps-head"><strong>Steps</strong> <span>2</span>`,
+		"Incoming intake",
+		`data-tooltip="Actions"`,
+		"Quality check",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+}
+
+func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Plain Stream", "string", "No passport")
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "beta.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	alphaIdx := strings.Index(body, "Alpha Plain Stream")
+	betaIdx := strings.Index(body, ">Workflow</h3>")
+	if alphaIdx < 0 || betaIdx < 0 {
+		t.Fatalf("expected both catalog streams in body, alpha=%d beta=%d body=%q", alphaIdx, betaIdx, body)
+	}
+
+	alphaCardEnd := betaIdx
+	if alphaIdx > betaIdx {
+		alphaCardEnd = len(body)
+	}
+	alphaCard := body[alphaIdx:alphaCardEnd]
+	if strings.Contains(alphaCard, "Product Passport") || strings.Contains(alphaCard, `data-category="passport"`) {
+		t.Fatalf("plain stream must not show passport badge, got %q", alphaCard)
+	}
+
+	betaCard := body[betaIdx:]
+	if !strings.Contains(betaCard, `data-category="passport"`) {
+		t.Fatalf("DPP-enabled stream must include passport category hook, got %q", betaCard)
+	}
+	if !strings.Contains(betaCard, "Product Passport") {
+		t.Fatalf("DPP-enabled stream must show Product Passport badge, got %q", betaCard)
+	}
+	if !strings.Contains(body, `class="public-stream-card-badge">Stream</span>`) {
+		t.Fatalf("expected static Stream badge on public home cards, got %q", body)
 	}
 }
 

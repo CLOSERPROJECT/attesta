@@ -2063,9 +2063,19 @@ func (s *Server) publicStreamCards() ([]PublicStreamCardView, error) {
 	cards := make([]PublicStreamCardView, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
+		steps := sortedSteps(cfg.Workflow)
+		stepViews := make([]PublicStreamCardStepView, 0, len(steps))
+		for _, step := range steps {
+			stepViews = append(stepViews, PublicStreamCardStepView{
+				Title:        step.Title,
+				SubstepCount: len(step.Substep),
+			})
+		}
 		cards = append(cards, PublicStreamCardView{
-			Name:        cfg.Workflow.Name,
-			Description: strings.TrimSpace(cfg.Workflow.Description),
+			Name:            cfg.Workflow.Name,
+			Description:     strings.TrimSpace(cfg.Workflow.Description),
+			Steps:           stepViews,
+			PassportEnabled: cfg.DPP.Enabled,
 		})
 	}
 	return cards, nil
