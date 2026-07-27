@@ -1,0 +1,15 @@
+{{/* Public homepage stream card: name, description, and static Stream badge. Not a link. */}}
+
+{{ define "public_stream_card" }}
+  <article class="public-stream-card">
+    <div class="public-stream-card-header">
+      <h3 class="public-stream-card-title">{{ .Name }}</h3>
+      <div class="public-stream-card-badges">
+        <span class="public-stream-card-badge">Stream</span>
+      </div>
+      {{ if .Description }}
+        <p class="public-stream-card-description">{{ .Description }}</p>
+      {{ end }}
+    </div>
+  </article>
+{{ end }}

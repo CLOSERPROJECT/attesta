@@ -16,8 +16,9 @@ import (
 
 func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  parseTestTemplates(t),
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: t.TempDir(),
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -49,11 +50,130 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	}
 }
 
+func TestHandlePublicHomeEmptyCatalogRendersNoStreamCards(t *testing.T) {
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: t.TempDir(),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `class="public-stream-card"`) {
+		t.Fatalf("expected no public stream cards for empty catalog, got %q", body)
+	}
+	for _, fake := range []string{
+		"PV Module Tracing",
+		"Indium recycling recovery",
+		"Battery Passport",
+		"Critical Raw Materials",
+	} {
+		if strings.Contains(body, fake) {
+			t.Fatalf("expected no hard-coded stream tile %q on empty catalog, got %q", fake, body)
+		}
+	}
+}
+
+func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Stream", "string", "Alpha description")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "beta.yaml"), "Beta Stream", "number", "Beta description")
+
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if got := strings.Count(body, `class="public-stream-card"`); got != 2 {
+		t.Fatalf("public stream card count = %d, want 2", got)
+	}
+	for _, want := range []string{
+		"Alpha Stream",
+		"Alpha description",
+		"Beta Stream",
+		"Beta description",
+		`class="public-stream-card-badge">Stream</span>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	alphaIdx := strings.Index(body, "Alpha Stream")
+	betaIdx := strings.Index(body, "Beta Stream")
+	if alphaIdx < 0 || betaIdx < 0 || alphaIdx > betaIdx {
+		t.Fatalf("expected stable key order alpha before beta, alpha=%d beta=%d", alphaIdx, betaIdx)
+	}
+	if strings.Contains(body, "PV Module Tracing") {
+		t.Fatalf("expected no hard-coded Figma stream tiles, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeLimitsToFirstSixCatalogStreams(t *testing.T) {
+	tempDir := t.TempDir()
+	names := []string{
+		"Catalog One",
+		"Catalog Two",
+		"Catalog Three",
+		"Catalog Four",
+		"Catalog Five",
+		"Catalog Six",
+		"Catalog Seven",
+	}
+	files := []string{"a.yaml", "b.yaml", "c.yaml", "d.yaml", "e.yaml", "f.yaml", "g.yaml"}
+	for i, name := range names {
+		writeWorkflowConfig(t, filepath.Join(tempDir, files[i]), name, "string", name+" description")
+	}
+
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if got := strings.Count(body, `class="public-stream-card"`); got != 6 {
+		t.Fatalf("public stream card count = %d, want 6", got)
+	}
+	for _, want := range names[:6] {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q among first six cards, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, "Catalog Seven") {
+		t.Fatalf("did not expect seventh catalog stream on public home, got %q", body)
+	}
+	prev := -1
+	for _, want := range names[:6] {
+		idx := strings.Index(body, want)
+		if idx < 0 || idx < prev {
+			t.Fatalf("expected stable order for %q (prev=%d idx=%d)", want, prev, idx)
+		}
+		prev = idx
+	}
+}
+
 func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
 	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  parseTestTemplates(t),
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: t.TempDir(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				if sessionSecret != "session-public-home" {

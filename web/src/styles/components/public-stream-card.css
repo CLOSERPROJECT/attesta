@@ -1,0 +1,71 @@
+/*
+ * Public stream card — public homepage catalog tile (full component).
+ *
+ * article.public-stream-card
+ *   .public-stream-card-header
+ *     h3.public-stream-card-title
+ *     .public-stream-card-badges > span.public-stream-card-badge
+ *     p.public-stream-card-description
+ */
+
+.public-stream-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-6);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 340px;
+  min-height: 360px;
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.public-stream-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.public-stream-card-title {
+  font-size: var(--text-lg);
+  line-height: 1.75rem;
+}
+
+.public-stream-card-description {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-stream-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.public-stream-card-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}
+
+.public-stream-card-badge[data-category] {
+  background: var(--category-color);
+  border-color: var(--category-color);
+  color: var(--card);
+}

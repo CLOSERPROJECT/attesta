@@ -20,6 +20,12 @@ type StreamCardView struct {
 	DeleteAction      string
 }
 
+// PublicStreamCardView is the view model for templates/components/public_stream_card.html.
+type PublicStreamCardView struct {
+	Name        string
+	Description string
+}
+
 // WorkflowProcessCounts holds process status totals shown on a stream card.
 type WorkflowProcessCounts struct {
 	NotStarted int
