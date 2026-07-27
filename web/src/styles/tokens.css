@@ -17,20 +17,8 @@
   --text-4xl: 2.25rem;
   --text-5xl: 3rem;
 
-  /* Public landing (Figma landing_7 dark) */
-  --landing-bg: #1f242e;
-  --landing-surface: #121420;
-  --landing-muted: #1d1f2b;
-  --landing-secondary: #0d3235;
-  --landing-foreground: #ebf5f4;
-  --landing-text-muted: #a2c0b8;
-  --landing-text-secondary: #c1cac8;
-  --landing-primary: #d2eaeb;
-  --landing-accent: #1cc195;
-  --landing-accent-soft: #68c9af;
-  --landing-passport: #48baf9;
-  --landing-border: rgb(255 255 255 / 10%);
-  --landing-shadow: rgb(16 24 40 / 5%);
+  /* Category (marketing / stream taxonomy) */
+  --category-passport: light-dark(#1a7ab8, #48baf9);
 
   /* Line heights */
   --leading-none: 1;

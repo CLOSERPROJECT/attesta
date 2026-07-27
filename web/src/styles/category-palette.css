@@ -1,0 +1,9 @@
+/* Category key → shared custom property (consumed by badges, later chips) */
+[data-category="passport"] {
+  --category-color: var(--category-passport);
+}
+
+[data-category="fallback"],
+.public-home-badge:not([data-category]) {
+  --category-color: var(--muted-foreground);
+}
