@@ -51,10 +51,13 @@
             all completed
           </span>
         {{ else }}
-          {{/* Active-now chip is #183; until then show instance count only. */}}
           <span class="public-stream-card-metric">
             {{ template "icon-layers-2" . }}
             {{ if eq .InstanceCount 1 }}1 instance{{ else }}{{ .InstanceCount }} instances{{ end }}
+          </span>
+          <span class="public-stream-card-metric public-stream-card-metric-active">
+            {{ template "icon-activity" . }}
+            {{ if eq .ActiveCount 1 }}1 active now{{ else }}{{ .ActiveCount }} active now{{ end }}
           </span>
         {{ end }}
       </div>

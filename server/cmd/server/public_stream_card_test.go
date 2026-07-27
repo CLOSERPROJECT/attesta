@@ -316,6 +316,84 @@ func TestPublicStreamCardTemplateRendersPluralInstancesAllCompletedMetrics(t *te
 	}
 }
 
+func TestPublicStreamCardTemplateRendersOneActiveNowMetrics(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	card := PublicStreamCardView{
+		Name:          "Active Stream",
+		InstanceCount: 1,
+		ActiveCount:   1,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render public_stream_card template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`class="public-stream-card-metric"`,
+		`class="public-stream-card-metric public-stream-card-metric-active"`,
+		"1 instance",
+		"1 active now",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in active-now metrics layout, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("active-now metrics must not show all-completed chip, got: %s", body)
+	}
+	if strings.Contains(body, "1 instances") {
+		t.Fatalf("singular instance count must not use plural label, got: %s", body)
+	}
+	if strings.Contains(body, "1 actives now") || strings.Contains(body, "1 active nows") {
+		t.Fatalf("singular active count must use '1 active now', got: %s", body)
+	}
+	if strings.Count(body, "public-stream-card-metric") < 2 {
+		t.Fatalf("active-now metrics must render exactly two chips, got: %s", body)
+	}
+}
+
+func TestPublicStreamCardTemplateRendersPluralActiveNowMetrics(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	card := PublicStreamCardView{
+		Name:          "Active Stream",
+		InstanceCount: 3,
+		ActiveCount:   2,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render public_stream_card template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		"3 instances",
+		"2 active now",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in plural active-now metrics, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("active-now metrics must not show all-completed chip, got: %s", body)
+	}
+	if strings.Contains(body, "1 active now") {
+		t.Fatalf("plural active count must not use singular label, got: %s", body)
+	}
+	if !strings.Contains(body, `class="public-stream-card-metric public-stream-card-metric-active"`) {
+		t.Fatalf("expected active metric chip class, got: %s", body)
+	}
+	if strings.Count(body, "public-stream-card-metric") < 2 {
+		t.Fatalf("active-now metrics must render exactly two chips, got: %s", body)
+	}
+}
+
 func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 

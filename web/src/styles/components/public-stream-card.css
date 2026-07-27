@@ -12,7 +12,8 @@
  *       .public-stream-card-step > span + span.public-stream-card-step-meta
  *         (count + tip.public-stream-card-step-icon > icon-list)
  *   .public-stream-card-foot
- *     .public-stream-card-metrics > span.public-stream-card-metric[+icon-layers-2|icon-check-circle]
+ *     .public-stream-card-metrics > span.public-stream-card-metric[+icon-layers-2|icon-check-circle|icon-activity]
+ *       .public-stream-card-metric-active → activity icon uses --primary
  *     hr.public-stream-card-rule
  *     .public-stream-card-orgs
  *       .public-stream-card-orgs-head
@@ -178,6 +179,10 @@
   height: 14px;
   flex-shrink: 0;
   color: var(--muted-foreground);
+}
+
+.public-stream-card-metric-active .icon-svg {
+  color: var(--primary);
 }
 
 .public-stream-card-rule {

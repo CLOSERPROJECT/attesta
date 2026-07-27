@@ -2075,6 +2075,7 @@ func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView,
 		}
 		orgs, overflow := publicStreamCardOrganizations(cfg.Organizations, logoURLs)
 		instanceCount := 0
+		activeCount := 0
 		allCompleted := false
 		if s.store != nil {
 			processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
@@ -2083,14 +2084,13 @@ func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView,
 			}
 			instanceCount = len(processes)
 			if instanceCount > 0 {
-				active := 0
 				for i := range processes {
 					processes[i].Progress = normalizeProgressKeys(processes[i].Progress)
 					if deriveProcessStatus(cfg.Workflow, &processes[i]) == processStatusActive {
-						active++
+						activeCount++
 					}
 				}
-				allCompleted = active == 0
+				allCompleted = activeCount == 0
 			}
 		}
 		cards = append(cards, PublicStreamCardView{
@@ -2099,6 +2099,7 @@ func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView,
 			Steps:                 stepViews,
 			PassportEnabled:       cfg.DPP.Enabled,
 			InstanceCount:         instanceCount,
+			ActiveCount:           activeCount,
 			AllCompleted:          allCompleted,
 			Organizations:         orgs,
 			OrganizationsOverflow: overflow,

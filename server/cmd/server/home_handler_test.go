@@ -418,6 +418,94 @@ func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testi
 	}
 }
 
+func TestHandlePublicHomeRendersActiveNowMetricsScopedPerStream(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "live.yaml"), "Live Metrics Stream", "string", "Has active instances")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done only")
+
+	store := NewMemoryStore()
+	now := time.Now().UTC()
+	store.SeedProcess(Process{
+		WorkflowKey: "live",
+		CreatedAt:   now.Add(-3 * time.Minute),
+		Status:      processStatusActive,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "live",
+		CreatedAt:   now.Add(-2 * time.Minute),
+		Status:      processStatusTerminated,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "live",
+		CreatedAt:   now.Add(-time.Minute),
+		Status:      processStatusActive,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-4 * time.Minute),
+		Status:      processStatusDone,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-5 * time.Minute),
+		Status:      processStatusDone,
+	})
+
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	liveIdx := strings.Index(body, "Live Metrics Stream")
+	settledIdx := strings.Index(body, "Settled Metrics Stream")
+	if liveIdx < 0 || settledIdx < 0 {
+		t.Fatalf("expected both stream cards in body, got %q", body)
+	}
+
+	// Slice each card roughly by the next article boundary so assertions stay per-stream.
+	liveEnd := settledIdx
+	settledEnd := len(body)
+	if liveIdx > settledIdx {
+		liveEnd = len(body)
+		settledEnd = liveIdx
+	}
+	liveCard := body[liveIdx:liveEnd]
+	settledCard := body[settledIdx:settledEnd]
+
+	for _, want := range []string{
+		"3 instances",
+		"2 active now",
+		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
+	} {
+		if !strings.Contains(liveCard, want) {
+			t.Fatalf("live stream card missing %q, got %q", want, liveCard)
+		}
+	}
+	if strings.Contains(liveCard, "all completed") {
+		t.Fatalf("live stream with active instances must not show all-completed, got %q", liveCard)
+	}
+
+	for _, want := range []string{
+		"2 instances",
+		"all completed",
+	} {
+		if !strings.Contains(settledCard, want) {
+			t.Fatalf("settled stream card missing %q, got %q", want, settledCard)
+		}
+	}
+	if strings.Contains(settledCard, "active now") {
+		t.Fatalf("settled stream must not inherit live active-now metrics, got %q", settledCard)
+	}
+}
+
 func TestHandlePublicHomeLimitsToFirstSixCatalogStreams(t *testing.T) {
 	tempDir := t.TempDir()
 	names := []string{
