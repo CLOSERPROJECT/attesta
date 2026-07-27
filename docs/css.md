@@ -14,11 +14,12 @@ Load order from `web/src/styles.css`:
 1. `breakpoints.css` — sole `@custom-media` definitions  
 2. `tokens.css` — `:root`, `[data-theme="dark"]`, type/spacing tokens  
 3. `role-palette.css` — `data-role-palette` / `data-stream-status` maps  
-4. `reset.css`  
-5. `utilities.css` — `u-*`  
-6. `layout/index.css` — chrome, grids (`.rail-layout`), responsive shell  
-7. `components.css` — barrel; live import list is the file itself  
-8. `pages.css` — barrel; live import list is the file itself  
+4. `category-palette.css` — `data-category` → `--category-color`  
+5. `reset.css`  
+6. `utilities.css` — `u-*`  
+7. `layout/index.css` — chrome, grids (`.rail-layout`), responsive shell  
+8. `components.css` — barrel; live import list is the file itself  
+9. `pages.css` — barrel; live import list is the file itself  
 
 **Placement:** token → utility → layout → component → page. A selector lives in exactly one layer.
 
@@ -137,6 +138,7 @@ Writes persist `palette` only; legacy `color` CSS-var strings fall back via `rol
 | `data-theme` | `tokens.css` |
 | `data-role-palette` | `role-palette.css` |
 | `data-stream-status` | `role-palette.css` → `--stream-color` |
+| `data-category` | `category-palette.css` → `--category-color` |
 | `style="--progress: …%"` | `.stream-instance-card-progress-fill` only |
 
 Page-local hooks (`data-org-admin-*`, `data-home-*`, `data-process-id`, `data-formata-*`, carousel/copy/share, …) stay next to their template / `main.js` — do not catalog them here.

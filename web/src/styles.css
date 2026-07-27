@@ -1,6 +1,7 @@
 @import "./styles/breakpoints.css";
 @import "./styles/tokens.css";
 @import "./styles/role-palette.css";
+@import "./styles/category-palette.css";
 @import "./styles/reset.css";
 @import "./styles/utilities.css";
 @import "./styles/layout/index.css";
