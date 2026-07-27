@@ -1,6 +1,6 @@
 # Landing tokens + light/dark Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Drop `--landing-*`, make `/` follow Attesta `data-theme` light/dark tokens, and add a `data-category` → `--category-color` palette starting with `passport`.
 
@@ -43,7 +43,7 @@
 **Interfaces:**
 - Produces: `--category-passport`, `--category-color` (via `[data-category="passport"]`)
 
-- [ ] **Step 1: Replace `--landing-*` block with `--category-passport` in tokens**
+- [x] **Step 1: Replace `--landing-*` block with `--category-passport` in tokens**
 
 In `web/src/styles/tokens.css`, delete the entire “Public landing” block (`--landing-bg` … `--landing-shadow`). Keep `--text-4xl` / `--text-5xl`. After the font-size tokens (or near role/stream tokens), add:
 
@@ -52,7 +52,7 @@ In `web/src/styles/tokens.css`, delete the entire “Public landing” block (`-
   --category-passport: light-dark(#1a7ab8, #48baf9);
 ```
 
-- [ ] **Step 2: Create `category-palette.css`**
+- [x] **Step 2: Create `category-palette.css`**
 
 Create `web/src/styles/category-palette.css`:
 
@@ -68,7 +68,7 @@ Create `web/src/styles/category-palette.css`:
 }
 ```
 
-- [ ] **Step 3: Import after role-palette**
+- [x] **Step 3: Import after role-palette**
 
 In `web/src/styles.css`, after `role-palette.css`:
 
@@ -76,7 +76,7 @@ In `web/src/styles.css`, after `role-palette.css`:
 @import "./styles/category-palette.css";
 ```
 
-- [ ] **Step 4: Document in `docs/css.md`**
+- [x] **Step 4: Document in `docs/css.md`**
 
 Update layer stack item 3 to mention category palette (or insert as new item 4 and renumber):
 
@@ -93,7 +93,7 @@ Add to Shared `data-*` table:
 | `data-category` | `category-palette.css` → `--category-color` |
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/styles/tokens.css web/src/styles/category-palette.css web/src/styles.css docs/css.md
@@ -117,7 +117,7 @@ EOF
 **Interfaces:**
 - Consumes: semantic tokens + `--category-color` from Task 1
 
-- [ ] **Step 1: Update passport badges in template**
+- [x] **Step 1: Update passport badges in template**
 
 In `server/templates/pages/public_home.html`, replace every:
 
@@ -133,7 +133,7 @@ with:
 
 (four occurrences)
 
-- [ ] **Step 2: Retheme `public-home.css`**
+- [x] **Step 2: Retheme `public-home.css`**
 
 Apply these substitutions throughout `web/src/styles/pages/public-home.css`:
 
@@ -209,7 +209,7 @@ rg --landing- web/src server docs
 
 Expected: no matches (spec file may still mention `--landing-*` in historical mapping tables — that is OK under `docs/superpowers/`).
 
-- [ ] **Step 3: Lint and build**
+- [x] **Step 3: Lint and build**
 
 ```bash
 task css:lint
@@ -218,7 +218,7 @@ cd web && npm run build
 
 Expected: both succeed.
 
-- [ ] **Step 4: Handler smoke (optional but preferred)**
+- [x] **Step 4: Handler smoke (optional but preferred)**
 
 ```bash
 cd server && go test ./cmd/server/ -run 'TestHandlePublicHome'
@@ -226,7 +226,7 @@ cd server && go test ./cmd/server/ -run 'TestHandlePublicHome'
 
 Expected: PASS (markup still contains Sign In / Dashboard assertions; `data-category` does not break them).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/styles/pages/public-home.css server/templates/pages/public_home.html
