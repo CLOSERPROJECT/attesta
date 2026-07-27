@@ -2032,12 +2032,43 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if user, _, err := s.currentUser(r); err == nil {
 		base = s.pageBaseForUser(user, "public_home_body", "", "")
 	}
+	streams, err := s.publicStreamCards()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	view := struct {
 		PageBase
-	}{PageBase: base}
+		PublicStreams []PublicStreamCardView
+	}{PageBase: base, PublicStreams: streams}
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+const publicHomeStreamCardLimit = 6
+
+func (s *Server) publicStreamCards() ([]PublicStreamCardView, error) {
+	catalog, err := s.workflowCatalog()
+	if err != nil {
+		if err.Error() == "workflow config catalog is empty" {
+			return nil, nil
+		}
+		return nil, err
+	}
+	keys := sortedWorkflowKeys(catalog)
+	if len(keys) > publicHomeStreamCardLimit {
+		keys = keys[:publicHomeStreamCardLimit]
+	}
+	cards := make([]PublicStreamCardView, 0, len(keys))
+	for _, key := range keys {
+		cfg := catalog[key]
+		cards = append(cards, PublicStreamCardView{
+			Name:        cfg.Workflow.Name,
+			Description: strings.TrimSpace(cfg.Workflow.Description),
+		})
+	}
+	return cards, nil
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {

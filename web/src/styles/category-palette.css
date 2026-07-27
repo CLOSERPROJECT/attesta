@@ -4,6 +4,6 @@
 }
 
 [data-category="fallback"],
-.public-home-badge:not([data-category]) {
+.public-stream-card-badge:not([data-category]) {
   --category-color: var(--muted-foreground);
 }

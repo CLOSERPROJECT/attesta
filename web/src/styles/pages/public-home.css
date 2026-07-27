@@ -9,6 +9,7 @@
  *
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
  * Feature tiles use CSS-only component .home-feature-card (components/home-feature-card.css).
+ * Stream tiles use full component .public-stream-card (components/public-stream-card.css).
  */
 
 .public-home {
@@ -279,190 +280,11 @@
   justify-items: center;
 }
 
-.public-home-stream-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: var(--space-6);
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 340px;
-  min-height: 360px;
-  padding: var(--space-6);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.public-home-stream-card-main,
-.public-home-stream-card-header,
-.public-home-stream-steps,
-.public-home-stream-card-foot,
-.public-home-stream-instances {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 100%;
-}
-
-.public-home-stream-card-main {
-  gap: var(--space-6);
-}
-
-.public-home-stream-card-header {
-  gap: var(--space-3);
-}
-
-.public-home-stream-card h3 {
-  font-size: var(--text-lg);
-  line-height: 1.75rem;
-}
-
-.public-home-stream-card-header > p {
-  margin: 0;
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.public-home-stream-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.public-home-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--muted);
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1rem;
-}
-
-.public-home-badge[data-category] {
-  background: var(--category-color);
-  border-color: var(--category-color);
-  color: var(--card);
-}
-
-.public-home-stream-steps {
-  gap: 6px;
-  overflow: hidden;
-}
-
-.public-home-stream-steps-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-
-.public-home-stream-steps-head strong {
-  font-weight: var(--font-semibold);
-}
-
-.public-home-stream-step {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  width: 100%;
-  padding: var(--space-2) 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--muted);
-}
-
-.public-home-stream-step > span:first-child {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: 13px;
-  font-weight: var(--font-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.public-home-stream-step > span:last-child {
-  flex-shrink: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-
-.public-home-stream-more {
-  margin: 0;
-  padding: var(--space-1) 10px 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-}
-
-.public-home-stream-card-foot {
-  gap: var(--space-3);
-}
-
-.public-home-stream-metrics {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-}
-
-.public-home-stream-metric {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--foreground);
-}
-
-.public-home-stream-metric img {
-  width: 14px;
-  height: 14px;
-}
-
 .public-home-rule {
   width: 100%;
   margin: 0;
   border: 0;
   border-top: 1px solid var(--border);
-}
-
-.public-home-avatars {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.public-home-avatars img,
-.public-home-avatar-more {
-  width: 32px;
-  height: 32px;
-  border: 1.5px solid var(--border);
-  border-radius: 6px;
-  object-fit: cover;
-}
-
-.public-home-avatar-more {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  border-width: 2px;
-  background: var(--muted);
-  color: var(--primary);
-  font-size: var(--text-xs);
-  line-height: 1rem;
 }
 
 .public-home-process {
