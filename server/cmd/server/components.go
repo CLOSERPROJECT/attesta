@@ -26,12 +26,23 @@ type PublicStreamCardStepView struct {
 	SubstepCount int
 }
 
+// PublicStreamCardOrgView is one participating organization avatar on a public stream card.
+type PublicStreamCardOrgView struct {
+	Name     string
+	LogoURL  string
+	Initials string
+}
+
 // PublicStreamCardView is the view model for templates/components/public_stream_card.html.
 type PublicStreamCardView struct {
-	Name            string
-	Description     string
-	Steps           []PublicStreamCardStepView
-	PassportEnabled bool
+	Name                  string
+	Description           string
+	Steps                 []PublicStreamCardStepView
+	PassportEnabled       bool
+	InstanceCount         int
+	ActivityLabel         string
+	Organizations         []PublicStreamCardOrgView
+	OrganizationsOverflow int // count beyond the first four avatars; 0 when none
 }
 
 // WorkflowProcessCounts holds process status totals shown on a stream card.
@@ -43,20 +54,20 @@ type WorkflowProcessCounts struct {
 
 // StreamInstanceCard is the view model for templates/components/stream_instance_card.html.
 type StreamInstanceCard struct {
-	ID              string
-	Name            string
-	Status          string
-	StatusLabel     string
-	DetailHref      string
-	CreatedAt       string
-	CreatedAtISO    string
-	CreatedAtTime   time.Time
-	DoneSubsteps    int
-	TotalSubsteps   int
-	Percent         int
-	LastNotarizedAt string
+	ID                 string
+	Name               string
+	Status             string
+	StatusLabel        string
+	DetailHref         string
+	CreatedAt          string
+	CreatedAtISO       string
+	CreatedAtTime      time.Time
+	DoneSubsteps       int
+	TotalSubsteps      int
+	Percent            int
+	LastNotarizedAt    string
 	LastNotarizedAtISO string
-	LastDigestShort string
+	LastDigestShort    string
 }
 
 // SubstepRoleBadge is a role pill on a substep body (preview/result modes).
@@ -114,21 +125,21 @@ const (
 // SubstepBodyView is the view model for templates/components/substep_body.html.
 type SubstepBodyView struct {
 	WorkflowKey    string
-	ProcessID        string
-	SubstepID        string
-	Title            string
-	Description      string
-	Role             string
-	RoleBadges       []SubstepRoleBadge
-	MatchingRoles    []SubstepRoleOption
-	RoleLabel        string
-	Palette          string
-	InputKey         string
-	InputType        string
-	FormSchema       string
-	FormUISchema     string
-	Status           string
-	Mode             SubstepBodyMode
+	ProcessID      string
+	SubstepID      string
+	Title          string
+	Description    string
+	Role           string
+	RoleBadges     []SubstepRoleBadge
+	MatchingRoles  []SubstepRoleOption
+	RoleLabel      string
+	Palette        string
+	InputKey       string
+	InputType      string
+	FormSchema     string
+	FormUISchema   string
+	Status         string
+	Mode           SubstepBodyMode
 	DoneAt         string
 	DoneAtISO      string
 	DoneBy         string

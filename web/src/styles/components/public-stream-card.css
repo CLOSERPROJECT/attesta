@@ -11,6 +11,12 @@
  *     .public-stream-card-steps-list
  *       .public-stream-card-step > span + span.public-stream-card-step-meta
  *         (count + tip.public-stream-card-step-icon > icon-list)
+ *   .public-stream-card-foot
+ *     .public-stream-card-metrics > span + span.public-stream-card-metric
+ *     hr.public-stream-card-rule
+ *     .public-stream-card-orgs
+ *       .public-stream-card-orgs-head
+ *       .public-stream-card-avatars > img | span.public-stream-card-avatar | span.public-stream-card-avatar-more
  */
 
 .public-stream-card {
@@ -142,4 +148,86 @@
   width: 14px;
   height: 14px;
   opacity: 0.6;
+}
+
+.public-stream-card-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.public-stream-card-metrics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+}
+
+.public-stream-card-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground);
+}
+
+.public-stream-card-rule {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.public-stream-card-orgs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.public-stream-card-orgs-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.public-stream-card-orgs-head strong {
+  font-weight: var(--font-semibold);
+}
+
+.public-stream-card-avatars {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.public-stream-card-avatars img,
+.public-stream-card-avatar,
+.public-stream-card-avatar-more {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.public-stream-card-avatar,
+.public-stream-card-avatar-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: var(--muted);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+  font-weight: var(--font-semibold);
+}
+
+.public-stream-card-avatar-more {
+  border-width: 2px;
 }

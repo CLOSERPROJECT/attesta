@@ -246,6 +246,87 @@ func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
 	}
 }
 
+func TestHandlePublicHomeRendersOrgAvatarsAndMetricsFromCatalog(t *testing.T) {
+	tempDir := t.TempDir()
+	content := `workflow:
+  name: "Org Avatar Stream"
+  description: "Org footer and metrics fixture"
+  steps:
+    - id: "1"
+      title: "Incoming intake"
+      order: 1
+      organization: "acme"
+      substeps:
+        - id: "1.1"
+          title: "Record lot"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "lot"
+          inputType: "formata"
+          schema:
+            type: object
+organizations:
+  - slug: "acme"
+    name: "Acme Corp"
+  - slug: "beta"
+    name: "Beta Org"
+roles:
+  - orgSlug: "acme"
+    slug: "dep1"
+    name: "Department 1"
+users:
+  - id: "u1"
+    name: "User 1"
+    departmentId: "dep1"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "orgs.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	server := &Server{
+		store: NewMemoryStore(),
+		tmpl:  parseTestTemplates(t),
+		identity: &fakeIdentityStore{
+			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+				return []IdentityOrg{
+					{Slug: "acme", Name: "Acme Corp", LogoFileID: "logo-1"},
+					{Slug: "beta", Name: "Beta Org"},
+				}, nil
+			},
+		},
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"Org Avatar Stream",
+		`src="/organization/logo/acme"`,
+		`alt="Acme Corp"`,
+		`aria-label="Beta Org"`,
+		">BE<",
+		`<strong>Organizations</strong>`,
+		`class="public-stream-card-metrics"`,
+		">28<",
+		"all completed",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, "Stream Instances") {
+		t.Fatalf("footer must not say Stream Instances, got %q", body)
+	}
+	if strings.Contains(body, `src="/organization/logo/beta"`) {
+		t.Fatalf("beta without logo must use initials, not logo url, got %q", body)
+	}
+}
+
 func TestHandlePublicHomeLimitsToFirstSixCatalogStreams(t *testing.T) {
 	tempDir := t.TempDir()
 	names := []string{

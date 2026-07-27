@@ -1,4 +1,4 @@
-{{/* Public homepage stream card: name, description, Stream badge, optional passport badge, step preview. Not a link. */}}
+{{/* Public homepage stream card: name, description, Stream badge, optional passport badge, step preview, metrics stubs, org avatars. Not a link. */}}
 
 {{ define "public_stream_card" }}
   <article class="public-stream-card">
@@ -34,5 +34,34 @@
         </div>
       </div>
     {{ end }}
+    <div class="public-stream-card-foot">
+      <div class="public-stream-card-metrics">
+        <span>{{ .InstanceCount }}</span>
+        {{ if .ActivityLabel }}
+          <span class="public-stream-card-metric">{{ .ActivityLabel }}</span>
+        {{ end }}
+      </div>
+      {{ if .Organizations }}
+        <hr class="public-stream-card-rule" />
+        <div class="public-stream-card-orgs">
+          <div class="public-stream-card-orgs-head"><strong>Organizations</strong></div>
+          <div class="public-stream-card-avatars">
+            {{ range .Organizations }}
+              {{ if .LogoURL }}
+                <img src="{{ .LogoURL }}" alt="{{ .Name }}" width="32" height="32" />
+              {{ else }}
+                <span class="public-stream-card-avatar" role="img" aria-label="{{ .Name }}">{{ .Initials }}</span>
+              {{ end }}
+            {{ end }}
+            {{ if .OrganizationsOverflow }}
+              <span
+                class="public-stream-card-avatar-more"
+                aria-label="{{ .OrganizationsOverflow }} more organizations"
+              >+{{ .OrganizationsOverflow }}</span>
+            {{ end }}
+          </div>
+        </div>
+      {{ end }}
+    </div>
   </article>
 {{ end }}

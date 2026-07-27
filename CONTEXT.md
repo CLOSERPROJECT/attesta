@@ -31,7 +31,7 @@ The authenticated screen at `/my` where an operator chooses which stream (bluepr
 _Avoid_: Home, workflow picker
 
 **Public stream card**:
-A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), activity/instance metrics (placeholders until derived), and participating **organizations**. Distinct UI from the authenticated stream picker card. Not clickable in v1.
+A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), live stream-instance metrics (total count plus active-or-completed activity, or that none exist yet), and participating **organizations**. Distinct UI from the authenticated stream picker card. Not clickable in v1.
 _Avoid_: Stream card (when meaning the `/my` picker card), process card, landing stream tile, showcase stream
 
 **Organization**:

@@ -2032,7 +2032,7 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if user, _, err := s.currentUser(r); err == nil {
 		base = s.pageBaseForUser(user, "public_home_body", "", "")
 	}
-	streams, err := s.publicStreamCards()
+	streams, err := s.publicStreamCards(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2047,8 +2047,15 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 }
 
 const publicHomeStreamCardLimit = 6
+const publicHomeStreamOrgAvatarLimit = 4
 
-func (s *Server) publicStreamCards() ([]PublicStreamCardView, error) {
+// Stub metrics for public stream cards until real activity/instance derivation exists (#179).
+const (
+	publicHomeStreamInstanceCountStub = 28
+	publicHomeStreamActivityStub      = "all completed"
+)
+
+func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
 		if err.Error() == "workflow config catalog is empty" {
@@ -2060,6 +2067,7 @@ func (s *Server) publicStreamCards() ([]PublicStreamCardView, error) {
 	if len(keys) > publicHomeStreamCardLimit {
 		keys = keys[:publicHomeStreamCardLimit]
 	}
+	logoURLs := organizationLogoURLMap(ctx, s.identity)
 	cards := make([]PublicStreamCardView, 0, len(keys))
 	for _, key := range keys {
 		cfg := catalog[key]
@@ -2071,14 +2079,56 @@ func (s *Server) publicStreamCards() ([]PublicStreamCardView, error) {
 				SubstepCount: len(step.Substep),
 			})
 		}
+		orgs, overflow := publicStreamCardOrganizations(cfg.Organizations, logoURLs)
 		cards = append(cards, PublicStreamCardView{
-			Name:            cfg.Workflow.Name,
-			Description:     strings.TrimSpace(cfg.Workflow.Description),
-			Steps:           stepViews,
-			PassportEnabled: cfg.DPP.Enabled,
+			Name:                  cfg.Workflow.Name,
+			Description:           strings.TrimSpace(cfg.Workflow.Description),
+			Steps:                 stepViews,
+			PassportEnabled:       cfg.DPP.Enabled,
+			InstanceCount:         publicHomeStreamInstanceCountStub,
+			ActivityLabel:         publicHomeStreamActivityStub,
+			Organizations:         orgs,
+			OrganizationsOverflow: overflow,
 		})
 	}
 	return cards, nil
+}
+
+func publicStreamCardOrganizations(orgs []WorkflowOrganization, logoURLs map[string]string) ([]PublicStreamCardOrgView, int) {
+	out := make([]PublicStreamCardOrgView, 0, len(orgs))
+	for _, org := range orgs {
+		name := strings.TrimSpace(org.Name)
+		if name == "" {
+			name = strings.TrimSpace(org.Slug)
+		}
+		if name == "" {
+			continue
+		}
+		slug := strings.TrimSpace(org.Slug)
+		view := PublicStreamCardOrgView{
+			Name:     name,
+			Initials: organizationInitials(name),
+		}
+		if logoURLs != nil {
+			view.LogoURL = strings.TrimSpace(logoURLs[slug])
+		}
+		out = append(out, view)
+	}
+	if len(out) > publicHomeStreamOrgAvatarLimit {
+		return out[:publicHomeStreamOrgAvatarLimit], len(out) - publicHomeStreamOrgAvatarLimit
+	}
+	return out, 0
+}
+
+func organizationInitials(name string) string {
+	runes := []rune(strings.TrimSpace(name))
+	if len(runes) == 0 {
+		return ""
+	}
+	if len(runes) == 1 {
+		return strings.ToUpper(string(runes))
+	}
+	return strings.ToUpper(string(runes[:2]))
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -3428,7 +3478,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	}
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
-		PageBase: s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		Breadcrumbs:              buildPlatformAdminBreadcrumbs(),
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
@@ -3905,7 +3955,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 
 	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
 		view := OrgAdminView{
-			PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
+			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
 			Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 			ActivePanel:            activePanel,
 			NeedsOrganizationSetup: true,
@@ -3938,7 +3988,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
 
 	view := OrgAdminView{
-		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
+		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 		ActivePanel:            activePanel,
 		Organization:           org,
@@ -5327,7 +5377,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
-		PageBase: s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
+		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		ProcessID:    process.ID.Hex(),
 		DigitalLink:  link,
 		GTIN:         gtin,
