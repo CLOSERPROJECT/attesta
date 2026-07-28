@@ -63,3 +63,75 @@ func TestPlatformAdminTemplateOrganizationInviteAndPagination(t *testing.T) {
 		t.Fatalf("expected pagination controls and pages, got: %s", body)
 	}
 }
+
+func TestPlatformAdminCategoriesPanelMarkup(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		Categories: []TaxonomyCategoryNode{
+			{
+				Name:    "Supply Chain",
+				Slug:    "supply-chain",
+				Icon:    "batch-traceability",
+				IconURL: "/static/taxonomy/batch-traceability.svg",
+				SubCategories: []TaxonomySubCategoryNode{
+					{
+						Name:        "Procurement",
+						Slug:        "procurement",
+						Icon:        "procurement-workflow",
+						IconURL:     "/static/taxonomy/procurement-workflow.svg",
+						Description: "PO management",
+					},
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
+		t.Fatalf("render platform_admin_body: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		"Browse stream discovery categories",
+		`class="sidebar-nav-link is-active"`,
+		`href="/admin/categories"`,
+		`class="platform-admin-taxonomy-list"`,
+		`class="platform-admin-taxonomy-icon"`,
+		"Supply Chain",
+		"supply-chain",
+		"batch-traceability",
+		"/static/taxonomy/batch-traceability.svg",
+		"Procurement",
+		"procurement-workflow",
+		"PO management",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in categories panel markup, got:\n%s", want, body)
+		}
+	}
+
+	if strings.Contains(body, `class="panel-head-actions"`) {
+		t.Fatalf("did not expect orgs panel-head-actions on categories panel")
+	}
+}
+
+func TestPlatformAdminCategoriesPanelEmptyState(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
+		t.Fatalf("render platform_admin_body: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, "No categories yet") {
+		t.Fatalf("expected empty state message, got:\n%s", body)
+	}
+}

@@ -81,6 +81,7 @@ func TestHandlePublicCatalog(t *testing.T) {
 	}
 
 	server := catalogServer(now, identity)
+	seedPlatformAdminTaxonomy(t, server.store)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
@@ -137,6 +138,38 @@ func TestHandlePublicCatalog(t *testing.T) {
 		if palette, ok := role["palette"].(string); !ok || palette == "" {
 			t.Fatalf("role %#v missing palette", role)
 		}
+	}
+
+	categories, ok := raw["categories"].([]any)
+	if !ok || len(categories) != 1 {
+		t.Fatalf("raw categories = %#v", raw["categories"])
+	}
+	category, ok := categories[0].(map[string]any)
+	if !ok {
+		t.Fatalf("category item = %#v", categories[0])
+	}
+	if category["slug"] != "supply-chain" || category["name"] != "Supply Chain" {
+		t.Fatalf("category meta = %#v", category)
+	}
+	if category["iconURL"] != "/static/taxonomy/batch-traceability.svg" {
+		t.Fatalf("category iconURL = %#v", category["iconURL"])
+	}
+	subCategories, ok := category["subCategories"].([]any)
+	if !ok || len(subCategories) != 2 {
+		t.Fatalf("subCategories = %#v", category["subCategories"])
+	}
+	procurement, ok := subCategories[0].(map[string]any)
+	if !ok {
+		t.Fatalf("subcategory item = %#v", subCategories[0])
+	}
+	if procurement["slug"] != "procurement" {
+		t.Fatalf("procurement slug = %#v", procurement["slug"])
+	}
+	if procurement["iconURL"] != "/static/taxonomy/procurement-workflow.svg" {
+		t.Fatalf("procurement iconURL = %#v", procurement["iconURL"])
+	}
+	if procurement["description"] != "PO management" {
+		t.Fatalf("procurement description = %#v", procurement["description"])
 	}
 }
 
@@ -205,4 +238,50 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 		}
 	})
 
+	t.Run("load taxonomy", func(t *testing.T) {
+		identity := catalogAuthIdentity(now, true)
+		identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }
+		server := &Server{
+			authorizer:  fakeAuthorizer{},
+			store:       &failingListCategoriesStore{MemoryStore: NewMemoryStore(), err: errCatalogLoadTaxonomy},
+			identity:    identity,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handlePublicCatalog(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("list subcategories", func(t *testing.T) {
+		identity := catalogAuthIdentity(now, true)
+		identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }
+		base := NewMemoryStore()
+		seedPlatformAdminTaxonomy(t, base)
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			store: &failingListSubCategoriesStore{
+				MemoryStore: base,
+				err:         errCatalogListSubCategories,
+			},
+			identity:    identity,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handlePublicCatalog(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
 }
+
+var errCatalogLoadTaxonomy = errors.New("load taxonomy failed")
+var errCatalogListSubCategories = errors.New("list subcategories failed")

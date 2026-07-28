@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"path/filepath"
@@ -46,6 +47,18 @@ type Store interface {
 	ListFormataBuilderStreams(ctx context.Context) ([]FormataBuilderStream, error)
 	DeleteFormataBuilderStream(ctx context.Context, id primitive.ObjectID) error
 	DeleteWorkflowData(ctx context.Context, workflowKey string) error
+	ListCategories(ctx context.Context) ([]Category, error)
+	GetCategoryBySlug(ctx context.Context, slug string) (*Category, error)
+	DeleteCategory(ctx context.Context, slug string) error
+	ListSubCategories(ctx context.Context, categorySlug string) ([]SubCategory, error)
+	GetSubCategoryBySlug(ctx context.Context, categorySlug, slug string) (*SubCategory, error)
+	DeleteSubCategory(ctx context.Context, categorySlug, slug string) error
+	EnsureTaxonomyIndexes(ctx context.Context) error
+	ReplaceTaxonomy(ctx context.Context, categories []Category, subCategories []SubCategory) error
+	// TaxonomyRevision is a monotonically increasing counter bumped when taxonomy
+	// contents change. Used to invalidate the workflow catalog cache across processes
+	// (e.g. seed-categories CLI while the server keeps running).
+	TaxonomyRevision(ctx context.Context) (int64, error)
 }
 
 type Organization struct {
@@ -100,6 +113,7 @@ type MongoStore struct {
 type mongoDatabasePort interface {
 	Collection(name string) mongoCollectionPort
 	NewGridFSBucket(name string) (gridFSBucketPort, error)
+	RenameCollection(ctx context.Context, from, to string, dropTarget bool) error
 }
 
 type mongoCollectionPort interface {
@@ -122,6 +136,7 @@ type mongoSingleResultPort interface {
 type mongoCursorPort interface {
 	Next(ctx context.Context) bool
 	Decode(val interface{}) error
+	Err() error
 	Close(ctx context.Context) error
 }
 
@@ -145,6 +160,25 @@ func (d mongoDriverDatabase) NewGridFSBucket(name string) (gridFSBucketPort, err
 		return nil, err
 	}
 	return mongoDriverGridFSBucket{bucket: bucket}, nil
+}
+
+func (d mongoDriverDatabase) RenameCollection(ctx context.Context, from, to string, dropTarget bool) error {
+	if d.db == nil {
+		return errors.New("database is required")
+	}
+	from = strings.TrimSpace(from)
+	to = strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return fmt.Errorf("rename collection requires from and to names")
+	}
+	cmd := bson.D{
+		{Key: "renameCollection", Value: d.db.Name() + "." + from},
+		{Key: "to", Value: d.db.Name() + "." + to},
+	}
+	if dropTarget {
+		cmd = append(cmd, bson.E{Key: "dropTarget", Value: true})
+	}
+	return d.db.Client().Database("admin").RunCommand(ctx, cmd).Err()
 }
 
 type mongoDriverCollection struct {
@@ -230,6 +264,10 @@ func (c mongoDriverCursor) Next(ctx context.Context) bool {
 
 func (c mongoDriverCursor) Decode(val interface{}) error {
 	return c.cursor.Decode(val)
+}
+
+func (c mongoDriverCursor) Err() error {
+	return c.cursor.Err()
 }
 
 func (c mongoDriverCursor) Close(ctx context.Context) error {
@@ -555,11 +593,14 @@ func (s *MongoStore) attachmentsBucket() (gridFSBucketPort, error) {
 }
 
 type MemoryStore struct {
-	mu             sync.RWMutex
-	processes      map[primitive.ObjectID]Process
-	notarizations  []Notarization
-	attachments    map[primitive.ObjectID]memoryAttachment
-	formataStreams map[primitive.ObjectID]FormataBuilderStream
+	mu                sync.RWMutex
+	processes         map[primitive.ObjectID]Process
+	notarizations     []Notarization
+	attachments       map[primitive.ObjectID]memoryAttachment
+	formataStreams    map[primitive.ObjectID]FormataBuilderStream
+	categories        map[string]Category
+	subCategories     map[string]SubCategory
+	taxonomyRevision  int64
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -580,6 +621,8 @@ func NewMemoryStore() *MemoryStore {
 		processes:      map[primitive.ObjectID]Process{},
 		attachments:    map[primitive.ObjectID]memoryAttachment{},
 		formataStreams: map[primitive.ObjectID]FormataBuilderStream{},
+		categories:     map[string]Category{},
+		subCategories:  map[string]SubCategory{},
 	}
 }
 

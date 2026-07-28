@@ -42,10 +42,12 @@ const (
 )
 
 type WorkflowDef struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
-	Name        string             `bson:"name" yaml:"name"`
-	Description string             `bson:"description,omitempty" yaml:"description,omitempty"`
-	Steps       []WorkflowStep     `bson:"steps" yaml:"steps"`
+	ID              primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
+	Name            string             `bson:"name" yaml:"name"`
+	Description     string             `bson:"description,omitempty" yaml:"description,omitempty"`
+	CategorySlug    string             `bson:"categorySlug,omitempty" yaml:"categorySlug,omitempty"`
+	SubCategorySlug string             `bson:"subCategorySlug,omitempty" yaml:"subCategorySlug,omitempty"`
+	Steps           []WorkflowStep     `bson:"steps" yaml:"steps"`
 }
 
 type WorkflowStep struct {
@@ -151,12 +153,13 @@ type Server struct {
 	configProvider func() (RuntimeConfig, error)
 	workflowDefID  primitive.ObjectID
 	configDir      string
-	configMu       sync.Mutex
-	catalogModTime map[string]time.Time
-	catalog        map[string]RuntimeConfig
-	viteDevServer  string
-	enforceAuth    bool
-	formataArchURL string
+	configMu            sync.Mutex
+	catalogModTime      map[string]time.Time
+	catalogTaxonomyRev  int64
+	catalog             map[string]RuntimeConfig
+	viteDevServer       string
+	enforceAuth         bool
+	formataArchURL      string
 }
 
 type SSEHub struct {
@@ -286,6 +289,7 @@ type PageBase struct {
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
+	Categories    []TaxonomyCategoryNode      `json:"categories"`
 }
 
 type PublicCatalogOrganization struct {
@@ -407,6 +411,8 @@ type AboutView struct {
 
 type PlatformAdminView struct {
 	PageBase
+	ActivePanel              string
+	Categories               []TaxonomyCategoryNode
 	Breadcrumbs              BreadcrumbsView
 	SearchQuery              string
 	CurrentPage              int
@@ -683,6 +689,13 @@ type workflowContextValue struct {
 
 func main() {
 	ctx := context.Background()
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-categories" {
+		if err := runSeedCategoriesCommand(ctx, os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
@@ -719,6 +732,9 @@ func main() {
 		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
+	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
+		log.Fatal(err)
+	}
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
@@ -1187,7 +1203,7 @@ func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir 
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+		if !isWorkflowCatalogConfigFile(name) {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, name))
@@ -2217,6 +2233,13 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 		return response.Roles[i].Slug < response.Roles[j].Slug
 	})
 
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		http.Error(w, "failed to load taxonomy", http.StatusInternalServerError)
+		return
+	}
+	response.Categories = categories
+
 	writeJSON(w, response)
 }
 
@@ -2250,6 +2273,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
+	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
@@ -3380,8 +3404,9 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	}
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
-		PageBase: s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		Breadcrumbs:              buildPlatformAdminBreadcrumbs(),
+		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		ActivePanel:              "orgs",
+		Breadcrumbs:              buildPlatformAdminBreadcrumbs("orgs"),
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
 		TotalPages:               totalPages,
@@ -3413,6 +3438,31 @@ func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, c
 func (s *Server) renderPlatformAdminResults(w http.ResponseWriter, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
 	view := s.platformAdminView(user, confirmation, errs)
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin_results", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requirePlatformAdmin(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load categories", err, "failed to load platform admin categories")
+		return
+	}
+	view := PlatformAdminView{
+		PageBase:    s.pageBaseForUser(admin, "platform_admin_body", "", ""),
+		ActivePanel: "categories",
+		Categories:  categories,
+		Breadcrumbs: buildPlatformAdminBreadcrumbs("categories"),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -6458,6 +6508,9 @@ func parseRuntimeConfigData(source string, data []byte) (RuntimeConfig, error) {
 	if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
 		return RuntimeConfig{}, fmt.Errorf("workflow config is empty in %s", source)
 	}
+	if err := validateWorkflowCategoryPair(cfg.Workflow); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
+	}
 	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
@@ -6481,6 +6534,11 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 
+	taxRev, taxErr := s.catalogTaxonomyRevision()
+	if taxErr != nil {
+		return nil, taxErr
+	}
+
 	if s.store != nil {
 		streams, err := s.store.ListFormataBuilderStreams(context.Background())
 		if err != nil {
@@ -6495,11 +6553,12 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 				key := stream.ID.Hex()
 				modTimes[key] = workflowCatalogModTime(stream)
 			}
-			if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
+			if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) && s.catalogTaxonomyRev == taxRev {
 				return cloneWorkflowCatalog(s.catalog), nil
 			}
 
 			catalog := make(map[string]RuntimeConfig, len(streams))
+			cacheable := true
 			for _, stream := range streams {
 				if stream.ID.IsZero() {
 					return nil, errors.New("formata stream id is empty")
@@ -6509,10 +6568,19 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 				if parseErr != nil {
 					return nil, parseErr
 				}
+				if resolveErr := s.resolveCatalogStreamCategorization(&cfg); resolveErr != nil {
+					cacheable = false
+				}
 				catalog[key] = cfg
 			}
-			s.catalog = catalog
-			s.catalogModTime = modTimes
+			if cacheable {
+				s.catalog = catalog
+				s.catalogModTime = modTimes
+				s.catalogTaxonomyRev = taxRev
+			} else {
+				s.catalog = nil
+				s.catalogModTime = nil
+			}
 			return cloneWorkflowCatalog(catalog), nil
 		}
 	}
@@ -6533,7 +6601,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+		if !isWorkflowCatalogConfigFile(name) {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, name))
@@ -6551,11 +6619,12 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		}
 		modTimes[path] = info.ModTime()
 	}
-	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
+	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) && s.catalogTaxonomyRev == taxRev {
 		return cloneWorkflowCatalog(s.catalog), nil
 	}
 
 	catalog := make(map[string]RuntimeConfig, len(paths))
+	cacheable := true
 	for _, path := range paths {
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
@@ -6564,6 +6633,9 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		cfg, parseErr := parseRuntimeConfigData(filepath.Base(path), data)
 		if parseErr != nil {
 			return nil, parseErr
+		}
+		if resolveErr := s.resolveCatalogStreamCategorization(&cfg); resolveErr != nil {
+			cacheable = false
 		}
 		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 		if key == "" {
@@ -6575,10 +6647,23 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		catalog[key] = cfg
 	}
 
-	s.catalog = catalog
-	s.catalogModTime = modTimes
+	if cacheable {
+		s.catalog = catalog
+		s.catalogModTime = modTimes
+		s.catalogTaxonomyRev = taxRev
+	} else {
+		s.catalog = nil
+		s.catalogModTime = nil
+	}
 
 	return cloneWorkflowCatalog(catalog), nil
+}
+
+func (s *Server) catalogTaxonomyRevision() (int64, error) {
+	if s == nil || s.store == nil {
+		return 0, nil
+	}
+	return s.store.TaxonomyRevision(context.Background())
 }
 
 func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {

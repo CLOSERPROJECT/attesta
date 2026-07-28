@@ -1,0 +1,127 @@
+# Attesta stream-discovery taxonomy seed (full-replace via `go run ./cmd/server seed-categories`).
+# Extracted from Figma; see .scratch/stream-categories/figma-seed-notes.md for provenance.
+
+categories:
+  - slug: recycling-and-recovery
+    name: Recycling and Recovery
+    icon: weee
+    sortOrder: 1
+    subCategories:
+      - slug: photovoltaic-panels
+        name: Photovoltaic Panels
+        icon: photovoltaic-module
+        sortOrder: 1
+        description: Tracking disassembly and material recovery from photovoltaic panels
+      - slug: flat-screen-displays
+        name: Flat Screen Displays
+        icon: flat-screen
+        sortOrder: 2
+        description: Managing flat screen recycling and rare material recovery
+      - slug: printed-circuit-boards-pcb
+        name: Printed Circuit Boards (PCB)
+        icon: pcb
+        sortOrder: 3
+        description: Precious metal recovery process from electronic circuit boards
+      - slug: led-lighting
+        name: LED Lighting
+        icon: led-lighting
+        sortOrder: 4
+        description: Traceability of LED device disassembly and recycling
+      - slug: power-electronics
+        name: Power Electronics
+        icon: power-electronics
+        sortOrder: 5
+        description: Component and material recovery from power devices
+
+  - slug: supply-chain
+    name: Supply Chain
+    icon: batch-traceability
+    sortOrder: 2
+    subCategories:
+      - slug: shipment-tracking
+        name: Shipment Tracking
+        icon: shipment-tracking
+        sortOrder: 1
+        description: Real-time tracking of material shipments
+      - slug: supplier-onboarding
+        name: Supplier Onboarding
+        icon: supplier-onboarding
+        sortOrder: 2
+        description: Qualification and registration process for new suppliers
+      - slug: procurement
+        name: Procurement
+        icon: procurement-workflow
+        sortOrder: 3
+        description: Purchase order and procurement management
+      - slug: order-fulfillment
+        name: Order Fulfillment
+        icon: order-fulfillment
+        sortOrder: 4
+        description: Order fulfillment tracking through to delivery
+      - slug: partner-onboarding
+        name: Partner Onboarding
+        icon: partner-onboarding
+        sortOrder: 5
+        description: Registration and onboarding of new business partners
+
+  - slug: compliance-and-quality
+    name: Compliance and Quality
+    icon: quality-control
+    sortOrder: 3
+    subCategories:
+      - slug: compliance-review
+        name: Compliance Review
+        icon: compliance-review
+        sortOrder: 1
+        description: Regulatory compliance verification for processes and documents
+      - slug: quality-control
+        name: Quality Control
+        icon: reporting-workflow
+        sortOrder: 2
+        description: Quality checks on incoming and outgoing materials
+      - slug: audit-workflow
+        name: Audit Workflow
+        icon: audit-workflow
+        sortOrder: 3
+        description: Planning and execution of internal and external audits
+      - slug: certification
+        name: Certification
+        icon: certification-workflow
+        sortOrder: 4
+        description: Certification lifecycle and regulatory renewal management
+      - slug: inspection
+        name: Inspection
+        icon: inspection-workflow
+        sortOrder: 5
+        description: Inspections on facilities, batches, and production processes
+
+  - slug: workflow-and-operations
+    name: Workflow and Operations
+    icon: approval-workflow
+    sortOrder: 4
+    subCategories:
+      - slug: approval-workflow
+        name: Approval Workflow
+        icon: data-verification
+        sortOrder: 1
+        description: Multi-level approval flows for documents and processes
+      - slug: change-request
+        name: Change Request
+        icon: change-request
+        sortOrder: 2
+        description: Change request management for processes or configurations
+      - slug: corrective-action
+        name: Corrective Action
+        icon: corrective-action
+        sortOrder: 3
+        description: Logging and follow-up of corrective actions (CAPA)
+      - slug: maintenance
+        name: Maintenance
+        icon: maintenance-workflow
+        sortOrder: 4
+        description: Scheduling routine and extraordinary maintenance activities
+      - slug: issue-tracking
+        name: Issue Tracking
+        icon: issue-tracking
+        sortOrder: 5
+        description: Reporting and resolution of operational issues

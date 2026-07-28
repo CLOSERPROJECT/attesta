@@ -157,7 +157,7 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 		server.renderPlatformAdmin(rec, &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "invite sent", PlatformAdminErrors{})
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN ORGS 1 invite sent") {
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
 			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
 		}
 	})
@@ -851,7 +851,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN ORGS 1") {
+		if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1") {
 			t.Fatalf("body = %q", rec.Body.String())
 		}
 	})
@@ -1051,7 +1051,7 @@ func TestHandleAdminOrgsInviteOrgAdminWithPlatformAdmin(t *testing.T) {
 	if inviteRedirect != "http://attesta.local/invite/accept" {
 		t.Fatalf("invite redirect = %q", inviteRedirect)
 	}
-	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN ORGS 1 invite sent") {
+	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
@@ -1130,7 +1130,7 @@ func TestHandleAdminOrgsInviteOrgAdminSendsInviteForUnknownEmail(t *testing.T) {
 	if inviteRedirect != "http://attesta.local/invite/accept" || deletedSecret != "platform-session" {
 		t.Fatalf("redirect=%q deleted=%q", inviteRedirect, deletedSecret)
 	}
-	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN ORGS 1 invite sent") {
+	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
@@ -1202,7 +1202,7 @@ func TestHandleAdminOrgsInviteOrgAdminUpdatesExistingMembershipOnly(t *testing.T
 	if loginEmail != "admin@example.com" || deletedSecret != "platform-session" {
 		t.Fatalf("login=%q deleted=%q", loginEmail, deletedSecret)
 	}
-	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN ORGS 1 org admin access updated") {
+	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 org admin access updated") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
