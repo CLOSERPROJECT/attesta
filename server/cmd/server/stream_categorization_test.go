@@ -129,6 +129,17 @@ func TestApplyEffectiveStreamCategorizationMissingTaxonomyIsUncategorized(t *tes
 	}
 }
 
+func seedSupplyChainProcurementTaxonomy(t *testing.T, store Store) {
+	t.Helper()
+	if err := store.ReplaceTaxonomy(t.Context(), []Category{
+		{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1},
+	}, []SubCategory{
+		{CategorySlug: "supply-chain", Slug: "procurement", Name: "Procurement", Icon: "procurement-workflow", SortOrder: 1},
+	}); err != nil {
+		t.Fatalf("ReplaceTaxonomy: %v", err)
+	}
+}
+
 func TestWorkflowCatalogUnknownCategoryPathLoadsUncategorized(t *testing.T) {
 	tempDir := t.TempDir()
 	path := filepath.Join(tempDir, "workflow.yaml")
@@ -138,13 +149,7 @@ func TestWorkflowCatalogUnknownCategoryPathLoadsUncategorized(t *testing.T) {
 	}
 
 	store := NewMemoryStore()
-	if err := store.ReplaceTaxonomy(t.Context(), []Category{
-		{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1},
-	}, []SubCategory{
-		{CategorySlug: "supply-chain", Slug: "procurement", Name: "Procurement", Icon: "procurement-workflow", SortOrder: 1},
-	}); err != nil {
-		t.Fatalf("ReplaceTaxonomy: %v", err)
-	}
+	seedSupplyChainProcurementTaxonomy(t, store)
 
 	server := &Server{store: store, configDir: tempDir}
 	catalog, err := server.workflowCatalog()
@@ -157,6 +162,59 @@ func TestWorkflowCatalogUnknownCategoryPathLoadsUncategorized(t *testing.T) {
 	}
 }
 
+func TestWorkflowCatalogFormataUnknownCategoryPathLoadsUncategorized(t *testing.T) {
+	store := NewMemoryStore()
+	seedSupplyChainProcurementTaxonomy(t, store)
+
+	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: does-not-exist\n"),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	server := &Server{store: store}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	cfg, ok := catalog[saved.ID.Hex()]
+	if !ok {
+		t.Fatalf("catalog missing stream %s", saved.ID.Hex())
+	}
+	if cfg.Workflow.IsCategorized() {
+		t.Fatalf("expected uncategorized Formata stream, got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+	}
+}
+
+func TestWorkflowCatalogFormataKnownCategoryPathLoadsCategorized(t *testing.T) {
+	store := NewMemoryStore()
+	seedSupplyChainProcurementTaxonomy(t, store)
+
+	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: procurement\n"),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	server := &Server{store: store}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	cfg, ok := catalog[saved.ID.Hex()]
+	if !ok {
+		t.Fatalf("catalog missing stream %s", saved.ID.Hex())
+	}
+	if !cfg.Workflow.IsCategorized() {
+		t.Fatal("expected categorized Formata stream for known path")
+	}
+	if cfg.Workflow.CategorySlug != "supply-chain" || cfg.Workflow.SubCategorySlug != "procurement" {
+		t.Fatalf("got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+	}
+}
+
 func TestWorkflowCatalogKnownCategoryPathLoadsCategorized(t *testing.T) {
 	tempDir := t.TempDir()
 	path := filepath.Join(tempDir, "workflow.yaml")
@@ -166,13 +224,7 @@ func TestWorkflowCatalogKnownCategoryPathLoadsCategorized(t *testing.T) {
 	}
 
 	store := NewMemoryStore()
-	if err := store.ReplaceTaxonomy(t.Context(), []Category{
-		{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1},
-	}, []SubCategory{
-		{CategorySlug: "supply-chain", Slug: "procurement", Name: "Procurement", Icon: "procurement-workflow", SortOrder: 1},
-	}); err != nil {
-		t.Fatalf("ReplaceTaxonomy: %v", err)
-	}
+	seedSupplyChainProcurementTaxonomy(t, store)
 
 	server := &Server{store: store, configDir: tempDir}
 	catalog, err := server.workflowCatalog()

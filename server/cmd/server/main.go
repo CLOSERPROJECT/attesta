@@ -6558,6 +6558,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 				if parseErr != nil {
 					return nil, parseErr
 				}
+				s.resolveCatalogStreamCategorization(&cfg)
 				catalog[key] = cfg
 			}
 			s.catalog = catalog
