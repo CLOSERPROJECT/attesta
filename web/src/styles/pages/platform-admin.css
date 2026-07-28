@@ -130,3 +130,54 @@
   gap: var(--space-2);
   font-size: var(--text-sm);
 }
+
+.platform-admin-taxonomy-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.platform-admin-taxonomy-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.platform-admin-taxonomy-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.platform-admin-taxonomy-meta {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.platform-admin-taxonomy-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.platform-admin-taxonomy-slug,
+.platform-admin-taxonomy-icon-key,
+.platform-admin-taxonomy-description {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.platform-admin-taxonomy-sub-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0 0 0 var(--space-6);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.platform-admin-taxonomy-empty {
+  margin: var(--space-3) 0 0;
+}
