@@ -156,7 +156,7 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 		rec := httptest.NewRecorder()
-		server.renderPlatformAdmin(rec, &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "invite sent", PlatformAdminErrors{})
+		server.renderPlatformAdmin(rec, httptest.NewRequest(http.MethodGet, "/admin/orgs", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "invite sent", PlatformAdminErrors{})
 		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
 			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
 		}

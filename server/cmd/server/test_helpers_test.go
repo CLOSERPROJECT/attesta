@@ -94,6 +94,7 @@ func testTemplates() *template.Template {
 	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}
 	{{define "signup.html"}}{{template "layout.html" .}}{{end}}
 	{{define "platform_admin_body"}}PLATFORM_ADMIN {{.ActivePanel}} {{len .Organizations}} {{.Confirmation}}{{range .Categories}} CAT {{.Name}} {{.IconURL}}{{range .SubCategories}} SUB {{.Name}} {{.IconURL}}{{end}}{{end}}{{if .Error}} {{.Error}}{{end}}{{end}}
+	{{define "admin_console"}}ADMIN_CONSOLE {{.Title}} {{.Subtitle}}{{end}}
 	{{define "platform_admin_results"}}PLATFORM_ADMIN_RESULTS ORGS {{len .Organizations}} {{.Confirmation}}{{if .Error}} {{.Error}}{{end}}{{end}}
 	{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 	{{define "home_body"}}HOME{{end}}
