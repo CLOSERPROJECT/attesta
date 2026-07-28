@@ -1,0 +1,49 @@
+{{/* Shared admin soft-nav shell: page-header + sidebar + main (HTMX swap root). */}}
+
+{{ define "admin_console" }}
+  <div
+    id="{{ if .ID }}{{ .ID }}{{ else }}admin-console{{ end }}"
+    class="admin-console"
+  >
+    <section class="page-header">
+      {{ template "breadcrumbs" .Breadcrumbs }}
+      <div class="page-header-body">
+        <h1>{{ .Title }}</h1>
+        {{ if .Subtitle }}
+          <p>{{ .Subtitle }}</p>
+        {{ end }}
+      </div>
+    </section>
+
+    <div class="rail-layout rail-layout-ready">
+      <section class="panel panel-sticky">
+        <nav
+          class="sidebar-nav"
+          aria-label="{{ .NavLabel }}"
+        >
+          {{ range .NavItems }}
+            <a
+              href="{{ .Href }}"
+              class="sidebar-nav-link{{ if .Active }} is-active{{ end }}"
+              hx-get="{{ .Href }}"
+              hx-target="#{{ if $.ID }}{{ $.ID }}{{ else }}admin-console{{ end }}"
+              hx-select="#{{ if $.ID }}{{ $.ID }}{{ else }}admin-console{{ end }}"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              {{ if .Active }}aria-current="page"{{ end }}
+            >
+              <span class="sidebar-nav-title">{{ .Title }}</span>
+              {{ if .Copy }}
+                <span class="sidebar-nav-copy">{{ .Copy }}</span>
+              {{ end }}
+            </a>
+          {{ end }}
+        </nav>
+      </section>
+
+      <section class="panel rail-layout-main">
+        {{ render .MainTemplate .MainData }}
+      </section>
+    </div>
+  </div>
+{{ end }}

@@ -284,3 +284,24 @@ type BreadcrumbItem struct {
 type BreadcrumbsView struct {
 	Items []BreadcrumbItem
 }
+
+// AdminConsoleNavItem is one soft-nav link in templates/components/admin_console.html.
+type AdminConsoleNavItem struct {
+	Href   string
+	Title  string
+	Copy   string
+	Active bool
+}
+
+// AdminConsoleView is the view model for templates/components/admin_console.html.
+// MainTemplate is executed via the render func with MainData as the dot.
+type AdminConsoleView struct {
+	ID           string // default "admin-console" when empty
+	NavLabel     string
+	Title        string
+	Subtitle     string
+	Breadcrumbs  BreadcrumbsView
+	NavItems     []AdminConsoleNavItem
+	MainTemplate string
+	MainData     any
+}
