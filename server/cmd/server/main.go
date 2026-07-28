@@ -410,7 +410,7 @@ type AboutView struct {
 type PlatformAdminView struct {
 	PageBase
 	ActivePanel              string
-	Categories               []PlatformAdminCategoryRow
+	Categories               []TaxonomyCategoryNode
 	Breadcrumbs              BreadcrumbsView
 	SearchQuery              string
 	CurrentPage              int
@@ -3439,7 +3439,7 @@ func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	categories, err := buildPlatformAdminTaxonomyTree(r.Context(), s.store)
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
 	if err != nil {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load categories", err, "failed to load platform admin categories")
 		return

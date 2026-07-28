@@ -69,13 +69,13 @@ func TestPlatformAdminCategoriesPanelMarkup(t *testing.T) {
 
 	view := PlatformAdminView{
 		ActivePanel: "categories",
-		Categories: []PlatformAdminCategoryRow{
+		Categories: []TaxonomyCategoryNode{
 			{
 				Name:    "Supply Chain",
 				Slug:    "supply-chain",
 				Icon:    "batch-traceability",
 				IconURL: "/static/taxonomy/batch-traceability.svg",
-				SubCategories: []PlatformAdminSubCategoryRow{
+				SubCategories: []TaxonomySubCategoryNode{
 					{
 						Name:        "Procurement",
 						Slug:        "procurement",

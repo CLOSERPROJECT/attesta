@@ -6,19 +6,23 @@ import (
 	"strings"
 )
 
-type PlatformAdminCategoryRow struct {
-	Name          string
+// TaxonomyCategoryNode is a nested category in the platform taxonomy tree.
+type TaxonomyCategoryNode struct {
 	Slug          string
+	Name          string
 	Icon          string
-	IconURL       string // "/static/taxonomy/"+Icon+".svg" if allowlisted
-	SubCategories []PlatformAdminSubCategoryRow
+	IconURL       string
+	SortOrder     int
+	SubCategories []TaxonomySubCategoryNode
 }
 
-type PlatformAdminSubCategoryRow struct {
-	Name        string
+// TaxonomySubCategoryNode is a nested sub-category leaf under a category.
+type TaxonomySubCategoryNode struct {
 	Slug        string
+	Name        string
 	Icon        string
 	IconURL     string
+	SortOrder   int
 	Description string
 }
 
@@ -30,38 +34,40 @@ func taxonomyIconURL(icon string) string {
 	return fmt.Sprintf("/static/taxonomy/%s.svg", key)
 }
 
-func buildPlatformAdminTaxonomyTree(ctx context.Context, store Store) ([]PlatformAdminCategoryRow, error) {
+func loadTaxonomyTree(ctx context.Context, store Store) ([]TaxonomyCategoryNode, error) {
 	categories, err := store.ListCategories(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]PlatformAdminCategoryRow, 0, len(categories))
+	nodes := make([]TaxonomyCategoryNode, 0, len(categories))
 	for _, category := range categories {
 		subs, err := store.ListSubCategories(ctx, category.Slug)
 		if err != nil {
 			return nil, err
 		}
 
-		subRows := make([]PlatformAdminSubCategoryRow, 0, len(subs))
+		subNodes := make([]TaxonomySubCategoryNode, 0, len(subs))
 		for _, sub := range subs {
-			subRows = append(subRows, PlatformAdminSubCategoryRow{
+			subNodes = append(subNodes, TaxonomySubCategoryNode{
 				Name:        sub.Name,
 				Slug:        sub.Slug,
 				Icon:        sub.Icon,
 				IconURL:     taxonomyIconURL(sub.Icon),
+				SortOrder:   sub.SortOrder,
 				Description: sub.Description,
 			})
 		}
 
-		rows = append(rows, PlatformAdminCategoryRow{
+		nodes = append(nodes, TaxonomyCategoryNode{
 			Name:          category.Name,
 			Slug:          category.Slug,
 			Icon:          category.Icon,
 			IconURL:       taxonomyIconURL(category.Icon),
-			SubCategories: subRows,
+			SortOrder:     category.SortOrder,
+			SubCategories: subNodes,
 		})
 	}
 
-	return rows, nil
+	return nodes, nil
 }
