@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -56,69 +53,19 @@ func catalogReferencesSubCategoryPath(catalog map[string]RuntimeConfig, category
 	return false
 }
 
-// DeleteSubCategory refuses delete while any file-catalog Stream blueprint
+// DeleteSubCategory refuses delete while any live-catalog Stream blueprint
 // effectively references the Sub-category path, then deletes via the store.
 func (s *Server) DeleteSubCategory(ctx context.Context, categorySlug, slug string) error {
 	if s == nil || s.store == nil {
 		return fmt.Errorf("store is required")
 	}
-	return deleteSubCategory(ctx, s.store, categorySlug, slug, s.fileCatalogReferencesSubCategory)
+	return deleteSubCategory(ctx, s.store, categorySlug, slug, s.liveCatalogReferencesSubCategory)
 }
 
-func (s *Server) fileCatalogReferencesSubCategory(ctx context.Context, categorySlug, subCategorySlug string) (bool, error) {
-	catalog, err := s.loadFileWorkflowCatalog(ctx)
+func (s *Server) liveCatalogReferencesSubCategory(ctx context.Context, categorySlug, subCategorySlug string) (bool, error) {
+	catalog, err := s.workflowCatalog()
 	if err != nil {
 		return false, err
 	}
 	return catalogReferencesSubCategoryPath(catalog, categorySlug, subCategorySlug), nil
-}
-
-// loadFileWorkflowCatalog loads Stream blueprints from the config directory only
-// (effective categorization applied). Formata DB streams are out of scope for
-// this Restrict check — workflowCatalog() prefers Formata when present.
-func (s *Server) loadFileWorkflowCatalog(_ context.Context) (map[string]RuntimeConfig, error) {
-	dir := "config"
-	if trimmed := strings.TrimSpace(s.configDir); trimmed != "" {
-		dir = trimmed
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("config dir not found: %w", err)
-	}
-
-	paths := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !isWorkflowCatalogConfigFile(name) {
-			continue
-		}
-		paths = append(paths, filepath.Join(dir, name))
-	}
-	sort.Strings(paths)
-
-	catalog := make(map[string]RuntimeConfig, len(paths))
-	for _, path := range paths {
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return nil, fmt.Errorf("read config %s: %w", path, readErr)
-		}
-		cfg, parseErr := parseRuntimeConfigData(filepath.Base(path), data)
-		if parseErr != nil {
-			return nil, parseErr
-		}
-		s.resolveCatalogStreamCategorization(&cfg)
-		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
-		if key == "" {
-			return nil, fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
-		}
-		if _, exists := catalog[key]; exists {
-			return nil, fmt.Errorf("duplicate workflow key %q", key)
-		}
-		catalog[key] = cfg
-	}
-	return catalog, nil
 }

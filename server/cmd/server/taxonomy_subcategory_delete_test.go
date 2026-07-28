@@ -110,7 +110,7 @@ func TestSeedReplaceBypassesSubCategoryStreamRefRestrict(t *testing.T) {
 	}
 }
 
-func TestServerDeleteSubCategoryUsesFileCatalogRefs(t *testing.T) {
+func TestServerDeleteSubCategoryUsesLiveCatalogRefs(t *testing.T) {
 	dir := t.TempDir()
 	workflowYAML := minimalCategorizedWorkflowYAML(
 		"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
@@ -132,5 +132,57 @@ func TestServerDeleteSubCategoryUsesFileCatalogRefs(t *testing.T) {
 	}
 	if _, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "order-fulfillment"); !errors.Is(err, mongo.ErrNoDocuments) {
 		t.Fatalf("expected order-fulfillment gone, err = %v", err)
+	}
+}
+
+func TestServerDeleteSubCategoryRefusesWhenFormataStreamReferences(t *testing.T) {
+	store := NewMemoryStore()
+	seedProcurementTaxonomy(t, store)
+
+	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalCategorizedWorkflowYAML(
+			"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
+		),
+	}); err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	// Empty config dir: file-catalog scan would miss the Formata reference.
+	server := &Server{store: store, configDir: t.TempDir()}
+	if err := server.DeleteSubCategory(t.Context(), "supply-chain", "procurement"); !errors.Is(err, ErrSubCategoryReferencedByStream) {
+		t.Fatalf("DeleteSubCategory err = %v, want ErrSubCategoryReferencedByStream", err)
+	}
+	if _, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "procurement"); err != nil {
+		t.Fatalf("expected sub-category retained, get err = %v", err)
+	}
+}
+
+func TestServerDeleteSubCategoryIgnoresStaleFileRefsWhenFormataCatalogWins(t *testing.T) {
+	dir := t.TempDir()
+	staleYAML := minimalCategorizedWorkflowYAML(
+		"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
+	)
+	if err := os.WriteFile(filepath.Join(dir, "workflow.yaml"), []byte(staleYAML), 0o644); err != nil {
+		t.Fatalf("write workflow: %v", err)
+	}
+
+	store := NewMemoryStore()
+	seedProcurementTaxonomy(t, store)
+
+	// Live catalog is Formata-only and does not reference procurement.
+	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalCategorizedWorkflowYAML(
+			"  categorySlug: supply-chain\n  subCategorySlug: order-fulfillment\n",
+		),
+	}); err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	server := &Server{store: store, configDir: dir}
+	if err := server.DeleteSubCategory(t.Context(), "supply-chain", "procurement"); err != nil {
+		t.Fatalf("DeleteSubCategory: %v (stale file ref must not block)", err)
+	}
+	if _, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "procurement"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("expected procurement deleted, err = %v", err)
 	}
 }
