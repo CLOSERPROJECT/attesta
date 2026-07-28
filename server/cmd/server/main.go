@@ -409,6 +409,8 @@ type AboutView struct {
 
 type PlatformAdminView struct {
 	PageBase
+	ActivePanel              string
+	Categories               []PlatformAdminCategoryRow
 	Breadcrumbs              BreadcrumbsView
 	SearchQuery              string
 	CurrentPage              int
