@@ -1,12 +1,23 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+type failingListCategoriesStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingListCategoriesStore) ListCategories(_ context.Context) ([]Category, error) {
+	return nil, s.err
+}
 
 func seedPlatformAdminTaxonomy(t *testing.T, store Store) {
 	t.Helper()
@@ -50,6 +61,34 @@ func TestHandleAdminCategoriesNonAdminForbidden(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestHandleAdminCategoriesStoreError(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Now().UTC()
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store: &failingListCategoriesStore{
+			MemoryStore: NewMemoryStore(),
+			err:         errors.New("list categories failed"),
+		},
+		identity:    &fakeIdentityStore{},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminCategories(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
 

@@ -3444,10 +3444,12 @@ func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load categories", err, "failed to load platform admin categories")
 		return
 	}
-	view := s.platformAdminView(admin, "", PlatformAdminErrors{})
-	view.ActivePanel = "categories"
-	view.Categories = categories
-	view.Breadcrumbs = buildPlatformAdminBreadcrumbs("categories")
+	view := PlatformAdminView{
+		PageBase:    s.pageBaseForUser(admin, "platform_admin_body", "", ""),
+		ActivePanel: "categories",
+		Categories:  categories,
+		Breadcrumbs: buildPlatformAdminBreadcrumbs("categories"),
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
