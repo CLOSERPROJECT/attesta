@@ -2261,6 +2261,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
+	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
@@ -3392,6 +3393,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
 		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		ActivePanel:              "orgs",
 		Breadcrumbs:              buildPlatformAdminBreadcrumbs("orgs"),
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
@@ -3424,6 +3426,29 @@ func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, c
 func (s *Server) renderPlatformAdminResults(w http.ResponseWriter, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
 	view := s.platformAdminView(user, confirmation, errs)
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin_results", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requirePlatformAdmin(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	categories, err := buildPlatformAdminTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load categories", err, "failed to load platform admin categories")
+		return
+	}
+	view := s.platformAdminView(admin, "", PlatformAdminErrors{})
+	view.ActivePanel = "categories"
+	view.Categories = categories
+	view.Breadcrumbs = buildPlatformAdminBreadcrumbs("categories")
+	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
