@@ -7,57 +7,95 @@
       {{ template "breadcrumbs" .Breadcrumbs }}
       <div class="page-header-body">
         <h1>Platform admin dashboard</h1>
-        <p>Create and manage organizations</p>
+        {{ if eq .ActivePanel "categories" }}
+          <p>Browse stream discovery categories</p>
+        {{ else }}
+          <p>Create and manage organizations</p>
+        {{ end }}
       </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-head-actions">
-        <div class="panel-heading">
-          <h2>Organizations</h2>
-        </div>
-        <button
-          class="btn btn-primary"
-          type="button"
-          onclick="document.getElementById('create-org-dialog').showModal()"
+    <div class="rail-layout rail-layout-ready">
+      <section class="panel panel-sticky">
+        <nav
+          class="sidebar-nav"
+          aria-label="Platform admin sections"
         >
-          {{ template "icon-plus" . }}
-          Add organization
-        </button>
-      </div>
+          <a
+            href="/admin/orgs"
+            class="sidebar-nav-link{{ if ne .ActivePanel "categories" }} is-active{{ end }}"
+            {{ if ne .ActivePanel "categories" }}aria-current="page"{{ end }}
+          >
+            <span class="sidebar-nav-title">Organizations</span>
+            <span class="sidebar-nav-copy"
+              >Create and manage organizations</span
+            >
+          </a>
+          <a
+            href="/admin/categories"
+            class="sidebar-nav-link{{ if eq .ActivePanel "categories" }} is-active{{ end }}"
+            {{ if eq .ActivePanel "categories" }}aria-current="page"{{ end }}
+          >
+            <span class="sidebar-nav-title">Categories</span>
+            <span class="sidebar-nav-copy"
+              >Browse stream discovery categories</span
+            >
+          </a>
+        </nav>
+      </section>
 
-      <form
-        method="get"
-        action="/admin/orgs"
-        class="platform-admin-search"
-        id="platform-admin-search"
-      >
-        <input type="hidden" name="page" value="1" />
-        <label
-          class="platform-admin-search-field"
-          for="platform-admin-search-input"
-        >
-          {{ template "icon-search" . }}
-          <input
-            id="platform-admin-search-input"
-            type="search"
-            name="q"
-            value="{{ .SearchQuery }}"
-            placeholder="Search organizations by name"
-            autocomplete="off"
-            hx-get="/admin/orgs"
-            hx-target="#platform-admin-results"
-            hx-select="#platform-admin-results"
-            hx-swap="outerHTML"
-            hx-push-url="true"
-            hx-include="#platform-admin-search"
-            hx-trigger="input changed delay:200ms, search"
-          />
-        </label>
-      </form>
+      <section class="panel rail-layout-main">
+        {{ if eq .ActivePanel "categories" }}
+          {{ template "platform_admin_categories_panel" . }}
+        {{ else }}
+          <div class="panel-head-actions">
+            <div class="panel-heading">
+              <h2>Organizations</h2>
+            </div>
+            <button
+              class="btn btn-primary"
+              type="button"
+              onclick="document.getElementById('create-org-dialog').showModal()"
+            >
+              {{ template "icon-plus" . }}
+              Add organization
+            </button>
+          </div>
 
-      {{ template "platform_admin_results" . }}
-    </section>
+          <form
+            method="get"
+            action="/admin/orgs"
+            class="platform-admin-search"
+            id="platform-admin-search"
+          >
+            <input type="hidden" name="page" value="1" />
+            <label
+              class="platform-admin-search-field"
+              for="platform-admin-search-input"
+            >
+              {{ template "icon-search" . }}
+              <input
+                id="platform-admin-search-input"
+                type="search"
+                name="q"
+                value="{{ .SearchQuery }}"
+                placeholder="Search organizations by name"
+                autocomplete="off"
+                hx-get="/admin/orgs"
+                hx-target="#platform-admin-results"
+                hx-select="#platform-admin-results"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-include="#platform-admin-search"
+                hx-trigger="input changed delay:200ms, search"
+              />
+            </label>
+          </form>
+
+          {{ template "platform_admin_results" . }}
+        {{ end }}
+      </section>
+    </div>
   </div>
 
   <dialog id="create-org-dialog" class="dialog">
@@ -140,6 +178,62 @@
     }
   })();
 </script>
+{{ end }}
+
+{{ define "platform_admin_categories_panel" }}
+  <div class="panel-heading">
+    <h2>Categories</h2>
+    <p>Browse stream discovery categories</p>
+  </div>
+  {{ if .Categories }}
+    <ul class="platform-admin-taxonomy-list">
+      {{ range .Categories }}
+        <li class="platform-admin-taxonomy-category">
+          <div class="platform-admin-taxonomy-row">
+            {{ if .IconURL }}
+              <img
+                src="{{ .IconURL }}"
+                alt=""
+                class="platform-admin-taxonomy-icon"
+              />
+            {{ end }}
+            <div class="platform-admin-taxonomy-meta">
+              <p class="platform-admin-taxonomy-name">{{ .Name }}</p>
+              <p class="platform-admin-taxonomy-slug muted">{{ .Slug }}</p>
+              <p class="platform-admin-taxonomy-icon-key muted">{{ .Icon }}</p>
+            </div>
+          </div>
+          {{ if .SubCategories }}
+            <ul class="platform-admin-taxonomy-sub-list">
+              {{ range .SubCategories }}
+                <li class="platform-admin-taxonomy-sub">
+                  <div class="platform-admin-taxonomy-row">
+                    {{ if .IconURL }}
+                      <img
+                        src="{{ .IconURL }}"
+                        alt=""
+                        class="platform-admin-taxonomy-icon"
+                      />
+                    {{ end }}
+                    <div class="platform-admin-taxonomy-meta">
+                      <p class="platform-admin-taxonomy-name">{{ .Name }}</p>
+                      <p class="platform-admin-taxonomy-slug muted">{{ .Slug }}</p>
+                      <p class="platform-admin-taxonomy-icon-key muted">{{ .Icon }}</p>
+                      {{ if .Description }}
+                        <p class="platform-admin-taxonomy-description muted">{{ .Description }}</p>
+                      {{ end }}
+                    </div>
+                  </div>
+                </li>
+              {{ end }}
+            </ul>
+          {{ end }}
+        </li>
+      {{ end }}
+    </ul>
+  {{ else }}
+    <p class="muted platform-admin-taxonomy-empty">No categories yet</p>
+  {{ end }}
 {{ end }}
 
 {{ define "platform_admin_results" }}

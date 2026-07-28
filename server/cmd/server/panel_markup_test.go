@@ -218,7 +218,12 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="panel"`,
+		`class="rail-layout rail-layout-ready"`,
+		`class="panel panel-sticky"`,
+		`class="sidebar-nav"`,
+		`href="/admin/orgs"`,
+		`href="/admin/categories"`,
+		`class="panel rail-layout-main"`,
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Organizations</h2>",
