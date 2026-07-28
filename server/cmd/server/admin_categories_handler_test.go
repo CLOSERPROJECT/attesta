@@ -19,6 +19,15 @@ func (s *failingListCategoriesStore) ListCategories(_ context.Context) ([]Catego
 	return nil, s.err
 }
 
+type failingListSubCategoriesStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingListSubCategoriesStore) ListSubCategories(_ context.Context, _ string) ([]SubCategory, error) {
+	return nil, s.err
+}
+
 func seedPlatformAdminTaxonomy(t *testing.T, store Store) {
 	t.Helper()
 	err := store.ReplaceTaxonomy(t.Context(), []Category{

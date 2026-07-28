@@ -257,6 +257,31 @@ func TestHandlePublicCatalogStoreErrors(t *testing.T) {
 		}
 	})
 
+	t.Run("list subcategories", func(t *testing.T) {
+		identity := catalogAuthIdentity(now, true)
+		identity.listOrganizationsFunc = func(ctx context.Context) ([]IdentityOrg, error) { return nil, nil }
+		base := NewMemoryStore()
+		seedPlatformAdminTaxonomy(t, base)
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			store: &failingListSubCategoriesStore{
+				MemoryStore: base,
+				err:         errCatalogListSubCategories,
+			},
+			identity:    identity,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handlePublicCatalog(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
 }
 
 var errCatalogLoadTaxonomy = errors.New("load taxonomy failed")
+var errCatalogListSubCategories = errors.New("list subcategories failed")

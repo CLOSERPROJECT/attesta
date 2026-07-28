@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"testing"
 )
 
@@ -53,5 +55,25 @@ func TestLoadTaxonomyTree(t *testing.T) {
 	}
 	if cat.SubCategories[0].Description != "PO management" {
 		t.Fatalf("procurement description = %q", cat.SubCategories[0].Description)
+	}
+}
+
+func TestLoadTaxonomyTreeListSubCategoriesError(t *testing.T) {
+	store := NewMemoryStore()
+	err := store.ReplaceTaxonomy(t.Context(), []Category{
+		{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1},
+	}, []SubCategory{
+		{CategorySlug: "supply-chain", Slug: "procurement", Name: "Procurement", Icon: "procurement-workflow", SortOrder: 1},
+	})
+	if err != nil {
+		t.Fatalf("ReplaceTaxonomy: %v", err)
+	}
+
+	listSubErr := errors.New("list subcategories failed")
+	failing := &failingListSubCategoriesStore{MemoryStore: store, err: listSubErr}
+
+	_, err = loadTaxonomyTree(context.Background(), failing)
+	if !errors.Is(err, listSubErr) {
+		t.Fatalf("loadTaxonomyTree err = %v, want %v", err, listSubErr)
 	}
 }
