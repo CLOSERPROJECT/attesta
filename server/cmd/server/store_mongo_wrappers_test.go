@@ -51,6 +51,9 @@ func TestMongoDriverAdaptersExecuteWrapperMethods(t *testing.T) {
 	runAndRecover(func() {
 		_, _ = mongoDriverDatabase{}.NewGridFSBucket("attachments")
 	})
+	runAndRecover(func() {
+		_ = mongoDriverDatabase{}.RenameCollection(context.Background(), "from", "to", true)
+	})
 
 	runAndRecover(func() {
 		_, _ = (mongoDriverCollection{}).InsertOne(context.Background(), bson.M{})

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"path/filepath"
@@ -108,6 +109,7 @@ type MongoStore struct {
 type mongoDatabasePort interface {
 	Collection(name string) mongoCollectionPort
 	NewGridFSBucket(name string) (gridFSBucketPort, error)
+	RenameCollection(ctx context.Context, from, to string, dropTarget bool) error
 }
 
 type mongoCollectionPort interface {
@@ -153,6 +155,25 @@ func (d mongoDriverDatabase) NewGridFSBucket(name string) (gridFSBucketPort, err
 		return nil, err
 	}
 	return mongoDriverGridFSBucket{bucket: bucket}, nil
+}
+
+func (d mongoDriverDatabase) RenameCollection(ctx context.Context, from, to string, dropTarget bool) error {
+	if d.db == nil {
+		return errors.New("database is required")
+	}
+	from = strings.TrimSpace(from)
+	to = strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return fmt.Errorf("rename collection requires from and to names")
+	}
+	cmd := bson.D{
+		{Key: "renameCollection", Value: d.db.Name() + "." + from},
+		{Key: "to", Value: d.db.Name() + "." + to},
+	}
+	if dropTarget {
+		cmd = append(cmd, bson.E{Key: "dropTarget", Value: true})
+	}
+	return d.db.Client().Database("admin").RunCommand(ctx, cmd).Err()
 }
 
 type mongoDriverCollection struct {

@@ -44,12 +44,16 @@ func TestMongoStoreEnsureTaxonomyIndexes(t *testing.T) {
 	}
 }
 
-func TestMongoStoreReplaceTaxonomyDeletesThenInserts(t *testing.T) {
-	categories := &fakeMongoCollection{}
-	subs := &fakeMongoCollection{}
+func TestMongoStoreReplaceTaxonomyStagesThenRenames(t *testing.T) {
+	liveCats := &fakeMongoCollection{}
+	liveSubs := &fakeMongoCollection{}
+	stagingCats := &fakeMongoCollection{}
+	stagingSubs := &fakeMongoCollection{}
 	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
-		collectionCategories:    categories,
-		collectionSubCategories: subs,
+		collectionCategories:           liveCats,
+		collectionSubCategories:        liveSubs,
+		collectionCategoriesStaging:    stagingCats,
+		collectionSubCategoriesStaging: stagingSubs,
 	}}
 	store := &MongoStore{dbPort: db}
 
@@ -61,21 +65,66 @@ func TestMongoStoreReplaceTaxonomyDeletesThenInserts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReplaceTaxonomy: %v", err)
 	}
-	if len(categories.deleteManyFilters) != 1 {
-		t.Fatalf("expected categories DeleteMany, got %d", len(categories.deleteManyFilters))
+	if len(liveCats.deleteManyFilters) != 0 || len(liveCats.insertDocuments) != 0 {
+		t.Fatal("live categories must not be written directly")
 	}
-	if len(subs.deleteManyFilters) != 1 {
-		t.Fatalf("expected sub_categories DeleteMany, got %d", len(subs.deleteManyFilters))
+	if len(liveSubs.deleteManyFilters) != 0 || len(liveSubs.insertDocuments) != 0 {
+		t.Fatal("live sub_categories must not be written directly")
 	}
-	if len(categories.insertDocuments) != 1 {
-		t.Fatalf("category inserts = %d", len(categories.insertDocuments))
+	if len(stagingCats.deleteManyFilters) != 1 || len(stagingCats.insertDocuments) != 1 {
+		t.Fatalf("staging categories delete=%d insert=%d", len(stagingCats.deleteManyFilters), len(stagingCats.insertDocuments))
 	}
-	if len(subs.insertDocuments) != 1 {
-		t.Fatalf("sub inserts = %d", len(subs.insertDocuments))
+	if len(stagingSubs.deleteManyFilters) != 1 || len(stagingSubs.insertDocuments) != 1 {
+		t.Fatalf("staging subs delete=%d insert=%d", len(stagingSubs.deleteManyFilters), len(stagingSubs.insertDocuments))
 	}
-	cat := categories.insertDocuments[0].(Category)
+	cat := stagingCats.insertDocuments[0].(Category)
 	if cat.ID.IsZero() || cat.Slug != "supply-chain" {
 		t.Fatalf("inserted category = %#v", cat)
+	}
+	if len(db.renameCalls) != 2 {
+		t.Fatalf("renameCalls = %#v, want 2", db.renameCalls)
+	}
+	if db.renameCalls[0].from != collectionCategoriesStaging || db.renameCalls[0].to != collectionCategories || !db.renameCalls[0].dropTarget {
+		t.Fatalf("categories rename = %#v", db.renameCalls[0])
+	}
+	if db.renameCalls[1].from != collectionSubCategoriesStaging || db.renameCalls[1].to != collectionSubCategories || !db.renameCalls[1].dropTarget {
+		t.Fatalf("sub_categories rename = %#v", db.renameCalls[1])
+	}
+}
+
+func TestMongoStoreReplaceTaxonomyLeavesLiveIntactWhenStagingInsertFails(t *testing.T) {
+	insertErr := errors.New("staging insert failed")
+	liveCats := &fakeMongoCollection{}
+	liveSubs := &fakeMongoCollection{}
+	stagingCats := &fakeMongoCollection{
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return nil, insertErr
+		},
+	}
+	stagingSubs := &fakeMongoCollection{}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionCategories:           liveCats,
+		collectionSubCategories:        liveSubs,
+		collectionCategoriesStaging:    stagingCats,
+		collectionSubCategoriesStaging: stagingSubs,
+	}}
+	store := &MongoStore{dbPort: db}
+
+	err := store.ReplaceTaxonomy(t.Context(), []Category{
+		{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1},
+	}, nil)
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("err = %v, want %v", err, insertErr)
+	}
+	if len(liveCats.deleteManyFilters) != 0 || len(liveSubs.deleteManyFilters) != 0 {
+		t.Fatalf("live collections must not be cleared on staging failure; cats=%d subs=%d",
+			len(liveCats.deleteManyFilters), len(liveSubs.deleteManyFilters))
+	}
+	if len(liveCats.insertDocuments) != 0 || len(liveSubs.insertDocuments) != 0 {
+		t.Fatal("live collections must not receive inserts on staging failure")
+	}
+	if len(db.renameCalls) != 0 {
+		t.Fatalf("rename must not run on staging failure, got %#v", db.renameCalls)
 	}
 }
 
@@ -399,8 +448,8 @@ func TestMongoStoreTaxonomyErrorPaths(t *testing.T) {
 
 	t.Run("ReplaceTaxonomy validation and write errors", func(t *testing.T) {
 		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
-			collectionCategories:    &fakeMongoCollection{},
-			collectionSubCategories: &fakeMongoCollection{},
+			collectionCategoriesStaging:    &fakeMongoCollection{},
+			collectionSubCategoriesStaging: &fakeMongoCollection{},
 		}}}
 		if err := store.ReplaceTaxonomy(t.Context(), []Category{{Name: "x", Icon: "weee"}}, nil); err == nil {
 			t.Fatal("expected missing slug")
@@ -415,55 +464,55 @@ func TestMongoStoreTaxonomyErrorPaths(t *testing.T) {
 			t.Fatal("expected bad sub icon")
 		}
 
-		categories := &fakeMongoCollection{
+		stagingCats := &fakeMongoCollection{
 			deleteManyFn: func(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
 				return nil, deleteErr
 			},
 		}
 		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
-			collectionCategories:    categories,
-			collectionSubCategories: &fakeMongoCollection{},
+			collectionCategoriesStaging:    stagingCats,
+			collectionSubCategoriesStaging: &fakeMongoCollection{},
 		}}}
 		if err := store.ReplaceTaxonomy(t.Context(), nil, nil); !errors.Is(err, deleteErr) {
 			t.Fatalf("err = %v", err)
 		}
 
-		categories = &fakeMongoCollection{}
-		subs := &fakeMongoCollection{
+		stagingCats = &fakeMongoCollection{}
+		stagingSubs := &fakeMongoCollection{
 			deleteManyFn: func(ctx context.Context, filter interface{}, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
 				return nil, deleteErr
 			},
 		}
 		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
-			collectionCategories:    categories,
-			collectionSubCategories: subs,
+			collectionCategoriesStaging:    stagingCats,
+			collectionSubCategoriesStaging: stagingSubs,
 		}}}
 		if err := store.ReplaceTaxonomy(t.Context(), nil, nil); !errors.Is(err, deleteErr) {
 			t.Fatalf("err = %v", err)
 		}
 
-		categories = &fakeMongoCollection{
+		stagingCats = &fakeMongoCollection{
 			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
 				return nil, insertErr
 			},
 		}
 		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
-			collectionCategories:    categories,
-			collectionSubCategories: &fakeMongoCollection{},
+			collectionCategoriesStaging:    stagingCats,
+			collectionSubCategoriesStaging: &fakeMongoCollection{},
 		}}}
 		if err := store.ReplaceTaxonomy(t.Context(), []Category{{Slug: "x", Name: "X", Icon: "weee"}}, nil); !errors.Is(err, insertErr) {
 			t.Fatalf("err = %v", err)
 		}
 
-		categories = &fakeMongoCollection{}
-		subs = &fakeMongoCollection{
+		stagingCats = &fakeMongoCollection{}
+		stagingSubs = &fakeMongoCollection{
 			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
 				return nil, insertErr
 			},
 		}
 		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
-			collectionCategories:    categories,
-			collectionSubCategories: subs,
+			collectionCategoriesStaging:    stagingCats,
+			collectionSubCategoriesStaging: stagingSubs,
 		}}}
 		if err := store.ReplaceTaxonomy(t.Context(), nil, []SubCategory{{CategorySlug: "x", Slug: "y", Name: "Y", Icon: "weee"}}); !errors.Is(err, insertErr) {
 			t.Fatalf("err = %v", err)
@@ -497,4 +546,3 @@ func TestMemoryStoreReplaceTaxonomyValidation(t *testing.T) {
 		t.Fatalf("subs = %#v err=%v", all, err)
 	}
 }
-

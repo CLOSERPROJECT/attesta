@@ -15,6 +15,11 @@ type fakeMongoDatabase struct {
 	bucket      gridFSBucketPort
 	bucketErr   error
 	bucketNames []string
+	renameCalls []struct {
+		from       string
+		to         string
+		dropTarget bool
+	}
 }
 
 func (db *fakeMongoDatabase) Collection(name string) mongoCollectionPort {
@@ -38,6 +43,27 @@ func (db *fakeMongoDatabase) NewGridFSBucket(name string) (gridFSBucketPort, err
 		return nil, errors.New("missing fake bucket")
 	}
 	return db.bucket, nil
+}
+
+func (db *fakeMongoDatabase) RenameCollection(_ context.Context, from, to string, dropTarget bool) error {
+	if db.collections == nil {
+		db.collections = map[string]*fakeMongoCollection{}
+	}
+	db.renameCalls = append(db.renameCalls, struct {
+		from       string
+		to         string
+		dropTarget bool
+	}{from: from, to: to, dropTarget: dropTarget})
+	src, ok := db.collections[from]
+	if !ok {
+		return errors.New("source collection not found")
+	}
+	if _, exists := db.collections[to]; exists && !dropTarget {
+		return errors.New("target collection already exists")
+	}
+	db.collections[to] = src
+	delete(db.collections, from)
+	return nil
 }
 
 type fakeMongoCollection struct {

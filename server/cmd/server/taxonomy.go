@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	collectionCategories    = "categories"
-	collectionSubCategories = "sub_categories"
+	collectionCategories           = "categories"
+	collectionSubCategories        = "sub_categories"
+	collectionCategoriesStaging    = "categories__next"
+	collectionSubCategoriesStaging = "sub_categories__next"
 )
 
 // ErrCategoryHasSubCategories is returned when DeleteCategory is refused because
@@ -413,21 +415,49 @@ func (s *MongoStore) ReplaceTaxonomy(ctx context.Context, categories []Category,
 		preparedSubs = append(preparedSubs, sub)
 	}
 
-	if _, err := s.database().Collection(collectionCategories).DeleteMany(ctx, bson.M{}); err != nil {
+	db := s.database()
+	stagingCats := db.Collection(collectionCategoriesStaging)
+	stagingSubs := db.Collection(collectionSubCategoriesStaging)
+
+	if _, err := stagingCats.DeleteMany(ctx, bson.M{}); err != nil {
 		return err
 	}
-	if _, err := s.database().Collection(collectionSubCategories).DeleteMany(ctx, bson.M{}); err != nil {
+	if _, err := stagingSubs.DeleteMany(ctx, bson.M{}); err != nil {
 		return err
 	}
 	for _, category := range preparedCategories {
-		if _, err := s.database().Collection(collectionCategories).InsertOne(ctx, category); err != nil {
+		if _, err := stagingCats.InsertOne(ctx, category); err != nil {
 			return err
 		}
 	}
 	for _, sub := range preparedSubs {
-		if _, err := s.database().Collection(collectionSubCategories).InsertOne(ctx, sub); err != nil {
+		if _, err := stagingSubs.InsertOne(ctx, sub); err != nil {
 			return err
 		}
+	}
+	if err := stagingCats.CreateIndexes(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "slug", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("categories_slug_unique"),
+		},
+	}); err != nil {
+		return err
+	}
+	if err := stagingSubs.CreateIndexes(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "categorySlug", Value: 1}, {Key: "slug", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("sub_categories_parent_slug_unique"),
+		},
+	}); err != nil {
+		return err
+	}
+
+	// Promote staging only after both collections are fully written.
+	if err := db.RenameCollection(ctx, collectionCategoriesStaging, collectionCategories, true); err != nil {
+		return err
+	}
+	if err := db.RenameCollection(ctx, collectionSubCategoriesStaging, collectionSubCategories, true); err != nil {
+		return err
 	}
 	return nil
 }
