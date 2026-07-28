@@ -196,3 +196,9 @@ tasks:
           echo "total coverage: ${total}%"
           awk -v total="$total" -v min="$min" "BEGIN { if ((total+0) < (min+0)) { printf(\"coverage gate failed (< %.1f%%)\\n\", min); exit 1 } }"
           '
+
+  seed:categories:
+    desc: Full-replace Mongo taxonomy from server/config/categories.yaml.
+    dir: server
+    cmds:
+      - go run ./cmd/server seed-categories {{.CLI_ARGS}}

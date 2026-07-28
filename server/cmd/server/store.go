@@ -46,6 +46,14 @@ type Store interface {
 	ListFormataBuilderStreams(ctx context.Context) ([]FormataBuilderStream, error)
 	DeleteFormataBuilderStream(ctx context.Context, id primitive.ObjectID) error
 	DeleteWorkflowData(ctx context.Context, workflowKey string) error
+	ListCategories(ctx context.Context) ([]Category, error)
+	GetCategoryBySlug(ctx context.Context, slug string) (*Category, error)
+	DeleteCategory(ctx context.Context, slug string) error
+	ListSubCategories(ctx context.Context, categorySlug string) ([]SubCategory, error)
+	GetSubCategoryBySlug(ctx context.Context, categorySlug, slug string) (*SubCategory, error)
+	DeleteSubCategory(ctx context.Context, categorySlug, slug string) error
+	EnsureTaxonomyIndexes(ctx context.Context) error
+	ReplaceTaxonomy(ctx context.Context, categories []Category, subCategories []SubCategory) error
 }
 
 type Organization struct {
@@ -560,6 +568,8 @@ type MemoryStore struct {
 	notarizations  []Notarization
 	attachments    map[primitive.ObjectID]memoryAttachment
 	formataStreams map[primitive.ObjectID]FormataBuilderStream
+	categories     map[string]Category
+	subCategories  map[string]SubCategory
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -580,6 +590,8 @@ func NewMemoryStore() *MemoryStore {
 		processes:      map[primitive.ObjectID]Process{},
 		attachments:    map[primitive.ObjectID]memoryAttachment{},
 		formataStreams: map[primitive.ObjectID]FormataBuilderStream{},
+		categories:     map[string]Category{},
+		subCategories:  map[string]SubCategory{},
 	}
 }
 

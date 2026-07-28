@@ -239,6 +239,16 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 			*target = v
 			return nil
 		}
+	case *Category:
+		if v, ok := item.(Category); ok {
+			*target = v
+			return nil
+		}
+	case *SubCategory:
+		if v, ok := item.(SubCategory); ok {
+			*target = v
+			return nil
+		}
 	case *bson.M:
 		if v, ok := item.(bson.M); ok {
 			*target = v
