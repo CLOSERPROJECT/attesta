@@ -42,10 +42,12 @@ const (
 )
 
 type WorkflowDef struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
-	Name        string             `bson:"name" yaml:"name"`
-	Description string             `bson:"description,omitempty" yaml:"description,omitempty"`
-	Steps       []WorkflowStep     `bson:"steps" yaml:"steps"`
+	ID              primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
+	Name            string             `bson:"name" yaml:"name"`
+	Description     string             `bson:"description,omitempty" yaml:"description,omitempty"`
+	CategorySlug    string             `bson:"categorySlug,omitempty" yaml:"categorySlug,omitempty"`
+	SubCategorySlug string             `bson:"subCategorySlug,omitempty" yaml:"subCategorySlug,omitempty"`
+	Steps           []WorkflowStep     `bson:"steps" yaml:"steps"`
 }
 
 type WorkflowStep struct {
@@ -1194,7 +1196,7 @@ func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir 
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+		if !isWorkflowCatalogConfigFile(name) {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, name))
@@ -6465,6 +6467,9 @@ func parseRuntimeConfigData(source string, data []byte) (RuntimeConfig, error) {
 	if cfg.Workflow.Name == "" || len(cfg.Workflow.Steps) == 0 {
 		return RuntimeConfig{}, fmt.Errorf("workflow config is empty in %s", source)
 	}
+	if err := validateWorkflowCategoryPair(cfg.Workflow); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
+	}
 	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
@@ -6540,7 +6545,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+		if !isWorkflowCatalogConfigFile(name) {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, name))
@@ -6572,6 +6577,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		if parseErr != nil {
 			return nil, parseErr
 		}
+		s.resolveCatalogStreamCategorization(&cfg)
 		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 		if key == "" {
 			return nil, fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
