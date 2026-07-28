@@ -1,183 +1,142 @@
 {{/* Used on /admin/orgs to render platform administration page */}}
 
 {{ define "platform_admin_body" }}
-
   <div class="stack u-max-w-7xl u-mx-auto">
-    <section class="page-header">
-      {{ template "breadcrumbs" .Breadcrumbs }}
-      <div class="page-header-body">
-        <h1>Platform admin dashboard</h1>
-        {{ if eq .ActivePanel "categories" }}
-          <p>Browse stream discovery categories</p>
-        {{ else }}
-          <p>Create and manage organizations</p>
-        {{ end }}
-      </div>
-    </section>
-
-    <div class="rail-layout rail-layout-ready">
-      <section class="panel panel-sticky">
-        <nav
-          class="sidebar-nav"
-          aria-label="Platform admin sections"
-        >
-          <a
-            href="/admin/orgs"
-            class="sidebar-nav-link{{ if ne .ActivePanel "categories" }} is-active{{ end }}"
-            {{ if ne .ActivePanel "categories" }}aria-current="page"{{ end }}
-          >
-            <span class="sidebar-nav-title">Organizations</span>
-            <span class="sidebar-nav-copy"
-              >Create and manage organizations</span
-            >
-          </a>
-          <a
-            href="/admin/categories"
-            class="sidebar-nav-link{{ if eq .ActivePanel "categories" }} is-active{{ end }}"
-            {{ if eq .ActivePanel "categories" }}aria-current="page"{{ end }}
-          >
-            <span class="sidebar-nav-title">Categories</span>
-            <span class="sidebar-nav-copy"
-              >Browse stream discovery categories</span
-            >
-          </a>
-        </nav>
-      </section>
-
-      <section class="panel rail-layout-main">
-        {{ if eq .ActivePanel "categories" }}
-          {{ template "platform_admin_categories_panel" . }}
-        {{ else }}
-          <div class="panel-head-actions">
-            <div class="panel-heading">
-              <h2>Organizations</h2>
-            </div>
-            <button
-              class="btn btn-primary"
-              type="button"
-              onclick="document.getElementById('create-org-dialog').showModal()"
-            >
-              {{ template "icon-plus" . }}
-              Add organization
-            </button>
-          </div>
-
-          <form
-            method="get"
-            action="/admin/orgs"
-            class="platform-admin-search"
-            id="platform-admin-search"
-          >
-            <input type="hidden" name="page" value="1" />
-            <label
-              class="platform-admin-search-field"
-              for="platform-admin-search-input"
-            >
-              {{ template "icon-search" . }}
-              <input
-                id="platform-admin-search-input"
-                type="search"
-                name="q"
-                value="{{ .SearchQuery }}"
-                placeholder="Search organizations by name"
-                autocomplete="off"
-                hx-get="/admin/orgs"
-                hx-target="#platform-admin-results"
-                hx-select="#platform-admin-results"
-                hx-swap="outerHTML"
-                hx-push-url="true"
-                hx-include="#platform-admin-search"
-                hx-trigger="input changed delay:200ms, search"
-              />
-            </label>
-          </form>
-
-          {{ template "platform_admin_results" . }}
-        {{ end }}
-      </section>
-    </div>
+    {{ template "admin_console" (platformAdminConsole .) }}
   </div>
+{{ end }}
 
-  <dialog id="create-org-dialog" class="dialog">
-    <div class="dialog-card">
-      <header class="dialog-head">
-        <div>
-          <h3 class="dialog-title">New organization</h3>
-          <p class="dialog-subtitle">
-            Add a new organization to the platform
-          </p>
-        </div>
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon dialog-close"
-          onclick="document.getElementById('create-org-dialog').close()"
-        >
-          {{ template "icon-close" . }}
-        </button>
-      </header>
-      <form
-        method="post"
-        action="/admin/orgs"
-        class="input-form"
-        enctype="multipart/form-data"
+{{ define "platform_admin_main" }}
+  {{ if eq .ActivePanel "categories" }}
+    {{ template "platform_admin_categories_panel" . }}
+  {{ else }}
+    <div class="panel-head-actions">
+      <div class="panel-heading">
+        <h2>Organizations</h2>
+      </div>
+      <button
+        class="btn btn-primary"
+        type="button"
+        onclick="document.getElementById('create-org-dialog').showModal()"
       >
-        <input type="hidden" name="intent" value="create_org" />
-        <input type="hidden" name="q" value="{{ .SearchQuery }}" />
-        <input type="hidden" name="page" value="{{ .CurrentPage }}" />
-        <div class="form-field">
-          <label for="org-name">Organization name *</label>
-          <input
-            id="org-name"
-            name="name"
-            type="text"
-            value="{{ if eq .OrganizationDialogAction "create" }}
-              {{ .OrganizationDialogName }}
-            {{ end }}"
-            required
-          />
-        </div>
-        <div class="form-field">
-          <label for="org-logo">Organization logo</label>
-          <input
-            id="org-logo"
-            name="logo"
-            type="file"
-            accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
-          />
-        </div>
-        <div class="form-field">
-          <label for="org-admin-email">Organization admin email</label>
-          <input
-            id="org-admin-email"
-            name="invite_email"
-            type="email"
-            value="{{ if eq .OrganizationDialogAction "create" }}
-              {{ .InviteDialogEmail }}
-            {{ end }}"
-          />
-          <small class="muted">
-            Invite the first org admin now, or add more org admins later from
-            the organization invite action.
-          </small>
-        </div>
-        {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}
-          <p class="error">{{ .OrganizationError }}</p>
-        {{ end }}
-        <div class="dialog-actions">
-          <button class="btn btn-primary" type="submit">Create organization</button>
-        </div>
-      </form>
+        {{ template "icon-plus" . }}
+        Add organization
+      </button>
     </div>
-  </dialog>
 
-<script>
-  (function () {
-    const createDialog = document.getElementById("create-org-dialog");
-    if (createDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "create")}}true{{else}}false{{end}} && !createDialog.open) {
-      createDialog.showModal();
-    }
-  })();
-</script>
+    <form
+      method="get"
+      action="/admin/orgs"
+      class="platform-admin-search"
+      id="platform-admin-search"
+    >
+      <input type="hidden" name="page" value="1" />
+      <label
+        class="platform-admin-search-field"
+        for="platform-admin-search-input"
+      >
+        {{ template "icon-search" . }}
+        <input
+          id="platform-admin-search-input"
+          type="search"
+          name="q"
+          value="{{ .SearchQuery }}"
+          placeholder="Search organizations by name"
+          autocomplete="off"
+          hx-get="/admin/orgs"
+          hx-target="#platform-admin-results"
+          hx-select="#platform-admin-results"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-include="#platform-admin-search"
+          hx-trigger="input changed delay:200ms, search"
+        />
+      </label>
+    </form>
+
+    {{ template "platform_admin_results" . }}
+
+    <dialog id="create-org-dialog" class="dialog">
+      <div class="dialog-card">
+        <header class="dialog-head">
+          <div>
+            <h3 class="dialog-title">New organization</h3>
+            <p class="dialog-subtitle">
+              Add a new organization to the platform
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost btn-icon dialog-close"
+            onclick="document.getElementById('create-org-dialog').close()"
+          >
+            {{ template "icon-close" . }}
+          </button>
+        </header>
+        <form
+          method="post"
+          action="/admin/orgs"
+          class="input-form"
+          enctype="multipart/form-data"
+        >
+          <input type="hidden" name="intent" value="create_org" />
+          <input type="hidden" name="q" value="{{ .SearchQuery }}" />
+          <input type="hidden" name="page" value="{{ .CurrentPage }}" />
+          <div class="form-field">
+            <label for="org-name">Organization name *</label>
+            <input
+              id="org-name"
+              name="name"
+              type="text"
+              value="{{ if eq .OrganizationDialogAction "create" }}
+                {{ .OrganizationDialogName }}
+              {{ end }}"
+              required
+            />
+          </div>
+          <div class="form-field">
+            <label for="org-logo">Organization logo</label>
+            <input
+              id="org-logo"
+              name="logo"
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+            />
+          </div>
+          <div class="form-field">
+            <label for="org-admin-email">Organization admin email</label>
+            <input
+              id="org-admin-email"
+              name="invite_email"
+              type="email"
+              value="{{ if eq .OrganizationDialogAction "create" }}
+                {{ .InviteDialogEmail }}
+              {{ end }}"
+            />
+            <small class="muted">
+              Invite the first org admin now, or add more org admins later from
+              the organization invite action.
+            </small>
+          </div>
+          {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}
+            <p class="error">{{ .OrganizationError }}</p>
+          {{ end }}
+          <div class="dialog-actions">
+            <button class="btn btn-primary" type="submit">Create organization</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <script>
+      (function () {
+        const createDialog = document.getElementById("create-org-dialog");
+        if (createDialog && {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}true{{ else }}false{{ end }} && !createDialog.open) {
+          createDialog.showModal();
+        }
+      })();
+    </script>
+  {{ end }}
 {{ end }}
 
 {{ define "platform_admin_categories_panel" }}

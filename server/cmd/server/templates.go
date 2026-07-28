@@ -23,8 +23,10 @@ func templateFuncs() template.FuncMap {
 		"streamTimelineSubstep": func(substep TimelineSubstep, hideStatus bool) StreamTimelineSubstepView {
 			return StreamTimelineSubstepView{Substep: substep, HideStatus: hideStatus}
 		},
-		"substepShellDisplay": substepShellDisplay,
+		"substepShellDisplay":      substepShellDisplay,
 		"effectiveSubstepBodyMode": effectiveSubstepBodyMode,
+		"platformAdminConsole":     platformAdminConsole,
+		"orgAdminConsole":          orgAdminConsole,
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: odd number of arguments")

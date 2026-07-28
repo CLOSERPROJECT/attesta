@@ -414,6 +414,7 @@ type PlatformAdminView struct {
 	ActivePanel              string
 	Categories               []TaxonomyCategoryNode
 	Breadcrumbs              BreadcrumbsView
+	Console                  AdminConsoleView
 	SearchQuery              string
 	CurrentPage              int
 	TotalPages               int
@@ -1301,7 +1302,7 @@ func logAndHTTPError(w http.ResponseWriter, r *http.Request, status int, userMes
 
 func (s *Server) logAndRenderPlatformAdminError(w http.ResponseWriter, r *http.Request, user *AccountUser, confirmation string, errs PlatformAdminErrors, err error, message string, args ...interface{}) {
 	logRequestError(r, err, message, args...)
-	s.renderPlatformAdmin(w, user, confirmation, errs)
+	s.renderPlatformAdmin(w, r, user, confirmation, errs)
 }
 
 func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Request, user *AccountUser, orgSlug, inviteLink string, errs OrgAdminErrors, err error, message string, args ...interface{}) {
@@ -3403,7 +3404,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		pageNumbers = append(pageNumbers, page)
 	}
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
-	return PlatformAdminView{
+	view := PlatformAdminView{
 		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		ActivePanel:              "orgs",
 		Breadcrumbs:              buildPlatformAdminBreadcrumbs("orgs"),
@@ -3426,10 +3427,18 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		InviteDialogEmail:        errs.InviteEmail,
 		Error:                    firstNonEmpty(errs.Organization, errs.Invite),
 	}
+	view.Console = platformAdminConsole(view)
+	return view
 }
 
-func (s *Server) renderPlatformAdmin(w http.ResponseWriter, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
+func (s *Server) renderPlatformAdmin(w http.ResponseWriter, r *http.Request, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
 	view := s.platformAdminView(user, confirmation, errs)
+	if wantsAdminConsolePartial(r) {
+		if err := s.tmpl.ExecuteTemplate(w, "admin_console", view.Console); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -3462,6 +3471,13 @@ func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
 		Categories:  categories,
 		Breadcrumbs: buildPlatformAdminBreadcrumbs("categories"),
 	}
+	view.Console = platformAdminConsole(view)
+	if wantsAdminConsolePartial(r) {
+		if err := s.tmpl.ExecuteTemplate(w, "admin_console", view.Console); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -3489,11 +3505,11 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		searchQuery, page := platformAdminListStateFromRequest(r)
 		confirmation := homePickerMessage(r, "confirmation")
-		if isHTMXRequest(r) {
+		if isHTMXRequest(r) && htmxTargetID(r) == "platform-admin-results" {
 			s.renderPlatformAdminResults(w, admin, confirmation, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 			return
 		}
-		s.renderPlatformAdmin(w, admin, confirmation, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+		s.renderPlatformAdmin(w, r, admin, confirmation, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 		return
 	case http.MethodPost:
 		contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
@@ -3501,7 +3517,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			r.Body = http.MaxBytesReader(w, r.Body, organizationLogoMaxBytes())
 			if err := r.ParseMultipartForm(1 << 20); err != nil {
 				if isRequestTooLarge(err) {
-					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "logo file too large"})
+					s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "logo file too large"})
 					return
 				}
 				logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse platform admin multipart form")
@@ -3523,11 +3539,11 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			orgSlug := strings.TrimSpace(r.FormValue("org_slug"))
 			email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 			if email == "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "email is required", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Invite: "email is required", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			if orgSlug == "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "organization is required", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Invite: "organization is required", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			redirectURL := inviteRedirectURL(r)
@@ -3536,7 +3552,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					logRequestError(r, err, "failed to load organization %s for platform admin invite", orgSlug)
 				}
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "organization not found", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Invite: "organization not found", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			platformSession, err := s.ensurePlatformAdminOwnsOrganization(r.Context(), org.Slug, redirectURL)
@@ -3549,14 +3565,14 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			}()
 			message, err := s.inviteOrganizationAdminWithSession(r.Context(), platformSession.Secret, *org, email, redirectURL)
 			if errors.Is(err, errPlatformAdminInviteCrossOrg) {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Invite: "email already belongs to another organization", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Invite: "email already belongs to another organization", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			if err != nil {
 				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Invite: "failed to create invite", DialogAction: "invite", OrgSlug: orgSlug, InviteEmail: email, SearchQuery: searchQuery, Page: page}, err, "failed to create org admin invite for %s in %s", email, org.Slug)
 				return
 			}
-			s.renderPlatformAdmin(w, admin, message, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+			s.renderPlatformAdmin(w, r, admin, message, PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 			return
 		}
 		switch intent {
@@ -3564,17 +3580,17 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			name := strings.TrimSpace(r.FormValue("name"))
 			inviteEmail := strings.ToLower(strings.TrimSpace(r.FormValue("invite_email")))
 			if name == "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization name is required", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization name is required", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			orgSlug := canonifySlug(name)
 			if existing, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
 			if logoErrMsg != "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: logoErrMsg, DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: logoErrMsg, DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			platformSession, err := s.platformAdminIdentitySession(r.Context())
@@ -3588,7 +3604,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			createdOrg, err := s.identity.CreateOrganization(r.Context(), platformSession.Secret, name)
 			if err != nil {
 				if isDuplicateSlugError(err) {
-					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
+					s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
 					return
 				}
 				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to create organization", DialogAction: "create", OrgName: name, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page}, err, "failed to create organization %s", name)
@@ -3612,7 +3628,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			if inviteEmail != "" {
 				message, err := s.inviteOrganizationAdminWithSession(r.Context(), platformSession.Secret, createdOrg, inviteEmail, inviteRedirectURL(r))
 				if errors.Is(err, errPlatformAdminInviteCrossOrg) {
-					s.renderPlatformAdmin(w, admin, "organization created", PlatformAdminErrors{Invite: "email already belongs to another organization", DialogAction: "invite", OrgSlug: createdOrg.Slug, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
+					s.renderPlatformAdmin(w, r, admin, "organization created", PlatformAdminErrors{Invite: "email already belongs to another organization", DialogAction: "invite", OrgSlug: createdOrg.Slug, InviteEmail: inviteEmail, SearchQuery: searchQuery, Page: page})
 					return
 				}
 				if err != nil {
@@ -3628,11 +3644,11 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			currentSlug := strings.TrimSpace(r.FormValue("org_slug"))
 			name := strings.TrimSpace(r.FormValue("name"))
 			if currentSlug == "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "edit", SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "edit", SearchQuery: searchQuery, Page: page})
 				return
 			}
 			if name == "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization name is required", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization name is required", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			org, err := s.identity.GetOrganizationBySlug(r.Context(), currentSlug)
@@ -3640,19 +3656,19 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					logRequestError(r, err, "failed to load organization %s for platform admin update", currentSlug)
 				}
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			targetOrgSlug := canonifySlug(name)
 			if targetOrgSlug != strings.TrimSpace(org.Slug) {
 				if existing, err := s.identity.GetOrganizationBySlug(r.Context(), targetOrgSlug); err == nil && existing != nil && strings.TrimSpace(existing.ID) != strings.TrimSpace(org.ID) {
-					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
+					s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
 					return
 				}
 			}
 			logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
 			if logoErrMsg != "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: logoErrMsg, DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: logoErrMsg, DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			previousLogoFileID := strings.TrimSpace(org.LogoFileID)
@@ -3672,7 +3688,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			updatedOrg, err := s.identity.UpdateOrganizationAsAdmin(r.Context(), currentSlug, name, logoFileID, append([]IdentityRole(nil), org.Roles...))
 			if err != nil {
 				if isDuplicateSlugError(err) {
-					s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
+					s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization slug already exists", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page})
 					return
 				}
 				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to update organization", DialogAction: "edit", OrgSlug: currentSlug, OrgName: name, SearchQuery: searchQuery, Page: page}, err, "failed to update organization %s", currentSlug)
@@ -3683,12 +3699,12 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 					log.Printf("failed to delete previous organization logo %q: %v", previousLogoFileID, err)
 				}
 			}
-			s.renderPlatformAdmin(w, admin, "organization updated", PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+			s.renderPlatformAdmin(w, r, admin, "organization updated", PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 			return
 		case "delete_org":
 			currentSlug := strings.TrimSpace(r.FormValue("org_slug"))
 			if currentSlug == "" {
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "delete", SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "delete", SearchQuery: searchQuery, Page: page})
 				return
 			}
 			org, err := s.identity.GetOrganizationBySlug(r.Context(), currentSlug)
@@ -3696,7 +3712,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					logRequestError(r, err, "failed to load organization %s for platform admin deletion", currentSlug)
 				}
-				s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "delete", OrgSlug: currentSlug, SearchQuery: searchQuery, Page: page})
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization not found", DialogAction: "delete", OrgSlug: currentSlug, SearchQuery: searchQuery, Page: page})
 				return
 			}
 			previousLogoFileID := strings.TrimSpace(org.LogoFileID)
@@ -3709,10 +3725,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 					log.Printf("failed to delete organization logo %q after deleting org %s: %v", previousLogoFileID, currentSlug, err)
 				}
 			}
-			s.renderPlatformAdmin(w, admin, "organization deleted", PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
+			s.renderPlatformAdmin(w, r, admin, "organization deleted", PlatformAdminErrors{SearchQuery: searchQuery, Page: page})
 			return
 		default:
-			s.renderPlatformAdmin(w, admin, "", PlatformAdminErrors{Organization: "unsupported action", SearchQuery: searchQuery, Page: page})
+			s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "unsupported action", SearchQuery: searchQuery, Page: page})
 			return
 		}
 	default:
@@ -3731,12 +3747,15 @@ func resolveOrgAdminActivePanel(r *http.Request, errs OrgAdminErrors, inviteLink
 		return "profile"
 	}
 	if r != nil {
-		switch r.URL.Path {
-		case organizationPath("roles"):
+		// handleMyRoutes rewrites /my/organization/... to /organization/... before handlers run.
+		// Match both forms (and trailing slash) via shared suffixes.
+		path := strings.TrimSuffix(r.URL.Path, "/")
+		switch {
+		case strings.HasSuffix(path, "/organization/roles"):
 			return "roles"
-		case organizationPath("members"):
+		case strings.HasSuffix(path, "/organization/members"):
 			return "members"
-		case organizationPath("profile"):
+		case strings.HasSuffix(path, "/organization/profile"):
 			return "profile"
 		}
 	}
@@ -3964,6 +3983,12 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	}
 	if strings.TrimSpace(org.LogoAttachmentID) == "" {
 		view.OrganizationLogoURL = ""
+	}
+	if wantsAdminConsolePartial(r) {
+		if err := s.tmpl.ExecuteTemplate(w, "admin_console", orgAdminConsole(view)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -7489,6 +7514,9 @@ func effectiveSubstep(canonical WorkflowSub, override *SubstepOverride) Workflow
 }
 
 func isHTMXRequest(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
 	return strings.EqualFold(r.Header.Get("HX-Request"), "true")
 }
 

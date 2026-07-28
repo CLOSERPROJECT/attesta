@@ -94,6 +94,7 @@ func testTemplates() *template.Template {
 	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}
 	{{define "signup.html"}}{{template "layout.html" .}}{{end}}
 	{{define "platform_admin_body"}}PLATFORM_ADMIN {{.ActivePanel}} {{len .Organizations}} {{.Confirmation}}{{range .Categories}} CAT {{.Name}} {{.IconURL}}{{range .SubCategories}} SUB {{.Name}} {{.IconURL}}{{end}}{{end}}{{if .Error}} {{.Error}}{{end}}{{end}}
+	{{define "admin_console"}}ADMIN_CONSOLE {{.Title}} {{.Subtitle}}{{end}}
 	{{define "platform_admin_results"}}PLATFORM_ADMIN_RESULTS ORGS {{len .Organizations}} {{.Confirmation}}{{if .Error}} {{.Error}}{{end}}{{end}}
 	{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
 	{{define "home_body"}}HOME{{end}}
@@ -103,6 +104,7 @@ func testTemplates() *template.Template {
 {{define "dashboard.html"}}{{template "layout.html" .}}{{end}}
 {{define "dashboard_partial.html"}}{{template "dashboard_body" .}}{{end}}
 {{define "org_admin_body"}}ORG_ADMIN {{.Organization.Slug}} ROLES {{len .Roles}} INVITES {{len .Invites}} USERS {{len .Users}} {{range .Users}}{{range .RoleOptions}}{{if .Selected}}ROLE_STYLE {{.Palette}} {{end}}{{end}}{{end}} {{.InviteLink}}{{if .Error}} {{.Error}}{{end}}{{end}}
+{{define "org_admin_main"}}ORG_ADMIN_MAIN {{.ActivePanel}}{{end}}
 {{define "org_admin.html"}}{{template "layout.html" .}}{{end}}
 {{define "process_body"}}PROCESS {{.ProcessID}} {{template "process_content.html" .}}{{end}}
 {{define "process_content.html"}}PROCESS_CONTENT {{.ProcessID}} {{.DPPURL}} {{.Detail.Error}}{{with .Detail.SelectedBody}}{{.SubstepID}}{{end}}{{end}}

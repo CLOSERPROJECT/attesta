@@ -10,6 +10,7 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
+		ActivePanel: "roles",
 		RoleRows: []OrgAdminRoleRow{
 			{
 				Slug:    "approver",

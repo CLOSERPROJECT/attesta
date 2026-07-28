@@ -3,24 +3,16 @@
 {{ define "org_admin_body" }}
 
   <div class="stack u-max-w-7xl u-mx-auto">
-    <section class="page-header">
-      {{ template "breadcrumbs" .Breadcrumbs }}
-      <div class="page-header-body">
-        <h1>Organization admin dashboard</h1>
-        <p>Manage organization settings, roles, and members</p>
-      </div>
-    </section>
-    <div
-      class="rail-layout{{ if not .NeedsOrganizationSetup }}
-        rail-layout-ready
-      {{ end }}"
-    >
-      <section
-        class="panel{{ if not .NeedsOrganizationSetup }}
-          panel-sticky
-        {{ end }}"
-      >
-        {{ if .NeedsOrganizationSetup }}
+    {{ if .NeedsOrganizationSetup }}
+      <section class="page-header">
+        {{ template "breadcrumbs" .Breadcrumbs }}
+        <div class="page-header-body">
+          <h1>Organization admin dashboard</h1>
+          <p>Manage organization settings, roles, and members</p>
+        </div>
+      </section>
+      <div class="rail-layout">
+        <section class="panel">
           <div class="panel-heading">
             <p>
               Your org admin invite is not assigned to an organization yet.
@@ -52,924 +44,15 @@
             {{ end }}
             <button class="btn btn-primary" type="submit">Create organization</button>
           </form>
-        {{ else }}
-          <nav
-            class="sidebar-nav"
-            aria-label="Organization admin sections"
-          >
-            <a
-              href="/my/organization/profile"
-              class="sidebar-nav-link{{ if eq .ActivePanel "profile" }} is-active{{ end }}"
-              data-org-admin-nav="profile"
-              aria-controls="org-admin-panel-profile"
-              {{ if eq .ActivePanel "profile" }}aria-current="page"{{ end }}
-            >
-              <span class="sidebar-nav-title"
-                >Organization profile</span
-              >
-              <span class="sidebar-nav-copy"
-                >Update your organization name and logo</span
-              >
-            </a>
-            <a
-              href="/my/organization/roles"
-              class="sidebar-nav-link{{ if eq .ActivePanel "roles" }} is-active{{ end }}"
-              data-org-admin-nav="roles"
-              aria-controls="org-admin-panel-roles"
-              {{ if eq .ActivePanel "roles" }}aria-current="page"{{ end }}
-            >
-              <span class="sidebar-nav-title">Roles</span>
-              <span class="sidebar-nav-copy"
-                >Manage the role catalog for your organization</span
-              >
-            </a>
-            <a
-              href="/my/organization/members"
-              class="sidebar-nav-link{{ if eq .ActivePanel "members" }} is-active{{ end }}"
-              data-org-admin-nav="members"
-              aria-controls="org-admin-panel-members"
-              {{ if eq .ActivePanel "members" }}aria-current="page"{{ end }}
-            >
-              <span class="sidebar-nav-title">Members</span>
-              <span class="sidebar-nav-copy"
-                >Invite people and update member access</span
-              >
-            </a>
-          </nav>
-        {{ end }}
-      </section>
-
-      {{ if not .NeedsOrganizationSetup }}
-        <section
-          class="panel rail-layout-main org-admin-panel-main"
-          data-org-admin-shell
-          data-org-admin-default-panel="{{ .ActivePanel }}"
-        >
-          <section
-            class="org-admin-panel-section"
-            id="org-admin-panel-profile"
-            data-org-admin-panel="profile"
-            {{ if ne .ActivePanel "profile" }}hidden{{ end }}
-          >
-            <div class="panel-heading">
-              <h2>Organization profile</h2>
-              <p>Review and update your organization details</p>
-            </div>
-            <div class="org-profile-summary">
-              {{ if .OrganizationLogoURL }}
-                <img
-                  src="{{ .OrganizationLogoURL }}"
-                  alt="{{ .Organization.Name }} logo"
-                  class="org-profile-logo"
-                />
-              {{ else }}
-                <span class="org-profile-logo-placeholder">
-                  {{ template "icon-no-org" . }}
-                </span>
-              {{ end }}
-              <div class="org-profile-meta">
-                <p class="org-profile-name">
-                  <strong>{{ .Organization.Name }}</strong>
-                </p>
-                <p class="muted org-profile-slug">
-                  Slug:
-                  {{ .Organization.Slug }}
-                </p>
-              </div>
-            </div>
-            <form
-              method="post"
-              action="/my/organization/users"
-              class="input-form org-profile-form"
-              enctype="multipart/form-data"
-            >
-              <input type="hidden" name="intent" value="update_org" />
-              <div class="form-field">
-                <label for="org-name-profile">Organization name</label>
-                <input
-                  id="org-name-profile"
-                  name="name"
-                  type="text"
-                  value="{{ .Organization.Name }}"
-                  required
-                />
-              </div>
-              <div class="form-field">
-                <label for="org-logo-profile"
-                  >Organization logo (optional)</label
-                >
-                <input
-                  id="org-logo-profile"
-                  name="logo"
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
-                />
-              </div>
-              {{ if .OrganizationError }}
-                <p class="error">{{ .OrganizationError }}</p>
-              {{ end }}
-              <div class="org-admin-form-actions">
-                <button class="btn btn-primary" type="submit">Save organization</button>
-              </div>
-            </form>
-          </section>
-          <section
-            class="org-admin-panel-section"
-            id="org-admin-panel-roles"
-            data-org-admin-panel="roles"
-            {{ if ne .ActivePanel "roles" }}hidden{{ end }}
-          >
-            <div class="panel-head-actions">
-              <div class="panel-heading">
-                <h2>Roles</h2>
-                <p>Available roles for your organization</p>
-              </div>
-              <button
-                class="btn btn-primary"
-                type="button"
-                onclick="document.getElementById('add-role-dialog').showModal()"
-              >
-                {{ template "icon-plus" . }}
-                Add role
-              </button>
-            </div>
-            {{ if .RoleRows }}
-              <ul class="list-rows">
-                {{ range .RoleRows }}
-                  <li class="list-row">
-                    <div class="list-row-main">
-                      <span
-                        class="pill pill-lg role-pill"
-                        data-role-palette="{{ .Palette }}"
-                      >
-                        {{ .Name }}
-                      </span>
-                    </div>
-                    <div class="list-row-actions">
-                      {{ if .InUse }}
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-icon btn-xs"
-                          aria-label="Edit role"
-                          title="Role in use"
-                          disabled
-                        >
-                          {{ template "icon-settings-muted" . }}
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-ghost-danger btn-icon btn-xs"
-                          aria-label="Delete role"
-                          title="Role in use"
-                          disabled
-                        >
-                          {{ template "icon-trash-muted" . }}
-                        </button>
-                      {{ else }}
-                        <span class="muted u-text-xs"
-                          >Not used</span
-                        >
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-icon btn-xs"
-                          aria-label="Edit role"
-                          onclick="document.getElementById('edit-role-{{ .Slug }}').showModal()"
-                        >
-                          {{ template "icon-settings" . }}
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-ghost-danger btn-icon btn-xs"
-                          aria-label="Delete role"
-                          onclick="document.getElementById('delete-role-{{ .Slug }}').showModal()"
-                        >
-                          {{ template "icon-trash" . }}
-                        </button>
-                      {{ end }}
-                    </div>
-                    {{ if and $.RoleError (or (eq $.RoleDialogAction "edit") (eq $.RoleDialogAction "delete")) (eq $.RoleDialogSlug .Slug) .InUse }}
-                      <p class="error">{{ $.RoleError }}</p>
-                    {{ end }}
-                    {{ if not .InUse }}
-                      <dialog
-                        id="edit-role-{{ .Slug }}"
-                        class="dialog dialog-overflow"
-                      >
-                        <div class="dialog-card">
-                          <header class="dialog-head">
-                            <div>
-                              <h3 class="dialog-title">Edit Role</h3>
-                              <p class="dialog-subtitle">
-                                Change the role name and color
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              class="btn btn-ghost btn-icon dialog-close"
-                              onclick="document.getElementById('edit-role-{{ .Slug }}').close()"
-                            >
-                              {{ template "icon-close" . }}
-                            </button>
-                          </header>
-                          <div class="org-admin-dialog-role-pill">
-                            <span
-                              class="pill pill-lg role-pill"
-                              data-role-palette="{{ .Palette }}"
-                            >
-                              {{ .Name }}
-                            </span>
-                          </div>
-                          <form
-                            method="post"
-                            action="/my/organization/roles"
-                            class="input-form"
-                          >
-                            <input
-                              type="hidden"
-                              name="intent"
-                              value="set_role"
-                            />
-                            <input
-                              type="hidden"
-                              name="role_slug"
-                              value="{{ .Slug }}"
-                            />
-                            <div class="form-field">
-                              <label for="edit-role-name-{{ .Slug }}"
-                                >Role name</label
-                              >
-                              <input
-                                id="edit-role-name-{{ .Slug }}"
-                                name="name"
-                                type="text"
-                                {{ if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleDialogName }}
-                                  value="{{ $.RoleDialogName }}"
-                                {{ else }}
-                                  value="{{ .Name }}"
-                                {{ end }}
-                                required
-                              />
-                            </div>
-                            <div class="form-field">
-                              <label for="edit-role-palette-{{ .Slug }}"
-                                >Role color palette</label
-                              >
-                              <div
-                                class="role-palette-picker"
-                                data-role-palette-picker
-                              >
-                                <div class="role-palette-select-wrap">
-                                  <select
-                                    id="edit-role-palette-{{ .Slug }}"
-                                    name="palette"
-                                    required
-                                    class="role-palette-native-select"
-                                    data-role-palette-select
-                                  >
-                                    {{ template "role-palette-options" (or $.RoleDialogPalette .Palette) }}
-                                  </select>
-                                  <button
-                                    type="button"
-                                    class="roles-picker-toggle role-palette-toggle"
-                                    data-role-palette-toggle
-                                    aria-expanded="false"
-                                  >
-                                    <span data-role-palette-toggle-label></span>
-                                    <span
-                                      class="roles-picker-toggle-icon"
-                                      aria-hidden="true"
-                                    >
-                                      {{ template "icon-chevron-down" . }}
-                                    </span>
-                                  </button>
-                                  <div
-                                    class="roles-picker-menu role-palette-menu"
-                                    data-role-palette-menu
-                                    hidden
-                                  >
-                                    <ul
-                                      class="roles-picker-options"
-                                      data-role-palette-options
-                                    ></ul>
-                                  </div>
-                                </div>
-                                <span
-                                  class="role-palette-preview"
-                                  aria-hidden="true"
-                                  data-role-palette-preview
-                                ></span>
-                              </div>
-                            </div>
-                            {{ if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleError }}
-                              <p class="error">{{ $.RoleError }}</p>
-                            {{ end }}
-                            <div
-                              class="dialog-actions"
-                            >
-                              <button class="btn btn-primary" type="submit">
-                                Save role
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      </dialog>
-                      <dialog
-                        id="delete-role-{{ .Slug }}"
-                        class="dialog"
-                      >
-                        <div class="dialog-card">
-                          <header class="dialog-head">
-                            <div>
-                              <h3
-                                class="dialog-title u-text-danger"
-                              >
-                                Danger zone - Delete role
-                              </h3>
-                              <p class="dialog-subtitle">
-                                This action cannot be undone
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              class="btn btn-ghost btn-icon dialog-close"
-                              onclick="document.getElementById('delete-role-{{ .Slug }}').close()"
-                            >
-                              {{ template "icon-close" . }}
-                            </button>
-                          </header>
-                          <div class="org-admin-dialog-role-pill">
-                            <span
-                              class="pill pill-lg role-pill"
-                              data-role-palette="{{ .Palette }}"
-                            >
-                              {{ .Name }}
-                            </span>
-                          </div>
-                          <p>
-                            This will permanently remove the role from your
-                            organization. Confirm only if you want to continue.
-                          </p>
-                          {{ if and (eq $.RoleDialogAction "delete") (eq $.RoleDialogSlug .Slug) $.RoleError }}
-                            <p class="error">{{ $.RoleError }}</p>
-                          {{ end }}
-                          <form
-                            method="post"
-                            action="/my/organization/roles"
-                            class="input-form"
-                          >
-                            <input
-                              type="hidden"
-                              name="intent"
-                              value="delete_role"
-                            />
-                            <input
-                              type="hidden"
-                              name="role_slug"
-                              value="{{ .Slug }}"
-                            />
-                            <div
-                              class="dialog-actions"
-                            >
-                              <button type="submit" class="btn btn-danger">
-                                Delete role
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      </dialog>
-                    {{ end }}
-                  </li>
-                {{ end }}
-              </ul>
-            {{ else }}
-              <p class="muted">No organization roles yet</p>
-            {{ end }}
-          </section>
-          <section
-            class="org-admin-panel-section"
-            id="org-admin-panel-members"
-            data-org-admin-panel="members"
-            {{ if ne .ActivePanel "members" }}hidden{{ end }}
-          >
-            <div class="panel-head-actions">
-              <div class="panel-heading">
-                <h2>Users</h2>
-                <p>Members and invites for your organization</p>
-              </div>
-              <button
-                class="btn btn-primary"
-                type="button"
-                onclick="document.getElementById('add-user-dialog').showModal()"
-              >
-                {{ template "icon-plus" . }}
-                Add user
-              </button>
-            </div>
-            {{ if .UsersError }}<p class="error">{{ .UsersError }}</p>{{ end }}
-            {{ if .Users }}
-              <ul class="list-rows">
-                {{ range .Users }}
-                  <li class="list-row">
-                    <div class="list-row-main">
-                      <span class="user-email">
-                        {{ if .IsOrgAdmin }}
-                          {{ template "icon-user-org-admin" . }}
-                        {{ else }}
-                          {{ template "icon-user-member" . }}
-                        {{ end }}
-                        {{ .Email }}
-                        {{ if not .Activated }}
-                          <span
-                            class="pill role-pill pill-accent"
-                            >Pending invite</span
-                          >
-                        {{ end }}
-                      </span>
-                      <div class="user-tags">
-                        {{ range .RoleOptions }}
-                          {{ if and .Selected (not (or (eq .Slug "org-admin") (eq .Slug "org_admin"))) }}
-                            <span
-                              class="pill role-pill"
-                              data-role-palette="{{ .Palette }}"
-                            >
-                              {{ .Name }}
-                            </span>
-                          {{ end }}
-                        {{ end }}
-                      </div>
-                    </div>
-                    <div class="list-row-actions">
-                      <button
-                        type="button"
-                        class="btn btn-ghost btn-icon btn-xs"
-                        aria-label="Edit user"
-                        onclick="document.getElementById('manage-user-{{ .UserID }}').showModal()"
-                      >
-                        {{ template "icon-settings" . }}
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-ghost-danger btn-icon btn-xs"
-                        aria-label="Delete user"
-                        onclick="document.getElementById('delete-user-{{ .UserID }}').showModal()"
-                      >
-                        {{ template "icon-trash" . }}
-                      </button>
-                    </div>
-                    <dialog
-                      id="manage-user-{{ .UserID }}"
-                      class="dialog dialog-overflow"
-                    >
-                      <div class="dialog-card">
-                        <header class="dialog-head">
-                          <div>
-                            <h3 class="dialog-title">Manage User</h3>
-                            <p class="dialog-subtitle">{{ .Email }}</p>
-                          </div>
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-icon dialog-close"
-                            onclick="document.getElementById('manage-user-{{ .UserID }}').close()"
-                          >
-                            {{ template "icon-close" . }}
-                          </button>
-                        </header>
-
-                        <form
-                          method="post"
-                          action="/my/organization/users"
-                          class="input-form"
-                        >
-                          <input
-                            type="hidden"
-                            name="intent"
-                            value="set_roles"
-                          />
-                          <input
-                            type="hidden"
-                            name="userId"
-                            value="{{ .UserID }}"
-                          />
-                          <div class="form-field">
-                            <label>Roles</label>
-                            <div class="roles-picker" data-role-picker>
-                              <button
-                                type="button"
-                                class="roles-picker-toggle"
-                                data-role-picker-toggle
-                                aria-expanded="false"
-                              >
-                                <span data-role-picker-toggle-label
-                                  >Select roles</span
-                                >
-                                <span
-                                  class="roles-picker-toggle-icon"
-                                  aria-hidden="true"
-                                >
-                                  {{ template "icon-chevron-down" . }}
-                                </span>
-                              </button>
-                              <div
-                                class="roles-picker-menu"
-                                data-role-picker-menu
-                                hidden
-                              >
-                                <input
-                                  type="search"
-                                  class="roles-picker-search"
-                                  data-role-picker-search
-                                  placeholder="Search roles..."
-                                />
-                                <ul class="roles-picker-options">
-                                  {{ range .RoleOptions }}
-                                    <li>
-                                      <button
-                                        type="button"
-                                        class="roles-picker-option"
-                                        data-role-picker-option
-                                        data-value="{{ .Slug }}"
-                                        data-label="{{ .Name }} ({{ .Slug }})"
-                                        {{ if .Selected }}
-                                          data-selected="true"
-                                        {{ end }}
-                                      >
-                                        <span>{{ .Name }} ({{ .Slug }})</span>
-                                        <span class="roles-picker-option-check"
-                                          >Selected</span
-                                        >
-                                      </button>
-                                    </li>
-                                  {{ end }}
-                                </ul>
-                                <p
-                                  class="roles-picker-empty"
-                                  data-role-picker-empty
-                                  hidden
-                                >
-                                  No roles match your search
-                                </p>
-                              </div>
-                              <div data-role-picker-hidden-inputs></div>
-                            </div>
-                          </div>
-                          <div
-                            class="dialog-actions"
-                          >
-                            <button class="btn btn-primary" type="submit">
-                              Save roles
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    </dialog>
-                    <dialog
-                      id="delete-user-{{ .UserID }}"
-                      class="dialog"
-                    >
-                      <div class="dialog-card">
-                        <header class="dialog-head">
-                          <div>
-                            <h3
-                              class="dialog-title u-text-danger"
-                            >
-                              Danger zone - Delete Account
-                            </h3>
-                            <p class="dialog-subtitle">{{ .Email }}</p>
-                          </div>
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-icon dialog-close"
-                            onclick="document.getElementById('delete-user-{{ .UserID }}').close()"
-                          >
-                            {{ template "icon-close" . }}
-                          </button>
-                        </header>
-                        <p class="u-m-0 u-mb-5">
-                          This will remove the account from your organization.
-                          Confirm only if you want to permanently delete this
-                          user access.
-                        </p>
-                        <form
-                          method="post"
-                          action="/my/organization/users"
-                          class="input-form"
-                        >
-                          <input
-                            type="hidden"
-                            name="intent"
-                            value="delete_user"
-                          />
-                          <input
-                            type="hidden"
-                            name="userId"
-                            value="{{ .UserID }}"
-                          />
-                          <div
-                            class="dialog-actions"
-                          >
-                            <button type="submit" class="btn btn-danger">
-                              Delete account
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    </dialog>
-                  </li>
-                {{ end }}
-              </ul>
-            {{ else }}
-              <p class="muted">No organization users yet</p>
-            {{ end }}
-          </section>
-
-          <dialog
-            id="add-role-dialog"
-            class="dialog dialog-overflow"
-          >
-            <div class="dialog-card">
-              <header class="dialog-head">
-                <div>
-                  <h3 class="dialog-title">Add Role</h3>
-                  <p class="dialog-subtitle">
-                    Create a new role for your organization
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-icon dialog-close"
-                  onclick="document.getElementById('add-role-dialog').close()"
-                >
-                  {{ template "icon-close" . }}
-                </button>
-              </header>
-
-              <form method="post" action="/my/organization/roles" class="input-form">
-                <input type="hidden" name="intent" value="create_role" />
-                <div class="form-field">
-                  <label for="role-name">Role name</label>
-                  <input
-                    id="role-name"
-                    name="name"
-                    type="text"
-                    value="{{ if and (eq .RoleDialogAction "create") .RoleDialogName }}
-                      {{ .RoleDialogName }}
-                    {{ end }}"
-                    required
-                  />
-                </div>
-                <div class="form-field">
-                  <label for="role-palette">Role color palette</label>
-                  <div class="role-palette-picker" data-role-palette-picker data-role-palette-auto>
-                    <div class="role-palette-select-wrap">
-                      <select
-                        id="role-palette"
-                        name="palette"
-                        required
-                        class="role-palette-native-select"
-                        data-role-palette-select
-                      >
-                        {{ template "role-palette-options" (or .RoleDialogPalette "red") }}
-                      </select>
-                      <button
-                        type="button"
-                        class="roles-picker-toggle role-palette-toggle"
-                        data-role-palette-toggle
-                        aria-expanded="false"
-                      >
-                        <span data-role-palette-toggle-label></span>
-                        <span
-                          class="roles-picker-toggle-icon"
-                          aria-hidden="true"
-                        >
-                          {{ template "icon-chevron-down" . }}
-                        </span>
-                      </button>
-                      <div
-                        class="roles-picker-menu role-palette-menu"
-                        data-role-palette-menu
-                        hidden
-                      >
-                        <ul
-                          class="roles-picker-options"
-                          data-role-palette-options
-                        ></ul>
-                      </div>
-                    </div>
-                    <span
-                      class="role-palette-preview"
-                      aria-hidden="true"
-                      data-role-palette-preview
-                    ></span>
-                  </div>
-                </div>
-                {{ if and .RoleError (eq .RoleDialogAction "create") }}
-                  <p class="error">{{ .RoleError }}</p>
-                {{ end }}
-                <div class="dialog-actions">
-                  <button class="btn btn-primary" type="submit">Create role</button>
-                </div>
-              </form>
-            </div>
-          </dialog>
-
-          <dialog
-            id="add-user-dialog"
-            class="dialog dialog-overflow"
-          >
-            <div class="dialog-card">
-              <header class="dialog-head">
-                <div>
-                  <h3 class="dialog-title">Add User</h3>
-                  <p class="dialog-subtitle">
-                    Invite a new user to your organization
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-icon dialog-close"
-                  onclick="document.getElementById('add-user-dialog').close()"
-                >
-                  {{ template "icon-close" . }}
-                </button>
-              </header>
-
-              <form method="post" action="/my/organization/users" class="input-form">
-                <input type="hidden" name="intent" value="invite" />
-                <div class="form-field">
-                  <label for="user-email">Email</label>
-                  <input id="user-email" name="email" type="email" required />
-                </div>
-                <div class="form-field">
-                  <label>Roles</label>
-                  <div class="roles-picker" data-role-picker>
-                    <button
-                      type="button"
-                      class="roles-picker-toggle"
-                      data-role-picker-toggle
-                      aria-expanded="false"
-                    >
-                      <span data-role-picker-toggle-label>Select roles</span>
-                      <span
-                        class="roles-picker-toggle-icon"
-                        aria-hidden="true"
-                      >
-                        {{ template "icon-chevron-down" . }}
-                      </span>
-                    </button>
-                    <div class="roles-picker-menu" data-role-picker-menu hidden>
-                      <input
-                        type="search"
-                        class="roles-picker-search"
-                        data-role-picker-search
-                        placeholder="Search roles..."
-                      />
-                      <ul class="roles-picker-options">
-                        {{ range .Roles }}
-                          <li>
-                            <button
-                              type="button"
-                              class="roles-picker-option"
-                              data-role-picker-option
-                              data-value="{{ .Slug }}"
-                              data-label="{{ .Name }} ({{ .Slug }})"
-                            >
-                              <span>{{ .Name }} ({{ .Slug }})</span>
-                              <span class="roles-picker-option-check"
-                                >Selected</span
-                              >
-                            </button>
-                          </li>
-                        {{ end }}
-                      </ul>
-                      <p
-                        class="roles-picker-empty"
-                        data-role-picker-empty
-                        hidden
-                      >
-                        No roles match your search
-                      </p>
-                    </div>
-                    <div data-role-picker-hidden-inputs></div>
-                  </div>
-                </div>
-                {{ if .InviteError }}
-                  <p class="error">{{ .InviteError }}</p>
-                {{ end }}
-                <div class="dialog-actions">
-                  <button class="btn btn-primary" type="submit">Create invite</button>
-                </div>
-              </form>
-            </div>
-          </dialog>
         </section>
-      {{ end }}
-    </div>
+      </div>
+    {{ else }}
+      {{ template "admin_console" (orgAdminConsole .) }}
+    {{ end }}
   </div>
 
 <script>
   (function () {
-    const orgAdminShell = document.querySelector("[data-org-admin-shell]");
-    const orgAdminMobilePanelMedia = window.matchMedia("(max-width: 767px)");
-    const orgAdminPanels = new Set(["profile", "roles", "members"]);
-    const orgAdminPanelPaths = {
-      profile: "/my/organization/profile",
-      roles: "/my/organization/roles",
-      members: "/my/organization/members",
-    };
-    const orgAdminPanelFromPath = (path) => {
-      switch (path) {
-        case "/my/organization/profile":
-          return "profile";
-        case "/my/organization/roles":
-          return "roles";
-        case "/my/organization/members":
-          return "members";
-        default:
-          return null;
-      }
-    };
-    let activeOrgAdminPanel = "profile";
-    const setOrgAdminPanel = (panelName) => {
-      if (!orgAdminShell || !orgAdminPanels.has(panelName)) {
-        return;
-      }
-      activeOrgAdminPanel = panelName;
-      const panels = Array.from(orgAdminShell.querySelectorAll("[data-org-admin-panel]"));
-      panels.forEach((panel) => {
-        const currentName = panel.getAttribute("data-org-admin-panel");
-        panel.hidden = currentName !== panelName;
-      });
-      const navLinks = Array.from(document.querySelectorAll("[data-org-admin-nav]"));
-      navLinks.forEach((link) => {
-        const currentName = link.getAttribute("data-org-admin-nav");
-        const isActive = currentName === panelName;
-        link.classList.toggle("is-active", isActive);
-        if (isActive) {
-          link.setAttribute("aria-current", "page");
-        } else {
-          link.removeAttribute("aria-current");
-        }
-      });
-      orgAdminShell.setAttribute("data-org-admin-ready", "true");
-    };
-    const focusOrgAdminPanel = () => {
-      if (!orgAdminShell || !orgAdminMobilePanelMedia.matches) {
-        return;
-      }
-      window.requestAnimationFrame(() => {
-        const top = window.scrollY + orgAdminShell.getBoundingClientRect().top - 12;
-        window.scrollTo({
-          top: Math.max(0, top),
-          behavior: "smooth",
-        });
-      });
-    };
-
-    if (orgAdminShell) {
-      const preferredPanel = (() => {
-        const pathPanel = orgAdminPanelFromPath(window.location.pathname);
-        if (pathPanel && orgAdminPanels.has(pathPanel)) {
-          return pathPanel;
-        }
-        const defaultPanel = (orgAdminShell.getAttribute("data-org-admin-default-panel") || "").trim();
-        if (orgAdminPanels.has(defaultPanel)) {
-          return defaultPanel;
-        }
-        return "profile";
-      })();
-      Array.from(document.querySelectorAll("[data-org-admin-nav]")).forEach((link) => {
-        link.addEventListener("click", (event) => {
-          event.preventDefault();
-          const panelName = (link.getAttribute("data-org-admin-nav") || "").trim();
-          if (!orgAdminPanels.has(panelName)) {
-            return;
-          }
-          setOrgAdminPanel(panelName);
-          const path = orgAdminPanelPaths[panelName];
-          if (window.location.pathname === path) {
-            window.history.replaceState({ orgAdminPanel: panelName }, "", path);
-          } else {
-            window.history.pushState({ orgAdminPanel: panelName }, "", path);
-          }
-          focusOrgAdminPanel();
-        });
-      });
-      window.addEventListener("popstate", (event) => {
-        const statePanel = event.state && event.state.orgAdminPanel;
-        const panelName =
-          (statePanel && orgAdminPanels.has(statePanel) && statePanel) ||
-          orgAdminPanelFromPath(window.location.pathname) ||
-          preferredPanel;
-        setOrgAdminPanel(panelName);
-        focusOrgAdminPanel();
-      });
-      setOrgAdminPanel(preferredPanel);
-      const preferredPath = orgAdminPanelPaths[preferredPanel];
-      if (preferredPath) {
-        window.history.replaceState({ orgAdminPanel: preferredPanel }, "", preferredPath);
-      }
-    }
-
     const rolePalettePickers = Array.from(document.querySelectorAll("[data-role-palette-picker]"));
     const closeAllPalettePickers = (except) => {
       rolePalettePickers.forEach((picker) => {
@@ -1362,6 +445,586 @@
     });
   })();
 </script>
+{{ end }}
+
+{{ define "org_admin_main" }}
+  {{ if eq .ActivePanel "roles" }}
+    {{ template "org_admin_roles_panel" . }}
+  {{ else if eq .ActivePanel "members" }}
+    {{ template "org_admin_members_panel" . }}
+  {{ else }}
+    {{ template "org_admin_profile_panel" . }}
+  {{ end }}
+{{ end }}
+
+{{ define "org_admin_profile_panel" }}
+  <section class="org-admin-panel-section" id="org-admin-panel-profile">
+    <div class="panel-heading">
+      <h2>Organization profile</h2>
+      <p>Review and update your organization details</p>
+    </div>
+    <div class="org-profile-summary">
+      {{ if .OrganizationLogoURL }}
+        <img
+          src="{{ .OrganizationLogoURL }}"
+          alt="{{ .Organization.Name }} logo"
+          class="org-profile-logo"
+        />
+      {{ else }}
+        <span class="org-profile-logo-placeholder">
+          {{ template "icon-no-org" . }}
+        </span>
+      {{ end }}
+      <div class="org-profile-meta">
+        <p class="org-profile-name">
+          <strong>{{ .Organization.Name }}</strong>
+        </p>
+        <p class="muted org-profile-slug">
+          Slug:
+          {{ .Organization.Slug }}
+        </p>
+      </div>
+    </div>
+    <form
+      method="post"
+      action="/my/organization/users"
+      class="input-form org-profile-form"
+      enctype="multipart/form-data"
+    >
+      <input type="hidden" name="intent" value="update_org" />
+      <div class="form-field">
+        <label for="org-name-profile">Organization name</label>
+        <input
+          id="org-name-profile"
+          name="name"
+          type="text"
+          value="{{ .Organization.Name }}"
+          required
+        />
+      </div>
+      <div class="form-field">
+        <label for="org-logo-profile"
+          >Organization logo (optional)</label
+        >
+        <input
+          id="org-logo-profile"
+          name="logo"
+          type="file"
+          accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+        />
+      </div>
+      {{ if .OrganizationError }}
+        <p class="error">{{ .OrganizationError }}</p>
+      {{ end }}
+      <div class="org-admin-form-actions">
+        <button class="btn btn-primary" type="submit">Save organization</button>
+      </div>
+    </form>
+  </section>
+{{ end }}
+
+{{ define "org_admin_roles_panel" }}
+  <section class="org-admin-panel-section" id="org-admin-panel-roles">
+    <div class="panel-head-actions">
+      <div class="panel-heading">
+        <h2>Roles</h2>
+        <p>Available roles for your organization</p>
+      </div>
+      <button
+        class="btn btn-primary"
+        type="button"
+        onclick="document.getElementById('add-role-dialog').showModal()"
+      >
+        {{ template "icon-plus" . }}
+        Add role
+      </button>
+    </div>
+    {{ if .RoleRows }}
+      <ul class="list-rows">
+        {{ range .RoleRows }}
+          <li class="list-row">
+            <div class="list-row-main">
+              <span
+                class="pill pill-lg role-pill"
+                data-role-palette="{{ .Palette }}"
+              >
+                {{ .Name }}
+              </span>
+            </div>
+            <div class="list-row-actions">
+              {{ if .InUse }}
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-icon btn-xs"
+                  aria-label="Edit role"
+                  title="Role in use"
+                  disabled
+                >
+                  {{ template "icon-settings-muted" . }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost-danger btn-icon btn-xs"
+                  aria-label="Delete role"
+                  title="Role in use"
+                  disabled
+                >
+                  {{ template "icon-trash-muted" . }}
+                </button>
+              {{ else }}
+                <span class="muted u-text-xs"
+                  >Not used</span
+                >
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-icon btn-xs"
+                  aria-label="Edit role"
+                  onclick="document.getElementById('edit-role-{{ .Slug }}').showModal()"
+                >
+                  {{ template "icon-settings" . }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost-danger btn-icon btn-xs"
+                  aria-label="Delete role"
+                  onclick="document.getElementById('delete-role-{{ .Slug }}').showModal()"
+                >
+                  {{ template "icon-trash" . }}
+                </button>
+              {{ end }}
+            </div>
+            {{ if and $.RoleError (or (eq $.RoleDialogAction "edit") (eq $.RoleDialogAction "delete")) (eq $.RoleDialogSlug .Slug) .InUse }}
+              <p class="error">{{ $.RoleError }}</p>
+            {{ end }}
+            {{ if not .InUse }}
+              <dialog
+                id="edit-role-{{ .Slug }}"
+                class="dialog dialog-overflow"
+              >
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3 class="dialog-title">Edit Role</h3>
+                      <p class="dialog-subtitle">
+                        Change the role name and color
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('edit-role-{{ .Slug }}').close()"
+                    >
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <div class="org-admin-dialog-role-pill">
+                    <span
+                      class="pill pill-lg role-pill"
+                      data-role-palette="{{ .Palette }}"
+                    >
+                      {{ .Name }}
+                    </span>
+                  </div>
+                  <form
+                    method="post"
+                    action="/my/organization/roles"
+                    class="input-form"
+                  >
+                    <input
+                      type="hidden"
+                      name="intent"
+                      value="set_role"
+                    />
+                    <input
+                      type="hidden"
+                      name="role_slug"
+                      value="{{ .Slug }}"
+                    />
+                    <div class="form-field">
+                      <label for="edit-role-name-{{ .Slug }}"
+                        >Role name</label
+                      >
+                      <input
+                        id="edit-role-name-{{ .Slug }}"
+                        name="name"
+                        type="text"
+                        {{ if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleDialogName }}
+                          value="{{ $.RoleDialogName }}"
+                        {{ else }}
+                          value="{{ .Name }}"
+                        {{ end }}
+                        required
+                      />
+                    </div>
+                    <div class="form-field">
+                      <label for="edit-role-palette-{{ .Slug }}"
+                        >Role color palette</label
+                      >
+                      <div
+                        class="role-palette-picker"
+                        data-role-palette-picker
+                      >
+                        <div class="role-palette-select-wrap">
+                          <select
+                            id="edit-role-palette-{{ .Slug }}"
+                            name="palette"
+                            required
+                            class="role-palette-native-select"
+                            data-role-palette-select
+                          >
+                            {{ template "role-palette-options" (or $.RoleDialogPalette .Palette) }}
+                          </select>
+                          <button
+                            type="button"
+                            class="roles-picker-toggle role-palette-toggle"
+                            data-role-palette-toggle
+                            aria-expanded="false"
+                          >
+                            <span data-role-palette-toggle-label></span>
+                            <span
+                              class="roles-picker-toggle-icon"
+                              aria-hidden="true"
+                            >
+                              {{ template "icon-chevron-down" . }}
+                            </span>
+                          </button>
+                          <div
+                            class="roles-picker-menu role-palette-menu"
+                            data-role-palette-menu
+                            hidden
+                          >
+                            <ul
+                              class="roles-picker-options"
+                              data-role-palette-options
+                            ></ul>
+                          </div>
+                        </div>
+                        <span
+                          class="role-palette-preview"
+                          aria-hidden="true"
+                          data-role-palette-preview
+                        ></span>
+                      </div>
+                    </div>
+                    {{ if and (eq $.RoleDialogAction "edit") (eq $.RoleDialogSlug .Slug) $.RoleError }}
+                      <p class="error">{{ $.RoleError }}</p>
+                    {{ end }}
+                    <div
+                      class="dialog-actions"
+                    >
+                      <button class="btn btn-primary" type="submit">
+                        Save role
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+              <dialog
+                id="delete-role-{{ .Slug }}"
+                class="dialog"
+              >
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3
+                        class="dialog-title u-text-danger"
+                      >
+                        Danger zone - Delete role
+                      </h3>
+                      <p class="dialog-subtitle">
+                        This action cannot be undone
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('delete-role-{{ .Slug }}').close()"
+                    >
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <div class="org-admin-dialog-role-pill">
+                    <span
+                      class="pill pill-lg role-pill"
+                      data-role-palette="{{ .Palette }}"
+                    >
+                      {{ .Name }}
+                    </span>
+                  </div>
+                  <p>
+                    This will permanently remove the role from your
+                    organization. Confirm only if you want to continue.
+                  </p>
+                  {{ if and (eq $.RoleDialogAction "delete") (eq $.RoleDialogSlug .Slug) $.RoleError }}
+                    <p class="error">{{ $.RoleError }}</p>
+                  {{ end }}
+                  <form
+                    method="post"
+                    action="/my/organization/roles"
+                    class="input-form"
+                  >
+                    <input
+                      type="hidden"
+                      name="intent"
+                      value="delete_role"
+                    />
+                    <input
+                      type="hidden"
+                      name="role_slug"
+                      value="{{ .Slug }}"
+                    />
+                    <div
+                      class="dialog-actions"
+                    >
+                      <button type="submit" class="btn btn-danger">
+                        Delete role
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            {{ end }}
+          </li>
+        {{ end }}
+      </ul>
+    {{ else }}
+      <p class="muted">No organization roles yet</p>
+    {{ end }}
+  </section>
+{{ end }}
+
+{{ define "org_admin_members_panel" }}
+  <section class="org-admin-panel-section" id="org-admin-panel-members">
+    <div class="panel-head-actions">
+      <div class="panel-heading">
+        <h2>Users</h2>
+        <p>Members and invites for your organization</p>
+      </div>
+      <button
+        class="btn btn-primary"
+        type="button"
+        onclick="document.getElementById('add-user-dialog').showModal()"
+      >
+        {{ template "icon-plus" . }}
+        Add user
+      </button>
+    </div>
+    {{ if .UsersError }}<p class="error">{{ .UsersError }}</p>{{ end }}
+    {{ if .Users }}
+      <ul class="list-rows">
+        {{ range .Users }}
+          <li class="list-row">
+            <div class="list-row-main">
+              <span class="user-email">
+                {{ if .IsOrgAdmin }}
+                  {{ template "icon-user-org-admin" . }}
+                {{ else }}
+                  {{ template "icon-user-member" . }}
+                {{ end }}
+                {{ .Email }}
+                {{ if not .Activated }}
+                  <span
+                    class="pill role-pill pill-accent"
+                    >Pending invite</span
+                  >
+                {{ end }}
+              </span>
+              <div class="user-tags">
+                {{ range .RoleOptions }}
+                  {{ if and .Selected (not (or (eq .Slug "org-admin") (eq .Slug "org_admin"))) }}
+                    <span
+                      class="pill role-pill"
+                      data-role-palette="{{ .Palette }}"
+                    >
+                      {{ .Name }}
+                    </span>
+                  {{ end }}
+                {{ end }}
+              </div>
+            </div>
+            <div class="list-row-actions">
+              <button
+                type="button"
+                class="btn btn-ghost btn-icon btn-xs"
+                aria-label="Edit user"
+                onclick="document.getElementById('manage-user-{{ .UserID }}').showModal()"
+              >
+                {{ template "icon-settings" . }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost-danger btn-icon btn-xs"
+                aria-label="Delete user"
+                onclick="document.getElementById('delete-user-{{ .UserID }}').showModal()"
+              >
+                {{ template "icon-trash" . }}
+              </button>
+            </div>
+            <dialog
+              id="manage-user-{{ .UserID }}"
+              class="dialog dialog-overflow"
+            >
+              <div class="dialog-card">
+                <header class="dialog-head">
+                  <div>
+                    <h3 class="dialog-title">Manage User</h3>
+                    <p class="dialog-subtitle">{{ .Email }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-icon dialog-close"
+                    onclick="document.getElementById('manage-user-{{ .UserID }}').close()"
+                  >
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+
+                <form
+                  method="post"
+                  action="/my/organization/users"
+                  class="input-form"
+                >
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="set_roles"
+                  />
+                  <input
+                    type="hidden"
+                    name="userId"
+                    value="{{ .UserID }}"
+                  />
+                  <div class="form-field">
+                    <label>Roles</label>
+                    <div class="roles-picker" data-role-picker>
+                      <button
+                        type="button"
+                        class="roles-picker-toggle"
+                        data-role-picker-toggle
+                        aria-expanded="false"
+                      >
+                        <span data-role-picker-toggle-label
+                          >Select roles</span
+                        >
+                        <span
+                          class="roles-picker-toggle-icon"
+                          aria-hidden="true"
+                        >
+                          {{ template "icon-chevron-down" . }}
+                        </span>
+                      </button>
+                      <div
+                        class="roles-picker-menu"
+                        data-role-picker-menu
+                        hidden
+                      >
+                        <input
+                          type="search"
+                          class="roles-picker-search"
+                          data-role-picker-search
+                          placeholder="Search roles..."
+                        />
+                        <ul class="roles-picker-options">
+                          {{ range .RoleOptions }}
+                            <li>
+                              <button
+                                type="button"
+                                class="roles-picker-option"
+                                data-role-picker-option
+                                data-value="{{ .Slug }}"
+                                data-label="{{ .Name }} ({{ .Slug }})"
+                                {{ if .Selected }}
+                                  data-selected="true"
+                                {{ end }}
+                              >
+                                <span>{{ .Name }} ({{ .Slug }})</span>
+                                <span class="roles-picker-option-check"
+                                  >Selected</span
+                                >
+                              </button>
+                            </li>
+                          {{ end }}
+                        </ul>
+                        <p
+                          class="roles-picker-empty"
+                          data-role-picker-empty
+                          hidden
+                        >
+                          No roles match your search
+                        </p>
+                      </div>
+                      <div data-role-picker-hidden-inputs></div>
+                    </div>
+                  </div>
+                  <div
+                    class="dialog-actions"
+                  >
+                    <button class="btn btn-primary" type="submit">
+                      Save roles
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+            <dialog
+              id="delete-user-{{ .UserID }}"
+              class="dialog"
+            >
+              <div class="dialog-card">
+                <header class="dialog-head">
+                  <div>
+                    <h3
+                      class="dialog-title u-text-danger"
+                    >
+                      Danger zone - Delete Account
+                    </h3>
+                    <p class="dialog-subtitle">{{ .Email }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-icon dialog-close"
+                    onclick="document.getElementById('delete-user-{{ .UserID }}').close()"
+                  >
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+                <p class="u-m-0 u-mb-5">
+                  This will remove the account from your organization.
+                  Confirm only if you want to permanently delete this
+                  user access.
+                </p>
+                <form
+                  method="post"
+                  action="/my/organization/users"
+                  class="input-form"
+                >
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="delete_user"
+                  />
+                  <input
+                    type="hidden"
+                    name="userId"
+                    value="{{ .UserID }}"
+                  />
+                  <div
+                    class="dialog-actions"
+                  >
+                    <button type="submit" class="btn btn-danger">
+                      Delete account
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+          </li>
+        {{ end }}
+      </ul>
+    {{ else }}
+      <p class="muted">No organization users yet</p>
+    {{ end }}
+  </section>
 {{ end }}
 
 {{ define "org_admin.html" }}

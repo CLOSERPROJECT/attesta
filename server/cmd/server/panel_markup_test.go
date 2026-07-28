@@ -340,6 +340,7 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
+		ActivePanel: "roles",
 		Organization: Organization{
 			Name: "Acme Org",
 			Slug: "acme-org",
@@ -363,11 +364,12 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	if rolesStart == -1 {
 		t.Fatalf("expected org-admin roles panel section, got:\n%s", body)
 	}
-	rolesEnd := strings.Index(body[rolesStart:], `id="org-admin-panel-members"`)
-	if rolesEnd == -1 {
-		t.Fatalf("expected org-admin members panel section after roles, got:\n%s", body)
+	// Include the opening <section ...> which places class before id.
+	sectionStart := strings.LastIndex(body[:rolesStart], "<section")
+	if sectionStart == -1 {
+		t.Fatal("expected opening section tag before roles panel id")
 	}
-	rolesSection := body[rolesStart : rolesStart+rolesEnd]
+	rolesSection := body[sectionStart:]
 
 	for _, want := range []string{
 		`class="org-admin-panel-section"`,

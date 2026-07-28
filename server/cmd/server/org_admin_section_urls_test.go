@@ -124,6 +124,10 @@ func TestResolveOrgAdminActivePanelFromPath(t *testing.T) {
 		{path: "/my/organization/members", want: "members"},
 		{path: "/my/organization/roles", want: "roles"},
 		{path: "/my/organization/users", want: "profile"},
+		{path: "/organization/profile", want: "profile"},
+		{path: "/organization/members", want: "members"},
+		{path: "/organization/roles", want: "roles"},
+		{path: "/organization/roles/", want: "roles"},
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
@@ -136,50 +140,49 @@ func TestResolveOrgAdminActivePanelFromPath(t *testing.T) {
 func assertOrgAdminActivePanel(t *testing.T, body, panel string) {
 	t.Helper()
 
+	if !strings.Contains(body, `id="admin-console"`) {
+		t.Fatalf("expected admin-console soft-nav shell for %q", panel)
+	}
 	if !strings.Contains(body, `class="sidebar-nav-link is-active"`) {
 		t.Fatalf("expected active sidebar nav link for %q", panel)
 	}
-	if !strings.Contains(body, `href="/my/organization/`+panel+`"`) {
-		t.Fatalf("expected nav href for %q panel", panel)
+
+	href := "/my/organization/" + panel
+	activeIdx := strings.Index(body, `class="sidebar-nav-link is-active"`)
+	if activeIdx == -1 {
+		t.Fatalf("expected active sidebar nav link for %q", panel)
 	}
-	if !strings.Contains(body, `data-org-admin-default-panel="`+panel+`"`) {
-		preview := body
-		if len(preview) > 400 {
-			preview = preview[:400]
-		}
-		t.Fatalf("expected default panel %q, got body prefix:\n%s", panel, preview)
+	start := activeIdx - 200
+	if start < 0 {
+		start = 0
+	}
+	end := activeIdx + 350
+	if end > len(body) {
+		end = len(body)
+	}
+	window := body[start:end]
+	if !strings.Contains(window, `href="`+href+`"`) {
+		t.Fatalf("expected active soft-nav link for %q, got snippet:\n%s", panel, window)
+	}
+	if !strings.Contains(window, `aria-current="page"`) {
+		t.Fatalf("expected aria-current on active %q link, got snippet:\n%s", panel, window)
+	}
+	if !strings.Contains(window, `hx-target="#admin-console"`) {
+		t.Fatalf("expected hx-target on soft-nav for %q, got snippet:\n%s", panel, window)
 	}
 
-	panelID := `id="org-admin-panel-` + panel + `"` 
-	panelStart := strings.Index(body, panelID)
-	if panelStart == -1 {
+	panelID := `id="org-admin-panel-` + panel + `"`
+	if !strings.Contains(body, panelID) {
 		t.Fatalf("expected %s section in body", panelID)
-	}
-	panelEnd := strings.Index(body[panelStart:], ">")
-	if panelEnd == -1 {
-		t.Fatalf("expected opening tag for %s", panelID)
-	}
-	panelTag := body[panelStart : panelStart+panelEnd+1]
-	if strings.Contains(panelTag, "hidden") {
-		t.Fatalf("active panel %q must not be hidden, got tag %q", panel, panelTag)
 	}
 
 	for _, other := range []string{"profile", "roles", "members"} {
 		if other == panel {
 			continue
 		}
-		otherID := `id="org-admin-panel-` + other + `"` 
-		otherStart := strings.Index(body, otherID)
-		if otherStart == -1 {
-			t.Fatalf("expected %s section in body", otherID)
-		}
-		otherEnd := strings.Index(body[otherStart:], ">")
-		if otherEnd == -1 {
-			t.Fatalf("expected opening tag for %s", otherID)
-		}
-		otherTag := body[otherStart : otherStart+otherEnd+1]
-		if !strings.Contains(otherTag, "hidden") {
-			t.Fatalf("inactive panel %q should be hidden, got tag %q", other, otherTag)
+		otherID := `id="org-admin-panel-` + other + `"`
+		if strings.Contains(body, otherID) {
+			t.Fatalf("inactive panel %q must not be rendered, found %s", other, otherID)
 		}
 	}
 }

@@ -10,6 +10,7 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
+		ActivePanel:  "roles",
 		Organization: Organization{Name: "Acme Org", Slug: "acme-org"},
 		RoleRows: []OrgAdminRoleRow{
 			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", InUse: false},
@@ -23,22 +24,35 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 		},
 	}
 
-	var out bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&out, "org_admin_body", view); err != nil {
-		t.Fatalf("render org_admin_body: %v", err)
+	var rolesOut bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&rolesOut, "org_admin_body", view); err != nil {
+		t.Fatalf("render org_admin_body roles: %v", err)
 	}
-	body := out.String()
+	rolesBody := rolesOut.String()
 
 	for _, want := range []string{
 		`class="list-rows"`,
 		`class="list-row"`,
 		`class="list-row-main"`,
 		`class="list-row-actions"`,
+	} {
+		if !strings.Contains(rolesBody, want) {
+			t.Fatalf("expected %q in roles markup, got:\n%s", want, rolesBody)
+		}
+	}
+
+	view.ActivePanel = "members"
+	var membersOut bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&membersOut, "org_admin_body", view); err != nil {
+		t.Fatalf("render org_admin_body members: %v", err)
+	}
+	membersBody := membersOut.String()
+	for _, want := range []string{
 		`class="user-email"`,
 		`class="user-tags"`,
 	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q in org admin markup, got:\n%s", want, body)
+		if !strings.Contains(membersBody, want) {
+			t.Fatalf("expected %q in members markup, got:\n%s", want, membersBody)
 		}
 	}
 
@@ -50,17 +64,17 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 		`class="user-main"`,
 		`class="user-actions"`,
 	} {
-		if strings.Contains(body, legacy) {
+		if strings.Contains(rolesBody, legacy) || strings.Contains(membersBody, legacy) {
 			t.Fatalf("did not expect legacy class %q in org admin markup", legacy)
 		}
 	}
 
 	// Roles pill lives inside list-row-main (not a bare first child beside actions).
-	rowIdx := strings.Index(body, `class="list-row"`)
+	rowIdx := strings.Index(rolesBody, `class="list-row"`)
 	if rowIdx < 0 {
 		t.Fatal("expected list-row")
 	}
-	snippet := body[rowIdx:]
+	snippet := rolesBody[rowIdx:]
 	mainIdx := strings.Index(snippet, `class="list-row-main"`)
 	actionsIdx := strings.Index(snippet, `class="list-row-actions"`)
 	pillIdx := strings.Index(snippet, `class="pill pill-lg role-pill"`)
@@ -71,7 +85,6 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 		t.Fatalf("expected role pill inside list-row-main before list-row-actions")
 	}
 }
-
 func TestPlatformAdminListRowMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
