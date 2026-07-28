@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # Stop host-dev processes that belong to this checkout only.
-# Usage: dev-stop-local.sh [--ports-only] [repo_root]
+# Usage: dev-stop-local.sh [--ports-only|--server-only|--web-only] [repo_root]
 # Optional env: PORT, VITE_PORT — if set, fail when a foreign process holds them.
 # --ports-only: skip path-scoped kills; only run port_holder_ok checks.
+# --server-only: kill air/server only (do not touch vite — needed when task:dev
+#   starts server+web in parallel; otherwise server startup races and kills vite).
+# --web-only: kill vite only.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=deployment/scripts/dev-lib.sh
 source "$SCRIPT_DIR/dev-lib.sh"
 
 ports_only=false
-if [[ "${1:-}" == "--ports-only" ]]; then
-  ports_only=true
-  shift
-fi
+server_only=false
+web_only=false
+case "${1:-}" in
+  --ports-only) ports_only=true; shift ;;
+  --server-only) server_only=true; shift ;;
+  --web-only) web_only=true; shift ;;
+esac
 
 repo_root="${1:-$(git rev-parse --show-toplevel)}"
 repo_root="$(cd "$repo_root" && pwd)"
@@ -33,16 +39,20 @@ kill_matching() {
 }
 
 if [[ "$ports_only" != true ]]; then
-  # air in this server dir
-  kill_matching 'air -c \.air\.toml' "$server_dir"
-  # built binary for this tree
-  if [[ -e "$bin_path" ]]; then
-    for pid in $(pgrep -f "$bin_path" 2>/dev/null || true); do
-      kill "$pid" >/dev/null 2>&1 || true
-    done
+  if [[ "$web_only" != true ]]; then
+    # air in this server dir
+    kill_matching 'air -c \.air\.toml' "$server_dir"
+    # built binary for this tree
+    if [[ -e "$bin_path" ]]; then
+      for pid in $(pgrep -f "$bin_path" 2>/dev/null || true); do
+        kill "$pid" >/dev/null 2>&1 || true
+      done
+    fi
   fi
-  # vite for this web dir (node running vite with cwd=web)
-  kill_matching 'vite' "$web_dir"
+  if [[ "$server_only" != true ]]; then
+    # vite for this web dir (node running vite with cwd=web)
+    kill_matching 'vite' "$web_dir"
+  fi
 
   sleep 1
 fi

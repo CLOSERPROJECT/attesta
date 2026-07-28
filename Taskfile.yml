@@ -113,7 +113,8 @@ tasks:
     cmds:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
-      - bash deployment/scripts/dev-stop-local.sh
+      # --server-only: do not kill vite (task:dev starts server+web in parallel)
+      - bash deployment/scripts/dev-stop-local.sh --server-only
       - sh -c 'cd server && go install github.com/air-verse/air@latest'
       - |
           bash -c '
@@ -129,6 +130,7 @@ tasks:
   dev:web:
     desc: Vite dev server (HMR) on VITE_PORT from .env.local.
     cmds:
+      - bash deployment/scripts/dev-stop-local.sh --web-only
       - sh -c 'cd web && npm install'
       - |
           bash -c '
