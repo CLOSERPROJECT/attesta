@@ -3391,8 +3391,8 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	}
 	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
 	return PlatformAdminView{
-		PageBase: s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		Breadcrumbs:              buildPlatformAdminBreadcrumbs(),
+		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		Breadcrumbs:              buildPlatformAdminBreadcrumbs("orgs"),
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
 		TotalPages:               totalPages,

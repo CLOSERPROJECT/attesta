@@ -29,11 +29,20 @@ func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	}}
 }
 
-func buildPlatformAdminBreadcrumbs() BreadcrumbsView {
-	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Dashboard", Href: appHomePath},
-		{Label: "Platform admin", Href: "/admin/orgs", Current: true},
-	}}
+func buildPlatformAdminBreadcrumbs(activePanel string) BreadcrumbsView {
+	switch strings.TrimSpace(activePanel) {
+	case "categories":
+		return BreadcrumbsView{Items: []BreadcrumbItem{
+			{Label: "Dashboard", Href: appHomePath},
+			{Label: "Platform admin", Href: "/admin/orgs"},
+			{Label: "Categories", Href: "/admin/categories", Current: true},
+		}}
+	default:
+		return BreadcrumbsView{Items: []BreadcrumbItem{
+			{Label: "Dashboard", Href: appHomePath},
+			{Label: "Platform admin", Href: "/admin/orgs", Current: true},
+		}}
+	}
 }
 
 func streamCrumbLabel(workflowName, workflowKey string) string {
