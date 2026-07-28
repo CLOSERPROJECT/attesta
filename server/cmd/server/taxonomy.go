@@ -270,9 +270,12 @@ func (s *MongoStore) ListCategories(ctx context.Context) ([]Category, error) {
 	for cursor.Next(ctx) {
 		var category Category
 		if err := cursor.Decode(&category); err != nil {
-			continue
+			return nil, err
 		}
 		items = append(items, category)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -334,9 +337,12 @@ func (s *MongoStore) ListSubCategories(ctx context.Context, categorySlug string)
 	for cursor.Next(ctx) {
 		var sub SubCategory
 		if err := cursor.Decode(&sub); err != nil {
-			continue
+			return nil, err
 		}
 		items = append(items, sub)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
 	}
 	return items, nil
 }

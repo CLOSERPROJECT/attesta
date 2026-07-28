@@ -136,6 +136,7 @@ type mongoSingleResultPort interface {
 type mongoCursorPort interface {
 	Next(ctx context.Context) bool
 	Decode(val interface{}) error
+	Err() error
 	Close(ctx context.Context) error
 }
 
@@ -263,6 +264,10 @@ func (c mongoDriverCursor) Next(ctx context.Context) bool {
 
 func (c mongoDriverCursor) Decode(val interface{}) error {
 	return c.cursor.Decode(val)
+}
+
+func (c mongoDriverCursor) Err() error {
+	return c.cursor.Err()
 }
 
 func (c mongoDriverCursor) Close(ctx context.Context) error {

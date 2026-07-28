@@ -195,6 +195,7 @@ type fakeCursor struct {
 	index       int
 	closed      bool
 	closeErr    error
+	err         error
 }
 
 func (c *fakeCursor) Next(ctx context.Context) bool {
@@ -215,6 +216,10 @@ func (c *fakeCursor) Decode(val interface{}) error {
 	return nil
 }
 
+func (c *fakeCursor) Err() error {
+	return c.err
+}
+
 func (c *fakeCursor) Close(ctx context.Context) error {
 	c.closed = true
 	return c.closeErr
@@ -226,6 +231,7 @@ type fakeAnyCursor struct {
 	index       int
 	closed      bool
 	closeErr    error
+	err         error
 }
 
 func (c *fakeAnyCursor) Next(ctx context.Context) bool {
@@ -282,6 +288,10 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 		}
 	}
 	return errors.New("unsupported decode target")
+}
+
+func (c *fakeAnyCursor) Err() error {
+	return c.err
 }
 
 func (c *fakeAnyCursor) Close(ctx context.Context) error {

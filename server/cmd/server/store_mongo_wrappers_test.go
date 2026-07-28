@@ -97,6 +97,9 @@ func TestMongoDriverAdaptersExecuteWrapperMethods(t *testing.T) {
 		_ = (mongoDriverCursor{}).Decode(&Process{})
 	})
 	runAndRecover(func() {
+		_ = (mongoDriverCursor{}).Err()
+	})
+	runAndRecover(func() {
 		_ = (mongoDriverCursor{}).Close(context.Background())
 	})
 

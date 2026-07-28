@@ -317,7 +317,25 @@ func TestMongoStoreTaxonomyErrorPaths(t *testing.T) {
 		}
 	})
 
-	t.Run("ListCategories decode skip", func(t *testing.T) {
+	t.Run("ListCategories cursor error", func(t *testing.T) {
+		cursorErr := errors.New("cursor iteration failed")
+		categories := &fakeMongoCollection{
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return &fakeAnyCursor{
+					items: []interface{}{Category{Slug: "supply-chain", Name: "Supply Chain", Icon: "weee"}},
+					err:   cursorErr,
+				}, nil
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories: categories,
+		}}}
+		if _, err := store.ListCategories(t.Context()); !errors.Is(err, cursorErr) {
+			t.Fatalf("err = %v, want %v", err, cursorErr)
+		}
+	})
+
+	t.Run("ListCategories decode error", func(t *testing.T) {
 		categories := &fakeMongoCollection{
 			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
 				return &fakeAnyCursor{items: []interface{}{"bad"}}, nil
@@ -326,12 +344,8 @@ func TestMongoStoreTaxonomyErrorPaths(t *testing.T) {
 		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
 			collectionCategories: categories,
 		}}}
-		got, err := store.ListCategories(t.Context())
-		if err != nil {
-			t.Fatalf("err = %v", err)
-		}
-		if len(got) != 0 {
-			t.Fatalf("got = %#v", got)
+		if _, err := store.ListCategories(t.Context()); err == nil {
+			t.Fatal("expected decode error")
 		}
 	})
 
