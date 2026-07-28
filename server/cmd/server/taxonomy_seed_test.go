@@ -230,3 +230,85 @@ func writeTempTaxonomySeed(t *testing.T, contents string) string {
 	}
 	return path
 }
+
+func TestBootstrapTaxonomySeedsWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	seed := `
+categories:
+  - slug: supply-chain
+    name: Supply Chain
+    icon: batch-traceability
+    sortOrder: 1
+    subCategories:
+      - slug: procurement
+        name: Procurement
+        icon: procurement-workflow
+        sortOrder: 1
+`
+	if err := os.WriteFile(filepath.Join(dir, "categories.yaml"), []byte(strings.TrimSpace(seed)+"\n"), 0o644); err != nil {
+		t.Fatalf("write categories.yaml: %v", err)
+	}
+
+	store := NewMemoryStore()
+	if err := bootstrapTaxonomy(t.Context(), store, dir); err != nil {
+		t.Fatalf("bootstrapTaxonomy: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+	if len(cats) != 1 || cats[0].Slug != "supply-chain" {
+		t.Fatalf("categories = %#v", cats)
+	}
+}
+
+func TestBootstrapTaxonomySkipsWhenTaxonomyExists(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "categories.yaml"), []byte(`
+categories:
+  - slug: from-file
+    name: From File
+    icon: weee
+    sortOrder: 1
+`), 0o644); err != nil {
+		t.Fatalf("write categories.yaml: %v", err)
+	}
+
+	store := NewMemoryStore()
+	if err := store.ReplaceTaxonomy(t.Context(), []Category{
+		{Slug: "existing", Name: "Existing", Icon: "weee", SortOrder: 1},
+	}, nil); err != nil {
+		t.Fatalf("ReplaceTaxonomy: %v", err)
+	}
+
+	if err := bootstrapTaxonomy(t.Context(), store, dir); err != nil {
+		t.Fatalf("bootstrapTaxonomy: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+	if len(cats) != 1 || cats[0].Slug != "existing" {
+		t.Fatalf("bootstrap must not replace existing taxonomy, got %#v", cats)
+	}
+}
+
+func TestBootstrapTaxonomyNoopWhenSeedFileMissing(t *testing.T) {
+	store := NewMemoryStore()
+	if err := bootstrapTaxonomy(t.Context(), store, t.TempDir()); err != nil {
+		t.Fatalf("bootstrapTaxonomy missing file: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+	if len(cats) != 0 {
+		t.Fatalf("expected empty taxonomy, got %#v", cats)
+	}
+}
+
+func TestBootstrapTaxonomyNilStoreNoop(t *testing.T) {
+	if err := bootstrapTaxonomy(t.Context(), nil, t.TempDir()); err != nil {
+		t.Fatalf("bootstrapTaxonomy nil store: %v", err)
+	}
+}

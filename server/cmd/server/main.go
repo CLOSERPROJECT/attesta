@@ -732,6 +732,9 @@ func main() {
 		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
+	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
+		log.Fatal(err)
+	}
 	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
