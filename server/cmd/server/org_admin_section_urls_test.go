@@ -124,6 +124,10 @@ func TestResolveOrgAdminActivePanelFromPath(t *testing.T) {
 		{path: "/my/organization/members", want: "members"},
 		{path: "/my/organization/roles", want: "roles"},
 		{path: "/my/organization/users", want: "profile"},
+		{path: "/organization/profile", want: "profile"},
+		{path: "/organization/members", want: "members"},
+		{path: "/organization/roles", want: "roles"},
+		{path: "/organization/roles/", want: "roles"},
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)

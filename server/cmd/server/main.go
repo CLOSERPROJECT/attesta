@@ -3747,12 +3747,15 @@ func resolveOrgAdminActivePanel(r *http.Request, errs OrgAdminErrors, inviteLink
 		return "profile"
 	}
 	if r != nil {
-		switch r.URL.Path {
-		case organizationPath("roles"):
+		// handleMyRoutes rewrites /my/organization/... to /organization/... before handlers run.
+		// Match both forms (and trailing slash) via shared suffixes.
+		path := strings.TrimSuffix(r.URL.Path, "/")
+		switch {
+		case strings.HasSuffix(path, "/organization/roles"):
 			return "roles"
-		case organizationPath("members"):
+		case strings.HasSuffix(path, "/organization/members"):
 			return "members"
-		case organizationPath("profile"):
+		case strings.HasSuffix(path, "/organization/profile"):
 			return "profile"
 		}
 	}
