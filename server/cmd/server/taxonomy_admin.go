@@ -8,22 +8,22 @@ import (
 
 // TaxonomyCategoryNode is a nested category in the platform taxonomy tree.
 type TaxonomyCategoryNode struct {
-	Slug          string
-	Name          string
-	Icon          string
-	IconURL       string
-	SortOrder     int
-	SubCategories []TaxonomySubCategoryNode
+	Slug          string                    `json:"slug"`
+	Name          string                    `json:"name"`
+	Icon          string                    `json:"icon"`
+	IconURL       string                    `json:"iconURL"`
+	SortOrder     int                       `json:"sortOrder"`
+	SubCategories []TaxonomySubCategoryNode `json:"subCategories"`
 }
 
 // TaxonomySubCategoryNode is a nested sub-category leaf under a category.
 type TaxonomySubCategoryNode struct {
-	Slug        string
-	Name        string
-	Icon        string
-	IconURL     string
-	SortOrder   int
-	Description string
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	IconURL     string `json:"iconURL"`
+	SortOrder   int    `json:"sortOrder"`
+	Description string `json:"description"`
 }
 
 func taxonomyIconURL(icon string) string {

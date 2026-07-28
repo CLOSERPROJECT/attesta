@@ -288,6 +288,7 @@ type PageBase struct {
 type PublicCatalogResponse struct {
 	Organizations []PublicCatalogOrganization `json:"organizations"`
 	Roles         []PublicCatalogRole         `json:"roles"`
+	Categories    []TaxonomyCategoryNode      `json:"categories"`
 }
 
 type PublicCatalogOrganization struct {
@@ -2227,6 +2228,13 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 		}
 		return response.Roles[i].Slug < response.Roles[j].Slug
 	})
+
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		http.Error(w, "failed to load taxonomy", http.StatusInternalServerError)
+		return
+	}
+	response.Categories = categories
 
 	writeJSON(w, response)
 }
