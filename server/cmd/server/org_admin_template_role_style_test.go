@@ -10,6 +10,7 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := OrgAdminView{
+		ActivePanel: "members",
 		Roles: []Role{
 			{Slug: "org-admin", Name: "Org Admin"},
 			{Slug: "qa-reviewer", Name: "QA Reviewer"},
@@ -87,7 +88,8 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	view := OrgAdminView{
-		InviteLink: "/invite/token-pending",
+		ActivePanel: "members",
+		InviteLink:  "/invite/token-pending",
 	}
 
 	var out bytes.Buffer

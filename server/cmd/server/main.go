@@ -3981,6 +3981,12 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	if strings.TrimSpace(org.LogoAttachmentID) == "" {
 		view.OrganizationLogoURL = ""
 	}
+	if wantsAdminConsolePartial(r) {
+		if err := s.tmpl.ExecuteTemplate(w, "admin_console", orgAdminConsole(view)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -7505,6 +7511,9 @@ func effectiveSubstep(canonical WorkflowSub, override *SubstepOverride) Workflow
 }
 
 func isHTMXRequest(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
 	return strings.EqualFold(r.Header.Get("HX-Request"), "true")
 }
 

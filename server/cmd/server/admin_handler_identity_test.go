@@ -686,6 +686,7 @@ func TestHandleAdminOrgsPlatformAdminHTMXGetAndLogo(t *testing.T) {
 	t.Run("htmx get renders partial", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/admin/orgs?q=acme", nil)
 		req.Header.Set("HX-Request", "true")
+		req.Header.Set("HX-Target", "platform-admin-results")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
