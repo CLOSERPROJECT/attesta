@@ -92,6 +92,58 @@ func TestMongoStoreReplaceTaxonomyStagesThenRenames(t *testing.T) {
 	}
 }
 
+func TestMongoStoreTaxonomyRevision(t *testing.T) {
+	t.Run("missing doc is zero", func(t *testing.T) {
+		store := &MongoStore{dbPort: &fakeMongoDatabase{}}
+		got, err := store.TaxonomyRevision(t.Context())
+		if err != nil {
+			t.Fatalf("TaxonomyRevision: %v", err)
+		}
+		if got != 0 {
+			t.Fatalf("revision = %d, want 0", got)
+		}
+	})
+
+	t.Run("returns stored n", func(t *testing.T) {
+		meta := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{decodeFn: func(v interface{}) error {
+					doc := v.(*struct {
+						N int64 `bson:"n"`
+					})
+					doc.N = 7
+					return nil
+				}}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionTaxonomyMeta: meta,
+		}}}
+		got, err := store.TaxonomyRevision(t.Context())
+		if err != nil {
+			t.Fatalf("TaxonomyRevision: %v", err)
+		}
+		if got != 7 {
+			t.Fatalf("revision = %d, want 7", got)
+		}
+	})
+
+	t.Run("propagates find error", func(t *testing.T) {
+		findErr := errors.New("meta find failed")
+		meta := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: findErr}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionTaxonomyMeta: meta,
+		}}}
+		if _, err := store.TaxonomyRevision(t.Context()); !errors.Is(err, findErr) {
+			t.Fatalf("err = %v, want %v", err, findErr)
+		}
+	})
+}
+
 func TestMongoStoreReplaceTaxonomyLeavesLiveIntactWhenStagingInsertFails(t *testing.T) {
 	insertErr := errors.New("staging insert failed")
 	liveCats := &fakeMongoCollection{}
@@ -429,6 +481,38 @@ func TestMongoStoreTaxonomyErrorPaths(t *testing.T) {
 		}}}
 		if _, err := store.ListSubCategories(t.Context(), "x"); !errors.Is(err, findErr) {
 			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("ListSubCategories cursor error", func(t *testing.T) {
+		cursorErr := errors.New("sub cursor iteration failed")
+		subs := &fakeMongoCollection{
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return &fakeAnyCursor{
+					items: []interface{}{SubCategory{CategorySlug: "x", Slug: "y", Name: "Y", Icon: "weee"}},
+					err:   cursorErr,
+				}, nil
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionSubCategories: subs,
+		}}}
+		if _, err := store.ListSubCategories(t.Context(), "x"); !errors.Is(err, cursorErr) {
+			t.Fatalf("err = %v, want %v", err, cursorErr)
+		}
+	})
+
+	t.Run("ListSubCategories decode error", func(t *testing.T) {
+		subs := &fakeMongoCollection{
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return &fakeAnyCursor{items: []interface{}{"bad"}}, nil
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionSubCategories: subs,
+		}}}
+		if _, err := store.ListSubCategories(t.Context(), "x"); err == nil {
+			t.Fatal("expected decode error")
 		}
 	})
 

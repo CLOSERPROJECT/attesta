@@ -137,6 +137,46 @@ func TestApplyEffectiveStreamCategorizationLookupErrorKeepsPair(t *testing.T) {
 	}
 }
 
+func TestResolveCatalogStreamCategorizationNilConfig(t *testing.T) {
+	server := &Server{}
+	if err := server.resolveCatalogStreamCategorization(nil); err != nil {
+		t.Fatalf("nil cfg: %v", err)
+	}
+}
+
+func TestStoreSubCategoryPathExistsNilServerOrStore(t *testing.T) {
+	var nilServer *Server
+	ok, err := nilServer.storeSubCategoryPathExists(t.Context(), "a", "b")
+	if err != nil || ok {
+		t.Fatalf("nil server = %v, %v", ok, err)
+	}
+	server := &Server{}
+	ok, err = server.storeSubCategoryPathExists(t.Context(), "a", "b")
+	if err != nil || ok {
+		t.Fatalf("nil store = %v, %v", ok, err)
+	}
+}
+
+func TestStoreSubCategoryPathExistsPropagatesLookupError(t *testing.T) {
+	lookupErr := errors.New("mongo down")
+	store := NewMemoryStore()
+	seedSupplyChainProcurementTaxonomy(t, store)
+	server := &Server{store: &failingGetSubCategoryStore{MemoryStore: store, err: lookupErr}}
+	ok, err := server.storeSubCategoryPathExists(t.Context(), "supply-chain", "procurement")
+	if !errors.Is(err, lookupErr) || ok {
+		t.Fatalf("got ok=%v err=%v", ok, err)
+	}
+}
+
+type failingGetSubCategoryStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingGetSubCategoryStore) GetSubCategoryBySlug(_ context.Context, _, _ string) (*SubCategory, error) {
+	return nil, s.err
+}
+
 func TestApplyEffectiveStreamCategorizationMissingTaxonomyIsUncategorized(t *testing.T) {
 	workflow := WorkflowDef{
 		Name:            "Workflow",

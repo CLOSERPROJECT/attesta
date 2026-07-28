@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -310,5 +311,27 @@ func TestBootstrapTaxonomyNoopWhenSeedFileMissing(t *testing.T) {
 func TestBootstrapTaxonomyNilStoreNoop(t *testing.T) {
 	if err := bootstrapTaxonomy(t.Context(), nil, t.TempDir()); err != nil {
 		t.Fatalf("bootstrapTaxonomy nil store: %v", err)
+	}
+}
+
+func TestTaxonomyBootstrapSeedPath(t *testing.T) {
+	t.Setenv("CATEGORIES_SEED", "")
+	if got := taxonomyBootstrapSeedPath(""); got != filepath.Join("config", "categories.yaml") {
+		t.Fatalf("empty configDir = %q", got)
+	}
+	if got := taxonomyBootstrapSeedPath("cfg"); got != filepath.Join("cfg", "categories.yaml") {
+		t.Fatalf("configDir = %q", got)
+	}
+	t.Setenv("CATEGORIES_SEED", "/custom/categories.yaml")
+	if got := taxonomyBootstrapSeedPath("ignored"); got != "/custom/categories.yaml" {
+		t.Fatalf("CATEGORIES_SEED = %q", got)
+	}
+}
+
+func TestBootstrapTaxonomyPropagatesListError(t *testing.T) {
+	listErr := errors.New("list categories failed")
+	store := &failingListCategoriesStore{MemoryStore: NewMemoryStore(), err: listErr}
+	if err := bootstrapTaxonomy(t.Context(), store, t.TempDir()); !errors.Is(err, listErr) {
+		t.Fatalf("err = %v, want %v", err, listErr)
 	}
 }
