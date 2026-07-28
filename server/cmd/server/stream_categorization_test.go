@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,14 +107,33 @@ func TestApplyEffectiveStreamCategorizationKnownPathKeepsPair(t *testing.T) {
 		CategorySlug:    " supply-chain ",
 		SubCategorySlug: " procurement ",
 	}
-	applyEffectiveStreamCategorization(t.Context(), &workflow, func(_ context.Context, categorySlug, subCategorySlug string) (bool, error) {
+	if err := applyEffectiveStreamCategorization(t.Context(), &workflow, func(_ context.Context, categorySlug, subCategorySlug string) (bool, error) {
 		return categorySlug == "supply-chain" && subCategorySlug == "procurement", nil
-	})
+	}); err != nil {
+		t.Fatalf("applyEffectiveStreamCategorization: %v", err)
+	}
 	if !workflow.IsCategorized() {
 		t.Fatal("expected categorized Stream for known taxonomy path")
 	}
 	if workflow.CategorySlug != "supply-chain" || workflow.SubCategorySlug != "procurement" {
 		t.Fatalf("got %q / %q after trim", workflow.CategorySlug, workflow.SubCategorySlug)
+	}
+}
+
+func TestApplyEffectiveStreamCategorizationLookupErrorKeepsPair(t *testing.T) {
+	workflow := WorkflowDef{
+		Name:            "Workflow",
+		CategorySlug:    "supply-chain",
+		SubCategorySlug: "procurement",
+	}
+	err := applyEffectiveStreamCategorization(t.Context(), &workflow, func(_ context.Context, _, _ string) (bool, error) {
+		return false, errors.New("taxonomy unavailable")
+	})
+	if err == nil {
+		t.Fatal("expected lookup error")
+	}
+	if !workflow.IsCategorized() {
+		t.Fatal("lookup errors must not clear the declared category pair")
 	}
 }
 
@@ -212,6 +232,85 @@ func TestWorkflowCatalogFormataKnownCategoryPathLoadsCategorized(t *testing.T) {
 	}
 	if cfg.Workflow.CategorySlug != "supply-chain" || cfg.Workflow.SubCategorySlug != "procurement" {
 		t.Fatalf("got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+	}
+}
+
+func TestWorkflowCatalogRebuildsAfterTaxonomyReplaceWithoutStreamChange(t *testing.T) {
+	store := NewMemoryStore()
+	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: procurement\n"),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	server := &Server{store: store}
+	first, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(first): %v", err)
+	}
+	if first[saved.ID.Hex()].Workflow.IsCategorized() {
+		t.Fatal("expected uncategorized before taxonomy exists")
+	}
+
+	seedSupplyChainProcurementTaxonomy(t, store)
+
+	second, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(second): %v", err)
+	}
+	cfg := second[saved.ID.Hex()]
+	if !cfg.Workflow.IsCategorized() {
+		t.Fatal("expected categorized after taxonomy seed without stream modtime change")
+	}
+	if cfg.Workflow.CategorySlug != "supply-chain" || cfg.Workflow.SubCategorySlug != "procurement" {
+		t.Fatalf("got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+	}
+}
+
+type flakyTaxonomyLookupStore struct {
+	*MemoryStore
+	failRemaining int
+}
+
+func (s *flakyTaxonomyLookupStore) GetSubCategoryBySlug(ctx context.Context, categorySlug, slug string) (*SubCategory, error) {
+	if s.failRemaining > 0 {
+		s.failRemaining--
+		return nil, errors.New("transient taxonomy lookup failure")
+	}
+	return s.MemoryStore.GetSubCategoryBySlug(ctx, categorySlug, slug)
+}
+
+func TestWorkflowCatalogRetriesAfterTransientTaxonomyLookupFailure(t *testing.T) {
+	base := NewMemoryStore()
+	seedSupplyChainProcurementTaxonomy(t, base)
+	saved, err := base.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: procurement\n"),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	store := &flakyTaxonomyLookupStore{MemoryStore: base, failRemaining: 1}
+	server := &Server{store: store}
+
+	first, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(first): %v", err)
+	}
+	if !first[saved.ID.Hex()].Workflow.IsCategorized() {
+		t.Fatal("transient lookup must keep declared category pair")
+	}
+
+	second, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(second): %v", err)
+	}
+	if !second[saved.ID.Hex()].Workflow.IsCategorized() {
+		t.Fatal("expected categorized after transient lookup recovers")
+	}
+	if store.failRemaining != 0 {
+		t.Fatalf("failRemaining = %d, want 0 (second call should have looked up)", store.failRemaining)
 	}
 }
 

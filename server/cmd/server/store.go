@@ -55,6 +55,10 @@ type Store interface {
 	DeleteSubCategory(ctx context.Context, categorySlug, slug string) error
 	EnsureTaxonomyIndexes(ctx context.Context) error
 	ReplaceTaxonomy(ctx context.Context, categories []Category, subCategories []SubCategory) error
+	// TaxonomyRevision is a monotonically increasing counter bumped when taxonomy
+	// contents change. Used to invalidate the workflow catalog cache across processes
+	// (e.g. seed-categories CLI while the server keeps running).
+	TaxonomyRevision(ctx context.Context) (int64, error)
 }
 
 type Organization struct {
@@ -584,13 +588,14 @@ func (s *MongoStore) attachmentsBucket() (gridFSBucketPort, error) {
 }
 
 type MemoryStore struct {
-	mu             sync.RWMutex
-	processes      map[primitive.ObjectID]Process
-	notarizations  []Notarization
-	attachments    map[primitive.ObjectID]memoryAttachment
-	formataStreams map[primitive.ObjectID]FormataBuilderStream
-	categories     map[string]Category
-	subCategories  map[string]SubCategory
+	mu                sync.RWMutex
+	processes         map[primitive.ObjectID]Process
+	notarizations     []Notarization
+	attachments       map[primitive.ObjectID]memoryAttachment
+	formataStreams    map[primitive.ObjectID]FormataBuilderStream
+	categories        map[string]Category
+	subCategories     map[string]SubCategory
+	taxonomyRevision  int64
 
 	InsertProcessErr  error
 	LoadProcessErr    error

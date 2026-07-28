@@ -153,12 +153,13 @@ type Server struct {
 	configProvider func() (RuntimeConfig, error)
 	workflowDefID  primitive.ObjectID
 	configDir      string
-	configMu       sync.Mutex
-	catalogModTime map[string]time.Time
-	catalog        map[string]RuntimeConfig
-	viteDevServer  string
-	enforceAuth    bool
-	formataArchURL string
+	configMu            sync.Mutex
+	catalogModTime      map[string]time.Time
+	catalogTaxonomyRev  int64
+	catalog             map[string]RuntimeConfig
+	viteDevServer       string
+	enforceAuth         bool
+	formataArchURL      string
 }
 
 type SSEHub struct {
@@ -6530,6 +6531,11 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 
+	taxRev, taxErr := s.catalogTaxonomyRevision()
+	if taxErr != nil {
+		return nil, taxErr
+	}
+
 	if s.store != nil {
 		streams, err := s.store.ListFormataBuilderStreams(context.Background())
 		if err != nil {
@@ -6544,11 +6550,12 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 				key := stream.ID.Hex()
 				modTimes[key] = workflowCatalogModTime(stream)
 			}
-			if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
+			if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) && s.catalogTaxonomyRev == taxRev {
 				return cloneWorkflowCatalog(s.catalog), nil
 			}
 
 			catalog := make(map[string]RuntimeConfig, len(streams))
+			cacheable := true
 			for _, stream := range streams {
 				if stream.ID.IsZero() {
 					return nil, errors.New("formata stream id is empty")
@@ -6558,11 +6565,19 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 				if parseErr != nil {
 					return nil, parseErr
 				}
-				s.resolveCatalogStreamCategorization(&cfg)
+				if resolveErr := s.resolveCatalogStreamCategorization(&cfg); resolveErr != nil {
+					cacheable = false
+				}
 				catalog[key] = cfg
 			}
-			s.catalog = catalog
-			s.catalogModTime = modTimes
+			if cacheable {
+				s.catalog = catalog
+				s.catalogModTime = modTimes
+				s.catalogTaxonomyRev = taxRev
+			} else {
+				s.catalog = nil
+				s.catalogModTime = nil
+			}
 			return cloneWorkflowCatalog(catalog), nil
 		}
 	}
@@ -6601,11 +6616,12 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		}
 		modTimes[path] = info.ModTime()
 	}
-	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) {
+	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) && s.catalogTaxonomyRev == taxRev {
 		return cloneWorkflowCatalog(s.catalog), nil
 	}
 
 	catalog := make(map[string]RuntimeConfig, len(paths))
+	cacheable := true
 	for _, path := range paths {
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
@@ -6615,7 +6631,9 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		if parseErr != nil {
 			return nil, parseErr
 		}
-		s.resolveCatalogStreamCategorization(&cfg)
+		if resolveErr := s.resolveCatalogStreamCategorization(&cfg); resolveErr != nil {
+			cacheable = false
+		}
 		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 		if key == "" {
 			return nil, fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
@@ -6626,10 +6644,23 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		catalog[key] = cfg
 	}
 
-	s.catalog = catalog
-	s.catalogModTime = modTimes
+	if cacheable {
+		s.catalog = catalog
+		s.catalogModTime = modTimes
+		s.catalogTaxonomyRev = taxRev
+	} else {
+		s.catalog = nil
+		s.catalogModTime = nil
+	}
 
 	return cloneWorkflowCatalog(catalog), nil
+}
+
+func (s *Server) catalogTaxonomyRevision() (int64, error) {
+	if s == nil || s.store == nil {
+		return 0, nil
+	}
+	return s.store.TaxonomyRevision(context.Background())
 }
 
 func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {

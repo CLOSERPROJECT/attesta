@@ -43,35 +43,40 @@ func validateWorkflowCategoryPair(workflow WorkflowDef) error {
 }
 
 // applyEffectiveStreamCategorization keeps a declared Sub-category path only when
-// it exists in taxonomy. Unknown or unavailable taxonomy paths become uncategorized
-// (slugs cleared) without failing blueprint load. Pair completeness is validated
-// separately by validateWorkflowCategoryPair.
-func applyEffectiveStreamCategorization(ctx context.Context, workflow *WorkflowDef, pathExists subCategoryPathExists) {
+// it exists in taxonomy. Unknown paths (or a nil checker) become uncategorized
+// without failing blueprint load. Lookup errors leave the declared pair unchanged
+// and are returned so callers can avoid caching a transient resolution.
+// Pair completeness is validated separately by validateWorkflowCategoryPair.
+func applyEffectiveStreamCategorization(ctx context.Context, workflow *WorkflowDef, pathExists subCategoryPathExists) error {
 	if workflow == nil {
-		return
+		return nil
 	}
 	categorySlug := strings.TrimSpace(workflow.CategorySlug)
 	subCategorySlug := strings.TrimSpace(workflow.SubCategorySlug)
 	if categorySlug == "" && subCategorySlug == "" {
 		workflow.CategorySlug = ""
 		workflow.SubCategorySlug = ""
-		return
+		return nil
 	}
 
 	if pathExists == nil {
 		workflow.CategorySlug = ""
 		workflow.SubCategorySlug = ""
-		return
+		return nil
 	}
 
 	ok, err := pathExists(ctx, categorySlug, subCategorySlug)
-	if err != nil || !ok {
+	if err != nil {
+		return err
+	}
+	if !ok {
 		workflow.CategorySlug = ""
 		workflow.SubCategorySlug = ""
-		return
+		return nil
 	}
 	workflow.CategorySlug = categorySlug
 	workflow.SubCategorySlug = subCategorySlug
+	return nil
 }
 
 func (s *Server) storeSubCategoryPathExists(ctx context.Context, categorySlug, subCategorySlug string) (bool, error) {
@@ -85,17 +90,16 @@ func (s *Server) storeSubCategoryPathExists(ctx context.Context, categorySlug, s
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return false, nil
 	}
-	// Taxonomy lookup failures must not fail catalog load; treat as uncategorized.
-	return false, nil
+	return false, err
 }
 
-func (s *Server) resolveCatalogStreamCategorization(cfg *RuntimeConfig) {
+func (s *Server) resolveCatalogStreamCategorization(cfg *RuntimeConfig) error {
 	if cfg == nil {
-		return
+		return nil
 	}
 	var pathExists subCategoryPathExists
 	if s != nil {
 		pathExists = s.storeSubCategoryPathExists
 	}
-	applyEffectiveStreamCategorization(context.Background(), &cfg.Workflow, pathExists)
+	return applyEffectiveStreamCategorization(context.Background(), &cfg.Workflow, pathExists)
 }

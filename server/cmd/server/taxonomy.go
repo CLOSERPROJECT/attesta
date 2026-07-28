@@ -18,6 +18,8 @@ const (
 	collectionSubCategories        = "sub_categories"
 	collectionCategoriesStaging    = "categories__next"
 	collectionSubCategoriesStaging = "sub_categories__next"
+	collectionTaxonomyMeta         = "taxonomy_meta"
+	taxonomyRevisionDocID          = "revision"
 )
 
 // ErrCategoryHasSubCategories is returned when DeleteCategory is refused because
@@ -144,6 +146,7 @@ func (s *MemoryStore) DeleteCategory(_ context.Context, slug string) error {
 		}
 	}
 	delete(s.categories, trimmed)
+	s.taxonomyRevision++
 	return nil
 }
 
@@ -189,11 +192,18 @@ func (s *MemoryStore) DeleteSubCategory(_ context.Context, categorySlug, slug st
 		return mongo.ErrNoDocuments
 	}
 	delete(s.subCategories, key)
+	s.taxonomyRevision++
 	return nil
 }
 
 func (s *MemoryStore) EnsureTaxonomyIndexes(_ context.Context) error {
 	return nil
+}
+
+func (s *MemoryStore) TaxonomyRevision(_ context.Context) (int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.taxonomyRevision, nil
 }
 
 func (s *MemoryStore) ReplaceTaxonomy(_ context.Context, categories []Category, subCategories []SubCategory) error {
@@ -242,6 +252,7 @@ func (s *MemoryStore) ReplaceTaxonomy(_ context.Context, categories []Category, 
 
 	s.categories = nextCategories
 	s.subCategories = nextSubs
+	s.taxonomyRevision++
 	return nil
 }
 
@@ -298,7 +309,7 @@ func (s *MongoStore) DeleteCategory(ctx context.Context, slug string) error {
 	if result != nil && result.DeletedCount == 0 {
 		return mongo.ErrNoDocuments
 	}
-	return nil
+	return s.bumpTaxonomyRevision(ctx)
 }
 
 func (s *MongoStore) ListSubCategories(ctx context.Context, categorySlug string) ([]SubCategory, error) {
@@ -355,7 +366,7 @@ func (s *MongoStore) DeleteSubCategory(ctx context.Context, categorySlug, slug s
 	if result != nil && result.DeletedCount == 0 {
 		return mongo.ErrNoDocuments
 	}
-	return nil
+	return s.bumpTaxonomyRevision(ctx)
 }
 
 func (s *MongoStore) EnsureTaxonomyIndexes(ctx context.Context) error {
@@ -459,5 +470,32 @@ func (s *MongoStore) ReplaceTaxonomy(ctx context.Context, categories []Category,
 	if err := db.RenameCollection(ctx, collectionSubCategoriesStaging, collectionSubCategories, true); err != nil {
 		return err
 	}
-	return nil
+	return s.bumpTaxonomyRevision(ctx)
+}
+
+func (s *MongoStore) TaxonomyRevision(ctx context.Context) (int64, error) {
+	var doc struct {
+		N int64 `bson:"n"`
+	}
+	err := s.database().Collection(collectionTaxonomyMeta).FindOne(
+		ctx,
+		bson.M{"_id": taxonomyRevisionDocID},
+	).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return doc.N, nil
+}
+
+func (s *MongoStore) bumpTaxonomyRevision(ctx context.Context) error {
+	_, err := s.database().Collection(collectionTaxonomyMeta).UpdateOne(
+		ctx,
+		bson.M{"_id": taxonomyRevisionDocID},
+		bson.M{"$inc": bson.M{"n": int64(1)}},
+		options.Update().SetUpsert(true),
+	)
+	return err
 }
