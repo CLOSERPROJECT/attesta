@@ -1,70 +1,65 @@
-{{/* Public homepage stream card: name, description, Stream badge, optional passport badge, step preview, live instance metrics, org avatars. Not a link. */}}
+{{/* Public homepage stream card: title, description, optional DPP chip, run/step/role metrics, org avatars. Not a link. */}}
 
 {{ define "public_stream_card" }}
   <article class="public-stream-card">
     <div class="public-stream-card-header">
       <h3 class="public-stream-card-title">{{ .Name }}</h3>
-      <div class="public-stream-card-badges">
-        <span class="public-stream-card-badge">Stream</span>
-        {{ if .PassportEnabled }}
-          <span class="public-stream-card-badge" data-category="passport">Product Passport</span>
-        {{ end }}
-      </div>
       {{ if .Description }}
         <p class="public-stream-card-description">{{ .Description }}</p>
       {{ end }}
+      {{ if .PassportEnabled }}
+        <span class="public-stream-card-dpp">
+          DPP
+          {{ template "icon-file-text" . }}
+        </span>
+      {{ end }}
     </div>
-    {{ if .Steps }}
-      <div class="public-stream-card-steps">
-        <div class="public-stream-card-steps-head"><strong>Steps</strong> <span>{{ len .Steps }}</span></div>
-        <div class="public-stream-card-steps-list">
-          {{ range .Steps }}
-            <div class="public-stream-card-step">
-              <span>{{ .Title }}</span>
-              <span class="public-stream-card-step-meta">
-                <span>{{ .SubstepCount }}</span>
-                {{ template "tip" (dict
-                  "Tooltip" "Actions"
-                  "Class" "public-stream-card-step-icon"
-                  "Icon" "icon-list"
-                ) }}
-              </span>
-            </div>
-          {{ end }}
-        </div>
-      </div>
-    {{ end }}
     <div class="public-stream-card-foot">
       <div class="public-stream-card-metrics">
-        {{ if eq .InstanceCount 0 }}
+        <div class="public-stream-card-metrics-row">
+          {{ if eq .InstanceCount 0 }}
+            <span class="public-stream-card-metric">
+              {{ template "icon-layers-2" . }}
+              no runs yet
+            </span>
+          {{ else if .AllCompleted }}
+            <span class="public-stream-card-metric">
+              {{ template "icon-layers-2" . }}
+              {{ if eq .InstanceCount 1 }}1 run{{ else }}{{ .InstanceCount }} runs{{ end }}
+            </span>
+            <span class="public-stream-card-metric">
+              {{ template "icon-check-circle" . }}
+              all completed
+            </span>
+          {{ else }}
+            <span class="public-stream-card-metric">
+              {{ template "icon-layers-2" . }}
+              {{ if eq .InstanceCount 1 }}1 run{{ else }}{{ .InstanceCount }} runs{{ end }}
+            </span>
+            <span class="public-stream-card-metric public-stream-card-metric-active">
+              {{ template "icon-activity" . }}
+              {{ if eq .ActiveCount 1 }}1 active now{{ else }}{{ .ActiveCount }} active now{{ end }}
+            </span>
+          {{ end }}
+        </div>
+        <div class="public-stream-card-metrics-row">
           <span class="public-stream-card-metric">
-            {{ template "icon-layers-2" . }}
-            no instances yet
-          </span>
-        {{ else if .AllCompleted }}
-          <span class="public-stream-card-metric">
-            {{ template "icon-layers-2" . }}
-            {{ if eq .InstanceCount 1 }}1 instance{{ else }}{{ .InstanceCount }} instances{{ end }}
+            {{ template "icon-list" . }}
+            {{ if eq .StepCount 1 }}1 step{{ else }}{{ .StepCount }} steps{{ end }}
           </span>
           <span class="public-stream-card-metric">
-            {{ template "icon-check-circle" . }}
-            all completed
+            {{ template "icon-users-group" . }}
+            {{ if eq .RoleCount 1 }}1 role{{ else }}{{ .RoleCount }} roles{{ end }}
           </span>
-        {{ else }}
-          <span class="public-stream-card-metric">
-            {{ template "icon-layers-2" . }}
-            {{ if eq .InstanceCount 1 }}1 instance{{ else }}{{ .InstanceCount }} instances{{ end }}
-          </span>
-          <span class="public-stream-card-metric public-stream-card-metric-active">
-            {{ template "icon-activity" . }}
-            {{ if eq .ActiveCount 1 }}1 active now{{ else }}{{ .ActiveCount }} active now{{ end }}
-          </span>
-        {{ end }}
+        </div>
       </div>
       {{ if .Organizations }}
         <hr class="public-stream-card-rule" />
         <div class="public-stream-card-orgs">
-          <div class="public-stream-card-orgs-head"><strong>Organizations</strong></div>
+          <div class="public-stream-card-orgs-head">
+            <strong>Organizations</strong>
+            <span class="public-stream-card-orgs-count">{{ .OrganizationCount }}</span>
+          </div>
           <div class="public-stream-card-avatars">
             {{ range .Organizations }}
               {{ if .LogoURL }}

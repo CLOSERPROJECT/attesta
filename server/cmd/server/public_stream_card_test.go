@@ -24,48 +24,43 @@ func TestPublicStreamCardTemplateRendersCoreFields(t *testing.T) {
 		`class="public-stream-card"`,
 		"PV Module Tracing",
 		"End-to-end tracing of photovoltaic modules",
-		"Stream",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in rendered public stream card, got: %s", want, body)
 		}
 	}
-	if strings.Contains(body, "<a ") || strings.Contains(body, "<a>") {
-		t.Fatalf("public stream card must not be a link, got: %s", body)
-	}
-	if strings.Contains(body, `href=`) {
-		t.Fatalf("public stream card must not navigate, got: %s", body)
+	for _, mustNot := range []string{
+		"public-stream-card-badge",
+		">Stream<",
+		"<a ",
+		"<a>",
+		`href=`,
+	} {
+		if strings.Contains(body, mustNot) {
+			t.Fatalf("public stream card must not contain %q, got: %s", mustNot, body)
+		}
 	}
 }
 
-func TestPublicStreamCardTemplateRendersStepPreview(t *testing.T) {
+func TestPublicStreamCardTemplateRendersStepsAndRolesMetrics(t *testing.T) {
 	tmpl := parseTestTemplates(t)
-
 	var out bytes.Buffer
-	card := PublicStreamCardView{
-		Name: "PV Module Tracing",
-	}
+	card := PublicStreamCardView{Name: "PV", StepCount: 3, RoleCount: 4}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
-		t.Fatalf("render public_stream_card template: %v", err)
+		t.Fatalf("render: %v", err)
 	}
 	body := out.String()
-
 	for _, want := range []string{
-		`class="public-stream-card-steps-head"><strong>Steps</strong> <span>2</span>`,
-		`class="public-stream-card-steps-list"`,
-		"Incoming intake",
-		"<span>3</span>",
-		"Quality check",
-		"<span>1</span>",
-		`data-tooltip="Actions"`,
-		`class="tip public-stream-card-step-icon"`,
+		`class="public-stream-card-metrics-row"`,
+		"3 steps",
+		"4 roles",
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q in rendered public stream card, got: %s", want, body)
+			t.Fatalf("expected %q, got: %s", want, body)
 		}
 	}
-	if strings.Contains(body, " actions") {
-		t.Fatalf("did not expect literal actions label, got: %s", body)
+	if strings.Contains(body, "public-stream-card-steps") {
+		t.Fatalf("must not render steps list, got: %s", body)
 	}
 }
 
@@ -82,14 +77,11 @@ func TestPublicStreamCardTemplateOmitsPassportBadgeWhenDisabled(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, `class="public-stream-card-badge">Stream</span>`) {
-		t.Fatalf("expected static Stream badge, got: %s", body)
+	if strings.Contains(body, "public-stream-card-dpp") {
+		t.Fatalf("did not expect DPP chip when disabled, got: %s", body)
 	}
-	if strings.Contains(body, "Product Passport") {
-		t.Fatalf("did not expect Product Passport badge when DPP disabled, got: %s", body)
-	}
-	if strings.Contains(body, `data-category="passport"`) {
-		t.Fatalf("did not expect passport category hook when DPP disabled, got: %s", body)
+	if strings.Contains(body, ">DPP<") {
+		t.Fatalf("did not expect DPP label when disabled, got: %s", body)
 	}
 }
 
@@ -106,14 +98,11 @@ func TestPublicStreamCardTemplateRendersPassportBadgeWhenEnabled(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, `class="public-stream-card-badge">Stream</span>`) {
-		t.Fatalf("expected static Stream badge to remain, got: %s", body)
+	if !strings.Contains(body, "public-stream-card-dpp") {
+		t.Fatalf("expected DPP chip class, got: %s", body)
 	}
-	if !strings.Contains(body, `data-category="passport"`) {
-		t.Fatalf("expected passport category hook, got: %s", body)
-	}
-	if !strings.Contains(body, "Product Passport") {
-		t.Fatalf("expected Product Passport badge label, got: %s", body)
+	if !strings.Contains(body, "DPP") {
+		t.Fatalf("expected DPP label, got: %s", body)
 	}
 }
 
@@ -126,6 +115,7 @@ func TestPublicStreamCardTemplateRendersOrgLogoAvatarWithAccessibleName(t *testi
 		Organizations: []PublicStreamCardOrgView{
 			{Name: "Acme Corp", LogoURL: "/organization/logo/acme"},
 		},
+		OrganizationCount: 1,
 	}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
 		t.Fatalf("render public_stream_card template: %v", err)
@@ -152,6 +142,7 @@ func TestPublicStreamCardTemplateFallsBackToOrgInitialsWhenNoLogo(t *testing.T) 
 		Organizations: []PublicStreamCardOrgView{
 			{Name: "Acme Corp", Initials: "AC"},
 		},
+		OrganizationCount: 1,
 	}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
 		t.Fatalf("render public_stream_card template: %v", err)
@@ -185,6 +176,7 @@ func TestPublicStreamCardTemplateRendersOrgOverflowCount(t *testing.T) {
 			{Name: "Four", Initials: "FO"},
 		},
 		OrganizationsOverflow: 3,
+		OrganizationCount:     7,
 	}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
 		t.Fatalf("render public_stream_card template: %v", err)
@@ -220,7 +212,7 @@ func TestPublicStreamCardTemplateRendersEmptyMetricsAsSingleLayersChip(t *testin
 	for _, want := range []string{
 		`class="public-stream-card-metrics"`,
 		`class="public-stream-card-metric"`,
-		"no instances yet",
+		"no runs yet",
 		// icon-layers-2 path
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 	} {
@@ -231,11 +223,11 @@ func TestPublicStreamCardTemplateRendersEmptyMetricsAsSingleLayersChip(t *testin
 	if strings.Contains(body, "all completed") {
 		t.Fatalf("empty metrics must not show all-completed chip, got: %s", body)
 	}
+	if strings.Contains(body, "active now") {
+		t.Fatalf("empty metrics must not show active chip, got: %s", body)
+	}
 	if strings.Contains(body, `d="m9 12 2 2 4-4"`) {
 		t.Fatalf("empty metrics must not render check-circle icon, got: %s", body)
-	}
-	if strings.Count(body, `class="public-stream-card-metric"`) != 1 {
-		t.Fatalf("empty metrics must render exactly one chip, got: %s", body)
 	}
 }
 
@@ -255,7 +247,7 @@ func TestPublicStreamCardTemplateRendersOneInstanceAllCompletedMetrics(t *testin
 
 	for _, want := range []string{
 		`class="public-stream-card-metric"`,
-		"1 instance",
+		"1 run",
 		"all completed",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 		`d="m9 12 2 2 4-4"`,
@@ -264,14 +256,14 @@ func TestPublicStreamCardTemplateRendersOneInstanceAllCompletedMetrics(t *testin
 			t.Fatalf("expected %q in all-completed metrics layout, got: %s", want, body)
 		}
 	}
-	if strings.Contains(body, "1 instances") {
+	if strings.Contains(body, "1 runs") {
 		t.Fatalf("singular count must not use plural label, got: %s", body)
 	}
-	if strings.Contains(body, "no instances yet") {
+	if strings.Contains(body, "no runs yet") {
 		t.Fatalf("settled metrics must not show empty label, got: %s", body)
 	}
-	if strings.Count(body, `class="public-stream-card-metric"`) != 2 {
-		t.Fatalf("all-completed metrics must render exactly two chips, got: %s", body)
+	if strings.Contains(body, "active now") {
+		t.Fatalf("all-completed metrics must not show active chip, got: %s", body)
 	}
 }
 
@@ -290,7 +282,7 @@ func TestPublicStreamCardTemplateRendersPluralInstancesAllCompletedMetrics(t *te
 	body := out.String()
 
 	for _, want := range []string{
-		"2 instances",
+		"2 runs",
 		"all completed",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 		`d="m9 12 2 2 4-4"`,
@@ -299,11 +291,8 @@ func TestPublicStreamCardTemplateRendersPluralInstancesAllCompletedMetrics(t *te
 			t.Fatalf("expected %q in plural all-completed metrics, got: %s", want, body)
 		}
 	}
-	if strings.Contains(body, "2 instance<") || strings.Contains(body, "2 instance\n") || strings.Contains(body, ">2 instance<") {
-		t.Fatalf("plural count must use instances label, got: %s", body)
-	}
-	if strings.Count(body, `class="public-stream-card-metric"`) != 2 {
-		t.Fatalf("all-completed metrics must render exactly two chips, got: %s", body)
+	if strings.Contains(body, "2 run<") || strings.Contains(body, "2 run\n") || strings.Contains(body, ">2 run<") {
+		t.Fatalf("plural count must use runs label, got: %s", body)
 	}
 }
 
@@ -324,7 +313,7 @@ func TestPublicStreamCardTemplateRendersOneActiveNowMetrics(t *testing.T) {
 	for _, want := range []string{
 		`class="public-stream-card-metric"`,
 		`class="public-stream-card-metric public-stream-card-metric-active"`,
-		"1 instance",
+		"1 run",
 		"1 active now",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
@@ -336,14 +325,11 @@ func TestPublicStreamCardTemplateRendersOneActiveNowMetrics(t *testing.T) {
 	if strings.Contains(body, "all completed") {
 		t.Fatalf("active-now metrics must not show all-completed chip, got: %s", body)
 	}
-	if strings.Contains(body, "1 instances") {
-		t.Fatalf("singular instance count must not use plural label, got: %s", body)
+	if strings.Contains(body, "1 runs") {
+		t.Fatalf("singular run count must not use plural label, got: %s", body)
 	}
 	if strings.Contains(body, "1 actives now") || strings.Contains(body, "1 active nows") {
 		t.Fatalf("singular active count must use '1 active now', got: %s", body)
-	}
-	if strings.Count(body, "public-stream-card-metric") < 2 {
-		t.Fatalf("active-now metrics must render exactly two chips, got: %s", body)
 	}
 }
 
@@ -362,7 +348,7 @@ func TestPublicStreamCardTemplateRendersPluralActiveNowMetrics(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		"3 instances",
+		"3 runs",
 		"2 active now",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
@@ -380,9 +366,6 @@ func TestPublicStreamCardTemplateRendersPluralActiveNowMetrics(t *testing.T) {
 	if !strings.Contains(body, `class="public-stream-card-metric public-stream-card-metric-active"`) {
 		t.Fatalf("expected active metric chip class, got: %s", body)
 	}
-	if strings.Count(body, "public-stream-card-metric") < 2 {
-		t.Fatalf("active-now metrics must render exactly two chips, got: %s", body)
-	}
 }
 
 func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing.T) {
@@ -390,9 +373,10 @@ func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing
 
 	var out bytes.Buffer
 	card := PublicStreamCardView{
-		Name:          "PV Module Tracing",
-		InstanceCount: 28,
-		AllCompleted:  true,
+		Name:              "PV Module Tracing",
+		InstanceCount:     28,
+		AllCompleted:      true,
+		OrganizationCount: 5,
 		Organizations: []PublicStreamCardOrgView{
 			{Name: "Acme Corp", Initials: "AC"},
 		},
@@ -404,11 +388,13 @@ func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing
 
 	for _, want := range []string{
 		`class="public-stream-card-metrics"`,
-		"28 instances",
+		"28 runs",
 		"all completed",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 		`d="m9 12 2 2 4-4"`,
 		`<strong>Organizations</strong>`,
+		`class="public-stream-card-orgs-count"`,
+		">5<",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in rendered public stream card, got: %s", want, body)
