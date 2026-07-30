@@ -24,7 +24,7 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 	active := strings.TrimSpace(view.ActivePanel)
 	subtitle := "Create and manage organizations"
 	if active == "categories" {
-		subtitle = "Browse stream discovery categories"
+		subtitle = "Manage stream discovery taxonomy"
 	}
 	return AdminConsoleView{
 		ID:          "admin-console",

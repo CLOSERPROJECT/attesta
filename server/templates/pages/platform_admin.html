@@ -140,59 +140,166 @@
 {{ end }}
 
 {{ define "platform_admin_categories_panel" }}
-  <div class="panel-heading">
-    <h2>Categories</h2>
-    <p>Browse stream discovery categories</p>
-  </div>
-  {{ if .Categories }}
-    <ul class="platform-admin-taxonomy-list">
-      {{ range .Categories }}
-        <li class="platform-admin-taxonomy-category">
-          <div class="platform-admin-taxonomy-row">
-            {{ if .IconURL }}
-              <img
-                src="{{ .IconURL }}"
-                alt=""
-                class="platform-admin-taxonomy-icon"
-              />
+  <div id="platform-admin-categories">
+    <div class="panel-head-actions">
+      <div class="panel-heading">
+        <h2>Categories</h2>
+        <p>Manage stream discovery taxonomy</p>
+      </div>
+      <a
+        class="btn btn-primary btn-icon"
+        href="/admin/categories?new=group"
+        aria-label="Add category group"
+      >
+        {{ template "icon-plus" . }}
+      </a>
+    </div>
+
+    <p class="platform-admin-taxonomy-meta-pill muted">
+      {{ .CategoriesEditor.GroupCount }} groups · {{ .CategoriesEditor.LeafCount }} categories
+    </p>
+
+    {{ if .CategoriesEditor.Confirmation }}
+      <p class="confirmation">{{ .CategoriesEditor.Confirmation }}</p>
+    {{ end }}
+
+    {{ if .CategoriesEditor.Categories }}
+      <ul class="platform-admin-taxonomy-list">
+        {{ range $category := .CategoriesEditor.Categories }}
+          <li class="platform-admin-taxonomy-category">
+            {{ if and $.CategoriesEditor.Form.Open (eq $.CategoriesEditor.Form.Mode "edit") (eq $.CategoriesEditor.Form.Level "group") (eq $.CategoriesEditor.Form.Slug $category.Slug) }}
+              {{ template "platform_admin_categories_form" $.CategoriesEditor }}
+            {{ else }}
+              <div class="platform-admin-taxonomy-row">
+                {{ if $category.IconURL }}
+                  <img
+                    src="{{ $category.IconURL }}"
+                    alt=""
+                    class="platform-admin-taxonomy-icon"
+                  />
+                {{ end }}
+                <div class="platform-admin-taxonomy-meta">
+                  <p class="platform-admin-taxonomy-name">{{ $category.Name }}</p>
+                  <p class="platform-admin-taxonomy-slug muted">{{ $category.Slug }}</p>
+                </div>
+                <div class="platform-admin-taxonomy-actions">
+                  <a
+                    class="btn btn-ghost btn-xs"
+                    href="/admin/categories?edit=group&amp;slug={{ $category.Slug | urlquery }}"
+                  >Edit</a>
+                  <a
+                    class="btn btn-ghost btn-xs"
+                    href="/admin/categories?new=sub&amp;parent={{ $category.Slug | urlquery }}"
+                  >Add subcategory</a>
+                </div>
+              </div>
             {{ end }}
-            <div class="platform-admin-taxonomy-meta">
-              <p class="platform-admin-taxonomy-name">{{ .Name }}</p>
-              <p class="platform-admin-taxonomy-slug muted">{{ .Slug }}</p>
-              <p class="platform-admin-taxonomy-icon-key muted">{{ .Icon }}</p>
-            </div>
-          </div>
-          {{ if .SubCategories }}
-            <ul class="platform-admin-taxonomy-sub-list">
-              {{ range .SubCategories }}
-                <li class="platform-admin-taxonomy-sub">
-                  <div class="platform-admin-taxonomy-row">
-                    {{ if .IconURL }}
-                      <img
-                        src="{{ .IconURL }}"
-                        alt=""
-                        class="platform-admin-taxonomy-icon"
-                      />
+            {{ if $category.SubCategories }}
+              <ul class="platform-admin-taxonomy-sub-list">
+                {{ range $category.SubCategories }}
+                  <li class="platform-admin-taxonomy-sub">
+                    {{ if and $.CategoriesEditor.Form.Open (eq $.CategoriesEditor.Form.Mode "edit") (eq $.CategoriesEditor.Form.Level "leaf") (eq $.CategoriesEditor.Form.ParentSlug $category.Slug) (eq $.CategoriesEditor.Form.Slug .Slug) }}
+                      {{ template "platform_admin_categories_form" $.CategoriesEditor }}
+                    {{ else }}
+                      <div class="platform-admin-taxonomy-row">
+                        {{ if .IconURL }}
+                          <img
+                            src="{{ .IconURL }}"
+                            alt=""
+                            class="platform-admin-taxonomy-icon"
+                          />
+                        {{ end }}
+                        <div class="platform-admin-taxonomy-meta">
+                          <p class="platform-admin-taxonomy-name">{{ .Name }}</p>
+                          <p class="platform-admin-taxonomy-slug muted">{{ .Slug }}</p>
+                          {{ if .Description }}
+                            <p class="platform-admin-taxonomy-description muted">{{ .Description }}</p>
+                          {{ end }}
+                        </div>
+                        <div class="platform-admin-taxonomy-actions">
+                          <a
+                            class="btn btn-ghost btn-xs"
+                            href="/admin/categories?edit=sub&amp;parent={{ $category.Slug | urlquery }}&amp;slug={{ .Slug | urlquery }}"
+                          >Edit</a>
+                        </div>
+                      </div>
                     {{ end }}
-                    <div class="platform-admin-taxonomy-meta">
-                      <p class="platform-admin-taxonomy-name">{{ .Name }}</p>
-                      <p class="platform-admin-taxonomy-slug muted">{{ .Slug }}</p>
-                      <p class="platform-admin-taxonomy-icon-key muted">{{ .Icon }}</p>
-                      {{ if .Description }}
-                        <p class="platform-admin-taxonomy-description muted">{{ .Description }}</p>
-                      {{ end }}
-                    </div>
-                  </div>
-                </li>
-              {{ end }}
-            </ul>
-          {{ end }}
-        </li>
+                  </li>
+                {{ end }}
+              </ul>
+            {{ end }}
+            {{ if and $.CategoriesEditor.Form.Open (eq $.CategoriesEditor.Form.Mode "create") (eq $.CategoriesEditor.Form.Level "leaf") (eq $.CategoriesEditor.Form.ParentSlug $category.Slug) }}
+              {{ template "platform_admin_categories_form" $.CategoriesEditor }}
+            {{ end }}
+          </li>
+        {{ end }}
+      </ul>
+    {{ else }}
+      <p class="muted platform-admin-taxonomy-empty">No categories yet</p>
+    {{ end }}
+
+    {{ if and .CategoriesEditor.Form.Open (eq .CategoriesEditor.Form.Mode "create") (eq .CategoriesEditor.Form.Level "group") }}
+      {{ template "platform_admin_categories_form" .CategoriesEditor }}
+    {{ end }}
+  </div>
+{{ end }}
+
+{{ define "platform_admin_categories_form" }}
+  <form
+    method="post"
+    action="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
+    class="input-form platform-admin-categories-form"
+    id="categories-editor-form"
+  >
+    <input
+      type="hidden"
+      name="intent"
+      value="{{ if eq .Form.Mode "create" }}create{{ else }}update{{ end }}"
+    />
+    {{ if and (eq .Form.Mode "edit") (eq .Form.Level "group") }}
+      <input type="hidden" name="slug" value="{{ .Form.Slug }}" />
+    {{ end }}
+    {{ if eq .Form.Level "leaf" }}
+      <input type="hidden" name="parent" value="{{ .Form.ParentSlug }}" />
+      {{ if eq .Form.Mode "edit" }}
+        <input type="hidden" name="slug" value="{{ .Form.Slug }}" />
       {{ end }}
-    </ul>
-  {{ else }}
-    <p class="muted platform-admin-taxonomy-empty">No categories yet</p>
-  {{ end }}
+    {{ end }}
+    <div class="form-field">
+      <label for="categories-editor-name">Name</label>
+      <input
+        id="categories-editor-name"
+        name="name"
+        type="text"
+        value="{{ .Form.Name }}"
+        required
+      />
+    </div>
+    <div class="form-field">
+      <label for="categories-editor-icon">Icon</label>
+      <input
+        id="categories-editor-icon"
+        name="icon"
+        type="text"
+        value="{{ .Form.Icon }}"
+      />
+    </div>
+    {{ if eq .Form.Level "leaf" }}
+      <div class="form-field">
+        <label for="categories-editor-description">Description</label>
+        <textarea id="categories-editor-description" name="description">{{ .Form.Description }}</textarea>
+      </div>
+    {{ end }}
+    {{ if .Form.Error }}
+      <p class="error">{{ .Form.Error }}</p>
+    {{ end }}
+    <div class="dialog-actions">
+      <a class="btn btn-secondary" href="/admin/categories">Cancel</a>
+      <button class="btn btn-primary" type="submit">
+        {{ if eq .Form.Mode "create" }}Create{{ else }}Save{{ end }}
+      </button>
+    </div>
+  </form>
 {{ end }}
 
 {{ define "platform_admin_results" }}

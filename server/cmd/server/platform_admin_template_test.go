@@ -69,19 +69,23 @@ func TestPlatformAdminCategoriesPanelMarkup(t *testing.T) {
 
 	view := PlatformAdminView{
 		ActivePanel: "categories",
-		Categories: []TaxonomyCategoryNode{
-			{
-				Name:    "Supply Chain",
-				Slug:    "supply-chain",
-				Icon:    "batch-traceability",
-				IconURL: "/static/taxonomy/batch-traceability.svg",
-				SubCategories: []TaxonomySubCategoryNode{
-					{
-						Name:        "Procurement",
-						Slug:        "procurement",
-						Icon:        "procurement-workflow",
-						IconURL:     "/static/taxonomy/procurement-workflow.svg",
-						Description: "PO management",
+		CategoriesEditor: CategoriesEditorView{
+			GroupCount: 1,
+			LeafCount:  1,
+			Categories: []TaxonomyCategoryNode{
+				{
+					Name:    "Supply Chain",
+					Slug:    "supply-chain",
+					Icon:    "batch-traceability",
+					IconURL: "/static/taxonomy/batch-traceability.svg",
+					SubCategories: []TaxonomySubCategoryNode{
+						{
+							Name:        "Procurement",
+							Slug:        "procurement",
+							Icon:        "procurement-workflow",
+							IconURL:     "/static/taxonomy/procurement-workflow.svg",
+							Description: "PO management",
+						},
 					},
 				},
 			},
@@ -95,14 +99,15 @@ func TestPlatformAdminCategoriesPanelMarkup(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		"Browse stream discovery categories",
+		`id="platform-admin-categories"`,
+		"Manage stream discovery taxonomy",
+		"1 groups · 1 categories",
 		`class="sidebar-nav-link is-active"`,
 		`href="/admin/categories"`,
 		`class="platform-admin-taxonomy-list"`,
 		`class="platform-admin-taxonomy-icon"`,
 		"Supply Chain",
 		"supply-chain",
-		"batch-traceability",
 		"/static/taxonomy/batch-traceability.svg",
 		"Procurement",
 		"procurement-workflow",
@@ -113,8 +118,8 @@ func TestPlatformAdminCategoriesPanelMarkup(t *testing.T) {
 		}
 	}
 
-	if strings.Contains(body, `class="panel-head-actions"`) {
-		t.Fatalf("did not expect orgs panel-head-actions on categories panel")
+	if strings.Contains(body, `class="panel-head-actions"`) && strings.Contains(body, `name="invite_email"`) {
+		t.Fatalf("did not expect org invite fields on categories panel")
 	}
 }
 
@@ -122,7 +127,8 @@ func TestPlatformAdminCategoriesPanelEmptyState(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	view := PlatformAdminView{
-		ActivePanel: "categories",
+		ActivePanel:      "categories",
+		CategoriesEditor: CategoriesEditorView{},
 	}
 
 	var out bytes.Buffer
@@ -133,5 +139,38 @@ func TestPlatformAdminCategoriesPanelEmptyState(t *testing.T) {
 
 	if !strings.Contains(body, "No categories yet") {
 		t.Fatalf("expected empty state message, got:\n%s", body)
+	}
+	if !strings.Contains(body, "0 groups · 0 categories") {
+		t.Fatalf("expected empty meta pill counts, got:\n%s", body)
+	}
+}
+
+func TestPlatformAdminCategoriesPanelNewGroupForm(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		CategoriesEditor: CategoriesEditorView{
+			GroupCount: 1,
+			LeafCount:  1,
+			Form: CategoriesEditorForm{
+				Open:  true,
+				Level: "group",
+				Mode:  "create",
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_categories_panel", view); err != nil {
+		t.Fatalf("render platform_admin_categories_panel: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, `name="intent"`) || !strings.Contains(body, `value="create"`) {
+		t.Fatalf("expected create intent in group form, got:\n%s", body)
+	}
+	if strings.Contains(body, `name="description"`) || strings.Contains(body, "categories-editor-description") {
+		t.Fatalf("group form must not include description field, got:\n%s", body)
 	}
 }

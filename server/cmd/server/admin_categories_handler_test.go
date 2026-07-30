@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +40,52 @@ func seedPlatformAdminTaxonomy(t *testing.T, store Store) {
 	})
 	if err != nil {
 		t.Fatalf("ReplaceTaxonomy: %v", err)
+	}
+}
+
+func newCategoriesAdminServer(t *testing.T, store Store) *Server {
+	t.Helper()
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "workflow.yaml")
+	if err := os.WriteFile(path, []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	now := time.Now().UTC()
+	return &Server{
+		authorizer:  fakeAuthorizer{},
+		store:       store,
+		identity:    &fakeIdentityStore{},
+		tmpl:        parseTestTemplates(t),
+		configDir:   tempDir,
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+}
+
+func TestWantsCategoriesPanelPartial(t *testing.T) {
+	t.Parallel()
+
+	full := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
+	if wantsCategoriesPanelPartial(full) {
+		t.Fatal("non-HTMX must be false")
+	}
+
+	console := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
+	console.Header.Set("HX-Request", "true")
+	console.Header.Set("HX-Target", "admin-console")
+	if wantsCategoriesPanelPartial(console) {
+		t.Fatal("admin-console HTMX must not request categories panel partial")
+	}
+
+	panel := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
+	panel.Header.Set("HX-Request", "true")
+	panel.Header.Set("HX-Target", "platform-admin-categories")
+	if !wantsCategoriesPanelPartial(panel) {
+		t.Fatal("categories panel HTMX must request panel partial")
 	}
 }
 
@@ -101,22 +149,10 @@ func TestHandleAdminCategoriesStoreError(t *testing.T) {
 	}
 }
 
-func TestHandleAdminCategoriesRendersTaxonomyTree(t *testing.T) {
-	t.Setenv("ADMIN_EMAIL", "admin@example.com")
-	t.Setenv("ADMIN_PASSWORD", "change-me")
-
-	now := time.Now().UTC()
+func TestHandleAdminCategoriesRendersEditorPanel(t *testing.T) {
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
-
-	server := &Server{
-		authorizer:  fakeAuthorizer{},
-		store:       store,
-		identity:    &fakeIdentityStore{},
-		tmpl:        testTemplates(),
-		enforceAuth: true,
-		now:         func() time.Time { return now },
-	}
+	server := newCategoriesAdminServer(t, store)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
@@ -129,16 +165,73 @@ func TestHandleAdminCategoriesRendersTaxonomyTree(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		"PLATFORM_ADMIN categories",
+		`id="platform-admin-categories"`,
+		"Manage stream discovery taxonomy",
+		"1 groups · 2 categories",
 		"Supply Chain",
 		"/static/taxonomy/batch-traceability.svg",
 		"Procurement",
 		"/static/taxonomy/procurement-workflow.svg",
 		"Order Fulfillment",
 		"/static/taxonomy/order-fulfillment.svg",
+		"PO management",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected body to contain %q, got: %s", want, body)
 		}
+	}
+}
+
+func TestHandleAdminCategoriesNewGroupForm(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/categories?new=group", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminCategories(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`name="intent"`,
+		`value="create"`,
+		`id="categories-editor-form"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected body to contain %q, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `name="description"`) || strings.Contains(body, "categories-editor-description") {
+		t.Fatalf("group create form must not include description field, got: %s", body)
+	}
+}
+
+func TestHandleAdminCategoriesHTMXPanelPartial(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "platform-admin-categories")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminCategories(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="platform-admin-categories"`) {
+		t.Fatalf("expected categories panel partial, got: %s", body)
+	}
+	if strings.Contains(body, `id="admin-console"`) || strings.Contains(body, "<html") || strings.Contains(body, `class="topbar"`) {
+		t.Fatalf("panel HTMX must not include layout or console chrome, got: %s", body)
 	}
 }
