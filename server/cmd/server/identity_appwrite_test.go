@@ -792,6 +792,46 @@ func TestAppwriteIdentityListOrganizationMembershipsPendingMembership(t *testing
 	}
 }
 
+func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *testing.T) {
+	var userGETs int
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme":
+			_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme/memberships":
+			_, _ = w.Write([]byte(`{"total":2,"memberships":[
+				{"$id":"m1","userId":"user-1","userEmail":"owner@example.com","teamId":"acme","teamName":"Acme Org","confirm":true,"roles":["owner"]},
+				{"$id":"m2","userId":"user-2","userEmail":"member@example.com","teamId":"acme","teamName":"Acme Org","confirm":true,"roles":["member","iapprover"]}
+			]}`))
+		case strings.HasPrefix(r.URL.Path, "/v1/users/"):
+			userGETs++
+			t.Fatalf("lite list must not call users API: %s %s", r.Method, r.URL.Path)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+	memberships, err := identity.ListOrganizationMembershipsLite(context.Background(), "acme")
+	if err != nil {
+		t.Fatalf("ListOrganizationMembershipsLite error: %v", err)
+	}
+	if userGETs != 0 {
+		t.Fatalf("userGETs = %d, want 0", userGETs)
+	}
+	if len(memberships) != 2 {
+		t.Fatalf("memberships = %#v", memberships)
+	}
+	if !memberships[0].IsOrgAdmin || memberships[0].Email != "owner@example.com" || !memberships[0].Confirmed {
+		t.Fatalf("memberships[0] = %#v", memberships[0])
+	}
+	if memberships[1].IsOrgAdmin || memberships[1].Email != "member@example.com" {
+		t.Fatalf("memberships[1] = %#v", memberships[1])
+	}
+}
+
 func TestAppwriteIdentityCreateAccountAndRecovery(t *testing.T) {
 	var createPath string
 	var createBody map[string]interface{}

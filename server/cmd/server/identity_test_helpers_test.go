@@ -25,6 +25,7 @@ type fakeIdentityStore struct {
 	inviteOrganizationUserFunc              func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	listOrganizationsFunc                   func(ctx context.Context) ([]IdentityOrg, error)
 	listOrganizationMembershipsFunc         func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	listOrganizationMembershipsLiteFunc     func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	listOrganizationUsersFunc               func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	getOrganizationBySlugFunc               func(ctx context.Context, slug string) (*IdentityOrg, error)
 	updateOrganizationFunc                  func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
@@ -164,6 +165,14 @@ func (f *fakeIdentityStore) ListOrganizationMemberships(ctx context.Context, org
 		return f.listOrganizationMembershipsFunc(ctx, orgSlug)
 	}
 	return nil, nil
+}
+
+func (f *fakeIdentityStore) ListOrganizationMembershipsLite(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+	if f.listOrganizationMembershipsLiteFunc != nil {
+		return f.listOrganizationMembershipsLiteFunc(ctx, orgSlug)
+	}
+	// Default: reuse full list hook so existing fakes keep working when only listOrganizationMembershipsFunc is set.
+	return f.ListOrganizationMemberships(ctx, orgSlug)
 }
 
 func (f *fakeIdentityStore) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {

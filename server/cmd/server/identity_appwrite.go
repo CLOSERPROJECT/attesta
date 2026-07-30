@@ -466,6 +466,28 @@ func (a *appwriteIdentity) ListOrganizationMemberships(ctx context.Context, orgS
 	return memberships, nil
 }
 
+// ListOrganizationMembershipsLite returns memberships decoded from the team membership
+// list only. IsOrgAdmin is derived from membership roles (owner / invite encoding), not
+// user labels. Callers that need label-accurate roles must use ListOrganizationMemberships.
+func (a *appwriteIdentity) ListOrganizationMembershipsLite(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	membershipList, err := teams.New(a.adminClient).ListMemberships(strings.TrimSpace(org.ID))
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	memberships := make([]IdentityMembership, 0, len(membershipList.Memberships))
+	for i := range membershipList.Memberships {
+		memberships = append(memberships, membershipFromAppwrite(&membershipList.Memberships[i], org))
+	}
+	return memberships, nil
+}
+
 func (a *appwriteIdentity) GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -886,7 +908,7 @@ func (a *appwriteIdentity) getOrganizationByTeamID(ctx context.Context, teamID s
 	return &org, nil
 }
 
-func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
+func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) IdentityMembership {
 	if membership == nil {
 		return IdentityMembership{}
 	}
@@ -910,6 +932,11 @@ func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership 
 	if joinedAt, err := parseAppwriteTime(membership.Joined); err == nil {
 		identity.JoinedAt = joinedAt
 	}
+	return identity
+}
+
+func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
+	identity := membershipFromAppwrite(membership, org)
 	if identity.UserID != "" {
 		if user, err := a.GetUserByID(ctx, identity.UserID); err == nil {
 			identity.Email = user.Email

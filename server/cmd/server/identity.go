@@ -29,6 +29,7 @@ type IdentityStore interface {
 	InviteOrganizationUser(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	ListOrganizations(ctx context.Context) ([]IdentityOrg, error)
 	ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	ListOrganizationMembershipsLite(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
