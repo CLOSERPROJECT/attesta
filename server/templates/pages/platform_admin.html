@@ -284,6 +284,7 @@
                           hx-post="/admin/categories"
                           hx-target="#platform-admin-categories"
                           hx-swap="outerHTML"
+                          hx-sync="#platform-admin-categories:queue all"
                         >
                           <input type="hidden" name="intent" value="delete" />
                           <input type="hidden" name="slug" value="{{ $category.Slug }}" />
@@ -415,6 +416,7 @@
                                   hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
                                   hx-target="#platform-admin-categories"
                                   hx-swap="outerHTML"
+                                  hx-sync="#platform-admin-categories:queue all"
                                 >
                                   <input type="hidden" name="intent" value="delete" />
                                   <input type="hidden" name="slug" value="{{ .Slug }}" />

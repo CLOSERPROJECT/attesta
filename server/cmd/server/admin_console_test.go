@@ -42,6 +42,9 @@ func TestPlatformAdminConsoleNav(t *testing.T) {
 	if c.Subtitle != "Manage stream discovery taxonomy" {
 		t.Fatalf("Subtitle = %q", c.Subtitle)
 	}
+	if c.NavItems[1].Copy != "Manage stream discovery taxonomy" {
+		t.Fatalf("Categories nav Copy = %q", c.NavItems[1].Copy)
+	}
 }
 
 func TestOrgAdminConsoleNav(t *testing.T) {

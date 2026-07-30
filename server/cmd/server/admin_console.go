@@ -42,7 +42,7 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 			{
 				Href:   "/admin/categories",
 				Title:  "Categories",
-				Copy:   "Browse stream discovery categories",
+				Copy:   "Manage stream discovery taxonomy",
 				Active: active == "categories",
 			},
 		},

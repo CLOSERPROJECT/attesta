@@ -87,6 +87,8 @@ func enrichTaxonomyEditorTree(nodes []TaxonomyCategoryNode, referenced func(cate
 		enriched.CanDelete = len(category.SubCategories) == 0
 		if !enriched.CanDelete {
 			enriched.DeleteReason = "Has subcategories"
+		} else {
+			enriched.DeleteReason = ""
 		}
 		enriched.CanMoveUp = i > 0
 		enriched.CanMoveDown = i < len(nodes)-1
@@ -99,6 +101,7 @@ func enrichTaxonomyEditorTree(nodes []TaxonomyCategoryNode, referenced func(cate
 				enrichedSub.DeleteReason = "Referenced by a stream"
 			} else {
 				enrichedSub.CanDelete = true
+				enrichedSub.DeleteReason = ""
 			}
 			enrichedSub.CanMoveUp = j > 0
 			enrichedSub.CanMoveDown = j < len(category.SubCategories)-1
