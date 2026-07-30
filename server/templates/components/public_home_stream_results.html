@@ -1,0 +1,16 @@
+{{ define "public_home_stream_results" }}
+  <div class="public-home-stream-results" id="public-home-stream-results">
+    {{ if .Streams }}
+      <div class="public-home-stream-grid">
+        {{ range .Streams }}
+          {{ template "public_stream_card" . }}
+        {{ end }}
+      </div>
+    {{ else }}
+      <div class="public-home-stream-empty">
+        <p>No public streams in this category yet.</p>
+        <a class="btn btn-primary btn-lg" href="{{ .CreateStreamHref }}">Create a stream</a>
+      </div>
+    {{ end }}
+  </div>
+{{ end }}

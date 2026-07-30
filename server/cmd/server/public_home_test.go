@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -147,5 +149,78 @@ func TestPublicHomeCreateStreamHref(t *testing.T) {
 	}
 	if got := publicHomeCreateStreamHref(true); got != "/my/organization/formata-builder" {
 		t.Fatalf("signed-in href = %q", got)
+	}
+}
+
+func TestHandlePublicStreamsPartialFilters(t *testing.T) {
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "match.yaml"), "Match Stream", "string", "Filtered stream")
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
+
+	req := httptest.NewRequest(http.MethodGet, "/streams/public?category=supply-chain&subCategory=procurement", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicStreamsPartial(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Match Stream") {
+		t.Fatalf("missing stream name: %s", body)
+	}
+	if !strings.Contains(body, `class="public-home-stream-results"`) {
+		t.Fatalf("missing results wrapper: %s", body)
+	}
+	if strings.Contains(body, `class="public-home-header"`) {
+		t.Fatalf("partial must not include landing header: %s", body)
+	}
+	if strings.Contains(body, "Stream Categories") {
+		t.Fatalf("partial must not include sidebar header: %s", body)
+	}
+}
+
+func TestHandlePublicStreamsPartialUnknownPath404(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/streams/public?category=nope&subCategory=nope", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicStreamsPartial(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d", rec.Code)
+	}
+}
+
+func TestHandlePublicStreamsPartialMissingQuery404(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/streams/public", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicStreamsPartial(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d", rec.Code)
+	}
+}
+
+func TestHandlePublicStreamsPartialEmptyShowsCreateCTA(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/streams/public?category=supply-chain&subCategory=procurement", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicStreamsPartial(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "No public streams in this category yet") {
+		t.Fatalf("missing empty copy: %s", body)
+	}
+	if !strings.Contains(body, `href="/login?next=%2Fmy%2Forganization%2Fformata-builder"`) {
+		t.Fatalf("missing create CTA: %s", body)
+	}
+	if !strings.Contains(body, "Create a stream") {
+		t.Fatalf("missing CTA label: %s", body)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"strings"
 )
@@ -110,6 +111,41 @@ func (s *Server) publicStreamCardsForPath(ctx context.Context, categorySlug, sub
 		}
 	}
 	return cards, nil
+}
+
+func (s *Server) handlePublicStreamsPartial(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	cat := strings.TrimSpace(r.URL.Query().Get("category"))
+	sub := strings.TrimSpace(r.URL.Query().Get("subCategory"))
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		http.Error(w, "failed to load categories", http.StatusInternalServerError)
+		return
+	}
+	if !taxonomyHasPath(categories, cat, sub) {
+		http.NotFound(w, r)
+		return
+	}
+	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	signedIn := false
+	if _, _, err := s.currentUser(r); err == nil {
+		signedIn = true
+	}
+	view := PublicHomeStreamResultsView{
+		Streams:          streams,
+		CreateStreamHref: publicHomeCreateStreamHref(signedIn),
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, "public_home_stream_results", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) buildPublicStreamCardView(ctx context.Context, key string, cfg RuntimeConfig, logoURLs map[string]string) (PublicStreamCardView, error) {

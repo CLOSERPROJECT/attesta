@@ -2054,7 +2054,7 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	categorySlug, subCategorySlug := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subcategory"))
+	categorySlug, subCategorySlug := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subCategory"))
 	streams, err := s.publicStreamCardsForPath(r.Context(), categorySlug, subCategorySlug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2311,6 +2311,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
+	mux.HandleFunc("/streams/public", s.handlePublicStreamsPartial)
 	mux.HandleFunc("/my", s.handleHome)
 	mux.HandleFunc("/my/", s.handleMyRoutes)
 	mux.HandleFunc("/", s.handlePublicHome)
