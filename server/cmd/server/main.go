@@ -2046,24 +2046,34 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := s.pageBase("public_home_body", "", "")
+	signedIn := false
 	if user, _, err := s.currentUser(r); err == nil {
 		base = s.pageBaseForUser(user, "public_home_body", "", "")
+		signedIn = true
 	}
 	categories, err := loadTaxonomyTree(r.Context(), s.store)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	categorySlug, subCategorySlug := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subCategory"))
-	streams, err := s.publicStreamCardsForPath(r.Context(), categorySlug, subCategorySlug)
+	cat, sub := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subCategory"))
+	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	view := struct {
 		PageBase
-		PublicStreams []PublicStreamCardView
-	}{PageBase: base, PublicStreams: streams}
+		Categories    []PublicHomeCategoryView
+		StreamResults PublicHomeStreamResultsView
+	}{
+		PageBase:   base,
+		Categories: buildPublicHomeCategories(categories, cat, sub),
+		StreamResults: PublicHomeStreamResultsView{
+			Streams:          streams,
+			CreateStreamHref: publicHomeCreateStreamHref(signedIn),
+		},
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

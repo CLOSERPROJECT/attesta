@@ -15,6 +15,53 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestHandlePublicHomeRendersTaxonomySidebar(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="public-home-category-sidebar"`,
+		"Supply Chain",
+		"Procurement",
+		"Order Fulfillment",
+		`hx-get="/streams/public?category=supply-chain&amp;subCategory=procurement"`,
+		`hx-target="#public-home-stream-results"`,
+		`hx-push-url="/?category=supply-chain&amp;subCategory=procurement"`,
+		`id="public-home-stream-results"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in %s", want, body)
+		}
+	}
+	for _, gone := range []string{
+		`data-landing-tabs`,
+		`public-home-tabs`,
+		"See all streams",
+		`icon-cat-compliance.svg`,
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("did not expect %q", gone)
+		}
+	}
+}
+
+func TestHandlePublicHomeQuerySelectsSubcategory(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/?category=supply-chain&subCategory=order-fulfillment", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	body := rec.Body.String()
+	if !strings.Contains(body, `subCategory=order-fulfillment`) || !strings.Contains(body, "is-active") {
+		t.Fatalf("expected active subcategory markup, got %s", body)
+	}
+}
+
 func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	server := &Server{
 		store:     NewMemoryStore(),

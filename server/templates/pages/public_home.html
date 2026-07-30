@@ -73,62 +73,49 @@
         <h2>Explore Public Streams</h2>
       </div>
 
-      <div class="public-home-tabs" data-landing-tabs>
-        <button type="button" class="public-home-tabs-arrow js-landing-tabs-prev" aria-label="Scroll categories left">‹</button>
-        <div class="public-home-tabs-scroll js-landing-tabs-scroll" role="tablist" aria-label="Stream categories">
-          <button type="button" class="public-home-tab is-active" role="tab" aria-selected="true">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-compliance.svg" alt="" width="20" height="20" />
-            </span>
-            Compliance &amp; Quality
-          </button>
-          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-supply.svg" alt="" width="20" height="20" />
-            </span>
-            Supply Chain
-          </button>
-          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-workflow.svg" alt="" width="20" height="20" />
-            </span>
-            Workflow &amp; Operations
-          </button>
-          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-data.svg" alt="" width="20" height="20" />
-            </span>
-            Data &amp; Documentation
-          </button>
-          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-people.svg" alt="" width="20" height="20" />
-            </span>
-            People &amp; Identity
-          </button>
-          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-recycling.svg" alt="" width="20" height="20" />
-            </span>
-            Recycling &amp; Recovery
-          </button>
-          <button type="button" class="public-home-tab" role="tab" aria-selected="false">
-            <span class="public-home-tab-icon" aria-hidden="true">
-              <img src="{{ $asset }}/icon-cat-materials.svg" alt="" width="20" height="20" />
-            </span>
-            Critical Materials
-          </button>
-        </div>
-        <button type="button" class="public-home-tabs-arrow js-landing-tabs-next" aria-label="Scroll categories right">›</button>
-      </div>
+      <div class="public-home-streams-layout">
+        <aside class="public-home-category-sidebar" aria-label="Stream categories" data-landing-category-sidebar>
+          <div class="public-home-category-sidebar-header">
+            {{ template "icon-layout-grid" . }}
+            <p class="public-home-category-sidebar-title">Stream Categories</p>
+          </div>
+          <div class="public-home-category-sidebar-list">
+            {{ range .Categories }}
+              <details class="public-home-category" {{ if .Expanded }}open{{ end }} data-category-slug="{{ .Slug }}">
+                <summary class="public-home-category-summary">
+                  <span class="public-home-category-label">
+                    {{ if .IconURL }}
+                      <img class="public-home-category-icon" src="{{ .IconURL }}" alt="" width="20" height="20" />
+                    {{ end }}
+                    <span>{{ .Name }}</span>
+                  </span>
+                  <span class="public-home-category-chevron" aria-hidden="true">
+                    <span class="public-home-category-chevron-closed">{{ template "icon-chevron-right" }}</span>
+                    <span class="public-home-category-chevron-open">{{ template "icon-chevron-down" }}</span>
+                  </span>
+                </summary>
+                <div class="public-home-subcategories">
+                  {{ range .SubCategories }}
+                    <button
+                      type="button"
+                      class="public-home-subcategory{{ if .Active }} is-active{{ end }}"
+                      data-subcategory-slug="{{ .Slug }}"
+                      hx-get="{{ .PartialURL }}"
+                      hx-target="#public-home-stream-results"
+                      hx-swap="innerHTML"
+                      hx-push-url="{{ .PushURL }}"
+                    >{{ .Name }}</button>
+                  {{ end }}
+                </div>
+              </details>
+            {{ else }}
+              <p class="public-home-category-sidebar-empty">No categories yet.</p>
+            {{ end }}
+          </div>
+        </aside>
 
-      <div class="public-home-stream-grid">
-        {{ range .PublicStreams }}
-          {{ template "public_stream_card" . }}
-        {{ end }}
+        {{ template "public_home_stream_results" .StreamResults }}
       </div>
-
-      <a class="btn btn-primary btn-lg" href="/signup">See all streams</a>
     </section>
 
     <section class="public-home-process" id="how-it-works">
