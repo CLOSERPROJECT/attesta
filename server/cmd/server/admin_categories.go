@@ -100,6 +100,102 @@ func (s *Server) handleAdminCategoriesPost(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+func (s *Server) handleAdminCategoriesPath(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requirePlatformAdmin(w, r)
+	if !ok {
+		return
+	}
+
+	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/admin/categories/"), "/")
+	parts := strings.Split(rest, "/")
+	if len(parts) != 2 || parts[1] != "subcategories" || strings.TrimSpace(parts[0]) == "" {
+		http.NotFound(w, r)
+		return
+	}
+	parentSlug := strings.TrimSpace(parts[0])
+
+	switch r.Method {
+	case http.MethodPost:
+		s.handleAdminSubcategoriesPost(w, r, admin, parentSlug)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleAdminSubcategoriesPost(w http.ResponseWriter, r *http.Request, admin *AccountUser, parentSlug string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	intent := strings.TrimSpace(r.Form.Get("intent"))
+	switch intent {
+	case "create":
+		name := strings.TrimSpace(r.Form.Get("name"))
+		icon := strings.TrimSpace(r.Form.Get("icon"))
+		description := strings.TrimSpace(r.Form.Get("description"))
+		_, err := s.store.CreateSubCategory(r.Context(), SubCategory{
+			CategorySlug: parentSlug,
+			Slug:         canonifySlug(name),
+			Name:         name,
+			Icon:         icon,
+			Description:  description,
+		})
+		if err != nil {
+			form := &CategoriesEditorForm{
+				Open:        true,
+				Level:       "leaf",
+				Mode:        "create",
+				ParentSlug:  parentSlug,
+				Name:        name,
+				Icon:        icon,
+				Description: description,
+			}
+			s.renderCategoriesEditor(w, r, admin, "", taxonomyLeafMutationError(err), form)
+			return
+		}
+		s.renderCategoriesEditor(w, r, admin, "Subcategory created", "", nil)
+	case "update":
+		slug := strings.TrimSpace(r.Form.Get("slug"))
+		name := strings.TrimSpace(r.Form.Get("name"))
+		icon := strings.TrimSpace(r.Form.Get("icon"))
+		description := strings.TrimSpace(r.Form.Get("description"))
+		_, err := s.store.UpdateSubCategory(r.Context(), parentSlug, slug, name, icon, description)
+		if err != nil {
+			form := &CategoriesEditorForm{
+				Open:        true,
+				Level:       "leaf",
+				Mode:        "edit",
+				ParentSlug:  parentSlug,
+				Slug:        slug,
+				Name:        name,
+				Icon:        icon,
+				Description: description,
+			}
+			s.renderCategoriesEditor(w, r, admin, "", taxonomyLeafMutationError(err), form)
+			return
+		}
+		s.renderCategoriesEditor(w, r, admin, "Subcategory updated", "", nil)
+	case "delete":
+		slug := strings.TrimSpace(r.Form.Get("slug"))
+		if err := s.DeleteSubCategory(r.Context(), parentSlug, slug); err != nil {
+			s.renderCategoriesEditor(w, r, admin, "", taxonomyLeafMutationError(err), nil)
+			return
+		}
+		s.renderCategoriesEditor(w, r, admin, "Subcategory deleted", "", nil)
+	case "reorder":
+		slug := strings.TrimSpace(r.Form.Get("slug"))
+		direction := strings.TrimSpace(r.Form.Get("direction"))
+		if err := s.store.ReorderSubCategory(r.Context(), parentSlug, slug, direction); err != nil {
+			s.renderCategoriesEditor(w, r, admin, "", taxonomyLeafMutationError(err), nil)
+			return
+		}
+		s.renderCategoriesEditor(w, r, admin, "Subcategory reordered", "", nil)
+	default:
+		http.Error(w, "unknown intent", http.StatusBadRequest)
+	}
+}
+
 func taxonomyGroupMutationError(err error) string {
 	if err == nil {
 		return ""
@@ -115,6 +211,26 @@ func taxonomyGroupMutationError(err error) string {
 		return "cannot move further"
 	case errors.Is(err, mongo.ErrNoDocuments):
 		return "category not found"
+	default:
+		return err.Error()
+	}
+}
+
+func taxonomyLeafMutationError(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch {
+	case errors.Is(err, ErrTaxonomySlugExists):
+		return "taxonomy slug already exists"
+	case errors.Is(err, ErrInvalidTaxonomyIcon):
+		return "invalid taxonomy icon"
+	case errors.Is(err, ErrSubCategoryReferencedByStream):
+		return "sub-category referenced by a stream"
+	case errors.Is(err, ErrTaxonomyReorderBoundary):
+		return "cannot move further"
+	case errors.Is(err, mongo.ErrNoDocuments):
+		return "sub-category not found"
 	default:
 		return err.Error()
 	}

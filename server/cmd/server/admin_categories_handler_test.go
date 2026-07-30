@@ -79,6 +79,253 @@ func postAdminCategories(t *testing.T, server *Server, form url.Values) *httptes
 	return rec
 }
 
+func postAdminSubcategories(t *testing.T, server *Server, parentSlug string, form url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	path := "/admin/categories/" + parentSlug + "/subcategories"
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleAdminCategoriesPath(rec, req)
+	return rec
+}
+
+func newCategoriesAdminServerWithCatalog(t *testing.T, store Store, categoryLines string) *Server {
+	t.Helper()
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "workflow.yaml")
+	if err := os.WriteFile(path, []byte(minimalCategorizedWorkflowYAML(categoryLines)), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	now := time.Now().UTC()
+	return &Server{
+		authorizer:  fakeAuthorizer{},
+		store:       store,
+		identity:    &fakeIdentityStore{},
+		tmpl:        parseTestTemplates(t),
+		configDir:   tempDir,
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+}
+
+func TestHandleAdminSubcategoriesCreate(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "New Leaf")
+	form.Set("icon", "weee")
+	form.Set("description", "Leaf description")
+	rec := postAdminSubcategories(t, server, "supply-chain", form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "New Leaf") || !strings.Contains(body, "Subcategory created") {
+		t.Fatalf("expected create confirmation and name in body, got: %s", body)
+	}
+	got, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "new-leaf")
+	if err != nil {
+		t.Fatalf("GetSubCategoryBySlug: %v", err)
+	}
+	if got.Name != "New Leaf" || got.Icon != "weee" || got.Description != "Leaf description" {
+		t.Fatalf("stored subcategory = %#v", got)
+	}
+}
+
+func TestHandleAdminSubcategoriesUpdate(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "update")
+	form.Set("slug", "procurement")
+	form.Set("name", "Updated Procurement")
+	form.Set("icon", "weee")
+	form.Set("description", "Updated description")
+	rec := postAdminSubcategories(t, server, "supply-chain", form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Updated Procurement") || !strings.Contains(body, "Subcategory updated") {
+		t.Fatalf("expected update confirmation and name in body, got: %s", body)
+	}
+	got, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "procurement")
+	if err != nil {
+		t.Fatalf("GetSubCategoryBySlug: %v", err)
+	}
+	if got.Name != "Updated Procurement" || got.Icon != "weee" || got.Description != "Updated description" {
+		t.Fatalf("stored subcategory = %#v", got)
+	}
+}
+
+func TestHandleAdminSubcategoriesDelete(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "delete")
+	form.Set("slug", "order-fulfillment")
+	rec := postAdminSubcategories(t, server, "supply-chain", form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Subcategory deleted") {
+		t.Fatalf("expected delete confirmation, got: %s", rec.Body.String())
+	}
+	if _, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "order-fulfillment"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("expected deleted subcategory, err = %v", err)
+	}
+}
+
+func TestHandleAdminSubcategoriesReorder(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "reorder")
+	form.Set("slug", "order-fulfillment")
+	form.Set("direction", "up")
+	rec := postAdminSubcategories(t, server, "supply-chain", form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Subcategory reordered") {
+		t.Fatalf("expected reorder confirmation, got: %s", rec.Body.String())
+	}
+	list, err := store.ListSubCategories(t.Context(), "supply-chain")
+	if err != nil {
+		t.Fatalf("ListSubCategories: %v", err)
+	}
+	if len(list) != 2 || list[0].Slug != "order-fulfillment" || list[1].Slug != "procurement" {
+		t.Fatalf("order = %v, %v; want order-fulfillment then procurement", list[0].Slug, list[1].Slug)
+	}
+}
+
+func TestHandleAdminSubcategoriesCreateDuplicateSlug(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "Procurement")
+	form.Set("icon", "weee")
+	rec := postAdminSubcategories(t, server, "supply-chain", form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "taxonomy slug already exists") {
+		t.Fatalf("expected duplicate slug error, got: %s", body)
+	}
+	if !strings.Contains(body, `id="categories-editor-form"`) {
+		t.Fatalf("expected create form to remain open, got: %s", body)
+	}
+}
+
+func TestHandleAdminSubcategoriesPostNonAdminForbidden(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Now().UTC()
+	user := AccountUser{
+		Email:     "member@example.com",
+		RoleSlugs: []string{"org-admin"},
+		OrgSlug:   "acme",
+	}
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: testIdentityForSessions(now, map[string]AccountUser{
+			"member-session": user,
+		}),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "New Leaf")
+	form.Set("icon", "weee")
+	req := httptest.NewRequest(http.MethodPost, "/admin/categories/supply-chain/subcategories", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "member-session"})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminCategoriesPath(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestHandleAdminSubcategoriesDeleteBlockedWhenCatalogReferences(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServerWithCatalog(t, store,
+		"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleAdminCategories(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Procurement") {
+		t.Fatalf("expected procurement in GET body, got: %s", rec.Body.String())
+	}
+
+	view, err := server.buildCategoriesEditorView(t.Context(), url.Values{}, "", "", nil)
+	if err != nil {
+		t.Fatalf("buildCategoriesEditorView: %v", err)
+	}
+	if len(view.Categories) != 1 || len(view.Categories[0].SubCategories) < 1 {
+		t.Fatalf("expected seeded taxonomy in view, got %#v", view.Categories)
+	}
+	procurement := view.Categories[0].SubCategories[0]
+	if procurement.CanDelete {
+		t.Fatal("procurement leaf should not be deletable when referenced by catalog stream")
+	}
+	if procurement.DeleteReason != "Referenced by a stream" {
+		t.Fatalf("DeleteReason = %q, want %q", procurement.DeleteReason, "Referenced by a stream")
+	}
+
+	form := url.Values{}
+	form.Set("intent", "delete")
+	form.Set("slug", "procurement")
+	delRec := postAdminSubcategories(t, server, "supply-chain", form)
+	if delRec.Code != http.StatusOK {
+		t.Fatalf("POST delete status = %d, want %d; body = %s", delRec.Code, http.StatusOK, delRec.Body.String())
+	}
+	delBody := delRec.Body.String()
+	if strings.Contains(delBody, "Subcategory deleted") {
+		t.Fatalf("expected delete to be blocked, got success confirmation in body")
+	}
+	if _, err := store.GetSubCategoryBySlug(t.Context(), "supply-chain", "procurement"); err != nil {
+		t.Fatalf("expected subcategory retained, get err = %v", err)
+	}
+}
+
 func TestHandleAdminCategoriesCreateGroup(t *testing.T) {
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)

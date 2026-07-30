@@ -2276,6 +2276,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
+	mux.HandleFunc("/admin/categories/", s.handleAdminCategoriesPath)
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
