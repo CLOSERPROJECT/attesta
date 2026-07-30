@@ -2,6 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -105,6 +110,66 @@ func TestFilterPlatformOrgAdminMembershipsDropsNonAdmins(t *testing.T) {
 	}
 	if got[0].Email != "owner@example.com" || got[1].Email != "pending@example.com" {
 		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestPlatformAdminViewAppwriteCallCeiling(t *testing.T) {
+	const orgCount = 12
+	const membersPerOrg = 8
+	var totalRequests atomic.Int64
+	var userRequests atomic.Int64
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		totalRequests.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		path := r.URL.Path
+		switch {
+		case path == "/v1/teams":
+			teamsPayload := make([]map[string]any, 0, orgCount)
+			for i := 0; i < orgCount; i++ {
+				id := fmt.Sprintf("org-%d", i)
+				teamsPayload = append(teamsPayload, map[string]any{
+					"$id": id, "name": fmt.Sprintf("Org %d", i),
+					"prefs": map[string]any{"schemaVersion": 1, "slug": id},
+				})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"total": orgCount, "teams": teamsPayload})
+		case strings.HasSuffix(path, "/memberships") && strings.HasPrefix(path, "/v1/teams/"):
+			teamID := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/teams/"), "/memberships")
+			teamID = strings.TrimSuffix(teamID, "/")
+			memberships := make([]map[string]any, 0, membersPerOrg)
+			for m := 0; m < membersPerOrg; m++ {
+				memberships = append(memberships, map[string]any{
+					"$id": fmt.Sprintf("%s-m-%d", teamID, m),
+					"userId": fmt.Sprintf("%s-u-%d", teamID, m),
+					"userEmail": fmt.Sprintf("u%d@%s.example", m, teamID),
+					"teamId": teamID, "teamName": teamID, "confirm": true,
+					"roles": []string{"member"},
+				})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"total": membersPerOrg, "memberships": memberships})
+		case strings.HasPrefix(path, "/v1/teams/"):
+			teamID := strings.TrimPrefix(path, "/v1/teams/")
+			_ = json.NewEncoder(w).Encode(map[string]any{"$id": teamID, "name": teamID, "prefs": map[string]any{"schemaVersion": 1, "slug": teamID}})
+		case strings.HasPrefix(path, "/v1/users/"):
+			userRequests.Add(1)
+			t.Fatalf("unexpected user hydration: %s", path)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+	server := &Server{identity: identity, authorizer: fakeAuthorizer{}}
+	_ = server.platformAdminView(&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
+
+	// 1 list page + ≤12 get team + 12 list memberships = ≤25 (no user calls)
+	if userRequests.Load() != 0 {
+		t.Fatalf("userRequests = %d", userRequests.Load())
+	}
+	if total := totalRequests.Load(); total > 25 {
+		t.Fatalf("totalRequests = %d, want ≤ 25", total)
 	}
 }
 
