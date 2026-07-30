@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestTaxonomyHasPath(t *testing.T) {
 	cats := []TaxonomyCategoryNode{{
@@ -55,6 +60,45 @@ func TestResolvePublicHomeSelectionEmptyTaxonomy(t *testing.T) {
 	cat, sub := resolvePublicHomeSelection(nil, "a", "b")
 	if cat != "" || sub != "" {
 		t.Fatalf("got %q/%q, want empty", cat, sub)
+	}
+}
+
+func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
+	tempDir := t.TempDir()
+	matchYAML := strings.Replace(
+		minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: procurement\n"),
+		`name: "Workflow"`,
+		`name: "Match Stream"`,
+		1,
+	)
+	otherYAML := strings.Replace(
+		minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: order-fulfillment\n"),
+		`name: "Workflow"`,
+		`name: "Other Stream"`,
+		1,
+	)
+	if err := os.WriteFile(filepath.Join(tempDir, "match.yaml"), []byte(matchYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "other.yaml"), []byte(otherYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
+
+	cards, err := server.publicStreamCardsForPath(t.Context(), "supply-chain", "procurement")
+	if err != nil {
+		t.Fatalf("publicStreamCardsForPath: %v", err)
+	}
+	if len(cards) != 1 || cards[0].Name != "Match Stream" {
+		t.Fatalf("cards = %#v, want only Match Stream", cards)
+	}
+
+	empty, err := server.publicStreamCardsForPath(t.Context(), "", "")
+	if err != nil || len(empty) != 0 {
+		t.Fatalf("empty path = %#v err=%v", empty, err)
 	}
 }
 

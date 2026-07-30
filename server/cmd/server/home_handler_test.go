@@ -81,11 +81,13 @@ func TestHandlePublicHomeEmptyCatalogRendersNoStreamCards(t *testing.T) {
 
 func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Stream", "string", "Alpha description")
-	writeWorkflowConfig(t, filepath.Join(tempDir, "beta.yaml"), "Beta Stream", "number", "Beta description")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Stream", "string", "Alpha description")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "beta.yaml"), "Beta Stream", "number", "Beta description")
 
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{
-		store:     NewMemoryStore(),
+		store:     store,
 		tmpl:      parseTestTemplates(t),
 		configDir: tempDir,
 	}
@@ -125,6 +127,8 @@ func TestHandlePublicHomeRendersStreamStepPreviewFromCatalog(t *testing.T) {
 	content := `workflow:
   name: "Catalog Trace Stream"
   description: "Catalog step preview fixture"
+  categorySlug: "supply-chain"
+  subCategorySlug: "procurement"
   steps:
     - id: "1"
       title: "Incoming intake"
@@ -176,8 +180,10 @@ users:
 		t.Fatalf("write fixture: %v", err)
 	}
 
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{
-		store:     NewMemoryStore(),
+		store:     store,
 		tmpl:      parseTestTemplates(t),
 		configDir: tempDir,
 	}
@@ -203,11 +209,13 @@ users:
 
 func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Plain Stream", "string", "No passport")
-	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "beta.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Plain Stream", "string", "No passport")
+	writePublicHomeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "beta.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
 
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{
-		store:     NewMemoryStore(),
+		store:     store,
 		tmpl:      parseTestTemplates(t),
 		configDir: tempDir,
 	}
@@ -251,6 +259,8 @@ func TestHandlePublicHomeRendersOrgAvatarsAndMetricsFromCatalog(t *testing.T) {
 	content := `workflow:
   name: "Org Avatar Stream"
   description: "Org footer and metrics fixture"
+  categorySlug: "supply-chain"
+  subCategorySlug: "procurement"
   steps:
     - id: "1"
       title: "Incoming intake"
@@ -283,8 +293,10 @@ users:
 		t.Fatalf("write fixture: %v", err)
 	}
 
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{
-		store: NewMemoryStore(),
+		store: store,
 		tmpl:  parseTestTemplates(t),
 		identity: &fakeIdentityStore{
 			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
@@ -334,10 +346,12 @@ users:
 
 func TestHandlePublicHomeRendersNoInstancesYetWhenStreamHasNoProcesses(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "empty.yaml"), "Empty Metrics Stream", "string", "No processes yet")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "empty.yaml"), "Empty Metrics Stream", "string", "No processes yet")
 
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{
-		store:     NewMemoryStore(),
+		store:     store,
 		tmpl:      parseTestTemplates(t),
 		configDir: tempDir,
 	}
@@ -368,9 +382,10 @@ func TestHandlePublicHomeRendersNoInstancesYetWhenStreamHasNoProcesses(t *testin
 
 func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done and terminated only")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done and terminated only")
 
 	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	now := time.Now().UTC()
 	store.SeedProcess(Process{
 		WorkflowKey: "settled",
@@ -420,10 +435,11 @@ func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testi
 
 func TestHandlePublicHomeRendersActiveNowMetricsScopedPerStream(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "live.yaml"), "Live Metrics Stream", "string", "Has active instances")
-	writeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done only")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "live.yaml"), "Live Metrics Stream", "string", "Has active instances")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done only")
 
 	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	now := time.Now().UTC()
 	store.SeedProcess(Process{
 		WorkflowKey: "live",
@@ -519,11 +535,13 @@ func TestHandlePublicHomeLimitsToFirstSixCatalogStreams(t *testing.T) {
 	}
 	files := []string{"a.yaml", "b.yaml", "c.yaml", "d.yaml", "e.yaml", "f.yaml", "g.yaml"}
 	for i, name := range names {
-		writeWorkflowConfig(t, filepath.Join(tempDir, files[i]), name, "string", name+" description")
+		writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, files[i]), name, "string", name+" description")
 	}
 
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{
-		store:     NewMemoryStore(),
+		store:     store,
 		tmpl:      parseTestTemplates(t),
 		configDir: tempDir,
 	}

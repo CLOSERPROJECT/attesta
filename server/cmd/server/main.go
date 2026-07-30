@@ -2049,7 +2049,13 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if user, _, err := s.currentUser(r); err == nil {
 		base = s.pageBaseForUser(user, "public_home_body", "", "")
 	}
-	streams, err := s.publicStreamCards(r.Context())
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	categorySlug, subCategorySlug := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subcategory"))
+	streams, err := s.publicStreamCardsForPath(r.Context(), categorySlug, subCategorySlug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2061,94 +2067,6 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-const publicHomeStreamCardLimit = 6
-const publicHomeStreamOrgAvatarLimit = 4
-
-func (s *Server) publicStreamCards(ctx context.Context) ([]PublicStreamCardView, error) {
-	catalog, err := s.workflowCatalog()
-	if err != nil {
-		if err.Error() == "workflow config catalog is empty" {
-			return nil, nil
-		}
-		return nil, err
-	}
-	keys := sortedWorkflowKeys(catalog)
-	if len(keys) > publicHomeStreamCardLimit {
-		keys = keys[:publicHomeStreamCardLimit]
-	}
-	logoURLs := organizationLogoURLMap(ctx, s.identity)
-	cards := make([]PublicStreamCardView, 0, len(keys))
-	for _, key := range keys {
-		cfg := catalog[key]
-		steps := sortedSteps(cfg.Workflow)
-		stepViews := make([]PublicStreamCardStepView, 0, len(steps))
-		for _, step := range steps {
-			stepViews = append(stepViews, PublicStreamCardStepView{
-				Title:        step.Title,
-				SubstepCount: len(step.Substep),
-			})
-		}
-		orgs, overflow := publicStreamCardOrganizations(cfg.Organizations, logoURLs)
-		instanceCount := 0
-		activeCount := 0
-		allCompleted := false
-		if s.store != nil {
-			processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
-			if listErr != nil {
-				return nil, listErr
-			}
-			instanceCount = len(processes)
-			if instanceCount > 0 {
-				for i := range processes {
-					processes[i].Progress = normalizeProgressKeys(processes[i].Progress)
-					if deriveProcessStatus(cfg.Workflow, &processes[i]) == processStatusActive {
-						activeCount++
-					}
-				}
-				allCompleted = activeCount == 0
-			}
-		}
-		cards = append(cards, PublicStreamCardView{
-			Name:                  cfg.Workflow.Name,
-			Description:           strings.TrimSpace(cfg.Workflow.Description),
-			Steps:                 stepViews,
-			PassportEnabled:       cfg.DPP.Enabled,
-			InstanceCount:         instanceCount,
-			ActiveCount:           activeCount,
-			AllCompleted:          allCompleted,
-			Organizations:         orgs,
-			OrganizationsOverflow: overflow,
-		})
-	}
-	return cards, nil
-}
-
-func publicStreamCardOrganizations(orgs []WorkflowOrganization, logoURLs map[string]string) ([]PublicStreamCardOrgView, int) {
-	out := make([]PublicStreamCardOrgView, 0, len(orgs))
-	for _, org := range orgs {
-		name := strings.TrimSpace(org.Name)
-		if name == "" {
-			name = strings.TrimSpace(org.Slug)
-		}
-		if name == "" {
-			continue
-		}
-		slug := strings.TrimSpace(org.Slug)
-		view := PublicStreamCardOrgView{
-			Name:     name,
-			Initials: organizationInitials(name),
-		}
-		if logoURLs != nil {
-			view.LogoURL = strings.TrimSpace(logoURLs[slug])
-		}
-		out = append(out, view)
-	}
-	if len(out) > publicHomeStreamOrgAvatarLimit {
-		return out[:publicHomeStreamOrgAvatarLimit], len(out) - publicHomeStreamOrgAvatarLimit
-	}
-	return out, 0
 }
 
 func organizationInitials(name string) string {
