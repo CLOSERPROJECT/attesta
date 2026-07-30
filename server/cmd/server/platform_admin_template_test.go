@@ -101,7 +101,7 @@ func TestPlatformAdminCategoriesPanelMarkup(t *testing.T) {
 	for _, want := range []string{
 		`id="platform-admin-categories"`,
 		"Manage stream discovery taxonomy",
-		"1 groups · 1 categories",
+		"1 categories · 1 subcategories",
 		`class="sidebar-nav-link is-active"`,
 		`href="/admin/categories"`,
 		`class="platform-admin-taxonomy-list"`,
@@ -140,7 +140,7 @@ func TestPlatformAdminCategoriesPanelEmptyState(t *testing.T) {
 	if !strings.Contains(body, "No categories yet") {
 		t.Fatalf("expected empty state message, got:\n%s", body)
 	}
-	if !strings.Contains(body, "0 groups · 0 categories") {
+	if !strings.Contains(body, "0 categories · 0 subcategories") {
 		t.Fatalf("expected empty meta pill counts, got:\n%s", body)
 	}
 }

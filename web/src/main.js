@@ -1171,7 +1171,7 @@ function dismissToast(el) {
   el.classList.add("toast-exit");
   window.setTimeout(() => {
     el.remove();
-  }, 180);
+  }, 240);
 }
 
 function enforceToastCap(host) {
@@ -1201,8 +1201,11 @@ function promoteToasts(root = document) {
     node.classList.add("toast-enter");
     host.prepend(node);
     enforceToastCap(host);
+    // Double rAF so the enter state paints before transitioning to rest.
     requestAnimationFrame(() => {
-      node.classList.remove("toast-enter");
+      requestAnimationFrame(() => {
+        node.classList.remove("toast-enter");
+      });
     });
     node.addEventListener(
       "click",
@@ -1266,6 +1269,44 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
     }
   }
 });
+
+// Sticky category headers jump above the viewport when their accordion collapses
+// while stuck. Scroll the details to the sticky edge before close so the header
+// stays on-screen instead of leaping to the next category.
+document.addEventListener(
+  "click",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const summary = target.closest(
+      "summary.platform-admin-taxonomy-category-head",
+    );
+    if (!(summary instanceof HTMLElement)) {
+      return;
+    }
+    if (target.closest("button, a, input, select, textarea, label")) {
+      return;
+    }
+    const details = summary.closest(
+      "details.platform-admin-taxonomy-category-details",
+    );
+    if (!(details instanceof HTMLDetailsElement) || !details.open) {
+      return;
+    }
+    const stickyTop = 0;
+    const detailsTop = details.getBoundingClientRect().top;
+    if (detailsTop >= stickyTop - 1) {
+      return;
+    }
+    window.scrollTo({
+      top: window.scrollY + detailsTop - stickyTop,
+      behavior: "instant",
+    });
+  },
+  true,
+);
 
 document.body.addEventListener("toggle", (event) => {
   const target = event.target;

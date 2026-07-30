@@ -61,7 +61,7 @@ func (s *Server) handleAdminCategoriesPost(w http.ResponseWriter, r *http.Reques
 			s.renderCategoriesEditor(w, r, admin, "", taxonomyGroupMutationError(err), form)
 			return
 		}
-		s.renderCategoriesEditor(w, r, admin, "Category group created", "", nil)
+		s.renderCategoriesEditor(w, r, admin, "Category created", "", nil)
 	case "update":
 		slug := strings.TrimSpace(r.Form.Get("slug"))
 		name := strings.TrimSpace(r.Form.Get("name"))
@@ -79,14 +79,14 @@ func (s *Server) handleAdminCategoriesPost(w http.ResponseWriter, r *http.Reques
 			s.renderCategoriesEditor(w, r, admin, "", taxonomyGroupMutationError(err), form)
 			return
 		}
-		s.renderCategoriesEditor(w, r, admin, "Category group updated", "", nil)
+		s.renderCategoriesEditor(w, r, admin, "Category updated", "", nil)
 	case "delete":
 		slug := strings.TrimSpace(r.Form.Get("slug"))
 		if err := s.store.DeleteCategory(r.Context(), slug); err != nil {
 			s.renderCategoriesEditor(w, r, admin, "", taxonomyGroupMutationError(err), nil)
 			return
 		}
-		s.renderCategoriesEditor(w, r, admin, "Category group deleted", "", nil)
+		s.renderCategoriesEditor(w, r, admin, "Category deleted", "", nil)
 	case "reorder":
 		slug := strings.TrimSpace(r.Form.Get("slug"))
 		direction := strings.TrimSpace(r.Form.Get("direction"))
@@ -94,7 +94,7 @@ func (s *Server) handleAdminCategoriesPost(w http.ResponseWriter, r *http.Reques
 			s.renderCategoriesEditor(w, r, admin, "", taxonomyGroupMutationError(err), nil)
 			return
 		}
-		s.renderCategoriesEditor(w, r, admin, "Category group reordered", "", nil)
+		s.renderCategoriesEditor(w, r, admin, "Category reordered", "", nil)
 	default:
 		http.Error(w, "unknown intent", http.StatusBadRequest)
 	}

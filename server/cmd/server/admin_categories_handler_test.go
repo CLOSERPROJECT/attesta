@@ -341,7 +341,7 @@ func TestHandleAdminCategoriesCreateGroup(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "New Group") || !strings.Contains(body, "Category group created") {
+	if !strings.Contains(body, "New Group") || !strings.Contains(body, "Category created") {
 		t.Fatalf("expected create confirmation and name in body, got: %s", body)
 	}
 	got, err := store.GetCategoryBySlug(t.Context(), "new-group")
@@ -369,7 +369,7 @@ func TestHandleAdminCategoriesUpdateGroup(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "Updated Chain") || !strings.Contains(body, "Category group updated") {
+	if !strings.Contains(body, "Updated Chain") || !strings.Contains(body, "Category updated") {
 		t.Fatalf("expected update confirmation and name in body, got: %s", body)
 	}
 	got, err := store.GetCategoryBySlug(t.Context(), "supply-chain")
@@ -399,7 +399,7 @@ func TestHandleAdminCategoriesDeleteGroup(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "Category group deleted") {
+	if !strings.Contains(rec.Body.String(), "Category deleted") {
 		t.Fatalf("expected delete confirmation, got: %s", rec.Body.String())
 	}
 	if _, err := store.GetCategoryBySlug(t.Context(), "empty-group"); !errors.Is(err, mongo.ErrNoDocuments) {
@@ -426,7 +426,7 @@ func TestHandleAdminCategoriesReorderGroup(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "Category group reordered") {
+	if !strings.Contains(rec.Body.String(), "Category reordered") {
 		t.Fatalf("expected reorder confirmation, got: %s", rec.Body.String())
 	}
 	list, err := store.ListCategories(t.Context())
@@ -629,7 +629,7 @@ func TestHandleAdminCategoriesRendersEditorPanel(t *testing.T) {
 	for _, want := range []string{
 		`id="platform-admin-categories"`,
 		"Manage stream discovery taxonomy",
-		"1 groups · 2 categories",
+		"1 categories · 2 subcategories",
 		"Supply Chain",
 		"/static/taxonomy/batch-traceability.svg",
 		"Procurement",

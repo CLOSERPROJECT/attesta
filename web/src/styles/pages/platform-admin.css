@@ -155,17 +155,67 @@
 .platform-admin-taxonomy-category {
   border: 1px solid var(--border);
   border-radius: 4px;
-  overflow: clip;
   background: var(--card);
   box-shadow: 0 1px 0 var(--inset-highlight);
 }
 
+.platform-admin-taxonomy-category-details {
+  display: block;
+  interpolate-size: allow-keywords;
+}
+
+.platform-admin-taxonomy-category-details::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 0.2s ease,
+    content-visibility 0.2s allow-discrete;
+}
+
+.platform-admin-taxonomy-category-details[open]::details-content {
+  block-size: auto;
+}
+
 .platform-admin-taxonomy-category-head {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   background: linear-gradient(180deg, var(--tag), var(--muted));
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+summary.platform-admin-taxonomy-category-head {
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.platform-admin-taxonomy-category-head::-webkit-details-marker,
+summary.platform-admin-taxonomy-category-head::marker {
+  display: none;
+  content: "";
+}
+
+.platform-admin-taxonomy-category-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  transition: transform 0.2s ease;
+}
+
+.platform-admin-taxonomy-category-chevron .icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.platform-admin-taxonomy-category-details[open]
+  > .platform-admin-taxonomy-category-head
+  .platform-admin-taxonomy-category-chevron {
+  transform: rotate(90deg);
 }
 
 .platform-admin-taxonomy-category-head:not(:last-child) {
@@ -174,7 +224,9 @@
 
 .platform-admin-taxonomy-category-head > .platform-admin-taxonomy-row {
   align-items: center;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
 }
 
 .platform-admin-taxonomy-category-head .platform-admin-categories-form {
@@ -183,6 +235,8 @@
   border-radius: 0;
   padding: 0;
   background: transparent;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .platform-admin-taxonomy-row {
@@ -369,9 +423,22 @@
   background: var(--card);
 }
 
+.platform-admin-categories-form textarea {
+  min-height: 5.5rem;
+}
+
+.platform-admin-categories-form .dialog-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.platform-admin-categories-form .dialog-actions .btn {
+  width: auto;
+}
+
 .platform-admin-categories-form-title {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   color: var(--foreground);
