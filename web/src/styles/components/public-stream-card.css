@@ -24,8 +24,8 @@
   box-sizing: border-box;
   width: 100%;
   max-width: 340px;
-  min-height: 360px;
-  padding: var(--space-6);
+  min-height: 300px;
+  padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
@@ -35,29 +35,31 @@
 .public-stream-card-header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
 }
 
 .public-stream-card-title {
   font-size: var(--text-lg);
-  line-height: 1.75rem;
+  line-height: 1.5rem;
 }
 
 .public-stream-card-description {
   margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   overflow: hidden;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   line-height: 1.25rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .public-stream-card-dpp {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  width: fit-content;
   padding: 2px var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -83,7 +85,7 @@
 .public-stream-card-metrics {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
@@ -125,7 +127,7 @@
 .public-stream-card-orgs {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
 }
 
