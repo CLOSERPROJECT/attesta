@@ -1156,11 +1156,76 @@ if (processId && workflowKey && processPageContent) {
   });
 }
 
+const TOAST_DISMISS_MS = 3000;
+const TOAST_MAX = 3;
+
+function toastHost() {
+  return document.getElementById("toast-host");
+}
+
+function dismissToast(el) {
+  if (!(el instanceof HTMLElement) || el.dataset.toastDismissing === "1") {
+    return;
+  }
+  el.dataset.toastDismissing = "1";
+  el.classList.add("toast-exit");
+  window.setTimeout(() => {
+    el.remove();
+  }, 240);
+}
+
+function enforceToastCap(host) {
+  const items = [...host.querySelectorAll(".confirmation[data-toast]")];
+  while (items.length > TOAST_MAX) {
+    const oldest = items.pop();
+    if (oldest) {
+      oldest.remove();
+    }
+  }
+}
+
+function promoteToasts(root = document) {
+  const host = toastHost();
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  const scope = root instanceof Element || root instanceof Document ? root : document;
+  const nodes = scope.querySelectorAll?.(".confirmation[data-toast]") ?? [];
+  for (const node of nodes) {
+    if (!(node instanceof HTMLElement)) {
+      continue;
+    }
+    if (host.contains(node)) {
+      continue;
+    }
+    node.classList.add("toast-enter");
+    host.prepend(node);
+    enforceToastCap(host);
+    // Double rAF so the enter state paints before transitioning to rest.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        node.classList.remove("toast-enter");
+      });
+    });
+    node.addEventListener(
+      "click",
+      () => {
+        dismissToast(node);
+      },
+      { once: true },
+    );
+    window.setTimeout(() => {
+      dismissToast(node);
+    }, TOAST_DISMISS_MS);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   formatLocalDateTimes(document);
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
   focusNextActionInput();
+  promoteToasts(document);
 });
 
 document.addEventListener("click", (event) => {
@@ -1181,13 +1246,67 @@ document.addEventListener("click", (event) => {
 document.body.addEventListener("htmx:afterSwap", (event) => {
   if (event.target instanceof Element) {
     formatLocalDateTimes(event.target);
+    promoteToasts(event.target);
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
     markSelectedSubstep(currentSelectedSubstep());
     focusNextActionInput();
   }
+  if (event.detail?.target?.id === "platform-admin-categories") {
+    const form = document.getElementById("categories-editor-form");
+    form?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    for (const picker of event.target.querySelectorAll(
+      "[data-taxonomy-icon-picker]",
+    )) {
+      if (!(picker instanceof HTMLElement)) {
+        continue;
+      }
+      const grid = picker.querySelector(".platform-admin-taxonomy-icon-grid");
+      if (grid instanceof HTMLElement) {
+        grid.hidden = !picker.classList.contains("is-open");
+      }
+    }
+  }
 });
+
+// Sticky category headers jump above the viewport when their accordion collapses
+// while stuck. Scroll the details to the sticky edge before close so the header
+// stays on-screen instead of leaping to the next category.
+document.addEventListener(
+  "click",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const summary = target.closest(
+      "summary.platform-admin-taxonomy-category-head",
+    );
+    if (!(summary instanceof HTMLElement)) {
+      return;
+    }
+    if (target.closest("button, a, input, select, textarea, label")) {
+      return;
+    }
+    const details = summary.closest(
+      "details.platform-admin-taxonomy-category-details",
+    );
+    if (!(details instanceof HTMLDetailsElement) || !details.open) {
+      return;
+    }
+    const stickyTop = 0;
+    const detailsTop = details.getBoundingClientRect().top;
+    if (detailsTop >= stickyTop - 1) {
+      return;
+    }
+    window.scrollTo({
+      top: window.scrollY + detailsTop - stickyTop,
+      behavior: "instant",
+    });
+  },
+  true,
+);
 
 document.body.addEventListener("toggle", (event) => {
   const target = event.target;
@@ -1338,6 +1457,51 @@ document.body.addEventListener("click", (event) => {
   }
   const shareButton = target.closest(".js-share-link");
   if (!(shareButton instanceof HTMLButtonElement)) {
+    const pickerToggle = target.closest("[data-taxonomy-icon-picker-toggle]");
+    if (pickerToggle instanceof HTMLButtonElement) {
+      event.preventDefault();
+      const picker = pickerToggle.closest("[data-taxonomy-icon-picker]");
+      if (picker instanceof HTMLElement) {
+        const open = picker.classList.toggle("is-open");
+        pickerToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        const grid = picker.querySelector(".platform-admin-taxonomy-icon-grid");
+        if (grid instanceof HTMLElement) {
+          grid.hidden = !open;
+        }
+      }
+      return;
+    }
+    const iconOption = target.closest("[data-taxonomy-icon-option]");
+    if (iconOption instanceof HTMLElement) {
+      event.preventDefault();
+      const picker = iconOption.closest("[data-taxonomy-icon-picker]");
+      if (!(picker instanceof HTMLElement)) {
+        return;
+      }
+      const key = (iconOption.dataset.taxonomyIconOption || "").trim();
+      const hidden = picker.querySelector('input[name="icon"]');
+      if (hidden instanceof HTMLInputElement) {
+        hidden.value = key;
+      }
+      const toggle = picker.querySelector("[data-taxonomy-icon-picker-toggle]");
+      if (toggle instanceof HTMLButtonElement && key) {
+        toggle.innerHTML = `<img src="/static/taxonomy/${key}.svg" alt="" class="platform-admin-taxonomy-icon-picker-preview" data-taxonomy-icon-preview />`;
+      }
+      for (const option of picker.querySelectorAll(
+        "[data-taxonomy-icon-option]",
+      )) {
+        option.classList.toggle("is-selected", option === iconOption);
+      }
+      picker.classList.remove("is-open");
+      if (toggle instanceof HTMLButtonElement) {
+        toggle.setAttribute("aria-expanded", "false");
+      }
+      const grid = picker.querySelector(".platform-admin-taxonomy-icon-grid");
+      if (grid instanceof HTMLElement) {
+        grid.hidden = true;
+      }
+      return;
+    }
     return;
   }
   event.preventDefault();

@@ -139,45 +139,384 @@
   gap: var(--space-4);
 }
 
+@supports (view-transition-name: none) {
+  /* Named taxonomy rows (inline view-transition-name) morph on HTMX reorder swaps. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 120ms;
+  }
+
+  ::view-transition-group(*) {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+.platform-admin-taxonomy-category {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  box-shadow: 0 1px 0 var(--inset-highlight);
+}
+
+.platform-admin-taxonomy-category-details {
+  display: block;
+  interpolate-size: allow-keywords;
+}
+
+.platform-admin-taxonomy-category-details::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 0.2s ease,
+    content-visibility 0.2s allow-discrete;
+}
+
+.platform-admin-taxonomy-category-details[open]::details-content {
+  block-size: auto;
+}
+
+.platform-admin-taxonomy-category-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(180deg, var(--tag), var(--muted));
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+summary.platform-admin-taxonomy-category-head {
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.platform-admin-taxonomy-category-head::-webkit-details-marker,
+summary.platform-admin-taxonomy-category-head::marker {
+  display: none;
+  content: "";
+}
+
+.platform-admin-taxonomy-category-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  transition: transform 0.2s ease;
+}
+
+.platform-admin-taxonomy-category-chevron .icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.platform-admin-taxonomy-category-details[open]
+  > .platform-admin-taxonomy-category-head
+  .platform-admin-taxonomy-category-chevron {
+  transform: rotate(90deg);
+}
+
+.platform-admin-taxonomy-category-head:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.platform-admin-taxonomy-category-head > .platform-admin-taxonomy-row {
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.platform-admin-taxonomy-category-head .platform-admin-categories-form {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .platform-admin-taxonomy-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+.platform-admin-taxonomy-icon-well {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: var(--success-muted);
+}
+
+.platform-admin-taxonomy-icon-well--group {
+  width: 24px;
+  height: 24px;
+}
+
+.platform-admin-taxonomy-icon-well--leaf {
+  width: 32px;
+  height: 32px;
 }
 
 .platform-admin-taxonomy-icon {
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
   object-fit: contain;
 }
 
+.platform-admin-taxonomy-icon--leaf {
+  width: 20px;
+  height: 20px;
+}
+
 .platform-admin-taxonomy-meta {
   min-width: 0;
+  flex: 1 1 auto;
   display: grid;
   gap: var(--space-1);
 }
 
 .platform-admin-taxonomy-name {
   margin: 0;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-tight);
+}
+
+.platform-admin-taxonomy-name--leaf {
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
 }
 
 .platform-admin-taxonomy-slug,
 .platform-admin-taxonomy-icon-key,
 .platform-admin-taxonomy-description {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--muted-foreground);
 }
 
 .platform-admin-taxonomy-sub-list {
   list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0 0 0 var(--space-6);
+  margin: 0;
+  padding: var(--space-3);
   display: grid;
   gap: var(--space-3);
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+}
+
+.platform-admin-taxonomy-sub-list--form {
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+}
+
+.platform-admin-taxonomy-sub-list--form .platform-admin-categories-form {
+  margin: 0;
+}
+
+.platform-admin-taxonomy-sub {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  overflow: clip;
+}
+
+.platform-admin-taxonomy-sub-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--card);
+}
+
+.platform-admin-taxonomy-sub-card > .platform-admin-taxonomy-row {
+  align-items: center;
+}
+
+.platform-admin-taxonomy-sub .platform-admin-categories-form {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  border-top: 0;
+}
+
+.platform-admin-taxonomy-sub-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.platform-admin-taxonomy-sub-primary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .platform-admin-taxonomy-empty {
   margin: var(--space-3) 0 0;
+}
+
+.platform-admin-taxonomy-meta-pill {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+.platform-admin-taxonomy-panel-error {
+  margin: var(--space-3) 0 0;
+}
+
+.platform-admin-taxonomy-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.platform-admin-taxonomy-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.platform-admin-taxonomy-action-group + .platform-admin-taxonomy-action-group {
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--border);
+}
+
+.platform-admin-taxonomy-action-group .platform-admin-taxonomy-reorder {
+  gap: 0;
+}
+
+.platform-admin-taxonomy-reorder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.platform-admin-taxonomy-reorder-form {
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.platform-admin-categories-form {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+}
+
+.platform-admin-categories-form textarea {
+  min-height: 5.5rem;
+}
+
+.platform-admin-categories-form .dialog-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.platform-admin-categories-form .dialog-actions .btn {
+  width: auto;
+}
+
+.platform-admin-categories-form-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: var(--foreground);
+}
+
+.platform-admin-taxonomy-category > .platform-admin-categories-form,
+.platform-admin-taxonomy-list + .platform-admin-categories-form {
+  margin-top: var(--space-4);
+}
+
+.platform-admin-taxonomy-icon-picker {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.platform-admin-taxonomy-icon-picker-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.platform-admin-taxonomy-icon-picker-toggle:hover {
+  border-color: var(--primary);
+}
+
+.platform-admin-taxonomy-icon-picker-preview {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.platform-admin-taxonomy-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.platform-admin-taxonomy-icon-picker.is-open
+  .platform-admin-taxonomy-icon-grid {
+  display: grid;
+}
+
+.platform-admin-taxonomy-icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  cursor: pointer;
+}
+
+.platform-admin-taxonomy-icon-option:hover,
+.platform-admin-taxonomy-icon-option.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.platform-admin-taxonomy-icon-option img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }

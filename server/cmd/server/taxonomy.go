@@ -26,8 +26,14 @@ const (
 // one or more Sub-categories still reference the Category slug.
 var ErrCategoryHasSubCategories = errors.New("category has sub-categories")
 
+// ErrTaxonomySlugExists is returned when a category or sub-category slug collides.
+var ErrTaxonomySlugExists = errors.New("taxonomy slug already exists")
+
 // ErrInvalidTaxonomyIcon is returned when an icon key is not in the allowlist.
 var ErrInvalidTaxonomyIcon = errors.New("invalid taxonomy icon")
+
+// ErrTaxonomyReorderBoundary is returned when a category or sub-category cannot move further in the given direction.
+var ErrTaxonomyReorderBoundary = fmt.Errorf("cannot move further")
 
 // Category is a platform-global discovery bucket for browsing Streams.
 type Category struct {
@@ -85,6 +91,44 @@ func validateTaxonomyIcon(icon string) error {
 	return nil
 }
 
+func taxonomyNeighborIndex(index, length int, direction string) (int, error) {
+	switch strings.TrimSpace(direction) {
+	case "up":
+		if index <= 0 {
+			return 0, ErrTaxonomyReorderBoundary
+		}
+		return index - 1, nil
+	case "down":
+		if index >= length-1 {
+			return 0, ErrTaxonomyReorderBoundary
+		}
+		return index + 1, nil
+	default:
+		return 0, fmt.Errorf("invalid reorder direction: %q", direction)
+	}
+}
+
+func sortCategories(items []Category) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].SortOrder != items[j].SortOrder {
+			return items[i].SortOrder < items[j].SortOrder
+		}
+		return items[i].Slug < items[j].Slug
+	})
+}
+
+func sortSubCategories(items []SubCategory) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].SortOrder != items[j].SortOrder {
+			return items[i].SortOrder < items[j].SortOrder
+		}
+		if items[i].CategorySlug != items[j].CategorySlug {
+			return items[i].CategorySlug < items[j].CategorySlug
+		}
+		return items[i].Slug < items[j].Slug
+	})
+}
+
 func cloneCategory(category Category) Category {
 	return category
 }
@@ -113,12 +157,7 @@ func (s *MemoryStore) ListCategories(_ context.Context) ([]Category, error) {
 	for _, category := range s.categories {
 		items = append(items, cloneCategory(category))
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].SortOrder != items[j].SortOrder {
-			return items[i].SortOrder < items[j].SortOrder
-		}
-		return items[i].Slug < items[j].Slug
-	})
+	sortCategories(items)
 	return items, nil
 }
 
@@ -131,6 +170,61 @@ func (s *MemoryStore) GetCategoryBySlug(_ context.Context, slug string) (*Catego
 	}
 	cloned := cloneCategory(category)
 	return &cloned, nil
+}
+
+func (s *MemoryStore) CreateCategory(_ context.Context, category Category) (Category, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	slug := strings.TrimSpace(category.Slug)
+	name := strings.TrimSpace(category.Name)
+	icon := strings.TrimSpace(category.Icon)
+	if slug == "" || name == "" {
+		return Category{}, fmt.Errorf("category slug and name are required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+	if _, exists := s.categories[slug]; exists {
+		return Category{}, ErrTaxonomySlugExists
+	}
+	maxOrder := 0
+	for _, c := range s.categories {
+		if c.SortOrder > maxOrder {
+			maxOrder = c.SortOrder
+		}
+	}
+	if category.ID.IsZero() {
+		category.ID = primitive.NewObjectID()
+	}
+	category.Slug, category.Name, category.Icon = slug, name, icon
+	category.SortOrder = maxOrder + 1
+	s.categories[slug] = cloneCategory(category)
+	s.taxonomyRevision++
+	return cloneCategory(category), nil
+}
+
+func (s *MemoryStore) UpdateCategory(_ context.Context, slug, name, icon string) (Category, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	trimmed := strings.TrimSpace(slug)
+	existing, ok := s.categories[trimmed]
+	if !ok {
+		return Category{}, mongo.ErrNoDocuments
+	}
+	name = strings.TrimSpace(name)
+	icon = strings.TrimSpace(icon)
+	if name == "" {
+		return Category{}, fmt.Errorf("category name is required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+	existing.Name, existing.Icon = name, icon
+	s.categories[trimmed] = cloneCategory(existing)
+	s.taxonomyRevision++
+	return cloneCategory(existing), nil
 }
 
 func (s *MemoryStore) DeleteCategory(_ context.Context, slug string) error {
@@ -150,6 +244,41 @@ func (s *MemoryStore) DeleteCategory(_ context.Context, slug string) error {
 	return nil
 }
 
+func (s *MemoryStore) ReorderCategory(_ context.Context, slug, direction string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	trimmed := strings.TrimSpace(slug)
+	if _, ok := s.categories[trimmed]; !ok {
+		return mongo.ErrNoDocuments
+	}
+	items := make([]Category, 0, len(s.categories))
+	for _, category := range s.categories {
+		items = append(items, category)
+	}
+	sortCategories(items)
+	index := -1
+	for i, category := range items {
+		if category.Slug == trimmed {
+			index = i
+			break
+		}
+	}
+	neighbor, err := taxonomyNeighborIndex(index, len(items), direction)
+	if err != nil {
+		return err
+	}
+	aSlug := items[index].Slug
+	bSlug := items[neighbor].Slug
+	a := s.categories[aSlug]
+	b := s.categories[bSlug]
+	a.SortOrder, b.SortOrder = b.SortOrder, a.SortOrder
+	s.categories[aSlug] = cloneCategory(a)
+	s.categories[bSlug] = cloneCategory(b)
+	s.taxonomyRevision++
+	return nil
+}
+
 func (s *MemoryStore) ListSubCategories(_ context.Context, categorySlug string) ([]SubCategory, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -161,15 +290,7 @@ func (s *MemoryStore) ListSubCategories(_ context.Context, categorySlug string) 
 		}
 		items = append(items, cloneSubCategory(sub))
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].SortOrder != items[j].SortOrder {
-			return items[i].SortOrder < items[j].SortOrder
-		}
-		if items[i].CategorySlug != items[j].CategorySlug {
-			return items[i].CategorySlug < items[j].CategorySlug
-		}
-		return items[i].Slug < items[j].Slug
-	})
+	sortSubCategories(items)
 	return items, nil
 }
 
@@ -184,6 +305,68 @@ func (s *MemoryStore) GetSubCategoryBySlug(_ context.Context, categorySlug, slug
 	return &cloned, nil
 }
 
+func (s *MemoryStore) CreateSubCategory(_ context.Context, sub SubCategory) (SubCategory, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	parent := strings.TrimSpace(sub.CategorySlug)
+	slug := strings.TrimSpace(sub.Slug)
+	name := strings.TrimSpace(sub.Name)
+	icon := strings.TrimSpace(sub.Icon)
+	description := strings.TrimSpace(sub.Description)
+	if parent == "" || slug == "" || name == "" {
+		return SubCategory{}, fmt.Errorf("sub-category categorySlug, slug, and name are required")
+	}
+	if _, ok := s.categories[parent]; !ok {
+		return SubCategory{}, mongo.ErrNoDocuments
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return SubCategory{}, err
+	}
+	key := subCategoryKey(parent, slug)
+	if _, exists := s.subCategories[key]; exists {
+		return SubCategory{}, ErrTaxonomySlugExists
+	}
+	maxOrder := 0
+	for _, existing := range s.subCategories {
+		if existing.CategorySlug == parent && existing.SortOrder > maxOrder {
+			maxOrder = existing.SortOrder
+		}
+	}
+	if sub.ID.IsZero() {
+		sub.ID = primitive.NewObjectID()
+	}
+	sub.CategorySlug, sub.Slug, sub.Name, sub.Icon, sub.Description = parent, slug, name, icon, description
+	sub.SortOrder = maxOrder + 1
+	s.subCategories[key] = cloneSubCategory(sub)
+	s.taxonomyRevision++
+	return cloneSubCategory(sub), nil
+}
+
+func (s *MemoryStore) UpdateSubCategory(_ context.Context, categorySlug, slug, name, icon, description string) (SubCategory, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	key := subCategoryKey(categorySlug, slug)
+	existing, ok := s.subCategories[key]
+	if !ok {
+		return SubCategory{}, mongo.ErrNoDocuments
+	}
+	name = strings.TrimSpace(name)
+	icon = strings.TrimSpace(icon)
+	description = strings.TrimSpace(description)
+	if name == "" {
+		return SubCategory{}, fmt.Errorf("sub-category name is required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return SubCategory{}, err
+	}
+	existing.Name, existing.Icon, existing.Description = name, icon, description
+	s.subCategories[key] = cloneSubCategory(existing)
+	s.taxonomyRevision++
+	return cloneSubCategory(existing), nil
+}
+
 func (s *MemoryStore) DeleteSubCategory(_ context.Context, categorySlug, slug string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -192,6 +375,44 @@ func (s *MemoryStore) DeleteSubCategory(_ context.Context, categorySlug, slug st
 		return mongo.ErrNoDocuments
 	}
 	delete(s.subCategories, key)
+	s.taxonomyRevision++
+	return nil
+}
+
+func (s *MemoryStore) ReorderSubCategory(_ context.Context, categorySlug, slug, direction string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	parent := strings.TrimSpace(categorySlug)
+	trimmed := strings.TrimSpace(slug)
+	if _, ok := s.subCategories[subCategoryKey(parent, trimmed)]; !ok {
+		return mongo.ErrNoDocuments
+	}
+	items := make([]SubCategory, 0)
+	for _, sub := range s.subCategories {
+		if sub.CategorySlug == parent {
+			items = append(items, sub)
+		}
+	}
+	sortSubCategories(items)
+	index := -1
+	for i, sub := range items {
+		if sub.Slug == trimmed {
+			index = i
+			break
+		}
+	}
+	neighbor, err := taxonomyNeighborIndex(index, len(items), direction)
+	if err != nil {
+		return err
+	}
+	aKey := subCategoryKey(parent, items[index].Slug)
+	bKey := subCategoryKey(parent, items[neighbor].Slug)
+	a := s.subCategories[aKey]
+	b := s.subCategories[bKey]
+	a.SortOrder, b.SortOrder = b.SortOrder, a.SortOrder
+	s.subCategories[aKey] = cloneSubCategory(a)
+	s.subCategories[bKey] = cloneSubCategory(b)
 	s.taxonomyRevision++
 	return nil
 }
@@ -291,6 +512,79 @@ func (s *MongoStore) GetCategoryBySlug(ctx context.Context, slug string) (*Categ
 	return &category, nil
 }
 
+func (s *MongoStore) CreateCategory(ctx context.Context, category Category) (Category, error) {
+	slug := strings.TrimSpace(category.Slug)
+	name := strings.TrimSpace(category.Name)
+	icon := strings.TrimSpace(category.Icon)
+	if slug == "" || name == "" {
+		return Category{}, fmt.Errorf("category slug and name are required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+
+	maxOrder := 0
+	var top Category
+	err := s.database().Collection(collectionCategories).FindOne(
+		ctx,
+		bson.M{},
+		options.FindOne().SetSort(bson.D{{Key: "sortOrder", Value: -1}}),
+	).Decode(&top)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return Category{}, err
+	}
+	if err == nil {
+		maxOrder = top.SortOrder
+	}
+
+	if category.ID.IsZero() {
+		category.ID = primitive.NewObjectID()
+	}
+	category.Slug, category.Name, category.Icon = slug, name, icon
+	category.SortOrder = maxOrder + 1
+
+	if _, err := s.database().Collection(collectionCategories).InsertOne(ctx, category); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return Category{}, ErrTaxonomySlugExists
+		}
+		return Category{}, err
+	}
+	if err := s.bumpTaxonomyRevision(ctx); err != nil {
+		return Category{}, err
+	}
+	return category, nil
+}
+
+func (s *MongoStore) UpdateCategory(ctx context.Context, slug, name, icon string) (Category, error) {
+	trimmed := strings.TrimSpace(slug)
+	name = strings.TrimSpace(name)
+	icon = strings.TrimSpace(icon)
+	if name == "" {
+		return Category{}, fmt.Errorf("category name is required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+
+	var updated Category
+	err := s.database().Collection(collectionCategories).FindOneAndUpdate(
+		ctx,
+		bson.M{"slug": trimmed},
+		bson.M{"$set": bson.M{"name": name, "icon": icon}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return Category{}, mongo.ErrNoDocuments
+	}
+	if err != nil {
+		return Category{}, err
+	}
+	if err := s.bumpTaxonomyRevision(ctx); err != nil {
+		return Category{}, err
+	}
+	return updated, nil
+}
+
 func (s *MongoStore) DeleteCategory(ctx context.Context, slug string) error {
 	trimmed := strings.TrimSpace(slug)
 	var child SubCategory
@@ -361,6 +655,87 @@ func (s *MongoStore) GetSubCategoryBySlug(ctx context.Context, categorySlug, slu
 	return &sub, nil
 }
 
+func (s *MongoStore) CreateSubCategory(ctx context.Context, sub SubCategory) (SubCategory, error) {
+	parent := strings.TrimSpace(sub.CategorySlug)
+	slug := strings.TrimSpace(sub.Slug)
+	name := strings.TrimSpace(sub.Name)
+	icon := strings.TrimSpace(sub.Icon)
+	description := strings.TrimSpace(sub.Description)
+	if parent == "" || slug == "" || name == "" {
+		return SubCategory{}, fmt.Errorf("sub-category categorySlug, slug, and name are required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return SubCategory{}, err
+	}
+
+	if _, err := s.GetCategoryBySlug(ctx, parent); err != nil {
+		return SubCategory{}, err
+	}
+
+	maxOrder := 0
+	var top SubCategory
+	err := s.database().Collection(collectionSubCategories).FindOne(
+		ctx,
+		bson.M{"categorySlug": parent},
+		options.FindOne().SetSort(bson.D{{Key: "sortOrder", Value: -1}}),
+	).Decode(&top)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return SubCategory{}, err
+	}
+	if err == nil {
+		maxOrder = top.SortOrder
+	}
+
+	if sub.ID.IsZero() {
+		sub.ID = primitive.NewObjectID()
+	}
+	sub.CategorySlug, sub.Slug, sub.Name, sub.Icon, sub.Description = parent, slug, name, icon, description
+	sub.SortOrder = maxOrder + 1
+
+	if _, err := s.database().Collection(collectionSubCategories).InsertOne(ctx, sub); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return SubCategory{}, ErrTaxonomySlugExists
+		}
+		return SubCategory{}, err
+	}
+	if err := s.bumpTaxonomyRevision(ctx); err != nil {
+		return SubCategory{}, err
+	}
+	return sub, nil
+}
+
+func (s *MongoStore) UpdateSubCategory(ctx context.Context, categorySlug, slug, name, icon, description string) (SubCategory, error) {
+	parent := strings.TrimSpace(categorySlug)
+	trimmed := strings.TrimSpace(slug)
+	name = strings.TrimSpace(name)
+	icon = strings.TrimSpace(icon)
+	description = strings.TrimSpace(description)
+	if name == "" {
+		return SubCategory{}, fmt.Errorf("sub-category name is required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return SubCategory{}, err
+	}
+
+	var updated SubCategory
+	err := s.database().Collection(collectionSubCategories).FindOneAndUpdate(
+		ctx,
+		bson.M{"categorySlug": parent, "slug": trimmed},
+		bson.M{"$set": bson.M{"name": name, "icon": icon, "description": description}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return SubCategory{}, mongo.ErrNoDocuments
+	}
+	if err != nil {
+		return SubCategory{}, err
+	}
+	if err := s.bumpTaxonomyRevision(ctx); err != nil {
+		return SubCategory{}, err
+	}
+	return updated, nil
+}
+
 func (s *MongoStore) DeleteSubCategory(ctx context.Context, categorySlug, slug string) error {
 	result, err := s.database().Collection(collectionSubCategories).DeleteOne(ctx, bson.M{
 		"categorySlug": strings.TrimSpace(categorySlug),
@@ -371,6 +746,69 @@ func (s *MongoStore) DeleteSubCategory(ctx context.Context, categorySlug, slug s
 	}
 	if result != nil && result.DeletedCount == 0 {
 		return mongo.ErrNoDocuments
+	}
+	return s.bumpTaxonomyRevision(ctx)
+}
+
+func (s *MongoStore) ReorderCategory(ctx context.Context, slug, direction string) error {
+	trimmed := strings.TrimSpace(slug)
+	items, err := s.ListCategories(ctx)
+	if err != nil {
+		return err
+	}
+	index := -1
+	for i, category := range items {
+		if category.Slug == trimmed {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return mongo.ErrNoDocuments
+	}
+	neighbor, err := taxonomyNeighborIndex(index, len(items), direction)
+	if err != nil {
+		return err
+	}
+	a, b := items[index], items[neighbor]
+	coll := s.database().Collection(collectionCategories)
+	if _, err := coll.UpdateOne(ctx, bson.M{"slug": a.Slug}, bson.M{"$set": bson.M{"sortOrder": b.SortOrder}}); err != nil {
+		return err
+	}
+	if _, err := coll.UpdateOne(ctx, bson.M{"slug": b.Slug}, bson.M{"$set": bson.M{"sortOrder": a.SortOrder}}); err != nil {
+		return err
+	}
+	return s.bumpTaxonomyRevision(ctx)
+}
+
+func (s *MongoStore) ReorderSubCategory(ctx context.Context, categorySlug, slug, direction string) error {
+	parent := strings.TrimSpace(categorySlug)
+	trimmed := strings.TrimSpace(slug)
+	items, err := s.ListSubCategories(ctx, parent)
+	if err != nil {
+		return err
+	}
+	index := -1
+	for i, sub := range items {
+		if sub.Slug == trimmed {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return mongo.ErrNoDocuments
+	}
+	neighbor, err := taxonomyNeighborIndex(index, len(items), direction)
+	if err != nil {
+		return err
+	}
+	a, b := items[index], items[neighbor]
+	coll := s.database().Collection(collectionSubCategories)
+	if _, err := coll.UpdateOne(ctx, bson.M{"categorySlug": parent, "slug": a.Slug}, bson.M{"$set": bson.M{"sortOrder": b.SortOrder}}); err != nil {
+		return err
+	}
+	if _, err := coll.UpdateOne(ctx, bson.M{"categorySlug": parent, "slug": b.Slug}, bson.M{"$set": bson.M{"sortOrder": a.SortOrder}}); err != nil {
+		return err
 	}
 	return s.bumpTaxonomyRevision(ctx)
 }

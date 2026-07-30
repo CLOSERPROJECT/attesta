@@ -9,21 +9,9 @@ import (
 )
 
 func TestHandleAdminCategoriesHTMXReturnsAdminConsole(t *testing.T) {
-	t.Setenv("ADMIN_EMAIL", "admin@example.com")
-	t.Setenv("ADMIN_PASSWORD", "change-me")
-
-	now := time.Now().UTC()
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
-
-	server := &Server{
-		authorizer:  fakeAuthorizer{},
-		store:       store,
-		identity:    &fakeIdentityStore{},
-		tmpl:        parseTestTemplates(t),
-		enforceAuth: true,
-		now:         func() time.Time { return now },
-	}
+	server := newCategoriesAdminServer(t, store)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/categories", nil)
 	req.Header.Set("HX-Request", "true")
@@ -46,7 +34,7 @@ func TestHandleAdminCategoriesHTMXReturnsAdminConsole(t *testing.T) {
 	for _, want := range []string{
 		`hx-get="/admin/orgs"`,
 		`hx-target="#admin-console"`,
-		"Browse stream discovery categories",
+		"Manage stream discovery taxonomy",
 		"Supply Chain",
 	} {
 		if !strings.Contains(body, want) {

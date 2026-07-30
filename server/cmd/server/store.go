@@ -49,10 +49,16 @@ type Store interface {
 	DeleteWorkflowData(ctx context.Context, workflowKey string) error
 	ListCategories(ctx context.Context) ([]Category, error)
 	GetCategoryBySlug(ctx context.Context, slug string) (*Category, error)
+	CreateCategory(ctx context.Context, category Category) (Category, error)
+	UpdateCategory(ctx context.Context, slug string, name, icon string) (Category, error)
 	DeleteCategory(ctx context.Context, slug string) error
+	ReorderCategory(ctx context.Context, slug, direction string) error
 	ListSubCategories(ctx context.Context, categorySlug string) ([]SubCategory, error)
 	GetSubCategoryBySlug(ctx context.Context, categorySlug, slug string) (*SubCategory, error)
+	CreateSubCategory(ctx context.Context, sub SubCategory) (SubCategory, error)
+	UpdateSubCategory(ctx context.Context, categorySlug, slug, name, icon, description string) (SubCategory, error)
 	DeleteSubCategory(ctx context.Context, categorySlug, slug string) error
+	ReorderSubCategory(ctx context.Context, categorySlug, slug, direction string) error
 	EnsureTaxonomyIndexes(ctx context.Context) error
 	ReplaceTaxonomy(ctx context.Context, categories []Category, subCategories []SubCategory) error
 	// TaxonomyRevision is a monotonically increasing counter bumped when taxonomy
