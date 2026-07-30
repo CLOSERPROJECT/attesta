@@ -181,3 +181,116 @@
 .platform-admin-taxonomy-empty {
   margin: var(--space-3) 0 0;
 }
+
+.platform-admin-taxonomy-meta-pill {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+.platform-admin-taxonomy-panel-error {
+  margin: var(--space-3) 0 0;
+}
+
+.platform-admin-taxonomy-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.platform-admin-taxonomy-reorder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.platform-admin-taxonomy-reorder-form {
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+
+.platform-admin-taxonomy-reorder-up .icon {
+  transform: rotate(180deg);
+}
+
+.platform-admin-categories-form {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+}
+
+.platform-admin-taxonomy-icon-picker {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.platform-admin-taxonomy-icon-picker-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.platform-admin-taxonomy-icon-picker-toggle:hover {
+  border-color: var(--primary);
+}
+
+.platform-admin-taxonomy-icon-picker-preview {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.platform-admin-taxonomy-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.platform-admin-taxonomy-icon-picker.is-open .platform-admin-taxonomy-icon-grid {
+  display: grid;
+}
+
+.platform-admin-taxonomy-icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  cursor: pointer;
+}
+
+.platform-admin-taxonomy-icon-option:hover,
+.platform-admin-taxonomy-icon-option.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.platform-admin-taxonomy-icon-option img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}

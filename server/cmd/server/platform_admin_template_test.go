@@ -174,3 +174,177 @@ func TestPlatformAdminCategoriesPanelNewGroupForm(t *testing.T) {
 		t.Fatalf("group form must not include description field, got:\n%s", body)
 	}
 }
+
+func TestPlatformAdminCategoriesPanelHTMXActions(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		CategoriesEditor: CategoriesEditorView{
+			GroupCount: 1,
+			LeafCount:  1,
+			IconKeys:   []string{"weee", "batch-traceability"},
+			Categories: []TaxonomyCategoryNode{
+				{
+					Name:        "Supply Chain",
+					Slug:        "supply-chain",
+					Icon:        "batch-traceability",
+					IconURL:     "/static/taxonomy/batch-traceability.svg",
+					CanDelete:   false,
+					DeleteReason: "Has subcategories",
+					CanMoveDown: false,
+					SubCategories: []TaxonomySubCategoryNode{
+						{
+							Name:        "Procurement",
+							Slug:        "procurement",
+							Icon:        "procurement-workflow",
+							IconURL:     "/static/taxonomy/procurement-workflow.svg",
+							Description: "PO management",
+							CanDelete:   true,
+							CanMoveUp:   false,
+							CanMoveDown: false,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_categories_panel", view); err != nil {
+		t.Fatalf("render platform_admin_categories_panel: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`hx-get="/admin/categories?new=group"`,
+		`hx-target="#platform-admin-categories"`,
+		`hx-swap="outerHTML"`,
+		`hx-get="/admin/categories?new=sub&amp;parent=supply-chain"`,
+		`hx-get="/admin/categories?edit=group&amp;slug=supply-chain"`,
+		`hx-get="/admin/categories?edit=sub&amp;parent=supply-chain&amp;slug=procurement"`,
+		`hx-post="/admin/categories"`,
+		`hx-post="/admin/categories/supply-chain/subcategories"`,
+		`hx-sync="#platform-admin-categories:queue all"`,
+		`hx-disabled-elt=".platform-admin-taxonomy-reorder"`,
+		`name="direction"`,
+		`value="up"`,
+		`value="down"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in categories panel HTMX markup, got:\n%s", want, body)
+		}
+	}
+}
+
+func TestPlatformAdminCategoriesPanelDeleteDialog(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		CategoriesEditor: CategoriesEditorView{
+			GroupCount: 1,
+			LeafCount:  1,
+			Categories: []TaxonomyCategoryNode{
+				{
+					Name:      "Empty Group",
+					Slug:      "empty-group",
+					Icon:      "weee",
+					IconURL:   "/static/taxonomy/weee.svg",
+					CanDelete: true,
+					SubCategories: []TaxonomySubCategoryNode{
+						{
+							Name:        "Leaf",
+							Slug:        "leaf",
+							Icon:        "weee",
+							IconURL:     "/static/taxonomy/weee.svg",
+							CanDelete:   false,
+							DeleteReason: "Referenced by a stream",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_categories_panel", view); err != nil {
+		t.Fatalf("render platform_admin_categories_panel: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, `<dialog id="delete-group-empty-group" class="dialog">`) {
+		t.Fatalf("expected delete dialog for deletable group, got:\n%s", body)
+	}
+	if strings.Contains(body, `<dialog id="delete-sub-empty-group-leaf" class="dialog">`) {
+		t.Fatalf("expected no delete dialog for blocked leaf, got:\n%s", body)
+	}
+	if !strings.Contains(body, `title="Referenced by a stream"`) {
+		t.Fatalf("expected disabled delete title for blocked leaf, got:\n%s", body)
+	}
+}
+
+func TestPlatformAdminCategoriesPanelFormIconGridAndCancel(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		CategoriesEditor: CategoriesEditorView{
+			Form: CategoriesEditorForm{
+				Open:  true,
+				Level: "leaf",
+				Mode:  "create",
+				ParentSlug: "supply-chain",
+			},
+			IconKeys: []string{"weee", "batch-traceability"},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_categories_form", view.CategoriesEditor); err != nil {
+		t.Fatalf("render platform_admin_categories_form: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`data-taxonomy-icon-picker`,
+		`/static/taxonomy/weee.svg`,
+		`/static/taxonomy/batch-traceability.svg`,
+		`name="description"`,
+		`hx-get="/admin/categories"`,
+		`hx-target="#platform-admin-categories"`,
+		`id="categories-editor-form"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in leaf create form, got:\n%s", want, body)
+		}
+	}
+}
+
+func TestPlatformAdminCategoriesPanelErrorWhenFormClosed(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		CategoriesEditor: CategoriesEditorView{
+			Form: CategoriesEditorForm{
+				Open:  false,
+				Error: "cannot move further",
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_categories_panel", view); err != nil {
+		t.Fatalf("render platform_admin_categories_panel: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, `class="error platform-admin-taxonomy-panel-error"`) ||
+		!strings.Contains(body, "cannot move further") {
+		t.Fatalf("expected panel-level error when form is closed, got:\n%s", body)
+	}
+	if strings.Contains(body, `id="categories-editor-form"`) {
+		t.Fatalf("did not expect open form when showing panel error, got:\n%s", body)
+	}
+}

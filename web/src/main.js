@@ -1187,6 +1187,21 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
     markSelectedSubstep(currentSelectedSubstep());
     focusNextActionInput();
   }
+  if (event.detail?.target?.id === "platform-admin-categories") {
+    const form = document.getElementById("categories-editor-form");
+    form?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    for (const picker of event.target.querySelectorAll(
+      "[data-taxonomy-icon-picker]",
+    )) {
+      if (!(picker instanceof HTMLElement)) {
+        continue;
+      }
+      const grid = picker.querySelector(".platform-admin-taxonomy-icon-grid");
+      if (grid instanceof HTMLElement) {
+        grid.hidden = !picker.classList.contains("is-open");
+      }
+    }
+  }
 });
 
 document.body.addEventListener("toggle", (event) => {
@@ -1338,6 +1353,51 @@ document.body.addEventListener("click", (event) => {
   }
   const shareButton = target.closest(".js-share-link");
   if (!(shareButton instanceof HTMLButtonElement)) {
+    const pickerToggle = target.closest("[data-taxonomy-icon-picker-toggle]");
+    if (pickerToggle instanceof HTMLButtonElement) {
+      event.preventDefault();
+      const picker = pickerToggle.closest("[data-taxonomy-icon-picker]");
+      if (picker instanceof HTMLElement) {
+        const open = picker.classList.toggle("is-open");
+        pickerToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        const grid = picker.querySelector(".platform-admin-taxonomy-icon-grid");
+        if (grid instanceof HTMLElement) {
+          grid.hidden = !open;
+        }
+      }
+      return;
+    }
+    const iconOption = target.closest("[data-taxonomy-icon-option]");
+    if (iconOption instanceof HTMLElement) {
+      event.preventDefault();
+      const picker = iconOption.closest("[data-taxonomy-icon-picker]");
+      if (!(picker instanceof HTMLElement)) {
+        return;
+      }
+      const key = (iconOption.dataset.taxonomyIconOption || "").trim();
+      const hidden = picker.querySelector('input[name="icon"]');
+      if (hidden instanceof HTMLInputElement) {
+        hidden.value = key;
+      }
+      const toggle = picker.querySelector("[data-taxonomy-icon-picker-toggle]");
+      if (toggle instanceof HTMLButtonElement && key) {
+        toggle.innerHTML = `<img src="/static/taxonomy/${key}.svg" alt="" class="platform-admin-taxonomy-icon-picker-preview" data-taxonomy-icon-preview />`;
+      }
+      for (const option of picker.querySelectorAll(
+        "[data-taxonomy-icon-option]",
+      )) {
+        option.classList.toggle("is-selected", option === iconOption);
+      }
+      picker.classList.remove("is-open");
+      if (toggle instanceof HTMLButtonElement) {
+        toggle.setAttribute("aria-expanded", "false");
+      }
+      const grid = picker.querySelector(".platform-admin-taxonomy-icon-grid");
+      if (grid instanceof HTMLElement) {
+        grid.hidden = true;
+      }
+      return;
+    }
     return;
   }
   event.preventDefault();

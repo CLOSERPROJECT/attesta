@@ -146,13 +146,16 @@
         <h2>Categories</h2>
         <p>Manage stream discovery taxonomy</p>
       </div>
-      <a
+      <button
         class="btn btn-primary btn-icon"
-        href="/admin/categories?new=group"
+        type="button"
         aria-label="Add category group"
+        hx-get="/admin/categories?new=group"
+        hx-target="#platform-admin-categories"
+        hx-swap="outerHTML"
       >
         {{ template "icon-plus" . }}
-      </a>
+      </button>
     </div>
 
     <p class="platform-admin-taxonomy-meta-pill muted">
@@ -161,6 +164,10 @@
 
     {{ if .CategoriesEditor.Confirmation }}
       <p class="confirmation">{{ .CategoriesEditor.Confirmation }}</p>
+    {{ end }}
+
+    {{ if and .CategoriesEditor.Form.Error (not .CategoriesEditor.Form.Open) }}
+      <p class="error platform-admin-taxonomy-panel-error">{{ .CategoriesEditor.Form.Error }}</p>
     {{ end }}
 
     {{ if .CategoriesEditor.Categories }}
@@ -183,14 +190,120 @@
                   <p class="platform-admin-taxonomy-slug muted">{{ $category.Slug }}</p>
                 </div>
                 <div class="platform-admin-taxonomy-actions">
-                  <a
+                  <div class="platform-admin-taxonomy-reorder">
+                    <form
+                      class="platform-admin-taxonomy-reorder-form"
+                      hx-post="/admin/categories"
+                      hx-target="#platform-admin-categories"
+                      hx-swap="outerHTML"
+                      hx-sync="#platform-admin-categories:queue all"
+                      hx-disabled-elt=".platform-admin-taxonomy-reorder"
+                    >
+                      <input type="hidden" name="intent" value="reorder" />
+                      <input type="hidden" name="slug" value="{{ $category.Slug }}" />
+                      <input type="hidden" name="direction" value="up" />
+                      <button
+                        class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-up"
+                        type="submit"
+                        aria-label="Move group up"
+                        {{ if not $category.CanMoveUp }}disabled{{ end }}
+                      >
+                        {{ template "icon-chevron-down" $ }}
+                      </button>
+                    </form>
+                    <form
+                      class="platform-admin-taxonomy-reorder-form"
+                      hx-post="/admin/categories"
+                      hx-target="#platform-admin-categories"
+                      hx-swap="outerHTML"
+                      hx-sync="#platform-admin-categories:queue all"
+                      hx-disabled-elt=".platform-admin-taxonomy-reorder"
+                    >
+                      <input type="hidden" name="intent" value="reorder" />
+                      <input type="hidden" name="slug" value="{{ $category.Slug }}" />
+                      <input type="hidden" name="direction" value="down" />
+                      <button
+                        class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-down"
+                        type="submit"
+                        aria-label="Move group down"
+                        {{ if not $category.CanMoveDown }}disabled{{ end }}
+                      >
+                        {{ template "icon-chevron-down" $ }}
+                      </button>
+                    </form>
+                  </div>
+                  <button
                     class="btn btn-ghost btn-xs"
-                    href="/admin/categories?edit=group&amp;slug={{ $category.Slug | urlquery }}"
-                  >Edit</a>
-                  <a
+                    type="button"
+                    hx-get="/admin/categories?edit=group&amp;slug={{ $category.Slug | urlquery }}"
+                    hx-target="#platform-admin-categories"
+                    hx-swap="outerHTML"
+                  >
+                    Edit
+                  </button>
+                  <button
                     class="btn btn-ghost btn-xs"
-                    href="/admin/categories?new=sub&amp;parent={{ $category.Slug | urlquery }}"
-                  >Add subcategory</a>
+                    type="button"
+                    hx-get="/admin/categories?new=sub&amp;parent={{ $category.Slug | urlquery }}"
+                    hx-target="#platform-admin-categories"
+                    hx-swap="outerHTML"
+                  >
+                    Add subcategory
+                  </button>
+                  {{ if $category.CanDelete }}
+                    <button
+                      class="btn btn-ghost-danger btn-icon btn-xs"
+                      type="button"
+                      aria-label="Delete group"
+                      onclick="document.getElementById('delete-group-{{ $category.Slug }}').showModal()"
+                    >
+                      {{ template "icon-trash" $ }}
+                    </button>
+                    <dialog id="delete-group-{{ $category.Slug }}" class="dialog">
+                      <div class="dialog-card">
+                        <header class="dialog-head">
+                          <div>
+                            <h3 class="dialog-title u-text-danger">Delete category group</h3>
+                            <p class="dialog-subtitle">{{ $category.Name }}</p>
+                          </div>
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-icon dialog-close"
+                            onclick="document.getElementById('delete-group-{{ $category.Slug }}').close()"
+                          >
+                            {{ template "icon-close" $ }}
+                          </button>
+                        </header>
+                        <p class="u-m-0 u-mb-5">
+                          This will permanently remove the category group. Confirm only if you want to continue.
+                        </p>
+                        <form
+                          method="post"
+                          action="/admin/categories"
+                          class="input-form"
+                          hx-post="/admin/categories"
+                          hx-target="#platform-admin-categories"
+                          hx-swap="outerHTML"
+                        >
+                          <input type="hidden" name="intent" value="delete" />
+                          <input type="hidden" name="slug" value="{{ $category.Slug }}" />
+                          <div class="dialog-actions">
+                            <button type="submit" class="btn btn-danger">Delete group</button>
+                          </div>
+                        </form>
+                      </div>
+                    </dialog>
+                  {{ else }}
+                    <button
+                      class="btn btn-ghost-danger btn-icon btn-xs"
+                      type="button"
+                      aria-label="Delete group"
+                      disabled
+                      title="{{ $category.DeleteReason }}"
+                    >
+                      {{ template "icon-trash" $ }}
+                    </button>
+                  {{ end }}
                 </div>
               </div>
             {{ end }}
@@ -217,10 +330,111 @@
                           {{ end }}
                         </div>
                         <div class="platform-admin-taxonomy-actions">
-                          <a
+                          <div class="platform-admin-taxonomy-reorder">
+                            <form
+                              class="platform-admin-taxonomy-reorder-form"
+                              hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
+                              hx-target="#platform-admin-categories"
+                              hx-swap="outerHTML"
+                              hx-sync="#platform-admin-categories:queue all"
+                              hx-disabled-elt=".platform-admin-taxonomy-reorder"
+                            >
+                              <input type="hidden" name="intent" value="reorder" />
+                              <input type="hidden" name="slug" value="{{ .Slug }}" />
+                              <input type="hidden" name="direction" value="up" />
+                              <button
+                                class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-up"
+                                type="submit"
+                                aria-label="Move subcategory up"
+                                {{ if not .CanMoveUp }}disabled{{ end }}
+                              >
+                                {{ template "icon-chevron-down" $ }}
+                              </button>
+                            </form>
+                            <form
+                              class="platform-admin-taxonomy-reorder-form"
+                              hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
+                              hx-target="#platform-admin-categories"
+                              hx-swap="outerHTML"
+                              hx-sync="#platform-admin-categories:queue all"
+                              hx-disabled-elt=".platform-admin-taxonomy-reorder"
+                            >
+                              <input type="hidden" name="intent" value="reorder" />
+                              <input type="hidden" name="slug" value="{{ .Slug }}" />
+                              <input type="hidden" name="direction" value="down" />
+                              <button
+                                class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-down"
+                                type="submit"
+                                aria-label="Move subcategory down"
+                                {{ if not .CanMoveDown }}disabled{{ end }}
+                              >
+                                {{ template "icon-chevron-down" $ }}
+                              </button>
+                            </form>
+                          </div>
+                          <button
                             class="btn btn-ghost btn-xs"
-                            href="/admin/categories?edit=sub&amp;parent={{ $category.Slug | urlquery }}&amp;slug={{ .Slug | urlquery }}"
-                          >Edit</a>
+                            type="button"
+                            hx-get="/admin/categories?edit=sub&amp;parent={{ $category.Slug | urlquery }}&amp;slug={{ .Slug | urlquery }}"
+                            hx-target="#platform-admin-categories"
+                            hx-swap="outerHTML"
+                          >
+                            Edit
+                          </button>
+                          {{ if .CanDelete }}
+                            <button
+                              class="btn btn-ghost-danger btn-icon btn-xs"
+                              type="button"
+                              aria-label="Delete subcategory"
+                              onclick="document.getElementById('delete-sub-{{ $category.Slug }}-{{ .Slug }}').showModal()"
+                            >
+                              {{ template "icon-trash" $ }}
+                            </button>
+                            <dialog id="delete-sub-{{ $category.Slug }}-{{ .Slug }}" class="dialog">
+                              <div class="dialog-card">
+                                <header class="dialog-head">
+                                  <div>
+                                    <h3 class="dialog-title u-text-danger">Delete subcategory</h3>
+                                    <p class="dialog-subtitle">{{ .Name }}</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    class="btn btn-ghost btn-icon dialog-close"
+                                    onclick="document.getElementById('delete-sub-{{ $category.Slug }}-{{ .Slug }}').close()"
+                                  >
+                                    {{ template "icon-close" $ }}
+                                  </button>
+                                </header>
+                                <p class="u-m-0 u-mb-5">
+                                  This will permanently remove the subcategory. Confirm only if you want to continue.
+                                </p>
+                                <form
+                                  method="post"
+                                  action="/admin/categories/{{ $category.Slug }}/subcategories"
+                                  class="input-form"
+                                  hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
+                                  hx-target="#platform-admin-categories"
+                                  hx-swap="outerHTML"
+                                >
+                                  <input type="hidden" name="intent" value="delete" />
+                                  <input type="hidden" name="slug" value="{{ .Slug }}" />
+                                  <div class="dialog-actions">
+                                    <button type="submit" class="btn btn-danger">Delete subcategory</button>
+                                  </div>
+                                </form>
+                              </div>
+                            </dialog>
+                          {{ else }}
+                            <button
+                              class="btn btn-ghost-danger btn-icon btn-xs"
+                              type="button"
+                              aria-label="Delete subcategory"
+                              disabled
+                              title="{{ .DeleteReason }}"
+                            >
+                              {{ template "icon-trash" $ }}
+                            </button>
+                          {{ end }}
                         </div>
                       </div>
                     {{ end }}
@@ -249,7 +463,10 @@
     method="post"
     action="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
     class="input-form platform-admin-categories-form"
-    id="categories-editor-form"
+    {{ if eq .Form.Mode "create" }}id="categories-editor-form"{{ end }}
+    hx-post="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
+    hx-target="#platform-admin-categories"
+    hx-swap="outerHTML"
   >
     <input
       type="hidden"
@@ -276,13 +493,43 @@
       />
     </div>
     <div class="form-field">
-      <label for="categories-editor-icon">Icon</label>
-      <input
-        id="categories-editor-icon"
-        name="icon"
-        type="text"
-        value="{{ .Form.Icon }}"
-      />
+      <span class="form-label">Icon</span>
+      <div
+        class="platform-admin-taxonomy-icon-picker{{ if .Form.Icon }} is-selected{{ end }}"
+        data-taxonomy-icon-picker
+      >
+        <input type="hidden" name="icon" value="{{ .Form.Icon }}" />
+        <button
+          type="button"
+          class="platform-admin-taxonomy-icon-picker-toggle"
+          data-taxonomy-icon-picker-toggle
+          aria-label="Choose icon"
+          aria-expanded="false"
+        >
+          {{ if .Form.Icon }}
+            <img
+              src="/static/taxonomy/{{ .Form.Icon }}.svg"
+              alt=""
+              class="platform-admin-taxonomy-icon-picker-preview"
+              data-taxonomy-icon-preview
+            />
+          {{ else }}
+            <span class="muted">Choose icon</span>
+          {{ end }}
+        </button>
+        <div class="platform-admin-taxonomy-icon-grid" hidden>
+          {{ range .IconKeys }}
+            <button
+              type="button"
+              class="platform-admin-taxonomy-icon-option{{ if eq $.Form.Icon . }} is-selected{{ end }}"
+              data-taxonomy-icon-option="{{ . }}"
+              aria-label="{{ . }}"
+            >
+              <img src="/static/taxonomy/{{ . }}.svg" alt="" />
+            </button>
+          {{ end }}
+        </div>
+      </div>
     </div>
     {{ if eq .Form.Level "leaf" }}
       <div class="form-field">
@@ -294,7 +541,15 @@
       <p class="error">{{ .Form.Error }}</p>
     {{ end }}
     <div class="dialog-actions">
-      <a class="btn btn-secondary" href="/admin/categories">Cancel</a>
+      <button
+        class="btn btn-secondary"
+        type="button"
+        hx-get="/admin/categories"
+        hx-target="#platform-admin-categories"
+        hx-swap="outerHTML"
+      >
+        Cancel
+      </button>
       <button class="btn btn-primary" type="submit">
         {{ if eq .Form.Mode "create" }}Create{{ else }}Save{{ end }}
       </button>
