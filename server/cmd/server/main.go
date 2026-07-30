@@ -3275,26 +3275,32 @@ func redirectPlatformAdminWithMessage(w http.ResponseWriter, r *http.Request, qu
 var errPlatformAdminInviteCrossOrg = errors.New("platform admin invite email belongs to another organization")
 
 func platformAdminOrganizationRows(ctx context.Context, organizations []Organization, identity IdentityStore) []PlatformAdminOrganizationRow {
-	rows := make([]PlatformAdminOrganizationRow, 0, len(organizations))
-	for _, organization := range organizations {
-		row := PlatformAdminOrganizationRow{
-			Name:             organization.Name,
-			Slug:             organization.Slug,
-			LogoAttachmentID: organization.LogoAttachmentID,
-		}
-		if identity != nil && strings.TrimSpace(organization.Slug) != "" {
-			memberships, err := identity.ListOrganizationMembershipsLite(ctx, organization.Slug)
-			if err != nil {
-				log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
-			} else {
-				row.OrgAdminEmails, row.PendingOrgAdminEmails = summarizePlatformOrgAdminMemberships(
-					filterPlatformOrgAdminMemberships(memberships),
-				)
+	rows := make([]PlatformAdminOrganizationRow, len(organizations))
+	var wg sync.WaitGroup
+	for i, organization := range organizations {
+		wg.Add(1)
+		go func(i int, organization Organization) {
+			defer wg.Done()
+			row := PlatformAdminOrganizationRow{
+				Name:             organization.Name,
+				Slug:             organization.Slug,
+				LogoAttachmentID: organization.LogoAttachmentID,
 			}
-		}
-		row.OrgAdminStatus, row.OrgAdminStatusClassName = platformOrgAdminStatus(row.OrgAdminEmails, row.PendingOrgAdminEmails)
-		rows = append(rows, row)
+			if identity != nil && strings.TrimSpace(organization.Slug) != "" {
+				memberships, err := identity.ListOrganizationMembershipsLite(ctx, organization.Slug)
+				if err != nil {
+					log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
+				} else {
+					row.OrgAdminEmails, row.PendingOrgAdminEmails = summarizePlatformOrgAdminMemberships(
+						filterPlatformOrgAdminMemberships(memberships),
+					)
+				}
+			}
+			row.OrgAdminStatus, row.OrgAdminStatusClassName = platformOrgAdminStatus(row.OrgAdminEmails, row.PendingOrgAdminEmails)
+			rows[i] = row
+		}(i, organization)
 	}
+	wg.Wait()
 	return rows
 }
 

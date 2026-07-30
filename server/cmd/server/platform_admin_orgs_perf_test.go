@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestPlatformAdminViewDoesNotCallHydratedMembershipList(t *testing.T) {
@@ -66,6 +67,29 @@ func TestPlatformAdminViewDoesNotCallHydratedMembershipList(t *testing.T) {
 	}
 	if view.Organizations[1].OrgAdminStatus != "No org admin" {
 		t.Fatalf("missing status = %q", view.Organizations[1].OrgAdminStatus)
+	}
+}
+
+func TestPlatformAdminOrganizationRowsPreservesOrderUnderParallelFetch(t *testing.T) {
+	var calls atomic.Int64
+	identity := &fakeIdentityStore{
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+			n := calls.Add(1)
+			// Stagger later orgs so unordered append would scramble results.
+			if orgSlug == "a" {
+				time.Sleep(30 * time.Millisecond)
+			}
+			_ = n
+			return []IdentityMembership{{Email: orgSlug + "-owner@example.com", IsOrgAdmin: true, Confirmed: true}}, nil
+		},
+	}
+	orgs := []Organization{{Slug: "a", Name: "A"}, {Slug: "b", Name: "B"}, {Slug: "c", Name: "C"}}
+	rows := platformAdminOrganizationRows(context.Background(), orgs, identity)
+	if len(rows) != 3 || rows[0].Slug != "a" || rows[1].Slug != "b" || rows[2].Slug != "c" {
+		t.Fatalf("rows = %#v", rows)
+	}
+	if rows[0].OrgAdminEmails[0] != "a-owner@example.com" || rows[2].OrgAdminEmails[0] != "c-owner@example.com" {
+		t.Fatalf("emails = %#v", rows)
 	}
 }
 
