@@ -171,7 +171,9 @@ func (s *Server) handlePublicStreamsPartial(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) buildPublicStreamCardView(ctx context.Context, key string, cfg RuntimeConfig, logoURLs map[string]string) (PublicStreamCardView, error) {
+	steps := sortedSteps(cfg.Workflow)
 	orgs, overflow := publicStreamCardOrganizations(cfg.Organizations, logoURLs)
+	orgCount := len(orgs) + overflow
 	instanceCount := 0
 	activeCount := 0
 	allCompleted := false
@@ -198,6 +200,9 @@ func (s *Server) buildPublicStreamCardView(ctx context.Context, key string, cfg 
 		InstanceCount:         instanceCount,
 		ActiveCount:           activeCount,
 		AllCompleted:          allCompleted,
+		StepCount:             len(steps),
+		RoleCount:             publicStreamCardRoleCount(cfg.Workflow),
+		OrganizationCount:     orgCount,
 		Organizations:         orgs,
 		OrganizationsOverflow: overflow,
 	}, nil

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 )
@@ -415,6 +416,56 @@ func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing
 	}
 	if strings.Contains(body, "Stream Instances") {
 		t.Fatalf("footer must not say Stream Instances, got: %s", body)
+	}
+}
+
+func TestBuildPublicStreamCardViewFillsStepRoleOrgCounts(t *testing.T) {
+	s := &Server{store: NewMemoryStore()}
+	cfg := RuntimeConfig{
+		Workflow: WorkflowDef{
+			Name:        "Counted Stream",
+			Description: "counts",
+			Steps: []WorkflowStep{
+				{
+					Title: "One",
+					Substep: []WorkflowSub{
+						{Roles: []string{"qa"}},
+						{Roles: []string{"ops"}},
+					},
+				},
+				{
+					Title:   "Two",
+					Substep: []WorkflowSub{{Roles: []string{"qa"}}},
+				},
+			},
+		},
+		Organizations: []WorkflowOrganization{
+			{Slug: "a", Name: "Alpha"},
+			{Slug: "b", Name: "Beta"},
+			{Slug: "c", Name: "Gamma"},
+			{Slug: "d", Name: "Delta"},
+			{Slug: "e", Name: "Epsilon"},
+		},
+		DPP: DPPConfig{Enabled: true},
+	}
+	card, err := s.buildPublicStreamCardView(context.Background(), "counted", cfg, nil)
+	if err != nil {
+		t.Fatalf("buildPublicStreamCardView: %v", err)
+	}
+	if card.StepCount != 2 {
+		t.Fatalf("StepCount = %d, want 2", card.StepCount)
+	}
+	if card.RoleCount != 2 {
+		t.Fatalf("RoleCount = %d, want 2", card.RoleCount)
+	}
+	if card.OrganizationCount != 5 {
+		t.Fatalf("OrganizationCount = %d, want 5", card.OrganizationCount)
+	}
+	if len(card.Organizations) != 4 || card.OrganizationsOverflow != 1 {
+		t.Fatalf("avatars=%d overflow=%d, want 4/1", len(card.Organizations), card.OrganizationsOverflow)
+	}
+	if !card.PassportEnabled {
+		t.Fatal("PassportEnabled want true")
 	}
 }
 
