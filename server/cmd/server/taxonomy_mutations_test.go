@@ -100,6 +100,30 @@ func TestMemoryStoreCreateSubCategoryRequiresParent(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreCreateSubCategoryDuplicateSlug(t *testing.T) {
+	store := NewMemoryStore()
+	_, err := store.CreateCategory(t.Context(), Category{
+		Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.CreateSubCategory(t.Context(), SubCategory{
+		CategorySlug: "supply-chain", Slug: "procurement", Name: "A",
+		Icon: "procurement-workflow",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.CreateSubCategory(t.Context(), SubCategory{
+		CategorySlug: "supply-chain", Slug: "procurement", Name: "B",
+		Icon: "order-fulfillment",
+	})
+	if !errors.Is(err, ErrTaxonomySlugExists) {
+		t.Fatalf("err=%v, want ErrTaxonomySlugExists", err)
+	}
+}
+
 func TestMemoryStoreUpdateSubCategory(t *testing.T) {
 	store := NewMemoryStore()
 	_, _ = store.CreateCategory(t.Context(), Category{
