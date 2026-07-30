@@ -3,7 +3,6 @@
   --category-color: var(--category-passport);
 }
 
-[data-category="fallback"],
-.public-stream-card-badge:not([data-category]) {
+[data-category="fallback"] {
   --category-color: var(--muted-foreground);
 }
