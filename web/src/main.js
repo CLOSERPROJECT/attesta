@@ -1177,7 +1177,7 @@ function dismissToast(el) {
 function enforceToastCap(host) {
   const items = [...host.querySelectorAll(".confirmation[data-toast]")];
   while (items.length > TOAST_MAX) {
-    const oldest = items.shift();
+    const oldest = items.pop();
     if (oldest) {
       oldest.remove();
     }
