@@ -1449,35 +1449,25 @@ if (deptRoot) {
   }
 }
 
-const initLandingTabs = () => {
-  const root = document.querySelector("[data-landing-tabs]");
+const initLandingCategorySidebar = () => {
+  const root = document.querySelector("[data-landing-category-sidebar]");
   if (!(root instanceof HTMLElement)) {
     return;
   }
-  const scroll = root.querySelector(".js-landing-tabs-scroll");
-  const prev = root.querySelector(".js-landing-tabs-prev");
-  const next = root.querySelector(".js-landing-tabs-next");
-  if (!(scroll instanceof HTMLElement)) {
-    return;
-  }
-  const scrollByAmount = () => Math.max(160, Math.floor(scroll.clientWidth * 0.6));
-  prev?.addEventListener("click", () => {
-    scroll.scrollBy({ left: -scrollByAmount(), behavior: "smooth" });
+  root.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const btn = target.closest(".public-home-subcategory");
+    if (!(btn instanceof HTMLElement) || !root.contains(btn)) {
+      return;
+    }
+    for (const other of root.querySelectorAll(".public-home-subcategory")) {
+      other.classList.remove("is-active");
+    }
+    btn.classList.add("is-active");
   });
-  next?.addEventListener("click", () => {
-    scroll.scrollBy({ left: scrollByAmount(), behavior: "smooth" });
-  });
-  for (const tab of scroll.querySelectorAll(".public-home-tab")) {
-    tab.addEventListener("click", () => {
-      for (const other of scroll.querySelectorAll(".public-home-tab")) {
-        other.classList.remove("is-active");
-        other.setAttribute("aria-selected", "false");
-      }
-      tab.classList.add("is-active");
-      tab.setAttribute("aria-selected", "true");
-      tab.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
-    });
-  }
 };
 
-initLandingTabs();
+initLandingCategorySidebar();
