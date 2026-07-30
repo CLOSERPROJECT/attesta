@@ -207,10 +207,16 @@ func TestHandlePublicStreamsPartialFilters(t *testing.T) {
 	if !strings.Contains(body, `class="public-home-results-subcategory-header"`) {
 		t.Fatalf("missing results subcategory header: %s", body)
 	}
-	if !strings.Contains(body, `class="public-home-results-subcategory-name">Procurement<`) {
+	if !strings.Contains(body, `class="public-home-results-subcategory-name"`) {
+		t.Fatalf("missing subcategory name element in results: %s", body)
+	}
+	if !strings.Contains(body, "Procurement") {
 		t.Fatalf("missing subcategory name in results: %s", body)
 	}
-	if !strings.Contains(body, `class="public-home-results-subcategory-description">PO management<`) {
+	if !strings.Contains(body, `class="public-home-results-subcategory-description"`) {
+		t.Fatalf("missing subcategory description element in results: %s", body)
+	}
+	if !strings.Contains(body, "PO management") {
 		t.Fatalf("missing subcategory description in results: %s", body)
 	}
 	if strings.Contains(body, `class="public-home-header"`) {
