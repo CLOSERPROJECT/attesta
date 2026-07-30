@@ -144,3 +144,33 @@ func TestMemoryStoreUpdateSubCategory(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestMemoryStoreReorderCategoryUpDown(t *testing.T) {
+	store := NewMemoryStore()
+	_, _ = store.CreateCategory(t.Context(), Category{Slug: "a", Name: "A", Icon: "weee"})
+	_, _ = store.CreateCategory(t.Context(), Category{Slug: "b", Name: "B", Icon: "batch-traceability"})
+	if err := store.ReorderCategory(t.Context(), "b", "up"); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := store.ListCategories(t.Context())
+	if list[0].Slug != "b" || list[1].Slug != "a" {
+		t.Fatalf("order=%v %v", list[0].Slug, list[1].Slug)
+	}
+	if err := store.ReorderCategory(t.Context(), "b", "up"); !errors.Is(err, ErrTaxonomyReorderBoundary) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestMemoryStoreReorderSubCategoryWithinParent(t *testing.T) {
+	store := NewMemoryStore()
+	_, _ = store.CreateCategory(t.Context(), Category{Slug: "g", Name: "G", Icon: "weee"})
+	_, _ = store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s1", Name: "S1", Icon: "weee"})
+	_, _ = store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s2", Name: "S2", Icon: "batch-traceability"})
+	if err := store.ReorderSubCategory(t.Context(), "g", "s2", "up"); err != nil {
+		t.Fatal(err)
+	}
+	subs, _ := store.ListSubCategories(t.Context(), "g")
+	if subs[0].Slug != "s2" {
+		t.Fatalf("got %s", subs[0].Slug)
+	}
+}
