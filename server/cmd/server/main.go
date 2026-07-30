@@ -3274,20 +3274,20 @@ func redirectPlatformAdminWithMessage(w http.ResponseWriter, r *http.Request, qu
 
 var errPlatformAdminInviteCrossOrg = errors.New("platform admin invite email belongs to another organization")
 
-func platformAdminOrganizationRows(ctx context.Context, organizations []Organization, identity IdentityStore) []PlatformAdminOrganizationRow {
+func platformAdminOrganizationRows(ctx context.Context, organizations []IdentityOrg, identity IdentityStore) []PlatformAdminOrganizationRow {
 	rows := make([]PlatformAdminOrganizationRow, len(organizations))
 	var wg sync.WaitGroup
 	for i, organization := range organizations {
 		wg.Add(1)
-		go func(i int, organization Organization) {
+		go func(i int, organization IdentityOrg) {
 			defer wg.Done()
 			row := PlatformAdminOrganizationRow{
 				Name:             organization.Name,
 				Slug:             organization.Slug,
-				LogoAttachmentID: organization.LogoAttachmentID,
+				LogoAttachmentID: strings.TrimSpace(organization.LogoFileID),
 			}
-			if identity != nil && strings.TrimSpace(organization.Slug) != "" {
-				memberships, err := identity.ListOrganizationMembershipsLite(ctx, organization.Slug)
+			if identity != nil && (strings.TrimSpace(organization.ID) != "" || strings.TrimSpace(organization.Slug) != "") {
+				memberships, err := identity.ListOrganizationMembershipsLite(ctx, organization)
 				if err != nil {
 					log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
 				} else {
@@ -3439,11 +3439,6 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		}
 	}
 
-	organizations := make([]Organization, 0, len(orgPage.Organizations))
-	for _, org := range orgPage.Organizations {
-		organizations = append(organizations, organizationFromIdentityOrg(org))
-	}
-
 	totalPages := 1
 	if orgPage.Total > 0 {
 		totalPages = (orgPage.Total + limit - 1) / limit
@@ -3452,7 +3447,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	for page := 1; page <= totalPages; page++ {
 		pageNumbers = append(pageNumbers, page)
 	}
-	rows := platformAdminOrganizationRows(context.Background(), organizations, s.identity)
+	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	view := PlatformAdminView{
 		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		ActivePanel:              "orgs",

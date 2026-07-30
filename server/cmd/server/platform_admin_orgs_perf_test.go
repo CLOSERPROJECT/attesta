@@ -34,9 +34,9 @@ func TestPlatformAdminViewDoesNotCallHydratedMembershipList(t *testing.T) {
 			t.Fatalf("platform admin view must not call ListOrganizationMemberships (%s)", orgSlug)
 			return nil, nil
 		},
-		listOrganizationMembershipsLiteFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
 			liteCalls.Add(1)
-			switch orgSlug {
+			switch org.Slug {
 			case "accepted":
 				return []IdentityMembership{
 					{Email: "admin@example.com", Confirmed: true, IsOrgAdmin: true},
@@ -78,17 +78,17 @@ func TestPlatformAdminViewDoesNotCallHydratedMembershipList(t *testing.T) {
 func TestPlatformAdminOrganizationRowsPreservesOrderUnderParallelFetch(t *testing.T) {
 	var calls atomic.Int64
 	identity := &fakeIdentityStore{
-		listOrganizationMembershipsLiteFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
 			n := calls.Add(1)
-			// Stagger later orgs so unordered append would scramble results.
-			if orgSlug == "a" {
+			// Stagger org "a" so unordered append would scramble results.
+			if org.Slug == "a" {
 				time.Sleep(30 * time.Millisecond)
 			}
 			_ = n
-			return []IdentityMembership{{Email: orgSlug + "-owner@example.com", IsOrgAdmin: true, Confirmed: true}}, nil
+			return []IdentityMembership{{Email: org.Slug + "-owner@example.com", IsOrgAdmin: true, Confirmed: true}}, nil
 		},
 	}
-	orgs := []Organization{{Slug: "a", Name: "A"}, {Slug: "b", Name: "B"}, {Slug: "c", Name: "C"}}
+	orgs := []IdentityOrg{{Slug: "a", Name: "A"}, {Slug: "b", Name: "B"}, {Slug: "c", Name: "C"}}
 	rows := platformAdminOrganizationRows(context.Background(), orgs, identity)
 	if len(rows) != 3 || rows[0].Slug != "a" || rows[1].Slug != "b" || rows[2].Slug != "c" {
 		t.Fatalf("rows = %#v", rows)
@@ -149,8 +149,7 @@ func TestPlatformAdminViewAppwriteCallCeiling(t *testing.T) {
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"total": membersPerOrg, "memberships": memberships})
 		case strings.HasPrefix(path, "/v1/teams/"):
-			teamID := strings.TrimPrefix(path, "/v1/teams/")
-			_ = json.NewEncoder(w).Encode(map[string]any{"$id": teamID, "name": teamID, "prefs": map[string]any{"schemaVersion": 1, "slug": teamID}})
+			t.Fatalf("unexpected team GET (lite path should use paged team ID): %s", path)
 		case strings.HasPrefix(path, "/v1/users/"):
 			userRequests.Add(1)
 			t.Fatalf("unexpected user hydration: %s", path)
@@ -164,12 +163,12 @@ func TestPlatformAdminViewAppwriteCallCeiling(t *testing.T) {
 	server := &Server{identity: identity, authorizer: fakeAuthorizer{}}
 	_ = server.platformAdminView(&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
 
-	// 1 list page + ≤12 get team + 12 list memberships = ≤25 (no user calls)
+	// 1 list page + 12 list memberships by team ID = 13 (no slug GETs, no user calls)
 	if userRequests.Load() != 0 {
 		t.Fatalf("userRequests = %d", userRequests.Load())
 	}
-	if total := totalRequests.Load(); total > 25 {
-		t.Fatalf("totalRequests = %d, want ≤ 25", total)
+	if total := totalRequests.Load(); total > 13 {
+		t.Fatalf("totalRequests = %d, want ≤ 13", total)
 	}
 }
 
@@ -188,7 +187,7 @@ func TestPlatformAdminViewUsesOrganizationPageTotal(t *testing.T) {
 				},
 			}, nil
 		},
-		listOrganizationMembershipsLiteFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
 			return nil, nil
 		},
 	}
@@ -196,5 +195,49 @@ func TestPlatformAdminViewUsesOrganizationPageTotal(t *testing.T) {
 	view := server.platformAdminView(&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{SearchQuery: "ac", Page: 2})
 	if view.MatchedOrganizations != 25 || view.TotalPages != 3 || view.CurrentPage != 2 || len(view.Organizations) != 1 {
 		t.Fatalf("view paging = matched=%d pages=%d page=%d rows=%d", view.MatchedOrganizations, view.TotalPages, view.CurrentPage, len(view.Organizations))
+	}
+}
+
+func TestPlatformAdminViewPassesPagedTeamIDToLiteMemberships(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	var seenTeamID string
+	identity := &fakeIdentityStore{
+		listOrganizationsPageFunc: func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+			return IdentityOrgPage{
+				Total: 1,
+				Organizations: []IdentityOrg{
+					{ID: "hashed-team-id", Slug: "renamed-org-slug", Name: "Renamed Org", LogoFileID: "logo-1"},
+				},
+			}, nil
+		},
+		getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+			t.Fatalf("must not resolve by slug when paged team ID is known (%s)", slug)
+			return nil, ErrIdentityNotFound
+		},
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
+			seenTeamID = org.ID
+			if org.ID != "hashed-team-id" || org.Slug != "renamed-org-slug" {
+				t.Fatalf("org = %#v", org)
+			}
+			return []IdentityMembership{
+				{Email: "owner@example.com", Confirmed: true, IsOrgAdmin: true},
+			}, nil
+		},
+	}
+	server := &Server{identity: identity, authorizer: fakeAuthorizer{}}
+	view := server.platformAdminView(&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
+	if seenTeamID != "hashed-team-id" {
+		t.Fatalf("seenTeamID = %q", seenTeamID)
+	}
+	if len(view.Organizations) != 1 || view.Organizations[0].Slug != "renamed-org-slug" {
+		t.Fatalf("rows = %#v", view.Organizations)
+	}
+	if view.Organizations[0].OrgAdminStatus != "At least one org admin accepted" {
+		t.Fatalf("status = %q", view.Organizations[0].OrgAdminStatus)
+	}
+	if view.Organizations[0].LogoAttachmentID != "logo-1" {
+		t.Fatalf("logo = %q", view.Organizations[0].LogoAttachmentID)
 	}
 }

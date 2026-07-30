@@ -507,21 +507,34 @@ func (a *appwriteIdentity) ListOrganizationMemberships(ctx context.Context, orgS
 // ListOrganizationMembershipsLite returns memberships decoded from the team membership
 // list only. IsOrgAdmin is derived from membership roles (owner / invite encoding), not
 // user labels. Callers that need label-accurate roles must use ListOrganizationMemberships.
-func (a *appwriteIdentity) ListOrganizationMembershipsLite(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+//
+// When org.ID is set it is used as the Appwrite team ID directly (no slug lookup). That
+// matters for paged platform-admin catalogs where slug may differ from team ID and
+// GetOrganizationBySlug's ListOrganizations fallback is not exhaustive.
+func (a *appwriteIdentity) ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
-	if err != nil {
-		return nil, err
+	resolved := org
+	teamID := strings.TrimSpace(org.ID)
+	if teamID == "" {
+		found, err := a.GetOrganizationBySlug(ctx, org.Slug)
+		if err != nil {
+			return nil, err
+		}
+		resolved = *found
+		teamID = strings.TrimSpace(resolved.ID)
 	}
-	membershipList, err := teams.New(a.adminClient).ListMemberships(strings.TrimSpace(org.ID))
+	if teamID == "" {
+		return nil, ErrIdentityNotFound
+	}
+	membershipList, err := teams.New(a.adminClient).ListMemberships(teamID)
 	if err != nil {
 		return nil, normalizeIdentityError(err)
 	}
 	memberships := make([]IdentityMembership, 0, len(membershipList.Memberships))
 	for i := range membershipList.Memberships {
-		memberships = append(memberships, membershipFromAppwrite(&membershipList.Memberships[i], org))
+		memberships = append(memberships, membershipFromAppwrite(&membershipList.Memberships[i], &resolved))
 	}
 	return memberships, nil
 }

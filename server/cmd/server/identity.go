@@ -30,7 +30,10 @@ type IdentityStore interface {
 	ListOrganizations(ctx context.Context) ([]IdentityOrg, error)
 	ListOrganizationsPage(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error)
 	ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
-	ListOrganizationMembershipsLite(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	// ListOrganizationMembershipsLite lists memberships without user hydration.
+	// Prefer org.ID (Appwrite team ID) when known — e.g. from ListOrganizationsPage —
+	// so slug≠team-ID orgs still resolve without an unpaged ListOrganizations fallback.
+	ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)

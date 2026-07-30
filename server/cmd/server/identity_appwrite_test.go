@@ -797,13 +797,13 @@ func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *te
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme":
-			_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme/memberships":
 			_, _ = w.Write([]byte(`{"total":2,"memberships":[
 				{"$id":"m1","userId":"user-1","userEmail":"owner@example.com","teamId":"acme","teamName":"Acme Org","confirm":true,"roles":["owner"]},
 				{"$id":"m2","userId":"user-2","userEmail":"member@example.com","teamId":"acme","teamName":"Acme Org","confirm":true,"roles":["member","iapprover"]}
 			]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme":
+			t.Fatalf("lite list with team ID must not GET team by slug: %s", r.URL.Path)
 		case strings.HasPrefix(r.URL.Path, "/v1/users/"):
 			userGETs++
 			t.Fatalf("lite list must not call users API: %s %s", r.Method, r.URL.Path)
@@ -814,7 +814,7 @@ func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *te
 	defer appwriteAPI.Close()
 
 	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
-	memberships, err := identity.ListOrganizationMembershipsLite(context.Background(), "acme")
+	memberships, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{ID: "acme", Slug: "acme", Name: "Acme Org"})
 	if err != nil {
 		t.Fatalf("ListOrganizationMembershipsLite error: %v", err)
 	}
@@ -829,6 +829,38 @@ func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *te
 	}
 	if memberships[1].IsOrgAdmin || memberships[1].Email != "member@example.com" {
 		t.Fatalf("memberships[1] = %#v", memberships[1])
+	}
+}
+
+func TestAppwriteIdentityListOrganizationMembershipsLiteUsesTeamIDWhenSlugDiffers(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/hashed-team-id/memberships":
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[
+				{"$id":"m1","userId":"user-1","userEmail":"owner@example.com","teamId":"hashed-team-id","teamName":"Renamed Org","confirm":true,"roles":["owner"]}
+			]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/renamed-org-slug":
+			t.Fatalf("must not look up by slug when team ID is provided")
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams":
+			t.Fatalf("must not fall back to ListOrganizations when team ID is provided")
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+	memberships, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{
+		ID:   "hashed-team-id",
+		Slug: "renamed-org-slug",
+		Name: "Renamed Org",
+	})
+	if err != nil {
+		t.Fatalf("ListOrganizationMembershipsLite error: %v", err)
+	}
+	if len(memberships) != 1 || memberships[0].Email != "owner@example.com" || !memberships[0].IsOrgAdmin {
+		t.Fatalf("memberships = %#v", memberships)
 	}
 }
 
