@@ -792,6 +792,78 @@ func TestAppwriteIdentityListOrganizationMembershipsPendingMembership(t *testing
 	}
 }
 
+func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *testing.T) {
+	var userGETs int
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme/memberships":
+			_, _ = w.Write([]byte(`{"total":2,"memberships":[
+				{"$id":"m1","userId":"user-1","userEmail":"owner@example.com","teamId":"acme","teamName":"Acme Org","confirm":true,"roles":["owner"]},
+				{"$id":"m2","userId":"user-2","userEmail":"member@example.com","teamId":"acme","teamName":"Acme Org","confirm":true,"roles":["member","iapprover"]}
+			]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/acme":
+			t.Fatalf("lite list with team ID must not GET team by slug: %s", r.URL.Path)
+		case strings.HasPrefix(r.URL.Path, "/v1/users/"):
+			userGETs++
+			t.Fatalf("lite list must not call users API: %s %s", r.Method, r.URL.Path)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+	memberships, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{ID: "acme", Slug: "acme", Name: "Acme Org"})
+	if err != nil {
+		t.Fatalf("ListOrganizationMembershipsLite error: %v", err)
+	}
+	if userGETs != 0 {
+		t.Fatalf("userGETs = %d, want 0", userGETs)
+	}
+	if len(memberships) != 2 {
+		t.Fatalf("memberships = %#v", memberships)
+	}
+	if !memberships[0].IsOrgAdmin || memberships[0].Email != "owner@example.com" || !memberships[0].Confirmed {
+		t.Fatalf("memberships[0] = %#v", memberships[0])
+	}
+	if memberships[1].IsOrgAdmin || memberships[1].Email != "member@example.com" {
+		t.Fatalf("memberships[1] = %#v", memberships[1])
+	}
+}
+
+func TestAppwriteIdentityListOrganizationMembershipsLiteUsesTeamIDWhenSlugDiffers(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/hashed-team-id/memberships":
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[
+				{"$id":"m1","userId":"user-1","userEmail":"owner@example.com","teamId":"hashed-team-id","teamName":"Renamed Org","confirm":true,"roles":["owner"]}
+			]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams/renamed-org-slug":
+			t.Fatalf("must not look up by slug when team ID is provided")
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/teams":
+			t.Fatalf("must not fall back to ListOrganizations when team ID is provided")
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+	memberships, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{
+		ID:   "hashed-team-id",
+		Slug: "renamed-org-slug",
+		Name: "Renamed Org",
+	})
+	if err != nil {
+		t.Fatalf("ListOrganizationMembershipsLite error: %v", err)
+	}
+	if len(memberships) != 1 || memberships[0].Email != "owner@example.com" || !memberships[0].IsOrgAdmin {
+		t.Fatalf("memberships = %#v", memberships)
+	}
+}
+
 func TestAppwriteIdentityCreateAccountAndRecovery(t *testing.T) {
 	var createPath string
 	var createBody map[string]interface{}
@@ -1992,5 +2064,44 @@ func TestIdentityAppwriteNilAndErrorBranches(t *testing.T) {
 		Expire: "2026-03-18T10:11:12Z",
 	}, ""); err == nil {
 		t.Fatal("expected missing secret error")
+	}
+}
+
+func TestAppwriteIdentityListOrganizationsPagePassesLimitOffsetSearch(t *testing.T) {
+	var gotQueries []string
+	var gotSearch string
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/v1/teams" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		gotSearch = r.URL.Query().Get("search")
+		gotQueries = r.URL.Query()["queries[]"]
+		if len(gotQueries) == 0 {
+			// SDK may encode as queries — accept either form used by sdk-for-go v1.0.0
+			gotQueries = r.URL.Query()["queries"]
+		}
+		_, _ = w.Write([]byte(`{"total":40,"teams":[{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}]}`))
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+	page, err := identity.ListOrganizationsPage(context.Background(), IdentityOrgListOptions{
+		Search: "acme",
+		Limit:  12,
+		Offset: 24,
+	})
+	if err != nil {
+		t.Fatalf("ListOrganizationsPage error: %v", err)
+	}
+	if page.Total != 40 || len(page.Organizations) != 1 || page.Organizations[0].Slug != "acme" {
+		t.Fatalf("page = %#v", page)
+	}
+	if gotSearch != "acme" {
+		t.Fatalf("search = %q, want acme", gotSearch)
+	}
+	joined := strings.Join(gotQueries, ",")
+	if !strings.Contains(joined, "12") || !strings.Contains(joined, "24") {
+		t.Fatalf("queries = %#v (raw=%q), want limit 12 and offset 24", gotQueries, joined)
 	}
 }

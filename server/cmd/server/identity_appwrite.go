@@ -18,6 +18,7 @@ import (
 	appwritefile "github.com/appwrite/sdk-for-go/file"
 	"github.com/appwrite/sdk-for-go/id"
 	"github.com/appwrite/sdk-for-go/models"
+	"github.com/appwrite/sdk-for-go/query"
 	"github.com/appwrite/sdk-for-go/storage"
 	"github.com/appwrite/sdk-for-go/teams"
 	"github.com/appwrite/sdk-for-go/users"
@@ -403,6 +404,43 @@ func (a *appwriteIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg
 	return decodeIdentityOrgs(teamList), nil
 }
 
+func (a *appwriteIdentity) ListOrganizationsPage(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityOrgPage{}, err
+	}
+	limit := opts.Limit
+	if limit < 1 {
+		limit = 12
+	}
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	queries := []string{
+		query.Limit(limit),
+		query.Offset(offset),
+		query.OrderAsc("name"),
+	}
+	options := []teams.ListOption{
+		teams.New(a.adminClient).WithListQueries(queries),
+		teams.New(a.adminClient).WithListTotal(true),
+	}
+	if search := strings.TrimSpace(opts.Search); search != "" {
+		options = append(options, teams.New(a.adminClient).WithListSearch(search))
+	}
+	teamList, err := teams.New(a.adminClient).List(options...)
+	if err != nil {
+		return IdentityOrgPage{}, normalizeIdentityError(err)
+	}
+	if err := ctx.Err(); err != nil {
+		return IdentityOrgPage{}, err
+	}
+	return IdentityOrgPage{
+		Organizations: decodeIdentityOrgs(teamList),
+		Total:         teamList.Total,
+	}, nil
+}
+
 func (a *appwriteIdentity) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -462,6 +500,41 @@ func (a *appwriteIdentity) ListOrganizationMemberships(ctx context.Context, orgS
 	memberships := make([]IdentityMembership, 0, len(membershipList.Memberships))
 	for _, membership := range membershipList.Memberships {
 		memberships = append(memberships, a.toIdentityMembership(ctx, &membership, org))
+	}
+	return memberships, nil
+}
+
+// ListOrganizationMembershipsLite returns memberships decoded from the team membership
+// list only. IsOrgAdmin is derived from membership roles (owner / invite encoding), not
+// user labels. Callers that need label-accurate roles must use ListOrganizationMemberships.
+//
+// When org.ID is set it is used as the Appwrite team ID directly (no slug lookup). That
+// matters for paged platform-admin catalogs where slug may differ from team ID and
+// GetOrganizationBySlug's ListOrganizations fallback is not exhaustive.
+func (a *appwriteIdentity) ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	resolved := org
+	teamID := strings.TrimSpace(org.ID)
+	if teamID == "" {
+		found, err := a.GetOrganizationBySlug(ctx, org.Slug)
+		if err != nil {
+			return nil, err
+		}
+		resolved = *found
+		teamID = strings.TrimSpace(resolved.ID)
+	}
+	if teamID == "" {
+		return nil, ErrIdentityNotFound
+	}
+	membershipList, err := teams.New(a.adminClient).ListMemberships(teamID)
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	memberships := make([]IdentityMembership, 0, len(membershipList.Memberships))
+	for i := range membershipList.Memberships {
+		memberships = append(memberships, membershipFromAppwrite(&membershipList.Memberships[i], &resolved))
 	}
 	return memberships, nil
 }
@@ -886,7 +959,7 @@ func (a *appwriteIdentity) getOrganizationByTeamID(ctx context.Context, teamID s
 	return &org, nil
 }
 
-func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
+func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) IdentityMembership {
 	if membership == nil {
 		return IdentityMembership{}
 	}
@@ -910,6 +983,11 @@ func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership 
 	if joinedAt, err := parseAppwriteTime(membership.Joined); err == nil {
 		identity.JoinedAt = joinedAt
 	}
+	return identity
+}
+
+func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
+	identity := membershipFromAppwrite(membership, org)
 	if identity.UserID != "" {
 		if user, err := a.GetUserByID(ctx, identity.UserID); err == nil {
 			identity.Email = user.Email
