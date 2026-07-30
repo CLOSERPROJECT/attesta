@@ -2,7 +2,6 @@
  * Public marketing landing — pages/public_home.html
  *
  * div.public-home
- *   header.public-home-header
  *   section.public-home-hero | .public-home-process | .public-home-features | .public-home-dev
  *   .public-home-streams-split#streams (bordered two-column shell)
  *     aside.public-home-category-sidebar  (--card)
@@ -42,7 +41,6 @@
   text-decoration: none;
 }
 
-.public-home-header,
 .public-home-hero,
 .public-home-process,
 .public-home-features,
@@ -51,71 +49,11 @@
   padding-inline: var(--space-6);
 }
 
-.public-home-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  padding-block: var(--space-5);
-}
-
-.public-home-brand {
-  display: flex;
-  flex-shrink: 0;
-}
-
 .public-home-logo {
   display: block;
   width: 132px;
   height: 44px;
   object-fit: contain;
-}
-
-.public-home-nav {
-  display: none;
-  align-items: center;
-  gap: var(--space-8);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-  color: var(--muted-foreground);
-  white-space: nowrap;
-}
-
-.public-home-nav a:hover {
-  color: var(--foreground);
-}
-
-.public-home-header-cta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex-shrink: 0;
-}
-
-.public-home-signin {
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-  color: var(--muted-foreground);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  list-style: none;
-}
-
-.public-home-signin::-webkit-details-marker {
-  display: none;
-}
-
-.public-home-account {
-  position: relative;
-}
-
-.public-home-account .account-dropdown {
-  right: 0;
-  left: auto;
 }
 
 .public-home-label {
@@ -200,6 +138,7 @@
 .public-home-category-sidebar {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   background: var(--card);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
@@ -209,6 +148,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 20rem;
   padding: var(--space-6) var(--space-3) var(--space-4) var(--space-3);
 }
 
@@ -229,6 +171,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 20rem;
   padding: 0 var(--space-3) var(--space-6);
 }
 
@@ -435,11 +380,10 @@
 
 .public-home-stream-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 340px));
   gap: var(--space-4);
   width: 100%;
-  max-width: 80rem;
-  justify-items: center;
+  justify-content: start;
 }
 
 .public-home-rule {
@@ -653,14 +597,7 @@
   height: 100%;
 }
 
-@media (--sm-up) {
-  .public-home-stream-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (--md-up) {
-  .public-home-header,
   .public-home-hero,
   .public-home-process,
   .public-home-features,
@@ -669,18 +606,14 @@
     padding-inline: 40px;
   }
 
-  .public-home-nav {
-    display: flex;
-  }
-
   .public-home-streams-split {
     flex-direction: row;
     align-items: stretch;
   }
 
   .public-home-category-sidebar {
-    flex: 0 0 20rem;
-    max-width: 20rem;
+    flex: 0 0 24rem;
+    max-width: 24rem;
     border-bottom: 0;
     border-right: 1px solid var(--border);
   }
@@ -705,7 +638,6 @@
 }
 
 @media (--lg-up) {
-  .public-home-header,
   .public-home-hero,
   .public-home-process,
   .public-home-features,
@@ -722,10 +654,6 @@
   .public-home-section-head h2 {
     font-size: var(--text-4xl);
     line-height: 2.5rem;
-  }
-
-  .public-home-stream-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .public-home-feature-grid {
@@ -756,10 +684,6 @@
 }
 
 @media (--sm-down) {
-  .public-home-header .btn-primary {
-    display: none;
-  }
-
   .public-home-hero h1 {
     font-size: var(--text-4xl);
     line-height: 2.5rem;

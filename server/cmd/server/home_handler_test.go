@@ -81,11 +81,26 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 		t.Fatalf("unexpected redirect to %q", loc)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `href="/login"`) {
-		t.Fatalf("expected Sign In link on public home, got %q", body)
+	if !strings.Contains(body, `class="topbar`) {
+		t.Fatalf("expected shared topbar on public home, got %q", body)
 	}
-	if !strings.Contains(body, `class="public-home-signin btn btn-ghost btn-lg nav-action"`) {
-		t.Fatalf("expected landing Sign In styled as ghost nav button, got %q", body)
+	if !strings.Contains(body, `id="theme-toggle"`) {
+		t.Fatalf("expected theme toggle on public home, got %q", body)
+	}
+	if !strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected Login link on public home, got %q", body)
+	}
+	if !strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected shared topbar Login label on public home, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-header"`) {
+		t.Fatalf("expected no marketing header on public home, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-signin`) {
+		t.Fatalf("expected no landing Sign In chrome on public home, got %q", body)
+	}
+	if strings.Contains(body, `class="site-footer"`) {
+		t.Fatalf("expected no shared site-footer on public home, got %q", body)
 	}
 	if !strings.Contains(body, `class="public-home"`) {
 		t.Fatalf("expected public landing markup, got %q", body)
@@ -668,11 +683,17 @@ func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
 	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
 		t.Fatalf("expected Dashboard when logged in, got %q", body)
 	}
-	if strings.Contains(body, `class="public-home-signin btn btn-ghost btn-lg nav-action"`) {
-		t.Fatalf("expected no Sign In CTA when logged in, got %q", body)
+	if strings.Contains(body, `class="public-home-header"`) {
+		t.Fatalf("expected no marketing header when logged in, got %q", body)
 	}
-	if strings.Contains(body, `>Sign In</a>`) || strings.Contains(body, `>Login</a>`) {
-		t.Fatalf("expected no Sign In/Login link when logged in, got %q", body)
+	if strings.Contains(body, `class="public-home-signin`) {
+		t.Fatalf("expected no landing Sign In chrome when logged in, got %q", body)
+	}
+	if !strings.Contains(body, `class="topbar`) {
+		t.Fatalf("expected shared topbar when logged in, got %q", body)
+	}
+	if strings.Contains(body, `>Login</a>`) {
+		t.Fatalf("expected no Login link when logged in, got %q", body)
 	}
 }
 

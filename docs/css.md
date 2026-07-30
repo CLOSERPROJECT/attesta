@@ -39,7 +39,7 @@ Import new component/page modules from the matching barrel (`components.css` / `
 ### Exceptions (not inventable from the stem)
 
 - `pages/home.css` also styles stream dashboard nav panels used by `pages/stream.html`
-- `pages/public-home.css` ↔ `pages/public_home.html` (marketing landing; own chrome, hides app topbar/footer)
+- `pages/public-home.css` ↔ `pages/public_home.html` (marketing landing; uses shared app topbar, own footer instead of `.site-footer`)
 - `pages/org-admin-page.css` ↔ `pages/org_admin.html` (page shell); widgets/pickers stay in `components/org-admin.css`
 - `components/stream.css` is a cluster (sort toolbar, `.status-tag*` via `status_tag`) — not paired 1:1 with a `stream_*.html` component
 - `components/dpp_history_step.html` styles live under `pages/dpp.css` (`.dpp-history-*`)

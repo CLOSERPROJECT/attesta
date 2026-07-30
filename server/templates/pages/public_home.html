@@ -5,53 +5,6 @@
   {{ if .ViteDevServer }}{{ $brand = printf "%s/brand/attesta-lockup-on-dark.svg" .ViteDevServer }}{{ end }}
 
   <div class="public-home" data-landing>
-    <header class="public-home-header">
-      <a class="public-home-brand" href="/" aria-label="Attesta">
-        <img class="public-home-logo" src="{{ $brand }}" alt="" width="132" height="44" />
-      </a>
-      <nav class="public-home-nav" aria-label="Marketing">
-        <a href="#streams">Product</a>
-        <a href="#how-it-works">Solutions</a>
-        <a href="#features">Pricing</a>
-        <a href="#developers">Docs</a>
-      </nav>
-      <div class="public-home-header-cta">
-        {{ if .ShowLogout }}
-          <details class="account-menu public-home-account">
-            <summary class="public-home-signin" aria-label="Open account menu">
-              {{ if .UserEmail }}{{ .UserEmail }}{{ else }}Account{{ end }}
-            </summary>
-            <div class="account-dropdown">
-              <section class="account-menu-section">
-                <p class="account-menu-label">Signed in as</p>
-                <p class="account-menu-email">
-                  {{ if .UserEmail }}{{ .UserEmail }}{{ else }}Account{{ end }}
-                </p>
-              </section>
-              <section class="account-menu-section">
-                <a href="/my" class="account-menu-item">Dashboard</a>
-                {{ if .ShowOrgsLink }}
-                  <a href="/admin/orgs" class="account-menu-item">Orgs</a>
-                {{ end }}
-                {{ if .ShowMyOrgLink }}
-                  <a href="/my/organization/profile" class="account-menu-item">My organization</a>
-                {{ end }}
-                <form method="post" action="/logout">
-                  <button type="submit" class="account-menu-item account-menu-item-danger">
-                    Sign out
-                  </button>
-                </form>
-              </section>
-            </div>
-          </details>
-          <a class="btn btn-primary btn-lg" href="/my">Dashboard</a>
-        {{ else }}
-          <a class="public-home-signin btn btn-ghost btn-lg nav-action" href="/login">Sign In</a>
-          <a class="btn btn-primary btn-lg" href="/signup">Get Started</a>
-        {{ end }}
-      </div>
-    </header>
-
     <section class="public-home-hero">
       <p class="public-home-label">Attesta supply chain framework 2.0</p>
       <div class="public-home-hero-copy">

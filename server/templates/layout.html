@@ -105,8 +105,7 @@
       ></script>
     </head>
     <body>
-      {{ if ne .Body "public_home_body" }}
-        <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
+      <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
           <div class="topbar-content u-mx-auto u-max-w-7xl">
             <div class="topbar-brand-row">
               <a class="brand" href="/" aria-label="Attesta">
@@ -202,15 +201,11 @@
                   </div>
                 </details>
               {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
-                <a href="/login" class="btn btn-ghost btn-lg nav-action">
-                  {{ template "icon-log-in" . }}
-                  Login
-                </a>
+                <a href="/login" class="btn btn-ghost btn-lg nav-action">Login</a>
               {{ end }}
             </nav>
           </div>
-        </header>
-      {{ end }}
+      </header>
       <main class="page{{ if eq .Body "public_home_body" }} page-landing{{ end }}">
         {{ if eq .Body "home_picker_body" }}
           {{ template "home_picker_body" . }}
