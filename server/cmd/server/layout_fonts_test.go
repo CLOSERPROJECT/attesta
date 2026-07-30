@@ -49,7 +49,7 @@ func TestLayoutShowsAccountMenuWhenLoggedIn(t *testing.T) {
 	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action">Dashboard`) {
 		t.Fatalf("expected Dashboard inside menu, not topbar button, got:\n%s", body)
 	}
-	if strings.Contains(body, `>Login</a>`) {
-		t.Fatalf("expected no Login link when logged in, got:\n%s", body)
+	if strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected no topbar Login link when logged in, got:\n%s", body)
 	}
 }

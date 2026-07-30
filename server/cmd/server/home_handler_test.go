@@ -90,8 +90,14 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	if !strings.Contains(body, `href="/login"`) {
 		t.Fatalf("expected Login link on public home, got %q", body)
 	}
-	if !strings.Contains(body, `>Login</a>`) {
-		t.Fatalf("expected shared topbar Login label on public home, got %q", body)
+	if !strings.Contains(body, `btn btn-ghost btn-lg nav-action`) {
+		t.Fatalf("expected shared topbar Login control on public home, got %q", body)
+	}
+	if !strings.Contains(body, `d="M15 12H3"`) {
+		t.Fatalf("expected login icon in topbar on public home, got %q", body)
+	}
+	if !strings.Contains(body, "Login") {
+		t.Fatalf("expected Login label on public home, got %q", body)
 	}
 	if strings.Contains(body, `class="public-home-header"`) {
 		t.Fatalf("expected no marketing header on public home, got %q", body)
@@ -692,8 +698,8 @@ func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
 	if !strings.Contains(body, `class="topbar`) {
 		t.Fatalf("expected shared topbar when logged in, got %q", body)
 	}
-	if strings.Contains(body, `>Login</a>`) {
-		t.Fatalf("expected no Login link when logged in, got %q", body)
+	if strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected no topbar Login link when logged in, got %q", body)
 	}
 }
 

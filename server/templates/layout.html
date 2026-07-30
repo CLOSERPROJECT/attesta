@@ -201,7 +201,10 @@
                   </div>
                 </details>
               {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
-                <a href="/login" class="btn btn-ghost btn-lg nav-action">Login</a>
+                <a href="/login" class="btn btn-ghost btn-lg nav-action">
+                  {{ template "icon-log-in" . }}
+                  Login
+                </a>
               {{ end }}
             </nav>
           </div>
