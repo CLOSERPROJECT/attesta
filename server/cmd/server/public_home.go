@@ -39,6 +39,35 @@ func resolvePublicHomeSelection(categories []TaxonomyCategoryNode, categorySlug,
 	return categories[0].Slug, categories[0].SubCategories[0].Slug
 }
 
+func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, selectedSub string) []PublicHomeCategoryView {
+	out := make([]PublicHomeCategoryView, 0, len(categories))
+	for _, cat := range categories {
+		subs := make([]PublicHomeSubCategoryView, 0, len(cat.SubCategories))
+		for _, sub := range cat.SubCategories {
+			query := url.Values{
+				"category":    {cat.Slug},
+				"subCategory": {sub.Slug},
+			}
+			encoded := query.Encode()
+			subs = append(subs, PublicHomeSubCategoryView{
+				Slug:       sub.Slug,
+				Name:       sub.Name,
+				Active:     cat.Slug == selectedCat && sub.Slug == selectedSub,
+				PartialURL: "/streams/public?" + encoded,
+				PushURL:    "/?" + encoded,
+			})
+		}
+		out = append(out, PublicHomeCategoryView{
+			Slug:          cat.Slug,
+			Name:          cat.Name,
+			IconURL:       cat.IconURL,
+			Expanded:      cat.Slug == selectedCat,
+			SubCategories: subs,
+		})
+	}
+	return out
+}
+
 func publicHomeCreateStreamHref(signedIn bool) string {
 	target := organizationPath("formata-builder")
 	if signedIn {

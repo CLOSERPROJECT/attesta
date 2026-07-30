@@ -102,6 +102,45 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 	}
 }
 
+func TestBuildPublicHomeCategoriesMarksActiveAndURLs(t *testing.T) {
+	cats := []TaxonomyCategoryNode{
+		{
+			Slug: "supply-chain", Name: "Supply Chain", IconURL: "/static/taxonomy/batch-traceability.svg",
+			SubCategories: []TaxonomySubCategoryNode{
+				{Slug: "procurement", Name: "Procurement"},
+				{Slug: "order-fulfillment", Name: "Order Fulfillment"},
+			},
+		},
+		{
+			Slug: "compliance-and-quality", Name: "Compliance and Quality", IconURL: "/static/taxonomy/quality-control.svg",
+			SubCategories: []TaxonomySubCategoryNode{
+				{Slug: "inspection", Name: "Inspection"},
+			},
+		},
+	}
+	got := buildPublicHomeCategories(cats, "supply-chain", "order-fulfillment")
+	if len(got) != 2 {
+		t.Fatalf("len=%d", len(got))
+	}
+	if !got[0].Expanded || got[1].Expanded {
+		t.Fatalf("expanded flags: %#v", got)
+	}
+	if got[0].SubCategories[1].Active != true || got[0].SubCategories[0].Active {
+		t.Fatalf("active flags: %#v", got[0].SubCategories)
+	}
+	wantPartial := "/streams/public?category=supply-chain&subCategory=order-fulfillment"
+	wantPush := "/?category=supply-chain&subCategory=order-fulfillment"
+	if got[0].SubCategories[1].PartialURL != wantPartial {
+		t.Fatalf("PartialURL=%q", got[0].SubCategories[1].PartialURL)
+	}
+	if got[0].SubCategories[1].PushURL != wantPush {
+		t.Fatalf("PushURL=%q", got[0].SubCategories[1].PushURL)
+	}
+	if got[1].Name != "Compliance and Quality" || len(got[1].SubCategories) != 1 {
+		t.Fatalf("expected zero-stream category still present: %#v", got[1])
+	}
+}
+
 func TestPublicHomeCreateStreamHref(t *testing.T) {
 	if got := publicHomeCreateStreamHref(false); got != "/login?next=%2Fmy%2Forganization%2Fformata-builder" {
 		t.Fatalf("anonymous href = %q", got)

@@ -46,6 +46,30 @@ type PublicStreamCardView struct {
 	OrganizationsOverflow int // count beyond the first four avatars; 0 when none
 }
 
+// PublicHomeSubCategoryView is one filterable leaf in the landing sidebar.
+type PublicHomeSubCategoryView struct {
+	Slug       string
+	Name       string
+	Active     bool
+	PartialURL string // /streams/public?category=…&subCategory=…
+	PushURL    string // /?category=…&subCategory=…
+}
+
+// PublicHomeCategoryView is one accordion category on the landing sidebar.
+type PublicHomeCategoryView struct {
+	Slug          string
+	Name          string
+	IconURL       string
+	Expanded      bool
+	SubCategories []PublicHomeSubCategoryView
+}
+
+// PublicHomeStreamResultsView is the HTMX swap target for landing stream cards.
+type PublicHomeStreamResultsView struct {
+	Streams          []PublicStreamCardView
+	CreateStreamHref string
+}
+
 // WorkflowProcessCounts holds process status totals shown on a stream card.
 type WorkflowProcessCounts struct {
 	NotStarted int
