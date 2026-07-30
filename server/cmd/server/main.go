@@ -413,6 +413,7 @@ type PlatformAdminView struct {
 	PageBase
 	ActivePanel              string
 	Categories               []TaxonomyCategoryNode
+	CategoriesEditor         CategoriesEditorView
 	Breadcrumbs              BreadcrumbsView
 	Console                  AdminConsoleView
 	SearchQuery              string
