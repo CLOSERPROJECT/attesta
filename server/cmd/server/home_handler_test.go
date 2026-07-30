@@ -156,11 +156,13 @@ func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 		"Alpha description",
 		"Beta Stream",
 		"Beta description",
-		`class="public-stream-card-badge">Stream</span>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in public home body, got %q", want, body)
 		}
+	}
+	if strings.Contains(body, `public-stream-card-badge`) {
+		t.Fatalf("public home cards must not render legacy badges, got %q", body)
 	}
 	alphaIdx := strings.Index(body, "Alpha Stream")
 	betaIdx := strings.Index(body, "Beta Stream")
@@ -246,13 +248,21 @@ users:
 	body := rec.Body.String()
 	for _, want := range []string{
 		"Catalog Trace Stream",
-		`class="public-stream-card-steps-head"><strong>Steps</strong> <span>2</span>`,
-		"Incoming intake",
-		`data-tooltip="Actions"`,
-		"Quality check",
+		`class="public-stream-card-metrics-row"`,
+		"2 steps",
+		"1 role",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	for _, gone := range []string{
+		"public-stream-card-steps",
+		"Incoming intake",
+		"Quality check",
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("did not expect %q in public home body, got %q", gone, body)
 		}
 	}
 }
@@ -288,19 +298,19 @@ func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
 		alphaCardEnd = len(body)
 	}
 	alphaCard := body[alphaIdx:alphaCardEnd]
-	if strings.Contains(alphaCard, "Product Passport") || strings.Contains(alphaCard, `data-category="passport"`) {
-		t.Fatalf("plain stream must not show passport badge, got %q", alphaCard)
+	if strings.Contains(alphaCard, "public-stream-card-dpp") || strings.Contains(alphaCard, ">DPP<") {
+		t.Fatalf("plain stream must not show DPP chip, got %q", alphaCard)
 	}
 
 	betaCard := body[betaIdx:]
-	if !strings.Contains(betaCard, `data-category="passport"`) {
-		t.Fatalf("DPP-enabled stream must include passport category hook, got %q", betaCard)
+	if !strings.Contains(betaCard, `class="public-stream-card-dpp"`) {
+		t.Fatalf("DPP-enabled stream must show DPP chip, got %q", betaCard)
 	}
-	if !strings.Contains(betaCard, "Product Passport") {
-		t.Fatalf("DPP-enabled stream must show Product Passport badge, got %q", betaCard)
+	if !strings.Contains(betaCard, "DPP") {
+		t.Fatalf("DPP-enabled stream must show DPP label, got %q", betaCard)
 	}
-	if !strings.Contains(body, `class="public-stream-card-badge">Stream</span>`) {
-		t.Fatalf("expected static Stream badge on public home cards, got %q", body)
+	if strings.Contains(body, `public-stream-card-badge`) {
+		t.Fatalf("public home cards must not render legacy badges, got %q", body)
 	}
 }
 
@@ -374,7 +384,8 @@ users:
 		">BE<",
 		`<strong>Organizations</strong>`,
 		`class="public-stream-card-metrics"`,
-		"no instances yet",
+		`class="public-stream-card-orgs-count"`,
+		"no runs yet",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in public home body, got %q", want, body)
@@ -415,7 +426,7 @@ func TestHandlePublicHomeRendersNoInstancesYetWhenStreamHasNoProcesses(t *testin
 
 	for _, want := range []string{
 		"Empty Metrics Stream",
-		"no instances yet",
+		"no runs yet",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 	} {
 		if !strings.Contains(body, want) {
@@ -463,7 +474,7 @@ func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testi
 
 	for _, want := range []string{
 		"Settled Metrics Stream",
-		"2 instances",
+		"2 runs",
 		"all completed",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
 		`d="m9 12 2 2 4-4"`,
@@ -475,11 +486,11 @@ func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testi
 	if strings.Contains(body, ">28<") {
 		t.Fatalf("stub instance count must not appear, got %q", body)
 	}
-	if strings.Contains(body, "no instances yet") {
+	if strings.Contains(body, "no runs yet") {
 		t.Fatalf("settled stream must not show empty label, got %q", body)
 	}
-	if strings.Count(body, `class="public-stream-card-metric"`) != 2 {
-		t.Fatalf("settled metrics must render exactly two chips, got %q", body)
+	if strings.Count(body, `class="public-stream-card-metrics-row"`) != 2 {
+		t.Fatalf("settled metrics must render run and step/role rows, got %q", body)
 	}
 }
 
@@ -547,7 +558,7 @@ func TestHandlePublicHomeRendersActiveNowMetricsScopedPerStream(t *testing.T) {
 	settledCard := body[settledIdx:settledEnd]
 
 	for _, want := range []string{
-		"3 instances",
+		"3 runs",
 		"2 active now",
 		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
 	} {
@@ -560,7 +571,7 @@ func TestHandlePublicHomeRendersActiveNowMetricsScopedPerStream(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"2 instances",
+		"2 runs",
 		"all completed",
 	} {
 		if !strings.Contains(settledCard, want) {
