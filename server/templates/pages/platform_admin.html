@@ -147,14 +147,14 @@
         <p>Manage stream discovery taxonomy</p>
       </div>
       <button
-        class="btn btn-primary btn-icon"
+        class="btn btn-primary"
         type="button"
-        aria-label="Add category"
         hx-get="/admin/categories?new=group"
         hx-target="#platform-admin-categories"
         hx-swap="outerHTML"
       >
         {{ template "icon-plus" . }}
+        Add category
       </button>
     </div>
 
