@@ -40,6 +40,31 @@ func resolvePublicHomeSelection(categories []TaxonomyCategoryNode, categorySlug,
 	return categories[0].Slug, categories[0].SubCategories[0].Slug
 }
 
+func buildPublicHomeStreamResultsView(categories []TaxonomyCategoryNode, cat, sub string, streams []PublicStreamCardView, createHref string) PublicHomeStreamResultsView {
+	view := PublicHomeStreamResultsView{
+		Streams:          streams,
+		CreateStreamHref: createHref,
+	}
+	for _, category := range categories {
+		if category.Slug != cat {
+			continue
+		}
+		view.CategoryName = category.Name
+		view.CategoryIconURL = category.IconURL
+		for _, leaf := range category.SubCategories {
+			if leaf.Slug != sub {
+				continue
+			}
+			view.SubCategoryName = leaf.Name
+			view.SubCategoryIconURL = leaf.IconURL
+			view.SubCategoryDescription = leaf.Description
+			break
+		}
+		break
+	}
+	return view
+}
+
 func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, selectedSub string) []PublicHomeCategoryView {
 	out := make([]PublicHomeCategoryView, 0, len(categories))
 	for _, cat := range categories {
@@ -138,10 +163,7 @@ func (s *Server) handlePublicStreamsPartial(w http.ResponseWriter, r *http.Reque
 	if _, _, err := s.currentUser(r); err == nil {
 		signedIn = true
 	}
-	view := PublicHomeStreamResultsView{
-		Streams:          streams,
-		CreateStreamHref: publicHomeCreateStreamHref(signedIn),
-	}
+	view := buildPublicHomeStreamResultsView(categories, cat, sub, streams, publicHomeCreateStreamHref(signedIn))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.ExecuteTemplate(w, "public_home_stream_results", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

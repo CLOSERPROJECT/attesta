@@ -2069,10 +2069,7 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	}{
 		PageBase:   base,
 		Categories: buildPublicHomeCategories(categories, cat, sub),
-		StreamResults: PublicHomeStreamResultsView{
-			Streams:          streams,
-			CreateStreamHref: publicHomeCreateStreamHref(signedIn),
-		},
+		StreamResults: buildPublicHomeStreamResultsView(categories, cat, sub, streams, publicHomeCreateStreamHref(signedIn)),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

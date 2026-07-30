@@ -66,8 +66,13 @@ type PublicHomeCategoryView struct {
 
 // PublicHomeStreamResultsView is the HTMX swap target for landing stream cards.
 type PublicHomeStreamResultsView struct {
-	Streams          []PublicStreamCardView
-	CreateStreamHref string
+	Streams                []PublicStreamCardView
+	CreateStreamHref       string
+	CategoryName           string
+	CategoryIconURL        string
+	SubCategoryName        string
+	SubCategoryIconURL     string
+	SubCategoryDescription string
 }
 
 // WorkflowProcessCounts holds process status totals shown on a stream card.

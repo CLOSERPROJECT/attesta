@@ -3,11 +3,10 @@
  *
  * div.public-home
  *   header.public-home-header
- *   section.public-home-hero | .public-home-streams | .public-home-process
- *     | .public-home-features | .public-home-dev
- *     .public-home-streams-layout (sidebar + results)
- *       aside.public-home-category-sidebar
- *       .public-home-stream-results
+ *   section.public-home-hero | .public-home-process | .public-home-features | .public-home-dev
+ *   .public-home-streams-split#streams (bordered two-column shell)
+ *     aside.public-home-category-sidebar  (--card)
+ *     .public-home-stream-results         (--muted)
  *   footer.public-home-footer
  *
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
@@ -45,7 +44,6 @@
 
 .public-home-header,
 .public-home-hero,
-.public-home-streams,
 .public-home-process,
 .public-home-features,
 .public-home-dev,
@@ -190,30 +188,20 @@
   line-height: 2.25rem;
 }
 
-.public-home-streams {
+.public-home-streams-split {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-6);
-  background: var(--background);
-  padding-block: var(--space-8) 80px;
-}
-
-.public-home-streams-layout {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
   width: 100%;
-  max-width: 80rem;
-  align-items: stretch;
+  border-block: 1px solid var(--border);
+  overflow: hidden;
 }
 
 .public-home-category-sidebar {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 8px;
   background: var(--card);
+  border-bottom: 1px solid var(--border);
   overflow: hidden;
 }
 
@@ -222,7 +210,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-4);
-  border-bottom: 1px solid var(--border);
+  padding-top: var(--space-5);
 }
 
 .public-home-category-sidebar-title {
@@ -242,11 +230,24 @@
 .public-home-category {
   border-radius: 8px;
   background: var(--background);
+  border: 1px solid transparent;
+  interpolate-size: allow-keywords;
 }
 
 .public-home-category[open] {
-  background: var(--muted);
-  border: 1px solid var(--border);
+  border-color: var(--border);
+}
+
+.public-home-category::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 0.2s ease,
+    content-visibility 0.2s allow-discrete;
+}
+
+.public-home-category[open]::details-content {
+  block-size: auto;
 }
 
 .public-home-category-summary {
@@ -282,16 +283,15 @@
   height: 20px;
 }
 
-.public-home-category-chevron-open {
-  display: none;
-}
-
-.public-home-category[open] .public-home-category-chevron-open {
+.public-home-category-chevron {
   display: inline-flex;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform 0.2s ease;
 }
 
-.public-home-category[open] .public-home-category-chevron-closed {
-  display: none;
+.public-home-category[open] .public-home-category-chevron {
+  transform: rotate(90deg);
 }
 
 .public-home-subcategories {
@@ -301,8 +301,11 @@
 }
 
 .public-home-subcategory {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
+  overflow: hidden;
   text-align: left;
   border: 0;
   border-radius: 6px;
@@ -313,15 +316,90 @@
   cursor: pointer;
 }
 
+.public-home-subcategory::before {
+  content: "";
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: transparent;
+}
+
 .public-home-subcategory.is-active {
   background: var(--secondary);
-  color: var(--foreground);
-  box-shadow: inset 3px 0 0 var(--primary);
+  color: var(--primary);
+  font-weight: var(--font-medium);
+}
+
+.public-home-subcategory.is-active::before {
+  background: var(--primary);
 }
 
 .public-home-stream-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   flex: 1;
   min-width: 0;
+  background: var(--muted);
+  padding: var(--space-6);
+}
+
+.public-home-results-category-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.public-home-results-category-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.public-home h2.public-home-results-category-name {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  color: var(--foreground);
+}
+
+.public-home-results-subcategory-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+}
+
+.public-home-results-subcategory-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.public-home-results-subcategory-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.public-home-results-subcategory-name {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  line-height: 2rem;
+  color: var(--foreground);
+}
+
+.public-home-results-subcategory-description {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  line-height: 1.25rem;
+  color: var(--muted-foreground);
 }
 
 .public-home-stream-empty {
@@ -559,7 +637,6 @@
 @media (--md-up) {
   .public-home-header,
   .public-home-hero,
-  .public-home-streams,
   .public-home-process,
   .public-home-features,
   .public-home-dev,
@@ -571,14 +648,16 @@
     display: flex;
   }
 
-  .public-home-streams-layout {
+  .public-home-streams-split {
     flex-direction: row;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
   .public-home-category-sidebar {
     flex: 0 0 20rem;
     max-width: 20rem;
+    border-bottom: 0;
+    border-right: 1px solid var(--border);
   }
 
   .public-home-stream-grid {
@@ -607,7 +686,6 @@
 @media (--lg-up) {
   .public-home-header,
   .public-home-hero,
-  .public-home-streams,
   .public-home-process,
   .public-home-features,
   .public-home-dev,

@@ -104,6 +104,31 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 	}
 }
 
+func TestBuildPublicHomeStreamResultsViewFillsSelection(t *testing.T) {
+	cats := []TaxonomyCategoryNode{
+		{
+			Slug: "supply-chain", Name: "Supply Chain", IconURL: "/static/taxonomy/batch-traceability.svg",
+			SubCategories: []TaxonomySubCategoryNode{
+				{Slug: "procurement", Name: "Procurement", IconURL: "/static/taxonomy/procurement-workflow.svg", Description: "PO management"},
+			},
+		},
+	}
+	streams := []PublicStreamCardView{{Name: "Example Stream"}}
+	got := buildPublicHomeStreamResultsView(cats, "supply-chain", "procurement", streams, "/login?next=builder")
+	if got.CategoryName != "Supply Chain" || got.CategoryIconURL != "/static/taxonomy/batch-traceability.svg" {
+		t.Fatalf("category fields = %#v", got)
+	}
+	if got.SubCategoryName != "Procurement" || got.SubCategoryIconURL != "/static/taxonomy/procurement-workflow.svg" {
+		t.Fatalf("subcategory fields = %#v", got)
+	}
+	if got.SubCategoryDescription != "PO management" {
+		t.Fatalf("SubCategoryDescription = %q", got.SubCategoryDescription)
+	}
+	if len(got.Streams) != 1 || got.CreateStreamHref != "/login?next=builder" {
+		t.Fatalf("streams/create href = %#v", got)
+	}
+}
+
 func TestBuildPublicHomeCategoriesMarksActiveAndURLs(t *testing.T) {
 	cats := []TaxonomyCategoryNode{
 		{
@@ -173,6 +198,21 @@ func TestHandlePublicStreamsPartialFilters(t *testing.T) {
 	if !strings.Contains(body, `class="public-home-stream-results"`) {
 		t.Fatalf("missing results wrapper: %s", body)
 	}
+	if !strings.Contains(body, `class="public-home-results-category-header"`) {
+		t.Fatalf("missing results category header: %s", body)
+	}
+	if !strings.Contains(body, `class="public-home-results-category-name">Supply Chain<`) {
+		t.Fatalf("missing category name in results: %s", body)
+	}
+	if !strings.Contains(body, `class="public-home-results-subcategory-header"`) {
+		t.Fatalf("missing results subcategory header: %s", body)
+	}
+	if !strings.Contains(body, `class="public-home-results-subcategory-name">Procurement<`) {
+		t.Fatalf("missing subcategory name in results: %s", body)
+	}
+	if !strings.Contains(body, `class="public-home-results-subcategory-description">PO management<`) {
+		t.Fatalf("missing subcategory description in results: %s", body)
+	}
 	if strings.Contains(body, `class="public-home-header"`) {
 		t.Fatalf("partial must not include landing header: %s", body)
 	}
@@ -190,6 +230,32 @@ func TestHandlePublicStreamsPartialUnknownPath404(t *testing.T) {
 	server.handlePublicStreamsPartial(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status=%d", rec.Code)
+	}
+}
+
+func TestHandlePublicHomeRendersSubcategoryHeaderFromTaxonomySeed(t *testing.T) {
+	store := NewMemoryStore()
+	yamlPath := filepath.Join("..", "..", "config", "categories.yaml")
+	if err := seedTaxonomyFromFile(t.Context(), store, yamlPath); err != nil {
+		t.Fatalf("seedTaxonomyFromFile: %v", err)
+	}
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="public-home-results-subcategory-header"`,
+		`class="public-home-results-subcategory-name">Photovoltaic Panels<`,
+		`class="public-home-results-subcategory-description">Tracking disassembly and material recovery from photovoltaic panels<`,
+		`/static/taxonomy/photovoltaic-module.svg`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in %s", want, body)
+		}
 	}
 }
 

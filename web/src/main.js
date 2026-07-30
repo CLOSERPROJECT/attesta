@@ -1454,6 +1454,25 @@ const initLandingCategorySidebar = () => {
   if (!(root instanceof HTMLElement)) {
     return;
   }
+  // `toggle` on <details> does not bubble — listen in the capture phase.
+  root.addEventListener(
+    "toggle",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLDetailsElement)) {
+        return;
+      }
+      if (!target.classList.contains("public-home-category") || !target.open) {
+        return;
+      }
+      for (const other of root.querySelectorAll("details.public-home-category")) {
+        if (other !== target) {
+          other.open = false;
+        }
+      }
+    },
+    true,
+  );
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) {

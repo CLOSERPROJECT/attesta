@@ -32,6 +32,9 @@ func TestHandlePublicHomeRendersTaxonomySidebar(t *testing.T) {
 		`hx-target="#public-home-stream-results"`,
 		`hx-push-url="/?category=supply-chain&amp;subCategory=procurement"`,
 		`id="public-home-stream-results"`,
+		`class="public-home-results-category-header"`,
+		`class="public-home-results-category-name">Supply Chain<`,
+		`/static/taxonomy/batch-traceability.svg`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in %s", want, body)
