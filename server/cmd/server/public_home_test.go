@@ -249,8 +249,10 @@ func TestHandlePublicHomeRendersSubcategoryHeaderFromTaxonomySeed(t *testing.T) 
 	body := rec.Body.String()
 	for _, want := range []string{
 		`class="public-home-results-subcategory-header"`,
-		`class="public-home-results-subcategory-name">Photovoltaic Panels<`,
-		`class="public-home-results-subcategory-description">Tracking disassembly and material recovery from photovoltaic panels<`,
+		`class="public-home-results-subcategory-name"`,
+		"Photovoltaic Panels",
+		`class="public-home-results-subcategory-description"`,
+		"Tracking disassembly and material recovery from photovoltaic panels",
 		`/static/taxonomy/photovoltaic-module.svg`,
 	} {
 		if !strings.Contains(body, want) {
