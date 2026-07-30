@@ -34,14 +34,15 @@
   margin: 0;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
   transition:
-    opacity 160ms ease,
-    transform 160ms ease;
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
+/* Enter/exit: slide up from below the toast slot */
 .confirmation[data-toast].toast-enter,
 .confirmation[data-toast].toast-exit {
   opacity: 0;
-  transform: translateY(0.5rem);
+  transform: translateY(100%);
 }
 
 .toast-host .confirmation[data-toast] {
