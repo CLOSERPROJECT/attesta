@@ -3287,13 +3287,26 @@ func platformAdminOrganizationRows(ctx context.Context, organizations []Organiza
 			if err != nil {
 				log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
 			} else {
-				row.OrgAdminEmails, row.PendingOrgAdminEmails = summarizePlatformOrgAdminMemberships(memberships)
+				row.OrgAdminEmails, row.PendingOrgAdminEmails = summarizePlatformOrgAdminMemberships(
+					filterPlatformOrgAdminMemberships(memberships),
+				)
 			}
 		}
 		row.OrgAdminStatus, row.OrgAdminStatusClassName = platformOrgAdminStatus(row.OrgAdminEmails, row.PendingOrgAdminEmails)
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+func filterPlatformOrgAdminMemberships(memberships []IdentityMembership) []IdentityMembership {
+	out := make([]IdentityMembership, 0, len(memberships))
+	for _, membership := range memberships {
+		if !membership.IsOrgAdmin {
+			continue
+		}
+		out = append(out, membership)
+	}
+	return out
 }
 
 func summarizePlatformOrgAdminMemberships(memberships []IdentityMembership) ([]string, []string) {

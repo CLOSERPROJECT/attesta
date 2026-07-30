@@ -68,3 +68,18 @@ func TestPlatformAdminViewDoesNotCallHydratedMembershipList(t *testing.T) {
 		t.Fatalf("missing status = %q", view.Organizations[1].OrgAdminStatus)
 	}
 }
+
+func TestFilterPlatformOrgAdminMembershipsDropsNonAdmins(t *testing.T) {
+	in := []IdentityMembership{
+		{Email: "owner@example.com", IsOrgAdmin: true, Confirmed: true},
+		{Email: "member@example.com", IsOrgAdmin: false, Confirmed: true},
+		{Email: "pending@example.com", IsOrgAdmin: true, Confirmed: false},
+	}
+	got := filterPlatformOrgAdminMemberships(in)
+	if len(got) != 2 {
+		t.Fatalf("got = %#v", got)
+	}
+	if got[0].Email != "owner@example.com" || got[1].Email != "pending@example.com" {
+		t.Fatalf("got = %#v", got)
+	}
+}
