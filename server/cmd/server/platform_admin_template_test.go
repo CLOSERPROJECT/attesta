@@ -314,10 +314,18 @@ func TestPlatformAdminCategoriesPanelFormIconGridAndCancel(t *testing.T) {
 		`hx-get="/admin/categories"`,
 		`hx-target="#platform-admin-categories"`,
 		`id="categories-editor-form"`,
+		`New subcategory`,
+		`<label for="categories-editor-icon-toggle">Icon</label>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in leaf create form, got:\n%s", want, body)
 		}
+	}
+	nameIdx := strings.Index(body, `id="categories-editor-name"`)
+	descIdx := strings.Index(body, `id="categories-editor-description"`)
+	iconIdx := strings.Index(body, `id="categories-editor-icon-toggle"`)
+	if nameIdx < 0 || descIdx < 0 || iconIdx < 0 || !(nameIdx < descIdx && descIdx < iconIdx) {
+		t.Fatalf("expected field order name → description → icon, got indices name=%d desc=%d icon=%d\n%s", nameIdx, descIdx, iconIdx, body)
 	}
 }
 
