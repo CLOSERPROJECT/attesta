@@ -49,6 +49,8 @@ type Store interface {
 	DeleteWorkflowData(ctx context.Context, workflowKey string) error
 	ListCategories(ctx context.Context) ([]Category, error)
 	GetCategoryBySlug(ctx context.Context, slug string) (*Category, error)
+	CreateCategory(ctx context.Context, category Category) (Category, error)
+	UpdateCategory(ctx context.Context, slug string, name, icon string) (Category, error)
 	DeleteCategory(ctx context.Context, slug string) error
 	ListSubCategories(ctx context.Context, categorySlug string) ([]SubCategory, error)
 	GetSubCategoryBySlug(ctx context.Context, categorySlug, slug string) (*SubCategory, error)

@@ -26,6 +26,9 @@ const (
 // one or more Sub-categories still reference the Category slug.
 var ErrCategoryHasSubCategories = errors.New("category has sub-categories")
 
+// ErrTaxonomySlugExists is returned when a category or sub-category slug collides.
+var ErrTaxonomySlugExists = errors.New("taxonomy slug already exists")
+
 // ErrInvalidTaxonomyIcon is returned when an icon key is not in the allowlist.
 var ErrInvalidTaxonomyIcon = errors.New("invalid taxonomy icon")
 
@@ -131,6 +134,61 @@ func (s *MemoryStore) GetCategoryBySlug(_ context.Context, slug string) (*Catego
 	}
 	cloned := cloneCategory(category)
 	return &cloned, nil
+}
+
+func (s *MemoryStore) CreateCategory(_ context.Context, category Category) (Category, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	slug := strings.TrimSpace(category.Slug)
+	name := strings.TrimSpace(category.Name)
+	icon := strings.TrimSpace(category.Icon)
+	if slug == "" || name == "" {
+		return Category{}, fmt.Errorf("category slug and name are required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+	if _, exists := s.categories[slug]; exists {
+		return Category{}, ErrTaxonomySlugExists
+	}
+	maxOrder := 0
+	for _, c := range s.categories {
+		if c.SortOrder > maxOrder {
+			maxOrder = c.SortOrder
+		}
+	}
+	if category.ID.IsZero() {
+		category.ID = primitive.NewObjectID()
+	}
+	category.Slug, category.Name, category.Icon = slug, name, icon
+	category.SortOrder = maxOrder + 1
+	s.categories[slug] = cloneCategory(category)
+	s.taxonomyRevision++
+	return cloneCategory(category), nil
+}
+
+func (s *MemoryStore) UpdateCategory(_ context.Context, slug, name, icon string) (Category, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureTaxonomyMaps()
+	trimmed := strings.TrimSpace(slug)
+	existing, ok := s.categories[trimmed]
+	if !ok {
+		return Category{}, mongo.ErrNoDocuments
+	}
+	name = strings.TrimSpace(name)
+	icon = strings.TrimSpace(icon)
+	if name == "" {
+		return Category{}, fmt.Errorf("category name is required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+	existing.Name, existing.Icon = name, icon
+	s.categories[trimmed] = cloneCategory(existing)
+	s.taxonomyRevision++
+	return cloneCategory(existing), nil
 }
 
 func (s *MemoryStore) DeleteCategory(_ context.Context, slug string) error {
@@ -289,6 +347,79 @@ func (s *MongoStore) GetCategoryBySlug(ctx context.Context, slug string) (*Categ
 		return nil, err
 	}
 	return &category, nil
+}
+
+func (s *MongoStore) CreateCategory(ctx context.Context, category Category) (Category, error) {
+	slug := strings.TrimSpace(category.Slug)
+	name := strings.TrimSpace(category.Name)
+	icon := strings.TrimSpace(category.Icon)
+	if slug == "" || name == "" {
+		return Category{}, fmt.Errorf("category slug and name are required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+
+	maxOrder := 0
+	var top Category
+	err := s.database().Collection(collectionCategories).FindOne(
+		ctx,
+		bson.M{},
+		options.FindOne().SetSort(bson.D{{Key: "sortOrder", Value: -1}}),
+	).Decode(&top)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return Category{}, err
+	}
+	if err == nil {
+		maxOrder = top.SortOrder
+	}
+
+	if category.ID.IsZero() {
+		category.ID = primitive.NewObjectID()
+	}
+	category.Slug, category.Name, category.Icon = slug, name, icon
+	category.SortOrder = maxOrder + 1
+
+	if _, err := s.database().Collection(collectionCategories).InsertOne(ctx, category); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return Category{}, ErrTaxonomySlugExists
+		}
+		return Category{}, err
+	}
+	if err := s.bumpTaxonomyRevision(ctx); err != nil {
+		return Category{}, err
+	}
+	return category, nil
+}
+
+func (s *MongoStore) UpdateCategory(ctx context.Context, slug, name, icon string) (Category, error) {
+	trimmed := strings.TrimSpace(slug)
+	name = strings.TrimSpace(name)
+	icon = strings.TrimSpace(icon)
+	if name == "" {
+		return Category{}, fmt.Errorf("category name is required")
+	}
+	if err := validateTaxonomyIcon(icon); err != nil {
+		return Category{}, err
+	}
+
+	var updated Category
+	err := s.database().Collection(collectionCategories).FindOneAndUpdate(
+		ctx,
+		bson.M{"slug": trimmed},
+		bson.M{"$set": bson.M{"name": name, "icon": icon}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return Category{}, mongo.ErrNoDocuments
+	}
+	if err != nil {
+		return Category{}, err
+	}
+	if err := s.bumpTaxonomyRevision(ctx); err != nil {
+		return Category{}, err
+	}
+	return updated, nil
 }
 
 func (s *MongoStore) DeleteCategory(ctx context.Context, slug string) error {
