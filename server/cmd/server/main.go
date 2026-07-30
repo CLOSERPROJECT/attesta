@@ -3283,7 +3283,7 @@ func platformAdminOrganizationRows(ctx context.Context, organizations []Organiza
 			LogoAttachmentID: organization.LogoAttachmentID,
 		}
 		if identity != nil && strings.TrimSpace(organization.Slug) != "" {
-			memberships, err := identity.ListOrganizationMemberships(ctx, organization.Slug)
+			memberships, err := identity.ListOrganizationMembershipsLite(ctx, organization.Slug)
 			if err != nil {
 				log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
 			} else {
