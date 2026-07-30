@@ -20,12 +20,6 @@ type StreamCardView struct {
 	DeleteAction      string
 }
 
-// PublicStreamCardStepView is one blueprint step row on a public stream card.
-type PublicStreamCardStepView struct {
-	Title        string
-	SubstepCount int
-}
-
 // PublicStreamCardOrgView is one participating organization avatar on a public stream card.
 type PublicStreamCardOrgView struct {
 	Name     string
@@ -37,11 +31,13 @@ type PublicStreamCardOrgView struct {
 type PublicStreamCardView struct {
 	Name                  string
 	Description           string
-	Steps                 []PublicStreamCardStepView
 	PassportEnabled       bool
 	InstanceCount         int
 	ActiveCount           int  // active instances (dashboard Active: not done, not terminated)
 	AllCompleted          bool // true when T>=1 and no active instances (settled)
+	StepCount             int
+	RoleCount             int
+	OrganizationCount     int // total orgs before avatar truncation
 	Organizations         []PublicStreamCardOrgView
 	OrganizationsOverflow int // count beyond the first four avatars; 0 when none
 }

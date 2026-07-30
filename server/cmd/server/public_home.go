@@ -171,14 +171,6 @@ func (s *Server) handlePublicStreamsPartial(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) buildPublicStreamCardView(ctx context.Context, key string, cfg RuntimeConfig, logoURLs map[string]string) (PublicStreamCardView, error) {
-	steps := sortedSteps(cfg.Workflow)
-	stepViews := make([]PublicStreamCardStepView, 0, len(steps))
-	for _, step := range steps {
-		stepViews = append(stepViews, PublicStreamCardStepView{
-			Title:        step.Title,
-			SubstepCount: len(step.Substep),
-		})
-	}
 	orgs, overflow := publicStreamCardOrganizations(cfg.Organizations, logoURLs)
 	instanceCount := 0
 	activeCount := 0
@@ -202,7 +194,6 @@ func (s *Server) buildPublicStreamCardView(ctx context.Context, key string, cfg 
 	return PublicStreamCardView{
 		Name:                  cfg.Workflow.Name,
 		Description:           strings.TrimSpace(cfg.Workflow.Description),
-		Steps:                 stepViews,
 		PassportEnabled:       cfg.DPP.Enabled,
 		InstanceCount:         instanceCount,
 		ActiveCount:           activeCount,
@@ -236,4 +227,16 @@ func publicStreamCardOrganizations(orgs []WorkflowOrganization, logoURLs map[str
 		return out[:publicHomeStreamOrgAvatarLimit], len(out) - publicHomeStreamOrgAvatarLimit
 	}
 	return out, 0
+}
+
+func publicStreamCardRoleCount(def WorkflowDef) int {
+	seen := map[string]struct{}{}
+	for _, step := range def.Steps {
+		for _, sub := range step.Substep {
+			for _, role := range substepRoles(sub) {
+				seen[role] = struct{}{}
+			}
+		}
+	}
+	return len(seen)
 }

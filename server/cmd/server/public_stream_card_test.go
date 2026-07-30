@@ -43,10 +43,6 @@ func TestPublicStreamCardTemplateRendersStepPreview(t *testing.T) {
 	var out bytes.Buffer
 	card := PublicStreamCardView{
 		Name: "PV Module Tracing",
-		Steps: []PublicStreamCardStepView{
-			{Title: "Incoming intake", SubstepCount: 3},
-			{Title: "Quality check", SubstepCount: 1},
-		},
 	}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
 		t.Fatalf("render public_stream_card template: %v", err)
@@ -79,9 +75,6 @@ func TestPublicStreamCardTemplateOmitsPassportBadgeWhenDisabled(t *testing.T) {
 	card := PublicStreamCardView{
 		Name:            "Indium recycling recovery",
 		PassportEnabled: false,
-		Steps: []PublicStreamCardStepView{
-			{Title: "Incoming intake", SubstepCount: 2},
-		},
 	}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
 		t.Fatalf("render public_stream_card template: %v", err)
@@ -106,9 +99,6 @@ func TestPublicStreamCardTemplateRendersPassportBadgeWhenEnabled(t *testing.T) {
 	card := PublicStreamCardView{
 		Name:            "Battery Passport",
 		PassportEnabled: true,
-		Steps: []PublicStreamCardStepView{
-			{Title: "Cell assembly", SubstepCount: 4},
-		},
 	}
 	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
 		t.Fatalf("render public_stream_card template: %v", err)
@@ -425,6 +415,31 @@ func TestPublicStreamCardTemplateRendersOrganizationsFooterAndMetrics(t *testing
 	}
 	if strings.Contains(body, "Stream Instances") {
 		t.Fatalf("footer must not say Stream Instances, got: %s", body)
+	}
+}
+
+func TestPublicStreamCardRoleCountDistinctAcrossSubsteps(t *testing.T) {
+	def := WorkflowDef{
+		Steps: []WorkflowStep{
+			{
+				Substep: []WorkflowSub{
+					{Roles: []string{"qa", "ops"}},
+					{Roles: []string{" qa "}}, // duplicate after trim
+				},
+			},
+			{
+				Substep: []WorkflowSub{
+					{Role: "reviewer"},
+					{Roles: []string{"ops", ""}},
+				},
+			},
+		},
+	}
+	if got := publicStreamCardRoleCount(def); got != 3 {
+		t.Fatalf("publicStreamCardRoleCount = %d, want 3 (qa, ops, reviewer)", got)
+	}
+	if got := publicStreamCardRoleCount(WorkflowDef{}); got != 0 {
+		t.Fatalf("empty def role count = %d, want 0", got)
 	}
 }
 
