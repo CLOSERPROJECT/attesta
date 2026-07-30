@@ -173,7 +173,10 @@
     {{ if .CategoriesEditor.Categories }}
       <ul class="platform-admin-taxonomy-list">
         {{ range $category := .CategoriesEditor.Categories }}
-          <li class="platform-admin-taxonomy-category">
+          <li
+            class="platform-admin-taxonomy-category"
+            style="view-transition-name: taxonomy-group-{{ $category.Slug }}"
+          >
             {{ if and $.CategoriesEditor.Form.Open (eq $.CategoriesEditor.Form.Mode "edit") (eq $.CategoriesEditor.Form.Level "group") (eq $.CategoriesEditor.Form.Slug $category.Slug) }}
               <div class="platform-admin-taxonomy-category-head">
                 {{ template "platform_admin_categories_form" $.CategoriesEditor }}
@@ -212,7 +215,7 @@
                           class="platform-admin-taxonomy-reorder-form"
                           hx-post="/admin/categories"
                           hx-target="#platform-admin-categories"
-                          hx-swap="outerHTML"
+                          hx-swap="outerHTML transition:true"
                           hx-sync="#platform-admin-categories:queue all"
                           hx-disabled-elt=".platform-admin-taxonomy-reorder"
                         >
@@ -232,7 +235,7 @@
                           class="platform-admin-taxonomy-reorder-form"
                           hx-post="/admin/categories"
                           hx-target="#platform-admin-categories"
-                          hx-swap="outerHTML"
+                          hx-swap="outerHTML transition:true"
                           hx-sync="#platform-admin-categories:queue all"
                           hx-disabled-elt=".platform-admin-taxonomy-reorder"
                         >
@@ -324,7 +327,10 @@
             {{ if $category.SubCategories }}
               <ul class="platform-admin-taxonomy-sub-list">
                 {{ range $category.SubCategories }}
-                  <li class="platform-admin-taxonomy-sub">
+                  <li
+                    class="platform-admin-taxonomy-sub"
+                    style="view-transition-name: taxonomy-leaf-{{ $category.Slug }}-{{ .Slug }}"
+                  >
                     {{ if and $.CategoriesEditor.Form.Open (eq $.CategoriesEditor.Form.Mode "edit") (eq $.CategoriesEditor.Form.Level "leaf") (eq $.CategoriesEditor.Form.ParentSlug $category.Slug) (eq $.CategoriesEditor.Form.Slug .Slug) }}
                       {{ template "platform_admin_categories_form" $.CategoriesEditor }}
                     {{ else }}
@@ -352,7 +358,7 @@
                               class="platform-admin-taxonomy-reorder-form"
                               hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
                               hx-target="#platform-admin-categories"
-                              hx-swap="outerHTML"
+                              hx-swap="outerHTML transition:true"
                               hx-sync="#platform-admin-categories:queue all"
                               hx-disabled-elt=".platform-admin-taxonomy-reorder"
                             >
@@ -372,7 +378,7 @@
                               class="platform-admin-taxonomy-reorder-form"
                               hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
                               hx-target="#platform-admin-categories"
-                              hx-swap="outerHTML"
+                              hx-swap="outerHTML transition:true"
                               hx-sync="#platform-admin-categories:queue all"
                               hx-disabled-elt=".platform-admin-taxonomy-reorder"
                             >

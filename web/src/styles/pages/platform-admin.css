@@ -139,6 +139,19 @@
   gap: var(--space-4);
 }
 
+@supports (view-transition-name: none) {
+  /* Named taxonomy rows (inline view-transition-name) morph on HTMX reorder swaps. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 120ms;
+  }
+
+  ::view-transition-group(*) {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
 .platform-admin-taxonomy-category {
   border: 1px solid var(--border);
   border-radius: 4px;
