@@ -5,11 +5,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type failingListCategoriesStore struct {
@@ -63,6 +66,218 @@ func newCategoriesAdminServer(t *testing.T, store Store) *Server {
 		configDir:   tempDir,
 		enforceAuth: true,
 		now:         func() time.Time { return now },
+	}
+}
+
+func postAdminCategories(t *testing.T, server *Server, form url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/admin/categories", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleAdminCategories(rec, req)
+	return rec
+}
+
+func TestHandleAdminCategoriesCreateGroup(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "New Group")
+	form.Set("icon", "weee")
+	rec := postAdminCategories(t, server, form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "New Group") || !strings.Contains(body, "Category group created") {
+		t.Fatalf("expected create confirmation and name in body, got: %s", body)
+	}
+	got, err := store.GetCategoryBySlug(t.Context(), "new-group")
+	if err != nil {
+		t.Fatalf("GetCategoryBySlug: %v", err)
+	}
+	if got.Name != "New Group" || got.Icon != "weee" {
+		t.Fatalf("stored category = %#v", got)
+	}
+}
+
+func TestHandleAdminCategoriesUpdateGroup(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "update")
+	form.Set("slug", "supply-chain")
+	form.Set("name", "Updated Chain")
+	form.Set("icon", "weee")
+	rec := postAdminCategories(t, server, form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Updated Chain") || !strings.Contains(body, "Category group updated") {
+		t.Fatalf("expected update confirmation and name in body, got: %s", body)
+	}
+	got, err := store.GetCategoryBySlug(t.Context(), "supply-chain")
+	if err != nil {
+		t.Fatalf("GetCategoryBySlug: %v", err)
+	}
+	if got.Name != "Updated Chain" || got.Icon != "weee" {
+		t.Fatalf("stored category = %#v", got)
+	}
+}
+
+func TestHandleAdminCategoriesDeleteGroup(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	if _, err := store.CreateCategory(t.Context(), Category{
+		Slug: "empty-group", Name: "Empty Group", Icon: "weee",
+	}); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "delete")
+	form.Set("slug", "empty-group")
+	rec := postAdminCategories(t, server, form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Category group deleted") {
+		t.Fatalf("expected delete confirmation, got: %s", rec.Body.String())
+	}
+	if _, err := store.GetCategoryBySlug(t.Context(), "empty-group"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("expected deleted category, err = %v", err)
+	}
+}
+
+func TestHandleAdminCategoriesReorderGroup(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	if _, err := store.CreateCategory(t.Context(), Category{
+		Slug: "second-group", Name: "Second Group", Icon: "weee",
+	}); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "reorder")
+	form.Set("slug", "second-group")
+	form.Set("direction", "up")
+	rec := postAdminCategories(t, server, form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Category group reordered") {
+		t.Fatalf("expected reorder confirmation, got: %s", rec.Body.String())
+	}
+	list, err := store.ListCategories(t.Context())
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+	if len(list) != 2 || list[0].Slug != "second-group" || list[1].Slug != "supply-chain" {
+		t.Fatalf("order = %v, %v; want second-group then supply-chain", list[0].Slug, list[1].Slug)
+	}
+}
+
+func TestHandleAdminCategoriesCreateGroupDuplicateSlug(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "Supply Chain")
+	form.Set("icon", "weee")
+	rec := postAdminCategories(t, server, form)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "taxonomy slug already exists") {
+		t.Fatalf("expected duplicate slug error, got: %s", body)
+	}
+	if !strings.Contains(body, `id="categories-editor-form"`) {
+		t.Fatalf("expected create form to remain open, got: %s", body)
+	}
+}
+
+func TestHandleAdminCategoriesPostNonAdminForbidden(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Now().UTC()
+	user := AccountUser{
+		Email:     "member@example.com",
+		RoleSlugs: []string{"org-admin"},
+		OrgSlug:   "acme",
+	}
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: testIdentityForSessions(now, map[string]AccountUser{
+			"member-session": user,
+		}),
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "New Group")
+	form.Set("icon", "weee")
+	req := httptest.NewRequest(http.MethodPost, "/admin/categories", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "member-session"})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminCategories(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestHandleAdminCategoriesCreateGroupHTMXPanelPartial(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	form := url.Values{}
+	form.Set("intent", "create")
+	form.Set("name", "Panel Group")
+	form.Set("icon", "weee")
+	req := httptest.NewRequest(http.MethodPost, "/admin/categories", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "platform-admin-categories")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+
+	server.handleAdminCategories(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="platform-admin-categories"`) || !strings.Contains(body, "Panel Group") {
+		t.Fatalf("expected HTMX panel partial with new group, got: %s", body)
+	}
+	if strings.Contains(body, "<html") || strings.Contains(body, `class="topbar"`) {
+		t.Fatalf("HTMX panel must not include full layout, got: %s", body)
 	}
 }
 

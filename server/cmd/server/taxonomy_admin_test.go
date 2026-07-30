@@ -222,7 +222,7 @@ func TestBuildCategoriesEditorViewCountsAndCatalogReference(t *testing.T) {
 	}
 
 	server := &Server{store: store, configDir: tempDir}
-	view, err := server.buildCategoriesEditorView(t.Context(), url.Values{}, "", "saved")
+	view, err := server.buildCategoriesEditorView(t.Context(), url.Values{}, "", "saved", nil)
 	if err != nil {
 		t.Fatalf("buildCategoriesEditorView: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestBuildCategoriesEditorViewEditFormPopulation(t *testing.T) {
 		"parent": {"supply-chain"},
 		"slug":   {"procurement"},
 	}
-	view, err := server.buildCategoriesEditorView(t.Context(), q, "name required", "")
+	view, err := server.buildCategoriesEditorView(t.Context(), q, "name required", "", nil)
 	if err != nil {
 		t.Fatalf("buildCategoriesEditorView: %v", err)
 	}

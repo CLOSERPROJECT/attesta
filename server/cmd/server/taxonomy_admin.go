@@ -175,7 +175,7 @@ func populateCategoriesEditorFormFromTree(form *CategoriesEditorForm, categories
 	}
 }
 
-func (s *Server) buildCategoriesEditorView(ctx context.Context, q url.Values, formErr, confirmation string) (CategoriesEditorView, error) {
+func (s *Server) buildCategoriesEditorView(ctx context.Context, q url.Values, formErr, confirmation string, formState *CategoriesEditorForm) (CategoriesEditorView, error) {
 	nodes, err := loadTaxonomyTree(ctx, s.store)
 	if err != nil {
 		return CategoriesEditorView{}, err
@@ -190,9 +190,14 @@ func (s *Server) buildCategoriesEditorView(ctx context.Context, q url.Values, fo
 	}
 
 	categories := enrichTaxonomyEditorTree(nodes, referenced)
-	form := parseCategoriesEditorQuery(q)
+	var form CategoriesEditorForm
+	if formState != nil {
+		form = *formState
+	} else {
+		form = parseCategoriesEditorQuery(q)
+		populateCategoriesEditorFormFromTree(&form, categories)
+	}
 	form.Error = strings.TrimSpace(formErr)
-	populateCategoriesEditorFormFromTree(&form, categories)
 
 	groupCount := len(categories)
 	leafCount := 0
