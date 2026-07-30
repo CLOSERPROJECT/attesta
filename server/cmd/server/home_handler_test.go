@@ -120,6 +120,27 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	if strings.Contains(body, `>Dashboard</a>`) {
 		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
 	}
+	if !strings.Contains(body, `class="public-home-footer-legal"`) {
+		t.Fatalf("expected legal prose slot in public home footer, got %q", body)
+	}
+	if !strings.Contains(body, "GNU AGPLv3") {
+		t.Fatalf("expected AGPL legal copy in public home footer, got %q", body)
+	}
+	if !strings.Contains(body, "Project No. 101161109") {
+		t.Fatalf("expected CLOSER funding copy in public home footer, got %q", body)
+	}
+	if !strings.Contains(body, "Project No. 101228240") {
+		t.Fatalf("expected Even Closer funding copy in public home footer, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-footer-heading"`) {
+		t.Fatalf("expected parked footer nav columns not rendered, got %q", body)
+	}
+	if strings.Contains(body, `>Platform</p>`) {
+		t.Fatalf("expected Platform footer heading not rendered, got %q", body)
+	}
+	if server.tmpl.Lookup("public_home_footer_nav") == nil {
+		t.Fatal("expected parked template define public_home_footer_nav")
+	}
 }
 
 func TestHandlePublicHomeEmptyCatalogRendersNoStreamCards(t *testing.T) {
