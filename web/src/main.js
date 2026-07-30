@@ -1156,11 +1156,73 @@ if (processId && workflowKey && processPageContent) {
   });
 }
 
+const TOAST_DISMISS_MS = 3000;
+const TOAST_MAX = 3;
+
+function toastHost() {
+  return document.getElementById("toast-host");
+}
+
+function dismissToast(el) {
+  if (!(el instanceof HTMLElement) || el.dataset.toastDismissing === "1") {
+    return;
+  }
+  el.dataset.toastDismissing = "1";
+  el.classList.add("toast-exit");
+  window.setTimeout(() => {
+    el.remove();
+  }, 180);
+}
+
+function enforceToastCap(host) {
+  const items = [...host.querySelectorAll(".confirmation[data-toast]")];
+  while (items.length > TOAST_MAX) {
+    const oldest = items.shift();
+    if (oldest) {
+      oldest.remove();
+    }
+  }
+}
+
+function promoteToasts(root = document) {
+  const host = toastHost();
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  const scope = root instanceof Element || root instanceof Document ? root : document;
+  const nodes = scope.querySelectorAll?.(".confirmation[data-toast]") ?? [];
+  for (const node of nodes) {
+    if (!(node instanceof HTMLElement)) {
+      continue;
+    }
+    if (host.contains(node)) {
+      continue;
+    }
+    node.classList.add("toast-enter");
+    host.prepend(node);
+    enforceToastCap(host);
+    requestAnimationFrame(() => {
+      node.classList.remove("toast-enter");
+    });
+    node.addEventListener(
+      "click",
+      () => {
+        dismissToast(node);
+      },
+      { once: true },
+    );
+    window.setTimeout(() => {
+      dismissToast(node);
+    }, TOAST_DISMISS_MS);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   formatLocalDateTimes(document);
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
   focusNextActionInput();
+  promoteToasts(document);
 });
 
 document.addEventListener("click", (event) => {
@@ -1181,6 +1243,7 @@ document.addEventListener("click", (event) => {
 document.body.addEventListener("htmx:afterSwap", (event) => {
   if (event.target instanceof Element) {
     formatLocalDateTimes(event.target);
+    promoteToasts(event.target);
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
