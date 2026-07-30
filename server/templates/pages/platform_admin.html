@@ -163,7 +163,7 @@
     </p>
 
     {{ if .CategoriesEditor.Confirmation }}
-      <p class="confirmation">{{ .CategoriesEditor.Confirmation }}</p>
+      <p class="confirmation" data-toast>{{ .CategoriesEditor.Confirmation }}</p>
     {{ end }}
 
     {{ if and .CategoriesEditor.Form.Error (not .CategoriesEditor.Form.Open) }}

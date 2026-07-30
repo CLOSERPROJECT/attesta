@@ -359,3 +359,32 @@ func TestPlatformAdminCategoriesPanelErrorWhenFormClosed(t *testing.T) {
 		t.Fatalf("did not expect open form when showing panel error, got:\n%s", body)
 	}
 }
+
+func TestPlatformAdminCategoriesConfirmationUsesDataToast(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := PlatformAdminView{
+		ActivePanel: "categories",
+		CategoriesEditor: CategoriesEditorView{
+			Confirmation: "Subcategory reordered",
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "platform_admin_categories_panel", view); err != nil {
+		t.Fatalf("render platform_admin_categories_panel: %v", err)
+	}
+	body := out.String()
+
+	if !strings.Contains(body, "Subcategory reordered") {
+		t.Fatalf("expected confirmation text, got:\n%s", body)
+	}
+	if !strings.Contains(body, `class="confirmation" data-toast`) &&
+		!strings.Contains(body, `data-toast`) {
+		t.Fatalf("expected confirmation to opt into data-toast, got:\n%s", body)
+	}
+	// Prefer exact attribute adjacency used in template:
+	if !strings.Contains(body, `<p class="confirmation" data-toast>`) {
+		t.Fatalf("expected <p class=\"confirmation\" data-toast>, got:\n%s", body)
+	}
+}
