@@ -107,3 +107,29 @@ func TestFilterPlatformOrgAdminMembershipsDropsNonAdmins(t *testing.T) {
 		t.Fatalf("got = %#v", got)
 	}
 }
+
+func TestPlatformAdminViewUsesOrganizationPageTotal(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+	identity := &fakeIdentityStore{
+		listOrganizationsPageFunc: func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+			if opts.Limit != 12 || opts.Offset != 12 || opts.Search != "ac" {
+				t.Fatalf("opts = %#v", opts)
+			}
+			return IdentityOrgPage{
+				Total: 25,
+				Organizations: []IdentityOrg{
+					{ID: "t13", Slug: "org-13", Name: "Org 13"},
+				},
+			}, nil
+		},
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+			return nil, nil
+		},
+	}
+	server := &Server{identity: identity, authorizer: fakeAuthorizer{}}
+	view := server.platformAdminView(&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{SearchQuery: "ac", Page: 2})
+	if view.MatchedOrganizations != 25 || view.TotalPages != 3 || view.CurrentPage != 2 || len(view.Organizations) != 1 {
+		t.Fatalf("view paging = matched=%d pages=%d page=%d rows=%d", view.MatchedOrganizations, view.TotalPages, view.CurrentPage, len(view.Organizations))
+	}
+}

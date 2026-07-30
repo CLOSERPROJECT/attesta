@@ -28,6 +28,7 @@ type IdentityStore interface {
 	AddOrganizationUserByIDAsAdmin(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	InviteOrganizationUser(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	ListOrganizations(ctx context.Context) ([]IdentityOrg, error)
+	ListOrganizationsPage(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error)
 	ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	ListOrganizationMembershipsLite(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
@@ -64,6 +65,17 @@ type IdentityOrg struct {
 	Name       string
 	LogoFileID string
 	Roles      []IdentityRole
+}
+
+type IdentityOrgListOptions struct {
+	Search string
+	Limit  int
+	Offset int
+}
+
+type IdentityOrgPage struct {
+	Organizations []IdentityOrg
+	Total         int
 }
 
 type IdentityRole struct {

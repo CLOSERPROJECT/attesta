@@ -3403,26 +3403,56 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	errs.InviteEmail = strings.TrimSpace(errs.InviteEmail)
 	errs.SearchQuery = strings.TrimSpace(errs.SearchQuery)
 
-	organizations := s.platformOrganizations(context.Background())
-	filteredOrganizations := filterPlatformOrganizations(organizations, errs.SearchQuery)
-	currentPage := normalizePlatformAdminPage(errs.Page, len(filteredOrganizations))
-	start := (currentPage - 1) * platformAdminOrganizationsPerPage
-	end := min(start+platformAdminOrganizationsPerPage, len(filteredOrganizations))
-	pagedOrganizations := filteredOrganizations
-	if start < len(filteredOrganizations) {
-		pagedOrganizations = filteredOrganizations[start:end]
-	} else if len(filteredOrganizations) > 0 {
-		pagedOrganizations = filteredOrganizations[:0]
+	limit := platformAdminOrganizationsPerPage
+	requestedPage := errs.Page
+	if requestedPage < 1 {
+		requestedPage = 1
 	}
+	offset := (requestedPage - 1) * limit
+
+	orgPage := IdentityOrgPage{}
+	if s.identity != nil {
+		var err error
+		orgPage, err = s.identity.ListOrganizationsPage(context.Background(), IdentityOrgListOptions{
+			Search: errs.SearchQuery,
+			Limit:  limit,
+			Offset: offset,
+		})
+		if err != nil {
+			log.Printf("failed to list platform organizations page: %v", err)
+			orgPage = IdentityOrgPage{}
+		}
+	}
+
+	currentPage := normalizePlatformAdminPage(requestedPage, orgPage.Total)
+	if currentPage != requestedPage && s.identity != nil {
+		offset = (currentPage - 1) * limit
+		var err error
+		orgPage, err = s.identity.ListOrganizationsPage(context.Background(), IdentityOrgListOptions{
+			Search: errs.SearchQuery,
+			Limit:  limit,
+			Offset: offset,
+		})
+		if err != nil {
+			log.Printf("failed to list platform organizations page: %v", err)
+			orgPage = IdentityOrgPage{}
+		}
+	}
+
+	organizations := make([]Organization, 0, len(orgPage.Organizations))
+	for _, org := range orgPage.Organizations {
+		organizations = append(organizations, organizationFromIdentityOrg(org))
+	}
+
 	totalPages := 1
-	if len(filteredOrganizations) > 0 {
-		totalPages = (len(filteredOrganizations) + platformAdminOrganizationsPerPage - 1) / platformAdminOrganizationsPerPage
+	if orgPage.Total > 0 {
+		totalPages = (orgPage.Total + limit - 1) / limit
 	}
 	pageNumbers := make([]int, 0, totalPages)
 	for page := 1; page <= totalPages; page++ {
 		pageNumbers = append(pageNumbers, page)
 	}
-	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
+	rows := platformAdminOrganizationRows(context.Background(), organizations, s.identity)
 	view := PlatformAdminView{
 		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		ActivePanel:              "orgs",
@@ -3435,7 +3465,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		HasNextPage:              currentPage < totalPages,
 		PreviousPage:             max(currentPage-1, 1),
 		NextPage:                 min(currentPage+1, totalPages),
-		MatchedOrganizations:     len(filteredOrganizations),
+		MatchedOrganizations:     orgPage.Total,
 		Organizations:            rows,
 		Confirmation:             strings.TrimSpace(confirmation),
 		OrganizationError:        errs.Organization,

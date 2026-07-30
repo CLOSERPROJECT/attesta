@@ -18,6 +18,7 @@ import (
 	appwritefile "github.com/appwrite/sdk-for-go/file"
 	"github.com/appwrite/sdk-for-go/id"
 	"github.com/appwrite/sdk-for-go/models"
+	"github.com/appwrite/sdk-for-go/query"
 	"github.com/appwrite/sdk-for-go/storage"
 	"github.com/appwrite/sdk-for-go/teams"
 	"github.com/appwrite/sdk-for-go/users"
@@ -401,6 +402,43 @@ func (a *appwriteIdentity) ListOrganizations(ctx context.Context) ([]IdentityOrg
 		return nil, err
 	}
 	return decodeIdentityOrgs(teamList), nil
+}
+
+func (a *appwriteIdentity) ListOrganizationsPage(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+	if err := ctx.Err(); err != nil {
+		return IdentityOrgPage{}, err
+	}
+	limit := opts.Limit
+	if limit < 1 {
+		limit = 12
+	}
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	queries := []string{
+		query.Limit(limit),
+		query.Offset(offset),
+		query.OrderAsc("name"),
+	}
+	options := []teams.ListOption{
+		teams.New(a.adminClient).WithListQueries(queries),
+		teams.New(a.adminClient).WithListTotal(true),
+	}
+	if search := strings.TrimSpace(opts.Search); search != "" {
+		options = append(options, teams.New(a.adminClient).WithListSearch(search))
+	}
+	teamList, err := teams.New(a.adminClient).List(options...)
+	if err != nil {
+		return IdentityOrgPage{}, normalizeIdentityError(err)
+	}
+	if err := ctx.Err(); err != nil {
+		return IdentityOrgPage{}, err
+	}
+	return IdentityOrgPage{
+		Organizations: decodeIdentityOrgs(teamList),
+		Total:         teamList.Total,
+	}, nil
 }
 
 func (a *appwriteIdentity) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
