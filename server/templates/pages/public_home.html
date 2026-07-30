@@ -102,7 +102,7 @@
                       data-subcategory-slug="{{ .Slug }}"
                       hx-get="{{ .PartialURL }}"
                       hx-target="#public-home-stream-results"
-                      hx-swap="innerHTML"
+                      hx-swap="outerHTML"
                       hx-push-url="{{ .PushURL }}"
                     >{{ .Name }}</button>
                   {{ end }}
