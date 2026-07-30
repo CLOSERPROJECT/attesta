@@ -63,6 +63,7 @@
   --muted: #f8f9f4;
   --muted-foreground: #737973;
   --secondary: #fff;
+  --secondary-foreground: var(--foreground);
 
   /* Accent & semantic */
   --primary: #1e6f5c;
@@ -80,8 +81,9 @@
   --warning-muted: #fff7da;
   --warning-muted-foreground: #a67f05;
 
-  /* Borders & chips */
+  /* Borders, inputs & chips */
   --border: #c5d0b5;
+  --input: #fff;
   --pill: #eff4e9;
   --tag: #eef2e6;
 
@@ -97,7 +99,7 @@
   /* Topbar inverted */
   --topbar-inverted: #000;
   --topbar-inverted-foreground: #fff;
-  --topbar-inverted-primary: #57c2a6;
+  --topbar-inverted-primary: #1cc195;
 
   /* Role palette */
   --role-red: light-dark(
@@ -192,17 +194,18 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Surfaces */
+  /* Surfaces (Figma CLOSER dark → Attesta names) */
   --background: linear-gradient(135deg, #0b0f0d 0%, #121915 100%);
-  --foreground: #ecf1eb;
-  --card: #151c17;
+  --foreground: #ebf5f4;
+  --card: #1d1f2b;
   --muted: rgb(255 255 255 / 4%);
-  --muted-foreground: #b2b7b2;
-  --secondary: #0f1411;
+  --muted-foreground: #c1cac8;
+  --secondary: #0d3235;
+  --secondary-foreground: #d2eaeb;
 
-  /* Accent & semantic */
-  --primary: #57c2a6;
-  --primary-foreground: #fff;
+  /* Accent & semantic (Figma accent → primary) */
+  --primary: #1cc195;
+  --primary-foreground: #121420;
   --highlight: #d2a106;
   --highlight-foreground: #f2c64f;
   --destructive: #ff6b5f;
@@ -211,12 +214,13 @@
   /* Status muted */
   --destructive-muted: rgb(255 107 95 / 14%);
   --destructive-muted-foreground: #ffd1cc;
-  --success-muted: rgb(87 194 166 / 12%);
+  --success-muted: rgb(28 193 149 / 12%);
   --warning-muted: rgb(242 198 79 / 12%);
   --warning-muted-foreground: var(--highlight-foreground);
 
-  /* Borders & chips */
-  --border: rgb(236 241 235 / 14%);
+  /* Borders, inputs & chips */
+  --border: rgb(255 255 255 / 10%);
+  --input: rgb(255 255 255 / 12%);
   --pill: #243329;
   --tag: rgb(255 255 255 / 5%);
 
@@ -231,7 +235,7 @@
   /* Substep */
   --substep-done: rgb(255 255 255 / 14%);
   --substep-done-muted: rgb(255 255 255 / 6%);
-  --substep-available: rgb(87 194 166 / 22%);
-  --substep-available-muted: rgb(87 194 166 / 12%);
+  --substep-available: rgb(28 193 149 / 22%);
+  --substep-available-muted: rgb(28 193 149 / 12%);
   --substep-skipped-muted: rgb(255 255 255 / 4%);
 }
