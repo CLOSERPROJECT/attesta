@@ -1,4 +1,6 @@
 workflow:
+  categorySlug: supply-chain
+  subCategorySlug: shipment-tracking
   name: Indium recycling audit
   description: Shipment intake, inspection, and approval with traceable checkpoints
   steps:

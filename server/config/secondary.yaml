@@ -1,4 +1,6 @@
 workflow:
+  categorySlug: compliance-and-quality
+  subCategorySlug: quality-control
   name: Gallium shipment audit
   steps:
     - id: "1"
