@@ -174,3 +174,45 @@ func TestMemoryStoreReorderSubCategoryWithinParent(t *testing.T) {
 		t.Fatalf("got %s", subs[0].Slug)
 	}
 }
+
+func TestMemoryStoreTaxonomyMutationValidationGaps(t *testing.T) {
+	store := NewMemoryStore()
+	_, err := store.CreateCategory(t.Context(), Category{Slug: "g", Name: "G", Icon: "batch-traceability"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateCategory(t.Context(), "g", "G", "not-a-real-icon"); err == nil {
+		t.Fatal("expected invalid icon on update")
+	}
+	if _, err := store.UpdateCategory(t.Context(), "missing", "G", "batch-traceability"); err == nil {
+		t.Fatal("expected missing category")
+	}
+	if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "not-a-real-icon"}); err == nil {
+		t.Fatal("expected invalid leaf icon")
+	}
+	_, err = store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "procurement-workflow"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateSubCategory(t.Context(), "g", "s", "", "procurement-workflow", ""); err == nil {
+		t.Fatal("expected empty name")
+	}
+	if _, err := store.UpdateSubCategory(t.Context(), "g", "s", "S", "not-a-real-icon", ""); err == nil {
+		t.Fatal("expected invalid icon on leaf update")
+	}
+	if _, err := store.UpdateSubCategory(t.Context(), "g", "missing", "S", "procurement-workflow", ""); err == nil {
+		t.Fatal("expected missing leaf")
+	}
+	if err := store.ReorderSubCategory(t.Context(), "g", "missing", "up"); err == nil {
+		t.Fatal("expected missing reorder")
+	}
+}
+
+func TestTaxonomyIconURLEmpty(t *testing.T) {
+	if got := taxonomyIconURL(""); got != "" {
+		t.Fatalf("got %q", got)
+	}
+	if got := taxonomyIconURL("batch-traceability"); got == "" {
+		t.Fatal("expected non-empty url")
+	}
+}

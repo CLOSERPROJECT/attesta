@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -299,5 +300,24 @@ func TestHandlePublicStreamsPartialEmptyShowsCreateCTA(t *testing.T) {
 	}
 	if !strings.Contains(body, "Create a stream") {
 		t.Fatalf("missing CTA label: %s", body)
+	}
+}
+
+func TestHandlePublicStreamsPartialMethodNotAllowed(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	server.handlePublicStreamsPartial(rec, httptest.NewRequest(http.MethodPost, "/streams/public", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestHandlePublicStreamsPartialLoadErrors(t *testing.T) {
+	store := &failingListCategoriesStore{MemoryStore: NewMemoryStore(), err: errors.New("taxonomy down")}
+	server := &Server{store: store, tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	server.handlePublicStreamsPartial(rec, httptest.NewRequest(http.MethodGet, "/streams/public?category=a&subCategory=b", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d", rec.Code)
 	}
 }

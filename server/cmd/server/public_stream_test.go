@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"bytes"
 	"fmt"
 	"net/http"
@@ -429,5 +431,154 @@ func TestNewMuxPublicStreamAndPublicPartialCoexist(t *testing.T) {
 	}
 	if !strings.Contains(recPartial.Body.String(), `id="public-home-stream-results"`) {
 		t.Fatalf("partial body missing results root: %s", recPartial.Body.String())
+	}
+}
+
+func TestHandlePublicStreamMethodAndPathGuards(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+
+	rec := httptest.NewRecorder()
+	server.handlePublicStream(rec, httptest.NewRequest(http.MethodPost, "/streams/pilot", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST status = %d", rec.Code)
+	}
+
+	for _, path := range []string{"/streams", "/streams/", "/streams/public", "/streams/a/b"} {
+		rec = httptest.NewRecorder()
+		server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s status = %d, want 404", path, rec.Code)
+		}
+	}
+}
+
+func TestPublicStreamCardOrganizationsSkipsEmpty(t *testing.T) {
+	orgs, overflow := publicStreamCardOrganizations([]WorkflowOrganization{
+		{Slug: "", Name: ""},
+		{Slug: "alpha", Name: ""},
+		{Slug: "bravo", Name: "Bravo"},
+	}, map[string]string{"bravo": "/logo/bravo"})
+	if overflow != 0 {
+		t.Fatalf("overflow = %d", overflow)
+	}
+	if len(orgs) != 2 {
+		t.Fatalf("orgs = %#v", orgs)
+	}
+	if orgs[0].Name != "alpha" || orgs[1].LogoURL != "/logo/bravo" {
+		t.Fatalf("orgs = %#v", orgs)
+	}
+}
+
+func TestProcessCompletedAtFallbacks(t *testing.T) {
+	if !processCompletedAt(nil).IsZero() {
+		t.Fatal("nil process should be zero")
+	}
+	if !processCompletedAt(&Process{}).IsZero() {
+		t.Fatal("empty process should be zero")
+	}
+	gen := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	got := processCompletedAt(&Process{DPP: &ProcessDPP{GeneratedAt: gen}, Progress: map[string]ProcessStep{"1_1": {}}})
+	if !got.Equal(gen) {
+		t.Fatalf("got %v want DPP GeneratedAt", got)
+	}
+}
+
+type failingListRecentProcessesStore struct {
+	*MemoryStore
+	failOnCall int
+	calls      int
+	err        error
+}
+
+func (s *failingListRecentProcessesStore) ListRecentProcessesByWorkflow(ctx context.Context, workflowKey string, limit int64) ([]Process, error) {
+	s.calls++
+	if s.failOnCall > 0 && s.calls == s.failOnCall {
+		return nil, s.err
+	}
+	return s.MemoryStore.ListRecentProcessesByWorkflow(ctx, workflowKey, limit)
+}
+
+func TestHandlePublicStreamProcessListError(t *testing.T) {
+	tempDir := t.TempDir()
+	yaml := minimalCategorizedWorkflowYAML("") + "dpp:\n  enabled: true\n  gtin: \"09506000134352\"\n"
+	if err := os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := &failingListRecentProcessesStore{
+		MemoryStore: NewMemoryStore(),
+		failOnCall:  2,
+		err:         errors.New("list failed"),
+	}
+	seedPlatformAdminTaxonomy(t, store.MemoryStore)
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, "/streams/pilot", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandlePublicStreamSignedInUsesPageBaseForUser(t *testing.T) {
+	tempDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t), identity: &fakeIdentityStore{}}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/streams/pilot", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	server.handlePublicStream(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBuildPublicStreamOrganizationsSkipsBlankSlug(t *testing.T) {
+	got := buildPublicStreamOrganizations(RuntimeConfig{
+		Workflow: WorkflowDef{Steps: []WorkflowStep{
+			{StepID: "1", Order: 1, OrganizationSlug: "  "},
+			{StepID: "2", Order: 2, OrganizationSlug: "org-a"},
+		}},
+		Organizations: []WorkflowOrganization{{Slug: "org-a", Name: "Alpha"}},
+	}, nil)
+	if len(got) != 1 || got[0].Name != "Alpha" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestHandlePublicStreamCardViewListError(t *testing.T) {
+	tempDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := &failingListRecentProcessesStore{
+		MemoryStore: NewMemoryStore(),
+		failOnCall:  1,
+		err:         errors.New("card list failed"),
+	}
+	seedPlatformAdminTaxonomy(t, store.MemoryStore)
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, "/streams/pilot", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBuildPublicStreamRunsSkipsIncompleteDPP(t *testing.T) {
+	doneAt := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
+	def := WorkflowDef{Steps: []WorkflowStep{{Substep: []WorkflowSub{{SubstepID: "1.1"}}}}}
+	runs := buildPublicStreamRuns(def, []Process{{
+		ID:     primitive.NewObjectID(),
+		Status: processStatusDone,
+		Progress: map[string]ProcessStep{"1_1": {State: "done", DoneAt: &doneAt}},
+		DPP: &ProcessDPP{GTIN: "09506000134352", Lot: "", Serial: "SER", GeneratedAt: doneAt},
+	}})
+	if len(runs) != 0 {
+		t.Fatalf("runs = %#v, want empty for incomplete DPP", runs)
 	}
 }
