@@ -35,6 +35,9 @@ html:has(.my-home) {
   /* Above public-stream-card-menu (10) and dropdown (40). */
   z-index: 45;
   padding-top: var(--space-4);
+  /* Bleed over .page inline padding (space-4 on md-down; space-8/32px on md-up). */
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4);
   background: var(--background);
 }
 
@@ -78,6 +81,11 @@ html:has(.my-home) {
 }
 
 @media (--md-up) {
+  .my-home .public-home-results-category-header {
+    margin-inline: calc(-1 * var(--space-8));
+    padding-inline: var(--space-8);
+  }
+
   .my-home-category-bar {
     display: none;
   }
@@ -122,9 +130,6 @@ html:has(.my-home) {
   .my-home .public-home-results-category-header {
     /* Flush under sticky Stream categories bar (no hairline gap). */
     top: var(--my-home-category-bar-height);
-    /* Match category bar: bleed to viewport edges over .page padding. */
-    margin-inline: calc(-1 * var(--space-4));
-    padding-inline: var(--space-4);
   }
 
   .my-home-catalog-section {
