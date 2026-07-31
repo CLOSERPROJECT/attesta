@@ -1083,13 +1083,28 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow", "number")
 
+	now := time.Now().UTC()
+	sessionID := "session-home-picker"
+	user := AccountUser{
+		ID:        primitive.NewObjectID(),
+		Email:     "picker@example.com",
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+		Status:    "active",
+		CreatedAt: now,
+	}
+
 	server := &Server{
-		authorizer: fakeAuthorizer{},
-		tmpl:       homePickerTemplates(),
-		configDir:  tempDir,
+		authorizer:  fakeAuthorizer{},
+		store:       NewMemoryStore(),
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		tmpl:        homePickerTemplates(),
+		configDir:   tempDir,
+		enforceAuth: true,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -1097,13 +1112,13 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "PICK 2") {
-		t.Fatalf("expected picker marker, got %q", body)
+	if !strings.Contains(body, "PICK GROUPS 1") {
+		t.Fatalf("expected uncategorized group marker, got %q", body)
 	}
-	if !strings.Contains(body, "workflow:Main workflow:Main workflow description") || !strings.Contains(body, "secondary:Secondary workflow") {
-		t.Fatalf("expected workflow options in picker, got %q", body)
+	if !strings.Contains(body, "workflow:Main workflow:Main workflow description:instances=") || !strings.Contains(body, "secondary:Secondary workflow:instances=") {
+		t.Fatalf("expected accessible workflow cards in picker, got %q", body)
 	}
-	if strings.Contains(body, "secondary:Secondary workflow:Secondary workflow description:") {
+	if strings.Contains(body, "secondary:Secondary workflow:Secondary workflow description|") {
 		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
 	}
 }
@@ -1204,86 +1219,27 @@ func TestNextAvailableAuthorizedActionFiltersByAvailableRoleAndOrganization(t *t
 	}
 }
 
-func TestHandleHomePickerMarksWorkflowCardsWithMyTurn(t *testing.T) {
+func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
 
-	store := NewMemoryStore()
-	processID := primitive.NewObjectID()
-	store.SeedProcess(Process{
-		ID:          processID,
-		WorkflowKey: "workflow",
-		CreatedAt:   time.Date(2026, 2, 5, 10, 0, 0, 0, time.UTC),
-		Status:      "active",
-		Progress: map[string]ProcessStep{
-			"1_1": {State: "pending"},
-		},
-	})
-
+	now := time.Now().UTC()
+	sessionID := "session-home-scoped-links"
 	user := AccountUser{
 		ID:        primitive.NewObjectID(),
-		Email:     "member@example.com",
+		Email:     "scoped-links@example.com",
 		OrgSlug:   "org1",
 		RoleSlugs: []string{"dep1"},
 		Status:    "active",
-		CreatedAt: time.Now().UTC(),
+		CreatedAt: now,
 	}
-	sessionID := "session-home-turn"
-
-	server := &Server{
-		authorizer:  fakeAuthorizer{},
-		store:       store,
-		identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
-		tmpl:        homePickerTemplates(),
-		configDir:   tempDir,
-		enforceAuth: true,
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/my", nil)
-	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-	rec := httptest.NewRecorder()
-	server.handleHome(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
-	}
-	body := rec.Body.String()
-	expected := "workflow:Main workflow:Main workflow description:1/0/0:turn"
-	if !strings.Contains(body, expected) {
-		t.Fatalf("expected workflow turn marker %q, got %q", expected, body)
-	}
-}
-
-func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
-	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
-
-	store := NewMemoryStore()
-	store.SeedProcess(Process{
-		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
-		CreatedAt:   time.Date(2026, 2, 5, 10, 0, 0, 0, time.UTC),
-		Status:      "active",
-		Progress: map[string]ProcessStep{
-			"1_1": {State: "pending"},
-		},
-	})
-
-	user := AccountUser{
-		ID:        primitive.NewObjectID(),
-		Email:     "member-indicator@example.com",
-		OrgSlug:   "org1",
-		RoleSlugs: []string{"dep1"},
-		Status:    "active",
-		CreatedAt: time.Now().UTC(),
-	}
-	sessionID := "session-home-indicator"
 
 	tmpl := parseTestTemplates(t)
 	server := &Server{
 		authorizer:  fakeAuthorizer{},
-		store:       store,
-		identity:    testIdentityForSessions(time.Now().UTC(), map[string]AccountUser{sessionID: user}),
+		store:       NewMemoryStore(),
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
 		tmpl:        tmpl,
 		configDir:   tempDir,
 		enforceAuth: true,
@@ -1298,41 +1254,15 @@ func TestHandleHomePickerRendersTurnIndicatorOnWorkflowCard(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `stream-card-turn-indicator`) {
-		t.Fatalf("expected workflow turn indicator markup, got %q", body)
-	}
-	if !strings.Contains(body, `aria-label="Your turn pending in Main workflow"`) {
-		t.Fatalf("expected accessible turn indicator label, got %q", body)
-	}
-}
-
-func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
-	tempDir := t.TempDir()
-	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
-	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
-
-	tmpl := parseTestTemplates(t)
-	server := &Server{
-		authorizer: fakeAuthorizer{},
-		tmpl:       tmpl,
-		configDir:  tempDir,
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/my", nil)
-	rec := httptest.NewRecorder()
-	server.handleHome(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
-	}
-	body := rec.Body.String()
-	if !strings.Contains(body, `class="stack u-max-w-7xl u-mx-auto"`) ||
+	if !strings.Contains(body, `class="stack u-max-w-7xl u-mx-auto my-home"`) ||
 		!strings.Contains(body, `class="page-header"`) ||
 		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
-	if !strings.Contains(body, `class="workflow-grid"`) || !strings.Contains(body, `class="stream-card"`) {
-		t.Fatalf("expected workflow card grid markup, got %q", body)
+	if !strings.Contains(body, `class="my-home-catalog"`) ||
+		!strings.Contains(body, `class="public-home-stream-grid"`) ||
+		!strings.Contains(body, `class="public-stream-card"`) {
+		t.Fatalf("expected public stream card grid markup, got %q", body)
 	}
 	if !strings.Contains(body, `href="/my/streams/workflow/"`) {
 		t.Fatalf("expected scoped workflow href for workflow key, got %q", body)
@@ -1343,8 +1273,8 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	if !strings.Contains(body, "Main workflow description") {
 		t.Fatalf("expected description content in cards, got %q", body)
 	}
-	if !strings.Contains(body, "Not started") || !strings.Contains(body, "In progress") || !strings.Contains(body, "Completed") {
-		t.Fatalf("expected status labels in cards, got %q", body)
+	if !strings.Contains(body, "1 step") || !strings.Contains(body, "1 role") {
+		t.Fatalf("expected public card metrics in cards, got %q", body)
 	}
 }
 
@@ -1400,6 +1330,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		user := AccountUser{
 			ID:        primitive.NewObjectID(),
 			Email:     "org-admin-picker@example.com",
+			OrgSlug:   "org1",
 			RoleSlugs: []string{"org-admin"},
 			Status:    "active",
 			CreatedAt: time.Now().UTC(),
@@ -1424,11 +1355,17 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `href="/my/organization/formata-builder"`) {
-			t.Fatalf("expected create stream card for org admin, got %q", body)
+		for _, want := range []string{
+			`class="page-header-actions"`,
+			`href="/my/organization/formata-builder"`,
+			"Create a stream",
+		} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("expected %q in org admin home header, got %q", want, body)
+			}
 		}
-		if !strings.Contains(body, "stream-card-cta") || !strings.Contains(body, "Create new stream") {
-			t.Fatalf("expected create stream card cta for org admin, got %q", body)
+		if strings.Contains(body, "stream-card-cta") || strings.Contains(body, "Create new stream") {
+			t.Fatalf("did not expect legacy create stream card on /my, got %q", body)
 		}
 	})
 
@@ -1437,6 +1374,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		user := AccountUser{
 			ID:        primitive.NewObjectID(),
 			Email:     "member-picker@example.com",
+			OrgSlug:   "org1",
 			RoleSlugs: []string{"operator"},
 			Status:    "active",
 			CreatedAt: time.Now().UTC(),
@@ -1550,6 +1488,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			ID:             primitive.NewObjectID(),
 			IdentityUserID: "creator-home-user",
 			Email:          "creator-home@example.com",
+			OrgSlug:        "org1",
 			RoleSlugs:      []string{"org-admin"},
 			Status:         "active",
 		}
@@ -1582,7 +1521,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon public-stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for creator, got %q", body)
 		}
 		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -1614,6 +1553,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			ID:             primitive.NewObjectID(),
 			IdentityUserID: "creator-home-started-user",
 			Email:          "creator-home-started@example.com",
+			OrgSlug:        "org1",
 			RoleSlugs:      []string{"org-admin"},
 			Status:         "active",
 		}
@@ -1653,7 +1593,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon public-stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for started stream, got %q", body)
 		}
 		if strings.Contains(body, `id="delete-workflow-`+stream.ID.Hex()+`"`) {
@@ -1668,10 +1608,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect direct edit action for started stream, got %q", body)
 		}
-		if !strings.Contains(body, `class="stream-card-menu-item stream-card-menu-item-disabled"`) {
+		if !strings.Contains(body, `class="public-stream-card-menu-item public-stream-card-menu-item-disabled"`) {
 			t.Fatalf("expected disabled edit action for started stream, got %q", body)
 		}
-		if !strings.Contains(body, `class="stream-card-menu-item stream-card-menu-item-danger stream-card-menu-item-disabled"`) {
+		if !strings.Contains(body, `class="public-stream-card-menu-item public-stream-card-menu-item-danger public-stream-card-menu-item-disabled"`) {
 			t.Fatalf("expected disabled delete action for started stream, got %q", body)
 		}
 	})
@@ -1717,7 +1657,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, `class="btn btn-ghost btn-icon stream-card-menu-trigger"`) {
+		if !strings.Contains(body, `class="btn btn-ghost btn-icon public-stream-card-menu-trigger"`) {
 			t.Fatalf("expected workflow actions menu trigger for platform admin, got %q", body)
 		}
 		if !strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -1749,6 +1689,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			ID:             primitive.NewObjectID(),
 			IdentityUserID: "member-home-user",
 			Email:          "member-home@example.com",
+			OrgSlug:        "org1",
 			RoleSlugs:      []string{"inspector"},
 			Status:         "active",
 		}
@@ -1781,7 +1722,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		body := rec.Body.String()
-		if strings.Contains(body, `stream-card-menu-trigger`) {
+		if strings.Contains(body, `public-stream-card-menu-trigger`) {
 			t.Fatalf("did not expect workflow actions menu trigger without builder access, got %q", body)
 		}
 		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`&new=true"`) {
@@ -1790,13 +1731,16 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 		if strings.Contains(body, `href="/my/organization/formata-builder?stream=`+stream.ID.Hex()+`"`) {
 			t.Fatalf("did not expect edit action without builder access, got %q", body)
 		}
-		if strings.Contains(body, `stream-card-menu-item-danger stream-card-menu-item-disabled`) {
+		if strings.Contains(body, `public-stream-card-menu-item-danger public-stream-card-menu-item-disabled`) {
 			t.Fatalf("did not expect delete action without builder access, got %q", body)
 		}
 	})
 }
 
 func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
 	tempDir := t.TempDir()
 	writeTwoSubstepWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow")
 	writeTwoSubstepWorkflowConfig(t, tempDir+"/secondary.yaml", "Secondary workflow")
@@ -1862,13 +1806,15 @@ func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	})
 
 	server := &Server{
-		authorizer: fakeAuthorizer{},
-		tmpl:       homePickerTemplates(),
-		configDir:  tempDir,
-		store:      store,
+		authorizer:  fakeAuthorizer{},
+		tmpl:        homePickerTemplates(),
+		configDir:   tempDir,
+		store:       store,
+		enforceAuth: true,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
 	server.handleHome(rec, req)
 
@@ -1876,11 +1822,11 @@ func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "workflow:Main workflow:2/1/1") {
-		t.Fatalf("expected workflow counts 2/1/1, got %q", body)
+	if !strings.Contains(body, "workflow:Main workflow:instances=4:active=3|") {
+		t.Fatalf("expected workflow instance metrics, got %q", body)
 	}
-	if !strings.Contains(body, "secondary:Secondary workflow:0/1/1") {
-		t.Fatalf("expected secondary counts 0/1/1, got %q", body)
+	if !strings.Contains(body, "secondary:Secondary workflow:instances=2:active=1|") {
+		t.Fatalf("expected secondary instance metrics, got %q", body)
 	}
 }
 
@@ -2397,7 +2343,7 @@ PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}
 func homePickerTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_picker_body" .}}{{end}}
-{{define "home_picker_body"}}PICK {{len .Workflows}} {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}{{if .HasUserTurn}}:turn{{end}}|{{end}}{{end}}
+{{define "home_picker_body"}}PICK GROUPS {{len .Groups}}{{if .ShowCreateStream}} CREATE{{end}} {{range .Groups}}{{range .Streams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{end}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))
 }

@@ -36,9 +36,11 @@
     {{ end }}
   </header>
   {{ end }}
+  {{ if .Streams }}
   <div class="public-home-stream-grid">
     {{ range .Streams }}
       {{ template "managed_public_stream_card" . }}
     {{ end }}
   </div>
+  {{ end }}
 {{ end }}

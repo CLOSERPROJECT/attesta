@@ -49,6 +49,11 @@
   background: color-mix(in srgb, var(--primary) 12%, var(--card));
 }
 
+.public-stream-card-menu-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .public-stream-card-dropdown {
   position: absolute;
   top: calc(100%);
