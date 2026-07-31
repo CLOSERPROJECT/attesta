@@ -1626,10 +1626,10 @@ const initLandingCategorySidebar = () => {
       if (!(target instanceof HTMLDetailsElement)) {
         return;
       }
-      if (!target.classList.contains("public-home-category") || !target.open) {
+      if (!target.classList.contains("category-sidebar-category") || !target.open) {
         return;
       }
-      for (const other of root.querySelectorAll("details.public-home-category")) {
+      for (const other of root.querySelectorAll("details.category-sidebar-category")) {
         if (other !== target) {
           other.open = false;
         }
@@ -1642,11 +1642,11 @@ const initLandingCategorySidebar = () => {
     if (!(target instanceof Element)) {
       return;
     }
-    const btn = target.closest(".public-home-subcategory");
+    const btn = target.closest(".category-sidebar-subcategory");
     if (!(btn instanceof HTMLElement) || !root.contains(btn)) {
       return;
     }
-    for (const other of root.querySelectorAll(".public-home-subcategory")) {
+    for (const other of root.querySelectorAll(".category-sidebar-subcategory")) {
       other.classList.remove("is-active");
     }
     btn.classList.add("is-active");
