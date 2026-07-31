@@ -12,11 +12,11 @@
  *     .public-stream-metrics > span.public-stream-metric
  *       (+ org count metric when OrganizationCount > 0; no avatars)
  *   .public-stream-main
- *     section.public-stream-blueprint > h2 + .stream-timeline-list (via stream_timeline)
+ *     section.public-stream-section.public-stream-blueprint > h2 + .stream-timeline-list
  *     aside.public-stream-aside?
- *       section.public-stream-orgs? > h2 + ul.public-stream-orgs-list > li.public-stream-org
+ *       section.public-stream-section.public-stream-orgs? > h2 + ul.public-stream-orgs-list > li.public-stream-org
  *         img|span.public-stream-org-mark + span.public-stream-org-name
- *       section.public-stream-runs? (when PassportEnabled)
+ *       section.public-stream-section.public-stream-runs? (when PassportEnabled)
  *         h2 + ul.public-stream-runs-list > li.public-stream-runs-item
  *           time.public-stream-runs-time + a.public-stream-runs-dpp (+ icon-arrow-up-right)
  *         | .public-stream-runs-empty
@@ -156,10 +156,18 @@
   align-items: start;
 }
 
-.public-stream-blueprint {
+.public-stream-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.public-stream-section h2 {
+  font-size: var(--text-lg);
+  line-height: 1.75rem;
+}
+
+.public-stream-blueprint {
   min-width: 0;
 }
 
@@ -173,24 +181,14 @@
 
 .public-stream-orgs,
 .public-stream-runs {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
   width: max-content;
   max-width: 100%;
-}
-
-.public-stream-orgs h2,
-.public-stream-runs h2,
-.public-stream-blueprint h2 {
-  font-size: var(--text-lg);
-  line-height: 1.75rem;
 }
 
 .public-stream-orgs-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
