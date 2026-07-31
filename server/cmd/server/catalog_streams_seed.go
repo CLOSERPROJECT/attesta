@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 var catalogStreamNameVariants = []string{"Pilot", "Standard", "Extended"}
@@ -125,4 +126,81 @@ func loadCatalogStreamTemplateBodies(ctx context.Context, store Store, configDir
 		bodies = append(bodies, string(data))
 	}
 	return bodies, nil
+}
+
+type catalogStreamsSeedResult struct {
+	Leaves  int
+	Streams int
+}
+
+func seedCatalogStreams(ctx context.Context, server *Server, rng catalogStreamRNG) (catalogStreamsSeedResult, error) {
+	var zero catalogStreamsSeedResult
+	if server == nil || server.store == nil {
+		return zero, fmt.Errorf("catalog stream seed: server store is required")
+	}
+	if rng == nil {
+		return zero, fmt.Errorf("catalog stream seed: rng is required")
+	}
+
+	tree, err := loadTaxonomyTree(ctx, server.store)
+	if err != nil {
+		return zero, err
+	}
+	leaves := taxonomyLeavesFromTree(tree)
+	if len(leaves) == 0 {
+		return zero, fmt.Errorf("catalog stream seed: taxonomy is empty (run seed-categories first)")
+	}
+
+	templates, err := loadCatalogStreamTemplateBodies(ctx, server.store, server.configDir)
+	if err != nil {
+		return zero, err
+	}
+
+	catalog, err := server.workflowCatalog()
+	if err != nil && err.Error() != "workflow config catalog is empty" {
+		return zero, err
+	}
+	for key := range catalog {
+		if delErr := server.store.DeleteWorkflowData(ctx, key); delErr != nil {
+			return zero, fmt.Errorf("delete workflow data %s: %w", key, delErr)
+		}
+	}
+
+	existing, err := server.store.ListFormataBuilderStreams(ctx)
+	if err != nil {
+		return zero, err
+	}
+	for _, doc := range existing {
+		if delErr := server.store.DeleteFormataBuilderStream(ctx, doc.ID); delErr != nil {
+			return zero, fmt.Errorf("delete formata stream %s: %w", doc.ID.Hex(), delErr)
+		}
+	}
+
+	creator := platformAdminStreamUserID()
+	now := time.Now().UTC()
+	if server.now != nil {
+		now = server.now().UTC()
+	}
+	inserted := 0
+	for _, leaf := range leaves {
+		n := 1 + rng.Intn(3)
+		for i := 0; i < n; i++ {
+			body := templates[rng.Intn(len(templates))]
+			name := catalogStreamDisplayName(leaf.SubCategoryName, i)
+			yamlOut, applyErr := applyCatalogStreamCategoryAndName(body, leaf.CategorySlug, leaf.SubCategorySlug, name)
+			if applyErr != nil {
+				return zero, fmt.Errorf("build %s/%s: %w", leaf.CategorySlug, leaf.SubCategorySlug, applyErr)
+			}
+			if _, saveErr := server.store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
+				Stream:          yamlOut,
+				UpdatedAt:       now,
+				CreatedByUserID: creator,
+				UpdatedByUserID: creator,
+			}); saveErr != nil {
+				return zero, fmt.Errorf("save %s/%s: %w", leaf.CategorySlug, leaf.SubCategorySlug, saveErr)
+			}
+			inserted++
+		}
+	}
+	return catalogStreamsSeedResult{Leaves: len(leaves), Streams: inserted}, nil
 }
