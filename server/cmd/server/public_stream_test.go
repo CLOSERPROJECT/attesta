@@ -77,7 +77,7 @@ func TestPublicStreamBodyTemplateRendersOrganizationsAboveRuns(t *testing.T) {
 	}
 	for _, want := range []string{
 		`class="public-stream-aside"`,
-		`class="public-stream-orgs"`,
+		`class="public-stream-section public-stream-orgs"`,
 		`class="public-stream-orgs-list"`,
 		`class="public-stream-org"`,
 		`src="/organization/logo/alpha"`,
@@ -102,7 +102,7 @@ func TestPublicStreamBodyTemplateHidesOrganizationsWhenEmpty(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	body := out.String()
-	if strings.Contains(body, `class="public-stream-orgs"`) || strings.Contains(body, "Organizations") {
+	if strings.Contains(body, "public-stream-orgs") || strings.Contains(body, "Organizations") {
 		t.Fatalf("orgs section must be hidden when empty, got: %s", body)
 	}
 }
@@ -275,7 +275,7 @@ func TestPublicStreamBodyTemplateHidesRunsWithoutDPP(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	body := out.String()
-	if strings.Contains(body, "Recent completed runs") || strings.Contains(body, `class="public-stream-runs"`) {
+	if strings.Contains(body, "Recent completed runs") || strings.Contains(body, "public-stream-runs") {
 		t.Fatalf("runs section must be hidden without DPP, got: %s", body)
 	}
 }
