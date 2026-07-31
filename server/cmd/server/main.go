@@ -2319,6 +2319,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
 	mux.HandleFunc("/streams/public", s.handlePublicStreamsPartial)
+	mux.HandleFunc("/streams/", s.handlePublicStream)
 	mux.HandleFunc("/my", s.handleHome)
 	mux.HandleFunc("/my/", s.handleMyRoutes)
 	mux.HandleFunc("/", s.handlePublicHome)

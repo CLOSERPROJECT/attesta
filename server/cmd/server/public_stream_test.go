@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -196,5 +200,117 @@ func TestPublicStreamBodyTemplateEmptyRuns(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "No completed runs yet.") {
 		t.Fatalf("expected empty copy, got: %s", out.String())
+	}
+}
+
+func TestHandlePublicStreamOK(t *testing.T) {
+	tempDir := t.TempDir()
+	yaml := strings.Replace(
+		minimalCategorizedWorkflowYAML("  categorySlug: supply-chain\n  subCategorySlug: procurement\n"),
+		`name: "Workflow"`,
+		`name: "Pilot Workflow"`,
+		1,
+	)
+	if err := os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := NewMemoryStore()
+	doneAt := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "pilot",
+		Status:      processStatusDone,
+		CreatedAt:   doneAt,
+		Progress:    map[string]ProcessStep{"1_1": {State: "done", DoneAt: &doneAt}},
+		DPP:         &ProcessDPP{GTIN: "09506000134352", Lot: "LOT-1", Serial: "SER-1", GeneratedAt: doneAt},
+	})
+	store.SeedProcess(Process{
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: "pilot",
+		Status:      processStatusActive,
+		CreatedAt:   doneAt,
+		Progress:    map[string]ProcessStep{"1_1": {State: "pending"}},
+	})
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/streams/pilot", nil)
+	server.handlePublicStream(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Pilot Workflow",
+		"Recent completed runs",
+		`href="/01/09506000134352/10/LOT-1/21/SER-1"`,
+		"Workflow",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "/instance/start") || strings.Contains(body, "Sign in to run") {
+		t.Fatalf("unexpected CTA/actions in body")
+	}
+}
+
+func TestHandlePublicStreamUnknownKey404(t *testing.T) {
+	server := &Server{store: NewMemoryStore(), configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/streams/missing", nil)
+	server.handlePublicStream(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestHandlePublicStreamRejectsNestedPath(t *testing.T) {
+	tempDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
+	server := &Server{store: NewMemoryStore(), configDir: tempDir, tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/streams/pilot/instance/abc", nil)
+	server.handlePublicStream(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestHandlePublicStreamTrailingSlashOK(t *testing.T) {
+	tempDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
+	server := &Server{store: NewMemoryStore(), configDir: tempDir, tmpl: parseTestTemplates(t)}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/streams/pilot/", nil)
+	server.handlePublicStream(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestNewMuxPublicStreamAndPublicPartialCoexist(t *testing.T) {
+	tempDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML(
+		"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
+	)), 0o644)
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
+	mux := server.newMux()
+
+	recPage := httptest.NewRecorder()
+	mux.ServeHTTP(recPage, httptest.NewRequest(http.MethodGet, "/streams/pilot", nil))
+	if recPage.Code != http.StatusOK {
+		t.Fatalf("page status = %d", recPage.Code)
+	}
+
+	recPartial := httptest.NewRecorder()
+	mux.ServeHTTP(recPartial, httptest.NewRequest(http.MethodGet, "/streams/public?category=supply-chain&subCategory=procurement", nil))
+	if recPartial.Code != http.StatusOK {
+		t.Fatalf("partial status = %d", recPartial.Code)
+	}
+	if !strings.Contains(recPartial.Body.String(), `id="public-home-stream-results"`) {
+		t.Fatalf("partial body missing results root: %s", recPartial.Body.String())
 	}
 }
