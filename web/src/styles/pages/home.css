@@ -1,3 +1,61 @@
+/* Viewport hash jumps from category sidebar anchors. */
+html:has(.my-home) {
+  scroll-behavior: smooth;
+}
+
+.my-home-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.my-home-catalog-section {
+  display: flex;
+  flex-direction: column;
+
+  /* Match .public-home-stream-grid gap between subcategory header and cards. */
+  gap: var(--space-4);
+
+  /* Sticky category header clearance (padding-top + title + padding-bottom). */
+  scroll-margin-top: 4.5rem;
+}
+
+.my-home .public-home-results-subcategory-header {
+  padding-bottom: 0;
+}
+
+/* Stick category titles while scrolling the catalog (desktop: under viewport top). */
+.my-home .public-home-results-category-header {
+  position: sticky;
+  top: 0;
+
+  /* Above public-stream-card-menu (10) and dropdown (40). */
+  z-index: 45;
+  padding-top: var(--space-4);
+
+  /* Bleed over .page inline padding (space-4 on md-down; space-8/32px on md-up). */
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4);
+  background: var(--background);
+}
+
+/* Extra separation before the next category (avoid margin on sticky headers). */
+.my-home-catalog-section:has(+ .public-home-results-category-header) {
+  margin-bottom: var(--space-8);
+}
+
+.my-home-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Single mobile drawer control — sticky beside category titles (one for all headers). */
+.my-home-category-menu {
+  display: none;
+}
+
 .home-workflow-panel-main {
   display: grid;
 }
@@ -10,7 +68,88 @@
   scroll-margin-top: 140px;
 }
 
+@media (--md-up) {
+  .my-home .public-home-results-category-header {
+    margin-inline: calc(-1 * var(--space-8));
+    padding-inline: var(--space-8);
+  }
+
+  .my-home-body {
+    display: grid;
+    grid-template-columns: 18rem minmax(0, 1fr);
+    gap: var(--space-12);
+    align-items: start;
+  }
+
+  .my-home .nav-drawer-panel.my-home-sidebar {
+    display: block;
+    position: sticky;
+    inset: 0 auto auto;
+    width: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    background: transparent;
+    transform: none;
+  }
+
+  .my-home .nav-drawer-panel.my-home-sidebar:not(:popover-open) {
+    transform: none;
+  }
+
+  .my-home .category-sidebar {
+    background: transparent;
+    border-bottom: 0;
+    border-right: 0;
+
+    /* Match sticky category header padding-top. */
+    padding: var(--space-4) 0 0;
+    min-height: 0;
+  }
+
+  .my-home .category-sidebar-close {
+    display: none;
+  }
+}
+
 @media (--md-down) {
+  .my-home-category-menu {
+    /* Zero-height sticky host; button is absolutely placed so start/stuck match. */
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 47;
+    height: 0;
+    margin: 0;
+
+    /* Cancel .my-home-catalog gap so the control aligns with the first header. */
+    margin-bottom: calc(-1 * var(--space-8));
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .my-home-category-menu .nav-drawer-trigger {
+    position: absolute;
+
+    /* Match header padding, then nudge -3x / -1y. */
+    top: calc(var(--space-4) - var(--space-1));
+    left: calc(var(--space-4) - var(--space-3) - var(--space-2));
+    pointer-events: auto;
+    background: var(--background);
+  }
+
+  .my-home .public-home-results-category-header {
+    top: 0;
+
+    /* Room for the shared hamburger to the left of the title. */
+    padding-inline-start: calc(var(--space-4) + 2.25rem + var(--space-2));
+  }
+
+  .my-home-catalog-section {
+    /* Sticky category header clearance only. */
+    scroll-margin-top: 4.5rem;
+  }
+
   .preview-panel,
   .instances-panel {
     scroll-margin-top: var(--space-3);

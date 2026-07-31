@@ -19,7 +19,7 @@
  *       section.public-stream-section.public-stream-runs? (when PassportEnabled)
  *         h2 + ul.public-stream-runs-list > li.public-stream-runs-item
  *           time.public-stream-runs-time + a.public-stream-runs-dpp (+ icon-arrow-up-right)
- *         | .public-stream-runs-empty
+ *         | .empty-state
  */
 
 .public-stream {
@@ -278,41 +278,6 @@ span.public-stream-org-mark {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-
-.public-stream-runs-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--muted) 60%, transparent);
-  color: var(--muted-foreground);
-  text-align: center;
-}
-
-.public-stream-runs-empty .icon-svg {
-  width: 24px;
-  height: 24px;
-  color: var(--muted-foreground);
-}
-
-.public-stream-runs-empty-title {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  line-height: 1.25rem;
-}
-
-.public-stream-runs-empty-hint {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1rem;
 }
 
 @media (--md-up) {

@@ -27,6 +27,35 @@ type PublicStreamCardOrgView struct {
 	Initials string
 }
 
+// ManagedPublicStreamCardView wraps a public stream card with optional /my management actions.
+type ManagedPublicStreamCardView struct {
+	Card              PublicStreamCardView
+	Key               string
+	CanClone          bool
+	CanEdit           bool
+	EditAction        string
+	EditRequiresPurge bool
+	CanDelete         bool
+	DeleteAction      string
+}
+
+// MyHomeStreamGroupView is one taxonomy (or Uncategorized) block on /my.
+// CategoryName/CategoryIconURL are always set; ShowCategoryHeader is true only
+// on the first non-empty subcategory under a category so the h2 is not repeated.
+type MyHomeStreamGroupView struct {
+	CategoryName           string
+	CategoryIconURL        string
+	CategorySlug           string
+	SubCategorySlug        string
+	SubCategoryName        string
+	SubCategoryIconURL     string
+	SubCategoryDescription string
+	AnchorID               string
+	ShowCategoryHeader     bool
+	Uncategorized          bool
+	Streams                []ManagedPublicStreamCardView
+}
+
 // PublicStreamCardView is the view model for templates/components/public_stream_card.html.
 type PublicStreamCardView struct {
 	Name                  string
@@ -59,22 +88,31 @@ type PublicStreamPageView struct {
 	Blueprint     StreamInstanceDetailView
 }
 
-// PublicHomeSubCategoryView is one filterable leaf in the landing sidebar.
-type PublicHomeSubCategoryView struct {
+// CategorySidebarLeafView is one subcategory row in category_sidebar.
+// If Href is set, render an anchor; otherwise render an HTMX button using PartialURL/PushURL.
+type CategorySidebarLeafView struct {
 	Slug       string
 	Name       string
 	Active     bool
-	PartialURL string // /streams/public?category=…&subCategory=…
-	PushURL    string // /?category=…&subCategory=…
+	Href       string // /my anchors, e.g. #cat-supply-chain--procurement
+	PartialURL string // public home HTMX get
+	PushURL    string // public home hx-push-url
 }
 
-// PublicHomeCategoryView is one accordion category on the landing sidebar.
-type PublicHomeCategoryView struct {
+// CategorySidebarCategoryView is one accordion category in category_sidebar.
+type CategorySidebarCategoryView struct {
 	Slug          string
 	Name          string
 	IconURL       string
 	Expanded      bool
-	SubCategories []PublicHomeSubCategoryView
+	SubCategories []CategorySidebarLeafView
+}
+
+// CategorySidebarView is the root for templates/components/category_sidebar.html.
+type CategorySidebarView struct {
+	Title         string
+	CloseTargetID string // popover id for mobile drawer close; empty = no close control
+	Categories    []CategorySidebarCategoryView
 }
 
 // PublicHomeStreamResultsView is the HTMX swap target for landing stream cards.

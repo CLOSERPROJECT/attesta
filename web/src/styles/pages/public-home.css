@@ -4,13 +4,14 @@
  * div.public-home
  *   section.public-home-hero | .public-home-process | .public-home-features | .public-home-dev
  *   .public-home-streams-split#streams (full-bleed band; content capped at 8xl / 88rem)
- *     aside.public-home-category-sidebar  (--card, left bleed via ::before; shared padding like results)
+ *     aside.category-sidebar  (--card, left bleed via ::before; shared padding like results)
  *     .public-home-stream-results         (--muted, right bleed via ::after; padding on shell)
  *
  * Shared chrome footer: components/site_footer.html (+ site-footer.css).
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
  * Feature tiles use CSS-only component .home-feature-card (components/home-feature-card.css).
  * Stream tiles use full component .public-stream-card (components/public-stream-card.css).
+ * Category nav uses full component .category-sidebar (components/category-sidebar.css).
  */
 
 .public-home {
@@ -130,156 +131,6 @@
   overflow: hidden;
 }
 
-.public-home-category-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  overflow: hidden;
-  padding: var(--space-6) var(--space-5);
-}
-
-.public-home-category-sidebar-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.public-home-category-sidebar-header .icon-svg {
-  width: 24px;
-  height: 24px;
-}
-
-.public-home-category-sidebar-title {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: var(--font-medium);
-  line-height: 1.75rem;
-  color: var(--foreground);
-}
-
-.public-home-category-sidebar-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.public-home-category {
-  border-radius: 8px;
-  background: var(--muted);
-  border: 1px solid transparent;
-  interpolate-size: allow-keywords;
-}
-
-.public-home-category[open],
-.public-home-category:not([open]):hover {
-  border-color: var(--border);
-}
-
-.public-home-category::details-content {
-  block-size: 0;
-  overflow: hidden;
-  transition:
-    block-size 0.2s ease,
-    content-visibility 0.2s allow-discrete;
-}
-
-.public-home-category[open]::details-content {
-  block-size: auto;
-}
-
-.public-home-category-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  cursor: pointer;
-  list-style: none;
-}
-
-.public-home-category-summary::-webkit-details-marker {
-  display: none;
-}
-
-.public-home-category-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--muted-foreground);
-}
-
-.public-home-category[open] .public-home-category-label {
-  font-weight: var(--font-semibold);
-  color: var(--foreground);
-}
-
-.public-home-category-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.public-home-category-chevron {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--muted-foreground);
-  transition: transform 0.2s ease;
-}
-
-.public-home-category[open] .public-home-category-chevron {
-  transform: rotate(90deg);
-}
-
-.public-home-subcategories {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--space-3) var(--space-3) var(--space-5);
-}
-
-.public-home-subcategory {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  overflow: hidden;
-  text-align: left;
-  border: 0;
-  border-radius: 6px;
-  padding: var(--space-2) var(--space-3);
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.public-home-subcategory:hover {
-  background: var(--success-muted);
-  color: var(--primary);
-}
-
-.public-home-subcategory::before {
-  content: "";
-  flex-shrink: 0;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: transparent;
-}
-
-.public-home-subcategory.is-active {
-  background: var(--success-muted);
-  color: var(--primary);
-  font-weight: var(--font-medium);
-}
-
-.public-home-subcategory.is-active::before {
-  background: var(--primary);
-}
-
 .public-home-stream-results {
   display: flex;
   flex-direction: column;
@@ -304,9 +155,12 @@
   flex-shrink: 0;
 }
 
-.public-home h2.public-home-results-category-name {
+/* Unscoped: reused on /my (.my-home-catalog) as well as public home results. */
+h2.public-home-results-category-name {
   margin: 0;
   font-family: var(--font-sans);
+
+  /* Match .category-sidebar-title. */
   font-size: var(--text-lg);
   font-weight: var(--font-medium);
   line-height: 1.75rem;
@@ -334,9 +188,11 @@
 
 .public-home-results-subcategory-name {
   margin: 0;
-  font-size: var(--text-xl);
+
+  /* One step under category / sidebar title (text-lg). */
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  line-height: 1.75rem;
+  line-height: 1.5rem;
   color: var(--foreground);
 }
 
@@ -516,7 +372,7 @@
     background: var(--muted);
   }
 
-  .public-home-category-sidebar {
+  .category-sidebar {
     grid-column: 2;
     grid-row: 1;
     border-bottom: 0;

@@ -1,7 +1,10 @@
 /*
  * Public stream card — public homepage catalog tile (full component).
  *
- * a.public-stream-card | article.public-stream-card
+ * .public-stream-card-shell
+ *   details.public-stream-card-menu > summary.public-stream-card-menu-trigger
+ *     + .public-stream-card-dropdown > .public-stream-card-menu-item[+modifiers]
+ *   a.public-stream-card | article.public-stream-card
  *   .public-stream-card-header
  *     h3.public-stream-card-title
  *     p.public-stream-card-description
@@ -15,6 +18,105 @@
  *       .public-stream-card-orgs-head > strong + span.public-stream-card-orgs-count
  *       .public-stream-card-avatars > img | span.public-stream-card-avatar | span.public-stream-card-avatar-more
  */
+
+.public-stream-card-shell {
+  position: relative;
+}
+
+.public-stream-card-menu {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 10;
+}
+
+.public-stream-card-menu-trigger {
+  list-style: none;
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.public-stream-card-menu-trigger::marker {
+  content: "";
+}
+
+.public-stream-card-menu-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.public-stream-card-menu-trigger:hover,
+.public-stream-card-menu[open] .public-stream-card-menu-trigger {
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+}
+
+.public-stream-card-menu-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.public-stream-card-dropdown {
+  position: absolute;
+  top: calc(100%);
+  right: 0;
+  min-width: 160px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  box-shadow: 0 10px 26px var(--shadow);
+  z-index: 40;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.public-stream-card-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 9px;
+  gap: var(--space-2);
+  margin: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  text-decoration: none;
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.public-stream-card-menu-item:hover {
+  background: var(--muted);
+  text-decoration: none;
+}
+
+.public-stream-card-menu-item-disabled,
+.public-stream-card-menu-item:disabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.public-stream-card-menu-item-disabled:hover,
+.public-stream-card-menu-item:disabled:hover {
+  background: transparent;
+}
+
+.public-stream-card-menu-item-danger {
+  color: var(--destructive);
+}
+
+.public-stream-card-menu-item-danger:hover {
+  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
+}
+
+.public-stream-card-menu-item-danger.public-stream-card-menu-item-disabled,
+.public-stream-card-menu-item-danger:disabled {
+  color: var(--muted-foreground);
+}
 
 .public-stream-card {
   display: flex;

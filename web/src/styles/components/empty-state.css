@@ -1,0 +1,43 @@
+/*
+ * Empty state — centered dashed placeholder (CSS-only).
+ *
+ * div.empty-state
+ *   (optional .icon-svg)
+ *   p.empty-state-title
+ *   p.empty-state-hint
+ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.empty-state .icon-svg {
+  width: 24px;
+  height: 24px;
+  color: var(--muted-foreground);
+}
+
+.empty-state-title {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: 1.25rem;
+}
+
+.empty-state-hint {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}

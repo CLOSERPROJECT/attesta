@@ -304,16 +304,13 @@ type PublicCatalogRole struct {
 	Palette string `json:"palette"`
 }
 
-type WorkflowPickerView struct {
-	PageBase
-	Workflows            []StreamCardView
-	ShowCreateStreamCard bool
-	Error                string
-	Confirmation         string
-}
-
 type HomeWorkflowPickerView struct {
-	WorkflowPickerView
+	PageBase
+	Groups           []MyHomeStreamGroupView
+	Sidebar          CategorySidebarView
+	ShowCreateStream bool
+	Error            string
+	Confirmation     string
 }
 
 type PaginationLink struct {
@@ -1482,24 +1479,6 @@ func processStatusLabel(status string) string {
 	}
 }
 
-func workflowProcessCounts(def WorkflowDef, processes []Process) WorkflowProcessCounts {
-	counts := WorkflowProcessCounts{}
-	for _, process := range processes {
-		process.Progress = normalizeProgressKeys(process.Progress)
-		status := deriveProcessStatus(def, &process)
-		doneCount, _, _ := processProgressStats(def, &process)
-		switch {
-		case status == processStatusDone || status == processStatusTerminated:
-			counts.Terminated++
-		case doneCount == 0:
-			counts.NotStarted++
-		default:
-			counts.Started++
-		}
-	}
-	return counts
-}
-
 func formataStreamCreatorID(stream FormataBuilderStream) string {
 	if trimmed := strings.TrimSpace(stream.CreatedByUserID); trimmed != "" {
 		return trimmed
@@ -1512,90 +1491,6 @@ func homePickerMessage(r *http.Request, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(r.URL.Query().Get(key))
-}
-
-func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]StreamCardView, error) {
-	catalog, err := s.workflowCatalog()
-	if err != nil {
-		return nil, err
-	}
-	canEditSavedStreams := false
-	if user != nil {
-		if allowed, err := s.canViewFormataBuilder(ctx, user); err == nil {
-			canEditSavedStreams = allowed
-		}
-	}
-	streamsByKey := map[string]FormataBuilderStream{}
-	if s.store != nil {
-		streams, err := s.store.ListFormataBuilderStreams(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, stream := range streams {
-			if stream.ID.IsZero() {
-				continue
-			}
-			streamsByKey[stream.ID.Hex()] = stream
-		}
-	}
-	keys := sortedWorkflowKeys(catalog)
-	options := make([]StreamCardView, 0, len(keys))
-	for _, key := range keys {
-		cfg := catalog[key]
-		option := StreamCardView{
-			Key:          key,
-			Name:         cfg.Workflow.Name,
-			Description:  strings.TrimSpace(cfg.Workflow.Description),
-			Counts:       WorkflowProcessCounts{},
-			EditAction:   organizationPath("formata-builder?stream=" + key),
-			DeleteAction: streamPath(key) + "/delete",
-		}
-		if s.store == nil {
-			options = append(options, option)
-			continue
-		}
-		processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
-		if listErr != nil {
-			return nil, listErr
-		}
-		option.Counts = workflowProcessCounts(cfg.Workflow, processes)
-		actor := actorFromAccountUser(user, key)
-		if len(actor.RoleSlugs) == 0 && !s.enforceAuth {
-			actor.RoleSlugs = s.roles(cfg)
-			if len(actor.RoleSlugs) > 0 {
-				actor.Role = actor.RoleSlugs[0]
-			}
-		}
-		roleMeta := s.roleMetaIndex(ctx)
-		for _, process := range processes {
-			process.Progress = normalizeProgressKeys(process.Progress)
-			if deriveProcessStatus(cfg.Workflow, &process) != "active" {
-				continue
-			}
-			if _, ok := nextAuthorizedSubstepBody(cfg.Workflow, &process, key, actor, roleMeta, cfg.Roles); ok {
-				option.HasUserTurn = true
-				break
-			}
-		}
-		stream, ok := streamsByKey[key]
-		if ok && s.authorizer != nil && user != nil {
-			hasProcesses := option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0
-			option.CanClone = canEditSavedStreams
-			if canEditSavedStreams {
-				allowed, err := s.canEditStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
-				if err == nil {
-					option.CanEdit = allowed
-					option.EditRequiresPurge = allowed && hasProcesses
-				}
-			}
-			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
-			if err == nil {
-				option.CanDelete = allowed
-			}
-		}
-		options = append(options, option)
-	}
-	return options, nil
 }
 
 func (s *Server) selectedWorkflowUnvalidated(r *http.Request) (string, RuntimeConfig, error) {
@@ -2077,11 +1972,11 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := struct {
 		PageBase
-		Categories    []PublicHomeCategoryView
+		Sidebar       CategorySidebarView
 		StreamResults PublicHomeStreamResultsView
 	}{
-		PageBase:   base,
-		Categories: buildPublicHomeCategories(categories, cat, sub),
+		PageBase:      base,
+		Sidebar:       buildPublicHomeCategories(categories, cat, sub),
 		StreamResults: buildPublicHomeStreamResultsView(categories, cat, sub, streams, publicHomeCreateStreamHref(signedIn)),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
@@ -2110,23 +2005,23 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	options, err := s.workflowOptions(r.Context(), user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	showCreateStreamCard, authErr := s.canViewFormataBuilder(r.Context(), user)
+	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), user)
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
 	}
+	groups, err := s.buildMyHomeCatalog(r.Context(), user)
+	if err != nil {
+		logRequestError(r, err, "build my home catalog")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	view := HomeWorkflowPickerView{
-		WorkflowPickerView: WorkflowPickerView{
-			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
-			Workflows:            options,
-			ShowCreateStreamCard: showCreateStreamCard,
-			Error:                homePickerMessage(r, "error"),
-			Confirmation:         homePickerMessage(r, "confirmation"),
-		},
+		PageBase:         s.pageBaseForUser(user, "home_picker_body", "", ""),
+		Groups:           groups,
+		Sidebar:          buildMyHomeCategorySidebar(groups),
+		ShowCreateStream: showCreateStream && authErr == nil,
+		Error:            homePickerMessage(r, "error"),
+		Confirmation:     homePickerMessage(r, "confirmation"),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

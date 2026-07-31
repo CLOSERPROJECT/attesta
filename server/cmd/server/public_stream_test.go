@@ -295,7 +295,7 @@ func TestPublicStreamBodyTemplateEmptyRuns(t *testing.T) {
 	if !strings.Contains(out.String(), "No completed runs yet") {
 		t.Fatalf("expected empty copy, got: %s", out.String())
 	}
-	if !strings.Contains(out.String(), `class="public-stream-runs-empty"`) {
+	if !strings.Contains(out.String(), `class="empty-state"`) {
 		t.Fatalf("expected empty state, got: %s", out.String())
 	}
 }
