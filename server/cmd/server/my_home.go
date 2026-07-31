@@ -91,6 +91,7 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 
 	flush := func() {
 		if current != nil {
+			current.Expanded = len(cats) == 0
 			cats = append(cats, *current)
 			current = nil
 		}
@@ -102,7 +103,7 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 			cats = append(cats, CategorySidebarCategoryView{
 				Slug:     "uncategorized",
 				Name:     "Uncategorized",
-				Expanded: true,
+				Expanded: len(cats) == 0,
 				SubCategories: []CategorySidebarLeafView{{
 					Slug: "uncategorized",
 					Name: "Uncategorized",
@@ -114,10 +115,9 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 		if current == nil || current.Slug != g.CategorySlug {
 			flush()
 			current = &CategorySidebarCategoryView{
-				Slug:     g.CategorySlug,
-				Name:     g.CategoryName,
-				IconURL:  g.CategoryIconURL,
-				Expanded: true,
+				Slug:    g.CategorySlug,
+				Name:    g.CategoryName,
+				IconURL: g.CategoryIconURL,
 			}
 		}
 		current.SubCategories = append(current.SubCategories, CategorySidebarLeafView{

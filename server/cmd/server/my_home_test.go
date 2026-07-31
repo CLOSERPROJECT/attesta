@@ -133,6 +133,9 @@ func TestBuildMyHomeCategorySidebarFromGroups(t *testing.T) {
 	if got.Categories[1].Name != "Uncategorized" || got.Categories[1].SubCategories[0].Href != "#cat-uncategorized" {
 		t.Fatalf("uncat=%+v", got.Categories[1])
 	}
+	if got.Categories[1].Expanded {
+		t.Fatalf("only first category should start expanded, uncat=%+v", got.Categories[1])
+	}
 	if got.Categories[0].SubCategories[0].PartialURL != "" {
 		t.Fatalf("my leaves must not set PartialURL")
 	}

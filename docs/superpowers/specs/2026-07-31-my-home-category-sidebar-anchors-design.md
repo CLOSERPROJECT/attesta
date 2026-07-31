@@ -59,7 +59,7 @@ Wrap subcategory header + its stream grid in a `<section id="…" class="…">` 
 
 **Group fields:** Extend `MyHomeStreamGroupView` with slugs needed for ids (`CategorySlug`, `SubCategorySlug`) and/or a precomputed `AnchorID`. Category display name/icon header rules from the prior catalog polish stay (category header only on first non-empty leaf under a category).
 
-**Sidebar builder:** Derive the sidebar category list from the same accessible groups already built for `/my` (no second access pass). Categories with ≥1 leaf default `Expanded: true`. Uncategorized is a synthetic category named `Uncategorized` with a **single** leaf also labeled `Uncategorized` whose `Href` is `#cat-uncategorized` (keeps the same details→leaf shape as taxonomy paths).
+**Sidebar builder:** Derive the sidebar category list from the same accessible groups already built for `/my` (no second access pass). Only the **first** category starts `Expanded: true` (exclusive accordion on load; later opens close siblings via existing landing JS). Uncategorized is a synthetic category named `Uncategorized` with a **single** leaf also labeled `Uncategorized` whose `Href` is `#cat-uncategorized` (keeps the same details→leaf shape as taxonomy paths).
 
 **Empty catalog:** No sidebar and no hamburger (empty-state only).
 
