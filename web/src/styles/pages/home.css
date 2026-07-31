@@ -16,8 +16,16 @@ html:has(.my-home) {
 }
 
 .my-home-catalog-section {
+  display: flex;
+  flex-direction: column;
+  /* Match .public-home-stream-grid gap between subcategory header and cards. */
+  gap: var(--space-4);
   /* Sticky category header clearance (padding-top + title + padding-bottom). */
   scroll-margin-top: 4.5rem;
+}
+
+.my-home .public-home-results-subcategory-header {
+  padding-bottom: 0;
 }
 
 /* Stick category titles while scrolling the catalog (desktop: under viewport top). */
