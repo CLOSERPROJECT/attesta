@@ -71,6 +71,28 @@ func TestMyHomeStreamGroupTemplateUncategorizedOmitsSubcategoryHeader(t *testing
 	}
 }
 
+func TestMyHomeStreamGroupTemplateOmitsCategoryHeaderWhenEmpty(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	group := MyHomeStreamGroupView{
+		SubCategoryName: "Order Fulfillment",
+		Streams: []ManagedPublicStreamCardView{
+			{Card: PublicStreamCardView{Name: "Follow-on Stream"}},
+		},
+	}
+	if err := tmpl.ExecuteTemplate(&out, "my_home_stream_group", group); err != nil {
+		t.Fatalf("render my_home_stream_group template: %v", err)
+	}
+	body := out.String()
+	if strings.Contains(body, `class="public-home-results-category-header"`) {
+		t.Fatalf("empty CategoryName must omit category header, got: %s", body)
+	}
+	if !strings.Contains(body, `class="public-home-results-subcategory-name"`) || !strings.Contains(body, "Order Fulfillment") {
+		t.Fatalf("expected subcategory header, got: %s", body)
+	}
+}
+
 func TestHomePickerBodyTemplateRendersEmptyState(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 

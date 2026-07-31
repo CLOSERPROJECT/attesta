@@ -10,6 +10,7 @@ func buildMyHomeStreamGroups(categories []TaxonomyCategoryNode, cardsByKey map[s
 
 	var groups []MyHomeStreamGroupView
 	for _, category := range categories {
+		categoryHeaderEmitted := false
 		for _, sub := range category.SubCategories {
 			var streams []ManagedPublicStreamCardView
 			for _, key := range accessibleKeys {
@@ -34,14 +35,18 @@ func buildMyHomeStreamGroups(categories []TaxonomyCategoryNode, cardsByKey map[s
 			if len(streams) == 0 {
 				continue
 			}
-			groups = append(groups, MyHomeStreamGroupView{
-				CategoryName:           category.Name,
-				CategoryIconURL:        category.IconURL,
+			group := MyHomeStreamGroupView{
 				SubCategoryName:        sub.Name,
 				SubCategoryIconURL:     sub.IconURL,
 				SubCategoryDescription: sub.Description,
 				Streams:                streams,
-			})
+			}
+			if !categoryHeaderEmitted {
+				group.CategoryName = category.Name
+				group.CategoryIconURL = category.IconURL
+				categoryHeaderEmitted = true
+			}
+			groups = append(groups, group)
 		}
 	}
 

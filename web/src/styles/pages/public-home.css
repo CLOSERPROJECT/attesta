@@ -304,7 +304,8 @@
   flex-shrink: 0;
 }
 
-.public-home h2.public-home-results-category-name {
+/* Unscoped: reused on /my (.my-home-catalog) as well as public home results. */
+h2.public-home-results-category-name {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--text-lg);

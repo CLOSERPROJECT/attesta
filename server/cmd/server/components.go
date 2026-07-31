@@ -40,6 +40,8 @@ type ManagedPublicStreamCardView struct {
 }
 
 // MyHomeStreamGroupView is one taxonomy (or Uncategorized) block on /my.
+// CategoryName/CategoryIconURL are set only on the first non-empty subcategory
+// under a category so the category header is not repeated in the stacked catalog.
 type MyHomeStreamGroupView struct {
 	CategoryName           string
 	CategoryIconURL        string
