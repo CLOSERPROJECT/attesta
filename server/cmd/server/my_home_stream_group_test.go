@@ -140,6 +140,11 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 			t.Fatalf("missing %q in %s", want, body)
 		}
 	}
+	headerIdx := strings.Index(body, `class="page-header-head"`)
+	barIdx := strings.Index(body, `class="my-home-category-bar"`)
+	if headerIdx < 0 || barIdx < 0 || barIdx < headerIdx {
+		t.Fatalf("category bar must render below page-header-head; header=%d bar=%d body=%s", headerIdx, barIdx, body)
+	}
 }
 
 func TestHomePickerBodyTemplateRendersEmptyState(t *testing.T) {

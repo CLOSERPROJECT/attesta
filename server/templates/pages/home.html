@@ -2,20 +2,6 @@
 
 {{ define "home_picker_body" }}
 <section class="stack u-max-w-7xl u-mx-auto my-home">
-  {{ if .Groups }}
-  <div class="my-home-category-bar">
-    <button
-      type="button"
-      class="btn btn-ghost nav-drawer-trigger"
-      popovertarget="my-home-category-sidebar"
-      aria-label="Open stream categories"
-      title="Stream categories"
-    >
-      {{ template "icon-layout-grid" . }}
-      Stream categories
-    </button>
-  </div>
-  {{ end }}
   <section class="page-header">
     <div class="page-header-head">
       <div class="page-header-body">
@@ -31,6 +17,20 @@
       {{ end }}
     </div>
   </section>
+  {{ if .Groups }}
+  <div class="my-home-category-bar">
+    <button
+      type="button"
+      class="btn btn-ghost nav-drawer-trigger"
+      popovertarget="my-home-category-sidebar"
+      aria-label="Open stream categories"
+      title="Stream categories"
+    >
+      {{ template "icon-layout-grid" . }}
+      Stream categories
+    </button>
+  </div>
+  {{ end }}
   {{ if .Confirmation }}
     <p class="confirmation">{{ .Confirmation }}</p>
   {{ end }}
