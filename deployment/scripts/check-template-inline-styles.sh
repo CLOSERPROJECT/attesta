@@ -6,7 +6,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 templates="${root}/server/templates"
 
-allowed_pattern='--progress:'
+# Runtime-only exceptions documented in docs/css.md (Inline style=).
+allowed_pattern='(--progress:|view-transition-name:)'
 
 scan_styles() {
   if command -v rg >/dev/null 2>&1; then

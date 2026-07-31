@@ -161,6 +161,7 @@ No inline styles for static layout, spacing, or typography.
 | Pattern | Example | Consumer |
 |---------|---------|----------|
 | Progress width | `style="--progress: {{ .Percent }}%;"` | `.stream-instance-card-progress-fill` |
+| View transition name | `style="view-transition-name: taxonomy-group-{{ .Slug }}"` | Platform admin taxonomy morphs |
 
 All other dynamic theming uses `data-*`, not inline custom properties.
 
