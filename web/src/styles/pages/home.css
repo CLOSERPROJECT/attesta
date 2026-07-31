@@ -1,3 +1,8 @@
+/* Viewport hash jumps from category sidebar anchors. */
+html:has(.my-home) {
+  scroll-behavior: smooth;
+}
+
 .my-home-catalog {
   display: flex;
   flex-direction: column;
