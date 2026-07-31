@@ -16,6 +16,8 @@ func TestMyHomeStreamGroupTemplateRendersCategoryHeaders(t *testing.T) {
 		SubCategoryName:        "Procurement",
 		SubCategoryIconURL:     "/static/taxonomy/procurement-workflow.svg",
 		SubCategoryDescription: "PO management",
+		ShowCategoryHeader:     true,
+		AnchorID:               "cat-supply-chain--procurement",
 		Streams: []ManagedPublicStreamCardView{
 			{Card: PublicStreamCardView{Name: "Example Stream"}},
 		},
@@ -26,6 +28,7 @@ func TestMyHomeStreamGroupTemplateRendersCategoryHeaders(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
+		`id="cat-supply-chain--procurement"`,
 		`class="public-home-results-category-header"`,
 		`class="public-home-results-category-name">Supply Chain<`,
 		`class="public-home-results-subcategory-header"`,
@@ -46,8 +49,10 @@ func TestMyHomeStreamGroupTemplateUncategorizedOmitsSubcategoryHeader(t *testing
 
 	var out bytes.Buffer
 	group := MyHomeStreamGroupView{
-		CategoryName:  "Uncategorized",
-		Uncategorized: true,
+		CategoryName:       "Uncategorized",
+		Uncategorized:      true,
+		ShowCategoryHeader: true,
+		AnchorID:           "cat-uncategorized",
 		Streams: []ManagedPublicStreamCardView{
 			{Card: PublicStreamCardView{Name: "Loose Stream"}},
 		},
@@ -76,7 +81,10 @@ func TestMyHomeStreamGroupTemplateOmitsCategoryHeaderWhenEmpty(t *testing.T) {
 
 	var out bytes.Buffer
 	group := MyHomeStreamGroupView{
+		CategoryName:    "Supply Chain",
 		SubCategoryName: "Order Fulfillment",
+		ShowCategoryHeader: false,
+		AnchorID:        "cat-supply-chain--order-fulfillment",
 		Streams: []ManagedPublicStreamCardView{
 			{Card: PublicStreamCardView{Name: "Follow-on Stream"}},
 		},
@@ -86,7 +94,7 @@ func TestMyHomeStreamGroupTemplateOmitsCategoryHeaderWhenEmpty(t *testing.T) {
 	}
 	body := out.String()
 	if strings.Contains(body, `class="public-home-results-category-header"`) {
-		t.Fatalf("empty CategoryName must omit category header, got: %s", body)
+		t.Fatalf("ShowCategoryHeader false must omit category header, got: %s", body)
 	}
 	if !strings.Contains(body, `class="public-home-results-subcategory-name"`) || !strings.Contains(body, "Order Fulfillment") {
 		t.Fatalf("expected subcategory header, got: %s", body)

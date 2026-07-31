@@ -1,6 +1,16 @@
 package main
 
-import "context"
+import (
+	"context"
+	"strings"
+)
+
+func myHomeAnchorID(categorySlug, subCategorySlug string, uncategorized bool) string {
+	if uncategorized {
+		return "cat-uncategorized"
+	}
+	return "cat-" + strings.TrimSpace(categorySlug) + "--" + strings.TrimSpace(subCategorySlug)
+}
 
 func buildMyHomeStreamGroups(categories []TaxonomyCategoryNode, cardsByKey map[string]ManagedPublicStreamCardView, catalog map[string]RuntimeConfig, accessibleKeys []string) []MyHomeStreamGroupView {
 	remaining := make(map[string]struct{}, len(accessibleKeys))
@@ -36,16 +46,18 @@ func buildMyHomeStreamGroups(categories []TaxonomyCategoryNode, cardsByKey map[s
 				continue
 			}
 			group := MyHomeStreamGroupView{
+				CategoryName:           category.Name,
+				CategoryIconURL:        category.IconURL,
+				CategorySlug:           category.Slug,
+				SubCategorySlug:        sub.Slug,
 				SubCategoryName:        sub.Name,
 				SubCategoryIconURL:     sub.IconURL,
 				SubCategoryDescription: sub.Description,
+				AnchorID:               myHomeAnchorID(category.Slug, sub.Slug, false),
+				ShowCategoryHeader:     !categoryHeaderEmitted,
 				Streams:                streams,
 			}
-			if !categoryHeaderEmitted {
-				group.CategoryName = category.Name
-				group.CategoryIconURL = category.IconURL
-				categoryHeaderEmitted = true
-			}
+			categoryHeaderEmitted = true
 			groups = append(groups, group)
 		}
 	}
@@ -63,9 +75,11 @@ func buildMyHomeStreamGroups(categories []TaxonomyCategoryNode, cardsByKey map[s
 	}
 	if len(uncategorized) > 0 {
 		groups = append(groups, MyHomeStreamGroupView{
-			CategoryName:  "Uncategorized",
-			Uncategorized: true,
-			Streams:       uncategorized,
+			CategoryName:       "Uncategorized",
+			AnchorID:           myHomeAnchorID("", "", true),
+			ShowCategoryHeader: true,
+			Uncategorized:      true,
+			Streams:            uncategorized,
 		})
 	}
 	return groups
