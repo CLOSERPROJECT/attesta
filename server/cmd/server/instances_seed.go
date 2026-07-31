@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"fmt"
 	"strings"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type seedInstanceKind string
@@ -158,4 +163,90 @@ func seedSubstepSuppliesLot(sub WorkflowSub, lotKey string) bool {
 	}
 	_, ok = props[lotKey]
 	return ok
+}
+
+func seedActor() Actor {
+	return Actor{ID: "seed-user", Role: "seed", OrgSlug: "seed"}
+}
+
+func seedWorkflowInstances(ctx context.Context, store Store, workflowKey string, cfg RuntimeConfig, now time.Time) (int, error) {
+	key := strings.TrimSpace(workflowKey)
+	if key == "" {
+		return 0, fmt.Errorf("seed instances: workflow key is required")
+	}
+	if store == nil {
+		return 0, fmt.Errorf("seed instances: store is required")
+	}
+	if err := store.DeleteWorkflowData(ctx, key); err != nil {
+		return 0, fmt.Errorf("seed instances %s: delete: %w", key, err)
+	}
+	actor := seedActor()
+	plans := buildSeedInstancePlans(cfg, now)
+	inserted := 0
+	for _, plan := range plans {
+		id := primitive.NewObjectID()
+		created := now.Add(plan.CreatedOffset)
+		progress := synthesizeSeedProgress(cfg.Workflow, cfg, plan.DoneSubstepCount, created, actor)
+		subs := orderedSubsteps(cfg.Workflow)
+		for i := 0; i < plan.DoneSubstepCount && i < len(subs); i++ {
+			sub := subs[i]
+			if strings.TrimSpace(sub.InputType) != "file" {
+				continue
+			}
+			att, err := store.SaveAttachment(ctx, AttachmentUpload{
+				ProcessID:   id,
+				SubstepID:   sub.SubstepID,
+				Filename:    "seed-" + sub.SubstepID + ".txt",
+				ContentType: "text/plain",
+				UploadedAt:  created,
+			}, bytes.NewReader([]byte("attesta seed attachment\n")))
+			if err != nil {
+				return inserted, fmt.Errorf("seed instances %s: attachment %s: %w", key, sub.SubstepID, err)
+			}
+			enc := encodeProgressKey(sub.SubstepID)
+			step := progress[enc]
+			step.Data = map[string]interface{}{
+				"attachmentId": att.ID.Hex(),
+				"filename":     att.Filename,
+				"contentType":  att.ContentType,
+				"size":         att.SizeBytes,
+				"sha256":       att.SHA256,
+			}
+			progress[enc] = step
+		}
+		proc := Process{
+			ID:          id,
+			WorkflowKey: key,
+			Name:        plan.Name,
+			CreatedAt:   created,
+			CreatedBy:   actor.ID,
+			Status:      plan.Status,
+			Progress:    progress,
+		}
+		if plan.Status == processStatusTerminated {
+			ended := created.Add(30 * time.Second)
+			a := actor
+			proc.Termination = &ProcessTermination{
+				Reason:  plan.TerminationReason,
+				EndedAt: ended,
+				Actor:   &a,
+			}
+		}
+		if _, err := store.InsertProcess(ctx, proc); err != nil {
+			return inserted, fmt.Errorf("seed instances %s: insert: %w", key, err)
+		}
+		inserted++
+		if plan.WantDPP {
+			clone := cloneProcess(proc)
+			clone.Progress = normalizeProgressKeys(clone.Progress)
+			dpp, err := buildProcessDPP(cfg.Workflow, cfg.DPP, &clone, created)
+			if err != nil {
+				return inserted, fmt.Errorf("seed instances %s: dpp: %w", key, err)
+			}
+			if err := store.UpdateProcessDPP(ctx, id, key, dpp); err != nil {
+				return inserted, fmt.Errorf("seed instances %s: update dpp: %w", key, err)
+			}
+		}
+	}
+	return inserted, nil
 }
