@@ -159,6 +159,7 @@
 h2.public-home-results-category-name {
   margin: 0;
   font-family: var(--font-sans);
+  /* Match .category-sidebar-title. */
   font-size: var(--text-lg);
   font-weight: var(--font-medium);
   line-height: 1.75rem;
@@ -186,9 +187,10 @@ h2.public-home-results-category-name {
 
 .public-home-results-subcategory-name {
   margin: 0;
-  font-size: var(--text-xl);
+  /* One step under category / sidebar title (text-lg). */
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  line-height: 1.75rem;
+  line-height: 1.5rem;
   color: var(--foreground);
 }
 
