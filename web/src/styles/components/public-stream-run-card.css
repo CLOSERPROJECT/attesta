@@ -1,0 +1,68 @@
+/*
+ * Public stream run card — recent completed run on the public stream page.
+ *
+ * a.public-stream-run-card | article.public-stream-run-card
+ *   .public-stream-run-card-meta
+ *     span.public-stream-run-card-status
+ *     time.public-stream-run-card-date
+ *   span.public-stream-run-card-dpp (+ icon-file-text)
+ */
+
+.public-stream-run-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+a.public-stream-run-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.public-stream-run-card:hover {
+  border-color: var(--primary);
+}
+
+.public-stream-run-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.public-stream-run-card-status {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: 1.25rem;
+}
+
+.public-stream-run-card-date {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}
+
+.public-stream-run-card-dpp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}
+
+.public-stream-run-card-dpp .icon-svg {
+  width: 13px;
+  height: 16px;
+  flex-shrink: 0;
+}

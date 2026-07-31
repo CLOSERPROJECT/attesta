@@ -1,0 +1,24 @@
+{{ define "public_stream_run_card" }}
+  {{ if .DigitalLink }}
+  <a class="public-stream-run-card" href="{{ .DigitalLink }}">
+  {{ else }}
+  <article class="public-stream-run-card">
+  {{ end }}
+    <div class="public-stream-run-card-meta">
+      <span class="public-stream-run-card-status">{{ .StatusLabel }}</span>
+      {{ if .CompletedAt }}
+      <time class="public-stream-run-card-date">{{ .CompletedAt }}</time>
+      {{ end }}
+    </div>
+    {{ if .PassportChip }}
+    <span class="public-stream-run-card-dpp">
+      DPP
+      {{ template "icon-file-text" . }}
+    </span>
+    {{ end }}
+  {{ if .DigitalLink }}
+  </a>
+  {{ else }}
+  </article>
+  {{ end }}
+{{ end }}

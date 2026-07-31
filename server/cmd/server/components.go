@@ -43,6 +43,14 @@ type PublicStreamCardView struct {
 	OrganizationsOverflow int // count beyond the first four avatars; 0 when none
 }
 
+// PublicStreamRunCardView is one recent completed run on the public stream page.
+type PublicStreamRunCardView struct {
+	StatusLabel  string
+	CompletedAt  string
+	DigitalLink  string
+	PassportChip bool
+}
+
 // PublicHomeSubCategoryView is one filterable leaf in the landing sidebar.
 type PublicHomeSubCategoryView struct {
 	Slug       string
