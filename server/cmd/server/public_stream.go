@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"time"
 )
@@ -50,4 +51,23 @@ func buildPublicStreamRunCards(def WorkflowDef, processes []Process) []PublicStr
 		}
 	}
 	return out
+}
+
+func (s *Server) buildPublicStreamBlueprint(ctx context.Context, cfg RuntimeConfig, workflowKey string) StreamInstanceDetailView {
+	preview := makeStreamInstanceDetailReadOnly(
+		s.buildStreamInstanceDetailView(
+			ctx,
+			cfg,
+			workflowKey,
+			buildWorkflowPreviewProcess(cfg.Workflow, workflowKey),
+			Actor{},
+			"",
+			"",
+			false,
+		),
+		"Public preview.",
+	)
+	preview.HideStatus = true
+	preview.WorkflowPath = publicStreamPath(workflowKey)
+	return preview
 }

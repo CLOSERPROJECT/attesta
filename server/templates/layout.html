@@ -214,6 +214,8 @@
           {{ template "home_picker_body" . }}
         {{ else if eq .Body "public_home_body" }}
           {{ template "public_home_body" . }}
+        {{ else if eq .Body "public_stream_body" }}
+          {{ template "public_stream_body" . }}
         {{ else if eq .Body "login_body" }}
           {{ template "login_body" . }}
         {{ else if eq .Body "signup_body" }}

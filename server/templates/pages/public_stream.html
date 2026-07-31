@@ -1,0 +1,100 @@
+{{ define "public_stream_body" }}
+  <div class="public-stream u-max-w-7xl u-mx-auto stack">
+    <header class="public-stream-header">
+      <h1 class="public-stream-title">{{ .Header.Name }}</h1>
+      {{ if .Header.Description }}
+      <p class="public-stream-description">{{ .Header.Description }}</p>
+      {{ end }}
+      {{ if .Header.PassportEnabled }}
+      <span class="public-stream-dpp">
+        DPP
+        {{ template "icon-file-text" . }}
+      </span>
+      {{ end }}
+      <div class="public-stream-metrics">
+        <div class="public-stream-metrics-row">
+          {{ if eq .Header.InstanceCount 0 }}
+          <span class="public-stream-metric">
+            {{ template "icon-layers-2" . }}
+            no runs yet
+          </span>
+          {{ else if .Header.AllCompleted }}
+          <span class="public-stream-metric">
+            {{ template "icon-layers-2" . }}
+            {{ if eq .Header.InstanceCount 1 }}1 run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
+          </span>
+          <span class="public-stream-metric">
+            {{ template "icon-check-circle" . }}
+            all completed
+          </span>
+          {{ else }}
+          <span class="public-stream-metric">
+            {{ template "icon-layers-2" . }}
+            {{ if eq .Header.InstanceCount 1 }}1 run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
+          </span>
+          <span class="public-stream-metric public-stream-metric-active">
+            {{ template "icon-activity" . }}
+            {{ if eq .Header.ActiveCount 1 }}1 active now{{ else }}{{ .Header.ActiveCount }} active now{{ end }}
+          </span>
+          {{ end }}
+        </div>
+        <div class="public-stream-metrics-row">
+          <span class="public-stream-metric">
+            {{ template "icon-list" . }}
+            {{ if eq .Header.StepCount 1 }}1 step{{ else }}{{ .Header.StepCount }} steps{{ end }}
+          </span>
+          <span class="public-stream-metric">
+            {{ template "icon-users-group" . }}
+            {{ if eq .Header.RoleCount 1 }}1 role{{ else }}{{ .Header.RoleCount }} roles{{ end }}
+          </span>
+        </div>
+      </div>
+      {{ if .Header.Organizations }}
+      <hr class="public-stream-rule" />
+      <div class="public-stream-orgs">
+        <div class="public-stream-orgs-head">
+          <strong>Organizations</strong>
+          <span class="public-stream-orgs-count">{{ .Header.OrganizationCount }}</span>
+        </div>
+        <div class="public-stream-avatars">
+          {{ range .Header.Organizations }}
+            {{ if .LogoURL }}
+            <img src="{{ .LogoURL }}" alt="{{ .Name }}" width="32" height="32" />
+            {{ else }}
+            <span class="public-stream-avatar" role="img" aria-label="{{ .Name }}">{{ .Initials }}</span>
+            {{ end }}
+          {{ end }}
+          {{ if .Header.OrganizationsOverflow }}
+          <span
+            class="public-stream-avatar-more"
+            aria-label="{{ .Header.OrganizationsOverflow }} more organizations"
+          >+{{ .Header.OrganizationsOverflow }}</span>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+    </header>
+
+    <section class="public-stream-runs" aria-labelledby="public-stream-runs-heading">
+      <h2 id="public-stream-runs-heading">Recent completed runs</h2>
+      {{ if .RecentRuns }}
+      <div class="public-stream-runs-grid">
+        {{ range .RecentRuns }}
+          {{ template "public_stream_run_card" . }}
+        {{ end }}
+      </div>
+      {{ else }}
+      <p class="public-stream-runs-empty">No completed runs yet.</p>
+      {{ end }}
+    </section>
+
+    <section class="public-stream-blueprint" aria-labelledby="public-stream-blueprint-heading">
+      <h2 id="public-stream-blueprint-heading">Workflow</h2>
+      {{ template "stream_timeline" .Blueprint.StreamTimeline }}
+    </section>
+  </div>
+{{ end }}
+
+{{ define "public_stream.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

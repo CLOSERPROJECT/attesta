@@ -51,6 +51,14 @@ type PublicStreamRunCardView struct {
 	PassportChip bool
 }
 
+// PublicStreamPageView is the view model for templates/pages/public_stream.html.
+type PublicStreamPageView struct {
+	PageBase
+	Header     PublicStreamCardView
+	RecentRuns []PublicStreamRunCardView
+	Blueprint  StreamInstanceDetailView
+}
+
 // PublicHomeSubCategoryView is one filterable leaf in the landing sidebar.
 type PublicHomeSubCategoryView struct {
 	Slug       string

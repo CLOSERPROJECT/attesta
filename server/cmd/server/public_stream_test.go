@@ -102,3 +102,99 @@ func TestPublicStreamRunCardTemplateLinkVsStatic(t *testing.T) {
 		t.Fatalf("expected article, got: %s", sb)
 	}
 }
+
+func TestBuildPublicStreamBlueprintIsReadOnly(t *testing.T) {
+	server := &Server{tmpl: parseTestTemplates(t), store: NewMemoryStore()}
+	cfg, err := parseRuntimeConfigData("wf.yaml", []byte(minimalCategorizedWorkflowYAML("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	view := server.buildPublicStreamBlueprint(t.Context(), cfg, "wf")
+	if !view.HideStatus {
+		t.Fatal("expected HideStatus")
+	}
+	if view.CanTerminate || view.TerminateAction != "" {
+		t.Fatalf("must not expose terminate, got %#v", view)
+	}
+	if len(view.Timeline) == 0 {
+		t.Fatal("expected timeline steps")
+	}
+	for _, step := range view.Timeline {
+		for _, sub := range step.Substeps {
+			if sub.Body == nil || !sub.Body.ReadOnly {
+				t.Fatalf("substep body must be read-only, got %#v", sub.Body)
+			}
+		}
+	}
+}
+
+func TestPublicStreamBodyTemplateRendersSections(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	view := PublicStreamPageView{
+		PageBase: PageBase{Body: "public_stream_body"},
+		Header: PublicStreamCardView{
+			Name:        "Pilot Workflow",
+			Description: "Gallium batches",
+			StepCount:   3,
+			RoleCount:   5,
+		},
+		RecentRuns: []PublicStreamRunCardView{{
+			StatusLabel: "Completed",
+			CompletedAt: "1 Jul 2026 at 12:00 UTC",
+		}},
+		Blueprint: StreamInstanceDetailView{
+			HideStatus: true,
+			Timeline: []TimelineStep{{
+				Summary: StepSummaryView{StepID: "1", Title: "Step 1"},
+				Substeps: []TimelineSubstep{{
+					SubstepID: "1.1", Title: "Input",
+					Body: &SubstepBodyView{Mode: "preview", Title: "Input", ReadOnly: true, Reason: "Public preview."},
+				}},
+			}},
+		},
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_body", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := out.String()
+	for _, want := range []string{
+		`class="public-stream u-max-w-7xl`,
+		"Pilot Workflow",
+		"Gallium batches",
+		"Recent completed runs",
+		"Workflow",
+		`class="public-stream-run-card"`,
+		`class="stream-timeline-list"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body, got: %s", want, body)
+		}
+	}
+	for _, mustNot := range []string{
+		`action=`,
+		"/instance/start",
+		"/terminate",
+		"Sign in to run",
+		"Open in workspace",
+	} {
+		if strings.Contains(body, mustNot) {
+			t.Fatalf("must not contain %q, got: %s", mustNot, body)
+		}
+	}
+}
+
+func TestPublicStreamBodyTemplateEmptyRuns(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	view := PublicStreamPageView{
+		Header: PublicStreamCardView{Name: "Empty Runs"},
+		Blueprint: StreamInstanceDetailView{HideStatus: true},
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_body", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(out.String(), "No completed runs yet.") {
+		t.Fatalf("expected empty copy, got: %s", out.String())
+	}
+}
