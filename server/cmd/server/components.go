@@ -93,6 +93,7 @@ type PublicStreamPageView struct {
 type CategorySidebarLeafView struct {
 	Slug       string
 	Name       string
+	IconURL    string
 	Active     bool
 	Href       string // /my anchors, e.g. #cat-supply-chain--procurement
 	PartialURL string // public home HTMX get

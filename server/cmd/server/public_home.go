@@ -78,6 +78,7 @@ func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, s
 			subs = append(subs, CategorySidebarLeafView{
 				Slug:       sub.Slug,
 				Name:       sub.Name,
+				IconURL:    sub.IconURL,
 				Active:     cat.Slug == selectedCat && sub.Slug == selectedSub,
 				PartialURL: "/streams/public?" + encoded,
 				PushURL:    publicHomePath(cat.Slug, sub.Slug),
