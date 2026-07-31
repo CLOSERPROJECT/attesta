@@ -281,7 +281,7 @@ type PageBase struct {
 	WorkflowPath    string
 	UserEmail       string
 	IsPlatformAdmin bool
-	ShowOrgsLink    bool
+	ShowAdminLink   bool
 	ShowMyOrgLink   bool
 	ShowLogout      bool
 }
@@ -1430,11 +1430,11 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	base.UserEmail = strings.TrimSpace(user.Email)
 	base.IsPlatformAdmin = user.IsPlatformAdmin
 	base.ShowLogout = s.enforceAuth
-	showOrgsLink, err := s.canAccessPlatformAdminConsole(context.Background(), user)
+	showAdminLink, err := s.canAccessPlatformAdminConsole(context.Background(), user)
 	if err != nil {
 		logCapabilityCheckError(err, "cerbos check failed for platform admin navigation")
 	}
-	base.ShowOrgsLink = showOrgsLink
+	base.ShowAdminLink = showAdminLink
 	showMyOrgLink, err := s.canAccessOrgAdminConsole(context.Background(), user)
 	if err != nil {
 		logCapabilityCheckError(err, "cerbos check failed for org admin navigation")

@@ -16,7 +16,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (CSS rules), `.age
 - Stream dashboard is `/my/streams/:key/` (lists stream instances for one stream).
 - Legacy `/w/`, `/org-admin/`, `/dashboard`, and `/w/:key/dashboard` are not registered (hard cut → 404).
 - Admin consoles:
-  - Platform admin: `/admin/orgs` (create/edit/delete orgs, upload logos, invite org admins)
+  - Platform admin: `/admin` (redirects to `/admin/organizations`); sections `/admin/organizations`, `/admin/categories`; logo `/admin/organizations/logo/:id`
   - Org admin: `/my/organization/profile`, `/my/organization/roles`, `/my/organization/members` (forms `POST /my/organization/users`, `POST /my/organization/roles`)
 - Platform admin is env-driven (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). On startup the server ensures that account exists in Appwrite (`bootstrapPlatformAdminIdentity`). Cerbos policy `platform_admin_console` gates console access.
 - Auth/org state now lives in Appwrite:
@@ -26,7 +26,7 @@ See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (CSS rules), `.age
   - invites -> memberships
   - signup/login/reset -> Appwrite account/session/recovery flows
 - Global topbar now renders role-aware admin links on authenticated pages:
-  - Platform admin sees `Orgs` (`/admin/orgs`)
+  - Platform admin sees `Admin` (`/admin`)
   - Org admin with org context sees `My Org` (`/my/organization/profile`)
 - Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
 - Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
@@ -160,7 +160,9 @@ Global routes are registered in `Server.newMux()` (`server/cmd/server/main.go`).
 - `GET /` — public homepage (`handlePublicHome`)
 - `GET/POST /login`, `GET/POST /signup`, `POST /logout` (login default redirect → `/my`)
 - `GET /invite/…`, `GET/POST /reset`, `GET/POST /reset/…`
-- `GET/POST /admin/orgs`, `GET/POST /admin/orgs/` (platform admin org console; logo at `/admin/orgs/logo/:id`)
+- `GET /admin` — platform admin entry (redirects to `/admin/organizations`)
+- `GET/POST /admin/organizations`, `GET/POST /admin/organizations/` (platform admin org console; logo at `/admin/organizations/logo/:id`)
+- `GET/POST /admin/categories` (platform admin category taxonomy)
 - `GET /organization/logo/:slug` — public org logo asset
 - `GET /01/…` — public DPP Digital Link
 - `GET /events` — legacy SSE mux entry (production UI uses stream-scoped path below)
