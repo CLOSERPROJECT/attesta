@@ -15,6 +15,19 @@ html:has(.my-home) {
   min-width: 0;
 }
 
+/* Hide the rule before the first category; later ones separate categories. */
+.my-home-catalog > .my-home-category-rule:first-child {
+  display: none;
+}
+
+.my-home-category-rule {
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  /* Match sticky category header bleed over .page padding. */
+  margin-inline: calc(-1 * var(--space-4));
+}
+
 .my-home-catalog-section {
   display: flex;
   flex-direction: column;
@@ -84,6 +97,10 @@ html:has(.my-home) {
   .my-home .public-home-results-category-header {
     margin-inline: calc(-1 * var(--space-8));
     padding-inline: var(--space-8);
+  }
+
+  .my-home-category-rule {
+    margin-inline: calc(-1 * var(--space-8));
   }
 
   .my-home-category-bar {
