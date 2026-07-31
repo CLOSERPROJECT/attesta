@@ -134,7 +134,7 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 	}
 }
 
-// streamManagementFlags mirrors workflowOptions CanClone/CanEdit/CanDelete rules.
+// streamManagementFlags derives CanClone/CanEdit/CanDelete for managed stream cards.
 func (s *Server) streamManagementFlags(ctx context.Context, user *AccountUser, key string, stream FormataBuilderStream, hasProcesses, canEditSavedStreams bool) (canClone, canEdit, editRequiresPurge, canDelete bool) {
 	if s.authorizer == nil || user == nil {
 		return false, false, false, false
