@@ -35,7 +35,7 @@
   .my-home-body {
     display: grid;
     grid-template-columns: 18rem minmax(0, 1fr);
-    gap: var(--space-8);
+    gap: var(--space-12);
     align-items: start;
   }
 
@@ -45,8 +45,11 @@
 
   .my-home .nav-drawer-panel.my-home-sidebar {
     display: block;
-    position: static;
-    inset: auto;
+    position: sticky;
+    top: 44px;
+    right: auto;
+    bottom: auto;
+    left: auto;
     width: auto;
     height: auto;
     max-height: none;
@@ -57,6 +60,7 @@
   .my-home .category-sidebar {
     background: transparent;
     border-bottom: 0;
+    border-right: 0;
     padding: 0;
   }
 }
