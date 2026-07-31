@@ -32,13 +32,48 @@ func TestPublicStreamCardTemplateRendersCoreFields(t *testing.T) {
 	for _, mustNot := range []string{
 		"public-stream-card-badge",
 		">Stream<",
-		"<a ",
-		"<a>",
-		`href=`,
 	} {
 		if strings.Contains(body, mustNot) {
 			t.Fatalf("public stream card must not contain %q, got: %s", mustNot, body)
 		}
+	}
+}
+
+func TestPublicStreamCardTemplateLinksWhenHrefSet(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	card := PublicStreamCardView{
+		Name: "Linked Stream",
+		Href: "/streams/linked",
+	}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, `href="/streams/linked"`) {
+		t.Fatalf("expected href, got: %s", body)
+	}
+	if !strings.Contains(body, `class="public-stream-card"`) {
+		t.Fatalf("expected public-stream-card class, got: %s", body)
+	}
+	if strings.Contains(body, "<article") {
+		t.Fatalf("linked card must not use article shell, got: %s", body)
+	}
+}
+
+func TestPublicStreamCardTemplateStaysArticleWithoutHref(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	card := PublicStreamCardView{Name: "Static"}
+	if err := tmpl.ExecuteTemplate(&out, "public_stream_card", card); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, `<article class="public-stream-card"`) {
+		t.Fatalf("expected article shell, got: %s", body)
+	}
+	if strings.Contains(body, `href=`) {
+		t.Fatalf("empty Href must not link, got: %s", body)
 	}
 }
 
@@ -452,6 +487,9 @@ func TestBuildPublicStreamCardViewFillsStepRoleOrgCounts(t *testing.T) {
 	}
 	if !card.PassportEnabled {
 		t.Fatal("PassportEnabled want true")
+	}
+	if card.Href != "/streams/counted" {
+		t.Fatalf("Href = %q, want /streams/counted", card.Href)
 	}
 }
 

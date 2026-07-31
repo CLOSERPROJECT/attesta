@@ -196,6 +196,7 @@ func (s *Server) buildPublicStreamCardView(ctx context.Context, key string, cfg 
 	return PublicStreamCardView{
 		Name:                  cfg.Workflow.Name,
 		Description:           strings.TrimSpace(cfg.Workflow.Description),
+		Href:                  publicStreamPath(key),
 		PassportEnabled:       cfg.DPP.Enabled,
 		InstanceCount:         instanceCount,
 		ActiveCount:           activeCount,

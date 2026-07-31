@@ -31,6 +31,7 @@ type PublicStreamCardOrgView struct {
 type PublicStreamCardView struct {
 	Name                  string
 	Description           string
+	Href                  string // /streams/:key when set; empty keeps a non-link article
 	PassportEnabled       bool
 	InstanceCount         int
 	ActiveCount           int  // active instances (dashboard Active: not done, not terminated)

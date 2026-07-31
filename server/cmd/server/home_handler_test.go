@@ -198,6 +198,8 @@ func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 		"Alpha description",
 		"Beta Stream",
 		"Beta description",
+		`href="/streams/alpha"`,
+		`href="/streams/beta"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in public home body, got %q", want, body)

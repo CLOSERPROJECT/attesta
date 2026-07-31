@@ -97,6 +97,9 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 	if len(cards) != 1 || cards[0].Name != "Match Stream" {
 		t.Fatalf("cards = %#v, want only Match Stream", cards)
 	}
+	if cards[0].Href != "/streams/match" {
+		t.Fatalf("Href = %q, want /streams/match", cards[0].Href)
+	}
 
 	empty, err := server.publicStreamCardsForPath(t.Context(), "", "")
 	if err != nil || len(empty) != 0 {

@@ -1,7 +1,7 @@
 /*
  * Public stream card — public homepage catalog tile (full component).
  *
- * article.public-stream-card
+ * a.public-stream-card | article.public-stream-card
  *   .public-stream-card-header
  *     h3.public-stream-card-title
  *     p.public-stream-card-description
@@ -30,6 +30,15 @@
   border-radius: 12px;
   background: var(--card);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+a.public-stream-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.public-stream-card:hover {
+  border-color: var(--primary);
 }
 
 .public-stream-card-header {

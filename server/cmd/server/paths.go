@@ -8,6 +8,10 @@ func streamPath(key string) string {
 	return "/my/streams/" + strings.TrimSpace(key)
 }
 
+func publicStreamPath(key string) string {
+	return "/streams/" + strings.TrimSpace(key)
+}
+
 func streamInstancePath(key, instanceID string) string {
 	return streamPath(key) + "/instance/" + strings.TrimSpace(instanceID)
 }

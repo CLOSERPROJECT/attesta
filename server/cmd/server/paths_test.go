@@ -36,3 +36,12 @@ func TestAppHomePath(t *testing.T) {
 		t.Fatalf("appHomePath = %q", appHomePath)
 	}
 }
+
+func TestPublicStreamPath(t *testing.T) {
+	if got := publicStreamPath("  wf-a  "); got != "/streams/wf-a" {
+		t.Fatalf("publicStreamPath = %q, want /streams/wf-a", got)
+	}
+	if got := publicStreamPath(""); got != "/streams/" {
+		t.Fatalf("empty key = %q, want /streams/", got)
+	}
+}
