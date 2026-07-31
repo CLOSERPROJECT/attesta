@@ -20,8 +20,23 @@ html:has(.my-home) {
   gap: var(--space-6);
 }
 
-.my-home .nav-drawer-trigger {
+/* Mobile-only sticky strip so categories stay reachable while scrolling. */
+.my-home-category-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  margin-inline: calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4);
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+.my-home-category-bar .nav-drawer-trigger {
   display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .home-workflow-panel-main {
@@ -37,6 +52,10 @@ html:has(.my-home) {
 }
 
 @media (--md-up) {
+  .my-home-category-bar {
+    display: none;
+  }
+
   .my-home-body {
     display: grid;
     grid-template-columns: 18rem minmax(0, 1fr);
@@ -44,22 +63,20 @@ html:has(.my-home) {
     align-items: start;
   }
 
-  .my-home .nav-drawer-trigger {
-    display: none;
-  }
-
   .my-home .nav-drawer-panel.my-home-sidebar {
     display: block;
     position: sticky;
-    top: 44px;
-    right: auto;
-    bottom: auto;
-    left: auto;
+    inset: 44px auto auto;
     width: auto;
     height: auto;
     max-height: none;
     overflow: visible;
     background: transparent;
+    transform: none;
+  }
+
+  .my-home .nav-drawer-panel.my-home-sidebar:not(:popover-open) {
+    transform: none;
   }
 
   .my-home .category-sidebar {
@@ -67,10 +84,16 @@ html:has(.my-home) {
     border-bottom: 0;
     border-right: 0;
     padding: 0;
+    min-height: 0;
   }
 }
 
 @media (--md-down) {
+  .my-home-catalog-section {
+    /* topbar offset unused; sticky category bar (~52px) + breathing room */
+    scroll-margin-top: 3.5rem;
+  }
+
   .preview-panel,
   .instances-panel {
     scroll-margin-top: var(--space-3);

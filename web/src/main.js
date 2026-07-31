@@ -1680,3 +1680,37 @@ const initLandingCategorySidebar = () => {
 };
 
 initLandingCategorySidebar();
+
+const initMyHomeCategoryDrawer = () => {
+  const panel = document.getElementById("my-home-category-sidebar");
+  if (!(panel instanceof HTMLElement) || typeof panel.hidePopover !== "function") {
+    return;
+  }
+
+  const closeIfOpen = () => {
+    if (panel.matches(":popover-open")) {
+      panel.hidePopover();
+    }
+  };
+
+  panel.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const leaf = target.closest("a.category-sidebar-subcategory[href^='#']");
+    if (leaf instanceof HTMLElement && panel.contains(leaf)) {
+      closeIfOpen();
+    }
+  });
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      closeIfOpen();
+    },
+    { passive: true },
+  );
+};
+
+initMyHomeCategoryDrawer();

@@ -2,30 +2,31 @@
 
 {{ define "home_picker_body" }}
 <section class="stack u-max-w-7xl u-mx-auto my-home">
+  {{ if .Groups }}
+  <div class="my-home-category-bar">
+    <button
+      type="button"
+      class="btn btn-ghost nav-drawer-trigger"
+      popovertarget="my-home-category-sidebar"
+      aria-label="Open stream categories"
+      title="Stream categories"
+    >
+      {{ template "icon-layout-grid" . }}
+      Stream categories
+    </button>
+  </div>
+  {{ end }}
   <section class="page-header">
     <div class="page-header-head">
       <div class="page-header-body">
         <h1>Choose a stream</h1>
         <p>Select a stream to start or continue process tracking</p>
       </div>
-      {{ if or .Groups .ShowCreateStream }}
+      {{ if .ShowCreateStream }}
       <div class="page-header-actions">
-        {{ if .Groups }}
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon nav-drawer-trigger"
-          popovertarget="my-home-category-sidebar"
-          aria-label="Open stream categories"
-          title="Stream categories"
-        >
-          {{ template "icon-layout-grid" . }}
-        </button>
-        {{ end }}
-        {{ if .ShowCreateStream }}
         <a class="btn btn-primary" href="/my/organization/formata-builder">
           {{ template "icon-plus" . }} Create a stream
         </a>
-        {{ end }}
       </div>
       {{ end }}
     </div>

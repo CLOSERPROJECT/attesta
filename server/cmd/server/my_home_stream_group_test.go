@@ -124,6 +124,7 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 	}
 	body := out.String()
 	for _, want := range []string{
+		`class="my-home-category-bar"`,
 		`nav-drawer-trigger`,
 		`popovertarget="my-home-category-sidebar"`,
 		`id="my-home-category-sidebar"`,
