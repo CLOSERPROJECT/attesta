@@ -203,6 +203,12 @@ tasks:
     cmds:
       - go run ./cmd/server seed-categories {{.CLI_ARGS}}
 
+  seed:catalog-streams:
+    desc: Full-replace Formata catalog streams (1–3 per taxonomy leaf) for local/dev.
+    dir: server
+    cmds:
+      - go run ./cmd/server seed-catalog-streams {{.CLI_ARGS}}
+
   seed:instances:
     desc: Replace Mongo process instances for every runtime-catalog stream with a realistic demo mix.
     dir: server
