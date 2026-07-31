@@ -101,6 +101,43 @@ func TestMyHomeStreamGroupTemplateOmitsCategoryHeaderWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	view := HomeWorkflowPickerView{
+		PageBase: PageBase{Body: "home_picker_body"},
+		Groups: []MyHomeStreamGroupView{{
+			CategoryName: "Supply Chain", SubCategoryName: "Procurement",
+			AnchorID: "cat-supply-chain--procurement", ShowCategoryHeader: true,
+			Streams: []ManagedPublicStreamCardView{{Card: PublicStreamCardView{Name: "A"}}},
+		}},
+		Sidebar: CategorySidebarView{
+			Title: "Stream Categories",
+			Categories: []CategorySidebarCategoryView{{
+				Name: "Supply Chain", Expanded: true,
+				SubCategories: []CategorySidebarLeafView{{Name: "Procurement", Href: "#cat-supply-chain--procurement"}},
+			}},
+		},
+	}
+	if err := tmpl.ExecuteTemplate(&out, "home_picker_body", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := out.String()
+	for _, want := range []string{
+		`nav-drawer-trigger`,
+		`popovertarget="my-home-category-sidebar"`,
+		`id="my-home-category-sidebar"`,
+		`class="category-sidebar"`,
+		`href="#cat-supply-chain--procurement"`,
+		`id="cat-supply-chain--procurement"`,
+		`class="my-home-catalog"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in %s", want, body)
+		}
+	}
+}
+
 func TestHomePickerBodyTemplateRendersEmptyState(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
@@ -126,6 +163,14 @@ func TestHomePickerBodyTemplateRendersEmptyState(t *testing.T) {
 	}
 	if strings.Contains(body, `class="my-home-catalog"`) {
 		t.Fatalf("empty home picker must not render catalog, got: %s", body)
+	}
+	for _, gone := range []string{
+		`nav-drawer-trigger`,
+		`category-sidebar`,
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("empty home picker must not render %q, got: %s", gone, body)
+		}
 	}
 }
 

@@ -8,11 +8,24 @@
         <h1>Choose a stream</h1>
         <p>Select a stream to start or continue process tracking</p>
       </div>
-      {{ if .ShowCreateStream }}
+      {{ if or .Groups .ShowCreateStream }}
       <div class="page-header-actions">
+        {{ if .Groups }}
+        <button
+          type="button"
+          class="btn btn-ghost btn-icon nav-drawer-trigger"
+          popovertarget="my-home-category-sidebar"
+          aria-label="Open stream categories"
+          title="Stream categories"
+        >
+          {{ template "icon-layout-grid" . }}
+        </button>
+        {{ end }}
+        {{ if .ShowCreateStream }}
         <a class="btn btn-primary" href="/my/organization/formata-builder">
           {{ template "icon-plus" . }} Create a stream
         </a>
+        {{ end }}
       </div>
       {{ end }}
     </div>
@@ -22,10 +35,19 @@
   {{ end }}
   {{ template "error_banner.html" . }}
   {{ if .Groups }}
-    <div class="my-home-catalog">
-      {{ range .Groups }}
-        {{ template "my_home_stream_group" . }}
-      {{ end }}
+    <div class="my-home-body">
+      <div
+        id="my-home-category-sidebar"
+        class="nav-drawer-panel my-home-sidebar"
+        popover
+      >
+        {{ template "category_sidebar" .Sidebar }}
+      </div>
+      <div class="my-home-catalog">
+        {{ range .Groups }}
+          {{ template "my_home_stream_group" . }}
+        {{ end }}
+      </div>
     </div>
   {{ else }}
     <div class="empty-state">

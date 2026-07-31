@@ -818,6 +818,9 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
+		`nav-drawer-trigger`,
+		`id="my-home-category-sidebar"`,
+		`class="category-sidebar"`,
 		`class="my-home-catalog"`,
 		"Accessible Stream",
 		`href="/my/streams/accessible/"`,

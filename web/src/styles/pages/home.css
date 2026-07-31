@@ -2,6 +2,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
+  min-width: 0;
+}
+
+.my-home-catalog-section {
+  scroll-margin-top: 44px;
+}
+
+.my-home-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.my-home .nav-drawer-trigger {
+  display: inline-flex;
 }
 
 .home-workflow-panel-main {
@@ -14,6 +29,36 @@
 
 .instances-panel {
   scroll-margin-top: 140px;
+}
+
+@media (--md-up) {
+  .my-home-body {
+    display: grid;
+    grid-template-columns: 18rem minmax(0, 1fr);
+    gap: var(--space-8);
+    align-items: start;
+  }
+
+  .my-home .nav-drawer-trigger {
+    display: none;
+  }
+
+  .my-home .nav-drawer-panel.my-home-sidebar {
+    display: block;
+    position: static;
+    inset: auto;
+    width: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    background: transparent;
+  }
+
+  .my-home .category-sidebar {
+    background: transparent;
+    border-bottom: 0;
+    padding: 0;
+  }
 }
 
 @media (--md-down) {

@@ -1,0 +1,26 @@
+/*
+ * Nav drawer — left slide-in shell (CSS-only).
+ *
+ * button.nav-drawer-trigger[popovertarget="…"]
+ * div.nav-drawer-panel[popover][id="…"]   (hosts page content, e.g. category_sidebar)
+ *
+ * Desktop: page CSS forces .nav-drawer-panel into normal flow and hides the trigger.
+ * Do not use :target to open — hashes are reserved for in-page section anchors.
+ */
+
+.nav-drawer-panel {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--foreground);
+  width: min(18rem, 92vw);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: auto;
+}
+
+.nav-drawer-panel:popover-open {
+  position: fixed;
+  inset: 0 auto 0 0;
+}
