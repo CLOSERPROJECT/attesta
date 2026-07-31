@@ -24,7 +24,7 @@ func TestHandlePublicHomeRendersTaxonomySidebar(t *testing.T) {
 	server.handlePublicHome(rec, req)
 	body := rec.Body.String()
 	for _, want := range []string{
-		`class="public-home-category-sidebar"`,
+		`class="category-sidebar"`,
 		"Supply Chain",
 		"Procurement",
 		"Order Fulfillment",

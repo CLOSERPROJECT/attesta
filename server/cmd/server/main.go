@@ -2062,11 +2062,11 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := struct {
 		PageBase
-		Categories    []PublicHomeCategoryView
+		Sidebar       CategorySidebarView
 		StreamResults PublicHomeStreamResultsView
 	}{
-		PageBase:   base,
-		Categories: buildPublicHomeCategories(categories, cat, sub),
+		PageBase:      base,
+		Sidebar:       buildPublicHomeCategories(categories, cat, sub),
 		StreamResults: buildPublicHomeStreamResultsView(categories, cat, sub, streams, publicHomeCreateStreamHref(signedIn)),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {

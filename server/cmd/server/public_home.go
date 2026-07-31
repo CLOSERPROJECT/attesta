@@ -65,17 +65,17 @@ func buildPublicHomeStreamResultsView(categories []TaxonomyCategoryNode, cat, su
 	return view
 }
 
-func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, selectedSub string) []PublicHomeCategoryView {
-	out := make([]PublicHomeCategoryView, 0, len(categories))
+func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, selectedSub string) CategorySidebarView {
+	out := make([]CategorySidebarCategoryView, 0, len(categories))
 	for _, cat := range categories {
-		subs := make([]PublicHomeSubCategoryView, 0, len(cat.SubCategories))
+		subs := make([]CategorySidebarLeafView, 0, len(cat.SubCategories))
 		for _, sub := range cat.SubCategories {
 			query := url.Values{
 				"category":    {cat.Slug},
 				"subCategory": {sub.Slug},
 			}
 			encoded := query.Encode()
-			subs = append(subs, PublicHomeSubCategoryView{
+			subs = append(subs, CategorySidebarLeafView{
 				Slug:       sub.Slug,
 				Name:       sub.Name,
 				Active:     cat.Slug == selectedCat && sub.Slug == selectedSub,
@@ -83,7 +83,7 @@ func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, s
 				PushURL:    publicHomePath(cat.Slug, sub.Slug),
 			})
 		}
-		out = append(out, PublicHomeCategoryView{
+		out = append(out, CategorySidebarCategoryView{
 			Slug:          cat.Slug,
 			Name:          cat.Name,
 			IconURL:       cat.IconURL,
@@ -91,7 +91,10 @@ func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, s
 			SubCategories: subs,
 		})
 	}
-	return out
+	return CategorySidebarView{
+		Title:      "Stream Categories",
+		Categories: out,
+	}
 }
 
 func publicHomeCreateStreamHref(signedIn bool) string {

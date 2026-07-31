@@ -19,44 +19,7 @@
     </section>
 
     <div class="public-home-streams-split" id="streams">
-      <aside class="public-home-category-sidebar" aria-label="Stream categories" data-landing-category-sidebar>
-        <div class="public-home-category-sidebar-header">
-          {{ template "icon-layout-grid" . }}
-          <p class="public-home-category-sidebar-title">Stream Categories</p>
-        </div>
-        <div class="public-home-category-sidebar-list">
-          {{ range .Categories }}
-            <details class="public-home-category" {{ if .Expanded }}open{{ end }} data-category-slug="{{ .Slug }}">
-              <summary class="public-home-category-summary">
-                <span class="public-home-category-label">
-                  {{ if .IconURL }}
-                    <img class="public-home-category-icon" src="{{ .IconURL }}" alt="" width="20" height="20" />
-                  {{ end }}
-                  <span>{{ .Name }}</span>
-                </span>
-                <span class="public-home-category-chevron" aria-hidden="true">
-                  {{ template "icon-chevron-right" }}
-                </span>
-              </summary>
-              <div class="public-home-subcategories">
-                {{ range .SubCategories }}
-                  <button
-                    type="button"
-                    class="public-home-subcategory{{ if .Active }} is-active{{ end }}"
-                    data-subcategory-slug="{{ .Slug }}"
-                    hx-get="{{ .PartialURL }}"
-                    hx-target="#public-home-stream-results"
-                    hx-swap="outerHTML"
-                    hx-push-url="{{ .PushURL }}"
-                  >{{ .Name }}</button>
-                {{ end }}
-              </div>
-            </details>
-          {{ else }}
-            <p class="public-home-category-sidebar-empty">No categories yet.</p>
-          {{ end }}
-        </div>
-      </aside>
+      {{ template "category_sidebar" .Sidebar }}
 
       {{ template "public_home_stream_results" .StreamResults }}
     </div>

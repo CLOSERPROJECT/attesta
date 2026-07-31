@@ -150,25 +150,28 @@ func TestBuildPublicHomeCategoriesMarksActiveAndURLs(t *testing.T) {
 		},
 	}
 	got := buildPublicHomeCategories(cats, "supply-chain", "order-fulfillment")
-	if len(got) != 2 {
-		t.Fatalf("len=%d", len(got))
+	if got.Title != "Stream Categories" {
+		t.Fatalf("title=%q", got.Title)
 	}
-	if !got[0].Expanded || got[1].Expanded {
-		t.Fatalf("expanded flags: %#v", got)
+	if len(got.Categories) != 2 {
+		t.Fatalf("len=%d", len(got.Categories))
 	}
-	if got[0].SubCategories[1].Active != true || got[0].SubCategories[0].Active {
-		t.Fatalf("active flags: %#v", got[0].SubCategories)
+	if !got.Categories[0].Expanded || got.Categories[1].Expanded {
+		t.Fatalf("expanded flags: %#v", got.Categories)
+	}
+	if got.Categories[0].SubCategories[1].Active != true || got.Categories[0].SubCategories[0].Active {
+		t.Fatalf("active flags: %#v", got.Categories[0].SubCategories)
 	}
 	wantPartial := "/streams/public?category=supply-chain&subCategory=order-fulfillment"
 	wantPush := "/?category=supply-chain&subCategory=order-fulfillment"
-	if got[0].SubCategories[1].PartialURL != wantPartial {
-		t.Fatalf("PartialURL=%q", got[0].SubCategories[1].PartialURL)
+	if got.Categories[0].SubCategories[1].PartialURL != wantPartial {
+		t.Fatalf("PartialURL=%q", got.Categories[0].SubCategories[1].PartialURL)
 	}
-	if got[0].SubCategories[1].PushURL != wantPush {
-		t.Fatalf("PushURL=%q", got[0].SubCategories[1].PushURL)
+	if got.Categories[0].SubCategories[1].PushURL != wantPush {
+		t.Fatalf("PushURL=%q", got.Categories[0].SubCategories[1].PushURL)
 	}
-	if got[1].Name != "Compliance and Quality" || len(got[1].SubCategories) != 1 {
-		t.Fatalf("expected zero-stream category still present: %#v", got[1])
+	if got.Categories[1].Name != "Compliance and Quality" || len(got.Categories[1].SubCategories) != 1 {
+		t.Fatalf("expected zero-stream category still present: %#v", got.Categories[1])
 	}
 }
 
