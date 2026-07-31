@@ -406,7 +406,7 @@ var _ = Service("admin", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/admin/orgs")
+			GET("/admin/organizations")
 			Param("q")
 			Param("page")
 			Response(StatusOK)
@@ -419,7 +419,7 @@ var _ = Service("admin", func() {
 	Method("platformOrgAction", func() {
 		Result(Empty)
 		HTTP(func() {
-			POST("/admin/orgs")
+			POST("/admin/organizations")
 			Response(StatusOK)
 			Response(StatusSeeOther)
 			Response(StatusBadRequest)
@@ -436,7 +436,7 @@ var _ = Service("admin", func() {
 		})
 		Result(Empty)
 		HTTP(func() {
-			GET("/admin/orgs/logo/{logo_id}")
+			GET("/admin/organizations/logo/{logo_id}")
 			Response(StatusOK)
 			Response(StatusNotFound)
 			Response(StatusUnauthorized)

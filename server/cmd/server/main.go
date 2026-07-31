@@ -281,7 +281,7 @@ type PageBase struct {
 	WorkflowPath    string
 	UserEmail       string
 	IsPlatformAdmin bool
-	ShowOrgsLink    bool
+	ShowAdminLink   bool
 	ShowMyOrgLink   bool
 	ShowLogout      bool
 }
@@ -1430,11 +1430,11 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	base.UserEmail = strings.TrimSpace(user.Email)
 	base.IsPlatformAdmin = user.IsPlatformAdmin
 	base.ShowLogout = s.enforceAuth
-	showOrgsLink, err := s.canAccessPlatformAdminConsole(context.Background(), user)
+	showAdminLink, err := s.canAccessPlatformAdminConsole(context.Background(), user)
 	if err != nil {
 		logCapabilityCheckError(err, "cerbos check failed for platform admin navigation")
 	}
-	base.ShowOrgsLink = showOrgsLink
+	base.ShowAdminLink = showAdminLink
 	showMyOrgLink, err := s.canAccessOrgAdminConsole(context.Background(), user)
 	if err != nil {
 		logCapabilityCheckError(err, "cerbos check failed for org admin navigation")
@@ -2322,8 +2322,10 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
 	mux.HandleFunc("/logout", s.handleLogout)
-	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
-	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
+	mux.HandleFunc("/admin", s.handleAdminRoot)
+	mux.HandleFunc("/admin/{$}", s.handleAdminRoot)
+	mux.HandleFunc("/admin/organizations", s.handleAdminOrgs)
+	mux.HandleFunc("/admin/organizations/", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
 	mux.HandleFunc("/admin/categories/", s.handleAdminCategoriesPath)
 	mux.HandleFunc("/invite/", s.handleInvite)
@@ -3303,10 +3305,11 @@ func platformAdminPath(query string, page int) string {
 	if page > 1 {
 		values.Set("page", strconv.Itoa(page))
 	}
+	base := adminPath("organizations")
 	if encoded := values.Encode(); encoded != "" {
-		return "/admin/orgs?" + encoded
+		return base + "?" + encoded
 	}
-	return "/admin/orgs"
+	return base
 }
 
 func redirectPlatformAdminWithMessage(w http.ResponseWriter, r *http.Request, query string, page int, confirmation string) {
@@ -3503,8 +3506,8 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	view := PlatformAdminView{
 		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		ActivePanel:              "orgs",
-		Breadcrumbs:              buildPlatformAdminBreadcrumbs("orgs"),
+		ActivePanel:              "organizations",
+		Breadcrumbs:              buildPlatformAdminBreadcrumbs("organizations"),
 		SearchQuery:              errs.SearchQuery,
 		CurrentPage:              currentPage,
 		TotalPages:               totalPages,
@@ -3557,7 +3560,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "identity unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/admin/orgs"))
+	path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/admin/organizations"))
 	if strings.HasPrefix(path, "/logo/") {
 		s.handlePlatformAdminLogo(w, r)
 		return
@@ -4155,7 +4158,7 @@ func (s *Server) handlePlatformAdminLogo(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/admin/orgs/logo/"), "/")
+	logoID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/admin/organizations/logo/"), "/")
 	if logoID == "" || s.identity == nil {
 		http.NotFound(w, r)
 		return

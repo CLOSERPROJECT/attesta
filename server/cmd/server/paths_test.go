@@ -46,6 +46,24 @@ func TestPublicStreamPath(t *testing.T) {
 	}
 }
 
+func TestAdminPath(t *testing.T) {
+	cases := []struct {
+		rest string
+		want string
+	}{
+		{"", "/admin"},
+		{"organizations", "/admin/organizations"},
+		{"/categories", "/admin/categories"},
+		{"organizations/logo/logo-1", "/admin/organizations/logo/logo-1"},
+		{"  organizations  ", "/admin/organizations"},
+	}
+	for _, tc := range cases {
+		if got := adminPath(tc.rest); got != tc.want {
+			t.Fatalf("adminPath(%q) = %q, want %q", tc.rest, got, tc.want)
+		}
+	}
+}
+
 func TestPublicHomePath(t *testing.T) {
 	cases := []struct {
 		cat, sub, want string

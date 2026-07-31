@@ -169,10 +169,10 @@
                         {{ template "icon-layout-dashboard" . }}
                         Dashboard
                       </a>
-                      {{ if .ShowOrgsLink }}
-                        <a href="/admin/orgs" class="account-menu-item">
+                      {{ if .ShowAdminLink }}
+                        <a href="/admin" class="account-menu-item">
                           {{ template "icon-building-grid" . }}
-                          Orgs
+                          Admin
                         </a>
                       {{ end }}
                       {{ if .ShowMyOrgLink }}

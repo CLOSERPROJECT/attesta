@@ -1,4 +1,4 @@
-{{/* Used on /admin/orgs to render platform administration page */}}
+{{/* Used on /admin/organizations to render platform administration page */}}
 
 {{ define "platform_admin_body" }}
   <div class="stack u-max-w-7xl u-mx-auto">
@@ -26,7 +26,7 @@
 
     <form
       method="get"
-      action="/admin/orgs"
+      action="/admin/organizations"
       class="platform-admin-search"
       id="platform-admin-search"
     >
@@ -43,7 +43,7 @@
           value="{{ .SearchQuery }}"
           placeholder="Search organizations by name"
           autocomplete="off"
-          hx-get="/admin/orgs"
+          hx-get="/admin/organizations"
           hx-target="#platform-admin-results"
           hx-select="#platform-admin-results"
           hx-swap="outerHTML"
@@ -75,7 +75,7 @@
         </header>
         <form
           method="post"
-          action="/admin/orgs"
+          action="/admin/organizations"
           class="input-form"
           enctype="multipart/form-data"
         >
@@ -635,7 +635,7 @@
             <div class="list-row-main">
               {{ if .LogoAttachmentID }}
                 <img
-                  src="/admin/orgs/logo/{{ .LogoAttachmentID }}"
+                  src="/admin/organizations/logo/{{ .LogoAttachmentID }}"
                   alt="{{ .Name }} logo"
                   class="org-profile-logo org-profile-logo-sm"
                 />
@@ -698,7 +698,7 @@
                     {{ template "icon-close" . }}
                   </button>
                 </header>
-                <form method="post" action="/admin/orgs" class="input-form">
+                <form method="post" action="/admin/organizations" class="input-form">
                   <input type="hidden" name="intent" value="invite_org_admin" />
                   <input type="hidden" name="org_slug" value="{{ .Slug }}" />
                   <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
@@ -785,7 +785,7 @@
                 </header>
                 <form
                   method="post"
-                  action="/admin/orgs"
+                  action="/admin/organizations"
                   class="input-form"
                   enctype="multipart/form-data"
                 >
@@ -860,7 +860,7 @@
                 {{ if and (eq $.OrganizationDialogAction "delete") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError }}
                   <p class="error">{{ $.OrganizationError }}</p>
                 {{ end }}
-                <form method="post" action="/admin/orgs" class="input-form">
+                <form method="post" action="/admin/organizations" class="input-form">
                   <input type="hidden" name="intent" value="delete_org" />
                   <input type="hidden" name="org_slug" value="{{ .Slug }}" />
                   <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
@@ -892,7 +892,7 @@
         <div class="platform-admin-pagination-pages">
           <a
             class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
-            href="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+            href="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
                   &
@@ -901,7 +901,7 @@
                 page={{ .PreviousPage }}
               {{- end -}}
             {{- end -}}"
-            hx-get="/admin/orgs{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+            hx-get="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
                   &
@@ -924,12 +924,12 @@
               {{ else }}
                 btn btn-secondary
               {{ end }}"
-              href="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
+              href="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
                 ?{{- if $.SearchQuery -}}
                   q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
                 {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
               {{- end -}}"
-              hx-get="/admin/orgs{{- if or $.SearchQuery (gt . 1) -}}
+              hx-get="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
                 ?{{- if $.SearchQuery -}}
                   q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
                 {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
@@ -943,14 +943,14 @@
           {{ end }}
           <a
             class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
-            href="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
+            href="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
                   &
                 {{ end }}
               {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
             {{- end -}}"
-            hx-get="/admin/orgs{{- if or .SearchQuery (gt .NextPage 1) -}}
+            hx-get="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
               ?{{- if .SearchQuery -}}
                 q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
                   &

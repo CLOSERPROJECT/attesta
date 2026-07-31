@@ -30,18 +30,29 @@ func buildOrgAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 }
 
 func buildPlatformAdminBreadcrumbs(activePanel string) BreadcrumbsView {
+	section := strings.TrimSpace(activePanel)
+	return BreadcrumbsView{Items: []BreadcrumbItem{
+		{Label: "Dashboard", Href: appHomePath},
+		{Label: "Platform admin", Href: adminPath("")},
+		{Label: platformAdminSectionLabel(section), Href: platformAdminSectionHref(section), Current: true},
+	}}
+}
+
+func platformAdminSectionLabel(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
 	case "categories":
-		return BreadcrumbsView{Items: []BreadcrumbItem{
-			{Label: "Dashboard", Href: appHomePath},
-			{Label: "Platform admin", Href: "/admin/orgs"},
-			{Label: "Categories", Href: "/admin/categories", Current: true},
-		}}
+		return "Categories"
 	default:
-		return BreadcrumbsView{Items: []BreadcrumbItem{
-			{Label: "Dashboard", Href: appHomePath},
-			{Label: "Platform admin", Href: "/admin/orgs", Current: true},
-		}}
+		return "Organizations"
+	}
+}
+
+func platformAdminSectionHref(activePanel string) string {
+	switch strings.TrimSpace(activePanel) {
+	case "categories":
+		return adminPath("categories")
+	default:
+		return adminPath("organizations")
 	}
 }
 

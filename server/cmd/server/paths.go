@@ -43,3 +43,14 @@ func organizationPath(rest string) string {
 	rest = strings.TrimPrefix(rest, "/")
 	return "/my/organization/" + rest
 }
+
+// adminPath joins /admin with rest.
+// rest may be "organizations", "/categories", or "organizations/logo/{id}".
+func adminPath(rest string) string {
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return "/admin"
+	}
+	rest = strings.TrimPrefix(rest, "/")
+	return "/admin/" + rest
+}

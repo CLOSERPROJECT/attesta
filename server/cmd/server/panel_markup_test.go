@@ -221,7 +221,7 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		`class="rail-layout rail-layout-ready"`,
 		`class="panel panel-sticky"`,
 		`class="sidebar-nav"`,
-		`href="/admin/orgs"`,
+		`href="/admin/organizations"`,
 		`href="/admin/categories"`,
 		`class="panel rail-layout-main"`,
 		`class="panel-head-actions"`,

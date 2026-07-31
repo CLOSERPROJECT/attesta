@@ -103,7 +103,7 @@ func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {
 	form := url.Values{}
 	form.Set("email", "admin@example.com")
 	form.Set("password", "change-me")
-	form.Set("next", "/admin/orgs")
+	form.Set("next", "/admin/organizations")
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -113,8 +113,8 @@ func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/admin/orgs" {
-		t.Fatalf("location = %q, want /admin/orgs", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/admin/organizations" {
+		t.Fatalf("location = %q, want /admin/organizations", rec.Header().Get("Location"))
 	}
 	cookies := rec.Result().Cookies()
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" {
@@ -219,11 +219,50 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/my/organization/profile"`) {
+	if strings.Contains(body, `href="/admin"`) || strings.Contains(body, `href="/admin/organizations"`) || strings.Contains(body, `href="/my/organization/profile"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
 	}
 	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
 		t.Fatalf("expected login page without Login topbar link, got %q", body)
+	}
+}
+
+func TestHandleHomeShowsAdminTopbarLinkForPlatformAdmin(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	store := NewMemoryStore()
+	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream:          workflowStreamYAML("Admin nav test"),
+		CreatedByUserID: platformAdminStreamUserID(),
+		UpdatedByUserID: platformAdminStreamUserID(),
+		UpdatedAt:       time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("SaveFormataBuilderStream: %v", err)
+	}
+
+	tmpl := parseTestTemplates(t)
+	server := &Server{
+		store:       store,
+		tmpl:        tmpl,
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `href="/admin"`) || !strings.Contains(body, "Admin") {
+		t.Fatalf("expected Admin link to /admin, got:\n%s", body)
+	}
+	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, ">Orgs<") {
+		t.Fatalf("legacy Orgs link still present")
 	}
 }
 

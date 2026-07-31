@@ -156,8 +156,8 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 		rec := httptest.NewRecorder()
-		server.renderPlatformAdmin(rec, httptest.NewRequest(http.MethodGet, "/admin/orgs", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "invite sent", PlatformAdminErrors{})
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
+		server.renderPlatformAdmin(rec, httptest.NewRequest(http.MethodGet, "/admin/organizations", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "invite sent", PlatformAdminErrors{})
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN organizations 1 invite sent") {
 			t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
 		}
 	})
@@ -239,7 +239,7 @@ func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {
 		if len(filtered) != 1 || filtered[0].Slug != "acme" {
 			t.Fatalf("filtered = %#v", filtered)
 		}
-		if got := platformAdminPath("acme", 2); got != "/admin/orgs?page=2&q=acme" && got != "/admin/orgs?q=acme&page=2" {
+		if got := platformAdminPath("acme", 2); got != "/admin/organizations?page=2&q=acme" && got != "/admin/organizations?q=acme&page=2" {
 			t.Fatalf("platformAdminPath = %q", got)
 		}
 	})
@@ -257,7 +257,7 @@ func TestHandlePlatformAdminLogoAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -275,7 +275,7 @@ func TestHandlePlatformAdminLogoAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/logo/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations/logo/", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -297,7 +297,7 @@ func TestHandlePlatformAdminLogoAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -319,7 +319,7 @@ func TestHandlePlatformAdminLogoAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -346,7 +346,7 @@ func TestHandlePlatformAdminLogoAdditionalBranches(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-member"})
 		rec := httptest.NewRecorder()
 
@@ -574,7 +574,7 @@ func TestHandleAdminOrgsCreateOrganizationWithPlatformAdmin(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Fresh+Org"))
+	req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader("name=Fresh+Org"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
@@ -584,7 +584,7 @@ func TestHandleAdminOrgsCreateOrganizationWithPlatformAdmin(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if location := rec.Header().Get("Location"); !strings.Contains(location, "/admin/orgs") || !strings.Contains(location, "confirmation=organization+created") {
+	if location := rec.Header().Get("Location"); !strings.Contains(location, "/admin/organizations") || !strings.Contains(location, "confirmation=organization+created") {
 		t.Fatalf("location = %q", location)
 	}
 	if createName != "Fresh Org" {
@@ -642,7 +642,7 @@ func TestHandleAdminOrgsCreateOrganizationWithOptionalOrgAdminInvite(t *testing.
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader("name=Fresh+Org&invite_email=owner%40example.com"))
+	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader("name=Fresh+Org&invite_email=owner%40example.com"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
@@ -655,7 +655,7 @@ func TestHandleAdminOrgsCreateOrganizationWithOptionalOrgAdminInvite(t *testing.
 	if inviteEmail != "owner@example.com" || inviteSessionSecret != "platform-session" {
 		t.Fatalf("inviteEmail=%q inviteSessionSecret=%q", inviteEmail, inviteSessionSecret)
 	}
-	if location := rec.Header().Get("Location"); !strings.Contains(location, "/admin/orgs") || !strings.Contains(location, "confirmation=organization+created+and+invite+sent") {
+	if location := rec.Header().Get("Location"); !strings.Contains(location, "/admin/organizations") || !strings.Contains(location, "confirmation=organization+created+and+invite+sent") {
 		t.Fatalf("location = %q", location)
 	}
 }
@@ -684,7 +684,7 @@ func TestHandleAdminOrgsPlatformAdminHTMXGetAndLogo(t *testing.T) {
 	}
 
 	t.Run("htmx get renders partial", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs?q=acme", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations?q=acme", nil)
 		req.Header.Set("HX-Request", "true")
 		req.Header.Set("HX-Target", "platform-admin-results")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
@@ -701,7 +701,7 @@ func TestHandleAdminOrgsPlatformAdminHTMXGetAndLogo(t *testing.T) {
 	})
 
 	t.Run("logo handler streams file", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/logo/logo-1", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations/logo/logo-1", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -760,7 +760,7 @@ func TestHandleAdminOrgsUpdateAndDeleteOrganizationWithPlatformAdmin(t *testing.
 		form.Set("intent", "set_org")
 		form.Set("org_slug", "acme")
 		form.Set("name", "Acme Updated")
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -806,7 +806,7 @@ func TestHandleAdminOrgsUpdateAndDeleteOrganizationWithPlatformAdmin(t *testing.
 		form := url.Values{}
 		form.Set("intent", "delete_org")
 		form.Set("org_slug", "acme")
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -843,7 +843,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -852,7 +852,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1") {
+		if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN organizations 1") {
 			t.Fatalf("body = %q", rec.Body.String())
 		}
 	})
@@ -860,7 +860,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	t.Run("identity unavailable", func(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -874,7 +874,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	t.Run("invalid subpath", func(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs/unknown", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations/unknown", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -888,7 +888,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	t.Run("missing organization name", func(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(""))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(""))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -913,7 +913,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Fresh+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader("name=Fresh+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -928,7 +928,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 	t.Run("method not allowed", func(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{}, identity: &fakeIdentityStore{}, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPut, "/admin/orgs", nil)
+		req := httptest.NewRequest(http.MethodPut, "/admin/organizations", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 
@@ -954,7 +954,7 @@ func TestHandleAdminOrgsGetAndValidationErrors(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Fresh+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader("name=Fresh+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1033,7 +1033,7 @@ func TestHandleAdminOrgsInviteOrgAdminWithPlatformAdmin(t *testing.T) {
 	form.Set("intent", "invite_org_admin")
 	form.Set("org_slug", "acme")
 	form.Set("email", "owner@example.com")
-	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
@@ -1052,7 +1052,7 @@ func TestHandleAdminOrgsInviteOrgAdminWithPlatformAdmin(t *testing.T) {
 	if inviteRedirect != "http://attesta.local/invite/accept" {
 		t.Fatalf("invite redirect = %q", inviteRedirect)
 	}
-	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
+	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN organizations 1 invite sent") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
@@ -1115,7 +1115,7 @@ func TestHandleAdminOrgsInviteOrgAdminSendsInviteForUnknownEmail(t *testing.T) {
 	form.Set("intent", "invite_org_admin")
 	form.Set("org_slug", "acme")
 	form.Set("email", "new-owner@example.com")
-	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
@@ -1131,7 +1131,7 @@ func TestHandleAdminOrgsInviteOrgAdminSendsInviteForUnknownEmail(t *testing.T) {
 	if inviteRedirect != "http://attesta.local/invite/accept" || deletedSecret != "platform-session" {
 		t.Fatalf("redirect=%q deleted=%q", inviteRedirect, deletedSecret)
 	}
-	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 invite sent") {
+	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN organizations 1 invite sent") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
@@ -1187,7 +1187,7 @@ func TestHandleAdminOrgsInviteOrgAdminUpdatesExistingMembershipOnly(t *testing.T
 	form.Set("intent", "invite_org_admin")
 	form.Set("org_slug", "acme")
 	form.Set("email", "member@example.com")
-	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
@@ -1203,7 +1203,7 @@ func TestHandleAdminOrgsInviteOrgAdminUpdatesExistingMembershipOnly(t *testing.T
 	if loginEmail != "admin@example.com" || deletedSecret != "platform-session" {
 		t.Fatalf("login=%q deleted=%q", loginEmail, deletedSecret)
 	}
-	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN orgs 1 org admin access updated") {
+	if !strings.Contains(rec.Body.String(), "PLATFORM_ADMIN organizations 1 org admin access updated") {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
@@ -1244,7 +1244,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
 		form.Set("email", "member@example.com")
-		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1286,7 +1286,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
 		form.Set("email", "owner@example.com")
-		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1304,7 +1304,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form := url.Values{}
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1322,7 +1322,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form := url.Values{}
 		form.Set("intent", "invite_org_admin")
 		form.Set("email", "owner@example.com")
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1350,7 +1350,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
 		form.Set("email", "owner@example.com")
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1382,7 +1382,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
 		form.Set("email", "owner@example.com")
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1424,7 +1424,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
 		form.Set("email", "owner@example.com")
-		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1469,7 +1469,7 @@ func TestHandleAdminOrgsInviteOrgAdminErrors(t *testing.T) {
 		form.Set("intent", "invite_org_admin")
 		form.Set("org_slug", "acme")
 		form.Set("email", "owner@example.com")
-		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/orgs", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "http://attesta.local/admin/organizations", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1536,7 +1536,7 @@ func TestHandleAdminOrgsCreateOrganizationWithLogo(t *testing.T) {
 		t.Fatalf("writer.Close error: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(body.String()))
+	req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(body.String()))
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
@@ -1584,7 +1584,7 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close error: %v", err)
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(body.String()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(body.String()))
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1615,7 +1615,7 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 			enforceAuth: true,
 			now:         func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader("name=Fresh+Org"))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader("name=Fresh+Org"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1665,7 +1665,7 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close error: %v", err)
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(body.String()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(body.String()))
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
@@ -1718,7 +1718,7 @@ func TestHandleAdminOrgsCreateOrganizationErrors(t *testing.T) {
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close error: %v", err)
 		}
-		req := httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(body.String()))
+		req := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(body.String()))
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()

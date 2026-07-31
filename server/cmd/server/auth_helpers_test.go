@@ -335,7 +335,7 @@ func TestRequirePlatformAdmin(t *testing.T) {
 	}
 
 	t.Run("unauthenticated redirects", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 		rec := httptest.NewRecorder()
 		if _, ok := server.requirePlatformAdmin(rec, req); ok {
 			t.Fatal("expected requirePlatformAdmin to fail")
@@ -346,7 +346,7 @@ func TestRequirePlatformAdmin(t *testing.T) {
 	})
 
 	t.Run("platform admin allowed", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		user, ok := server.requirePlatformAdmin(rec, req)
@@ -359,7 +359,7 @@ func TestRequirePlatformAdmin(t *testing.T) {
 	})
 
 	t.Run("non platform admin forbidden", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-member"})
 		rec := httptest.NewRecorder()
 		if _, ok := server.requirePlatformAdmin(rec, req); ok {
