@@ -1,0 +1,138 @@
+{{/* /my catalog card shell: management menu + dialogs outside public_stream_card link. */}}
+
+{{ define "managed_public_stream_card" }}
+  <div class="public-stream-card-shell">
+    {{ if .CanClone }}
+      <details class="public-stream-card-menu">
+        <summary
+          class="btn btn-ghost btn-icon public-stream-card-menu-trigger"
+          aria-label="Open actions for {{ .Card.Name }}"
+          title="Open actions for {{ .Card.Name }}"
+        >
+          {{ template "icon-ellipsis-vertical" . }}
+        </summary>
+        <div class="public-stream-card-dropdown">
+          <a
+            href="{{ .EditAction }}&new=true"
+            class="public-stream-card-menu-item"
+          >
+            {{ template "icon-clone" . }} Clone
+          </a>
+          {{ if .CanEdit }}
+            {{ if .EditRequiresPurge }}
+              <button
+                type="button"
+                class="public-stream-card-menu-item public-stream-card-menu-item-danger"
+                onclick="document.getElementById('edit-workflow-{{ .Key }}').showModal()"
+              >
+                {{ template "icon-pencil" . }} Edit
+              </button>
+            {{ else }}
+              <a
+                href="{{ .EditAction }}"
+                class="public-stream-card-menu-item"
+              >
+                {{ template "icon-pencil" . }} Edit
+              </a>
+            {{ end }}
+          {{ else }}
+            <button
+              type="button"
+              class="public-stream-card-menu-item public-stream-card-menu-item-disabled"
+              disabled
+            >
+              {{ template "icon-pencil" . }} Edit
+            </button>
+          {{ end }}
+          {{ if .CanDelete }}
+            <button
+              type="button"
+              class="public-stream-card-menu-item public-stream-card-menu-item-danger"
+              onclick="document.getElementById('delete-workflow-{{ .Key }}').showModal()"
+            >
+              {{ template "icon-trash" . }} Delete
+            </button>
+          {{ else }}
+            <button
+              type="button"
+              class="public-stream-card-menu-item public-stream-card-menu-item-danger public-stream-card-menu-item-disabled"
+              disabled
+            >
+              {{ template "icon-trash" . }} Delete
+            </button>
+          {{ end }}
+        </div>
+      </details>
+    {{ end }}
+    {{ template "public_stream_card" .Card }}
+    {{ if .EditRequiresPurge }}
+      <dialog id="edit-workflow-{{ .Key }}" class="dialog">
+        <div class="dialog-card">
+          <header class="dialog-head">
+            <div>
+              <h3 class="dialog-title u-text-danger">
+                Danger zone - {{ template "icon-pencil" . }} Edit stream
+              </h3>
+              <p class="dialog-subtitle">{{ .Card.Name }}</p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon dialog-close"
+              onclick="document.getElementById('edit-workflow-{{ .Key }}').close()"
+            >
+              {{ template "icon-close" . }}
+            </button>
+          </header>
+          <p class="u-m-0 u-mb-5">
+            Saving changes to this stream will permanently delete all
+            existing instances and their collected workflow data.
+            Continue only if you want to proceed.
+          </p>
+          <div class="dialog-actions">
+            <a href="{{ .EditAction }}">
+              <button type="button" class="btn btn-danger">
+                Continue to editor
+              </button>
+            </a>
+          </div>
+        </div>
+      </dialog>
+    {{ end }}
+    {{ if .CanDelete }}
+      <dialog id="delete-workflow-{{ .Key }}" class="dialog">
+        <div class="dialog-card">
+          <header class="dialog-head">
+            <div>
+              <h3 class="dialog-title u-text-danger">
+                Danger zone - {{ template "icon-trash" . }} Delete stream
+              </h3>
+              <p class="dialog-subtitle">{{ .Card.Name }}</p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon dialog-close"
+              onclick="document.getElementById('delete-workflow-{{ .Key }}').close()"
+            >
+              {{ template "icon-close" . }}
+            </button>
+          </header>
+          <p class="u-m-0 u-mb-5">
+            This will permanently delete the stream and its workflow data.
+            Confirm only if you want to continue.
+          </p>
+          <form
+            method="post"
+            action="{{ .DeleteAction }}"
+            class="input-form"
+          >
+            <div class="dialog-actions">
+              <button type="submit" class="btn btn-danger">
+                Delete stream
+              </button>
+            </div>
+          </form>
+        </div>
+      </dialog>
+    {{ end }}
+  </div>
+{{ end }}
