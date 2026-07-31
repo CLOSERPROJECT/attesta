@@ -112,7 +112,8 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 			Streams: []ManagedPublicStreamCardView{{Card: PublicStreamCardView{Name: "A"}}},
 		}},
 		Sidebar: CategorySidebarView{
-			Title: "Stream Categories",
+			Title:         "Stream Categories",
+			CloseTargetID: "my-home-category-sidebar",
 			Categories: []CategorySidebarCategoryView{{
 				Name: "Supply Chain", Expanded: true,
 				SubCategories: []CategorySidebarLeafView{{Name: "Procurement", Href: "#cat-supply-chain--procurement"}},
@@ -127,6 +128,8 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 		`class="my-home-category-bar"`,
 		`nav-drawer-trigger`,
 		`popovertarget="my-home-category-sidebar"`,
+		`popovertargetaction="hide"`,
+		`category-sidebar-close`,
 		`id="my-home-category-sidebar"`,
 		`class="category-sidebar"`,
 		`href="#cat-supply-chain--procurement"`,

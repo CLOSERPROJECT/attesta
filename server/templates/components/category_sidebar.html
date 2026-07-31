@@ -1,8 +1,22 @@
 {{ define "category_sidebar" }}
 <aside class="category-sidebar" aria-label="Stream categories" data-landing-category-sidebar>
   <div class="category-sidebar-header">
-    {{ template "icon-layout-grid" . }}
-    <p class="category-sidebar-title">{{ .Title }}</p>
+    <div class="category-sidebar-header-main">
+      {{ template "icon-layout-grid" . }}
+      <p class="category-sidebar-title">{{ .Title }}</p>
+    </div>
+    {{ if .CloseTargetID }}
+    <button
+      type="button"
+      class="btn btn-ghost btn-icon category-sidebar-close"
+      popovertarget="{{ .CloseTargetID }}"
+      popovertargetaction="hide"
+      aria-label="Close stream categories"
+      title="Close"
+    >
+      {{ template "icon-close" . }}
+    </button>
+    {{ end }}
   </div>
   <div class="category-sidebar-list">
     {{ range .Categories }}

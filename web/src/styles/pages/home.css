@@ -86,6 +86,10 @@ html:has(.my-home) {
     padding: 0;
     min-height: 0;
   }
+
+  .my-home .category-sidebar-close {
+    display: none;
+  }
 }
 
 @media (--md-down) {

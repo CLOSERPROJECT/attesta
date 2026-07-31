@@ -127,7 +127,11 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 		})
 	}
 	flush()
-	return CategorySidebarView{Title: "Stream Categories", Categories: cats}
+	return CategorySidebarView{
+		Title:         "Stream Categories",
+		CloseTargetID: "my-home-category-sidebar",
+		Categories:    cats,
+	}
 }
 
 // streamManagementFlags mirrors workflowOptions CanClone/CanEdit/CanDelete rules.

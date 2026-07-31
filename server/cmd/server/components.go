@@ -110,8 +110,9 @@ type CategorySidebarCategoryView struct {
 
 // CategorySidebarView is the root for templates/components/category_sidebar.html.
 type CategorySidebarView struct {
-	Title      string
-	Categories []CategorySidebarCategoryView
+	Title         string
+	CloseTargetID string // popover id for mobile drawer close; empty = no close control
+	Categories    []CategorySidebarCategoryView
 }
 
 // PublicHomeStreamResultsView is the HTMX swap target for landing stream cards.

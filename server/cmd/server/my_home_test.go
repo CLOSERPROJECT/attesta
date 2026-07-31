@@ -124,6 +124,9 @@ func TestBuildMyHomeCategorySidebarFromGroups(t *testing.T) {
 	if got.Title != "Stream Categories" || len(got.Categories) != 2 {
 		t.Fatalf("got=%+v", got)
 	}
+	if got.CloseTargetID != "my-home-category-sidebar" {
+		t.Fatalf("CloseTargetID=%q", got.CloseTargetID)
+	}
 	if !got.Categories[0].Expanded || got.Categories[0].Name != "Supply Chain" || len(got.Categories[0].SubCategories) != 2 {
 		t.Fatalf("cat0=%+v", got.Categories[0])
 	}
