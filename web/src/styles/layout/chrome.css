@@ -204,15 +204,11 @@
 
 .page {
   flex: 1;
-  padding: var(--space-7) 32px 60px;
+  padding: var(--space-12) 32px 60px;
 }
 
 .page.page-landing {
   padding: 0;
-}
-
-.page:has(.breadcrumbs) {
-  padding-top: var(--space-4);
 }
 
 .stack {
