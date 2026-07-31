@@ -105,8 +105,8 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	if strings.Contains(body, `class="public-home-signin`) {
 		t.Fatalf("expected no landing Sign In chrome on public home, got %q", body)
 	}
-	if strings.Contains(body, `class="site-footer"`) {
-		t.Fatalf("expected no shared site-footer on public home, got %q", body)
+	if !strings.Contains(body, `class="site-footer"`) {
+		t.Fatalf("expected shared site-footer on public home, got %q", body)
 	}
 	if !strings.Contains(body, `class="public-home"`) {
 		t.Fatalf("expected public landing markup, got %q", body)
@@ -120,19 +120,19 @@ func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	if strings.Contains(body, `>Dashboard</a>`) {
 		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
 	}
-	if !strings.Contains(body, `class="public-home-footer-legal"`) {
-		t.Fatalf("expected legal prose slot in public home footer, got %q", body)
+	if !strings.Contains(body, `class="site-footer-legal"`) {
+		t.Fatalf("expected legal prose slot in site footer, got %q", body)
 	}
 	if !strings.Contains(body, "GNU AGPLv3") {
-		t.Fatalf("expected AGPL legal copy in public home footer, got %q", body)
+		t.Fatalf("expected AGPL legal copy in site footer, got %q", body)
 	}
 	if !strings.Contains(body, "Project No. 101161109") {
-		t.Fatalf("expected CLOSER funding copy in public home footer, got %q", body)
+		t.Fatalf("expected CLOSER funding copy in site footer, got %q", body)
 	}
 	if !strings.Contains(body, "Project No. 101228240") {
-		t.Fatalf("expected Even Closer funding copy in public home footer, got %q", body)
+		t.Fatalf("expected Even Closer funding copy in site footer, got %q", body)
 	}
-	if strings.Contains(body, `class="public-home-footer-heading"`) {
+	if strings.Contains(body, `class="site-footer-heading"`) {
 		t.Fatalf("expected parked footer nav columns not rendered, got %q", body)
 	}
 	if strings.Contains(body, `>Platform</p>`) {

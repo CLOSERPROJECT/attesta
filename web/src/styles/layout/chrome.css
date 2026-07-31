@@ -215,28 +215,6 @@
   padding-top: var(--space-4);
 }
 
-.site-footer {
-  margin-top: auto;
-  padding: var(--space-5) 32px var(--space-6);
-  border-top: 1px solid var(--border);
-  background: var(--secondary);
-  color: var(--muted-foreground);
-}
-
-.site-footer > * {
-  opacity: 0.5;
-}
-
-.site-footer p {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-xs);
-  line-height: var(--leading-normal);
-}
-
-.site-footer p:last-child {
-  margin-bottom: 0;
-}
-
 .stack {
   display: grid;
   gap: var(--space-6);

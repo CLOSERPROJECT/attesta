@@ -6,8 +6,8 @@
  *   .public-home-streams-split#streams (full-bleed band; content capped at 8xl / 88rem)
  *     aside.public-home-category-sidebar  (--card, left bleed via ::before)
  *     .public-home-stream-results         (--muted, right bleed via ::after)
- *   footer.public-home-footer
  *
+ * Shared chrome footer: components/site_footer.html (+ site-footer.css).
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
  * Feature tiles use CSS-only component .home-feature-card (components/home-feature-card.css).
  * Stream tiles use full component .public-stream-card (components/public-stream-card.css).
@@ -44,16 +44,8 @@
 .public-home-hero,
 .public-home-process,
 .public-home-features,
-.public-home-dev,
-.public-home-footer {
-  padding-inline: var(--space-6);
-}
-
-.public-home-logo {
-  display: block;
-  width: 132px;
-  height: 44px;
-  object-fit: contain;
+.public-home-dev {
+  padding-inline: 32px;
 }
 
 .public-home-label {
@@ -375,17 +367,9 @@
 
 .public-home-stream-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 305px), 305px));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: var(--space-4);
   width: 100%;
-  justify-content: start;
-}
-
-.public-home-rule {
-  width: 100%;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--border);
 }
 
 .public-home-process {
@@ -393,7 +377,16 @@
   flex-direction: column;
   gap: var(--space-12);
   background: var(--card);
-  padding-block: 96px;
+  padding-block: 64px;
+}
+
+.public-home-process > *,
+.public-home-features > *,
+.public-home-dev > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
 }
 
 .public-home-process-grid {
@@ -408,7 +401,7 @@
   flex-direction: column;
   gap: 56px;
   background: var(--background);
-  padding-block: 96px;
+  padding-block: 64px;
 }
 
 .public-home-feature-grid {
@@ -423,7 +416,7 @@
   flex-direction: column;
   gap: 56px;
   background: var(--card);
-  padding-block: 96px;
+  padding-block: 64px;
 }
 
 .public-home-dev-row {
@@ -496,124 +489,7 @@
   color: var(--primary);
 }
 
-.public-home-footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  background: var(--card);
-  border-top: 1px solid var(--border);
-  padding-block: 80px var(--space-12);
-}
-
-.public-home-footer-top {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-10);
-  width: 100%;
-}
-
-.public-home-footer-brand {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-width: 18.75rem;
-}
-
-.public-home-footer-brand > p {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-}
-
-.public-home-footer-legal {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  flex: 1;
-  min-width: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: var(--leading-normal);
-}
-
-.public-home-footer-legal p {
-  margin: 0;
-}
-
-.public-home-footer-cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-8) var(--space-10);
-}
-
-.public-home-footer-cols > div {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-}
-
-.public-home-footer-heading {
-  margin: 0;
-  color: var(--foreground);
-}
-
-.public-home-footer-cols a {
-  color: var(--muted-foreground);
-}
-
-.public-home-footer-cols a:hover {
-  color: var(--foreground);
-}
-
-.public-home-footer-bottom {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  width: 100%;
-}
-
-.public-home-footer-meta {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  align-items: flex-start;
-}
-
-.public-home-footer-meta > p {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1rem;
-}
-
-.public-home-socials {
-  display: flex;
-  gap: var(--space-1);
-  align-items: center;
-}
-
-.public-home-socials .btn,
-.public-home-socials .btn:hover:not(:disabled, .is-disabled) {
-  color: var(--muted-foreground);
-}
-
-.public-home-socials .icon-svg {
-  width: 18px;
-  height: 18px;
-}
-
 @media (--md-up) {
-  .public-home-hero,
-  .public-home-process,
-  .public-home-features,
-  .public-home-dev,
-  .public-home-footer {
-    padding-inline: 40px;
-  }
-
   .public-home-streams-split {
     display: grid;
     grid-template-columns:
@@ -658,27 +534,9 @@
   .public-home-feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .public-home-footer-cols {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .public-home-footer-meta {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
 }
 
 @media (--lg-up) {
-  .public-home-hero,
-  .public-home-process,
-  .public-home-features,
-  .public-home-dev,
-  .public-home-footer {
-    padding-inline: 80px;
-  }
-
   .public-home-hero h1 {
     font-size: var(--text-5xl);
     line-height: 3rem;
@@ -703,16 +561,14 @@
     width: 40rem;
     flex-shrink: 0;
   }
+}
 
-  .public-home-footer-top {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-
-  .public-home-footer-cols {
-    display: flex;
-    gap: var(--space-12);
+@media (--md-down) {
+  .public-home-hero,
+  .public-home-process,
+  .public-home-features,
+  .public-home-dev {
+    padding-inline: var(--space-4);
   }
 }
 
