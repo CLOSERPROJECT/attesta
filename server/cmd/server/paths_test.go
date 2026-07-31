@@ -45,3 +45,21 @@ func TestPublicStreamPath(t *testing.T) {
 		t.Fatalf("empty key = %q, want /streams/", got)
 	}
 }
+
+func TestPublicHomePath(t *testing.T) {
+	cases := []struct {
+		cat, sub, want string
+	}{
+		{"supply-chain", "procurement", "/?category=supply-chain&subCategory=procurement"},
+		{"  supply-chain  ", "  procurement  ", "/?category=supply-chain&subCategory=procurement"},
+		{"", "procurement", "/"},
+		{"supply-chain", "", "/"},
+		{"", "", "/"},
+		{"  ", "  ", "/"},
+	}
+	for _, tc := range cases {
+		if got := publicHomePath(tc.cat, tc.sub); got != tc.want {
+			t.Fatalf("publicHomePath(%q, %q) = %q, want %q", tc.cat, tc.sub, got, tc.want)
+		}
+	}
+}

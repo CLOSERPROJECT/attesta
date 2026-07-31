@@ -43,20 +43,20 @@ type PublicStreamCardView struct {
 	OrganizationsOverflow int // count beyond the first four avatars; 0 when none
 }
 
-// PublicStreamRunCardView is one recent completed run on the public stream page.
-type PublicStreamRunCardView struct {
-	StatusLabel  string
-	CompletedAt  string
-	DigitalLink  string
-	PassportChip bool
+// PublicStreamRunView is one recent completed DPP run on the public stream page.
+type PublicStreamRunView struct {
+	CompletedAt string
+	DigitalLink string
 }
 
 // PublicStreamPageView is the view model for templates/pages/public_stream.html.
 type PublicStreamPageView struct {
 	PageBase
-	Header     PublicStreamCardView
-	RecentRuns []PublicStreamRunCardView
-	Blueprint  StreamInstanceDetailView
+	HomeHref      string // /?category=…&subCategory=… or /
+	Header        PublicStreamCardView
+	Organizations []PublicStreamCardOrgView // step-order unique orgs; full list
+	RecentRuns    []PublicStreamRunView
+	Blueprint     StreamInstanceDetailView
 }
 
 // PublicHomeSubCategoryView is one filterable leaf in the landing sidebar.

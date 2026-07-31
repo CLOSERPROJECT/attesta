@@ -80,7 +80,7 @@ func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, s
 				Name:       sub.Name,
 				Active:     cat.Slug == selectedCat && sub.Slug == selectedSub,
 				PartialURL: "/streams/public?" + encoded,
-				PushURL:    "/?" + encoded,
+				PushURL:    publicHomePath(cat.Slug, sub.Slug),
 			})
 		}
 		out = append(out, PublicHomeCategoryView{

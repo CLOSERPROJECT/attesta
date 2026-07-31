@@ -25,31 +25,56 @@ func processCompletedAt(process *Process) time.Time {
 	return latest
 }
 
-func buildPublicStreamRunCards(def WorkflowDef, processes []Process) []PublicStreamRunCardView {
-	out := make([]PublicStreamRunCardView, 0, publicStreamRecentRunLimit)
+func buildPublicStreamRuns(def WorkflowDef, processes []Process) []PublicStreamRunView {
+	out := make([]PublicStreamRunView, 0, publicStreamRecentRunLimit)
 	for i := range processes {
 		p := processes[i]
 		p.Progress = normalizeProgressKeys(p.Progress)
 		if deriveProcessStatus(def, &p) != processStatusDone {
 			continue
 		}
-		card := PublicStreamRunCardView{
-			StatusLabel: "Completed",
+		if p.DPP == nil {
+			continue
+		}
+		gtin := strings.TrimSpace(p.DPP.GTIN)
+		lot := strings.TrimSpace(p.DPP.Lot)
+		serial := strings.TrimSpace(p.DPP.Serial)
+		if gtin == "" || lot == "" || serial == "" {
+			continue
+		}
+		out = append(out, PublicStreamRunView{
 			CompletedAt: humanReadableTraceabilityTime(processCompletedAt(&p)),
-		}
-		if p.DPP != nil {
-			gtin := strings.TrimSpace(p.DPP.GTIN)
-			lot := strings.TrimSpace(p.DPP.Lot)
-			serial := strings.TrimSpace(p.DPP.Serial)
-			if gtin != "" && lot != "" && serial != "" {
-				card.DigitalLink = digitalLinkURL(gtin, lot, serial)
-				card.PassportChip = true
-			}
-		}
-		out = append(out, card)
+			DigitalLink: digitalLinkURL(gtin, lot, serial),
+		})
 		if len(out) >= publicStreamRecentRunLimit {
 			break
 		}
+	}
+	return out
+}
+
+func buildPublicStreamOrganizations(cfg RuntimeConfig, logoURLs map[string]string) []PublicStreamCardOrgView {
+	orgNames := organizationNameMap(cfg)
+	seen := map[string]struct{}{}
+	out := make([]PublicStreamCardOrgView, 0)
+	for _, step := range sortedSteps(cfg.Workflow) {
+		slug := strings.TrimSpace(step.OrganizationSlug)
+		if slug == "" {
+			continue
+		}
+		if _, ok := seen[slug]; ok {
+			continue
+		}
+		seen[slug] = struct{}{}
+		name := organizationDisplayName(slug, orgNames)
+		view := PublicStreamCardOrgView{
+			Name:     name,
+			Initials: organizationInitials(name),
+		}
+		if logoURLs != nil {
+			view.LogoURL = strings.TrimSpace(logoURLs[slug])
+		}
+		out = append(out, view)
 	}
 	return out
 }
@@ -70,6 +95,10 @@ func (s *Server) buildPublicStreamBlueprint(ctx context.Context, cfg RuntimeConf
 	)
 	preview.HideStatus = true
 	preview.WorkflowPath = publicStreamPath(workflowKey)
+	// Browse-only blueprint: keep top-level steps open so substeps are visible.
+	for i := range preview.Timeline {
+		preview.Timeline[i].Expanded = true
+	}
 	return preview
 }
 
@@ -104,14 +133,14 @@ func (s *Server) handlePublicStream(w http.ResponseWriter, r *http.Request) {
 	}
 	header.Href = "" // page header is not a link back to itself
 
-	var recent []PublicStreamRunCardView
-	if s.store != nil {
+	var recent []PublicStreamRunView
+	if header.PassportEnabled && s.store != nil {
 		processes, listErr := s.store.ListRecentProcessesByWorkflow(ctx, key, 0)
 		if listErr != nil {
 			http.Error(w, listErr.Error(), http.StatusInternalServerError)
 			return
 		}
-		recent = buildPublicStreamRunCards(cfg.Workflow, processes)
+		recent = buildPublicStreamRuns(cfg.Workflow, processes)
 	}
 
 	base := s.pageBase("public_stream_body", key, cfg.Workflow.Name)
@@ -120,10 +149,12 @@ func (s *Server) handlePublicStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	view := PublicStreamPageView{
-		PageBase:   base,
-		Header:     header,
-		RecentRuns: recent,
-		Blueprint:  s.buildPublicStreamBlueprint(ctx, cfg, key),
+		PageBase:      base,
+		HomeHref:      publicHomePath(cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug),
+		Header:        header,
+		Organizations: buildPublicStreamOrganizations(cfg, logoURLs),
+		RecentRuns:    recent,
+		Blueprint:     s.buildPublicStreamBlueprint(ctx, cfg, key),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_stream.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
