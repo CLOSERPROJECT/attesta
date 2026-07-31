@@ -307,6 +307,7 @@ type PublicCatalogRole struct {
 type HomeWorkflowPickerView struct {
 	PageBase
 	Groups           []MyHomeStreamGroupView
+	Sidebar          CategorySidebarView
 	ShowCreateStream bool
 	Error            string
 	Confirmation     string
@@ -2108,6 +2109,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	view := HomeWorkflowPickerView{
 		PageBase:         s.pageBaseForUser(user, "home_picker_body", "", ""),
 		Groups:           groups,
+		Sidebar:          buildMyHomeCategorySidebar(groups),
 		ShowCreateStream: showCreateStream && authErr == nil,
 		Error:            homePickerMessage(r, "error"),
 		Confirmation:     homePickerMessage(r, "confirmation"),

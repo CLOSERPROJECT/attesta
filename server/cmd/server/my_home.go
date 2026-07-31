@@ -85,6 +85,51 @@ func buildMyHomeStreamGroups(categories []TaxonomyCategoryNode, cardsByKey map[s
 	return groups
 }
 
+func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarView {
+	var cats []CategorySidebarCategoryView
+	var current *CategorySidebarCategoryView
+
+	flush := func() {
+		if current != nil {
+			cats = append(cats, *current)
+			current = nil
+		}
+	}
+
+	for _, g := range groups {
+		if g.Uncategorized {
+			flush()
+			cats = append(cats, CategorySidebarCategoryView{
+				Slug:     "uncategorized",
+				Name:     "Uncategorized",
+				Expanded: true,
+				SubCategories: []CategorySidebarLeafView{{
+					Slug: "uncategorized",
+					Name: "Uncategorized",
+					Href: "#" + g.AnchorID,
+				}},
+			})
+			continue
+		}
+		if current == nil || current.Slug != g.CategorySlug {
+			flush()
+			current = &CategorySidebarCategoryView{
+				Slug:     g.CategorySlug,
+				Name:     g.CategoryName,
+				IconURL:  g.CategoryIconURL,
+				Expanded: true,
+			}
+		}
+		current.SubCategories = append(current.SubCategories, CategorySidebarLeafView{
+			Slug: g.SubCategorySlug,
+			Name: g.SubCategoryName,
+			Href: "#" + g.AnchorID,
+		})
+	}
+	flush()
+	return CategorySidebarView{Title: "Stream Categories", Categories: cats}
+}
+
 // streamManagementFlags mirrors workflowOptions CanClone/CanEdit/CanDelete rules.
 func (s *Server) streamManagementFlags(ctx context.Context, user *AccountUser, key string, stream FormataBuilderStream, hasProcesses, canEditSavedStreams bool) (canClone, canEdit, editRequiresPurge, canDelete bool) {
 	if s.authorizer == nil || user == nil {

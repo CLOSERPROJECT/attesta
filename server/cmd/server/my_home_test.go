@@ -113,3 +113,27 @@ func TestBuildMyHomeStreamGroupsSetsAnchorIDs(t *testing.T) {
 		t.Fatalf("uncat=%+v", groups[2])
 	}
 }
+
+func TestBuildMyHomeCategorySidebarFromGroups(t *testing.T) {
+	groups := []MyHomeStreamGroupView{
+		{CategorySlug: "supply-chain", CategoryName: "Supply Chain", CategoryIconURL: "/c.svg", SubCategorySlug: "procurement", SubCategoryName: "Procurement", AnchorID: "cat-supply-chain--procurement", ShowCategoryHeader: true},
+		{CategorySlug: "supply-chain", CategoryName: "Supply Chain", CategoryIconURL: "/c.svg", SubCategorySlug: "order-fulfillment", SubCategoryName: "Order Fulfillment", AnchorID: "cat-supply-chain--order-fulfillment"},
+		{Uncategorized: true, CategoryName: "Uncategorized", AnchorID: "cat-uncategorized", ShowCategoryHeader: true},
+	}
+	got := buildMyHomeCategorySidebar(groups)
+	if got.Title != "Stream Categories" || len(got.Categories) != 2 {
+		t.Fatalf("got=%+v", got)
+	}
+	if !got.Categories[0].Expanded || got.Categories[0].Name != "Supply Chain" || len(got.Categories[0].SubCategories) != 2 {
+		t.Fatalf("cat0=%+v", got.Categories[0])
+	}
+	if got.Categories[0].SubCategories[0].Href != "#cat-supply-chain--procurement" {
+		t.Fatalf("href0=%q", got.Categories[0].SubCategories[0].Href)
+	}
+	if got.Categories[1].Name != "Uncategorized" || got.Categories[1].SubCategories[0].Href != "#cat-uncategorized" {
+		t.Fatalf("uncat=%+v", got.Categories[1])
+	}
+	if got.Categories[0].SubCategories[0].PartialURL != "" {
+		t.Fatalf("my leaves must not set PartialURL")
+	}
+}
