@@ -27,6 +27,29 @@ type PublicStreamCardOrgView struct {
 	Initials string
 }
 
+// ManagedPublicStreamCardView wraps a public stream card with optional /my management actions.
+type ManagedPublicStreamCardView struct {
+	Card              PublicStreamCardView
+	Key               string
+	CanClone          bool
+	CanEdit           bool
+	EditAction        string
+	EditRequiresPurge bool
+	CanDelete         bool
+	DeleteAction      string
+}
+
+// MyHomeStreamGroupView is one taxonomy (or Uncategorized) block on /my.
+type MyHomeStreamGroupView struct {
+	CategoryName           string
+	CategoryIconURL        string
+	SubCategoryName        string
+	SubCategoryIconURL     string
+	SubCategoryDescription string
+	Uncategorized          bool
+	Streams                []ManagedPublicStreamCardView
+}
+
 // PublicStreamCardView is the view model for templates/components/public_stream_card.html.
 type PublicStreamCardView struct {
 	Name                  string
