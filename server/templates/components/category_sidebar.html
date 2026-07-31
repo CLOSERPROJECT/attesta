@@ -47,7 +47,7 @@
                 data-subcategory-slug="{{ .Slug }}"
                 hx-get="{{ .PartialURL }}"
                 hx-target="#public-home-stream-results"
-                hx-swap="outerHTML"
+                hx-swap="outerHTML settle:350ms"
                 hx-push-url="{{ .PushURL }}"
               >{{ .Name }}</button>
             {{ end }}
