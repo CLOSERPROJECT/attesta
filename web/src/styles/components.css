@@ -18,4 +18,8 @@
 @import url("./components/forms.css");
 @import url("./components/org-admin.css");
 @import url("./components/stream-instance-card.css");
+@import url("./components/home-phase-card.css");
+@import url("./components/home-feature-card.css");
+@import url("./components/public-stream-card.css");
+@import url("./components/site-footer.css");
 @import url("./components/stream.css");

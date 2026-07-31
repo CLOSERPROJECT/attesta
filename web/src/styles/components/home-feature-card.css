@@ -1,0 +1,48 @@
+/*
+ * Home feature card — capability tile (CSS-only component).
+ *
+ * article.home-feature-card
+ *   span.home-feature-card-icon
+ *   h3
+ *   p
+ */
+
+.home-feature-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 240px;
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.home-feature-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--muted);
+  font-size: var(--text-xl);
+  line-height: 1.75rem;
+}
+
+.home-feature-card h3 {
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: 1.5rem;
+}
+
+.home-feature-card > p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+}
+
+.home-feature-card > h3 + p {
+  margin-top: calc(var(--space-2) * -1);
+}

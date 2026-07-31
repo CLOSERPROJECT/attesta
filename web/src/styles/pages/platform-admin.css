@@ -428,8 +428,7 @@ summary.platform-admin-taxonomy-category-head::marker {
 }
 
 .platform-admin-categories-form .dialog-actions {
-  flex-direction: row;
-  flex-wrap: nowrap;
+  flex-flow: row nowrap;
 }
 
 .platform-admin-categories-form .dialog-actions .btn {

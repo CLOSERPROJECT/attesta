@@ -1,0 +1,94 @@
+{{ define "site_footer" }}
+  <footer class="site-footer">
+    <div class="site-footer-top">
+      <div class="site-footer-brand">
+        {{ if .ViteDevServer }}
+          <img
+            class="site-footer-logo"
+            src="{{ .ViteDevServer }}/brand/attesta-mark.svg"
+            alt="Attesta"
+            width="44"
+            height="44"
+          />
+        {{ else }}
+          <img
+            class="site-footer-logo"
+            src="/static/brand/attesta-mark.svg"
+            alt="Attesta"
+            width="44"
+            height="44"
+          />
+        {{ end }}
+        <p>
+          Decentralized stream traceability for regulated and high-stakes raw
+          material recovery loops.
+        </p>
+      </div>
+      <div class="site-footer-legal">
+        <p>
+          CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
+          chips and microElectronics pRoduction, Project No. 101161109) is funded
+          by the European Union under the Interregional Innovation Investments
+          (I3) Instrument of the European Regional Development Fund, managed by
+          the European Innovation Council and SMEs Executive Agency (EISMEA).
+        </p>
+        <p>
+          Even Closer (Project No. 101228240) is funded by the European Union
+          under the Interregional Innovation Investments (I3) Instrument of the
+          European Regional Development Fund, managed by the European Innovation
+          Council and SMEs Executive Agency (EISMEA).
+        </p>
+        <p>
+          This repository/website is part of CLOSER and Even Closer projects and
+          has received funding from the European Union. Views and opinions
+          expressed are those of the author(s) only and do not necessarily reflect
+          those of the European Union or EISMEA. Neither the European Union nor
+          the granting authority can be held responsible for them.
+        </p>
+      </div>
+    </div>
+    <div class="site-footer-bottom">
+      <hr class="site-footer-rule" />
+      <div class="site-footer-meta">
+        <p>
+          © 2025-2026 Forkbomb B.V. — The Forkbomb Company. Licensed under the
+          GNU AGPLv3.
+        </p>
+        <div class="site-footer-socials">
+          <a
+            class="btn btn-ghost btn-icon"
+            href="https://forkbomb.solutions/"
+            aria-label="Forkbomb website"
+            rel="noopener noreferrer"
+          >
+            {{ template "icon-globe" . }}
+          </a>
+          <a
+            class="btn btn-ghost btn-icon"
+            href="https://twitter.com/ForkbombEu"
+            aria-label="X (Twitter)"
+            rel="noopener noreferrer"
+          >
+            {{ template "icon-twitter" . }}
+          </a>
+          <a
+            class="btn btn-ghost btn-icon"
+            href="https://www.linkedin.com/company/forkbomb/"
+            aria-label="LinkedIn"
+            rel="noopener noreferrer"
+          >
+            {{ template "icon-linkedin" . }}
+          </a>
+          <a
+            class="btn btn-ghost btn-icon"
+            href="https://github.com/ForkbombEu/"
+            aria-label="GitHub"
+            rel="noopener noreferrer"
+          >
+            {{ template "icon-github" . }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+{{ end }}

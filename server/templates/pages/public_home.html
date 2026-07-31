@@ -1,11 +1,179 @@
 {{ define "public_home_body" }}
-  <section class="stack u-max-w-7xl u-mx-auto">
-    <section class="page-header">
-      <div class="page-header-body">
-        <h1>Attesta</h1>
+  {{ $asset := "/static/brand/landing" }}
+  {{ if .ViteDevServer }}{{ $asset = printf "%s/brand/landing" .ViteDevServer }}{{ end }}
+
+  <div class="public-home" data-landing>
+    <section class="public-home-hero">
+      <p class="public-home-label">Attesta supply chain framework 2.0</p>
+      <div class="public-home-hero-copy">
+        <h1>Verified traceability for supply chains</h1>
+        <p>
+          Attesta turns multi-party regulated streams into tamper-evident digital
+          records — from raw material intake to GS1 Digital Product Passports.
+        </p>
+      </div>
+      <div class="public-home-hero-cta">
+        <a class="btn btn-primary btn-lg" href="#how-it-works">How it works</a>
+        <a class="btn btn-outline btn-lg" href="/signup">Book a Demo</a>
       </div>
     </section>
-  </section>
+
+    <div class="public-home-streams-split" id="streams">
+      <aside class="public-home-category-sidebar" aria-label="Stream categories" data-landing-category-sidebar>
+        <div class="public-home-category-sidebar-header">
+          {{ template "icon-layout-grid" . }}
+          <p class="public-home-category-sidebar-title">Stream Categories</p>
+        </div>
+        <div class="public-home-category-sidebar-list">
+          {{ range .Categories }}
+            <details class="public-home-category" {{ if .Expanded }}open{{ end }} data-category-slug="{{ .Slug }}">
+              <summary class="public-home-category-summary">
+                <span class="public-home-category-label">
+                  {{ if .IconURL }}
+                    <img class="public-home-category-icon" src="{{ .IconURL }}" alt="" width="20" height="20" />
+                  {{ end }}
+                  <span>{{ .Name }}</span>
+                </span>
+                <span class="public-home-category-chevron" aria-hidden="true">
+                  {{ template "icon-chevron-right" }}
+                </span>
+              </summary>
+              <div class="public-home-subcategories">
+                {{ range .SubCategories }}
+                  <button
+                    type="button"
+                    class="public-home-subcategory{{ if .Active }} is-active{{ end }}"
+                    data-subcategory-slug="{{ .Slug }}"
+                    hx-get="{{ .PartialURL }}"
+                    hx-target="#public-home-stream-results"
+                    hx-swap="outerHTML"
+                    hx-push-url="{{ .PushURL }}"
+                  >{{ .Name }}</button>
+                {{ end }}
+              </div>
+            </details>
+          {{ else }}
+            <p class="public-home-category-sidebar-empty">No categories yet.</p>
+          {{ end }}
+        </div>
+      </aside>
+
+      {{ template "public_home_stream_results" .StreamResults }}
+    </div>
+
+    <section class="public-home-process" id="how-it-works">
+      <div class="public-home-section-head public-home-section-head-center">
+        <p class="public-home-label">Process Overview</p>
+        <h2>Tamper-evident by design</h2>
+      </div>
+      <div class="public-home-process-grid">
+        <article class="home-phase-card">
+          <div class="home-phase-card-top">
+            <span class="home-phase-card-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-plus.svg" alt="" width="24" height="24" />
+            </span>
+            <span class="home-phase-card-num">01</span>
+          </div>
+          <h3>Create Stream</h3>
+          <p>Organization templates batch parameters or inspection guidelines via schema-gated API or clean form views.</p>
+        </article>
+        <article class="home-phase-card">
+          <div class="home-phase-card-top">
+            <span class="home-phase-card-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-track.svg" alt="" width="24" height="24" />
+            </span>
+            <span class="home-phase-card-num">02</span>
+          </div>
+          <h3>Track Progress</h3>
+          <p>Cerbos policies validate role capabilities and step-order as batches shift across physical processing handlers.</p>
+        </article>
+        <article class="home-phase-card">
+          <div class="home-phase-card-top">
+            <span class="home-phase-card-icon" aria-hidden="true">
+              <img src="{{ $asset }}/icon-check.svg" alt="" width="24" height="24" />
+            </span>
+            <span class="home-phase-card-num">03</span>
+          </div>
+          <h3>Verify &amp; DPP</h3>
+          <p>Record hash state is written to the cryptographic registry, automatically producing a GS1 Digital Product Passport Link.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="public-home-features" id="features">
+      <div class="public-home-section-head">
+        <p class="public-home-label">Core Capabilities</p>
+        <h2>Built for the complexity of regulated material recovery</h2>
+      </div>
+      <div class="public-home-feature-grid">
+        <article class="home-feature-card">
+          <span class="home-feature-card-icon" aria-hidden="true">🔐</span>
+          <h3>Role-gated actions</h3>
+          <p>Cerbos identity policies enforce rigorous standard action patterns across multiple untrusted processors.</p>
+        </article>
+        <article class="home-feature-card">
+          <span class="home-feature-card-icon" aria-hidden="true">🧾</span>
+          <h3>Structured YAML workflows</h3>
+          <p>Deploy easily customizable material paths corresponding to regional battery and recycling parameters.</p>
+        </article>
+        <article class="home-feature-card">
+          <span class="home-feature-card-icon" aria-hidden="true">📎</span>
+          <h3>Cryptographic evidence</h3>
+          <p>All inspection pictures, certifications, and chemical labs are bound to the immutable stream hash.</p>
+        </article>
+        <article class="home-feature-card">
+          <span class="home-feature-card-icon" aria-hidden="true">⚡</span>
+          <h3>HTMX Live Timelines</h3>
+          <p>Real-time Server-Sent Events push stream logs directly to coordinator dashboards instantly.</p>
+        </article>
+        <article class="home-feature-card">
+          <span class="home-feature-card-icon" aria-hidden="true">🪪</span>
+          <h3>GS1 Digital Link</h3>
+          <p>Publish ready passports for regulators and end-users with seamless QR and URI integration.</p>
+        </article>
+        <article class="home-feature-card">
+          <span class="home-feature-card-icon" aria-hidden="true">📡</span>
+          <h3>API First Architecture</h3>
+          <p>Every workflow capability is documented directly via OpenAPI framework specs for custom ERP hooks.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="public-home-dev" id="developers">
+      <div class="public-home-section-head">
+        <p class="public-home-label">Developer-First</p>
+        <h2>Robust APIs for supply chains</h2>
+      </div>
+      <div class="public-home-dev-row">
+        <div class="public-home-dev-copy">
+          <p>
+            Connect Attesta directly into your legacy ERP, chemical laboratory software,
+            or WEEE tracking hubs using our fully documented REST hooks and OpenAPI specifications.
+          </p>
+          <div class="public-home-stats">
+            <div>
+              <p class="public-home-stat-value">100%</p>
+              <p class="public-home-stat-label">OpenAPI Coverage</p>
+            </div>
+            <div>
+              <p class="public-home-stat-value">GS1</p>
+              <p class="public-home-stat-label">Native Digital Link Support</p>
+            </div>
+          </div>
+          <div class="public-home-dev-cta">
+            <a class="btn btn-primary btn-lg" href="#developers">Explore Documentation</a>
+            <a class="btn btn-ghost btn-lg" href="https://github.com/forkbomb/attesta" rel="noopener noreferrer">View Github Specs</a>
+          </div>
+        </div>
+        <pre class="public-home-code" tabindex="0"><code><span class="public-home-code-accent">GET /streams/69b299c8/dpp</span>
+{
+  "dpp_url": "https://attesta.eu/01/05012345678900/21/A1B2C3D4",
+  "status": "notarized",
+  <span class="public-home-code-accent">"seal_hash": "sha256:8f2a...c190"</span>
+}</code></pre>
+      </div>
+    </section>
+  </div>
 {{ end }}
 
 {{ define "public_home.html" }}

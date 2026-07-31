@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -642,5 +643,496 @@ func TestMemoryStoreReplaceTaxonomyValidation(t *testing.T) {
 	all, err := raw.ListSubCategories(t.Context(), "")
 	if err != nil || len(all) != 0 {
 		t.Fatalf("subs = %#v err=%v", all, err)
+	}
+}
+
+func TestMongoStoreCreateUpdateReorderCategory(t *testing.T) {
+	categories := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: mongo.ErrNoDocuments}
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionCategories: categories,
+	}}
+	store := &MongoStore{dbPort: db}
+
+	if _, err := store.CreateCategory(t.Context(), Category{Name: "X", Icon: "batch-traceability"}); err == nil {
+		t.Fatal("expected missing slug")
+	}
+	if _, err := store.CreateCategory(t.Context(), Category{Slug: "x", Name: "X", Icon: "nope"}); err == nil {
+		t.Fatal("expected invalid icon")
+	}
+
+	created, err := store.CreateCategory(t.Context(), Category{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability"})
+	if err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+	if created.ID.IsZero() || created.SortOrder != 1 || created.Slug != "supply-chain" {
+		t.Fatalf("created = %#v", created)
+	}
+	if len(categories.insertDocuments) != 1 {
+		t.Fatalf("inserts = %d", len(categories.insertDocuments))
+	}
+
+	categories.findOneFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+		return fakeSingleResult{decodeFn: func(v interface{}) error {
+			*(v.(*Category)) = Category{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 3}
+			return nil
+		}}
+	}
+	created2, err := store.CreateCategory(t.Context(), Category{Slug: "recycling", Name: "Recycling", Icon: "batch-traceability"})
+	if err != nil {
+		t.Fatalf("CreateCategory second: %v", err)
+	}
+	if created2.SortOrder != 4 {
+		t.Fatalf("sortOrder = %d, want 4", created2.SortOrder)
+	}
+
+	categories.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+		return fakeSingleResult{decodeFn: func(v interface{}) error {
+			*(v.(*Category)) = Category{Slug: "supply-chain", Name: "Updated", Icon: "batch-traceability", SortOrder: 1}
+			return nil
+		}}
+	}
+	updated, err := store.UpdateCategory(t.Context(), "supply-chain", "Updated", "batch-traceability")
+	if err != nil {
+		t.Fatalf("UpdateCategory: %v", err)
+	}
+	if updated.Name != "Updated" {
+		t.Fatalf("updated = %#v", updated)
+	}
+	if _, err := store.UpdateCategory(t.Context(), "supply-chain", "", "batch-traceability"); err == nil {
+		t.Fatal("expected empty name")
+	}
+
+	categories.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+		return &fakeAnyCursor{items: []interface{}{
+			Category{Slug: "a", SortOrder: 1},
+			Category{Slug: "b", SortOrder: 2},
+		}}, nil
+	}
+	if err := store.ReorderCategory(t.Context(), "a", "down"); err != nil {
+		t.Fatalf("ReorderCategory: %v", err)
+	}
+	if len(categories.updateOneFilters) != 2 {
+		t.Fatalf("updateOne calls = %d, want 2", len(categories.updateOneFilters))
+	}
+	if err := store.ReorderCategory(t.Context(), "missing", "down"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("missing reorder err = %v", err)
+	}
+}
+
+func TestMongoStoreCreateUpdateReorderSubCategory(t *testing.T) {
+	parent := Category{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability"}
+	categories := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Category)) = parent
+				return nil
+			}}
+		},
+	}
+	subs := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: mongo.ErrNoDocuments}
+		},
+	}
+	db := &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionCategories:    categories,
+		collectionSubCategories: subs,
+	}}
+	store := &MongoStore{dbPort: db}
+
+	if _, err := store.CreateSubCategory(t.Context(), SubCategory{Slug: "x", Name: "X", Icon: "procurement-workflow"}); err == nil {
+		t.Fatal("expected missing parent")
+	}
+
+	created, err := store.CreateSubCategory(t.Context(), SubCategory{
+		CategorySlug: "supply-chain", Slug: "procurement", Name: "Procurement", Icon: "procurement-workflow",
+	})
+	if err != nil {
+		t.Fatalf("CreateSubCategory: %v", err)
+	}
+	if created.ID.IsZero() || created.SortOrder != 1 || created.CategorySlug != "supply-chain" {
+		t.Fatalf("created = %#v", created)
+	}
+
+	subs.findOneFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+		return fakeSingleResult{decodeFn: func(v interface{}) error {
+			*(v.(*SubCategory)) = SubCategory{CategorySlug: "supply-chain", Slug: "procurement", SortOrder: 2}
+			return nil
+		}}
+	}
+	created2, err := store.CreateSubCategory(t.Context(), SubCategory{
+		CategorySlug: "supply-chain", Slug: "shipping", Name: "Shipping", Icon: "procurement-workflow",
+	})
+	if err != nil {
+		t.Fatalf("CreateSubCategory second: %v", err)
+	}
+	if created2.SortOrder != 3 {
+		t.Fatalf("sortOrder = %d, want 3", created2.SortOrder)
+	}
+
+	subs.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+		return fakeSingleResult{decodeFn: func(v interface{}) error {
+			*(v.(*SubCategory)) = SubCategory{
+				CategorySlug: "supply-chain", Slug: "procurement", Name: "Updated", Icon: "procurement-workflow", Description: "d",
+			}
+			return nil
+		}}
+	}
+	updated, err := store.UpdateSubCategory(t.Context(), "supply-chain", "procurement", "Updated", "procurement-workflow", "d")
+	if err != nil {
+		t.Fatalf("UpdateSubCategory: %v", err)
+	}
+	if updated.Name != "Updated" || updated.Description != "d" {
+		t.Fatalf("updated = %#v", updated)
+	}
+	if _, err := store.UpdateSubCategory(t.Context(), "supply-chain", "procurement", "", "procurement-workflow", ""); err == nil {
+		t.Fatal("expected empty name")
+	}
+
+	subs.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+		return &fakeAnyCursor{items: []interface{}{
+			SubCategory{CategorySlug: "supply-chain", Slug: "a", SortOrder: 1},
+			SubCategory{CategorySlug: "supply-chain", Slug: "b", SortOrder: 2},
+		}}, nil
+	}
+	if err := store.ReorderSubCategory(t.Context(), "supply-chain", "a", "down"); err != nil {
+		t.Fatalf("ReorderSubCategory: %v", err)
+	}
+	if len(subs.updateOneFilters) != 2 {
+		t.Fatalf("updateOne calls = %d, want 2", len(subs.updateOneFilters))
+	}
+	if err := store.ReorderSubCategory(t.Context(), "supply-chain", "missing", "up"); !errors.Is(err, mongo.ErrNoDocuments) {
+		t.Fatalf("missing reorder err = %v", err)
+	}
+}
+
+func TestMongoStoreTaxonomyMutationErrorPaths(t *testing.T) {
+	findErr := errors.New("find failed")
+	insertErr := errors.New("insert failed")
+	updateErr := errors.New("update failed")
+	bumpColl := &fakeMongoCollection{
+		updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+			return nil, errors.New("bump failed")
+		},
+	}
+
+	t.Run("CreateCategory find max order error", func(t *testing.T) {
+		categories := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: findErr}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories: categories,
+		}}}
+		if _, err := store.CreateCategory(t.Context(), Category{Slug: "x", Name: "X", Icon: "batch-traceability"}); !errors.Is(err, findErr) {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("CreateCategory insert and bump errors", func(t *testing.T) {
+		categories := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: mongo.ErrNoDocuments}
+			},
+			insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+				return nil, insertErr
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories: categories,
+		}}}
+		if _, err := store.CreateCategory(t.Context(), Category{Slug: "x", Name: "X", Icon: "batch-traceability"}); !errors.Is(err, insertErr) {
+			t.Fatalf("err = %v", err)
+		}
+
+		categories.insertOneFn = nil
+		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories:  categories,
+			collectionTaxonomyMeta: bumpColl,
+		}}}
+		if _, err := store.CreateCategory(t.Context(), Category{Slug: "x", Name: "X", Icon: "batch-traceability"}); err == nil || !strings.Contains(err.Error(), "bump failed") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("UpdateCategory not found and errors", func(t *testing.T) {
+		categories := &fakeMongoCollection{
+			findOneAndUpdateFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: mongo.ErrNoDocuments}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories: categories,
+		}}}
+		if _, err := store.UpdateCategory(t.Context(), "missing", "N", "batch-traceability"); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("err = %v", err)
+		}
+		if _, err := store.UpdateCategory(t.Context(), "x", "N", "bad-icon"); err == nil {
+			t.Fatal("expected invalid icon")
+		}
+		categories.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: updateErr}
+		}
+		if _, err := store.UpdateCategory(t.Context(), "x", "N", "batch-traceability"); !errors.Is(err, updateErr) {
+			t.Fatalf("err = %v", err)
+		}
+		categories.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Category)) = Category{Slug: "x", Name: "N", Icon: "batch-traceability"}
+				return nil
+			}}
+		}
+		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories:   categories,
+			collectionTaxonomyMeta: bumpColl,
+		}}}
+		if _, err := store.UpdateCategory(t.Context(), "x", "N", "batch-traceability"); err == nil || !strings.Contains(err.Error(), "bump failed") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("CreateSubCategory parent and insert errors", func(t *testing.T) {
+		categories := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: mongo.ErrNoDocuments}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories:    categories,
+			collectionSubCategories: &fakeMongoCollection{},
+		}}}
+		if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "missing", Slug: "s", Name: "S", Icon: "procurement-workflow"}); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("err = %v", err)
+		}
+		if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "bad"}); err == nil {
+			t.Fatal("expected invalid icon")
+		}
+
+		categories.findOneFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Category)) = Category{Slug: "g"}
+				return nil
+			}}
+		}
+		subs := &fakeMongoCollection{
+			findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: findErr}
+			},
+		}
+		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories:    categories,
+			collectionSubCategories: subs,
+		}}}
+		if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "procurement-workflow"}); !errors.Is(err, findErr) {
+			t.Fatalf("err = %v", err)
+		}
+
+		subs.findOneFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: mongo.ErrNoDocuments}
+		}
+		subs.insertOneFn = func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return nil, insertErr
+		}
+		if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "procurement-workflow"}); !errors.Is(err, insertErr) {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("UpdateSubCategory and reorder errors", func(t *testing.T) {
+		subs := &fakeMongoCollection{
+			findOneAndUpdateFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+				return fakeSingleResult{err: mongo.ErrNoDocuments}
+			},
+		}
+		store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionSubCategories: subs,
+		}}}
+		if _, err := store.UpdateSubCategory(t.Context(), "g", "s", "N", "procurement-workflow", ""); !errors.Is(err, mongo.ErrNoDocuments) {
+			t.Fatalf("err = %v", err)
+		}
+		if _, err := store.UpdateSubCategory(t.Context(), "g", "s", "N", "bad", ""); err == nil {
+			t.Fatal("expected invalid icon")
+		}
+		subs.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: updateErr}
+		}
+		if _, err := store.UpdateSubCategory(t.Context(), "g", "s", "N", "procurement-workflow", ""); !errors.Is(err, updateErr) {
+			t.Fatalf("err = %v", err)
+		}
+
+		categories := &fakeMongoCollection{
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return nil, findErr
+			},
+		}
+		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionCategories: categories,
+		}}}
+		if err := store.ReorderCategory(t.Context(), "a", "down"); !errors.Is(err, findErr) {
+			t.Fatalf("err = %v", err)
+		}
+		categories.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{Category{Slug: "a", SortOrder: 1}}}, nil
+		}
+		if err := store.ReorderCategory(t.Context(), "a", "up"); !errors.Is(err, ErrTaxonomyReorderBoundary) {
+			t.Fatalf("err = %v", err)
+		}
+		categories.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{
+				Category{Slug: "a", SortOrder: 1},
+				Category{Slug: "b", SortOrder: 2},
+			}}, nil
+		}
+		categories.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+			return nil, updateErr
+		}
+		if err := store.ReorderCategory(t.Context(), "a", "down"); !errors.Is(err, updateErr) {
+			t.Fatalf("err = %v", err)
+		}
+
+		subs = &fakeMongoCollection{
+			findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+				return nil, findErr
+			},
+		}
+		store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+			collectionSubCategories: subs,
+		}}}
+		if err := store.ReorderSubCategory(t.Context(), "g", "a", "down"); !errors.Is(err, findErr) {
+			t.Fatalf("err = %v", err)
+		}
+		subs.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{SubCategory{Slug: "a", SortOrder: 1}}}, nil
+		}
+		if err := store.ReorderSubCategory(t.Context(), "g", "a", "down"); !errors.Is(err, ErrTaxonomyReorderBoundary) {
+			t.Fatalf("err = %v", err)
+		}
+		subs.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{
+				SubCategory{Slug: "a", SortOrder: 1},
+				SubCategory{Slug: "b", SortOrder: 2},
+			}}, nil
+		}
+		subs.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+			return nil, updateErr
+		}
+		if err := store.ReorderSubCategory(t.Context(), "g", "a", "down"); !errors.Is(err, updateErr) {
+			t.Fatalf("err = %v", err)
+		}
+	})
+}
+
+func TestMongoStoreCreateDuplicateAndSecondReorderUpdate(t *testing.T) {
+	dup := mongo.WriteException{WriteErrors: []mongo.WriteError{{Code: 11000, Message: "E11000"}}}
+	categories := &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: mongo.ErrNoDocuments}
+		},
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return nil, dup
+		},
+	}
+	store := &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionCategories: categories,
+	}}}
+	if _, err := store.CreateCategory(t.Context(), Category{Slug: "x", Name: "X", Icon: "batch-traceability"}); !errors.Is(err, ErrTaxonomySlugExists) {
+		t.Fatalf("err = %v", err)
+	}
+
+	categories.findFn = func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+		return &fakeAnyCursor{items: []interface{}{
+			Category{Slug: "a", SortOrder: 1},
+			Category{Slug: "b", SortOrder: 2},
+		}}, nil
+	}
+	calls := 0
+	categories.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+		calls++
+		if calls == 1 {
+			return &mongo.UpdateResult{}, nil
+		}
+		return nil, errors.New("second update failed")
+	}
+	categories.insertOneFn = nil
+	if err := store.ReorderCategory(t.Context(), "a", "down"); err == nil || !strings.Contains(err.Error(), "second update failed") {
+		t.Fatalf("err = %v", err)
+	}
+
+	subs := &fakeMongoCollection{
+		findFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (mongoCursorPort, error) {
+			return &fakeAnyCursor{items: []interface{}{
+				SubCategory{Slug: "a", SortOrder: 1},
+				SubCategory{Slug: "b", SortOrder: 2},
+			}}, nil
+		},
+	}
+	calls = 0
+	subs.updateOneFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+		calls++
+		if calls == 1 {
+			return &mongo.UpdateResult{}, nil
+		}
+		return nil, errors.New("second sub update failed")
+	}
+	store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionSubCategories: subs,
+	}}}
+	if err := store.ReorderSubCategory(t.Context(), "g", "a", "down"); err == nil || !strings.Contains(err.Error(), "second sub update failed") {
+		t.Fatalf("err = %v", err)
+	}
+
+	// CreateSubCategory duplicate + bump failure after insert
+	categories = &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{decodeFn: func(v interface{}) error {
+				*(v.(*Category)) = Category{Slug: "g"}
+				return nil
+			}}
+		},
+	}
+	subs = &fakeMongoCollection{
+		findOneFn: func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) mongoSingleResultPort {
+			return fakeSingleResult{err: mongo.ErrNoDocuments}
+		},
+		insertOneFn: func(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+			return nil, dup
+		},
+	}
+	store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionCategories:    categories,
+		collectionSubCategories: subs,
+	}}}
+	if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "procurement-workflow"}); !errors.Is(err, ErrTaxonomySlugExists) {
+		t.Fatalf("err = %v", err)
+	}
+
+	subs.insertOneFn = nil
+	bumpColl := &fakeMongoCollection{
+		updateOneFn: func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+			return nil, errors.New("bump failed")
+		},
+	}
+	store = &MongoStore{dbPort: &fakeMongoDatabase{collections: map[string]*fakeMongoCollection{
+		collectionCategories:    categories,
+		collectionSubCategories: subs,
+		collectionTaxonomyMeta:  bumpColl,
+	}}}
+	if _, err := store.CreateSubCategory(t.Context(), SubCategory{CategorySlug: "g", Slug: "s", Name: "S", Icon: "procurement-workflow"}); err == nil || !strings.Contains(err.Error(), "bump failed") {
+		t.Fatalf("err = %v", err)
+	}
+
+	subs.findOneAndUpdateFn = func(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) mongoSingleResultPort {
+		return fakeSingleResult{decodeFn: func(v interface{}) error {
+			*(v.(*SubCategory)) = SubCategory{Slug: "s", Name: "S"}
+			return nil
+		}}
+	}
+	if _, err := store.UpdateSubCategory(t.Context(), "g", "s", "S", "procurement-workflow", ""); err == nil || !strings.Contains(err.Error(), "bump failed") {
+		t.Fatalf("err = %v", err)
 	}
 }

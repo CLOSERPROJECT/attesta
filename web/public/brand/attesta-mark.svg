@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="attesta">
+  <defs>
+    <linearGradient id="atG" x1="0" y1="0" x2="0.18" y2="1">
+      <stop offset="0" stop-color="#54c794"></stop>
+      <stop offset="0.5" stop-color="#1f6e56"></stop>
+      <stop offset="1" stop-color="#0b3829"></stop>
+    </linearGradient>
+  </defs>
+  <path d="M100,16 L174,165 L163,188 L37,188 L26,165 Z M100,86 L134,152 L66,152 Z" fill="url(#atG)" fill-rule="evenodd"></path>
+  <polygon points="100,16 100,86 66,152 48,188 37,188 26,165" fill="#86ddb8" opacity="0.62"></polygon>
+  <polygon points="100,16 124,64 76,64" fill="#9be8c7" opacity="0.55"></polygon>
+</svg>

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,27 +15,675 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestHandlePublicHomeRedirectsToMy(t *testing.T) {
+func TestHandlePublicHomeRendersTaxonomySidebar(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="public-home-category-sidebar"`,
+		"Supply Chain",
+		"Procurement",
+		"Order Fulfillment",
+		`hx-get="/streams/public?category=supply-chain&amp;subCategory=procurement"`,
+		`hx-target="#public-home-stream-results"`,
+		`hx-push-url="/?category=supply-chain&amp;subCategory=procurement"`,
+		`id="public-home-stream-results"`,
+		`class="public-home-results-category-header"`,
+		`class="public-home-results-category-name">Supply Chain<`,
+		`/static/taxonomy/batch-traceability.svg`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in %s", want, body)
+		}
+	}
+	for _, gone := range []string{
+		`data-landing-tabs`,
+		`public-home-tabs`,
+		"See all streams",
+		`icon-cat-compliance.svg`,
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("did not expect %q", gone)
+		}
+	}
+}
+
+func TestHandlePublicHomeQuerySelectsSubcategory(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{store: store, configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/?category=supply-chain&subCategory=order-fulfillment", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	body := rec.Body.String()
+	if !strings.Contains(body, `subCategory=order-fulfillment`) || !strings.Contains(body, "is-active") {
+		t.Fatalf("expected active subcategory markup, got %s", body)
+	}
+}
+
+func TestHandlePublicHomeIsBlankAndPublic(t *testing.T) {
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  parseTestTemplates(t),
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: t.TempDir(),
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	server.handlePublicHome(rec, req)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
 	}
-	if got := rec.Header().Get("Location"); got != appHomePath {
-		t.Fatalf("location = %q, want %q", got, appHomePath)
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("unexpected redirect to %q", loc)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `class="topbar`) {
+		t.Fatalf("expected shared topbar on public home, got %q", body)
+	}
+	if !strings.Contains(body, `id="theme-toggle"`) {
+		t.Fatalf("expected theme toggle on public home, got %q", body)
+	}
+	if !strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected Login link on public home, got %q", body)
+	}
+	if !strings.Contains(body, `btn btn-ghost btn-lg nav-action`) {
+		t.Fatalf("expected shared topbar Login control on public home, got %q", body)
+	}
+	if !strings.Contains(body, `d="M15 12H3"`) {
+		t.Fatalf("expected login icon in topbar on public home, got %q", body)
+	}
+	if !strings.Contains(body, "Login") {
+		t.Fatalf("expected Login label on public home, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-header"`) {
+		t.Fatalf("expected no marketing header on public home, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-signin`) {
+		t.Fatalf("expected no landing Sign In chrome on public home, got %q", body)
+	}
+	if !strings.Contains(body, `class="site-footer"`) {
+		t.Fatalf("expected shared site-footer on public home, got %q", body)
+	}
+	if !strings.Contains(body, `class="public-home"`) {
+		t.Fatalf("expected public landing markup, got %q", body)
+	}
+	if !strings.Contains(body, "Verified traceability for supply chains") {
+		t.Fatalf("expected landing hero copy, got %q", body)
+	}
+	if strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected no account menu on public home, got %q", body)
+	}
+	if strings.Contains(body, `>Dashboard</a>`) {
+		t.Fatalf("expected no Dashboard link when logged out, got %q", body)
+	}
+	if !strings.Contains(body, `class="site-footer-legal"`) {
+		t.Fatalf("expected legal prose slot in site footer, got %q", body)
+	}
+	if !strings.Contains(body, "GNU AGPLv3") {
+		t.Fatalf("expected AGPL legal copy in site footer, got %q", body)
+	}
+	if !strings.Contains(body, "Project No. 101161109") {
+		t.Fatalf("expected CLOSER funding copy in site footer, got %q", body)
+	}
+	if !strings.Contains(body, "Project No. 101228240") {
+		t.Fatalf("expected Even Closer funding copy in site footer, got %q", body)
+	}
+	if strings.Contains(body, `class="site-footer-heading"`) {
+		t.Fatalf("expected parked footer nav columns not rendered, got %q", body)
+	}
+	if strings.Contains(body, `>Platform</p>`) {
+		t.Fatalf("expected Platform footer heading not rendered, got %q", body)
+	}
+	if server.tmpl.Lookup("public_home_footer_nav") == nil {
+		t.Fatal("expected parked template define public_home_footer_nav")
 	}
 }
 
-func TestHandlePublicHomeRedirectsToMyWhenLoggedIn(t *testing.T) {
+func TestHandlePublicHomeEmptyCatalogRendersNoStreamCards(t *testing.T) {
+	server := &Server{
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: t.TempDir(),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `class="public-stream-card"`) {
+		t.Fatalf("expected no public stream cards for empty catalog, got %q", body)
+	}
+	for _, fake := range []string{
+		"PV Module Tracing",
+		"Indium recycling recovery",
+		"Battery Passport",
+		"Critical Raw Materials",
+	} {
+		if strings.Contains(body, fake) {
+			t.Fatalf("expected no hard-coded stream tile %q on empty catalog, got %q", fake, body)
+		}
+	}
+}
+
+func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Stream", "string", "Alpha description")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "beta.yaml"), "Beta Stream", "number", "Beta description")
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if got := strings.Count(body, `class="public-stream-card"`); got != 2 {
+		t.Fatalf("public stream card count = %d, want 2", got)
+	}
+	for _, want := range []string{
+		"Alpha Stream",
+		"Alpha description",
+		"Beta Stream",
+		"Beta description",
+		`href="/streams/alpha"`,
+		`href="/streams/beta"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, `public-stream-card-badge`) {
+		t.Fatalf("public home cards must not render legacy badges, got %q", body)
+	}
+	alphaIdx := strings.Index(body, "Alpha Stream")
+	betaIdx := strings.Index(body, "Beta Stream")
+	if alphaIdx < 0 || betaIdx < 0 || alphaIdx > betaIdx {
+		t.Fatalf("expected stable key order alpha before beta, alpha=%d beta=%d", alphaIdx, betaIdx)
+	}
+	if strings.Contains(body, "PV Module Tracing") {
+		t.Fatalf("expected no hard-coded Figma stream tiles, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersStreamStepPreviewFromCatalog(t *testing.T) {
+	tempDir := t.TempDir()
+	content := `workflow:
+  name: "Catalog Trace Stream"
+  description: "Catalog step preview fixture"
+  categorySlug: "supply-chain"
+  subCategorySlug: "procurement"
+  steps:
+    - id: "1"
+      title: "Incoming intake"
+      order: 1
+      organization: "org1"
+      substeps:
+        - id: "1.1"
+          title: "Record lot"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "lot"
+          inputType: "formata"
+          schema:
+            type: object
+        - id: "1.2"
+          title: "Attach photo"
+          order: 2
+          roles: ["dep1"]
+          inputKey: "photo"
+          inputType: "formata"
+          schema:
+            type: object
+    - id: "2"
+      title: "Quality check"
+      order: 2
+      organization: "org1"
+      substeps:
+        - id: "2.1"
+          title: "Approve"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "ok"
+          inputType: "formata"
+          schema:
+            type: object
+organizations:
+  - slug: "org1"
+    name: "Organization 1"
+roles:
+  - orgSlug: "org1"
+    slug: "dep1"
+    name: "Department 1"
+users:
+  - id: "u1"
+    name: "User 1"
+    departmentId: "dep1"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "trace.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Catalog Trace Stream",
+		`class="public-stream-card-metrics-row"`,
+		"2 steps",
+		"1 role",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	for _, gone := range []string{
+		"public-stream-card-steps",
+		"Incoming intake",
+		"Quality check",
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("did not expect %q in public home body, got %q", gone, body)
+		}
+	}
+}
+
+func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Plain Stream", "string", "No passport")
+	writePublicHomeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "beta.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	alphaIdx := strings.Index(body, "Alpha Plain Stream")
+	betaIdx := strings.Index(body, ">Workflow</h3>")
+	if alphaIdx < 0 || betaIdx < 0 {
+		t.Fatalf("expected both catalog streams in body, alpha=%d beta=%d body=%q", alphaIdx, betaIdx, body)
+	}
+
+	alphaCardEnd := betaIdx
+	if alphaIdx > betaIdx {
+		alphaCardEnd = len(body)
+	}
+	alphaCard := body[alphaIdx:alphaCardEnd]
+	if strings.Contains(alphaCard, "public-stream-card-dpp") || strings.Contains(alphaCard, ">DPP<") {
+		t.Fatalf("plain stream must not show DPP chip, got %q", alphaCard)
+	}
+
+	betaCard := body[betaIdx:]
+	if !strings.Contains(betaCard, `class="public-stream-card-dpp"`) {
+		t.Fatalf("DPP-enabled stream must show DPP chip, got %q", betaCard)
+	}
+	if !strings.Contains(betaCard, "DPP") {
+		t.Fatalf("DPP-enabled stream must show DPP label, got %q", betaCard)
+	}
+	if strings.Contains(body, `public-stream-card-badge`) {
+		t.Fatalf("public home cards must not render legacy badges, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersOrgAvatarsAndMetricsFromCatalog(t *testing.T) {
+	tempDir := t.TempDir()
+	content := `workflow:
+  name: "Org Avatar Stream"
+  description: "Org footer and metrics fixture"
+  categorySlug: "supply-chain"
+  subCategorySlug: "procurement"
+  steps:
+    - id: "1"
+      title: "Incoming intake"
+      order: 1
+      organization: "acme"
+      substeps:
+        - id: "1.1"
+          title: "Record lot"
+          order: 1
+          roles: ["dep1"]
+          inputKey: "lot"
+          inputType: "formata"
+          schema:
+            type: object
+organizations:
+  - slug: "acme"
+    name: "Acme Corp"
+  - slug: "beta"
+    name: "Beta Org"
+roles:
+  - orgSlug: "acme"
+    slug: "dep1"
+    name: "Department 1"
+users:
+  - id: "u1"
+    name: "User 1"
+    departmentId: "dep1"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "orgs.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{
+		store: store,
+		tmpl:  parseTestTemplates(t),
+		identity: &fakeIdentityStore{
+			listOrganizationsFunc: func(ctx context.Context) ([]IdentityOrg, error) {
+				return []IdentityOrg{
+					{Slug: "acme", Name: "Acme Corp", LogoFileID: "logo-1"},
+					{Slug: "beta", Name: "Beta Org"},
+				}, nil
+			},
+		},
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"Org Avatar Stream",
+		`src="/organization/logo/acme"`,
+		`alt="Acme Corp"`,
+		`aria-label="Beta Org"`,
+		">BE<",
+		`<strong>Organizations</strong>`,
+		`class="public-stream-card-metrics"`,
+		`class="public-stream-card-orgs-count"`,
+		"no runs yet",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, "Stream Instances") {
+		t.Fatalf("footer must not say Stream Instances, got %q", body)
+	}
+	if strings.Contains(body, ">28<") {
+		t.Fatalf("stub instance count must not appear, got %q", body)
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("empty catalog stream must not show all-completed chip, got %q", body)
+	}
+	if strings.Contains(body, `src="/organization/logo/beta"`) {
+		t.Fatalf("beta without logo must use initials, not logo url, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersNoInstancesYetWhenStreamHasNoProcesses(t *testing.T) {
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "empty.yaml"), "Empty Metrics Stream", "string", "No processes yet")
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"Empty Metrics Stream",
+		"no runs yet",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, ">28<") {
+		t.Fatalf("stub instance count must not appear, got %q", body)
+	}
+	if strings.Contains(body, "all completed") {
+		t.Fatalf("empty stream must not show all-completed chip, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testing.T) {
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done and terminated only")
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	now := time.Now().UTC()
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-2 * time.Minute),
+		Status:      processStatusDone,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-time.Minute),
+		Status:      processStatusTerminated,
+	})
+
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"Settled Metrics Stream",
+		"2 runs",
+		"all completed",
+		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
+		`d="m9 12 2 2 4-4"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in public home body, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, ">28<") {
+		t.Fatalf("stub instance count must not appear, got %q", body)
+	}
+	if strings.Contains(body, "no runs yet") {
+		t.Fatalf("settled stream must not show empty label, got %q", body)
+	}
+	if strings.Count(body, `class="public-stream-card-metrics-row"`) != 2 {
+		t.Fatalf("settled metrics must render run and step/role rows, got %q", body)
+	}
+}
+
+func TestHandlePublicHomeRendersActiveNowMetricsScopedPerStream(t *testing.T) {
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "live.yaml"), "Live Metrics Stream", "string", "Has active instances")
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "settled.yaml"), "Settled Metrics Stream", "string", "Done only")
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	now := time.Now().UTC()
+	store.SeedProcess(Process{
+		WorkflowKey: "live",
+		CreatedAt:   now.Add(-3 * time.Minute),
+		Status:      processStatusActive,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "live",
+		CreatedAt:   now.Add(-2 * time.Minute),
+		Status:      processStatusTerminated,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "live",
+		CreatedAt:   now.Add(-time.Minute),
+		Status:      processStatusActive,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-4 * time.Minute),
+		Status:      processStatusDone,
+	})
+	store.SeedProcess(Process{
+		WorkflowKey: "settled",
+		CreatedAt:   now.Add(-5 * time.Minute),
+		Status:      processStatusDone,
+	})
+
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+
+	liveIdx := strings.Index(body, "Live Metrics Stream")
+	settledIdx := strings.Index(body, "Settled Metrics Stream")
+	if liveIdx < 0 || settledIdx < 0 {
+		t.Fatalf("expected both stream cards in body, got %q", body)
+	}
+
+	// Slice each card roughly by the next article boundary so assertions stay per-stream.
+	liveEnd := settledIdx
+	settledEnd := len(body)
+	if liveIdx > settledIdx {
+		liveEnd = len(body)
+		settledEnd = liveIdx
+	}
+	liveCard := body[liveIdx:liveEnd]
+	settledCard := body[settledIdx:settledEnd]
+
+	for _, want := range []string{
+		"3 runs",
+		"2 active now",
+		`M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36`,
+	} {
+		if !strings.Contains(liveCard, want) {
+			t.Fatalf("live stream card missing %q, got %q", want, liveCard)
+		}
+	}
+	if strings.Contains(liveCard, "all completed") {
+		t.Fatalf("live stream with active instances must not show all-completed, got %q", liveCard)
+	}
+
+	for _, want := range []string{
+		"2 runs",
+		"all completed",
+	} {
+		if !strings.Contains(settledCard, want) {
+			t.Fatalf("settled stream card missing %q, got %q", want, settledCard)
+		}
+	}
+	if strings.Contains(settledCard, "active now") {
+		t.Fatalf("settled stream must not inherit live active-now metrics, got %q", settledCard)
+	}
+}
+
+func TestHandlePublicHomeLimitsToFirstSixCatalogStreams(t *testing.T) {
+	tempDir := t.TempDir()
+	names := []string{
+		"Catalog One",
+		"Catalog Two",
+		"Catalog Three",
+		"Catalog Four",
+		"Catalog Five",
+		"Catalog Six",
+		"Catalog Seven",
+	}
+	files := []string{"a.yaml", "b.yaml", "c.yaml", "d.yaml", "e.yaml", "f.yaml", "g.yaml"}
+	for i, name := range names {
+		writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, files[i]), name, "string", name+" description")
+	}
+
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := &Server{
+		store:     store,
+		tmpl:      parseTestTemplates(t),
+		configDir: tempDir,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.handlePublicHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if got := strings.Count(body, `class="public-stream-card"`); got != 6 {
+		t.Fatalf("public stream card count = %d, want 6", got)
+	}
+	for _, want := range names[:6] {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q among first six cards, got %q", want, body)
+		}
+	}
+	if strings.Contains(body, "Catalog Seven") {
+		t.Fatalf("did not expect seventh catalog stream on public home, got %q", body)
+	}
+	prev := -1
+	for _, want := range names[:6] {
+		idx := strings.Index(body, want)
+		if idx < 0 || idx < prev {
+			t.Fatalf("expected stable order for %q (prev=%d idx=%d)", want, prev, idx)
+		}
+		prev = idx
+	}
+}
+
+func TestHandlePublicHomeShowsDashboardWhenLoggedIn(t *testing.T) {
 	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
 	server := &Server{
-		store: NewMemoryStore(),
-		tmpl:  parseTestTemplates(t),
+		store:     NewMemoryStore(),
+		tmpl:      parseTestTemplates(t),
+		configDir: t.TempDir(),
 		identity: &fakeIdentityStore{
 			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 				if sessionSecret != "session-public-home" {
@@ -53,11 +702,27 @@ func TestHandlePublicHomeRedirectsToMyWhenLoggedIn(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-public-home"})
 	rec := httptest.NewRecorder()
 	server.handlePublicHome(rec, req)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
 	}
-	if got := rec.Header().Get("Location"); got != appHomePath {
-		t.Fatalf("location = %q, want %q", got, appHomePath)
+	body := rec.Body.String()
+	if !strings.Contains(body, `account-menu`) {
+		t.Fatalf("expected account menu when logged in, got %q", body)
+	}
+	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, "Dashboard") {
+		t.Fatalf("expected Dashboard when logged in, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-header"`) {
+		t.Fatalf("expected no marketing header when logged in, got %q", body)
+	}
+	if strings.Contains(body, `class="public-home-signin`) {
+		t.Fatalf("expected no landing Sign In chrome when logged in, got %q", body)
+	}
+	if !strings.Contains(body, `class="topbar`) {
+		t.Fatalf("expected shared topbar when logged in, got %q", body)
+	}
+	if strings.Contains(body, `href="/login"`) {
+		t.Fatalf("expected no topbar Login link when logged in, got %q", body)
 	}
 }
 

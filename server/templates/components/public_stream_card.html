@@ -1,0 +1,90 @@
+{{/* Public homepage stream card: title, description, optional DPP chip, run/step/role metrics, org avatars. Link when Href set. */}}
+
+{{ define "public_stream_card" }}
+  {{ if .Href }}
+  <a class="public-stream-card" href="{{ .Href }}">
+  {{ else }}
+  <article class="public-stream-card">
+  {{ end }}
+    <div class="public-stream-card-header">
+      <h3 class="public-stream-card-title">{{ .Name }}</h3>
+      {{ if .Description }}
+        <p class="public-stream-card-description">{{ .Description }}</p>
+      {{ end }}
+      {{ if .PassportEnabled }}
+        <span class="public-stream-card-dpp">
+          DPP
+          {{ template "icon-file-text" . }}
+        </span>
+      {{ end }}
+    </div>
+    <div class="public-stream-card-foot">
+      <div class="public-stream-card-metrics">
+        <div class="public-stream-card-metrics-row">
+          {{ if eq .InstanceCount 0 }}
+            <span class="public-stream-card-metric">
+              {{ template "icon-layers-2" . }}
+              no runs yet
+            </span>
+          {{ else if .AllCompleted }}
+            <span class="public-stream-card-metric">
+              {{ template "icon-layers-2" . }}
+              {{ if eq .InstanceCount 1 }}1 run{{ else }}{{ .InstanceCount }} runs{{ end }}
+            </span>
+            <span class="public-stream-card-metric">
+              {{ template "icon-check-circle" . }}
+              all completed
+            </span>
+          {{ else }}
+            <span class="public-stream-card-metric">
+              {{ template "icon-layers-2" . }}
+              {{ if eq .InstanceCount 1 }}1 run{{ else }}{{ .InstanceCount }} runs{{ end }}
+            </span>
+            <span class="public-stream-card-metric public-stream-card-metric-active">
+              {{ template "icon-activity" . }}
+              {{ if eq .ActiveCount 1 }}1 active now{{ else }}{{ .ActiveCount }} active now{{ end }}
+            </span>
+          {{ end }}
+        </div>
+        <div class="public-stream-card-metrics-row">
+          <span class="public-stream-card-metric">
+            {{ template "icon-list" . }}
+            {{ if eq .StepCount 1 }}1 step{{ else }}{{ .StepCount }} steps{{ end }}
+          </span>
+          <span class="public-stream-card-metric">
+            {{ template "icon-users-group" . }}
+            {{ if eq .RoleCount 1 }}1 role{{ else }}{{ .RoleCount }} roles{{ end }}
+          </span>
+        </div>
+      </div>
+      {{ if .Organizations }}
+        <hr class="public-stream-card-rule" />
+        <div class="public-stream-card-orgs">
+          <div class="public-stream-card-orgs-head">
+            <strong>Organizations</strong>
+            <span class="public-stream-card-orgs-count">{{ .OrganizationCount }}</span>
+          </div>
+          <div class="public-stream-card-avatars">
+            {{ range .Organizations }}
+              {{ if .LogoURL }}
+                <img src="{{ .LogoURL }}" alt="{{ .Name }}" width="32" height="32" />
+              {{ else }}
+                <span class="public-stream-card-avatar" role="img" aria-label="{{ .Name }}">{{ .Initials }}</span>
+              {{ end }}
+            {{ end }}
+            {{ if .OrganizationsOverflow }}
+              <span
+                class="public-stream-card-avatar-more"
+                aria-label="{{ .OrganizationsOverflow }} more organizations"
+              >+{{ .OrganizationsOverflow }}</span>
+            {{ end }}
+          </div>
+        </div>
+      {{ end }}
+    </div>
+  {{ if .Href }}
+  </a>
+  {{ else }}
+  </article>
+  {{ end }}
+{{ end }}

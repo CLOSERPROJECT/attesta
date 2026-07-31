@@ -36,3 +36,30 @@ func TestAppHomePath(t *testing.T) {
 		t.Fatalf("appHomePath = %q", appHomePath)
 	}
 }
+
+func TestPublicStreamPath(t *testing.T) {
+	if got := publicStreamPath("  wf-a  "); got != "/streams/wf-a" {
+		t.Fatalf("publicStreamPath = %q, want /streams/wf-a", got)
+	}
+	if got := publicStreamPath(""); got != "/streams/" {
+		t.Fatalf("empty key = %q, want /streams/", got)
+	}
+}
+
+func TestPublicHomePath(t *testing.T) {
+	cases := []struct {
+		cat, sub, want string
+	}{
+		{"supply-chain", "procurement", "/?category=supply-chain&subCategory=procurement"},
+		{"  supply-chain  ", "  procurement  ", "/?category=supply-chain&subCategory=procurement"},
+		{"", "procurement", "/"},
+		{"supply-chain", "", "/"},
+		{"", "", "/"},
+		{"  ", "  ", "/"},
+	}
+	for _, tc := range cases {
+		if got := publicHomePath(tc.cat, tc.sub); got != tc.want {
+			t.Fatalf("publicHomePath(%q, %q) = %q, want %q", tc.cat, tc.sub, got, tc.want)
+		}
+	}
+}

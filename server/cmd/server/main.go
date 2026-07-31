@@ -697,6 +697,18 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-instances" {
+		if err := runSeedInstancesCommand(ctx, os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-catalog-streams" {
+		if err := runSeedCatalogStreamsCommand(ctx, os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
@@ -2046,9 +2058,46 @@ func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// Temporary: treat / as app entry until the real public homepage ships.
-	// Auth is handled by /my (anonymous visitors continue to login/signup).
-	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
+	base := s.pageBase("public_home_body", "", "")
+	signedIn := false
+	if user, _, err := s.currentUser(r); err == nil {
+		base = s.pageBaseForUser(user, "public_home_body", "", "")
+		signedIn = true
+	}
+	categories, err := loadTaxonomyTree(r.Context(), s.store)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cat, sub := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subCategory"))
+	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	view := struct {
+		PageBase
+		Categories    []PublicHomeCategoryView
+		StreamResults PublicHomeStreamResultsView
+	}{
+		PageBase:   base,
+		Categories: buildPublicHomeCategories(categories, cat, sub),
+		StreamResults: buildPublicHomeStreamResultsView(categories, cat, sub, streams, publicHomeCreateStreamHref(signedIn)),
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "public_home.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func organizationInitials(name string) string {
+	runes := []rune(strings.TrimSpace(name))
+	if len(runes) == 0 {
+		return ""
+	}
+	if len(runes) == 1 {
+		return strings.ToUpper(string(runes))
+	}
+	return strings.ToUpper(string(runes[:2]))
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -2283,6 +2332,8 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
+	mux.HandleFunc("/streams/public", s.handlePublicStreamsPartial)
+	mux.HandleFunc("/streams/", s.handlePublicStream)
 	mux.HandleFunc("/my", s.handleHome)
 	mux.HandleFunc("/my/", s.handleMyRoutes)
 	mux.HandleFunc("/", s.handlePublicHome)
@@ -3940,7 +3991,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 
 	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
 		view := OrgAdminView{
-			PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
+			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
 			Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 			ActivePanel:            activePanel,
 			NeedsOrganizationSetup: true,
@@ -3973,7 +4024,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
 
 	view := OrgAdminView{
-		PageBase: s.pageBaseForUser(user, "org_admin_body", "", ""),
+		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
 		ActivePanel:            activePanel,
 		Organization:           org,
@@ -5368,7 +5419,7 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 	traceability = publicDPPTraceabilityAttachmentURLs(traceability, link)
 	traceability = s.applyDoneByIdentityFallbackToDPPTraceability(r.Context(), traceability)
 	view := DPPPageView{
-		PageBase: s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
+		PageBase:     s.pageBase("dpp_body", workflowKey, cfg.Workflow.Name),
 		ProcessID:    process.ID.Hex(),
 		DigitalLink:  link,
 		GTIN:         gtin,

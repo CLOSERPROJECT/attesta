@@ -697,3 +697,179 @@ func TestHandleAdminCategoriesHTMXPanelPartial(t *testing.T) {
 		t.Fatalf("panel HTMX must not include layout or console chrome, got: %s", body)
 	}
 }
+
+func TestTaxonomyMutationErrorHelpers(t *testing.T) {
+	t.Parallel()
+	groupCases := []struct {
+		err  error
+		want string
+	}{
+		{nil, ""},
+		{ErrTaxonomySlugExists, "taxonomy slug already exists"},
+		{ErrInvalidTaxonomyIcon, "invalid taxonomy icon"},
+		{ErrCategoryHasSubCategories, "category has sub-categories"},
+		{ErrTaxonomyReorderBoundary, "cannot move further"},
+		{mongo.ErrNoDocuments, "category not found"},
+		{errors.New("boom"), "boom"},
+	}
+	for _, tc := range groupCases {
+		if got := taxonomyGroupMutationError(tc.err); got != tc.want {
+			t.Fatalf("group(%v) = %q, want %q", tc.err, got, tc.want)
+		}
+	}
+	leafCases := []struct {
+		err  error
+		want string
+	}{
+		{nil, ""},
+		{ErrTaxonomySlugExists, "taxonomy slug already exists"},
+		{ErrInvalidTaxonomyIcon, "invalid taxonomy icon"},
+		{ErrSubCategoryReferencedByStream, "sub-category referenced by a stream"},
+		{ErrTaxonomyReorderBoundary, "cannot move further"},
+		{mongo.ErrNoDocuments, "sub-category not found"},
+		{errors.New("leaf boom"), "leaf boom"},
+	}
+	for _, tc := range leafCases {
+		if got := taxonomyLeafMutationError(tc.err); got != tc.want {
+			t.Fatalf("leaf(%v) = %q, want %q", tc.err, got, tc.want)
+		}
+	}
+}
+
+func TestHandleAdminCategoriesGuardsAndUnknownIntent(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newCategoriesAdminServer(t, store)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/admin/categories", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	server.handleAdminCategories(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("DELETE status = %d", rec.Code)
+	}
+
+	rec = postAdminCategories(t, server, url.Values{"intent": {"nope"}})
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "unknown intent") {
+		t.Fatalf("unknown intent: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/categories/extra", strings.NewReader("intent=create"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	server.handleAdminCategories(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /admin/categories/extra status = %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/admin/categories/supply-chain/nope", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	server.handleAdminCategoriesPath(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("bad path status = %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/admin/categories/supply-chain/subcategories", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	server.handleAdminCategoriesPath(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET subcategories status = %d", rec.Code)
+	}
+
+	rec = postAdminSubcategories(t, server, "supply-chain", url.Values{"intent": {"nope"}})
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "unknown intent") {
+		t.Fatalf("unknown leaf intent: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+type failingTaxonomyMutationsStore struct {
+	*MemoryStore
+	updateCategoryErr    error
+	deleteCategoryErr    error
+	reorderCategoryErr   error
+	updateSubCategoryErr error
+	reorderSubCategoryErr error
+}
+
+func (s *failingTaxonomyMutationsStore) UpdateCategory(ctx context.Context, slug, name, icon string) (Category, error) {
+	if s.updateCategoryErr != nil {
+		return Category{}, s.updateCategoryErr
+	}
+	return s.MemoryStore.UpdateCategory(ctx, slug, name, icon)
+}
+
+func (s *failingTaxonomyMutationsStore) DeleteCategory(ctx context.Context, slug string) error {
+	if s.deleteCategoryErr != nil {
+		return s.deleteCategoryErr
+	}
+	return s.MemoryStore.DeleteCategory(ctx, slug)
+}
+
+func (s *failingTaxonomyMutationsStore) ReorderCategory(ctx context.Context, slug, direction string) error {
+	if s.reorderCategoryErr != nil {
+		return s.reorderCategoryErr
+	}
+	return s.MemoryStore.ReorderCategory(ctx, slug, direction)
+}
+
+func (s *failingTaxonomyMutationsStore) UpdateSubCategory(ctx context.Context, categorySlug, slug, name, icon, description string) (SubCategory, error) {
+	if s.updateSubCategoryErr != nil {
+		return SubCategory{}, s.updateSubCategoryErr
+	}
+	return s.MemoryStore.UpdateSubCategory(ctx, categorySlug, slug, name, icon, description)
+}
+
+func (s *failingTaxonomyMutationsStore) ReorderSubCategory(ctx context.Context, categorySlug, slug, direction string) error {
+	if s.reorderSubCategoryErr != nil {
+		return s.reorderSubCategoryErr
+	}
+	return s.MemoryStore.ReorderSubCategory(ctx, categorySlug, slug, direction)
+}
+
+func TestHandleAdminCategoriesMutationErrorRenders(t *testing.T) {
+	base := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, base)
+	store := &failingTaxonomyMutationsStore{
+		MemoryStore:           base,
+		updateCategoryErr:     ErrInvalidTaxonomyIcon,
+		deleteCategoryErr:     ErrCategoryHasSubCategories,
+		reorderCategoryErr:    ErrTaxonomyReorderBoundary,
+		updateSubCategoryErr:  ErrSubCategoryReferencedByStream,
+		reorderSubCategoryErr: mongo.ErrNoDocuments,
+	}
+	server := newCategoriesAdminServer(t, store)
+
+	rec := postAdminCategories(t, server, url.Values{
+		"intent": {"update"}, "slug": {"supply-chain"}, "name": {"X"}, "icon": {"batch-traceability"},
+	})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "invalid taxonomy icon") {
+		t.Fatalf("update err render: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = postAdminCategories(t, server, url.Values{"intent": {"delete"}, "slug": {"supply-chain"}})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "category has sub-categories") {
+		t.Fatalf("delete err render: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = postAdminCategories(t, server, url.Values{"intent": {"reorder"}, "slug": {"supply-chain"}, "direction": {"up"}})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "cannot move further") {
+		t.Fatalf("reorder err render: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = postAdminSubcategories(t, server, "supply-chain", url.Values{
+		"intent": {"update"}, "slug": {"procurement"}, "name": {"X"}, "icon": {"procurement-workflow"},
+	})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "sub-category referenced by a stream") {
+		t.Fatalf("leaf update err render: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = postAdminSubcategories(t, server, "supply-chain", url.Values{
+		"intent": {"reorder"}, "slug": {"procurement"}, "direction": {"up"},
+	})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "sub-category not found") {
+		t.Fatalf("leaf reorder err render: %d %s", rec.Code, rec.Body.String())
+	}
+}

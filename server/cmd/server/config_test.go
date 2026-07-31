@@ -841,6 +841,21 @@ func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 
 func writeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {
 	t.Helper()
+	writeWorkflowConfigWithCategories(t, path, name, inputType, "", "", description...)
+}
+
+const (
+	publicHomeTestCategorySlug    = "supply-chain"
+	publicHomeTestSubCategorySlug = "procurement"
+)
+
+func writePublicHomeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {
+	t.Helper()
+	writeWorkflowConfigWithCategories(t, path, name, inputType, publicHomeTestCategorySlug, publicHomeTestSubCategorySlug, description...)
+}
+
+func writeWorkflowConfigWithCategories(t *testing.T, path, name, inputType, categorySlug, subCategorySlug string, description ...string) {
+	t.Helper()
 	normalizedInputType := strings.TrimSpace(inputType)
 	switch strings.ToLower(normalizedInputType) {
 	case "string", "text", "number", "file":
@@ -851,8 +866,14 @@ func writeWorkflowConfig(t *testing.T, path, name, inputType string, description
 		schema = "          schema:\n" +
 			"            type: object\n"
 	}
+	categoryLines := ""
+	if strings.TrimSpace(categorySlug) != "" && strings.TrimSpace(subCategorySlug) != "" {
+		categoryLines = "  categorySlug: \"" + categorySlug + "\"\n" +
+			"  subCategorySlug: \"" + subCategorySlug + "\"\n"
+	}
 	content := "workflow:\n" +
 		"  name: \"" + name + "\"\n" +
+		categoryLines +
 		func() string {
 			if len(description) == 0 || strings.TrimSpace(description[0]) == "" {
 				return ""
@@ -883,6 +904,43 @@ func writeWorkflowConfig(t *testing.T, path, name, inputType string, description
 		"  - id: \"u1\"\n" +
 		"    name: \"User 1\"\n" +
 		"    departmentId: \"dep1\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp config %s: %v", path, err)
+	}
+}
+
+func writePublicHomeWorkflowConfigWithDPP(t *testing.T, path, dppBlock string) {
+	t.Helper()
+	content := "workflow:\n" +
+		"  name: \"Workflow\"\n" +
+		"  categorySlug: \"" + publicHomeTestCategorySlug + "\"\n" +
+		"  subCategorySlug: \"" + publicHomeTestSubCategorySlug + "\"\n" +
+		"  steps:\n" +
+		"    - id: \"1\"\n" +
+		"      title: \"Step 1\"\n" +
+		"      order: 1\n" +
+		"      organization: \"org1\"\n" +
+		"      substeps:\n" +
+		"        - id: \"1.1\"\n" +
+		"          title: \"Input\"\n" +
+		"          order: 1\n" +
+		"          roles: [\"dep1\"]\n" +
+		"          inputKey: \"value\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
+		"organizations:\n" +
+		"  - slug: \"org1\"\n" +
+		"    name: \"Organization 1\"\n" +
+		"roles:\n" +
+		"  - orgSlug: \"org1\"\n" +
+		"    slug: \"dep1\"\n" +
+		"    name: \"Department 1\"\n" +
+		"users:\n" +
+		"  - id: \"u1\"\n" +
+		"    name: \"User 1\"\n" +
+		"    departmentId: \"dep1\"\n" +
+		"dpp:\n" + dppBlock
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write temp config %s: %v", path, err)
 	}

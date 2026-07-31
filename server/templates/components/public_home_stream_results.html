@@ -1,0 +1,51 @@
+{{ define "public_home_stream_results" }}
+<div class="public-home-stream-results" id="public-home-stream-results">
+  {{ if .CategoryName }}
+  <header class="public-home-results-category-header">
+    {{ if .CategoryIconURL }}
+    <img
+      class="public-home-results-category-icon"
+      src="{{ .CategoryIconURL }}"
+      alt=""
+      width="24"
+      height="24"
+    />
+    {{ end }}
+    <h2 class="public-home-results-category-name">{{ .CategoryName }}</h2>
+  </header>
+  {{ end }} {{ if .SubCategoryName }}
+  <header class="public-home-results-subcategory-header">
+    <div class="public-home-results-subcategory-title-row">
+      {{ if .SubCategoryIconURL }}
+      <img
+        class="public-home-results-subcategory-icon"
+        src="{{ .SubCategoryIconURL }}"
+        alt=""
+        width="28"
+        height="28"
+      />
+      {{ end }}
+      <h3 class="public-home-results-subcategory-name">
+        {{ .SubCategoryName }}
+      </h3>
+    </div>
+    {{ if .SubCategoryDescription }}
+    <p class="public-home-results-subcategory-description">
+      {{ .SubCategoryDescription }}
+    </p>
+    {{ end }}
+  </header>
+  {{ end }} {{ if .Streams }}
+  <div class="public-home-stream-grid">
+    {{ range .Streams }} {{ template "public_stream_card" . }} {{ end }}
+  </div>
+  {{ else }}
+  <div class="public-home-stream-empty">
+    <p>No public streams in this category yet.</p>
+    <a class="btn btn-secondary btn-sm" href="{{ .CreateStreamHref }}">
+      {{ template "icon-plus" . }} Create a stream
+    </a>
+  </div>
+  {{ end }}
+</div>
+{{ end }}

@@ -14,11 +14,12 @@ Load order from `web/src/styles.css`:
 1. `breakpoints.css` — sole `@custom-media` definitions  
 2. `tokens.css` — `:root`, `[data-theme="dark"]`, type/spacing tokens  
 3. `role-palette.css` — `data-role-palette` / `data-stream-status` maps  
-4. `reset.css`  
-5. `utilities.css` — `u-*`  
-6. `layout/index.css` — chrome, grids (`.rail-layout`), responsive shell  
-7. `components.css` — barrel; live import list is the file itself  
-8. `pages.css` — barrel; live import list is the file itself  
+4. `category-palette.css` — `data-category` → `--category-color`  
+5. `reset.css`  
+6. `utilities.css` — `u-*`  
+7. `layout/index.css` — chrome, grids (`.rail-layout`), responsive shell  
+8. `components.css` — barrel; live import list is the file itself  
+9. `pages.css` — barrel; live import list is the file itself  
 
 **Placement:** token → utility → layout → component → page. A selector lives in exactly one layer.
 
@@ -38,6 +39,8 @@ Import new component/page modules from the matching barrel (`components.css` / `
 ### Exceptions (not inventable from the stem)
 
 - `pages/home.css` also styles stream dashboard nav panels used by `pages/stream.html`
+- `pages/public-home.css` ↔ `pages/public_home.html` (marketing landing; uses shared app topbar + `site_footer`)
+- `components/site_footer.html` → `components/site-footer.css` (shared chrome footer on all layout pages)
 - `pages/org-admin-page.css` ↔ `pages/org_admin.html` (page shell); widgets/pickers stay in `components/org-admin.css`
 - `components/stream.css` is a cluster (sort toolbar, `.status-tag*` via `status_tag`) — not paired 1:1 with a `stream_*.html` component
 - `components/dpp_history_step.html` styles live under `pages/dpp.css` (`.dpp-history-*`)
@@ -136,6 +139,7 @@ Writes persist `palette` only; legacy `color` CSS-var strings fall back via `rol
 | `data-theme` | `tokens.css` |
 | `data-role-palette` | `role-palette.css` |
 | `data-stream-status` | `role-palette.css` → `--stream-color` |
+| `data-category` | `category-palette.css` → `--category-color` |
 | `style="--progress: …%"` | `.stream-instance-card-progress-fill` only |
 
 Page-local hooks (`data-org-admin-*`, `data-home-*`, `data-process-id`, `data-formata-*`, carousel/copy/share, …) stay next to their template / `main.js` — do not catalog them here.
@@ -157,6 +161,7 @@ No inline styles for static layout, spacing, or typography.
 | Pattern | Example | Consumer |
 |---------|---------|----------|
 | Progress width | `style="--progress: {{ .Percent }}%;"` | `.stream-instance-card-progress-fill` |
+| View transition name | `style="view-transition-name: taxonomy-group-{{ .Slug }}"` | Platform admin taxonomy morphs |
 
 All other dynamic theming uses `data-*`, not inline custom properties.
 

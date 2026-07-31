@@ -1612,3 +1612,71 @@ if (deptRoot) {
     });
   }
 }
+
+const initLandingCategorySidebar = () => {
+  const root = document.querySelector("[data-landing-category-sidebar]");
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  // `toggle` on <details> does not bubble — listen in the capture phase.
+  root.addEventListener(
+    "toggle",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLDetailsElement)) {
+        return;
+      }
+      if (!target.classList.contains("public-home-category") || !target.open) {
+        return;
+      }
+      for (const other of root.querySelectorAll("details.public-home-category")) {
+        if (other !== target) {
+          other.open = false;
+        }
+      }
+    },
+    true,
+  );
+  root.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const btn = target.closest(".public-home-subcategory");
+    if (!(btn instanceof HTMLElement) || !root.contains(btn)) {
+      return;
+    }
+    for (const other of root.querySelectorAll(".public-home-subcategory")) {
+      other.classList.remove("is-active");
+    }
+    btn.classList.add("is-active");
+  });
+  // Stacked sidebar (below --md-up): after filter swap, bring results into view.
+  // HTMX sets detail.elt to the swap target for outerHTML, not the clicked button.
+  document.body.addEventListener("htmx:afterSettle", (event) => {
+    const target = event.target;
+    if (
+      !(target instanceof Element) ||
+      target.id !== "public-home-stream-results"
+    ) {
+      return;
+    }
+    const split = document.getElementById("streams");
+    if (!(split instanceof HTMLElement)) {
+      return;
+    }
+    // Side-by-side layout uses display:grid from --md-up.
+    if (getComputedStyle(split).display === "grid") {
+      return;
+    }
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  });
+};
+
+initLandingCategorySidebar();
