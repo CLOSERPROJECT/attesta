@@ -1,0 +1,52 @@
+/*
+ * Toast — fixed success notices (CSS-only component).
+ *
+ * div#toast-host.toast-host[aria-live=polite]
+ *   p.confirmation.toast[data-toast]   (promoted by main.js)
+ *
+ * Opt-in source (still in page HTML until promoted; must not shift layout):
+ *   p.confirmation[data-toast]
+ *
+ * Unmarked .confirmation banners stay in shared.css / document flow.
+ */
+
+.toast-host {
+  position: fixed;
+  z-index: 50;
+  inset: auto var(--space-4) var(--space-4) auto;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-2);
+  width: min(22rem, calc(100vw - 2 * var(--space-4)));
+  pointer-events: none;
+}
+
+.toast-host > * {
+  pointer-events: auto;
+}
+
+/* Out of flow from first paint — no panel jump before JS promote */
+.confirmation[data-toast] {
+  position: fixed;
+  z-index: 50;
+  inset: auto var(--space-4) var(--space-4) auto;
+  width: min(22rem, calc(100vw - 2 * var(--space-4)));
+  margin: 0;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+/* Enter/exit: slide up from below the toast slot */
+.confirmation[data-toast].toast-enter,
+.confirmation[data-toast].toast-exit {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.toast-host .confirmation[data-toast] {
+  position: relative;
+  inset: auto;
+  width: 100%;
+}

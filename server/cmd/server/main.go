@@ -413,6 +413,7 @@ type PlatformAdminView struct {
 	PageBase
 	ActivePanel              string
 	Categories               []TaxonomyCategoryNode
+	CategoriesEditor         CategoriesEditorView
 	Breadcrumbs              BreadcrumbsView
 	Console                  AdminConsoleView
 	SearchQuery              string
@@ -2324,6 +2325,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
+	mux.HandleFunc("/admin/categories/", s.handleAdminCategoriesPath)
 	mux.HandleFunc("/invite/", s.handleInvite)
 	mux.HandleFunc("/reset", s.handleResetRequest)
 	mux.HandleFunc("/reset/", s.handleResetSet)
@@ -3325,26 +3327,45 @@ func redirectPlatformAdminWithMessage(w http.ResponseWriter, r *http.Request, qu
 
 var errPlatformAdminInviteCrossOrg = errors.New("platform admin invite email belongs to another organization")
 
-func platformAdminOrganizationRows(ctx context.Context, organizations []Organization, identity IdentityStore) []PlatformAdminOrganizationRow {
-	rows := make([]PlatformAdminOrganizationRow, 0, len(organizations))
-	for _, organization := range organizations {
-		row := PlatformAdminOrganizationRow{
-			Name:             organization.Name,
-			Slug:             organization.Slug,
-			LogoAttachmentID: organization.LogoAttachmentID,
-		}
-		if identity != nil && strings.TrimSpace(organization.Slug) != "" {
-			memberships, err := identity.ListOrganizationMemberships(ctx, organization.Slug)
-			if err != nil {
-				log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
-			} else {
-				row.OrgAdminEmails, row.PendingOrgAdminEmails = summarizePlatformOrgAdminMemberships(memberships)
+func platformAdminOrganizationRows(ctx context.Context, organizations []IdentityOrg, identity IdentityStore) []PlatformAdminOrganizationRow {
+	rows := make([]PlatformAdminOrganizationRow, len(organizations))
+	var wg sync.WaitGroup
+	for i, organization := range organizations {
+		wg.Add(1)
+		go func(i int, organization IdentityOrg) {
+			defer wg.Done()
+			row := PlatformAdminOrganizationRow{
+				Name:             organization.Name,
+				Slug:             organization.Slug,
+				LogoAttachmentID: strings.TrimSpace(organization.LogoFileID),
 			}
-		}
-		row.OrgAdminStatus, row.OrgAdminStatusClassName = platformOrgAdminStatus(row.OrgAdminEmails, row.PendingOrgAdminEmails)
-		rows = append(rows, row)
+			if identity != nil && (strings.TrimSpace(organization.ID) != "" || strings.TrimSpace(organization.Slug) != "") {
+				memberships, err := identity.ListOrganizationMembershipsLite(ctx, organization)
+				if err != nil {
+					log.Printf("failed to list organization memberships for %s: %v", organization.Slug, err)
+				} else {
+					row.OrgAdminEmails, row.PendingOrgAdminEmails = summarizePlatformOrgAdminMemberships(
+						filterPlatformOrgAdminMemberships(memberships),
+					)
+				}
+			}
+			row.OrgAdminStatus, row.OrgAdminStatusClassName = platformOrgAdminStatus(row.OrgAdminEmails, row.PendingOrgAdminEmails)
+			rows[i] = row
+		}(i, organization)
 	}
+	wg.Wait()
 	return rows
+}
+
+func filterPlatformOrgAdminMemberships(memberships []IdentityMembership) []IdentityMembership {
+	out := make([]IdentityMembership, 0, len(memberships))
+	for _, membership := range memberships {
+		if !membership.IsOrgAdmin {
+			continue
+		}
+		out = append(out, membership)
+	}
+	return out
 }
 
 func summarizePlatformOrgAdminMemberships(memberships []IdentityMembership) ([]string, []string) {
@@ -3435,26 +3456,51 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	errs.InviteEmail = strings.TrimSpace(errs.InviteEmail)
 	errs.SearchQuery = strings.TrimSpace(errs.SearchQuery)
 
-	organizations := s.platformOrganizations(context.Background())
-	filteredOrganizations := filterPlatformOrganizations(organizations, errs.SearchQuery)
-	currentPage := normalizePlatformAdminPage(errs.Page, len(filteredOrganizations))
-	start := (currentPage - 1) * platformAdminOrganizationsPerPage
-	end := min(start+platformAdminOrganizationsPerPage, len(filteredOrganizations))
-	pagedOrganizations := filteredOrganizations
-	if start < len(filteredOrganizations) {
-		pagedOrganizations = filteredOrganizations[start:end]
-	} else if len(filteredOrganizations) > 0 {
-		pagedOrganizations = filteredOrganizations[:0]
+	limit := platformAdminOrganizationsPerPage
+	requestedPage := errs.Page
+	if requestedPage < 1 {
+		requestedPage = 1
 	}
+	offset := (requestedPage - 1) * limit
+
+	orgPage := IdentityOrgPage{}
+	if s.identity != nil {
+		var err error
+		orgPage, err = s.identity.ListOrganizationsPage(context.Background(), IdentityOrgListOptions{
+			Search: errs.SearchQuery,
+			Limit:  limit,
+			Offset: offset,
+		})
+		if err != nil {
+			log.Printf("failed to list platform organizations page: %v", err)
+			orgPage = IdentityOrgPage{}
+		}
+	}
+
+	currentPage := normalizePlatformAdminPage(requestedPage, orgPage.Total)
+	if currentPage != requestedPage && s.identity != nil {
+		offset = (currentPage - 1) * limit
+		var err error
+		orgPage, err = s.identity.ListOrganizationsPage(context.Background(), IdentityOrgListOptions{
+			Search: errs.SearchQuery,
+			Limit:  limit,
+			Offset: offset,
+		})
+		if err != nil {
+			log.Printf("failed to list platform organizations page: %v", err)
+			orgPage = IdentityOrgPage{}
+		}
+	}
+
 	totalPages := 1
-	if len(filteredOrganizations) > 0 {
-		totalPages = (len(filteredOrganizations) + platformAdminOrganizationsPerPage - 1) / platformAdminOrganizationsPerPage
+	if orgPage.Total > 0 {
+		totalPages = (orgPage.Total + limit - 1) / limit
 	}
 	pageNumbers := make([]int, 0, totalPages)
 	for page := 1; page <= totalPages; page++ {
 		pageNumbers = append(pageNumbers, page)
 	}
-	rows := platformAdminOrganizationRows(context.Background(), pagedOrganizations, s.identity)
+	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	view := PlatformAdminView{
 		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
 		ActivePanel:              "orgs",
@@ -3467,7 +3513,7 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		HasNextPage:              currentPage < totalPages,
 		PreviousPage:             max(currentPage-1, 1),
 		NextPage:                 min(currentPage+1, totalPages),
-		MatchedOrganizations:     len(filteredOrganizations),
+		MatchedOrganizations:     orgPage.Total,
 		Organizations:            rows,
 		Confirmation:             strings.TrimSpace(confirmation),
 		OrganizationError:        errs.Organization,
@@ -3498,38 +3544,6 @@ func (s *Server) renderPlatformAdmin(w http.ResponseWriter, r *http.Request, use
 func (s *Server) renderPlatformAdminResults(w http.ResponseWriter, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
 	view := s.platformAdminView(user, confirmation, errs)
 	if err := s.tmpl.ExecuteTemplate(w, "platform_admin_results", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
-	admin, ok := s.requirePlatformAdmin(w, r)
-	if !ok {
-		return
-	}
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	categories, err := loadTaxonomyTree(r.Context(), s.store)
-	if err != nil {
-		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load categories", err, "failed to load platform admin categories")
-		return
-	}
-	view := PlatformAdminView{
-		PageBase:    s.pageBaseForUser(admin, "platform_admin_body", "", ""),
-		ActivePanel: "categories",
-		Categories:  categories,
-		Breadcrumbs: buildPlatformAdminBreadcrumbs("categories"),
-	}
-	view.Console = platformAdminConsole(view)
-	if wantsAdminConsolePartial(r) {
-		if err := s.tmpl.ExecuteTemplate(w, "admin_console", view.Console); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-	if err := s.tmpl.ExecuteTemplate(w, "platform_admin.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

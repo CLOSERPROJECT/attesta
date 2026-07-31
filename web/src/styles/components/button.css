@@ -77,6 +77,12 @@ a.btn:hover {
   color: var(--foreground);
 }
 
+.btn-ghost:disabled,
+.btn-ghost[disabled],
+.btn-ghost.is-disabled {
+  opacity: 0.32;
+}
+
 .btn-ghost-danger {
   background: transparent;
   border-color: transparent;
@@ -86,6 +92,12 @@ a.btn:hover {
 .btn-ghost-danger:hover:not(:disabled, .is-disabled) {
   background: color-mix(in srgb, var(--destructive) 10%, var(--card));
   color: var(--destructive);
+}
+
+.btn-ghost-danger:disabled,
+.btn-ghost-danger[disabled],
+.btn-ghost-danger.is-disabled {
+  opacity: 0.32;
 }
 
 .btn-danger {

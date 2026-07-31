@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"time"
 )
@@ -24,7 +25,9 @@ type fakeIdentityStore struct {
 	addOrganizationUserByIDAsAdminFunc      func(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	inviteOrganizationUserFunc              func(ctx context.Context, sessionSecret, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	listOrganizationsFunc                   func(ctx context.Context) ([]IdentityOrg, error)
+	listOrganizationsPageFunc               func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error)
 	listOrganizationMembershipsFunc         func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	listOrganizationMembershipsLiteFunc     func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
 	listOrganizationUsersFunc               func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	getOrganizationBySlugFunc               func(ctx context.Context, slug string) (*IdentityOrg, error)
 	updateOrganizationFunc                  func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
@@ -159,11 +162,61 @@ func (f *fakeIdentityStore) ListOrganizations(ctx context.Context) ([]IdentityOr
 	return nil, nil
 }
 
+func (f *fakeIdentityStore) ListOrganizationsPage(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+	if f.listOrganizationsPageFunc != nil {
+		return f.listOrganizationsPageFunc(ctx, opts)
+	}
+	orgs, err := f.ListOrganizations(ctx)
+	if err != nil {
+		return IdentityOrgPage{}, err
+	}
+	filtered := append([]IdentityOrg(nil), orgs...)
+	if q := strings.ToLower(strings.TrimSpace(opts.Search)); q != "" {
+		filtered = nil
+		for _, org := range orgs {
+			if strings.Contains(strings.ToLower(org.Name), q) {
+				filtered = append(filtered, org)
+			}
+		}
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		if filtered[i].Name != filtered[j].Name {
+			return filtered[i].Name < filtered[j].Name
+		}
+		return filtered[i].Slug < filtered[j].Slug
+	})
+	total := len(filtered)
+	limit := opts.Limit
+	if limit < 1 {
+		limit = 12
+	}
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return IdentityOrgPage{Organizations: append([]IdentityOrg(nil), filtered[offset:end]...), Total: total}, nil
+}
+
 func (f *fakeIdentityStore) ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
 	if f.listOrganizationMembershipsFunc != nil {
 		return f.listOrganizationMembershipsFunc(ctx, orgSlug)
 	}
 	return nil, nil
+}
+
+func (f *fakeIdentityStore) ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
+	if f.listOrganizationMembershipsLiteFunc != nil {
+		return f.listOrganizationMembershipsLiteFunc(ctx, org)
+	}
+	// Default: reuse full list hook so existing fakes keep working when only listOrganizationMembershipsFunc is set.
+	return f.ListOrganizationMemberships(ctx, org.Slug)
 }
 
 func (f *fakeIdentityStore) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {

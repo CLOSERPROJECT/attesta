@@ -39,8 +39,11 @@ func TestPlatformAdminConsoleNav(t *testing.T) {
 	if len(c.NavItems) != 2 || !c.NavItems[1].Active || c.NavItems[1].Href != "/admin/categories" {
 		t.Fatalf("unexpected nav: %+v", c.NavItems)
 	}
-	if c.Subtitle != "Browse stream discovery categories" {
+	if c.Subtitle != "Manage stream discovery taxonomy" {
 		t.Fatalf("Subtitle = %q", c.Subtitle)
+	}
+	if c.NavItems[1].Copy != "Manage stream discovery taxonomy" {
+		t.Fatalf("Categories nav Copy = %q", c.NavItems[1].Copy)
 	}
 }
 

@@ -238,7 +238,8 @@
           {{ template "dpp_body" . }}
         {{ end }}
       </main>
-      {{ template "site_footer" . }}
+{{ template "site_footer" . }}
+      <div id="toast-host" class="toast-host" aria-live="polite"></div>
     </body>
   </html>
 {{ end }}
