@@ -15,6 +15,7 @@ func TestCategorySidebarTemplateHTMXLeaf(t *testing.T) {
 			Slug: "supply-chain", Name: "Supply Chain", IconURL: "/c.svg", Expanded: true,
 			SubCategories: []CategorySidebarLeafView{{
 				Slug: "procurement", Name: "Procurement", Active: true,
+				IconURL: "/static/taxonomy/procurement-workflow.svg",
 				PartialURL: "/streams/public?category=supply-chain&subCategory=procurement",
 				PushURL:    "/?category=supply-chain&subCategory=procurement",
 			}},
@@ -29,6 +30,8 @@ func TestCategorySidebarTemplateHTMXLeaf(t *testing.T) {
 		`class="category-sidebar-title">Stream Categories<`,
 		`hx-get="/streams/public?category=supply-chain&amp;subCategory=procurement"`,
 		`hx-push-url="/?category=supply-chain&amp;subCategory=procurement"`,
+		`class="category-sidebar-subcategory-icon"`,
+		`src="/static/taxonomy/procurement-workflow.svg"`,
 		`is-active`,
 	} {
 		if !strings.Contains(body, want) {

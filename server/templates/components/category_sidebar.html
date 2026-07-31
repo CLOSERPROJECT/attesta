@@ -39,7 +39,12 @@
                 class="category-sidebar-subcategory{{ if .Active }} is-active{{ end }}"
                 href="{{ .Href }}"
                 data-subcategory-slug="{{ .Slug }}"
-              >{{ .Name }}</a>
+              >
+                {{ if .IconURL }}
+                  <img class="category-sidebar-subcategory-icon" src="{{ .IconURL }}" alt="" width="16" height="16" />
+                {{ end }}
+                <span>{{ .Name }}</span>
+              </a>
             {{ else }}
               <button
                 type="button"
@@ -49,7 +54,12 @@
                 hx-target="#public-home-stream-results"
                 hx-swap="outerHTML settle:350ms"
                 hx-push-url="{{ .PushURL }}"
-              >{{ .Name }}</button>
+              >
+                {{ if .IconURL }}
+                  <img class="category-sidebar-subcategory-icon" src="{{ .IconURL }}" alt="" width="16" height="16" />
+                {{ end }}
+                <span>{{ .Name }}</span>
+              </button>
             {{ end }}
           {{ end }}
         </div>

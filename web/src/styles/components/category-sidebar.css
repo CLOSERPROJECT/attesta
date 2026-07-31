@@ -16,6 +16,8 @@
  *         span.category-sidebar-category-chevron
  *       .category-sidebar-subcategories
  *         a.category-sidebar-subcategory[.is-active] | button.category-sidebar-subcategory[.is-active]
+ *           img.category-sidebar-subcategory-icon?
+ *           span
  *     p.category-sidebar-empty
  */
 
@@ -166,6 +168,13 @@ a.category-sidebar-subcategory {
 .category-sidebar-subcategory:hover {
   background: var(--success-muted);
   color: var(--primary);
+}
+
+.category-sidebar-subcategory-icon {
+  display: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .category-sidebar-subcategory::before {

@@ -116,8 +116,8 @@ func TestBuildMyHomeStreamGroupsSetsAnchorIDs(t *testing.T) {
 
 func TestBuildMyHomeCategorySidebarFromGroups(t *testing.T) {
 	groups := []MyHomeStreamGroupView{
-		{CategorySlug: "supply-chain", CategoryName: "Supply Chain", CategoryIconURL: "/c.svg", SubCategorySlug: "procurement", SubCategoryName: "Procurement", AnchorID: "cat-supply-chain--procurement", ShowCategoryHeader: true},
-		{CategorySlug: "supply-chain", CategoryName: "Supply Chain", CategoryIconURL: "/c.svg", SubCategorySlug: "order-fulfillment", SubCategoryName: "Order Fulfillment", AnchorID: "cat-supply-chain--order-fulfillment"},
+		{CategorySlug: "supply-chain", CategoryName: "Supply Chain", CategoryIconURL: "/c.svg", SubCategorySlug: "procurement", SubCategoryName: "Procurement", SubCategoryIconURL: "/s.svg", AnchorID: "cat-supply-chain--procurement", ShowCategoryHeader: true},
+		{CategorySlug: "supply-chain", CategoryName: "Supply Chain", CategoryIconURL: "/c.svg", SubCategorySlug: "order-fulfillment", SubCategoryName: "Order Fulfillment", SubCategoryIconURL: "/o.svg", AnchorID: "cat-supply-chain--order-fulfillment"},
 		{Uncategorized: true, CategoryName: "Uncategorized", AnchorID: "cat-uncategorized", ShowCategoryHeader: true},
 	}
 	got := buildMyHomeCategorySidebar(groups)
@@ -132,6 +132,9 @@ func TestBuildMyHomeCategorySidebarFromGroups(t *testing.T) {
 	}
 	if got.Categories[0].SubCategories[0].Href != "#cat-supply-chain--procurement" {
 		t.Fatalf("href0=%q", got.Categories[0].SubCategories[0].Href)
+	}
+	if got.Categories[0].SubCategories[0].IconURL != "/s.svg" {
+		t.Fatalf("IconURL0=%q", got.Categories[0].SubCategories[0].IconURL)
 	}
 	if got.Categories[1].Name != "Uncategorized" || got.Categories[1].SubCategories[0].Href != "#cat-uncategorized" {
 		t.Fatalf("uncat=%+v", got.Categories[1])

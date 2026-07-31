@@ -121,9 +121,10 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 			}
 		}
 		current.SubCategories = append(current.SubCategories, CategorySidebarLeafView{
-			Slug: g.SubCategorySlug,
-			Name: g.SubCategoryName,
-			Href: "#" + g.AnchorID,
+			Slug:    g.SubCategorySlug,
+			Name:    g.SubCategoryName,
+			IconURL: g.SubCategoryIconURL,
+			Href:    "#" + g.AnchorID,
 		})
 	}
 	flush()

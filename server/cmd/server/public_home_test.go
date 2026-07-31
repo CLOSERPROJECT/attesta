@@ -138,8 +138,8 @@ func TestBuildPublicHomeCategoriesMarksActiveAndURLs(t *testing.T) {
 		{
 			Slug: "supply-chain", Name: "Supply Chain", IconURL: "/static/taxonomy/batch-traceability.svg",
 			SubCategories: []TaxonomySubCategoryNode{
-				{Slug: "procurement", Name: "Procurement"},
-				{Slug: "order-fulfillment", Name: "Order Fulfillment"},
+				{Slug: "procurement", Name: "Procurement", IconURL: "/static/taxonomy/procurement-workflow.svg"},
+				{Slug: "order-fulfillment", Name: "Order Fulfillment", IconURL: "/static/taxonomy/order-fulfillment.svg"},
 			},
 		},
 		{
@@ -161,6 +161,9 @@ func TestBuildPublicHomeCategoriesMarksActiveAndURLs(t *testing.T) {
 	}
 	if got.Categories[0].SubCategories[1].Active != true || got.Categories[0].SubCategories[0].Active {
 		t.Fatalf("active flags: %#v", got.Categories[0].SubCategories)
+	}
+	if got.Categories[0].SubCategories[1].IconURL != "/static/taxonomy/order-fulfillment.svg" {
+		t.Fatalf("IconURL=%q", got.Categories[0].SubCategories[1].IconURL)
 	}
 	wantPartial := "/streams/public?category=supply-chain&subCategory=order-fulfillment"
 	wantPush := "/?category=supply-chain&subCategory=order-fulfillment"
