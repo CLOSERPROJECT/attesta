@@ -125,7 +125,7 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 	}
 	body := out.String()
 	for _, want := range []string{
-		`class="my-home-category-bar"`,
+		`class="my-home-category-menu"`,
 		`nav-drawer-trigger`,
 		`popovertarget="my-home-category-sidebar"`,
 		`popovertargetaction="hide"`,
@@ -140,10 +140,13 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 			t.Fatalf("missing %q in %s", want, body)
 		}
 	}
+	if strings.Contains(body, `class="my-home-category-bar"`) {
+		t.Fatalf("mobile category bar must be removed, got: %s", body)
+	}
 	headerIdx := strings.Index(body, `class="page-header-head"`)
-	barIdx := strings.Index(body, `class="my-home-category-bar"`)
-	if headerIdx < 0 || barIdx < 0 || barIdx < headerIdx {
-		t.Fatalf("category bar must render below page-header-head; header=%d bar=%d body=%s", headerIdx, barIdx, body)
+	menuIdx := strings.Index(body, `class="my-home-category-menu"`)
+	if headerIdx < 0 || menuIdx < 0 || menuIdx < headerIdx {
+		t.Fatalf("category menu must render below page-header-head; header=%d menu=%d body=%s", headerIdx, menuIdx, body)
 	}
 }
 

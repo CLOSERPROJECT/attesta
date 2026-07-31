@@ -3,11 +3,6 @@ html:has(.my-home) {
   scroll-behavior: smooth;
 }
 
-/* Mobile sticky Stream categories bar: padding + btn (~36px) + borders. */
-.my-home {
-  --my-home-category-bar-height: 54px;
-}
-
 .my-home-catalog {
   display: flex;
   flex-direction: column;
@@ -41,9 +36,9 @@ html:has(.my-home) {
   background: var(--background);
 }
 
-/* Extra separation between categories (on top of .my-home-catalog gap). */
-.my-home-catalog > .public-home-results-category-header:not(:first-child) {
-  margin-top: var(--space-8);
+/* Extra separation before the next category (avoid margin on sticky headers). */
+.my-home-catalog-section:has(+ .public-home-results-category-header) {
+  margin-bottom: var(--space-8);
 }
 
 .my-home-body {
@@ -52,25 +47,9 @@ html:has(.my-home) {
   gap: var(--space-6);
 }
 
-/* Mobile-only sticky strip so categories stay reachable while scrolling. */
-.my-home-category-bar {
-  position: sticky;
-  top: 0;
-  z-index: 46;
-  display: flex;
-  align-items: center;
-  margin-inline: calc(-1 * var(--space-4));
-  padding: var(--space-2) var(--space-4);
-  background: var(--background);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-
-.my-home-category-bar .nav-drawer-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  transform: translateX(calc(-1 * var(--space-3)));
+/* Single mobile drawer control — sticky beside category titles (one for all headers). */
+.my-home-category-menu {
+  display: none;
 }
 
 .home-workflow-panel-main {
@@ -89,10 +68,6 @@ html:has(.my-home) {
   .my-home .public-home-results-category-header {
     margin-inline: calc(-1 * var(--space-8));
     padding-inline: var(--space-8);
-  }
-
-  .my-home-category-bar {
-    display: none;
   }
 
   .my-home-body {
@@ -133,14 +108,38 @@ html:has(.my-home) {
 }
 
 @media (--md-down) {
+  .my-home-category-menu {
+    /* Zero-height sticky host; button is absolutely placed so start/stuck match. */
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 47;
+    height: 0;
+    margin: 0;
+    /* Cancel .my-home-catalog gap so the control aligns with the first header. */
+    margin-bottom: calc(-1 * var(--space-8));
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .my-home-category-menu .nav-drawer-trigger {
+    position: absolute;
+    /* Match header padding, then nudge -3x / -1y. */
+    top: calc(var(--space-4) - var(--space-1));
+    left: calc(var(--space-4) - var(--space-3) - var(--space-2));
+    pointer-events: auto;
+    background: var(--background);
+  }
+
   .my-home .public-home-results-category-header {
-    /* Flush under sticky Stream categories bar (no hairline gap). */
-    top: var(--my-home-category-bar-height);
+    top: 0;
+    /* Room for the shared hamburger to the left of the title. */
+    padding-inline-start: calc(var(--space-4) + 2.25rem + var(--space-2));
   }
 
   .my-home-catalog-section {
-    /* Sticky category bar + sticky category header (~4rem). */
-    scroll-margin-top: calc(var(--my-home-category-bar-height) + 4rem);
+    /* Sticky category header clearance only. */
+    scroll-margin-top: 4.5rem;
   }
 
   .preview-panel,

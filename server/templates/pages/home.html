@@ -17,20 +17,6 @@
       {{ end }}
     </div>
   </section>
-  {{ if .Groups }}
-  <div class="my-home-category-bar">
-    <button
-      type="button"
-      class="btn btn-ghost nav-drawer-trigger"
-      popovertarget="my-home-category-sidebar"
-      aria-label="Open stream categories"
-      title="Stream categories"
-    >
-      {{ template "icon-layout-grid" . }}
-      Stream categories
-    </button>
-  </div>
-  {{ end }}
   {{ if .Confirmation }}
     <p class="confirmation">{{ .Confirmation }}</p>
   {{ end }}
@@ -45,6 +31,17 @@
         {{ template "category_sidebar" .Sidebar }}
       </div>
       <div class="my-home-catalog">
+        <div class="my-home-category-menu">
+          <button
+            type="button"
+            class="btn btn-ghost btn-icon nav-drawer-trigger"
+            popovertarget="my-home-category-sidebar"
+            aria-label="Open stream categories"
+            title="Stream categories"
+          >
+            {{ template "icon-menu" . }}
+          </button>
+        </div>
         {{ range .Groups }}
           {{ template "my_home_stream_group" . }}
         {{ end }}
