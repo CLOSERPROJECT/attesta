@@ -29,7 +29,6 @@ func TestMyHomeStreamGroupTemplateRendersCategoryHeaders(t *testing.T) {
 
 	for _, want := range []string{
 		`id="cat-supply-chain--procurement"`,
-		`class="my-home-category-rule"`,
 		`class="public-home-results-category-header"`,
 		`class="public-home-results-category-name">Supply Chain<`,
 		`class="public-home-results-subcategory-header"`,
@@ -96,9 +95,6 @@ func TestMyHomeStreamGroupTemplateOmitsCategoryHeaderWhenEmpty(t *testing.T) {
 	body := out.String()
 	if strings.Contains(body, `class="public-home-results-category-header"`) {
 		t.Fatalf("ShowCategoryHeader false must omit category header, got: %s", body)
-	}
-	if strings.Contains(body, `class="my-home-category-rule"`) {
-		t.Fatalf("ShowCategoryHeader false must omit category rule, got: %s", body)
 	}
 	if !strings.Contains(body, `class="public-home-results-subcategory-name"`) || !strings.Contains(body, "Order Fulfillment") {
 		t.Fatalf("expected subcategory header, got: %s", body)

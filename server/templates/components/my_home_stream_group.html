@@ -1,7 +1,6 @@
 {{ define "my_home_stream_group" }}
   {{ if .Uncategorized }}
   {{ if .ShowCategoryHeader }}
-  <hr class="my-home-category-rule" aria-hidden="true" />
   <header class="public-home-results-category-header">
     <h2 class="public-home-results-category-name">{{ .CategoryName }}</h2>
   </header>
@@ -17,7 +16,6 @@
   </section>
   {{ else }}
   {{ if .ShowCategoryHeader }}
-  <hr class="my-home-category-rule" aria-hidden="true" />
   <header class="public-home-results-category-header">
     {{ if .CategoryIconURL }}
     <img
