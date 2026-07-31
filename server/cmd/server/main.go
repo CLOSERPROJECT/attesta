@@ -696,6 +696,12 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-instances" {
+		if err := runSeedInstancesCommand(ctx, os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))

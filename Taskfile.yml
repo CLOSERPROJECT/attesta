@@ -202,3 +202,9 @@ tasks:
     dir: server
     cmds:
       - go run ./cmd/server seed-categories {{.CLI_ARGS}}
+
+  seed:instances:
+    desc: Replace Mongo process instances for every runtime-catalog stream with a realistic demo mix.
+    dir: server
+    cmds:
+      - go run ./cmd/server seed-instances {{.CLI_ARGS}}
