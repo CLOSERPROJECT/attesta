@@ -1,0 +1,48 @@
+{{ define "category_sidebar" }}
+<aside class="category-sidebar" aria-label="Stream categories" data-landing-category-sidebar>
+  <div class="category-sidebar-header">
+    {{ template "icon-layout-grid" . }}
+    <p class="category-sidebar-title">{{ .Title }}</p>
+  </div>
+  <div class="category-sidebar-list">
+    {{ range .Categories }}
+      <details class="category-sidebar-category" {{ if .Expanded }}open{{ end }} data-category-slug="{{ .Slug }}">
+        <summary class="category-sidebar-category-summary">
+          <span class="category-sidebar-category-label">
+            {{ if .IconURL }}
+              <img class="category-sidebar-category-icon" src="{{ .IconURL }}" alt="" width="20" height="20" />
+            {{ end }}
+            <span>{{ .Name }}</span>
+          </span>
+          <span class="category-sidebar-category-chevron" aria-hidden="true">
+            {{ template "icon-chevron-right" }}
+          </span>
+        </summary>
+        <div class="category-sidebar-subcategories">
+          {{ range .SubCategories }}
+            {{ if .Href }}
+              <a
+                class="category-sidebar-subcategory{{ if .Active }} is-active{{ end }}"
+                href="{{ .Href }}"
+                data-subcategory-slug="{{ .Slug }}"
+              >{{ .Name }}</a>
+            {{ else }}
+              <button
+                type="button"
+                class="category-sidebar-subcategory{{ if .Active }} is-active{{ end }}"
+                data-subcategory-slug="{{ .Slug }}"
+                hx-get="{{ .PartialURL }}"
+                hx-target="#public-home-stream-results"
+                hx-swap="outerHTML"
+                hx-push-url="{{ .PushURL }}"
+              >{{ .Name }}</button>
+            {{ end }}
+          {{ end }}
+        </div>
+      </details>
+    {{ else }}
+      <p class="category-sidebar-empty">No categories yet.</p>
+    {{ end }}
+  </div>
+</aside>
+{{ end }}

@@ -84,6 +84,32 @@ type PublicStreamPageView struct {
 	Blueprint     StreamInstanceDetailView
 }
 
+// CategorySidebarLeafView is one subcategory row in category_sidebar.
+// If Href is set, render an anchor; otherwise render an HTMX button using PartialURL/PushURL.
+type CategorySidebarLeafView struct {
+	Slug       string
+	Name       string
+	Active     bool
+	Href       string // /my anchors, e.g. #cat-supply-chain--procurement
+	PartialURL string // public home HTMX get
+	PushURL    string // public home hx-push-url
+}
+
+// CategorySidebarCategoryView is one accordion category in category_sidebar.
+type CategorySidebarCategoryView struct {
+	Slug          string
+	Name          string
+	IconURL       string
+	Expanded      bool
+	SubCategories []CategorySidebarLeafView
+}
+
+// CategorySidebarView is the root for templates/components/category_sidebar.html.
+type CategorySidebarView struct {
+	Title      string
+	Categories []CategorySidebarCategoryView
+}
+
 // PublicHomeSubCategoryView is one filterable leaf in the landing sidebar.
 type PublicHomeSubCategoryView struct {
 	Slug       string
