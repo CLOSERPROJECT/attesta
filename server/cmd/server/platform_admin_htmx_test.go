@@ -32,7 +32,7 @@ func TestHandleAdminCategoriesHTMXReturnsAdminConsole(t *testing.T) {
 		t.Fatalf("HTMX soft-nav must not include layout, got: %s", body)
 	}
 	for _, want := range []string{
-		`hx-get="/admin/orgs"`,
+		`hx-get="/admin/organizations"`,
 		`hx-target="#admin-console"`,
 		"Manage stream discovery taxonomy",
 		"Supply Chain",
@@ -57,7 +57,7 @@ func TestHandleAdminOrgsHTMXSearchStillReturnsResults(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/orgs?q=acme", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/organizations?q=acme", nil)
 	req.Header.Set("HX-Request", "true")
 	req.Header.Set("HX-Target", "platform-admin-results")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})

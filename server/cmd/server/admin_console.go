@@ -34,7 +34,7 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 		Breadcrumbs: view.Breadcrumbs,
 		NavItems: []AdminConsoleNavItem{
 			{
-				Href:   "/admin/orgs",
+				Href:   adminPath("organizations"),
 				Title:  "Organizations",
 				Copy:   "Create and manage organizations",
 				Active: active != "categories",

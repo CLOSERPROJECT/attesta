@@ -107,7 +107,7 @@ func TestRenderPlatformAdminAdditionalBranches(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 
-	server.renderPlatformAdmin(rec, httptest.NewRequest(http.MethodGet, "/admin/orgs", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{Invite: " invite failed "})
+	server.renderPlatformAdmin(rec, httptest.NewRequest(http.MethodGet, "/admin/organizations", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{Invite: " invite failed "})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -119,7 +119,7 @@ func TestRenderPlatformAdminAdditionalBranches(t *testing.T) {
 	broken := &Server{
 		authorizer: fakeAuthorizer{}, tmpl: template.Must(template.New("broken").Parse(`{{define "platform_admin.html"}}{{template "missing" .}}{{end}}`)), now: func() time.Time { return now }}
 	errRec := httptest.NewRecorder()
-	broken.renderPlatformAdmin(errRec, httptest.NewRequest(http.MethodGet, "/admin/orgs", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
+	broken.renderPlatformAdmin(errRec, httptest.NewRequest(http.MethodGet, "/admin/organizations", nil), &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true}, "", PlatformAdminErrors{})
 	if errRec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", errRec.Code, http.StatusInternalServerError)
 	}

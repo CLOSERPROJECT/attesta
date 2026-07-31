@@ -15,14 +15,14 @@ func TestServerMuxMountsPlatformAdminRoutes(t *testing.T) {
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 	rec := httptest.NewRecorder()
 	server.newMux().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/login?next=%2Fadmin%2Forgs" {
+	if rec.Header().Get("Location") != "/login?next=%2Fadmin%2Forganizations" {
 		t.Fatalf("location = %q", rec.Header().Get("Location"))
 	}
 }

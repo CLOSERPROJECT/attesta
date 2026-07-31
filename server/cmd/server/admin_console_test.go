@@ -9,12 +9,12 @@ import (
 func TestWantsAdminConsolePartial(t *testing.T) {
 	t.Parallel()
 
-	full := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+	full := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
 	if wantsAdminConsolePartial(full) {
 		t.Fatal("non-HTMX must be false")
 	}
 
-	results := httptest.NewRequest(http.MethodGet, "/admin/orgs?q=a", nil)
+	results := httptest.NewRequest(http.MethodGet, "/admin/organizations?q=a", nil)
 	results.Header.Set("HX-Request", "true")
 	results.Header.Set("HX-Target", "platform-admin-results")
 	if wantsAdminConsolePartial(results) {

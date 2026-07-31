@@ -103,7 +103,7 @@ func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {
 	form := url.Values{}
 	form.Set("email", "admin@example.com")
 	form.Set("password", "change-me")
-	form.Set("next", "/admin/orgs")
+	form.Set("next", "/admin/organizations")
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -113,8 +113,8 @@ func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if rec.Header().Get("Location") != "/admin/orgs" {
-		t.Fatalf("location = %q, want /admin/orgs", rec.Header().Get("Location"))
+	if rec.Header().Get("Location") != "/admin/organizations" {
+		t.Fatalf("location = %q, want /admin/organizations", rec.Header().Get("Location"))
 	}
 	cookies := rec.Result().Cookies()
 	if len(cookies) == 0 || cookies[0].Name != "attesta_session" {
@@ -219,7 +219,7 @@ func TestHandleLoginPageHidesAdminTopbarLinks(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/admin/orgs"`) || strings.Contains(body, `href="/my/organization/profile"`) {
+	if strings.Contains(body, `href="/admin/organizations"`) || strings.Contains(body, `href="/my/organization/profile"`) {
 		t.Fatalf("expected login page without admin nav links, got %q", body)
 	}
 	if strings.Contains(body, `class="btn btn-ghost btn-lg nav-action"`) {
