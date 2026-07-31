@@ -108,34 +108,27 @@
       <header class="topbar {{ if .IsPlatformAdmin }}topbar-pa{{ end }}">
           <div class="topbar-content u-mx-auto u-max-w-7xl">
             <div class="topbar-brand-row">
-              <a class="brand" href="/" aria-label="Attesta">
+              <a class="brand" href="/">
                 {{ if .ViteDevServer }}
                   <img
-                    class="brand-logo brand-logo-on-light"
-                    src="{{ .ViteDevServer }}/brand/attesta-lockup-on-light.svg"
+                    class="brand-logo"
+                    src="{{ .ViteDevServer }}/brand/attesta-mark.svg"
                     alt=""
                     aria-hidden="true"
-                  />
-                  <img
-                    class="brand-logo brand-logo-on-dark"
-                    src="{{ .ViteDevServer }}/brand/attesta-lockup-on-dark.svg"
-                    alt=""
-                    aria-hidden="true"
+                    width="32"
+                    height="32"
                   />
                 {{ else }}
                   <img
-                    class="brand-logo brand-logo-on-light"
-                    src="/static/brand/attesta-lockup-on-light.svg"
+                    class="brand-logo"
+                    src="/static/brand/attesta-mark.svg"
                     alt=""
                     aria-hidden="true"
-                  />
-                  <img
-                    class="brand-logo brand-logo-on-dark"
-                    src="/static/brand/attesta-lockup-on-dark.svg"
-                    alt=""
-                    aria-hidden="true"
+                    width="32"
+                    height="32"
                   />
                 {{ end }}
+                <span class="brand-wordmark">Attesta</span>
               </a>
               {{ if .IsPlatformAdmin }}
                 <span class="topbar-pa-label">Platform Admin</span>

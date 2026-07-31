@@ -7,8 +7,9 @@
 .topbar-pa {
   background: var(--topbar-inverted);
 
-  .brand {
-    color: var(--topbar-inverted-primary);
+  .brand,
+  .brand-wordmark {
+    color: var(--topbar-inverted-foreground);
   }
 
   .topbar-pa-label {
@@ -35,36 +36,36 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  margin-right: var(--space-3);
+  gap: var(--space-1);
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.brand:hover {
+  text-decoration: none;
 }
 
 .brand-logo {
-  width: 132px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   object-fit: contain;
+  transform: translateY(-2px);
 }
 
-.brand-logo-on-dark {
-  display: none;
+.brand-wordmark {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  letter-spacing: 0.01em;
 }
 
-[data-theme="dark"] .brand-logo-on-light,
-.topbar-pa .brand-logo-on-light {
-  display: none;
-}
-
-[data-theme="dark"] .brand-logo-on-dark,
-.topbar-pa .brand-logo-on-dark {
-  display: block;
-}
-
-[data-theme="dark"] .topbar-pa .brand-logo-on-light {
-  display: block;
-}
-
-[data-theme="dark"] .topbar-pa .brand-logo-on-dark {
-  display: none;
+.topbar-pa-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: 1;
 }
 
 .nav {
