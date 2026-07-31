@@ -817,6 +817,12 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
+	if !strings.Contains(body, `href="#cat-`) {
+		t.Fatalf("expected sidebar anchor hrefs, got %s", body)
+	}
+	if !strings.Contains(body, `id="cat-`) {
+		t.Fatalf("expected catalog section ids, got %s", body)
+	}
 	for _, want := range []string{
 		`nav-drawer-trigger`,
 		`id="my-home-category-sidebar"`,
