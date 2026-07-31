@@ -743,6 +743,140 @@ func TestHandleHomeRequiresAuthAtMy(t *testing.T) {
 	}
 }
 
+func writeMyHomeCatalogOtherOrgWorkflow(t *testing.T, path string) {
+	t.Helper()
+	content := "workflow:\n" +
+		"  name: \"Other Org Stream\"\n" +
+		"  categorySlug: \"" + publicHomeTestCategorySlug + "\"\n" +
+		"  subCategorySlug: \"" + publicHomeTestSubCategorySlug + "\"\n" +
+		"  steps:\n" +
+		"    - id: \"1\"\n" +
+		"      title: \"Step 1\"\n" +
+		"      order: 1\n" +
+		"      organization: \"org2\"\n" +
+		"      substeps:\n" +
+		"        - id: \"1.1\"\n" +
+		"          title: \"Input\"\n" +
+		"          order: 1\n" +
+		"          roles: [\"dep2\"]\n" +
+		"          inputKey: \"value\"\n" +
+		"          inputType: \"formata\"\n" +
+		"          schema:\n" +
+		"            type: object\n" +
+		"organizations:\n" +
+		"  - slug: \"org2\"\n" +
+		"    name: \"Organization 2\"\n" +
+		"roles:\n" +
+		"  - orgSlug: \"org2\"\n" +
+		"    slug: \"dep2\"\n" +
+		"    name: \"Department 2\"\n" +
+		"users:\n" +
+		"  - id: \"u2\"\n" +
+		"    name: \"User 2\"\n" +
+		"    departmentId: \"dep2\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write other org workflow %s: %v", path, err)
+	}
+}
+
+func TestHandleHomeCatalogWiring(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+
+	tempDir := t.TempDir()
+	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "accessible.yaml"), "Accessible Stream", "string", "Visible to org1")
+	writeMyHomeCatalogOtherOrgWorkflow(t, filepath.Join(tempDir, "other-org.yaml"))
+
+	now := time.Now().UTC()
+	sessionID := "session-my-home-catalog"
+	user := AccountUser{
+		ID:        primitive.NewObjectID(),
+		Email:     "member@example.com",
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+		Status:    "active",
+		CreatedAt: now,
+	}
+
+	server := &Server{
+		authorizer:  fakeAuthorizer{},
+		store:       store,
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		tmpl:        parseTestTemplates(t),
+		configDir:   tempDir,
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="my-home-catalog"`,
+		"Accessible Stream",
+		`href="/my/streams/accessible/"`,
+		"Supply Chain",
+		"Procurement",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in home catalog, got: %s", want, body)
+		}
+	}
+	for _, gone := range []string{
+		"Other Org Stream",
+		`href="/my/streams/other-org/"`,
+		`href="/streams/accessible"`,
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("did not expect %q in home catalog, got: %s", gone, body)
+		}
+	}
+
+	t.Run("org admin sees create stream in header", func(t *testing.T) {
+		adminSession := "session-my-home-org-admin"
+		admin := AccountUser{
+			ID:        primitive.NewObjectID(),
+			Email:     "admin@example.com",
+			OrgSlug:   "org1",
+			RoleSlugs: []string{"org-admin"},
+			Status:    "active",
+			CreatedAt: now,
+		}
+		adminServer := &Server{
+			authorizer:  fakeAuthorizer{},
+			store:       store,
+			identity:    testIdentityForSessions(now, map[string]AccountUser{adminSession: admin}),
+			tmpl:        parseTestTemplates(t),
+			configDir:   tempDir,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		adminReq := httptest.NewRequest(http.MethodGet, "/my", nil)
+		adminReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: adminSession})
+		adminRec := httptest.NewRecorder()
+		adminServer.handleHome(adminRec, adminReq)
+		if adminRec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", adminRec.Code, http.StatusOK)
+		}
+		adminBody := adminRec.Body.String()
+		for _, want := range []string{
+			`class="page-header-actions"`,
+			`href="/my/organization/formata-builder"`,
+			"Create a stream",
+		} {
+			if !strings.Contains(adminBody, want) {
+				t.Fatalf("expected %q in org admin home, got: %s", want, adminBody)
+			}
+		}
+	})
+}
+
 func TestHandleHomeListsProcesses(t *testing.T) {
 	store := NewMemoryStore()
 	now := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)

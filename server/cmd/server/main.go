@@ -1576,18 +1576,7 @@ func (s *Server) workflowOptions(ctx context.Context, user *AccountUser) ([]Stre
 		stream, ok := streamsByKey[key]
 		if ok && s.authorizer != nil && user != nil {
 			hasProcesses := option.Counts.NotStarted+option.Counts.Started+option.Counts.Terminated > 0
-			option.CanClone = canEditSavedStreams
-			if canEditSavedStreams {
-				allowed, err := s.canEditStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
-				if err == nil {
-					option.CanEdit = allowed
-					option.EditRequiresPurge = allowed && hasProcesses
-				}
-			}
-			allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses)
-			if err == nil {
-				option.CanDelete = allowed
-			}
+			option.CanClone, option.CanEdit, option.EditRequiresPurge, option.CanDelete = s.streamManagementFlags(ctx, user, key, stream, hasProcesses, canEditSavedStreams)
 		}
 		options = append(options, option)
 	}
@@ -2110,10 +2099,16 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
 	}
+	groups, err := s.buildMyHomeCatalog(r.Context(), user)
+	if err != nil {
+		logRequestError(r, err, "build my home catalog")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	view := HomeWorkflowPickerView{
 		PageBase:         s.pageBaseForUser(user, "home_picker_body", "", ""),
-		Groups:           nil,
-		ShowCreateStream: showCreateStream,
+		Groups:           groups,
+		ShowCreateStream: showCreateStream && authErr == nil,
 		Error:            homePickerMessage(r, "error"),
 		Confirmation:     homePickerMessage(r, "confirmation"),
 	}
