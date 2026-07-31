@@ -1,3 +1,9 @@
+.my-home-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
 .home-workflow-panel-main {
   display: grid;
 }

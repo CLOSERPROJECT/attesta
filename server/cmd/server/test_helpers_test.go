@@ -88,7 +88,7 @@ func testTemplates() *template.Template {
   {{else if eq .Body "dept_dashboard_body"}}{{template "dept_dashboard_body" .}}
   {{else if eq .Body "dept_process_body"}}{{template "dept_process_body" .}}{{end}}
 {{end}}
-	{{define "home_picker_body"}}HOME_PICKER {{range .Workflows}}{{.Key}}:{{.Name}}{{if .Description}}:{{.Description}}{{end}}:{{.Counts.NotStarted}}/{{.Counts.Started}}/{{.Counts.Terminated}}|{{end}}{{end}}
+	{{define "home_picker_body"}}HOME_PICKER GROUPS {{len .Groups}}{{if .ShowCreateStream}} CREATE{{end}}{{end}}
 	{{define "public_home_body"}}PUBLIC_HOME{{end}}
 	{{define "public_home.html"}}{{template "layout.html" .}}{{end}}
 	{{define "signup_body"}}SIGNUP {{.Email}} {{.Error}}{{end}}

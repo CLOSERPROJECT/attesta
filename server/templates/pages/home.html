@@ -1,30 +1,40 @@
 {{/* Used on /my to render the stream picker (home_picker_body). */}}
 
 {{ define "home_picker_body" }}
-  <section class="stack u-max-w-7xl u-mx-auto">
-    <section class="page-header">
+<section class="stack u-max-w-7xl u-mx-auto my-home">
+  <section class="page-header">
+    <div class="page-header-head">
       <div class="page-header-body">
         <h1>Choose a stream</h1>
         <p>Select a stream to start or continue process tracking</p>
       </div>
-    </section>
-    {{ if .Confirmation }}
-      <p class="confirmation">{{ .Confirmation }}</p>
-    {{ end }}
-    {{ template "error_banner.html" . }}
-    {{ if .Workflows }}
-      <div class="workflow-grid">
-        {{ range .Workflows }}
-          {{ template "stream_card" . }}
-        {{ end }}
-        {{ if .ShowCreateStreamCard }}
-          {{ template "stream_card_create" . }}
-        {{ end }}
+      {{ if .ShowCreateStream }}
+      <div class="page-header-actions">
+        <a class="btn btn-primary" href="/my/organization/formata-builder">
+          {{ template "icon-plus" . }} Create a stream
+        </a>
       </div>
-    {{ else }}
-      <p class="muted">No streams configured</p>
-    {{ end }}
+      {{ end }}
+    </div>
   </section>
+  {{ if .Confirmation }}
+    <p class="confirmation">{{ .Confirmation }}</p>
+  {{ end }}
+  {{ template "error_banner.html" . }}
+  {{ if .Groups }}
+    <div class="my-home-catalog">
+      {{ range .Groups }}
+        {{ template "my_home_stream_group" . }}
+      {{ end }}
+    </div>
+  {{ else }}
+    <div class="empty-state">
+      {{ template "icon-layers-2" . }}
+      <p class="empty-state-title">No streams available</p>
+      <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
+    </div>
+  {{ end }}
+</section>
 {{ end }}
 
 {{ define "home.html" }}

@@ -304,16 +304,12 @@ type PublicCatalogRole struct {
 	Palette string `json:"palette"`
 }
 
-type WorkflowPickerView struct {
-	PageBase
-	Workflows            []StreamCardView
-	ShowCreateStreamCard bool
-	Error                string
-	Confirmation         string
-}
-
 type HomeWorkflowPickerView struct {
-	WorkflowPickerView
+	PageBase
+	Groups           []MyHomeStreamGroupView
+	ShowCreateStream bool
+	Error            string
+	Confirmation     string
 }
 
 type PaginationLink struct {
@@ -2110,23 +2106,16 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	options, err := s.workflowOptions(r.Context(), user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	showCreateStreamCard, authErr := s.canViewFormataBuilder(r.Context(), user)
+	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), user)
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
 	}
 	view := HomeWorkflowPickerView{
-		WorkflowPickerView: WorkflowPickerView{
-			PageBase:             s.pageBaseForUser(user, "home_picker_body", "", ""),
-			Workflows:            options,
-			ShowCreateStreamCard: showCreateStreamCard,
-			Error:                homePickerMessage(r, "error"),
-			Confirmation:         homePickerMessage(r, "confirmation"),
-		},
+		PageBase:         s.pageBaseForUser(user, "home_picker_body", "", ""),
+		Groups:           nil,
+		ShowCreateStream: showCreateStream,
+		Error:            homePickerMessage(r, "error"),
+		Confirmation:     homePickerMessage(r, "confirmation"),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
