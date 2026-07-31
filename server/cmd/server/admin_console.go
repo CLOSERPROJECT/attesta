@@ -40,7 +40,7 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 				Active: active != "categories",
 			},
 			{
-				Href:   "/admin/categories",
+				Href:   adminPath("categories"),
 				Title:  "Categories",
 				Copy:   "Manage stream discovery taxonomy",
 				Active: active == "categories",
