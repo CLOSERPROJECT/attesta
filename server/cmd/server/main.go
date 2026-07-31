@@ -2322,6 +2322,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
 	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/admin", s.handleAdminRoot)
 	mux.HandleFunc("/admin/orgs", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/orgs/", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
