@@ -184,10 +184,6 @@
         </div>
         <div class="public-home-footer-legal">
           <p>
-            © 2025-2026 Forkbomb bv (forkbomb.eu) — The Forkbomb Company. Licensed
-            under the GNU AGPLv3.
-          </p>
-          <p>
             CLOSER (Circular raw materiaLs for european Open Strategic autonomy on
             chips and microElectronics pRoduction, Project No. 101161109) is
             funded by the European Union under the Interregional Innovation
@@ -213,16 +209,42 @@
       <div class="public-home-footer-bottom">
         <hr class="public-home-rule" />
         <div class="public-home-footer-meta">
-          <p>© 2026 Forkbomb bv. All rights reserved. Supported by EIC.</p>
+          <p>
+            © 2025-2026 Forkbomb B.V. — The Forkbomb Company. Licensed under the
+            GNU AGPLv3.
+          </p>
           <div class="public-home-socials">
-            <a href="https://x.com/" aria-label="X (Twitter)" rel="noopener noreferrer">
-              <img src="{{ $asset }}/icon-twitter.svg" alt="" width="18" height="18" />
+            <a
+              class="btn btn-ghost btn-icon"
+              href="https://forkbomb.solutions/"
+              aria-label="Forkbomb website"
+              rel="noopener noreferrer"
+            >
+              {{ template "icon-globe" . }}
             </a>
-            <a href="https://www.linkedin.com/" aria-label="LinkedIn" rel="noopener noreferrer">
-              <img src="{{ $asset }}/icon-linkedin.svg" alt="" width="18" height="18" />
+            <a
+              class="btn btn-ghost btn-icon"
+              href="https://twitter.com/ForkbombEu"
+              aria-label="X (Twitter)"
+              rel="noopener noreferrer"
+            >
+              {{ template "icon-twitter" . }}
             </a>
-            <a href="https://github.com/forkbomb/attesta" aria-label="GitHub" rel="noopener noreferrer">
-              <img src="{{ $asset }}/icon-github.svg" alt="" width="18" height="18" />
+            <a
+              class="btn btn-ghost btn-icon"
+              href="https://www.linkedin.com/company/forkbomb/"
+              aria-label="LinkedIn"
+              rel="noopener noreferrer"
+            >
+              {{ template "icon-linkedin" . }}
+            </a>
+            <a
+              class="btn btn-ghost btn-icon"
+              href="https://github.com/ForkbombEu/"
+              aria-label="GitHub"
+              rel="noopener noreferrer"
+            >
+              {{ template "icon-github" . }}
             </a>
           </div>
         </div>

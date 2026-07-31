@@ -3,9 +3,9 @@
  *
  * div.public-home
  *   section.public-home-hero | .public-home-process | .public-home-features | .public-home-dev
- *   .public-home-streams-split#streams (bordered two-column shell)
- *     aside.public-home-category-sidebar  (--card)
- *     .public-home-stream-results         (--muted)
+ *   .public-home-streams-split#streams (full-bleed band; content capped at 8xl / 88rem)
+ *     aside.public-home-category-sidebar  (--card, left bleed via ::before)
+ *     .public-home-stream-results         (--muted, right bleed via ::after)
  *   footer.public-home-footer
  *
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
@@ -127,6 +127,8 @@
 }
 
 .public-home-streams-split {
+  --public-home-streams-max: 88rem; /* 8xl */
+  --public-home-sidebar-width: 18rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -373,11 +375,10 @@
 
 .public-home-stream-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 305px), 305px));
   gap: var(--space-4);
   width: 100%;
-  max-width: 80rem;
-  justify-items: center;
+  justify-content: start;
 }
 
 .public-home-rule {
@@ -590,26 +591,18 @@
 
 .public-home-socials {
   display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
+  gap: var(--space-1);
+  align-items: center;
 }
 
-.public-home-socials a {
-  display: inline-flex;
+.public-home-socials .btn,
+.public-home-socials .btn:hover:not(:disabled, .is-disabled) {
+  color: var(--muted-foreground);
+}
+
+.public-home-socials .icon-svg {
   width: 18px;
   height: 18px;
-  overflow: hidden;
-}
-
-.public-home-socials img {
-  width: 100%;
-  height: 100%;
-}
-
-@media (--sm-up) {
-  .public-home-stream-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (--md-up) {
@@ -622,15 +615,40 @@
   }
 
   .public-home-streams-split {
-    flex-direction: row;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns:
+      max(0px, calc((100% - min(100%, var(--public-home-streams-max))) / 2))
+      var(--public-home-sidebar-width)
+      minmax(0, 1fr)
+      max(0px, calc((100% - min(100%, var(--public-home-streams-max))) / 2));
+  }
+
+  .public-home-streams-split::before,
+  .public-home-streams-split::after {
+    content: "";
+    grid-row: 1 / -1;
+  }
+
+  .public-home-streams-split::before {
+    grid-column: 1;
+    background: var(--card);
+  }
+
+  .public-home-streams-split::after {
+    grid-column: 4;
+    background: var(--muted);
   }
 
   .public-home-category-sidebar {
-    flex: 0 0 20rem;
-    max-width: 20rem;
+    grid-column: 2;
+    grid-row: 1;
     border-bottom: 0;
     border-right: 1px solid var(--border);
+  }
+
+  .public-home-stream-results {
+    grid-column: 3;
+    grid-row: 1;
   }
 
   .public-home-process-grid {
@@ -669,10 +687,6 @@
   .public-home-section-head h2 {
     font-size: var(--text-4xl);
     line-height: 2.5rem;
-  }
-
-  .public-home-stream-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .public-home-feature-grid {

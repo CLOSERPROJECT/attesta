@@ -1487,6 +1487,32 @@ const initLandingCategorySidebar = () => {
     }
     btn.classList.add("is-active");
   });
+  // Stacked sidebar (below --md-up): after filter swap, bring results into view.
+  // HTMX sets detail.elt to the swap target for outerHTML, not the clicked button.
+  document.body.addEventListener("htmx:afterSettle", (event) => {
+    const target = event.target;
+    if (
+      !(target instanceof Element) ||
+      target.id !== "public-home-stream-results"
+    ) {
+      return;
+    }
+    const split = document.getElementById("streams");
+    if (!(split instanceof HTMLElement)) {
+      return;
+    }
+    // Side-by-side layout uses display:grid from --md-up.
+    if (getComputedStyle(split).display === "grid") {
+      return;
+    }
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  });
 };
 
 initLandingCategorySidebar();
