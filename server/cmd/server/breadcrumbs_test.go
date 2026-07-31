@@ -85,34 +85,29 @@ func TestBuildOrgAdminBreadcrumbsSections(t *testing.T) {
 	}
 }
 
-func TestBuildPlatformAdminBreadcrumbsOrgsPanel(t *testing.T) {
-	cases := []string{"orgs", "", "other"}
-	for _, panel := range cases {
+func TestBuildPlatformAdminBreadcrumbs(t *testing.T) {
+	cases := map[string]struct {
+		label string
+		href  string
+	}{
+		"organizations": {label: "Organizations", href: "/admin/organizations"},
+		"":              {label: "Organizations", href: "/admin/organizations"},
+		"other":         {label: "Organizations", href: "/admin/organizations"},
+		"categories":    {label: "Categories", href: "/admin/categories"},
+	}
+	for panel, want := range cases {
 		got := buildPlatformAdminBreadcrumbs(panel)
-		if len(got.Items) != 2 {
-			t.Fatalf("panel %q: len(Items) = %d, want 2", panel, len(got.Items))
+		if len(got.Items) != 3 {
+			t.Fatalf("panel %q: len(Items) = %d, want 3", panel, len(got.Items))
 		}
 		if got.Items[0].Label != "Dashboard" || got.Items[0].Href != appHomePath {
 			t.Fatalf("panel %q: root = %+v", panel, got.Items[0])
 		}
-		if got.Items[1].Label != "Platform admin" || got.Items[1].Href != "/admin/orgs" || !got.Items[1].Current {
-			t.Fatalf("panel %q: current = %+v", panel, got.Items[1])
+		if got.Items[1].Label != "Platform admin" || got.Items[1].Href != adminPath("") || got.Items[1].Current {
+			t.Fatalf("panel %q: middle = %+v", panel, got.Items[1])
 		}
-	}
-}
-
-func TestBuildPlatformAdminBreadcrumbsCategoriesPanel(t *testing.T) {
-	got := buildPlatformAdminBreadcrumbs("categories")
-	if len(got.Items) != 3 {
-		t.Fatalf("len(Items) = %d, want 3", len(got.Items))
-	}
-	if got.Items[0].Label != "Dashboard" || got.Items[0].Href != appHomePath {
-		t.Fatalf("root = %+v", got.Items[0])
-	}
-	if got.Items[1].Label != "Platform admin" || got.Items[1].Href != "/admin/orgs" || got.Items[1].Current {
-		t.Fatalf("middle = %+v", got.Items[1])
-	}
-	if got.Items[2].Label != "Categories" || got.Items[2].Href != "/admin/categories" || !got.Items[2].Current {
-		t.Fatalf("current = %+v", got.Items[2])
+		if got.Items[2].Label != want.label || got.Items[2].Href != want.href || !got.Items[2].Current {
+			t.Fatalf("panel %q: section = %+v, want label=%q href=%q", panel, got.Items[2], want.label, want.href)
+		}
 	}
 }
