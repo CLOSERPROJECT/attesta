@@ -4,8 +4,8 @@
  * div.public-home
  *   section.public-home-hero | .public-home-process | .public-home-features | .public-home-dev
  *   .public-home-streams-split#streams (full-bleed band; content capped at 8xl / 88rem)
- *     aside.public-home-category-sidebar  (--card, left bleed via ::before)
- *     .public-home-stream-results         (--muted, right bleed via ::after)
+ *     aside.public-home-category-sidebar  (--card, left bleed via ::before; shared padding like results)
+ *     .public-home-stream-results         (--muted, right bleed via ::after; padding on shell)
  *
  * Shared chrome footer: components/site_footer.html (+ site-footer.css).
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
@@ -121,6 +121,7 @@
 .public-home-streams-split {
   --public-home-streams-max: 88rem; /* 8xl */
   --public-home-sidebar-width: 18rem;
+
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -132,16 +133,17 @@
 .public-home-category-sidebar {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
   background: var(--card);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
+  padding: var(--space-6) var(--space-5);
 }
 
 .public-home-category-sidebar-header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-6) var(--space-3) var(--space-4) var(--space-3);
 }
 
 .public-home-category-sidebar-header .icon-svg {
@@ -161,7 +163,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: 0 var(--space-3) var(--space-6);
 }
 
 .public-home-category {
