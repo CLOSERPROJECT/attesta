@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writeMinimalWorkflowYAML(t *testing.T, path, name string) {
@@ -65,6 +66,39 @@ func TestSeedInstancesWithStoreOpenerSeedsCatalog(t *testing.T) {
 	}
 	if len(list) != 8 {
 		t.Fatalf("demo instances = %d, want 8", len(list))
+	}
+}
+
+func TestSeedInstancesWithStoreOpenerLeavesEveryFifthStreamEmpty(t *testing.T) {
+	dir := t.TempDir()
+	// Sorted keys: a, b, c, d, e — e is 5th (index 4) and stays empty.
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		writeMinimalWorkflowYAML(t, filepath.Join(dir, name+".yaml"), "Stream "+name)
+	}
+	store := NewMemoryStore()
+	// Pre-seed junk on the empty target so replace wipe is visible.
+	store.SeedProcess(Process{WorkflowKey: "e", Status: processStatusActive, CreatedAt: time.Now().UTC()})
+	err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
+		return store, func() {}, nil
+	}, dir)
+	if err != nil {
+		t.Fatalf("seedInstancesWithStoreOpener: %v", err)
+	}
+	for _, key := range []string{"a", "b", "c", "d"} {
+		list, listErr := store.ListRecentProcessesByWorkflow(t.Context(), key, 0)
+		if listErr != nil {
+			t.Fatalf("list %s: %v", key, listErr)
+		}
+		if len(list) != 8 {
+			t.Fatalf("%s instances = %d, want 8", key, len(list))
+		}
+	}
+	emptyList, err := store.ListRecentProcessesByWorkflow(t.Context(), "e", 0)
+	if err != nil {
+		t.Fatalf("list e: %v", err)
+	}
+	if len(emptyList) != 0 {
+		t.Fatalf("e instances = %d, want 0 (empty-state stream)", len(emptyList))
 	}
 }
 

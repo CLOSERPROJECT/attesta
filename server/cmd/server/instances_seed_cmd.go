@@ -48,13 +48,21 @@ func seedInstancesWithStoreOpener(ctx context.Context, _ []string, open func(con
 		now = server.now()
 	}
 	total := 0
-	for _, key := range keys {
+	empty := 0
+	for i, key := range keys {
+		if seedStreamLeftEmpty(i) {
+			if err := store.DeleteWorkflowData(ctx, key); err != nil {
+				return fmt.Errorf("seed instances %s: delete: %w", key, err)
+			}
+			empty++
+			continue
+		}
 		n, err := seedWorkflowInstances(ctx, store, key, catalog[key], now)
 		if err != nil {
 			return err
 		}
 		total += n
 	}
-	log.Printf("seeded %d instances across %d streams", total, len(keys))
+	log.Printf("seeded %d instances across %d streams (%d left empty for empty-state UI)", total, len(keys)-empty, empty)
 	return nil
 }

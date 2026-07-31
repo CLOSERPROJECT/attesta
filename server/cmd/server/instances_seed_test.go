@@ -7,6 +7,26 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestSeedStreamLeftEmptyEveryFifth(t *testing.T) {
+	for _, tc := range []struct {
+		index int
+		want  bool
+	}{
+		{0, false},
+		{1, false},
+		{2, false},
+		{3, false},
+		{4, true},
+		{5, false},
+		{9, true},
+		{-1, false},
+	} {
+		if got := seedStreamLeftEmpty(tc.index); got != tc.want {
+			t.Fatalf("seedStreamLeftEmpty(%d) = %v, want %v", tc.index, got, tc.want)
+		}
+	}
+}
+
 func TestBuildSeedInstancePlansMix(t *testing.T) {
 	cfg := RuntimeConfig{
 		Workflow: WorkflowDef{

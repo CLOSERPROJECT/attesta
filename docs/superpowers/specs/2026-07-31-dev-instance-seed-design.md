@@ -16,6 +16,7 @@ Developers can run one command and see each catalog stream with multiple instanc
 4. **Replace:** For each catalog key, `DeleteWorkflowData(key)` then insert the fixture set (idempotent demo state).
 5. **Catalog:** Use the same `workflowCatalog()` rules the server uses (Formata streams if any exist, otherwise YAML under the config dir). Do not invent a second merge of YAML + Formata.
 6. **v1 counts:** Fixed mix per stream (8 instances); algorithmic progress from each workflow’s ordered substeps.
+7. **Empty streams:** Every 5th catalog stream (1-based among sorted keys) is left empty after `DeleteWorkflowData` so empty-state UI can be checked without a separate seed mode.
 
 ## CLI & DX
 

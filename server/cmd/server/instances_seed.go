@@ -19,7 +19,19 @@ const (
 	seedKindDoneNoDPP   seedInstanceKind = "done_no_dpp"
 	seedKindTerminated  seedInstanceKind = "terminated"
 	seedLotValue                         = "SEED-LOT-001"
+	// Every Nth catalog stream (1-based position among sorted keys) stays
+	// empty after delete so empty-state UI is easy to check in dev.
+	seedEmptyStreamPeriod = 5
 )
+
+// seedStreamLeftEmpty reports whether the stream at sorted catalog index
+// should get zero instances (still wiped via DeleteWorkflowData).
+func seedStreamLeftEmpty(sortedIndex int) bool {
+	if seedEmptyStreamPeriod <= 0 || sortedIndex < 0 {
+		return false
+	}
+	return (sortedIndex+1)%seedEmptyStreamPeriod == 0
+}
 
 type seedInstancePlan struct {
 	Kind              seedInstanceKind
