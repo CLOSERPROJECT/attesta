@@ -96,6 +96,30 @@ Product Passport */}} {{ define "dpp_body" }}
         {{ end }}
       </ul>
     </div>
+    <hr class="u-divider-10" />
+    <div class="dpp-untp">
+      <div class="panel-heading">
+        <h2>UNTP &amp; machine links</h2>
+      </div>
+      <ul class="dpp-untp-list">
+        <li class="dpp-untp-item">
+          <a href="{{ .DigitalLink }}?linkType=linkset"
+            >Identity resolver linkset</a
+          >
+          <span class="dpp-untp-item-meta">RFC 9264 · linkset+json</span>
+        </li>
+        <li class="dpp-untp-item">
+          <a href="{{ .DigitalLink }}?format=json"
+            >UNTP Digital Product Passport</a
+          >
+          <span class="dpp-untp-item-meta">W3C VC 2.0 · JSON</span>
+        </li>
+        <li class="dpp-untp-item">
+          <a href="{{ .DigitalLink }}/events">UNTP traceability events</a>
+          <span class="dpp-untp-item-meta">Digital Traceability Events · JSON</span>
+        </li>
+      </ul>
+    </div>
   </section>
 </div>
 {{ end }} {{ define "dpp.html" }} {{ template "layout.html" . }} {{ end }}

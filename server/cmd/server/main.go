@@ -142,24 +142,24 @@ type FakeNotary struct {
 }
 
 type Server struct {
-	mongo          *mongo.Client
-	store          Store
-	process        *ProcessService
-	identity       IdentityStore
-	tmpl           *template.Template
-	authorizer     Authorizer
-	sse            *SSEHub
-	now            func() time.Time
-	configProvider func() (RuntimeConfig, error)
-	workflowDefID  primitive.ObjectID
-	configDir      string
-	configMu            sync.Mutex
-	catalogModTime      map[string]time.Time
-	catalogTaxonomyRev  int64
-	catalog             map[string]RuntimeConfig
-	viteDevServer       string
-	enforceAuth         bool
-	formataArchURL      string
+	mongo              *mongo.Client
+	store              Store
+	process            *ProcessService
+	identity           IdentityStore
+	tmpl               *template.Template
+	authorizer         Authorizer
+	sse                *SSEHub
+	now                func() time.Time
+	configProvider     func() (RuntimeConfig, error)
+	workflowDefID      primitive.ObjectID
+	configDir          string
+	configMu           sync.Mutex
+	catalogModTime     map[string]time.Time
+	catalogTaxonomyRev int64
+	catalog            map[string]RuntimeConfig
+	viteDevServer      string
+	enforceAuth        bool
+	formataArchURL     string
 }
 
 type SSEHub struct {
@@ -5270,6 +5270,14 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		s.handleDigitalLinkDPPAttachment(w, r, gtin, lot, serial, attachmentID)
 		return
 	}
+	if gtin, lot, serial, ok, err := parseDigitalLinkEventsPath(r.URL.Path); ok {
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		s.handleDigitalLinkEvents(w, r, gtin, lot, serial)
+		return
+	}
 	gtin, lot, serial, err := parseDigitalLinkPath(r.URL.Path)
 	if err != nil {
 		http.NotFound(w, r)
@@ -5292,19 +5300,24 @@ func (s *Server) handleDigitalLinkDPP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	export := buildNotarizedExport(cfg.Workflow, process)
 	link := digitalLinkURL(gtin, lot, serial)
-	if prefersJSONResponse(r) {
-		response := map[string]interface{}{
-			"digital_link": link,
-			"workflow": map[string]string{
-				"key":         workflowKey,
-				"name":        cfg.Workflow.Name,
-				"description": cfg.Workflow.Description,
-			},
-			"export": export,
+	// UNTP Identity Resolver: GS1 resolver-style linkType filtering (IDR-07).
+	if linkType := strings.TrimSpace(r.URL.Query().Get("linkType")); linkType != "" {
+		scope, ok := untpLinksetScope(linkType)
+		if !ok {
+			http.NotFound(w, r)
+			return
 		}
-		writeJSON(w, response)
+		s.serveUNTPLinkset(w, r, link, scope)
+		return
+	}
+	if prefersLinksetResponse(r) {
+		s.serveUNTPLinkset(w, r, link, "all")
+		return
+	}
+	export := buildNotarizedExport(cfg.Workflow, process)
+	if prefersJSONResponse(r) {
+		writeJSON(w, buildUNTPDPPCredential(requestBaseURL(r), cfg, workflowKey, process, link))
 		return
 	}
 

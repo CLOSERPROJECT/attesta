@@ -52,7 +52,7 @@ func TestHandleDigitalLinkDPPJSON(t *testing.T) {
 		configDir: tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
+	req := httptest.NewRequest(http.MethodGet, "http://dl.example.com"+digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial), nil)
 	req.Header.Set("Accept", "application/json")
 	rr := httptest.NewRecorder()
 	server.handleDigitalLinkDPP(rr, req)
@@ -63,12 +63,31 @@ func TestHandleDigitalLinkDPPJSON(t *testing.T) {
 	if got := rr.Header().Get("Content-Type"); !strings.Contains(got, "application/json") {
 		t.Fatalf("expected JSON content type, got %q", got)
 	}
-	var payload map[string]interface{}
+	var payload struct {
+		Type              []string `json:"type"`
+		ID                string   `json:"id"`
+		CredentialSubject struct {
+			ID              string                 `json:"id"`
+			BatchNumber     string                 `json:"batchNumber"`
+			ItemNumber      string                 `json:"itemNumber"`
+			Characteristics map[string]interface{} `json:"characteristics"`
+		} `json:"credentialSubject"`
+	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response JSON: %v", err)
 	}
-	if payload["digital_link"] == "" {
-		t.Fatalf("expected digital_link in response, got %#v", payload)
+	if strings.Join(payload.Type, ",") != "DigitalProductPassport,VerifiableCredential" {
+		t.Fatalf("expected UNTP DPP credential type, got %#v", payload.Type)
+	}
+	wantLink := "http://dl.example.com" + digitalLinkURL(process.DPP.GTIN, process.DPP.Lot, process.DPP.Serial)
+	if payload.ID != wantLink || payload.CredentialSubject.ID != wantLink {
+		t.Fatalf("expected credential and subject id %q, got %q / %q", wantLink, payload.ID, payload.CredentialSubject.ID)
+	}
+	if payload.CredentialSubject.BatchNumber != process.DPP.Lot || payload.CredentialSubject.ItemNumber != process.DPP.Serial {
+		t.Fatalf("expected lot/serial mapped to batchNumber/itemNumber, got %#v", payload.CredentialSubject)
+	}
+	if payload.CredentialSubject.Characteristics["processId"] != process.ID.Hex() {
+		t.Fatalf("expected processId in characteristics, got %#v", payload.CredentialSubject.Characteristics)
 	}
 }
 

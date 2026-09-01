@@ -229,9 +229,12 @@ Download endpoint `handleDownloadProcessAttachment` streams GridFS content and s
 - Workflow YAML supports optional `dpp:` config (`enabled`, `gtin`, `lotInputKey`, `lotDefault`, `serialInputKey`, `serialStrategy`, plus presentation fields).
 - `gtin` is normalized/validated at config load (must resolve to 14 digits when enabled).
 - On first transition to process `done`, backend stores `process.dpp` (`gtin`, `lot`, `serial`, `generatedAt`) and keeps identifiers stable on repeated completion calls.
-- Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}`:
-  - HTML landing page (template: `server/templates/pages/dpp.html`)
-  - JSON (`Accept: application/json` or `?format=json`)
+- Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}` (UNTP Identity Resolver URL, ISO/IEC 18975 structured path):
+  - HTML landing page (template: `server/templates/pages/dpp.html`) — default link
+  - UNTP Digital Product Passport credential JSON (`Accept: application/json` or `?format=json`)
+  - UNTP Identity Resolver linkset, RFC 9264 (`?linkType=linkset|all|dpp|dte|pip`, or `Accept: application/linkset+json`)
+  - `GET /01/{gtin}/10/{lot}/21/{serial}/events` — UNTP Digital Traceability Event credential (one ModifyEvent per completed substep)
+  - UNTP implementation details: `docs/untp.md`
 - DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.
 
