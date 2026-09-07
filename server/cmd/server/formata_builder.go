@@ -363,6 +363,11 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 		if requiresPurge {
 			presentationOnly, compareErr := streamPresentationOnlyChange(existing.Stream, stream)
 			if compareErr != nil || !presentationOnly {
+				confirmPurge := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("confirmPurge")), "true")
+				if !confirmPurge {
+					writeFormataPurgeRequired(w)
+					return
+				}
 				if err := s.store.DeleteWorkflowData(r.Context(), streamID.Hex()); err != nil {
 					http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
 					return
@@ -388,6 +393,16 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func writeFormataPurgeRequired(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusConflict)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"code": "purge_required",
+		"message": "Saving these changes will permanently delete all existing stream instances and their collected workflow data. " +
+			"Name, description, and category alone would keep instances. Continue only if you want to proceed.",
+	})
 }
 
 func (s *Server) handleOrgAdminFormataBuilderStream(w http.ResponseWriter, r *http.Request, streamIDValue string, user *AccountUser) {

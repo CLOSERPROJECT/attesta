@@ -661,6 +661,24 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
+		}
+		if !strings.Contains(rec.Body.String(), `"purge_required"`) {
+			t.Fatalf("body = %q, want purge_required", rec.Body.String())
+		}
+		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
+		if err != nil {
+			t.Fatalf("HasProcessesByWorkflow error: %v", err)
+		}
+		if !hasProcesses {
+			t.Fatal("expected workflow data to remain until confirmPurge")
+		}
+
+		req = httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex()+"&confirmPurge=true", strings.NewReader(updated))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec = httptest.NewRecorder()
+		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusNoContent {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
 		}
@@ -672,7 +690,7 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		if !strings.Contains(got.Stream, "Step changed") {
 			t.Fatalf("stream = %q, want updated yaml", got.Stream)
 		}
-		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
+		hasProcesses, err = store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
 		if err != nil {
 			t.Fatalf("HasProcessesByWorkflow error: %v", err)
 		}
