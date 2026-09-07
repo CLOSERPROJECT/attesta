@@ -84,3 +84,28 @@ func TestStreamPresentationOnlyChange(t *testing.T) {
 		}
 	})
 }
+
+func TestStreamPresentationOnlyChangeOrgAndRoles(t *testing.T) {
+	base := workflowStreamYAML("Base stream")
+	t.Run("organization change is not presentation-only", func(t *testing.T) {
+		updated := strings.Replace(base, `organization: "org1"`, `organization: "org2"`, 1)
+		updated = strings.Replace(updated, `slug: "org1"`, `slug: "org2"`, 1)
+		ok, err := streamPresentationOnlyChange(base, updated)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if ok {
+			t.Fatal("expected shape change for organization")
+		}
+	})
+	t.Run("substep roles change is not presentation-only", func(t *testing.T) {
+		updated := strings.Replace(base, `roles: ["dep1"]`, `roles: ["dep1", "dep2"]`, 1)
+		ok, err := streamPresentationOnlyChange(base, updated)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if ok {
+			t.Fatal("expected shape change for roles")
+		}
+	})
+}

@@ -179,10 +179,10 @@ func TestBuildPublicHomeCategoriesMarksActiveAndURLs(t *testing.T) {
 }
 
 func TestPublicHomeCreateStreamHref(t *testing.T) {
-	if got := publicHomeCreateStreamHref(false); got != "/login?next=%2Fmy%2Forganization%2Fformata-builder" {
+	if got := publicHomeCreateStreamHref(false); got != "/login?next=%2Fmy%2Forganization%2Fformata-builder%3Fnew%3Dtrue" {
 		t.Fatalf("anonymous href = %q", got)
 	}
-	if got := publicHomeCreateStreamHref(true); got != "/my/organization/formata-builder" {
+	if got := publicHomeCreateStreamHref(true); got != "/my/organization/formata-builder?new=true" {
 		t.Fatalf("signed-in href = %q", got)
 	}
 }
@@ -301,7 +301,7 @@ func TestHandlePublicStreamsPartialEmptyShowsCreateCTA(t *testing.T) {
 	if !strings.Contains(body, "No public streams in this category yet") {
 		t.Fatalf("missing empty copy: %s", body)
 	}
-	if !strings.Contains(body, `href="/login?next=%2Fmy%2Forganization%2Fformata-builder"`) {
+	if !strings.Contains(body, `href="/login?next=%2Fmy%2Forganization%2Fformata-builder%3Fnew%3Dtrue"`) {
 		t.Fatalf("missing create CTA: %s", body)
 	}
 	if !strings.Contains(body, "Create a stream") {
