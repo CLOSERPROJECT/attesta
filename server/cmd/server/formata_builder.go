@@ -361,9 +361,12 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if requiresPurge {
-			if err := s.store.DeleteWorkflowData(r.Context(), streamID.Hex()); err != nil {
-				http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
-				return
+			presentationOnly, compareErr := streamPresentationOnlyChange(existing.Stream, stream)
+			if compareErr != nil || !presentationOnly {
+				if err := s.store.DeleteWorkflowData(r.Context(), streamID.Hex()); err != nil {
+					http.Error(w, "failed to delete stream data", http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 		if _, err := s.store.UpdateFormataBuilderStream(r.Context(), FormataBuilderStream{
