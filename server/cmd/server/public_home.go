@@ -99,7 +99,7 @@ func buildPublicHomeCategories(categories []TaxonomyCategoryNode, selectedCat, s
 }
 
 func publicHomeCreateStreamHref(signedIn bool) string {
-	target := organizationPath("formata-builder")
+	target := organizationPath("formata-builder?new=true")
 	if signedIn {
 		return target
 	}

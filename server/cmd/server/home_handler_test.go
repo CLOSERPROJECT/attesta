@@ -876,7 +876,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		adminBody := adminRec.Body.String()
 		for _, want := range []string{
 			`class="page-header-actions"`,
-			`href="/my/organization/formata-builder"`,
+			`href="/my/organization/formata-builder?new=true"`,
 			"Create a stream",
 		} {
 			if !strings.Contains(adminBody, want) {
@@ -1366,7 +1366,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		body := rec.Body.String()
 		for _, want := range []string{
 			`class="page-header-actions"`,
-			`href="/my/organization/formata-builder"`,
+			`href="/my/organization/formata-builder?new=true"`,
 			"Create a stream",
 		} {
 			if !strings.Contains(body, want) {
@@ -1407,7 +1407,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if strings.Contains(rec.Body.String(), `href="/my/organization/formata-builder"`) {
+		if strings.Contains(rec.Body.String(), `href="/my/organization/formata-builder?new=true"`) {
 			t.Fatalf("did not expect create stream card for non org admin, got %q", rec.Body.String())
 		}
 	})

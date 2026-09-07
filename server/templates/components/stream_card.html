@@ -130,9 +130,10 @@
             </button>
           </header>
           <p class="u-m-0 u-mb-5">
-            Saving changes to this stream will permanently delete all
-            existing instances and their collected workflow data.
-            Continue only if you want to proceed.
+            Changing steps, roles, forms, or other executable settings will
+            permanently delete all existing instances and their collected
+            workflow data. Changing only the name, description, or category
+            keeps existing instances.
           </p>
           <div class="dialog-actions">
             <a href="{{ .EditAction }}">
@@ -191,7 +192,7 @@
 {{ define "stream_card_create" }}
   <a
     class="stream-card stream-card-create"
-    href="/my/organization/formata-builder"
+    href="/my/organization/formata-builder?new=true"
   >
     <span class="stream-card-cta">
       {{ template "icon-plus" . }}

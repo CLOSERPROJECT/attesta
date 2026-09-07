@@ -656,9 +656,28 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 			Progress:    map[string]ProcessStep{},
 		})
 
-		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(workflowStreamYAML("Platform updated stream")))
+		updated := strings.Replace(workflowStreamYAML("Platform stale stream"), `title: "Step 1"`, `title: "Step changed"`, 1)
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(updated))
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
+		server.handleOrgAdminFormataBuilder(rec, req)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
+		}
+		if !strings.Contains(rec.Body.String(), `"purge_required"`) {
+			t.Fatalf("body = %q, want purge_required", rec.Body.String())
+		}
+		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
+		if err != nil {
+			t.Fatalf("HasProcessesByWorkflow error: %v", err)
+		}
+		if !hasProcesses {
+			t.Fatal("expected workflow data to remain until confirmPurge")
+		}
+
+		req = httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex()+"&confirmPurge=true", strings.NewReader(updated))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec = httptest.NewRecorder()
 		server.handleOrgAdminFormataBuilder(rec, req)
 		if rec.Code != http.StatusNoContent {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
@@ -668,15 +687,67 @@ func TestHandleOrgAdminFormataBuilderPost(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadFormataBuilderStreamByID error: %v", err)
 		}
-		if !strings.Contains(got.Stream, "Platform updated stream") {
+		if !strings.Contains(got.Stream, "Step changed") {
 			t.Fatalf("stream = %q, want updated yaml", got.Stream)
 		}
-		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
+		hasProcesses, err = store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
 		if err != nil {
 			t.Fatalf("HasProcessesByWorkflow error: %v", err)
 		}
 		if hasProcesses {
 			t.Fatal("expected workflow data to be purged")
+		}
+	})
+
+	t.Run("platform admin presentation-only edit keeps workflow data", func(t *testing.T) {
+		saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+			Stream:          workflowStreamYAML("Platform label stream"),
+			CreatedByUserID: "another-owner",
+			UpdatedByUserID: "another-owner",
+			UpdatedAt:       time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatalf("SaveFormataBuilderStream error: %v", err)
+		}
+		processID := primitive.NewObjectID()
+		store.SeedProcess(Process{
+			ID:          processID,
+			WorkflowKey: saved.ID.Hex(),
+			CreatedAt:   time.Now().UTC(),
+			Status:      "active",
+			Progress:    map[string]ProcessStep{},
+		})
+
+		updated := workflowStreamYAML("Platform renamed stream")
+		updated = strings.Replace(updated, `description: "demo"`, `description: "retagged"`, 1)
+		updated = strings.Replace(updated, "  name:", "  categorySlug: supply-chain\n  subCategorySlug: procurement\n  name:", 1)
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/formata-builder?stream="+saved.ID.Hex(), strings.NewReader(updated))
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminFormataBuilder(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status = %d body=%q, want %d", rec.Code, rec.Body.String(), http.StatusNoContent)
+		}
+
+		got, err := store.LoadFormataBuilderStreamByID(t.Context(), saved.ID)
+		if err != nil {
+			t.Fatalf("LoadFormataBuilderStreamByID error: %v", err)
+		}
+		if !strings.Contains(got.Stream, "Platform renamed stream") {
+			t.Fatalf("stream = %q, want renamed yaml", got.Stream)
+		}
+		if !strings.Contains(got.Stream, "categorySlug: supply-chain") {
+			t.Fatalf("stream = %q, want category", got.Stream)
+		}
+		hasProcesses, err := store.HasProcessesByWorkflow(t.Context(), saved.ID.Hex())
+		if err != nil {
+			t.Fatalf("HasProcessesByWorkflow error: %v", err)
+		}
+		if !hasProcesses {
+			t.Fatal("expected workflow data to be kept")
+		}
+		if _, err := store.LoadProcessByID(t.Context(), processID); err != nil {
+			t.Fatalf("LoadProcessByID: %v", err)
 		}
 	})
 

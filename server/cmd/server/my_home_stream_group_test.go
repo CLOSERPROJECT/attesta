@@ -201,7 +201,7 @@ func TestHomePickerBodyTemplateRendersCreateStreamAction(t *testing.T) {
 
 	for _, want := range []string{
 		`class="page-header-actions"`,
-		`href="/my/organization/formata-builder"`,
+		`href="/my/organization/formata-builder?new=true"`,
 		"Create a stream",
 	} {
 		if !strings.Contains(body, want) {

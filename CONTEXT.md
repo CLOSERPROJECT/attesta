@@ -48,6 +48,10 @@ _Avoid_: Tag, topic, Category (when meaning the leaf)
 A **Stream** may reference zero or one **Sub-category**, identified by `(categorySlug, subCategorySlug)`. It never attaches to a **Category** alone. Both slugs are required together; a missing or unknown path means the Stream is uncategorized. Display names need not be unique; slugs are identity.
 _Avoid_: Required category, category-only membership, document id as the Stream’s taxonomy reference
 
+**Stream presentation fields**:
+The blueprint label and discovery path on a **Stream**: name, description, and **Stream categorization**. Changing only these does not redefine the executable stream (steps, roles, forms, organizations, DPP identifiers).
+_Avoid_: Metadata (vague), tags, executable config
+
 **Organization**:
 A party that owns steps in a stream blueprint (team in Appwrite; listed under the stream’s organizations).
 _Avoid_: Department, company, team (in domain docs — Appwrite may still say team)
