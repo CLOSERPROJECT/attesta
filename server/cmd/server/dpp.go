@@ -159,6 +159,22 @@ func parseDigitalLinkAttachmentPath(path string) (string, string, string, string
 	return gtin, lot, serial, attachmentID, true, nil
 }
 
+// parseDigitalLinkEventsPath matches /01/{gtin}/10/{lot}/21/{serial}/events
+// (UNTP Digital Traceability Events endpoint). ok is true when the path
+// carries the /events suffix.
+func parseDigitalLinkEventsPath(path string) (string, string, string, bool, error) {
+	trimmed := strings.Trim(strings.TrimSpace(path), "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 7 || parts[6] != "events" {
+		return "", "", "", false, nil
+	}
+	gtin, lot, serial, err := parseDigitalLinkParts(parts[:6])
+	if err != nil {
+		return "", "", "", true, err
+	}
+	return gtin, lot, serial, true, nil
+}
+
 func parseDigitalLinkParts(parts []string) (string, string, string, error) {
 	if len(parts) != 6 || parts[0] != "01" || parts[2] != "10" || parts[4] != "21" {
 		return "", "", "", errors.New("invalid digital link path")
