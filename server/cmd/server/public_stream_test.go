@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
-	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -308,7 +308,7 @@ func TestHandlePublicStreamOK(t *testing.T) {
 		`name: "Pilot Workflow"`,
 		1,
 	)
-	yaml += "dpp:\n  enabled: true\n  gtin: \"09506000134352\"\n"
+	yaml += "dpp:\n" + dppSubjectYAML("09506000134352")
 	if err := os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +500,7 @@ func (s *failingListRecentProcessesStore) ListRecentProcessesByWorkflow(ctx cont
 
 func TestHandlePublicStreamProcessListError(t *testing.T) {
 	tempDir := t.TempDir()
-	yaml := minimalCategorizedWorkflowYAML("") + "dpp:\n  enabled: true\n  gtin: \"09506000134352\"\n"
+	yaml := minimalCategorizedWorkflowYAML("") + "dpp:\n" + dppSubjectYAML("09506000134352")
 	if err := os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -573,12 +573,25 @@ func TestBuildPublicStreamRunsSkipsIncompleteDPP(t *testing.T) {
 	doneAt := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	def := WorkflowDef{Steps: []WorkflowStep{{Substep: []WorkflowSub{{SubstepID: "1.1"}}}}}
 	runs := buildPublicStreamRuns(def, []Process{{
-		ID:     primitive.NewObjectID(),
-		Status: processStatusDone,
+		ID:       primitive.NewObjectID(),
+		Status:   processStatusDone,
 		Progress: map[string]ProcessStep{"1_1": {State: "done", DoneAt: &doneAt}},
-		DPP: &ProcessDPP{GTIN: "09506000134352", Lot: "", Serial: "SER", GeneratedAt: doneAt},
+		DPP:      &ProcessDPP{GTIN: "09506000134352", Lot: "", Serial: "SER", GeneratedAt: doneAt},
 	}})
 	if len(runs) != 0 {
 		t.Fatalf("runs = %#v, want empty for incomplete DPP", runs)
 	}
+}
+
+func dppSubjectYAML(gtin string) string {
+	return "  enabled: true\n" +
+		"  gtin: \"" + gtin + "\"\n" +
+		"  productCategory:\n" +
+		"    code: \"41601\"\n" +
+		"    name: \"Gallium, unwrought\"\n" +
+		"  producedAtFacility:\n" +
+		"    id: \"https://example.com/facility/1\"\n" +
+		"    name: \"Refinery\"\n" +
+		"  countryOfProduction:\n" +
+		"    countryCode: \"NL\"\n"
 }

@@ -40,6 +40,18 @@ func TestBuildUNTPDPPCredential(t *testing.T) {
 		ProductName:        "Recycled Gallium Batch",
 		ProductDescription: "Gallium intake and refinement",
 		OwnerName:          "Attesta Demo Operator",
+		ProductCategory: &DPPProductCategory{
+			Code:       "41601",
+			Name:       "Gallium, unwrought",
+			SchemeID:   untpCPCSchemeID,
+			SchemeName: untpCPCSchemeName,
+		},
+		ProducedAtFacility: &DPPFacility{
+			ID:           "https://dl.example.com/facility/refinery",
+			Name:         "Demo Refinery",
+			RegisteredID: "ref-001",
+		},
+		CountryOfProduction: &DPPCountry{CountryCode: "NL", CountryName: "Netherlands"},
 	}
 	process := untpTestProcess()
 	link := untpTestLink()
@@ -74,6 +86,15 @@ func TestBuildUNTPDPPCredential(t *testing.T) {
 	}
 	if subject.BatchNumber != "LOT-001" || subject.ItemNumber != "SERIAL-001" || subject.IDGranularity != "item" {
 		t.Fatalf("subject batch/serial/granularity = %#v", subject)
+	}
+	if len(subject.ProductCategory) != 1 || subject.ProductCategory[0].Code != "41601" || subject.ProductCategory[0].SchemeID != untpCPCSchemeID {
+		t.Fatalf("productCategory = %#v", subject.ProductCategory)
+	}
+	if subject.ProducedAtFacility == nil || subject.ProducedAtFacility.ID != "https://dl.example.com/facility/refinery" || subject.ProducedAtFacility.Name != "Demo Refinery" {
+		t.Fatalf("producedAtFacility = %#v", subject.ProducedAtFacility)
+	}
+	if subject.CountryOfProduction == nil || subject.CountryOfProduction.CountryCode != "NL" {
+		t.Fatalf("countryOfProduction = %#v", subject.CountryOfProduction)
 	}
 	if subject.IDScheme.ID != gs1DigitalLinkSchemeID || subject.IDScheme.Name != "GS1 Digital Link" {
 		t.Fatalf("idScheme = %#v", subject.IDScheme)
@@ -119,6 +140,9 @@ func TestBuildUNTPDPPCredentialFallbacks(t *testing.T) {
 
 func TestBuildUNTPTraceabilityEvents(t *testing.T) {
 	cfg := testRuntimeConfig()
+	cfg.Roles = []WorkflowRole{{OrgSlug: "org1", Slug: "dep1", Name: "Department 1", UNTpRole: "operator"}}
+	cfg.DPP.ProducedAtFacility = &DPPFacility{ID: "https://dl.example.com/facility/refinery", Name: "Demo Refinery"}
+
 	process := untpTestProcess()
 	step := process.Progress["1.1"]
 	step.Data = map[string]interface{}{
@@ -161,7 +185,11 @@ func TestBuildUNTPTraceabilityEvents(t *testing.T) {
 	if product.ID != "https://dl.example.com"+link || product.BatchNumber != "LOT-001" || product.ItemNumber != "SERIAL-001" || product.IDGranularity != "item" {
 		t.Fatalf("event product = %#v", product)
 	}
-	if len(event.RelatedParty) != 1 || event.RelatedParty[0].Role != "dep1" || event.RelatedParty[0].Party.Name != "u1" {
+
+	if event.ModifiedAtFacility == nil || event.ModifiedAtFacility.ID != "https://dl.example.com/facility/refinery" || event.ModifiedAtFacility.Name != "Demo Refinery" {
+		t.Fatalf("modifiedAtFacility = %#v", event.ModifiedAtFacility)
+	}
+	if len(event.RelatedParty) != 1 || event.RelatedParty[0].Role != "operator" || event.RelatedParty[0].Party.Name != "u1" {
 		t.Fatalf("relatedParty = %#v", event.RelatedParty)
 	}
 	if event.RelatedParty[0].Party.ID != "https://dl.example.com/#actor=u1" {
@@ -177,6 +205,7 @@ func TestBuildUNTPTraceabilityEvents(t *testing.T) {
 
 func TestBuildUNTPTraceabilityEventsRoleFallback(t *testing.T) {
 	cfg := testRuntimeConfig()
+	cfg.Roles = []WorkflowRole{{OrgSlug: "org1", Slug: "dep1", Name: "Department 1", UNTpRole: "operator"}}
 	process := untpTestProcess()
 	step := process.Progress["1.1"]
 	step.DoneBy = &Actor{ID: "u1"}
@@ -185,8 +214,24 @@ func TestBuildUNTPTraceabilityEventsRoleFallback(t *testing.T) {
 
 	events := buildUNTPTraceabilityEvents("", cfg.Workflow, cfg, process, link)
 
-	if len(events) != 1 || events[0].RelatedParty[0].Role != "dep1" {
-		t.Fatalf("events = %#v, want DoneBy role fallback to substep role", events)
+	if len(events) != 1 || events[0].RelatedParty[0].Role != "operator" {
+		t.Fatalf("events = %#v, want DoneBy role fallback mapped via untpRole", events)
+	}
+}
+
+func TestBuildUNTPTraceabilityEventsOmitsRelatedPartyForUnmappedRole(t *testing.T) {
+	cfg := testRuntimeConfig()
+	cfg.Roles = append(cfg.Roles, WorkflowRole{OrgSlug: "org1", Slug: "dep2", Name: "Department 2"})
+	process := untpTestProcess()
+	step := process.Progress["1.1"]
+	step.DoneBy = &Actor{ID: "u2", Role: "dep2"}
+	process.Progress["1.1"] = step
+	link := untpTestLink()
+
+	events := buildUNTPTraceabilityEvents("https://dl.example.com", cfg.Workflow, cfg, process, link)
+
+	if len(events) != 1 || len(events[0].RelatedParty) != 0 {
+		t.Fatalf("events = %#v, want relatedParty omitted for role without untpRole", events)
 	}
 }
 
@@ -252,7 +297,6 @@ func TestUntpLinksetScope(t *testing.T) {
 		}
 	}
 }
-
 func untpTestServer(t *testing.T) (*Server, *MemoryStore, Process) {
 	t.Helper()
 	tempDir := t.TempDir()
@@ -392,7 +436,7 @@ func TestHandleDigitalLinkEvents(t *testing.T) {
 	if event.EventDate != "2026-03-05T14:30:00Z" {
 		t.Fatalf("eventDate = %q", event.EventDate)
 	}
-	if len(event.RelatedParty) != 1 || event.RelatedParty[0].Role != "dep1" || event.RelatedParty[0].Party.Name != "u1" {
+	if len(event.RelatedParty) != 1 || event.RelatedParty[0].Role != "operator" || event.RelatedParty[0].Party.Name != "u1" {
 		t.Fatalf("relatedParty = %#v", event.RelatedParty)
 	}
 	if len(event.ModifiedProduct) != 1 || event.ModifiedProduct[0].Product.BatchNumber != "LOT-001" {

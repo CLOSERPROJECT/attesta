@@ -30,9 +30,10 @@ import (
 
 const (
 	untpVCCredentialsContext = "https://www.w3.org/ns/credentials/v2"
-	untpVocabularyContext    = "https://vocabulary.uncefact.org/untp/"
+	untpVocabularyContext    = "https://vocabulary.uncefact.org/untp/0.8.0/context/"
 	untpLinkTypeDTE          = "https://test.uncefact.org/vocabulary/linkTypes/dte"
 	gs1DigitalLinkSchemeID   = "https://id.gs1.org"
+	untpProductType          = "Product"
 )
 
 // UNTPCredential is the W3C VC 2.0 envelope shared by the DPP and DTE
@@ -56,16 +57,34 @@ type UNTPCredentialIssuer struct {
 
 // UNTPProduct is the credential subject of a Digital Product Passport.
 type UNTPProduct struct {
-	Type            []string               `json:"type"`
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name,omitempty"`
-	Description     string                 `json:"description,omitempty"`
-	IDScheme        UNTPIdentifierScheme   `json:"idScheme,omitzero"`
-	BatchNumber     string                 `json:"batchNumber,omitempty"`
-	ItemNumber      string                 `json:"itemNumber,omitempty"`
-	IDGranularity   string                 `json:"idGranularity,omitempty"`
-	RelatedDocument []UNTPLink             `json:"relatedDocument,omitempty"`
-	Characteristics map[string]interface{} `json:"characteristics,omitempty"`
+	Type                []string               `json:"type"`
+	ID                  string                 `json:"id"`
+	Name                string                 `json:"name,omitempty"`
+	Description         string                 `json:"description,omitempty"`
+	IDScheme            UNTPIdentifierScheme   `json:"idScheme,omitzero"`
+	BatchNumber         string                 `json:"batchNumber,omitempty"`
+	ItemNumber          string                 `json:"itemNumber,omitempty"`
+	IDGranularity       string                 `json:"idGranularity,omitempty"`
+	ProductCategory     []UNTPClassification   `json:"productCategory,omitempty"`
+	ProducedAtFacility  *UNTPFacility          `json:"producedAtFacility,omitzero"`
+	CountryOfProduction *UNTPCountry           `json:"countryOfProduction,omitzero"`
+	RelatedDocument     []UNTPLink             `json:"relatedDocument,omitempty"`
+	Characteristics     map[string]interface{} `json:"characteristics,omitempty"`
+}
+
+// UNTPFacility identifies a production facility (producedAtFacility or
+// modifiedAtFacility).
+type UNTPFacility struct {
+	Type         []string `json:"type,omitempty"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	RegisteredID string   `json:"registeredId,omitempty"`
+}
+
+// UNTPCountry is the ISO 3166-1 country of production.
+type UNTPCountry struct {
+	CountryCode string `json:"countryCode"`
+	CountryName string `json:"countryName,omitempty"`
 }
 
 type UNTPIdentifierScheme struct {
@@ -82,17 +101,16 @@ type UNTPLink struct {
 	LinkType  string `json:"linkType,omitempty"`
 }
 
-// UNTPModifyEvent is a UNTP ModifyEvent lifecycle event (checkpoint
-// observation on the product, identity retained).
 type UNTPModifyEvent struct {
-	Type            []string           `json:"type"`
-	ID              string             `json:"id"`
-	Name            string             `json:"name,omitempty"`
-	EventDate       string             `json:"eventDate,omitempty"`
-	ActivityType    UNTPClassification `json:"activityType,omitzero"`
-	ModifiedProduct []UNTPEventProduct `json:"modifiedProduct,omitempty"`
-	RelatedParty    []UNTPPartyRole    `json:"relatedParty,omitempty"`
-	RelatedDocument []UNTPLink         `json:"relatedDocument,omitempty"`
+	Type               []string           `json:"type"`
+	ID                 string             `json:"id"`
+	Name               string             `json:"name,omitempty"`
+	EventDate          string             `json:"eventDate,omitempty"`
+	ActivityType       UNTPClassification `json:"activityType,omitzero"`
+	ModifiedProduct    []UNTPEventProduct `json:"modifiedProduct,omitempty"`
+	ModifiedAtFacility *UNTPFacility      `json:"modifiedAtFacility,omitzero"`
+	RelatedParty       []UNTPPartyRole    `json:"relatedParty,omitempty"`
+	RelatedDocument    []UNTPLink         `json:"relatedDocument,omitempty"`
 }
 
 type UNTPClassification struct {
@@ -140,12 +158,45 @@ type UNTPLinksetContext struct {
 	DTE    []UNTPLinksetTarget `json:"dte,omitempty"`
 	PIP    []UNTPLinksetTarget `json:"pip,omitempty"`
 }
-
 type UNTPLinksetTarget struct {
 	Href     string   `json:"href"`
 	Type     string   `json:"type"`
 	Title    string   `json:"title,omitempty"`
 	Hreflang []string `json:"hreflang,omitempty"`
+}
+
+func untpProductCategory(cfg RuntimeConfig) []UNTPClassification {
+	if cfg.DPP.ProductCategory == nil {
+		return nil
+	}
+	return []UNTPClassification{{
+		Code:       cfg.DPP.ProductCategory.Code,
+		Name:       cfg.DPP.ProductCategory.Name,
+		SchemeID:   cfg.DPP.ProductCategory.SchemeID,
+		SchemeName: cfg.DPP.ProductCategory.SchemeName,
+	}}
+}
+
+func untpFacility(cfg *DPPFacility) *UNTPFacility {
+	if cfg == nil {
+		return nil
+	}
+	return &UNTPFacility{
+		Type:         []string{"Facility"},
+		ID:           cfg.ID,
+		Name:         cfg.Name,
+		RegisteredID: cfg.RegisteredID,
+	}
+}
+
+func untpCountry(cfg *DPPCountry) *UNTPCountry {
+	if cfg == nil {
+		return nil
+	}
+	return &UNTPCountry{
+		CountryCode: cfg.CountryCode,
+		CountryName: cfg.CountryName,
+	}
 }
 
 // absoluteDigitalLinkURL returns the fully qualified resolver URI for a
@@ -156,6 +207,22 @@ func absoluteDigitalLinkURL(baseURL, link string) string {
 		return link
 	}
 	return strings.TrimRight(baseURL, "/") + link
+}
+
+// untpRoleFor maps a workflow role slug to the UNTP PartyRole vocabulary.
+// Returns "" when the role has no untpRole mapping; the caller then omits the
+// relatedParty (arbitrary role strings are not valid PartyRole values).
+func untpRoleFor(roles []WorkflowRole, roleSlug string) string {
+	roleSlug = strings.TrimSpace(roleSlug)
+	if roleSlug == "" {
+		return ""
+	}
+	for _, r := range roles {
+		if strings.TrimSpace(r.Slug) == roleSlug {
+			return strings.TrimSpace(r.UNTpRole)
+		}
+	}
+	return ""
 }
 
 func untpIssuer(baseURL string, cfg RuntimeConfig) UNTPCredentialIssuer {
@@ -186,12 +253,15 @@ func untpProductDescription(cfg RuntimeConfig) string {
 func buildUNTPDPPCredential(baseURL string, cfg RuntimeConfig, workflowKey string, process *Process, link string) UNTPCredential {
 	productID := absoluteDigitalLinkURL(baseURL, link)
 	subject := UNTPProduct{
-		Type:          []string{"Product"},
-		ID:            productID,
-		Name:          untpProductName(cfg),
-		Description:   untpProductDescription(cfg),
-		IDScheme:      UNTPIdentifierScheme{Type: []string{"IdentifierScheme"}, ID: gs1DigitalLinkSchemeID, Name: "GS1 Digital Link"},
-		IDGranularity: "item",
+		Type:                []string{untpProductType},
+		ID:                  productID,
+		Name:                untpProductName(cfg),
+		Description:         untpProductDescription(cfg),
+		IDScheme:            UNTPIdentifierScheme{Type: []string{"IdentifierScheme"}, ID: gs1DigitalLinkSchemeID, Name: "GS1 Digital Link"},
+		IDGranularity:       "item",
+		ProductCategory:     untpProductCategory(cfg),
+		ProducedAtFacility:  untpFacility(cfg.DPP.ProducedAtFacility),
+		CountryOfProduction: untpCountry(cfg.DPP.CountryOfProduction),
 		RelatedDocument: []UNTPLink{{
 			LinkURL:   productID + "/events",
 			LinkName:  "Digital Traceability Events",
@@ -264,6 +334,7 @@ func buildUNTPTraceabilityEvents(baseURL string, def WorkflowDef, cfg RuntimeCon
 				Product:     productRef,
 				Disposition: "active",
 			}},
+			ModifiedAtFacility: untpFacility(cfg.DPP.ProducedAtFacility),
 		}
 		if progress.DoneAt != nil {
 			event.EventDate = rfc3339UTC(*progress.DoneAt)
@@ -276,15 +347,17 @@ func buildUNTPTraceabilityEvents(baseURL string, def WorkflowDef, cfg RuntimeCon
 					role = strings.TrimSpace(sub.Roles[0])
 				}
 			}
-			if actorID := strings.TrimSpace(progress.DoneBy.ID); actorID != "" {
-				event.RelatedParty = []UNTPPartyRole{{
-					Role: role,
-					Party: UNTPParty{
-						Type: []string{"Party"},
-						ID:   baseURL + "/#actor=" + url.QueryEscape(actorID),
-						Name: actorID,
-					},
-				}}
+			if untpRole := untpRoleFor(cfg.Roles, role); untpRole != "" {
+				if actorID := strings.TrimSpace(progress.DoneBy.ID); actorID != "" {
+					event.RelatedParty = []UNTPPartyRole{{
+						Role: untpRole,
+						Party: UNTPParty{
+							Type: []string{"Party"},
+							ID:   baseURL + "/#actor=" + url.QueryEscape(actorID),
+							Name: actorID,
+						},
+					}}
+				}
 			}
 		}
 		for _, meta := range attachmentsFromValue(progress.Data) {

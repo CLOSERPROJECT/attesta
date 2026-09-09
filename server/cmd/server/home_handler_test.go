@@ -314,7 +314,7 @@ users:
 func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
 	tempDir := t.TempDir()
 	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha Plain Stream", "string", "No passport")
-	writePublicHomeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "beta.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+	writePublicHomeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "beta.yaml"), dppSubjectYAML("9506000134352"))
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)

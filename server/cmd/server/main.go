@@ -250,21 +250,49 @@ type WorkflowOrganization struct {
 }
 
 type WorkflowRole struct {
-	OrgSlug string `yaml:"orgSlug"`
-	Slug    string `yaml:"slug"`
-	Name    string `yaml:"name"`
+	OrgSlug  string `yaml:"orgSlug"`
+	Slug     string `yaml:"slug"`
+	Name     string `yaml:"name"`
+	UNTpRole string `yaml:"untpRole"` // UNTP PartyRole for DTE relatedParty; optional
 }
 
 type DPPConfig struct {
-	Enabled            bool   `yaml:"enabled"`
-	GTIN               string `yaml:"gtin"`
-	LotInputKey        string `yaml:"lotInputKey"`
-	LotDefault         string `yaml:"lotDefault"`
-	SerialInputKey     string `yaml:"serialInputKey"`
-	SerialStrategy     string `yaml:"serialStrategy"`
-	ProductName        string `yaml:"productName"`
-	ProductDescription string `yaml:"productDescription"`
-	OwnerName          string `yaml:"ownerName"`
+	Enabled             bool                `yaml:"enabled"`
+	GTIN                string              `yaml:"gtin"`
+	LotInputKey         string              `yaml:"lotInputKey"`
+	LotDefault          string              `yaml:"lotDefault"`
+	SerialInputKey      string              `yaml:"serialInputKey"`
+	SerialStrategy      string              `yaml:"serialStrategy"`
+	ProductName         string              `yaml:"productName"`
+	ProductDescription  string              `yaml:"productDescription"`
+	OwnerName           string              `yaml:"ownerName"`
+	ProductCategory     *DPPProductCategory `yaml:"productCategory"`
+	ProducedAtFacility  *DPPFacility        `yaml:"producedAtFacility"`
+	CountryOfProduction *DPPCountry         `yaml:"countryOfProduction"`
+}
+
+// DPPProductCategory is the UN CPC classification of the product, required by
+// the UNTP DPP schema on the Product subject.
+type DPPProductCategory struct {
+	Code       string `yaml:"code"`
+	Name       string `yaml:"name"`
+	SchemeID   string `yaml:"schemeId"`
+	SchemeName string `yaml:"schemeName"`
+}
+
+// DPPFacility identifies the production facility. Required on the DPP Product
+// subject (producedAtFacility) and on every DTE ModifyEvent
+// (modifiedAtFacility).
+type DPPFacility struct {
+	ID           string `yaml:"id"`
+	Name         string `yaml:"name"`
+	RegisteredID string `yaml:"registeredId"`
+}
+
+// DPPCountry is the ISO 3166-1 alpha-2 country of production.
+type DPPCountry struct {
+	CountryCode string `yaml:"countryCode"`
+	CountryName string `yaml:"countryName"`
 }
 
 type RoleMeta struct {
@@ -7639,6 +7667,58 @@ func normalizeDPPConfig(cfg *DPPConfig) error {
 		return err
 	}
 	cfg.GTIN = normalizedGTIN
+
+	if err := normalizeDPPSubjectConfig(cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+const (
+	untpCPCSchemeID   = "https://unstats.un.org/unsd/classifications/Econ/cpc/"
+	untpCPCSchemeName = "UN Central Product Classification (CPC)"
+)
+
+// normalizeDPPSubjectConfig trims and validates the credential subject data
+// required by the UNTP DPP and DTE schemas. Scheme fields default to the UN
+// Central Product Classification for productCategory.
+func normalizeDPPSubjectConfig(cfg *DPPConfig) error {
+	if cfg.ProductCategory != nil {
+		cfg.ProductCategory.Code = strings.TrimSpace(cfg.ProductCategory.Code)
+		cfg.ProductCategory.Name = strings.TrimSpace(cfg.ProductCategory.Name)
+		cfg.ProductCategory.SchemeID = strings.TrimSpace(cfg.ProductCategory.SchemeID)
+		cfg.ProductCategory.SchemeName = strings.TrimSpace(cfg.ProductCategory.SchemeName)
+		if cfg.ProductCategory.Code == "" || cfg.ProductCategory.Name == "" {
+			return errors.New("dpp.productCategory.code and dpp.productCategory.name are required when dpp.enabled=true")
+		}
+		if cfg.ProductCategory.SchemeID == "" {
+			cfg.ProductCategory.SchemeID = untpCPCSchemeID
+		}
+		if cfg.ProductCategory.SchemeName == "" {
+			cfg.ProductCategory.SchemeName = untpCPCSchemeName
+		}
+	} else {
+		return errors.New("dpp.productCategory is required when dpp.enabled=true")
+	}
+
+	if cfg.ProducedAtFacility == nil {
+		return errors.New("dpp.producedAtFacility is required when dpp.enabled=true")
+	}
+	cfg.ProducedAtFacility.ID = strings.TrimSpace(cfg.ProducedAtFacility.ID)
+	cfg.ProducedAtFacility.Name = strings.TrimSpace(cfg.ProducedAtFacility.Name)
+	cfg.ProducedAtFacility.RegisteredID = strings.TrimSpace(cfg.ProducedAtFacility.RegisteredID)
+	if cfg.ProducedAtFacility.ID == "" || cfg.ProducedAtFacility.Name == "" {
+		return errors.New("dpp.producedAtFacility.id and dpp.producedAtFacility.name are required when dpp.enabled=true")
+	}
+
+	if cfg.CountryOfProduction == nil {
+		return errors.New("dpp.countryOfProduction is required when dpp.enabled=true")
+	}
+	cfg.CountryOfProduction.CountryCode = strings.TrimSpace(cfg.CountryOfProduction.CountryCode)
+	cfg.CountryOfProduction.CountryName = strings.TrimSpace(cfg.CountryOfProduction.CountryName)
+	if cfg.CountryOfProduction.CountryCode == "" {
+		return errors.New("dpp.countryOfProduction.countryCode is required when dpp.enabled=true")
+	}
 	return nil
 }
 
