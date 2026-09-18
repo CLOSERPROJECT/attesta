@@ -201,25 +201,21 @@
 
     const addRoleDialog = document.getElementById("add-role-dialog");
     if (addRoleDialog && {{if and .RoleError (eq .RoleDialogAction "create")}}true{{else}}false{{end}} && !addRoleDialog.open) {
-      setOrgAdminPanel("roles");
       addRoleDialog.showModal();
     }
 
     const editRoleDialog = document.getElementById("edit-role-{{.RoleDialogSlug}}");
     if (editRoleDialog && {{if and .RoleError (eq .RoleDialogAction "edit") .RoleDialogSlug}}true{{else}}false{{end}} && !editRoleDialog.open) {
-      setOrgAdminPanel("roles");
       editRoleDialog.showModal();
     }
 
     const deleteRoleDialog = document.getElementById("delete-role-{{.RoleDialogSlug}}");
     if (deleteRoleDialog && {{if and .RoleError (eq .RoleDialogAction "delete") .RoleDialogSlug}}true{{else}}false{{end}} && !deleteRoleDialog.open) {
-      setOrgAdminPanel("roles");
       deleteRoleDialog.showModal();
     }
 
     const addUserDialog = document.getElementById("add-user-dialog");
     if (addUserDialog && {{if or .InviteError .InviteLink}}true{{else}}false{{end}} && !addUserDialog.open) {
-      setOrgAdminPanel("members");
       addUserDialog.showModal();
     }
 
@@ -790,6 +786,96 @@
     {{ else }}
       <p class="muted">No organization roles yet</p>
     {{ end }}
+
+    <dialog
+      id="add-role-dialog"
+      class="dialog dialog-overflow"
+    >
+      <div class="dialog-card">
+        <header class="dialog-head">
+          <div>
+            <h3 class="dialog-title">Add Role</h3>
+            <p class="dialog-subtitle">
+              Create a new role for your organization
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost btn-icon dialog-close"
+            onclick="document.getElementById('add-role-dialog').close()"
+          >
+            {{ template "icon-close" . }}
+          </button>
+        </header>
+
+        <form method="post" action="/my/organization/roles" class="input-form">
+          <input type="hidden" name="intent" value="create_role" />
+          <div class="form-field">
+            <label for="role-name">Role name</label>
+            <input
+              id="role-name"
+              name="name"
+              type="text"
+              {{ if and (eq .RoleDialogAction "create") .RoleDialogName }}
+                value="{{ .RoleDialogName }}"
+              {{ end }}
+              required
+            />
+          </div>
+          <div class="form-field">
+            <label for="role-palette">Role color palette</label>
+            <div class="role-palette-picker" data-role-palette-picker data-role-palette-auto>
+              <div class="role-palette-select-wrap">
+                <select
+                  id="role-palette"
+                  name="palette"
+                  required
+                  class="role-palette-native-select"
+                  data-role-palette-select
+                >
+                  {{ template "role-palette-options" (or .RoleDialogPalette "red") }}
+                </select>
+                <button
+                  type="button"
+                  class="roles-picker-toggle role-palette-toggle"
+                  data-role-palette-toggle
+                  aria-expanded="false"
+                >
+                  <span data-role-palette-toggle-label></span>
+                  <span
+                    class="roles-picker-toggle-icon"
+                    aria-hidden="true"
+                  >
+                    {{ template "icon-chevron-down" . }}
+                  </span>
+                </button>
+                <div
+                  class="roles-picker-menu role-palette-menu"
+                  data-role-palette-menu
+                  hidden
+                >
+                  <ul
+                    class="roles-picker-options"
+                    data-role-palette-options
+                  ></ul>
+                </div>
+              </div>
+              <span
+                class="role-palette-preview"
+                aria-hidden="true"
+                data-role-palette-preview
+              ></span>
+            </div>
+          </div>
+          {{ if and .RoleError (eq .RoleDialogAction "create") }}
+            <p class="error">{{ .RoleError }}</p>
+          {{ end }}
+          <div class="dialog-actions">
+            <button class="btn btn-primary" type="submit">Create role</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
   </section>
 {{ end }}
 
@@ -1024,6 +1110,96 @@
     {{ else }}
       <p class="muted">No organization users yet</p>
     {{ end }}
+
+    <dialog
+      id="add-user-dialog"
+      class="dialog dialog-overflow"
+    >
+      <div class="dialog-card">
+        <header class="dialog-head">
+          <div>
+            <h3 class="dialog-title">Add User</h3>
+            <p class="dialog-subtitle">
+              Invite a new user to your organization
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost btn-icon dialog-close"
+            onclick="document.getElementById('add-user-dialog').close()"
+          >
+            {{ template "icon-close" . }}
+          </button>
+        </header>
+
+        <form method="post" action="/my/organization/users" class="input-form">
+          <input type="hidden" name="intent" value="invite" />
+          <div class="form-field">
+            <label for="user-email">Email</label>
+            <input id="user-email" name="email" type="email" required />
+          </div>
+          <div class="form-field">
+            <label>Roles</label>
+            <div class="roles-picker" data-role-picker>
+              <button
+                type="button"
+                class="roles-picker-toggle"
+                data-role-picker-toggle
+                aria-expanded="false"
+              >
+                <span data-role-picker-toggle-label>Select roles</span>
+                <span
+                  class="roles-picker-toggle-icon"
+                  aria-hidden="true"
+                >
+                  {{ template "icon-chevron-down" . }}
+                </span>
+              </button>
+              <div class="roles-picker-menu" data-role-picker-menu hidden>
+                <input
+                  type="search"
+                  class="roles-picker-search"
+                  data-role-picker-search
+                  placeholder="Search roles..."
+                />
+                <ul class="roles-picker-options">
+                  {{ range .Roles }}
+                    <li>
+                      <button
+                        type="button"
+                        class="roles-picker-option"
+                        data-role-picker-option
+                        data-value="{{ .Slug }}"
+                        data-label="{{ .Name }} ({{ .Slug }})"
+                      >
+                        <span>{{ .Name }} ({{ .Slug }})</span>
+                        <span class="roles-picker-option-check"
+                          >Selected</span
+                        >
+                      </button>
+                    </li>
+                  {{ end }}
+                </ul>
+                <p
+                  class="roles-picker-empty"
+                  data-role-picker-empty
+                  hidden
+                >
+                  No roles match your search
+                </p>
+              </div>
+              <div data-role-picker-hidden-inputs></div>
+            </div>
+          </div>
+          {{ if .InviteError }}
+            <p class="error">{{ .InviteError }}</p>
+          {{ end }}
+          <div class="dialog-actions">
+            <button class="btn btn-primary" type="submit">Create invite</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
   </section>
 {{ end }}
 

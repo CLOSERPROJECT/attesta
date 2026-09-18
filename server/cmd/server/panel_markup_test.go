@@ -377,6 +377,8 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 		`class="panel-heading"`,
 		"<h2>Roles</h2>",
 		"Add role",
+		`id="add-role-dialog"`,
+		`onclick="document.getElementById('add-role-dialog').showModal()"`,
 	} {
 		if !strings.Contains(rolesSection, want) {
 			t.Fatalf("expected %q in roles panel markup, got:\n%s", want, rolesSection)
@@ -386,11 +388,48 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	headIdx := strings.Index(rolesSection, `class="panel-head-actions"`)
 	headingIdx := strings.Index(rolesSection, `class="panel-heading"`)
 	btnIdx := strings.Index(rolesSection, "Add role")
-	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
-		t.Fatal("expected panel-head-actions, panel-heading, and Add role button in roles section")
+	dialogIdx := strings.Index(rolesSection, `id="add-role-dialog"`)
+	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 || dialogIdx == -1 {
+		t.Fatal("expected panel-head-actions, panel-heading, Add role button, and add-role-dialog in roles section")
 	}
 	if !(headIdx < headingIdx && headingIdx < btnIdx) {
 		t.Fatalf("expected panel-heading before Add role button inside panel-head-actions block")
+	}
+	if !(btnIdx < dialogIdx) {
+		t.Fatalf("expected Add role button before add-role-dialog")
+	}
+}
+
+func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	view := OrgAdminView{
+		ActivePanel: "members",
+		Organization: Organization{
+			Name: "Acme Org",
+			Slug: "acme-org",
+		},
+		Roles: []Role{
+			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald"},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "org_admin_body", view); err != nil {
+		t.Fatalf("render org_admin_body: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`id="add-user-dialog"`,
+		`onclick="document.getElementById('add-user-dialog').showModal()"`,
+		"Add user",
+		`name="intent" value="invite"`,
+		"Create invite",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in members panel markup, got:\n%s", want, body)
+		}
 	}
 }
 
