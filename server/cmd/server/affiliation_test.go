@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,6 +171,53 @@ func TestAffiliationPendingIntentEmpty(t *testing.T) {
 	}
 	if pending {
 		t.Fatal("expected no pending affiliation intent")
+	}
+}
+
+func TestWithdrawPendingJoinAndOrgCreationRequests(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	identity := &fakeIdentityStore{
+		getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+			if slug == "acme" {
+				return &IdentityOrg{
+					Slug:  "acme",
+					Name:  "Acme",
+					Roles: []IdentityRole{{Slug: "operator", Name: "Operator"}},
+				}, nil
+			}
+			return nil, ErrIdentityNotFound
+		},
+		listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+			return []IdentityUser{{ID: "admin-1", Email: "a@example.com", IsOrgAdmin: true}}, nil
+		},
+	}
+	aff := NewAffiliation(identity, store, &recordingMailer{}, time.Now, []string{"platform@example.com"})
+	user := IdentityUser{ID: "user-1", Email: "u@example.com"}
+
+	if _, err := aff.SubmitJoinRequest(ctx, user, "acme", []string{"operator"}); err != nil {
+		t.Fatalf("SubmitJoinRequest: %v", err)
+	}
+	if err := aff.WithdrawPendingJoinRequest(ctx, user); err != nil {
+		t.Fatalf("WithdrawPendingJoinRequest: %v", err)
+	}
+	pending, err := aff.HasPendingAffiliationIntent(ctx, user.ID)
+	if err != nil || pending {
+		t.Fatalf("pending after join withdraw=%v err=%v", pending, err)
+	}
+	if err := aff.WithdrawPendingJoinRequest(ctx, user); !errors.Is(err, ErrAffiliationNotFound) {
+		t.Fatalf("second withdraw err=%v, want NotFound", err)
+	}
+
+	if _, err := aff.SubmitOrganizationCreationRequest(ctx, user, "New Co"); err != nil {
+		t.Fatalf("SubmitOrganizationCreationRequest: %v", err)
+	}
+	if err := aff.WithdrawPendingOrganizationCreationRequest(ctx, user); err != nil {
+		t.Fatalf("WithdrawPendingOrganizationCreationRequest: %v", err)
+	}
+	pending, err = aff.HasPendingAffiliationIntent(ctx, user.ID)
+	if err != nil || pending {
+		t.Fatalf("pending after org withdraw=%v err=%v", pending, err)
 	}
 }
 
@@ -368,7 +416,7 @@ func TestServerAffiliationServiceSmoke(t *testing.T) {
 func TestSubmitOrganizationCreationRequestHappyPath(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()
-	mailer := &recordingMailer{}
+	mailer := &recordingMailer{publicBaseURL: "https://attesta.example"}
 	aff := NewAffiliation(&fakeIdentityStore{}, store, mailer, fixedNow, []string{"platform@example.com"})
 
 	user := IdentityUser{ID: "user-1", Email: "founder@example.com"}
@@ -395,6 +443,9 @@ func TestSubmitOrganizationCreationRequestHappyPath(t *testing.T) {
 	}
 	if len(msgs[0].To) != 1 || msgs[0].To[0] != "platform@example.com" {
 		t.Fatalf("to=%v", msgs[0].To)
+	}
+	if !strings.Contains(msgs[0].Body, "Open: https://attesta.example/admin/organizations") {
+		t.Fatalf("body missing action link: %q", msgs[0].Body)
 	}
 
 	pending, err := aff.ListPendingOrganizationCreationRequests(ctx)

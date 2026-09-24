@@ -13,9 +13,39 @@ import (
 func TestNewMailerFromEnvNoopWhenHostEmpty(t *testing.T) {
 	t.Setenv("SMTP_HOST", "")
 	t.Setenv("SMTP_PORT", "1025")
+	t.Setenv("PUBLIC_BASE_URL", "https://app.example")
 	mailer := newMailerFromEnv()
-	if _, ok := mailer.(noopMailer); !ok {
+	nm, ok := mailer.(noopMailer)
+	if !ok {
 		t.Fatalf("expected noopMailer when SMTP_HOST empty, got %T", mailer)
+	}
+	if got := nm.AbsoluteURL("/my/organization"); got != "https://app.example/my/organization" {
+		t.Fatalf("AbsoluteURL = %q", got)
+	}
+}
+
+func TestMailAbsoluteURL(t *testing.T) {
+	cases := []struct {
+		base, path, want string
+	}{
+		{"https://app.example", "/my", "https://app.example/my"},
+		{"https://app.example/", "my", "https://app.example/my"},
+		{"https://app.example/", "/my/organization", "https://app.example/my/organization"},
+		{"", "/my/onboarding", "/my/onboarding"},
+		{"", "my/onboarding", "/my/onboarding"},
+		{"https://app.example", "", "https://app.example"},
+	}
+	for _, tc := range cases {
+		if got := mailAbsoluteURL(tc.base, tc.path); got != tc.want {
+			t.Fatalf("mailAbsoluteURL(%q, %q)=%q, want %q", tc.base, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestRecordingMailerAbsoluteURL(t *testing.T) {
+	m := &recordingMailer{publicBaseURL: "http://localhost:3000"}
+	if got := m.AbsoluteURL("my/organization/members"); got != "http://localhost:3000/my/organization/members" {
+		t.Fatalf("AbsoluteURL = %q", got)
 	}
 }
 
@@ -26,6 +56,7 @@ func TestNewMailerFromEnvSMTPWhenHostSet(t *testing.T) {
 	t.Setenv("SMTP_USER", "")
 	t.Setenv("SMTP_PASSWORD", "")
 	t.Setenv("SMTP_SECURE", "")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:3000")
 	mailer := newMailerFromEnv()
 	sm, ok := mailer.(*smtpMailer)
 	if !ok {
@@ -36,6 +67,12 @@ func TestNewMailerFromEnvSMTPWhenHostSet(t *testing.T) {
 	}
 	if sm.secure != smtpSecurePlain {
 		t.Fatalf("expected smtpSecurePlain, got %v", sm.secure)
+	}
+	if sm.publicBaseURL != "http://localhost:3000" {
+		t.Fatalf("publicBaseURL = %q", sm.publicBaseURL)
+	}
+	if got := sm.AbsoluteURL("/admin/organizations"); got != "http://localhost:3000/admin/organizations" {
+		t.Fatalf("AbsoluteURL = %q", got)
 	}
 }
 

@@ -110,6 +110,20 @@ func (s *MemoryStore) UpdateJoinRequest(_ context.Context, req JoinRequest) (Joi
 	return cloneJoinRequest(req), nil
 }
 
+func (s *MemoryStore) DeleteJoinRequest(_ context.Context, id primitive.ObjectID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureAffiliationMaps()
+	if id.IsZero() {
+		return mongo.ErrNoDocuments
+	}
+	if _, ok := s.joinRequests[id]; !ok {
+		return mongo.ErrNoDocuments
+	}
+	delete(s.joinRequests, id)
+	return nil
+}
+
 func (s *MemoryStore) ListPendingJoinRequestsByOrg(_ context.Context, orgSlug string) ([]JoinRequest, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -189,6 +203,20 @@ func (s *MemoryStore) UpdateOrganizationCreationRequest(_ context.Context, req O
 	}
 	s.organizationCreationRequests[req.ID] = cloneOrganizationCreationRequest(req)
 	return cloneOrganizationCreationRequest(req), nil
+}
+
+func (s *MemoryStore) DeleteOrganizationCreationRequest(_ context.Context, id primitive.ObjectID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureAffiliationMaps()
+	if id.IsZero() {
+		return mongo.ErrNoDocuments
+	}
+	if _, ok := s.organizationCreationRequests[id]; !ok {
+		return mongo.ErrNoDocuments
+	}
+	delete(s.organizationCreationRequests, id)
+	return nil
 }
 
 func (s *MemoryStore) ListPendingOrganizationCreationRequests(_ context.Context) ([]OrganizationCreationRequest, error) {
@@ -277,6 +305,20 @@ func (s *MongoStore) UpdateJoinRequest(ctx context.Context, req JoinRequest) (Jo
 		return JoinRequest{}, mongo.ErrNoDocuments
 	}
 	return req, nil
+}
+
+func (s *MongoStore) DeleteJoinRequest(ctx context.Context, id primitive.ObjectID) error {
+	if id.IsZero() {
+		return mongo.ErrNoDocuments
+	}
+	result, err := s.database().Collection(collectionJoinRequests).DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return err
+	}
+	if result != nil && result.DeletedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
 }
 
 func (s *MongoStore) ListPendingJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error) {
@@ -369,6 +411,20 @@ func (s *MongoStore) UpdateOrganizationCreationRequest(ctx context.Context, req 
 		return OrganizationCreationRequest{}, mongo.ErrNoDocuments
 	}
 	return req, nil
+}
+
+func (s *MongoStore) DeleteOrganizationCreationRequest(ctx context.Context, id primitive.ObjectID) error {
+	if id.IsZero() {
+		return mongo.ErrNoDocuments
+	}
+	result, err := s.database().Collection(collectionOrganizationCreationRequests).DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return err
+	}
+	if result != nil && result.DeletedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
 }
 
 func (s *MongoStore) ListPendingOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error) {

@@ -35,28 +35,31 @@ func parseSMTPSecure(v string) smtpSecureMode {
 
 // smtpMailer sends plaintext MailMessage over SMTP (stdlib net/smtp).
 type smtpMailer struct {
-	host     string
-	port     string
-	username string
-	password string
-	from     string
-	secure   smtpSecureMode
+	host          string
+	port          string
+	username      string
+	password      string
+	from          string
+	secure        smtpSecureMode
+	publicBaseURL string
 }
 
 // newMailerFromEnv returns an SMTP mailer when SMTP_HOST is set; otherwise noopMailer.
 //
 // Env:
 //
-//	SMTP_HOST     — required to enable (empty → noop)
-//	SMTP_PORT     — default 1025 (Mailpit)
-//	SMTP_USER     — optional (empty OK for Mailpit)
-//	SMTP_PASSWORD — optional
-//	SMTP_FROM     — default attesta@localhost
-//	SMTP_SECURE   — empty/plain for Mailpit; "true"|"starttls" for STARTTLS; "tls" for implicit TLS (465)
+//	SMTP_HOST        — required to enable (empty → noop)
+//	SMTP_PORT        — default 1025 (Mailpit)
+//	SMTP_USER        — optional (empty OK for Mailpit)
+//	SMTP_PASSWORD    — optional
+//	SMTP_FROM        — default attesta@localhost
+//	SMTP_SECURE      — empty/plain for Mailpit; "true"|"starttls" for STARTTLS; "tls" for implicit TLS (465)
+//	PUBLIC_BASE_URL  — origin for AbsoluteURL (e.g. http://localhost:3000); empty → path-only links
 func newMailerFromEnv() Mailer {
+	publicBaseURL := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL"))
 	host := strings.TrimSpace(os.Getenv("SMTP_HOST"))
 	if host == "" {
-		return noopMailer{}
+		return noopMailer{publicBaseURL: publicBaseURL}
 	}
 	port := strings.TrimSpace(os.Getenv("SMTP_PORT"))
 	if port == "" {
@@ -67,13 +70,18 @@ func newMailerFromEnv() Mailer {
 		from = "attesta@localhost"
 	}
 	return &smtpMailer{
-		host:     host,
-		port:     port,
-		username: strings.TrimSpace(os.Getenv("SMTP_USER")),
-		password: os.Getenv("SMTP_PASSWORD"),
-		from:     from,
-		secure:   parseSMTPSecure(os.Getenv("SMTP_SECURE")),
+		host:          host,
+		port:          port,
+		username:      strings.TrimSpace(os.Getenv("SMTP_USER")),
+		password:      os.Getenv("SMTP_PASSWORD"),
+		from:          from,
+		secure:        parseSMTPSecure(os.Getenv("SMTP_SECURE")),
+		publicBaseURL: publicBaseURL,
 	}
+}
+
+func (m *smtpMailer) AbsoluteURL(path string) string {
+	return mailAbsoluteURL(m.publicBaseURL, path)
 }
 
 func (m *smtpMailer) Send(ctx context.Context, msg MailMessage) error {

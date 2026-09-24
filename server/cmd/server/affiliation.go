@@ -76,12 +76,14 @@ type affiliationStore interface {
 	InsertJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
 	LoadJoinRequestByID(ctx context.Context, id primitive.ObjectID) (*JoinRequest, error)
 	UpdateJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
+	DeleteJoinRequest(ctx context.Context, id primitive.ObjectID) error
 	FindPendingJoinRequestByUser(ctx context.Context, userID string) (*JoinRequest, error)
 	ListPendingJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error)
 
 	InsertOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
 	LoadOrganizationCreationRequestByID(ctx context.Context, id primitive.ObjectID) (*OrganizationCreationRequest, error)
 	UpdateOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
+	DeleteOrganizationCreationRequest(ctx context.Context, id primitive.ObjectID) error
 	FindPendingOrganizationCreationRequestByUser(ctx context.Context, userID string) (*OrganizationCreationRequest, error)
 	ListPendingOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error)
 }
@@ -229,6 +231,56 @@ func (a *Affiliation) PendingOrganizationCreationRequestForUser(ctx context.Cont
 	return a.store.FindPendingOrganizationCreationRequestByUser(ctx, userID)
 }
 
+// WithdrawPendingJoinRequest deletes the caller's pending join request (as if never submitted).
+func (a *Affiliation) WithdrawPendingJoinRequest(ctx context.Context, user IdentityUser) error {
+	uid := strings.TrimSpace(user.ID)
+	if uid == "" {
+		return ErrAffiliationNotFound
+	}
+	pending, err := a.PendingJoinRequestForUser(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if pending == nil {
+		return ErrAffiliationNotFound
+	}
+	if pending.Status != AffiliationStatusPending {
+		return ErrAffiliationNotPending
+	}
+	if err := a.store.DeleteJoinRequest(ctx, pending.ID); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return ErrAffiliationNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// WithdrawPendingOrganizationCreationRequest deletes the caller's pending org-creation request.
+func (a *Affiliation) WithdrawPendingOrganizationCreationRequest(ctx context.Context, user IdentityUser) error {
+	uid := strings.TrimSpace(user.ID)
+	if uid == "" {
+		return ErrAffiliationNotFound
+	}
+	pending, err := a.PendingOrganizationCreationRequestForUser(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if pending == nil {
+		return ErrAffiliationNotFound
+	}
+	if pending.Status != AffiliationStatusPending {
+		return ErrAffiliationNotPending
+	}
+	if err := a.store.DeleteOrganizationCreationRequest(ctx, pending.ID); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return ErrAffiliationNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func (a *Affiliation) HasPendingAffiliationIntent(ctx context.Context, userID string) (bool, error) {
 	join, err := a.PendingJoinRequestForUser(ctx, userID)
 	if err != nil {
@@ -337,8 +389,8 @@ func (a *Affiliation) ApproveJoinRequest(ctx context.Context, requestID primitiv
 			To:      []string{email},
 			Subject: "Join request approved: " + org.Name,
 			Body: fmt.Sprintf(
-				"Your request to join organization %q (slug %q) was approved.",
-				org.Name, org.Slug,
+				"Your request to join organization %q (slug %q) was approved.\n\nOpen: %s",
+				org.Name, org.Slug, a.actionURL("/my/organization"),
 			),
 		})
 	}
@@ -373,6 +425,7 @@ func (a *Affiliation) RejectJoinRequest(ctx context.Context, requestID primitive
 		if updated.RejectReason != "" {
 			body += " Reason: " + updated.RejectReason
 		}
+		body += "\n\nOpen: " + a.actionURL("/my/onboarding")
 		a.notify(ctx, MailMessage{
 			Kind:    MailKindJoinRejected,
 			To:      []string{email},
@@ -423,8 +476,8 @@ func (a *Affiliation) SubmitOrganizationCreationRequest(ctx context.Context, use
 			To:      append([]string(nil), a.platformAdminNotifyEmails...),
 			Subject: "Organization creation request: " + name,
 			Body: fmt.Sprintf(
-				"Requester %s submitted an organization creation request for %q (slug %q).",
-				strings.TrimSpace(user.Email), name, proposedSlug,
+				"Requester %s submitted an organization creation request for %q (slug %q).\n\nOpen: %s",
+				strings.TrimSpace(user.Email), name, proposedSlug, a.actionURL("/admin/organizations"),
 			),
 		})
 	}
@@ -479,8 +532,8 @@ func (a *Affiliation) ApproveOrganizationCreationRequest(ctx context.Context, re
 			To:      []string{email},
 			Subject: "Organization creation approved: " + updated.ProposedName,
 			Body: fmt.Sprintf(
-				"Your request to create organization %q (slug %q) was approved.",
-				updated.ProposedName, updated.ProposedSlug,
+				"Your request to create organization %q (slug %q) was approved.\n\nOpen: %s",
+				updated.ProposedName, updated.ProposedSlug, a.actionURL("/my/organization"),
 			),
 		})
 	}
@@ -512,6 +565,7 @@ func (a *Affiliation) RejectOrganizationCreationRequest(ctx context.Context, req
 		if updated.RejectReason != "" {
 			body += " Reason: " + updated.RejectReason
 		}
+		body += "\n\nOpen: " + a.actionURL("/my/onboarding")
 		a.notify(ctx, MailMessage{
 			Kind:    MailKindOrgCreationRejected,
 			To:      []string{email},
@@ -621,8 +675,8 @@ func ensureDeciderOrgMatches(decidedBy IdentityUser, orgSlug string) error {
 	return nil
 }
 
-// RequestableJoinRoles returns catalog roles that may be requested when joining an organization.
-// Org-admin roles are never requestable.
+// RequestableJoinRoles returns Organization roles that may be named on a Join request.
+// Org admin is membership standing, not an Organization role, and is never requestable here.
 func (a *Affiliation) RequestableJoinRoles(org IdentityOrg) []Role {
 	return requestableJoinRoles(org)
 }
@@ -754,10 +808,17 @@ func (a *Affiliation) notifyJoinSubmitted(ctx context.Context, req JoinRequest, 
 		To:      to,
 		Subject: "Join request: " + org.Name,
 		Body: fmt.Sprintf(
-			"Requester %s submitted a join request for organization %q (slug %q) with roles %v.",
-			strings.TrimSpace(req.RequesterEmail), org.Name, org.Slug, req.RoleSlugs,
+			"Requester %s submitted a join request for organization %q (slug %q) with roles %v.\n\nOpen: %s",
+			strings.TrimSpace(req.RequesterEmail), org.Name, org.Slug, req.RoleSlugs, a.actionURL("/my/organization/members"),
 		),
 	})
+}
+
+func (a *Affiliation) actionURL(path string) string {
+	if a.mailer == nil {
+		return mailAbsoluteURL("", path)
+	}
+	return a.mailer.AbsoluteURL(path)
 }
 
 func (a *Affiliation) notify(ctx context.Context, msg MailMessage) {
