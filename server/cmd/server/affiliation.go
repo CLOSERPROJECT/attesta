@@ -198,28 +198,7 @@ func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret strin
 		return err
 	}
 
-	userID := strings.TrimSpace(current.ID)
-	if userID == "" {
-		return nil
-	}
-	targetUser, getErr := a.identity.GetUserByID(ctx, userID)
-	if getErr != nil {
-		if errors.Is(getErr, ErrIdentityNotFound) {
-			return nil
-		}
-		return getErr
-	}
-	labels := make([]string, 0, len(targetUser.Labels))
-	for _, label := range targetUser.Labels {
-		if isManagedIdentityLabel(label) {
-			continue
-		}
-		labels = append(labels, strings.TrimSpace(label))
-	}
-	if _, err := a.identity.UpdateUserLabels(ctx, userID, labels); err != nil {
-		return err
-	}
-	return nil
+	return a.stripManagedIdentityLabels(ctx, current.ID)
 }
 
 func (a *Affiliation) PendingJoinRequestForUser(ctx context.Context, userID string) (*JoinRequest, error) {
@@ -327,13 +306,8 @@ func (a *Affiliation) ApproveJoinRequest(ctx context.Context, requestID primitiv
 		return JoinRequest{}, err
 	}
 
-	membership, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, roles, false)
-	if err != nil {
+	if err := a.grantOrganizationMembership(ctx, org.Slug, req.RequesterUserID, roles, false); err != nil {
 		_ = a.compensateJoinRequestToPending(ctx, updated)
-		return JoinRequest{}, err
-	}
-	if err := a.stampJoinRequestRoleLabels(ctx, req.RequesterUserID, roles); err != nil {
-		a.compensateJoinRequestAfterIdentity(ctx, updated, org.Slug, membership.ID)
 		return JoinRequest{}, err
 	}
 
@@ -474,11 +448,7 @@ func (a *Affiliation) ApproveOrganizationCreationRequest(ctx context.Context, re
 		_ = a.compensateOrganizationCreationRequestToPending(ctx, updated)
 		return OrganizationCreationRequest{}, IdentityOrg{}, err
 	}
-	if _, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, nil, true); err != nil {
-		a.compensateOrganizationCreationAfterIdentity(ctx, updated, org)
-		return OrganizationCreationRequest{}, IdentityOrg{}, err
-	}
-	if err := a.stampOrgAdminLabel(ctx, req.RequesterUserID); err != nil {
+	if err := a.grantOrganizationMembership(ctx, org.Slug, req.RequesterUserID, nil, true); err != nil {
 		a.compensateOrganizationCreationAfterIdentity(ctx, updated, org)
 		return OrganizationCreationRequest{}, IdentityOrg{}, err
 	}
@@ -542,16 +512,6 @@ func (a *Affiliation) compensateOrganizationCreationRequestToPending(ctx context
 	req.Status, req.RejectReason, req.DecidedByUserID, req.DecidedAt, req.UpdatedAt = clearAffiliationDecision(a.now().UTC())
 	_, err := a.store.UpdateOrganizationCreationRequest(ctx, req)
 	return err
-}
-
-// compensateJoinRequestAfterIdentity best-effort deletes the membership created during approve
-// (when membershipID is set), then reverts the request to pending. If delete fails, status is
-// still reverted so the request can be retried after manual cleanup.
-func (a *Affiliation) compensateJoinRequestAfterIdentity(ctx context.Context, req JoinRequest, orgSlug, membershipID string) {
-	if id := strings.TrimSpace(membershipID); id != "" {
-		_ = a.identity.DeleteOrganizationMembershipAsAdmin(ctx, strings.TrimSpace(orgSlug), id)
-	}
-	_ = a.compensateJoinRequestToPending(ctx, req)
 }
 
 // compensateOrganizationCreationAfterIdentity reverts the request to pending and best-effort
@@ -676,29 +636,31 @@ func validateJoinRequestRoles(org IdentityOrg, roleSlugs []string) ([]string, er
 	return roles, nil
 }
 
-func (a *Affiliation) stampOrgAdminLabel(ctx context.Context, userID string) error {
-	user, err := a.identity.GetUserByID(ctx, userID)
+// grantOrganizationMembership adds the user to the organization and stamps managed labels
+// (role labels and/or org-admin). On stamp failure it best-effort deletes the membership
+// just created and returns the stamp error.
+func (a *Affiliation) grantOrganizationMembership(ctx context.Context, orgSlug, userID string, roles []string, isOrgAdmin bool) error {
+	orgSlug = strings.TrimSpace(orgSlug)
+	userID = strings.TrimSpace(userID)
+	membership, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, orgSlug, userID, roles, isOrgAdmin)
 	if err != nil {
 		return err
 	}
-	labels := make([]string, 0, len(user.Labels)+1)
-	for _, label := range user.Labels {
-		if strings.EqualFold(strings.TrimSpace(label), identityOrgAdminLabel) {
-			continue
+	if err := a.stampManagedMembershipLabels(ctx, userID, roles, isOrgAdmin); err != nil {
+		if id := strings.TrimSpace(membership.ID); id != "" {
+			_ = a.identity.DeleteOrganizationMembershipAsAdmin(ctx, orgSlug, id)
 		}
-		labels = append(labels, strings.TrimSpace(label))
+		return err
 	}
-	labels = append(labels, identityOrgAdminLabel)
-	_, err = a.identity.UpdateUserLabels(ctx, userID, uniqueIdentityStrings(labels))
-	return err
+	return nil
 }
 
-func (a *Affiliation) stampJoinRequestRoleLabels(ctx context.Context, userID string, roleSlugs []string) error {
+func (a *Affiliation) stampManagedMembershipLabels(ctx context.Context, userID string, roleSlugs []string, isOrgAdmin bool) error {
 	user, err := a.identity.GetUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	labels := make([]string, 0, len(user.Labels)+len(roleSlugs))
+	labels := make([]string, 0, len(user.Labels)+len(roleSlugs)+1)
 	for _, label := range user.Labels {
 		if isManagedIdentityLabel(label) {
 			continue
@@ -708,7 +670,35 @@ func (a *Affiliation) stampJoinRequestRoleLabels(ctx context.Context, userID str
 	for _, roleSlug := range roleSlugs {
 		labels = append(labels, encodeIdentityRoleLabel(roleSlug))
 	}
+	if isOrgAdmin {
+		labels = append(labels, identityOrgAdminLabel)
+	}
 	_, err = a.identity.UpdateUserLabels(ctx, userID, uniqueIdentityStrings(labels))
+	return err
+}
+
+// stripManagedIdentityLabels removes role and org-admin labels from the user, leaving
+// any non-managed labels in place. Missing users are treated as already cleaned.
+func (a *Affiliation) stripManagedIdentityLabels(ctx context.Context, userID string) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil
+	}
+	targetUser, getErr := a.identity.GetUserByID(ctx, userID)
+	if getErr != nil {
+		if errors.Is(getErr, ErrIdentityNotFound) {
+			return nil
+		}
+		return getErr
+	}
+	labels := make([]string, 0, len(targetUser.Labels))
+	for _, label := range targetUser.Labels {
+		if isManagedIdentityLabel(label) {
+			continue
+		}
+		labels = append(labels, strings.TrimSpace(label))
+	}
+	_, err := a.identity.UpdateUserLabels(ctx, userID, labels)
 	return err
 }
 
