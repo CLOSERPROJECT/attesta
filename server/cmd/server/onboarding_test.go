@@ -82,13 +82,13 @@ func TestHandleOnboardingAffiliatedRedirectsHome(t *testing.T) {
 	}
 }
 
-func TestHandleOnboardingStubPages(t *testing.T) {
+func TestHandleOnboardingJoinAndRequestPages(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
-	sessionID := "session-onboarding-stubs"
+	sessionID := "session-onboarding-forms"
 	user := AccountUser{
 		ID:             primitive.NewObjectID(),
 		IdentityUserID: "user-3",
-		Email:          "stub@example.com",
+		Email:          "joiner@example.com",
 		Status:         "active",
 		CreatedAt:      now,
 	}
@@ -125,9 +125,6 @@ func TestHandleOnboardingStubPages(t *testing.T) {
 				t.Fatalf("expected %q, got:\n%s", want, body)
 			}
 		}
-		if strings.Contains(body, "Coming soon") {
-			t.Fatalf("did not expect stub copy, got:\n%s", body)
-		}
 	})
 
 	t.Run("request organization form", func(t *testing.T) {
@@ -150,9 +147,6 @@ func TestHandleOnboardingStubPages(t *testing.T) {
 			if !strings.Contains(body, want) {
 				t.Fatalf("expected %q, got:\n%s", want, body)
 			}
-		}
-		if strings.Contains(body, "Coming soon") {
-			t.Fatalf("did not expect stub copy, got:\n%s", body)
 		}
 	})
 }

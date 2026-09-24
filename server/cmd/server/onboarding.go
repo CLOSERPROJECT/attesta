@@ -16,14 +16,6 @@ type OnboardingHubView struct {
 	HomeHref       string
 }
 
-type OnboardingStubView struct {
-	PageBase
-	Title     string
-	Message   string
-	BackHref  string
-	BackLabel string
-}
-
 type OnboardingRequestOrganizationView struct {
 	PageBase
 	BackHref       string
@@ -265,27 +257,6 @@ func (s *Server) renderOnboardingRequestOrganization(w http.ResponseWriter, r *h
 		}
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "onboarding_request_organization.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) renderOnboardingStub(w http.ResponseWriter, r *http.Request, title, message string) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	user, ok := s.requireUnaffiliatedOnboarding(w, r)
-	if !ok {
-		return
-	}
-	view := OnboardingStubView{
-		PageBase:  s.pageBaseForUser(user, "onboarding_stub_body", "", ""),
-		Title:     title,
-		Message:   message,
-		BackHref:  onboardingPath(),
-		BackLabel: "Back to onboarding",
-	}
-	if err := s.tmpl.ExecuteTemplate(w, "onboarding_stub.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
