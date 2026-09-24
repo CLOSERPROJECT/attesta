@@ -1414,11 +1414,23 @@ func (s *Server) canViewCatalog(ctx context.Context, user *AccountUser) (bool, e
 }
 
 func (s *Server) canViewFormataBuilder(ctx context.Context, user *AccountUser) (bool, error) {
-	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, cerbosActionView)
+	return s.canAccessFormataBuilder(ctx, user, cerbosActionView)
 }
 
 func (s *Server) canSaveFormataBuilder(ctx context.Context, user *AccountUser) (bool, error) {
-	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, cerbosActionSave)
+	return s.canAccessFormataBuilder(ctx, user, cerbosActionSave)
+}
+
+// canAccessFormataBuilder gates Formata view/save: unaffiliated users are denied
+// before Cerbos; platform admins skip the affiliation check (empty OrgSlug is OK).
+func (s *Server) canAccessFormataBuilder(ctx context.Context, user *AccountUser, action string) (bool, error) {
+	if user == nil {
+		return false, nil
+	}
+	if !user.IsPlatformAdmin && !s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
+		return false, nil
+	}
+	return s.authorizeUserAction(ctx, user, cerbosResourceFormataBuilder, "formata-builder", nil, action)
 }
 
 func (s *Server) canEditStream(ctx context.Context, user *AccountUser, workflowKey string, createdByUserID string, hasProcesses bool) (bool, error) {
