@@ -138,9 +138,9 @@ func TestHandleOnboardingJoinAffiliatedBlocked(t *testing.T) {
 	if rec.Header().Get("Location") != "/my" {
 		t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
 	}
-	pending, err := store.FindPendingJoinRequestByUser(context.Background(), "user-2")
+	pending, err := server.affiliationService().PendingJoinRequestForUser(context.Background(), "user-2")
 	if err != nil {
-		t.Fatalf("FindPendingJoinRequestByUser: %v", err)
+		t.Fatalf("PendingJoinRequestForUser: %v", err)
 	}
 	if pending != nil {
 		t.Fatalf("expected no pending request for affiliated user, got %+v", pending)

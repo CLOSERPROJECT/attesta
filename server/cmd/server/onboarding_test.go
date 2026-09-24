@@ -23,6 +23,7 @@ func TestHandleOnboardingUnaffiliatedRendersHub(t *testing.T) {
 	}
 	server := &Server{
 		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		store:       NewMemoryStore(),
 		tmpl:        parseTestTemplates(t),
 		authorizer:  fakeAuthorizer{},
 		enforceAuth: true,
@@ -63,6 +64,7 @@ func TestHandleOnboardingAffiliatedRedirectsHome(t *testing.T) {
 	}
 	server := &Server{
 		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		store:       NewMemoryStore(),
 		tmpl:        parseTestTemplates(t),
 		authorizer:  fakeAuthorizer{},
 		enforceAuth: true,

@@ -65,18 +65,6 @@ type Store interface {
 	// contents change. Used to invalidate the workflow catalog cache across processes
 	// (e.g. seed-categories CLI while the server keeps running).
 	TaxonomyRevision(ctx context.Context) (int64, error)
-
-	InsertJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
-	LoadJoinRequestByID(ctx context.Context, id primitive.ObjectID) (*JoinRequest, error)
-	UpdateJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
-	ListJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error)
-	FindPendingJoinRequestByUser(ctx context.Context, userID string) (*JoinRequest, error)
-
-	InsertOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
-	LoadOrganizationCreationRequestByID(ctx context.Context, id primitive.ObjectID) (*OrganizationCreationRequest, error)
-	UpdateOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
-	ListOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error)
-	FindPendingOrganizationCreationRequestByUser(ctx context.Context, userID string) (*OrganizationCreationRequest, error)
 }
 
 type Organization struct {

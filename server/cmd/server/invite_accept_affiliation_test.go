@@ -31,7 +31,8 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 					return IdentitySession{}, errors.New("should not be called")
 				},
 			},
-			now: time.Now,
+			store: NewMemoryStore(),
+			now:   time.Now,
 		}
 		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=team-other&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
 		rec := httptest.NewRecorder()
@@ -69,7 +70,8 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 					return IdentityUser{ID: "user-1", Email: "member@example.com", OrgSlug: "acme", PasswordSet: true}, nil
 				},
 			},
-			now: time.Now,
+			store: NewMemoryStore(),
+			now:   time.Now,
 		}
 		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=team-acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
 		rec := httptest.NewRecorder()
@@ -98,7 +100,8 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 					return IdentityUser{ID: "user-1", Email: "new@example.com", PasswordSet: true}, nil
 				},
 			},
-			now: time.Now,
+			store: NewMemoryStore(),
+			now:   time.Now,
 		}
 		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=team-acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
 		rec := httptest.NewRecorder()
@@ -127,7 +130,8 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 					return IdentitySession{}, errors.New("should not be called")
 				},
 			},
-			now: time.Now,
+			store: NewMemoryStore(),
+			now:   time.Now,
 		}
 		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=team-other&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
 		rec := httptest.NewRecorder()

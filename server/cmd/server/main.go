@@ -7872,7 +7872,11 @@ func (s *Server) affiliationService() *Affiliation {
 	if mailer == nil {
 		mailer = noopMailer{}
 	}
-	s.affiliation = NewAffiliation(s.identity, s.store, mailer, s.now)
+	affStore, ok := s.store.(affiliationStore)
+	if !ok {
+		panic("store does not implement affiliationStore")
+	}
+	s.affiliation = NewAffiliation(s.identity, affStore, mailer, s.now)
 	return s.affiliation
 }
 

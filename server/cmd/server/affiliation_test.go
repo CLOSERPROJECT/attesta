@@ -220,6 +220,11 @@ func TestAffiliationJoinRequestRoundTrip(t *testing.T) {
 		t.Fatalf("HasPendingAffiliationIntent=%v err=%v", hasPending, err)
 	}
 
+	pendingListed, err := store.ListPendingJoinRequestsByOrg(ctx, "acme")
+	if err != nil || len(pendingListed) != 1 || pendingListed[0].ID != saved.ID {
+		t.Fatalf("pending listed=%v err=%v", pendingListed, err)
+	}
+
 	updated := *loaded
 	updated.Status = AffiliationStatusApproved
 	updated.DecidedByUserID = "admin-1"
@@ -233,9 +238,13 @@ func TestAffiliationJoinRequestRoundTrip(t *testing.T) {
 		t.Fatalf("updated=%+v", got)
 	}
 
-	listed, err := store.ListJoinRequestsByOrg(ctx, "acme")
-	if err != nil || len(listed) != 1 {
-		t.Fatalf("listed=%v err=%v", listed, err)
+	pendingAfter, err := aff.PendingJoinRequestForUser(ctx, "user-1")
+	if err != nil || pendingAfter != nil {
+		t.Fatalf("pending after approve=%+v err=%v", pendingAfter, err)
+	}
+	pendingListedAfter, err := store.ListPendingJoinRequestsByOrg(ctx, "acme")
+	if err != nil || len(pendingListedAfter) != 0 {
+		t.Fatalf("pending listed after approve=%v err=%v", pendingListedAfter, err)
 	}
 }
 
@@ -267,6 +276,11 @@ func TestAffiliationOrganizationCreationRequestRoundTrip(t *testing.T) {
 		t.Fatalf("pending=%+v err=%v", pending, err)
 	}
 
+	pendingListed, err := store.ListPendingOrganizationCreationRequests(ctx)
+	if err != nil || len(pendingListed) != 1 || pendingListed[0].ID != saved.ID {
+		t.Fatalf("pending listed=%v err=%v", pendingListed, err)
+	}
+
 	updated := *loaded
 	updated.Status = AffiliationStatusRejected
 	updated.RejectReason = "duplicate"
@@ -277,9 +291,13 @@ func TestAffiliationOrganizationCreationRequestRoundTrip(t *testing.T) {
 		t.Fatalf("updated=%+v err=%v", got, err)
 	}
 
-	listed, err := store.ListOrganizationCreationRequests(ctx)
-	if err != nil || len(listed) != 1 {
-		t.Fatalf("listed=%v err=%v", listed, err)
+	pendingAfter, err := aff.PendingOrganizationCreationRequestForUser(ctx, "user-2")
+	if err != nil || pendingAfter != nil {
+		t.Fatalf("pending after reject=%+v err=%v", pendingAfter, err)
+	}
+	pendingListedAfter, err := store.ListPendingOrganizationCreationRequests(ctx)
+	if err != nil || len(pendingListedAfter) != 0 {
+		t.Fatalf("pending listed after reject=%v err=%v", pendingListedAfter, err)
 	}
 }
 

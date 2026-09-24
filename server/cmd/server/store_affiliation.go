@@ -110,12 +110,15 @@ func (s *MemoryStore) UpdateJoinRequest(_ context.Context, req JoinRequest) (Joi
 	return cloneJoinRequest(req), nil
 }
 
-func (s *MemoryStore) ListJoinRequestsByOrg(_ context.Context, orgSlug string) ([]JoinRequest, error) {
+func (s *MemoryStore) ListPendingJoinRequestsByOrg(_ context.Context, orgSlug string) ([]JoinRequest, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	slug := strings.TrimSpace(orgSlug)
 	items := make([]JoinRequest, 0)
 	for _, req := range s.joinRequests {
+		if req.Status != AffiliationStatusPending {
+			continue
+		}
 		if slug != "" && req.OrgSlug != slug {
 			continue
 		}
@@ -188,11 +191,14 @@ func (s *MemoryStore) UpdateOrganizationCreationRequest(_ context.Context, req O
 	return cloneOrganizationCreationRequest(req), nil
 }
 
-func (s *MemoryStore) ListOrganizationCreationRequests(_ context.Context) ([]OrganizationCreationRequest, error) {
+func (s *MemoryStore) ListPendingOrganizationCreationRequests(_ context.Context) ([]OrganizationCreationRequest, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	items := make([]OrganizationCreationRequest, 0, len(s.organizationCreationRequests))
+	items := make([]OrganizationCreationRequest, 0)
 	for _, req := range s.organizationCreationRequests {
+		if req.Status != AffiliationStatusPending {
+			continue
+		}
 		items = append(items, cloneOrganizationCreationRequest(req))
 	}
 	sort.SliceStable(items, func(i, j int) bool {
@@ -273,8 +279,8 @@ func (s *MongoStore) UpdateJoinRequest(ctx context.Context, req JoinRequest) (Jo
 	return req, nil
 }
 
-func (s *MongoStore) ListJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error) {
-	filter := bson.M{}
+func (s *MongoStore) ListPendingJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error) {
+	filter := bson.M{"status": AffiliationStatusPending}
 	if slug := strings.TrimSpace(orgSlug); slug != "" {
 		filter["orgSlug"] = slug
 	}
@@ -365,9 +371,13 @@ func (s *MongoStore) UpdateOrganizationCreationRequest(ctx context.Context, req 
 	return req, nil
 }
 
-func (s *MongoStore) ListOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error) {
+func (s *MongoStore) ListPendingOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error) {
 	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}, {Key: "_id", Value: -1}})
-	cursor, err := s.database().Collection(collectionOrganizationCreationRequests).Find(ctx, bson.M{}, opts)
+	cursor, err := s.database().Collection(collectionOrganizationCreationRequests).Find(
+		ctx,
+		bson.M{"status": AffiliationStatusPending},
+		opts,
+	)
 	if err != nil {
 		return nil, err
 	}

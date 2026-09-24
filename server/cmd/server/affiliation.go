@@ -70,15 +70,31 @@ type OrganizationCreationRequest struct {
 	DecidedAt       time.Time                `bson:"decidedAt,omitempty"`
 }
 
+// affiliationStore is the persistence port for join and organization-creation intents.
+// Pending list methods return status==pending only; list-all is not part of this port.
+type affiliationStore interface {
+	InsertJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
+	LoadJoinRequestByID(ctx context.Context, id primitive.ObjectID) (*JoinRequest, error)
+	UpdateJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
+	FindPendingJoinRequestByUser(ctx context.Context, userID string) (*JoinRequest, error)
+	ListPendingJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error)
+
+	InsertOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
+	LoadOrganizationCreationRequestByID(ctx context.Context, id primitive.ObjectID) (*OrganizationCreationRequest, error)
+	UpdateOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
+	FindPendingOrganizationCreationRequestByUser(ctx context.Context, userID string) (*OrganizationCreationRequest, error)
+	ListPendingOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error)
+}
+
 // Affiliation owns affiliation-domain queries and join / organization-creation / leave commands.
 type Affiliation struct {
 	identity IdentityStore
-	store    Store
+	store    affiliationStore
 	mailer   Mailer
 	now      func() time.Time
 }
 
-func NewAffiliation(identity IdentityStore, store Store, mailer Mailer, now func() time.Time) *Affiliation {
+func NewAffiliation(identity IdentityStore, store affiliationStore, mailer Mailer, now func() time.Time) *Affiliation {
 	if mailer == nil {
 		mailer = noopMailer{}
 	}
@@ -270,17 +286,7 @@ func (a *Affiliation) SubmitJoinRequest(ctx context.Context, user IdentityUser, 
 }
 
 func (a *Affiliation) ListPendingJoinRequests(ctx context.Context, orgSlug string) ([]JoinRequest, error) {
-	all, err := a.store.ListJoinRequestsByOrg(ctx, strings.TrimSpace(orgSlug))
-	if err != nil {
-		return nil, err
-	}
-	pending := make([]JoinRequest, 0, len(all))
-	for _, req := range all {
-		if req.Status == AffiliationStatusPending {
-			pending = append(pending, req)
-		}
-	}
-	return pending, nil
+	return a.store.ListPendingJoinRequestsByOrg(ctx, strings.TrimSpace(orgSlug))
 }
 
 func (a *Affiliation) ApproveJoinRequest(ctx context.Context, requestID primitive.ObjectID, decidedBy IdentityUser) (JoinRequest, error) {
@@ -432,17 +438,7 @@ func (a *Affiliation) SubmitOrganizationCreationRequest(ctx context.Context, use
 }
 
 func (a *Affiliation) ListPendingOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error) {
-	all, err := a.store.ListOrganizationCreationRequests(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pending := make([]OrganizationCreationRequest, 0, len(all))
-	for _, req := range all {
-		if req.Status == AffiliationStatusPending {
-			pending = append(pending, req)
-		}
-	}
-	return pending, nil
+	return a.store.ListPendingOrganizationCreationRequests(ctx)
 }
 
 func (a *Affiliation) ApproveOrganizationCreationRequest(ctx context.Context, requestID primitive.ObjectID, decidedBy IdentityUser) (OrganizationCreationRequest, IdentityOrg, error) {
