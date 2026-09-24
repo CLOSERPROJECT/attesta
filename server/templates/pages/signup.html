@@ -5,35 +5,125 @@
         <h1>Sign Up</h1>
         <p>Create an account to continue</p>
       </div>
-      {{ if .Error }}
-        <p class="u-text-danger">{{ .Error }}</p>
-      {{ end }}
-      <form method="post" action="/signup" class="input-form">
-        <label for="signup-name">Name</label>
-        <input
-          id="signup-name"
-          name="name"
-          type="text"
-          value="{{ .Name }}"
-          maxlength="128"
-          autocomplete="name"
-          required
-        />
-        <label for="signup-email">Email</label>
-        <input
-          id="signup-email"
-          name="email"
-          type="email"
-          value="{{ .Email }}"
-          required
-        />
-        <label for="signup-password">Password</label>
-        <input id="signup-password" name="password" type="password" required />
-        <button class="btn btn-primary" type="submit">Create account</button>
+      <form method="post" action="/signup" class="input-form" id="signup-form">
+        <div class="form-field">
+          <label for="signup-name">Name</label>
+          <input
+            id="signup-name"
+            name="name"
+            type="text"
+            value="{{ .Name }}"
+            placeholder="Your name"
+            maxlength="128"
+            autocomplete="name"
+            required
+          />
+        </div>
+        <div class="form-field">
+          <label for="signup-email">Email</label>
+          <input
+            id="signup-email"
+            name="email"
+            type="email"
+            value="{{ .Email }}"
+            placeholder="you@example.com"
+            autocomplete="email"
+            required
+          />
+        </div>
+        <div class="form-field">
+          <label for="signup-password">Password</label>
+          <div class="password-field">
+            <input
+              id="signup-password"
+              name="password"
+              type="password"
+              placeholder="At least 12 characters"
+              autocomplete="new-password"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              data-target="signup-password"
+              aria-label="Toggle password visibility"
+            >
+              {{ template "icon-eye" . }}
+              {{ template "icon-eye-off" . }}
+            </button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="confirm-password">Confirm password</label>
+          <div class="password-field">
+            <input
+              id="confirm-password"
+              name="confirm_password"
+              type="password"
+              placeholder="Re-enter your password"
+              autocomplete="new-password"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              data-target="confirm-password"
+              aria-label="Toggle confirm password visibility"
+            >
+              {{ template "icon-eye" . }}
+              {{ template "icon-eye-off" . }}
+            </button>
+          </div>
+        </div>
+        {{ if .Error }}
+          <p class="error">{{ .Error }}</p>
+        {{ end }}
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Create account</button>
+        </div>
       </form>
-      <p class="muted">Already have an account? <a href="/login">Log in</a></p>
+      <hr class="u-divider" />
+      <p class="muted auth-switch">Already have an account? <a href="/login">Log in</a></p>
     </section>
   </div>
+  <script>
+    document.querySelectorAll(".toggle-password").forEach((toggle) => {
+      const inputId = toggle.getAttribute("data-target");
+      const input = inputId ? document.getElementById(inputId) : null;
+      if (!input) {
+        return;
+      }
+      toggle.addEventListener("click", () => {
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
+
+        const eye = toggle.querySelector(".icon-eye");
+        const eyeOff = toggle.querySelector(".icon-eye-off");
+        if (eye) {
+          eye.style.display = isPassword ? "none" : "block";
+        }
+        if (eyeOff) {
+          eyeOff.style.display = isPassword ? "block" : "none";
+        }
+      });
+    });
+
+    const signupForm = document.getElementById("signup-form");
+    const passwordInput = document.getElementById("signup-password");
+    const confirmInput = document.getElementById("confirm-password");
+    if (signupForm && passwordInput && confirmInput) {
+      const syncConfirmValidity = () => {
+        if (confirmInput.value && passwordInput.value !== confirmInput.value) {
+          confirmInput.setCustomValidity("passwords do not match");
+        } else {
+          confirmInput.setCustomValidity("");
+        }
+      };
+      passwordInput.addEventListener("input", syncConfirmValidity);
+      confirmInput.addEventListener("input", syncConfirmValidity);
+      signupForm.addEventListener("submit", syncConfirmValidity);
+    }
+  </script>
 {{ end }}
 
 {{ define "signup.html" }}

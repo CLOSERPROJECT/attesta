@@ -90,6 +90,106 @@ func TestHandleLoginCreatesSessionCookie(t *testing.T) {
 	}
 }
 
+func TestHandleLoginRedirectsByAffiliation(t *testing.T) {
+	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
+
+	t.Run("unaffiliated next home goes to onboarding", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return fakeIdentitySession("login-session", "user-1", now.Add(24*time.Hour)), nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-1", Email: "newbie@example.com", Status: "active"}, nil
+				},
+			},
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			now:   func() time.Time { return now },
+		}
+		form := url.Values{}
+		form.Set("email", "newbie@example.com")
+		form.Set("password", "secure-password")
+		form.Set("next", "/my")
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleLogin(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if loc := rec.Header().Get("Location"); loc != "/my/onboarding" {
+			t.Fatalf("location = %q, want /my/onboarding", loc)
+		}
+	})
+
+	t.Run("unaffiliated explicit next still wins", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return fakeIdentitySession("login-session-next", "user-1", now.Add(24*time.Hour)), nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-1", Email: "newbie@example.com", Status: "active"}, nil
+				},
+			},
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			now:   func() time.Time { return now },
+		}
+		form := url.Values{}
+		form.Set("email", "newbie@example.com")
+		form.Set("password", "secure-password")
+		form.Set("next", "/my/streams/workflow/")
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleLogin(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if loc := rec.Header().Get("Location"); loc != "/my/streams/workflow/" {
+			t.Fatalf("location = %q, want /my/streams/workflow/", loc)
+		}
+	})
+
+	t.Run("affiliated next home stays home", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return fakeIdentitySession("login-session-affiliated", "user-2", now.Add(24*time.Hour)), nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-2", Email: "member@example.com", OrgSlug: "acme", Status: "active"}, nil
+				},
+			},
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			now:   func() time.Time { return now },
+		}
+		form := url.Values{}
+		form.Set("email", "member@example.com")
+		form.Set("password", "secure-password")
+		form.Set("next", "/my")
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleLogin(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if loc := rec.Header().Get("Location"); loc != "/my" {
+			t.Fatalf("location = %q, want /my", loc)
+		}
+	})
+}
+
 func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "admin@example.com")
 	t.Setenv("ADMIN_PASSWORD", "change-me")
@@ -575,7 +675,7 @@ func TestHandleSignupRejectsMissingName(t *testing.T) {
 func TestHandleSignupRejectsWeakPassword(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
 	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), now: time.Now}
-	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=short"))
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=short&confirm_password=short"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 
@@ -589,10 +689,44 @@ func TestHandleSignupRejectsWeakPassword(t *testing.T) {
 	}
 }
 
+func TestHandleSignupRejectsPasswordMismatch(t *testing.T) {
+	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password&confirm_password=other-password"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleSignup(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), "passwords do not match") {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestHandleSignupRejectsEmptyConfirmPassword(t *testing.T) {
+	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
+	server := &Server{identity: &fakeIdentityStore{}, tmpl: testTemplates(), now: time.Now}
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	server.handleSignup(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), "passwords do not match") {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
 func TestHandleSignupIdentityUnavailable(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
 	server := &Server{tmpl: testTemplates(), now: time.Now}
-	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password"))
+	req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password&confirm_password=secure-password"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 
@@ -634,7 +768,7 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 			tmpl:  testTemplates(),
 			now:   func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=New+User&email=New%40Example.com&password=secure-password"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=New+User&email=New%40Example.com&password=secure-password&confirm_password=secure-password"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 
@@ -675,7 +809,7 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 			tmpl:  testTemplates(),
 			now:   func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=Member&email=member%40example.com&password=secure-password"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=Member&email=member%40example.com&password=secure-password&confirm_password=secure-password"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 
@@ -704,7 +838,7 @@ func TestHandleSignupReturnsServerErrors(t *testing.T) {
 			tmpl: testTemplates(),
 			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password&confirm_password=secure-password"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 
@@ -731,7 +865,7 @@ func TestHandleSignupReturnsServerErrors(t *testing.T) {
 			tmpl: testTemplates(),
 			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=secure-password&confirm_password=secure-password"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 
@@ -785,7 +919,7 @@ func TestHandleSignupAdditionalBranches(t *testing.T) {
 			tmpl: testTemplates(),
 			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=this-is-strong-enough"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 
@@ -809,7 +943,7 @@ func TestHandleSignupAdditionalBranches(t *testing.T) {
 			tmpl: testTemplates(),
 			now:  func() time.Time { return now },
 		}
-		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=this-is-strong-enough"))
+		req := httptest.NewRequest(http.MethodPost, "/signup", strings.NewReader("name=User+One&email=u1%40example.com&password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 
