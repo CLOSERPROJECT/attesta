@@ -10,6 +10,29 @@ import (
 	"strings"
 )
 
+// smtpSecureMode selects how the SMTP connection is secured.
+type smtpSecureMode int
+
+const (
+	smtpSecurePlain smtpSecureMode = iota
+	smtpSecureStartTLS
+	smtpSecureImplicitTLS
+)
+
+// parseSMTPSecure maps SMTP_SECURE env values to a typed mode.
+// Empty/unknown → plain; "true"|"1"|"yes"|"on"|"starttls" → STARTTLS;
+// "tls"|"ssl" → implicit TLS (typically port 465).
+func parseSMTPSecure(v string) smtpSecureMode {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "tls", "ssl":
+		return smtpSecureImplicitTLS
+	case "true", "1", "yes", "on", "starttls":
+		return smtpSecureStartTLS
+	default:
+		return smtpSecurePlain
+	}
+}
+
 // smtpMailer sends plaintext MailMessage over SMTP (stdlib net/smtp).
 type smtpMailer struct {
 	host     string
@@ -17,7 +40,7 @@ type smtpMailer struct {
 	username string
 	password string
 	from     string
-	secure   string // "", "true"|"starttls", or "tls"
+	secure   smtpSecureMode
 }
 
 // newMailerFromEnv returns an SMTP mailer when SMTP_HOST is set; otherwise noopMailer.
@@ -49,7 +72,7 @@ func newMailerFromEnv() Mailer {
 		username: strings.TrimSpace(os.Getenv("SMTP_USER")),
 		password: os.Getenv("SMTP_PASSWORD"),
 		from:     from,
-		secure:   strings.ToLower(strings.TrimSpace(os.Getenv("SMTP_SECURE"))),
+		secure:   parseSMTPSecure(os.Getenv("SMTP_SECURE")),
 	}
 }
 
@@ -69,13 +92,13 @@ func (m *smtpMailer) Send(ctx context.Context, msg MailMessage) error {
 	}
 
 	switch m.secure {
-	case "tls", "ssl":
+	case smtpSecureImplicitTLS:
 		return sendSMTPImplicitTLS(ctx, addr, m.host, auth, m.from, msg.To, raw)
-	case "true", "1", "yes", "on", "starttls":
+	case smtpSecureStartTLS:
 		return sendSMTPStartTLS(ctx, addr, m.host, auth, m.from, msg.To, raw)
 	default:
 		// Plain SMTP (Mailpit local). Prefer dial+send so ctx cancel is honored.
-		return sendSMTPPlain(ctx, addr, auth, m.from, msg.To, raw)
+		return sendSMTPPlain(ctx, addr, m.host, auth, m.from, msg.To, raw)
 	}
 }
 
@@ -97,47 +120,42 @@ func buildSMTPMessage(from string, msg MailMessage) []byte {
 	return []byte(b.String())
 }
 
-func sendSMTPPlain(ctx context.Context, addr string, auth smtp.Auth, from string, to []string, raw []byte) error {
+func sendSMTPPlain(ctx context.Context, addr, serverName string, auth smtp.Auth, from string, to []string, raw []byte) error {
 	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return err
-	}
-	host, _, _ := net.SplitHostPort(addr)
-	c, err := smtp.NewClient(conn, host)
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() { _ = c.Close() }()
-	return smtpClientSend(c, auth, from, to, raw)
+	return sendSMTPDialed(ctx, addr, serverName, d.DialContext, nil, auth, from, to, raw)
 }
 
 func sendSMTPStartTLS(ctx context.Context, addr, serverName string, auth smtp.Auth, from string, to []string, raw []byte) error {
 	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return err
-	}
-	c, err := smtp.NewClient(conn, serverName)
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() { _ = c.Close() }()
-	if ok, _ := c.Extension("STARTTLS"); ok {
-		cfg := &tls.Config{ServerName: serverName, MinVersion: tls.VersionTLS12}
-		if err := c.StartTLS(cfg); err != nil {
-			return err
+	upgrade := func(c *smtp.Client) error {
+		if ok, _ := c.Extension("STARTTLS"); ok {
+			cfg := &tls.Config{ServerName: serverName, MinVersion: tls.VersionTLS12}
+			return c.StartTLS(cfg)
 		}
+		return nil
 	}
-	return smtpClientSend(c, auth, from, to, raw)
+	return sendSMTPDialed(ctx, addr, serverName, d.DialContext, upgrade, auth, from, to, raw)
 }
 
 func sendSMTPImplicitTLS(ctx context.Context, addr, serverName string, auth smtp.Auth, from string, to []string, raw []byte) error {
 	var d tls.Dialer
 	d.Config = &tls.Config{ServerName: serverName, MinVersion: tls.VersionTLS12}
-	conn, err := d.DialContext(ctx, "tcp", addr)
+	return sendSMTPDialed(ctx, addr, serverName, d.DialContext, nil, auth, from, to, raw)
+}
+
+// sendSMTPDialed dials, builds an SMTP client, optionally upgrades TLS, then sends.
+// dial must honor ctx cancel (e.g. Dialer.DialContext / tls.Dialer.DialContext).
+func sendSMTPDialed(
+	ctx context.Context,
+	addr, serverName string,
+	dial func(ctx context.Context, network, addr string) (net.Conn, error),
+	upgrade func(*smtp.Client) error,
+	auth smtp.Auth,
+	from string,
+	to []string,
+	raw []byte,
+) error {
+	conn, err := dial(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -147,6 +165,11 @@ func sendSMTPImplicitTLS(ctx context.Context, addr, serverName string, auth smtp
 		return err
 	}
 	defer func() { _ = c.Close() }()
+	if upgrade != nil {
+		if err := upgrade(c); err != nil {
+			return err
+		}
+	}
 	return smtpClientSend(c, auth, from, to, raw)
 }
 

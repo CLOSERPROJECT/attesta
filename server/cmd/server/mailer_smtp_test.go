@@ -34,6 +34,47 @@ func TestNewMailerFromEnvSMTPWhenHostSet(t *testing.T) {
 	if sm.host != "mailpit" || sm.port != "1025" || sm.from != "attesta@localhost" {
 		t.Fatalf("unexpected config: %+v", sm)
 	}
+	if sm.secure != smtpSecurePlain {
+		t.Fatalf("expected smtpSecurePlain, got %v", sm.secure)
+	}
+}
+
+func TestParseSMTPSecure(t *testing.T) {
+	cases := []struct {
+		in   string
+		want smtpSecureMode
+	}{
+		{"", smtpSecurePlain},
+		{"plain", smtpSecurePlain},
+		{"garbage", smtpSecurePlain},
+		{"true", smtpSecureStartTLS},
+		{"1", smtpSecureStartTLS},
+		{"yes", smtpSecureStartTLS},
+		{"on", smtpSecureStartTLS},
+		{"starttls", smtpSecureStartTLS},
+		{"STARTTLS", smtpSecureStartTLS},
+		{"tls", smtpSecureImplicitTLS},
+		{"ssl", smtpSecureImplicitTLS},
+		{" TLS ", smtpSecureImplicitTLS},
+	}
+	for _, tc := range cases {
+		if got := parseSMTPSecure(tc.in); got != tc.want {
+			t.Fatalf("parseSMTPSecure(%q)=%v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestNewMailerFromEnvSMTPSecure(t *testing.T) {
+	t.Setenv("SMTP_HOST", "smtp.example")
+	t.Setenv("SMTP_SECURE", "tls")
+	mailer := newMailerFromEnv()
+	sm, ok := mailer.(*smtpMailer)
+	if !ok {
+		t.Fatalf("expected *smtpMailer, got %T", mailer)
+	}
+	if sm.secure != smtpSecureImplicitTLS {
+		t.Fatalf("expected smtpSecureImplicitTLS, got %v", sm.secure)
+	}
 }
 
 func TestNewMailerFromEnvDefaults(t *testing.T) {
@@ -84,7 +125,7 @@ func TestSMTPMailerSendPlaintext(t *testing.T) {
 		host:   host,
 		port:   port,
 		from:   "attesta@localhost",
-		secure: "",
+		secure: smtpSecurePlain,
 	}
 	msg := MailMessage{
 		Kind:    "affiliation_invite",
