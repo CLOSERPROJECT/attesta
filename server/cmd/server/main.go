@@ -2675,18 +2675,16 @@ func (s *Server) guardInviteAcceptAffiliation(ctx context.Context, teamID, userI
 	if !s.affiliationService().IsAffiliated(user) {
 		return nil
 	}
-	orgs, err := s.identity.ListOrganizations(ctx)
-	if err != nil {
+	org, err := s.identity.GetOrganizationBySlug(ctx, user.OrgSlug)
+	switch {
+	case err == nil:
+		// continue
+	case errors.Is(err, ErrIdentityNotFound):
+		return errInviteAcceptWrongOrg
+	default:
 		return err
 	}
-	userOrgID := ""
-	for _, org := range orgs {
-		if strings.EqualFold(strings.TrimSpace(org.Slug), strings.TrimSpace(user.OrgSlug)) {
-			userOrgID = strings.TrimSpace(org.ID)
-			break
-		}
-	}
-	if userOrgID == "" || userOrgID != teamID {
+	if org == nil || strings.TrimSpace(org.ID) != teamID {
 		return errInviteAcceptWrongOrg
 	}
 	return nil

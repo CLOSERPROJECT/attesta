@@ -20,11 +20,11 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 				getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
 					return IdentityUser{ID: userID, Email: "member@example.com", OrgSlug: "acme"}, nil
 				},
-				listOrganizationsFunc: func(_ context.Context) ([]IdentityOrg, error) {
-					return []IdentityOrg{
-						{ID: "team-acme", Slug: "acme", Name: "Acme"},
-						{ID: "team-other", Slug: "other", Name: "Other"},
-					}, nil
+				getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+					if slug != "acme" {
+						return nil, ErrIdentityNotFound
+					}
+					return &IdentityOrg{ID: "team-acme", Slug: "acme", Name: "Acme"}, nil
 				},
 				acceptInviteFunc: func(_ context.Context, _, _, _, _ string) (IdentitySession, error) {
 					acceptCalled = true
@@ -55,10 +55,11 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 				getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
 					return IdentityUser{ID: userID, Email: "member@example.com", OrgSlug: "acme"}, nil
 				},
-				listOrganizationsFunc: func(_ context.Context) ([]IdentityOrg, error) {
-					return []IdentityOrg{
-						{ID: "team-acme", Slug: "acme", Name: "Acme"},
-					}, nil
+				getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+					if slug != "acme" {
+						return nil, ErrIdentityNotFound
+					}
+					return &IdentityOrg{ID: "team-acme", Slug: "acme", Name: "Acme"}, nil
 				},
 				acceptInviteFunc: func(_ context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
 					acceptCalled = true
@@ -111,15 +112,15 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 		}
 	})
 
-	t.Run("list organizations failure returns 500", func(t *testing.T) {
+	t.Run("get organization by slug failure returns 500", func(t *testing.T) {
 		acceptCalled := false
 		server := &Server{
 			identity: &fakeIdentityStore{
 				getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
 					return IdentityUser{ID: userID, Email: "member@example.com", OrgSlug: "acme"}, nil
 				},
-				listOrganizationsFunc: func(_ context.Context) ([]IdentityOrg, error) {
-					return nil, errors.New("list orgs down")
+				getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+					return nil, errors.New("get org by slug down")
 				},
 				acceptInviteFunc: func(_ context.Context, _, _, _, _ string) (IdentitySession, error) {
 					acceptCalled = true
@@ -136,7 +137,7 @@ func TestHandleInviteAcceptAffiliationGate(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
 		if acceptCalled {
-			t.Fatal("AcceptInvite must not be called when list orgs fails")
+			t.Fatal("AcceptInvite must not be called when get org by slug fails")
 		}
 	})
 }
