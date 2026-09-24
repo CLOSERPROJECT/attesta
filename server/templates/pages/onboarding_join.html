@@ -1,0 +1,134 @@
+{{/* Used on /my/onboarding/join for organization join requests. */}}
+
+{{ define "onboarding_join_body" }}
+<section class="stack u-max-w-3xl u-mx-auto">
+  <section class="page-header">
+    <div class="page-header-head">
+      <div class="page-header-body">
+        <h1>Join an organization</h1>
+        {{ if .Pending }}
+          <p>Your join request is pending organization admin review.</p>
+        {{ else }}
+          <p>Search for an organization and request roles from its catalog.</p>
+        {{ end }}
+      </div>
+    </div>
+  </section>
+
+  {{ if .Pending }}
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>Pending join request</h2>
+        <p>You can submit another request only after this one is decided.</p>
+      </div>
+      <dl class="stack">
+        <div>
+          <dt class="muted">Organization</dt>
+          <dd>{{ .PendingOrgName }}</dd>
+        </div>
+        <div>
+          <dt class="muted">Slug</dt>
+          <dd>{{ .PendingOrgSlug }}</dd>
+        </div>
+        {{ if .PendingRoles }}
+          <div>
+            <dt class="muted">Requested roles</dt>
+            <dd>{{ .PendingRoles }}</dd>
+          </div>
+        {{ end }}
+        {{ if .PendingCreated }}
+          <div>
+            <dt class="muted">Submitted</dt>
+            <dd>{{ .PendingCreated }}</dd>
+          </div>
+        {{ end }}
+      </dl>
+    </section>
+  {{ else }}
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>Find an organization</h2>
+        <p>Search by name or slug. Results are only available while you are signed in.</p>
+      </div>
+      <form method="get" action="/my/onboarding/join" class="input-form">
+        <div class="form-field">
+          <label for="join-org-search">Organization search</label>
+          <input
+            id="join-org-search"
+            name="q"
+            type="search"
+            value="{{ .SearchQuery }}"
+            placeholder="Search organizations..."
+            autocomplete="off"
+          />
+        </div>
+        <button class="btn btn-secondary" type="submit">Search</button>
+      </form>
+
+      {{ if .HasSearched }}
+        {{ if .Results }}
+          <ul class="list-rows">
+            {{ range .Results }}
+              <li class="list-row">
+                <div class="list-row-main">
+                  <span>{{ .Name }}</span>
+                  <span class="muted">{{ .Slug }}</span>
+                </div>
+                <div class="list-row-actions">
+                  <a class="btn btn-ghost btn-xs" href="{{ .SelectHref }}">Select</a>
+                </div>
+              </li>
+            {{ end }}
+          </ul>
+        {{ else }}
+          <p class="muted">No organizations match your search</p>
+        {{ end }}
+      {{ end }}
+    </section>
+
+    {{ if .SelectedOrgSlug }}
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Request to join {{ .SelectedOrgName }}</h2>
+          <p>Choose one or more roles from this organization’s catalog. Org admin cannot be requested.</p>
+        </div>
+        <form method="post" action="/my/onboarding/join" class="input-form">
+          <input type="hidden" name="org_slug" value="{{ .SelectedOrgSlug }}" />
+          <input type="hidden" name="q" value="{{ .SearchQuery }}" />
+          <div class="form-field">
+            <label>Roles</label>
+            {{ if .SelectedOrgRoles }}
+              <ul class="stack u-gap-2">
+                {{ range .SelectedOrgRoles }}
+                  <li>
+                    <label class="u-flex-center u-gap-2">
+                      <input type="checkbox" name="roles" value="{{ .Slug }}" />
+                      <span>{{ .Name }} ({{ .Slug }})</span>
+                    </label>
+                  </li>
+                {{ end }}
+              </ul>
+            {{ else }}
+              <p class="muted">This organization has no requestable roles yet.</p>
+            {{ end }}
+          </div>
+          {{ if .FormError }}
+            <p class="error">{{ .FormError }}</p>
+          {{ end }}
+          <button class="btn btn-primary" type="submit" {{ if not .SelectedOrgRoles }}disabled{{ end }}>
+            Submit join request
+          </button>
+        </form>
+      </section>
+    {{ else if .FormError }}
+      <p class="error">{{ .FormError }}</p>
+    {{ end }}
+  {{ end }}
+
+  <p class="muted"><a href="{{ .BackHref }}">Back to onboarding</a></p>
+</section>
+{{ end }}
+
+{{ define "onboarding_join.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

@@ -431,10 +431,18 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		"Add user",
 		`name="intent" value="invite"`,
 		"Create invite",
+		"Pending join requests",
+		"<h2>Users</h2>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in members panel markup, got:\n%s", want, body)
 		}
+	}
+
+	pendingIdx := strings.Index(body, "Pending join requests")
+	usersIdx := strings.Index(body, "<h2>Users</h2>")
+	if pendingIdx == -1 || usersIdx == -1 || !(pendingIdx < usersIdx) {
+		t.Fatalf("expected Pending join requests section before Users heading")
 	}
 }
 

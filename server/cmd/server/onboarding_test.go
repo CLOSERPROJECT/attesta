@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -91,8 +92,12 @@ func TestHandleOnboardingStubPages(t *testing.T) {
 		Status:         "active",
 		CreatedAt:      now,
 	}
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.listOrganizationsPageFunc = func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+		return IdentityOrgPage{}, nil
+	}
 	server := &Server{
-		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		identity:    identity,
 		store:       NewMemoryStore(),
 		tmpl:        parseTestTemplates(t),
 		authorizer:  fakeAuthorizer{},
@@ -100,7 +105,7 @@ func TestHandleOnboardingStubPages(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	t.Run("join stub", func(t *testing.T) {
+	t.Run("join form", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 		rec := httptest.NewRecorder()
@@ -110,14 +115,18 @@ func TestHandleOnboardingStubPages(t *testing.T) {
 			t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
 		}
 		body := rec.Body.String()
-		if !strings.Contains(body, "Join an organization") {
-			t.Fatalf("expected join title, got:\n%s", body)
+		for _, want := range []string{
+			"Join an organization",
+			"Find an organization",
+			`name="q"`,
+			`href="/my/onboarding"`,
+		} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("expected %q, got:\n%s", want, body)
+			}
 		}
-		if !strings.Contains(body, "Coming soon") {
-			t.Fatalf("expected coming soon copy, got:\n%s", body)
-		}
-		if !strings.Contains(body, `href="/my/onboarding"`) {
-			t.Fatalf("expected back link to onboarding, got:\n%s", body)
+		if strings.Contains(body, "Coming soon") {
+			t.Fatalf("did not expect stub copy, got:\n%s", body)
 		}
 	})
 

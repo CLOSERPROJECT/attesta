@@ -231,6 +231,8 @@
           {{ template "dpp_body" . }}
         {{ else if eq .Body "onboarding_body" }}
           {{ template "onboarding_body" . }}
+        {{ else if eq .Body "onboarding_join_body" }}
+          {{ template "onboarding_join_body" . }}
         {{ else if eq .Body "onboarding_request_organization_body" }}
           {{ template "onboarding_request_organization_body" . }}
         {{ else if eq .Body "onboarding_stub_body" }}

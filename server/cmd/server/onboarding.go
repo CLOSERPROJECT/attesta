@@ -3,8 +3,11 @@ package main
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 )
+
+const onboardingJoinSearchLimit = 12
 
 type OnboardingHubView struct {
 	PageBase
@@ -30,6 +33,29 @@ type OnboardingRequestOrganizationView struct {
 	PendingName    string
 	PendingSlug    string
 	PendingCreated string
+}
+
+type OnboardingJoinOrgResult struct {
+	Slug       string
+	Name       string
+	SelectHref string
+}
+
+type OnboardingJoinView struct {
+	PageBase
+	BackHref         string
+	FormError        string
+	SearchQuery      string
+	Results          []OnboardingJoinOrgResult
+	HasSearched      bool
+	SelectedOrgSlug  string
+	SelectedOrgName  string
+	SelectedOrgRoles []Role
+	Pending          bool
+	PendingOrgSlug   string
+	PendingOrgName   string
+	PendingRoles     string
+	PendingCreated   string
 }
 
 func (s *Server) handleOnboardingRoutes(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +105,30 @@ func (s *Server) handleOnboardingHub(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOnboardingJoin(w http.ResponseWriter, r *http.Request) {
-	s.renderOnboardingStub(w, r, "Join an organization", "Coming soon. Organization join requests will live here.")
+	user, ok := s.requireUnaffiliatedOnboarding(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.renderOnboardingJoin(w, r, user, "", strings.TrimSpace(r.URL.Query().Get("q")), strings.TrimSpace(r.URL.Query().Get("org")))
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse join request form")
+			return
+		}
+		orgSlug := strings.TrimSpace(r.FormValue("org_slug"))
+		roles := requestedRoleSlugs(r.Form)
+		searchQuery := strings.TrimSpace(r.FormValue("q"))
+		_, err := s.affiliationService().SubmitJoinRequest(r.Context(), identityUserForAffiliation(user), orgSlug, roles)
+		if err != nil {
+			s.renderOnboardingJoin(w, r, user, affiliationJoinRequestFormError(err), searchQuery, orgSlug)
+			return
+		}
+		http.Redirect(w, r, onboardingJoinPath(), http.StatusSeeOther)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func (s *Server) handleOnboardingRequestOrganization(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +153,91 @@ func (s *Server) handleOnboardingRequestOrganization(w http.ResponseWriter, r *h
 		http.Redirect(w, r, onboardingRequestOrganizationPath(), http.StatusSeeOther)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) renderOnboardingJoin(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, searchQuery, selectedOrgSlug string) {
+	view := OnboardingJoinView{
+		PageBase:        s.pageBaseForUser(user, "onboarding_join_body", "", ""),
+		BackHref:        onboardingPath(),
+		FormError:       strings.TrimSpace(formError),
+		SearchQuery:     strings.TrimSpace(searchQuery),
+		SelectedOrgSlug: strings.TrimSpace(selectedOrgSlug),
+	}
+	if user != nil {
+		pending, err := s.affiliationService().PendingJoinRequestForUser(r.Context(), identityUserForAffiliation(user).ID)
+		if err != nil {
+			logRequestError(r, err, "failed to load pending join request for %s", user.Email)
+			http.Error(w, "failed to load join request", http.StatusInternalServerError)
+			return
+		}
+		if pending != nil {
+			view.Pending = true
+			view.PendingOrgSlug = pending.OrgSlug
+			view.PendingRoles = strings.Join(pending.RoleSlugs, ", ")
+			view.PendingCreated = humanReadableTraceabilityTime(pending.CreatedAt)
+			view.FormError = ""
+			view.SearchQuery = ""
+			view.SelectedOrgSlug = ""
+			if s.identity != nil {
+				if org, orgErr := s.identity.GetOrganizationBySlug(r.Context(), pending.OrgSlug); orgErr == nil && org != nil {
+					view.PendingOrgName = org.Name
+				}
+			}
+			if view.PendingOrgName == "" {
+				view.PendingOrgName = pending.OrgSlug
+			}
+			if err := s.tmpl.ExecuteTemplate(w, "onboarding_join.html", view); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+	}
+
+	if view.SearchQuery != "" && s.identity != nil {
+		view.HasSearched = true
+		page, err := s.identity.ListOrganizationsPage(r.Context(), IdentityOrgListOptions{
+			Search: view.SearchQuery,
+			Limit:  onboardingJoinSearchLimit,
+			Offset: 0,
+		})
+		if err != nil {
+			logRequestError(r, err, "failed to search organizations for join onboarding")
+			http.Error(w, "failed to search organizations", http.StatusInternalServerError)
+			return
+		}
+		view.Results = make([]OnboardingJoinOrgResult, 0, len(page.Organizations))
+		for _, org := range page.Organizations {
+			slug := strings.TrimSpace(org.Slug)
+			view.Results = append(view.Results, OnboardingJoinOrgResult{
+				Slug:       slug,
+				Name:       strings.TrimSpace(org.Name),
+				SelectHref: onboardingJoinSelectHref(view.SearchQuery, slug),
+			})
+		}
+	}
+
+	if view.SelectedOrgSlug != "" && s.identity != nil {
+		org, err := s.identity.GetOrganizationBySlug(r.Context(), view.SelectedOrgSlug)
+		switch {
+		case err == nil && org != nil:
+			view.SelectedOrgSlug = strings.TrimSpace(org.Slug)
+			view.SelectedOrgName = strings.TrimSpace(org.Name)
+			view.SelectedOrgRoles = joinRequestCatalogRoles(*org)
+		case errors.Is(err, ErrIdentityNotFound), err == nil && org == nil:
+			if view.FormError == "" {
+				view.FormError = "organization not found"
+			}
+			view.SelectedOrgSlug = ""
+		default:
+			logRequestError(r, err, "failed to load organization %s for join onboarding", view.SelectedOrgSlug)
+			http.Error(w, "failed to load organization", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := s.tmpl.ExecuteTemplate(w, "onboarding_join.html", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -167,6 +301,52 @@ func identityUserForAffiliation(user *AccountUser) IdentityUser {
 	}
 }
 
+func onboardingJoinSelectHref(searchQuery, orgSlug string) string {
+	values := url.Values{}
+	if q := strings.TrimSpace(searchQuery); q != "" {
+		values.Set("q", q)
+	}
+	if slug := strings.TrimSpace(orgSlug); slug != "" {
+		values.Set("org", slug)
+	}
+	href := onboardingJoinPath()
+	if encoded := values.Encode(); encoded != "" {
+		href += "?" + encoded
+	}
+	return href
+}
+
+func joinRequestCatalogRoles(org IdentityOrg) []Role {
+	roles := rolesFromIdentityOrg(org)
+	out := make([]Role, 0, len(roles))
+	for _, role := range roles {
+		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+			continue
+		}
+		out = append(out, role)
+	}
+	return out
+}
+
+func affiliationJoinRequestFormError(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrAffiliationAlreadyAffiliated):
+		return "you already belong to an organization"
+	case errors.Is(err, ErrAffiliationPendingExists):
+		return "you already have a pending affiliation request"
+	case errors.Is(err, ErrAffiliationNotFound):
+		return "organization not found"
+	case errors.Is(err, ErrAffiliationInvalidRoles):
+		return "select one or more roles from the organization catalog"
+	case errors.Is(err, ErrAffiliationNotPending):
+		return "join request is not pending"
+	default:
+		return "failed to process join request"
+	}
+}
+
 func affiliationOrganizationCreationFormError(err error) string {
 	switch {
 	case err == nil:
@@ -185,5 +365,22 @@ func affiliationOrganizationCreationFormError(err error) string {
 		return "organization creation request is not pending"
 	default:
 		return "failed to process organization creation request"
+	}
+}
+
+func affiliationJoinDecideFormError(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrAffiliationNotFound):
+		return "join request not found"
+	case errors.Is(err, ErrAffiliationNotPending):
+		return "join request is not pending"
+	case errors.Is(err, ErrAffiliationAlreadyAffiliated):
+		return "requester already belongs to an organization"
+	case errors.Is(err, ErrAffiliationInvalidRoles):
+		return "requested roles are no longer valid"
+	default:
+		return "failed to process join request"
 	}
 }

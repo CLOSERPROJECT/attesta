@@ -719,6 +719,591 @@ func TestListPendingOrganizationCreationRequestsFiltersNonPending(t *testing.T) 
 	}
 }
 
+func TestSubmitJoinRequestHappyPath(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	identity := joinRequestTestIdentity(nil)
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+
+	user := IdentityUser{ID: "user-1", Email: "joiner@example.com"}
+	saved, err := aff.SubmitJoinRequest(ctx, user, "acme", []string{" viewer ", "editor", "viewer"})
+	if err != nil {
+		t.Fatalf("SubmitJoinRequest: %v", err)
+	}
+	if saved.ID.IsZero() || saved.Status != AffiliationStatusPending {
+		t.Fatalf("saved=%+v", saved)
+	}
+	if saved.OrgSlug != "acme" || saved.RequesterUserID != "user-1" || saved.RequesterEmail != "joiner@example.com" {
+		t.Fatalf("saved fields=%+v", saved)
+	}
+	if len(saved.RoleSlugs) != 2 || saved.RoleSlugs[0] != "viewer" || saved.RoleSlugs[1] != "editor" {
+		t.Fatalf("roleSlugs=%v", saved.RoleSlugs)
+	}
+
+	msgs := mailer.Messages()
+	if len(msgs) != 1 || msgs[0].Kind != MailKindJoinSubmitted {
+		t.Fatalf("messages=%+v", msgs)
+	}
+	if len(msgs[0].To) != 1 || msgs[0].To[0] != "owner@example.com" {
+		t.Fatalf("to=%v", msgs[0].To)
+	}
+
+	pending, err := aff.ListPendingJoinRequests(ctx, "acme")
+	if err != nil || len(pending) != 1 || pending[0].ID != saved.ID {
+		t.Fatalf("pending=%v err=%v", pending, err)
+	}
+}
+
+func TestSubmitJoinRequestInvariants(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("already affiliated", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", OrgSlug: "other"}, "acme", []string{"viewer"})
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("pending join exists", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+		user := IdentityUser{ID: "u", Email: "u@example.com"}
+		if _, err := aff.SubmitJoinRequest(ctx, user, "acme", []string{"viewer"}); err != nil {
+			t.Fatalf("first: %v", err)
+		}
+		_, err := aff.SubmitJoinRequest(ctx, user, "acme", []string{"editor"})
+		if !errors.Is(err, ErrAffiliationPendingExists) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("pending create exists", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+		if _, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+			RequesterUserID: "u",
+			RequesterEmail:  "u@example.com",
+			ProposedName:    "New Org",
+			ProposedSlug:    "new-org",
+		}); err != nil {
+			t.Fatalf("seed create: %v", err)
+		}
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "acme", []string{"viewer"})
+		if !errors.Is(err, ErrAffiliationPendingExists) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("org missing", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "missing", []string{"viewer"})
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("empty org slug", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u"}, "  ", []string{"viewer"})
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("zero roles", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "acme", nil)
+		if !errors.Is(err, ErrAffiliationInvalidRoles) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("unknown role", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "acme", []string{"ghost"})
+		if !errors.Is(err, ErrAffiliationInvalidRoles) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("org-admin rejected", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "acme", []string{"org-admin"})
+		if !errors.Is(err, ErrAffiliationInvalidRoles) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("org_admin rejected", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "acme", []string{"org_admin"})
+		if !errors.Is(err, ErrAffiliationInvalidRoles) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
+func TestSubmitJoinRequestMailFailureDoesNotFailCommand(t *testing.T) {
+	ctx := context.Background()
+	mailer := &recordingMailer{err: errors.New("smtp down")}
+	aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), mailer, fixedNow)
+	saved, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "acme", []string{"viewer"})
+	if err != nil {
+		t.Fatalf("submit should succeed despite mail failure: %v", err)
+	}
+	if saved.Status != AffiliationStatusPending {
+		t.Fatalf("saved=%+v", saved)
+	}
+	if len(mailer.Messages()) != 1 {
+		t.Fatalf("expected mail attempt recorded")
+	}
+}
+
+func TestApproveJoinRequestHappyPath(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+
+	var addedSlug, addedUserID string
+	var addedRoles []string
+	var addedAsAdmin bool
+	var updatedLabels []string
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "joiner@example.com", Labels: []string{"customKeep", encodeIdentityRoleLabel("stale")}},
+	}
+	identity := joinRequestTestIdentity(users)
+	identity.addOrganizationUserByIDAsAdminFunc = func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+		addedSlug, addedUserID, addedAsAdmin = orgSlug, userID, isOrgAdmin
+		addedRoles = append([]string(nil), roleSlugs...)
+		return IdentityMembership{ID: "mem-1", UserID: userID, RoleSlugs: roleSlugs, IsOrgAdmin: isOrgAdmin, Confirmed: true}, nil
+	}
+	identity.updateUserLabelsFunc = func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+		updatedLabels = append([]string(nil), labels...)
+		user := users[userID]
+		user.Labels = append([]string(nil), labels...)
+		users[userID] = user
+		return user, nil
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+
+	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer", "editor"},
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	decidedBy := IdentityUser{ID: "admin-1", Email: "owner@example.com", OrgSlug: "acme"}
+	updated, err := aff.ApproveJoinRequest(ctx, saved.ID, decidedBy)
+	if err != nil {
+		t.Fatalf("ApproveJoinRequest: %v", err)
+	}
+	if updated.Status != AffiliationStatusApproved || updated.DecidedByUserID != "admin-1" {
+		t.Fatalf("updated=%+v", updated)
+	}
+	if updated.DecidedAt.IsZero() {
+		t.Fatal("expected DecidedAt")
+	}
+	if addedSlug != "acme" || addedUserID != "user-1" || addedAsAdmin {
+		t.Fatalf("add membership slug=%q user=%q admin=%v", addedSlug, addedUserID, addedAsAdmin)
+	}
+	if len(addedRoles) != 2 || addedRoles[0] != "viewer" || addedRoles[1] != "editor" {
+		t.Fatalf("addedRoles=%v", addedRoles)
+	}
+	if len(updatedLabels) != 3 || updatedLabels[0] != "customKeep" {
+		t.Fatalf("labels=%v", updatedLabels)
+	}
+	if updatedLabels[1] != encodeIdentityRoleLabel("viewer") || updatedLabels[2] != encodeIdentityRoleLabel("editor") {
+		t.Fatalf("role labels=%v", updatedLabels)
+	}
+	for _, label := range updatedLabels {
+		if label == identityOrgAdminLabel {
+			t.Fatal("must not stamp org-admin label")
+		}
+		if label == encodeIdentityRoleLabel("stale") {
+			t.Fatal("managed stale role label should be replaced")
+		}
+	}
+
+	msgs := mailer.Messages()
+	if len(msgs) != 1 || msgs[0].Kind != MailKindJoinApproved {
+		t.Fatalf("messages=%+v", msgs)
+	}
+	if len(msgs[0].To) != 1 || msgs[0].To[0] != "joiner@example.com" {
+		t.Fatalf("to=%v", msgs[0].To)
+	}
+
+	pending, err := aff.ListPendingJoinRequests(ctx, "acme")
+	if err != nil || len(pending) != 0 {
+		t.Fatalf("pending after approve=%v err=%v", pending, err)
+	}
+}
+
+func TestApproveJoinRequestInvariants(t *testing.T) {
+	ctx := context.Background()
+	decidedBy := IdentityUser{ID: "admin-1", OrgSlug: "acme"}
+
+	t.Run("not found", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.ApproveJoinRequest(ctx, primitive.NewObjectID(), decidedBy)
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("not pending", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		saved.Status = AffiliationStatusRejected
+		if _, err := store.UpdateJoinRequest(ctx, saved); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		_, err = aff.ApproveJoinRequest(ctx, saved.ID, decidedBy)
+		if !errors.Is(err, ErrAffiliationNotPending) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("decider org mismatch", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		_, err = aff.ApproveJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "other"})
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+		loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+			t.Fatalf("loaded=%+v err=%v", loaded, err)
+		}
+	})
+
+	t.Run("requester now affiliated leaves pending", func(t *testing.T) {
+		store := NewMemoryStore()
+		users := map[string]IdentityUser{
+			"user-1": {ID: "user-1", Email: "u@example.com", OrgSlug: "other"},
+		}
+		aff := NewAffiliation(joinRequestTestIdentity(users), store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		_, err = aff.ApproveJoinRequest(ctx, saved.ID, decidedBy)
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+		loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+			t.Fatalf("loaded=%+v err=%v", loaded, err)
+		}
+	})
+
+	t.Run("roles revalidated on approve", func(t *testing.T) {
+		store := NewMemoryStore()
+		users := map[string]IdentityUser{
+			"user-1": {ID: "user-1", Email: "u@example.com"},
+		}
+		identity := joinRequestTestIdentity(users)
+		identity.getOrganizationBySlugFunc = func(_ context.Context, slug string) (*IdentityOrg, error) {
+			if slug != "acme" {
+				return nil, ErrIdentityNotFound
+			}
+			// Role catalog no longer includes "viewer".
+			return &IdentityOrg{
+				ID:   "team-1",
+				Slug: "acme",
+				Name: "Acme",
+				Roles: []IdentityRole{
+					{Slug: "editor", Name: "Editor"},
+				},
+			}, nil
+		}
+		aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		_, err = aff.ApproveJoinRequest(ctx, saved.ID, decidedBy)
+		if !errors.Is(err, ErrAffiliationInvalidRoles) {
+			t.Fatalf("err=%v", err)
+		}
+		loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+			t.Fatalf("loaded=%+v err=%v", loaded, err)
+		}
+	})
+}
+
+func TestApproveJoinRequestMailFailureDoesNotFailCommand(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{err: errors.New("smtp down")}
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "joiner@example.com"},
+	}
+	identity := joinRequestTestIdentity(users)
+	identity.addOrganizationUserByIDAsAdminFunc = func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+		return IdentityMembership{ID: "mem-1", UserID: userID, RoleSlugs: roleSlugs, IsOrgAdmin: isOrgAdmin}, nil
+	}
+	identity.updateUserLabelsFunc = func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+		user := users[userID]
+		user.Labels = append([]string(nil), labels...)
+		users[userID] = user
+		return user, nil
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	updated, err := aff.ApproveJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "acme"})
+	if err != nil {
+		t.Fatalf("approve should succeed despite mail failure: %v", err)
+	}
+	if updated.Status != AffiliationStatusApproved {
+		t.Fatalf("updated=%+v", updated)
+	}
+}
+
+func TestRejectJoinRequestAndResubmit(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	aff := NewAffiliation(joinRequestTestIdentity(nil), store, mailer, fixedNow)
+	user := IdentityUser{ID: "user-1", Email: "joiner@example.com"}
+
+	saved, err := aff.SubmitJoinRequest(ctx, user, "acme", []string{"viewer"})
+	if err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	rejected, err := aff.RejectJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "acme"}, "not a fit")
+	if err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+	if rejected.Status != AffiliationStatusRejected || rejected.RejectReason != "not a fit" {
+		t.Fatalf("rejected=%+v", rejected)
+	}
+	if rejected.DecidedByUserID != "admin-1" || rejected.DecidedAt.IsZero() {
+		t.Fatalf("decision fields=%+v", rejected)
+	}
+
+	msgs := mailer.Messages()
+	if len(msgs) != 2 {
+		t.Fatalf("messages=%d, want submit+reject", len(msgs))
+	}
+	if msgs[1].Kind != MailKindJoinRejected || msgs[1].To[0] != "joiner@example.com" {
+		t.Fatalf("reject mail=%+v", msgs[1])
+	}
+
+	pending, err := aff.HasPendingAffiliationIntent(ctx, user.ID)
+	if err != nil || pending {
+		t.Fatalf("pending after reject=%v err=%v", pending, err)
+	}
+
+	resubmitted, err := aff.SubmitJoinRequest(ctx, user, "acme", []string{"editor"})
+	if err != nil {
+		t.Fatalf("resubmit: %v", err)
+	}
+	if resubmitted.Status != AffiliationStatusPending || len(resubmitted.RoleSlugs) != 1 || resubmitted.RoleSlugs[0] != "editor" {
+		t.Fatalf("resubmitted=%+v", resubmitted)
+	}
+}
+
+func TestRejectJoinRequestInvariants(t *testing.T) {
+	ctx := context.Background()
+	decidedBy := IdentityUser{ID: "admin-1", OrgSlug: "acme"}
+
+	t.Run("not found", func(t *testing.T) {
+		aff := NewAffiliation(joinRequestTestIdentity(nil), NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.RejectJoinRequest(ctx, primitive.NewObjectID(), decidedBy, "")
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("not pending", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		saved.Status = AffiliationStatusApproved
+		if _, err := store.UpdateJoinRequest(ctx, saved); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		_, err = aff.RejectJoinRequest(ctx, saved.ID, decidedBy, "late")
+		if !errors.Is(err, ErrAffiliationNotPending) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("decider org mismatch", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		_, err = aff.RejectJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "other"}, "nope")
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
+func TestRejectJoinRequestMailFailureDoesNotFailCommand(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{err: errors.New("smtp down")}
+	aff := NewAffiliation(joinRequestTestIdentity(nil), store, mailer, fixedNow)
+	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	updated, err := aff.RejectJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "acme"}, "nope")
+	if err != nil {
+		t.Fatalf("reject should succeed despite mail failure: %v", err)
+	}
+	if updated.Status != AffiliationStatusRejected {
+		t.Fatalf("updated=%+v", updated)
+	}
+}
+
+func TestListPendingJoinRequestsFiltersNonPending(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
+
+	pendingReq, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "a@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+	})
+	if err != nil {
+		t.Fatalf("seed pending: %v", err)
+	}
+	rejected, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-2",
+		RequesterEmail:  "b@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"editor"},
+	})
+	if err != nil {
+		t.Fatalf("seed rejected: %v", err)
+	}
+	rejected.Status = AffiliationStatusRejected
+	if _, err := store.UpdateJoinRequest(ctx, rejected); err != nil {
+		t.Fatalf("mark rejected: %v", err)
+	}
+	if _, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-3",
+		RequesterEmail:  "c@example.com",
+		OrgSlug:         "other",
+		RoleSlugs:       []string{"viewer"},
+	}); err != nil {
+		t.Fatalf("seed other org: %v", err)
+	}
+
+	listed, err := aff.ListPendingJoinRequests(ctx, "acme")
+	if err != nil || len(listed) != 1 || listed[0].ID != pendingReq.ID {
+		t.Fatalf("listed=%v err=%v", listed, err)
+	}
+}
+
+func joinRequestTestIdentity(users map[string]IdentityUser) *fakeIdentityStore {
+	if users == nil {
+		users = map[string]IdentityUser{}
+	}
+	return &fakeIdentityStore{
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			user, ok := users[userID]
+			if !ok {
+				return IdentityUser{}, ErrIdentityNotFound
+			}
+			return user, nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+			if slug != "acme" {
+				return nil, ErrIdentityNotFound
+			}
+			return &IdentityOrg{
+				ID:   "team-1",
+				Slug: "acme",
+				Name: "Acme",
+				Roles: []IdentityRole{
+					{Slug: "viewer", Name: "Viewer"},
+					{Slug: "editor", Name: "Editor"},
+					{Slug: "org-admin", Name: "Org Admin"},
+				},
+			}, nil
+		},
+		listOrganizationUsersFunc: func(_ context.Context, orgSlug string) ([]IdentityUser, error) {
+			if orgSlug != "acme" {
+				return nil, nil
+			}
+			return []IdentityUser{
+				{ID: "admin-1", Email: "owner@example.com", OrgSlug: "acme", IsOrgAdmin: true},
+				{ID: "member-1", Email: "member@example.com", OrgSlug: "acme", IsOrgAdmin: false},
+			}, nil
+		},
+	}
+}
+
 func fixedNow() time.Time {
 	return time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 }

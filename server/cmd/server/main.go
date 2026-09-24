@@ -488,8 +488,16 @@ type OrgAdminView struct {
 	RoleRows               []OrgAdminRoleRow
 	Users                  []OrgAdminUserRow
 	Invites                []OrgAdminInviteRow
+	PendingJoinRequests    []OrgAdminJoinRequestRow
 	InviteLink             string
 	Error                  string
+}
+
+type OrgAdminJoinRequestRow struct {
+	ID             string
+	RequesterEmail string
+	RoleSlugs      string
+	CreatedAt      string
 }
 
 type OrgAdminErrors struct {
@@ -3925,6 +3933,26 @@ func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, no
 	return orgInvites
 }
 
+func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug string) ([]OrgAdminJoinRequestRow, error) {
+	if s == nil || s.store == nil {
+		return nil, nil
+	}
+	pending, err := s.affiliationService().ListPendingJoinRequests(ctx, orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]OrgAdminJoinRequestRow, 0, len(pending))
+	for _, req := range pending {
+		rows = append(rows, OrgAdminJoinRequestRow{
+			ID:             req.ID.Hex(),
+			RequesterEmail: strings.TrimSpace(req.RequesterEmail),
+			RoleSlugs:      strings.Join(req.RoleSlugs, ", "),
+			CreatedAt:      humanReadableTraceabilityTime(req.CreatedAt),
+		})
+	}
+	return rows, nil
+}
+
 func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSlug string) (Organization, []Role, []OrgAdminUserRow, []OrgAdminInviteRow, error) {
 	_ = user
 	if s.identity == nil {
@@ -3992,6 +4020,13 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	rolePills := buildOrgAdminRolePills(roles)
 	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
 
+	pendingJoinRows, pendingJoinErr := orgAdminPendingJoinRequestRows(context.Background(), s, org.Slug)
+	if pendingJoinErr != nil {
+		log.Printf("failed to load pending join requests for org %s: %v", org.Slug, pendingJoinErr)
+		http.Error(w, "failed to load pending join requests", http.StatusInternalServerError)
+		return
+	}
+
 	view := OrgAdminView{
 		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
 		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
@@ -4012,6 +4047,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 		RoleRows:               roleRows,
 		Users:                  orgUsers,
 		Invites:                orgInvites,
+		PendingJoinRequests:    pendingJoinRows,
 		InviteLink:             strings.TrimSpace(inviteLink),
 		Error:                  firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
 	}
@@ -4705,6 +4741,31 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, err, "failed to clear labels for deleted user %s in organization %s", target.UserID, admin.OrgSlug)
 				return
 			}
+		}
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+	case "approve_join":
+		requestIDHex := strings.TrimSpace(r.FormValue("request_id"))
+		requestID, err := primitive.ObjectIDFromHex(requestIDHex)
+		if err != nil {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "join request not found"})
+			return
+		}
+		if _, err := s.affiliationService().ApproveJoinRequest(r.Context(), requestID, identityUserForAffiliation(admin)); err != nil {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: affiliationJoinDecideFormError(err)})
+			return
+		}
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+	case "reject_join":
+		requestIDHex := strings.TrimSpace(r.FormValue("request_id"))
+		requestID, err := primitive.ObjectIDFromHex(requestIDHex)
+		if err != nil {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "join request not found"})
+			return
+		}
+		reason := strings.TrimSpace(r.FormValue("reason"))
+		if _, err := s.affiliationService().RejectJoinRequest(r.Context(), requestID, identityUserForAffiliation(admin), reason); err != nil {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: affiliationJoinDecideFormError(err)})
+			return
 		}
 		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	default:

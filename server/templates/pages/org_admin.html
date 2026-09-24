@@ -861,6 +861,75 @@
 
 {{ define "org_admin_members_panel" }}
   <section class="org-admin-panel-section" id="org-admin-panel-members">
+    <div class="panel-block panel-block-spaced">
+      <div class="panel-heading">
+        <h2>Pending join requests</h2>
+        <p>Review requests from users who asked to join this organization</p>
+      </div>
+      {{ if .PendingJoinRequests }}
+        <ul class="list-rows">
+          {{ range .PendingJoinRequests }}
+            <li class="list-row">
+              <div class="list-row-main">
+                <div class="platform-admin-item-copy">
+                  <p class="platform-admin-item-name">{{ .RequesterEmail }}</p>
+                  <p class="muted">
+                    {{ if .RoleSlugs }}{{ .RoleSlugs }}{{ end }}
+                    {{ if .CreatedAt }}{{ if .RoleSlugs }} · {{ end }}{{ .CreatedAt }}{{ end }}
+                  </p>
+                </div>
+              </div>
+              <div class="list-row-actions">
+                <form method="post" action="/my/organization/users" class="panel-actions">
+                  <input type="hidden" name="intent" value="approve_join" />
+                  <input type="hidden" name="request_id" value="{{ .ID }}" />
+                  <button class="btn btn-primary btn-xs" type="submit">Approve</button>
+                </form>
+                <button
+                  type="button"
+                  class="btn btn-ghost-danger btn-xs"
+                  onclick="document.getElementById('reject-join-{{ .ID }}').showModal()"
+                >
+                  Reject
+                </button>
+              </div>
+
+              <dialog id="reject-join-{{ .ID }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3 class="dialog-title">Reject join request</h3>
+                      <p class="dialog-subtitle">{{ .RequesterEmail }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('reject-join-{{ .ID }}').close()"
+                    >
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <form method="post" action="/my/organization/users" class="input-form">
+                    <input type="hidden" name="intent" value="reject_join" />
+                    <input type="hidden" name="request_id" value="{{ .ID }}" />
+                    <div class="form-field">
+                      <label for="reject-join-reason-{{ .ID }}">Reason (optional)</label>
+                      <input id="reject-join-reason-{{ .ID }}" name="reason" type="text" />
+                    </div>
+                    <div class="dialog-actions">
+                      <button class="btn btn-danger" type="submit">Reject request</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            </li>
+          {{ end }}
+        </ul>
+      {{ else }}
+        <p class="muted">No pending join requests</p>
+      {{ end }}
+    </div>
+
     <div class="panel-head-actions">
       <div class="panel-heading">
         <h2>Users</h2>
