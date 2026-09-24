@@ -2059,7 +2059,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		Groups:           groups,
 		Sidebar:          buildMyHomeCategorySidebar(groups),
 		ShowCreateStream: showCreateStream && authErr == nil,
-		Unaffiliated:     !s.affiliationService().IsAffiliated(IdentityUser{OrgSlug: user.OrgSlug}),
+		Unaffiliated:     !s.affiliationService().IsAffiliated(identityUserForAffiliation(user)),
 		Error:            homePickerMessage(r, "error"),
 		Confirmation:     homePickerMessage(r, "confirmation"),
 	}
@@ -2630,6 +2630,15 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if err := s.guardInviteAcceptAffiliation(r.Context(), teamID, userID); err != nil {
+		switch {
+		case errors.Is(err, errInviteAcceptWrongOrg):
+			http.Error(w, "already belongs to another organization", http.StatusBadRequest)
+		default:
+			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to accept invite", err, "failed invite affiliation gate team=%s user=%s", teamID, userID)
+		}
+		return
+	}
 	session, err := s.identity.AcceptInvite(r.Context(), teamID, membershipID, userID, secret)
 	if err != nil {
 		logAndHTTPError(w, r, http.StatusBadRequest, "failed to accept invite", err, "failed to accept invite team=%s membership=%s user=%s", teamID, membershipID, userID)
@@ -2646,6 +2655,40 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		logRequestError(r, err, "failed to load invited user after accepting invite")
 	}
 	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
+}
+
+var errInviteAcceptWrongOrg = errors.New("invite accept: already belongs to another organization")
+
+// guardInviteAcceptAffiliation blocks affiliated users from accepting invites into a different org.
+// Unaffiliated users and GetUserByID not-found (new invitees) are allowed through.
+func (s *Server) guardInviteAcceptAffiliation(ctx context.Context, teamID, userID string) error {
+	user, err := s.identity.GetUserByID(ctx, userID)
+	switch {
+	case err == nil:
+		// continue
+	case errors.Is(err, ErrIdentityNotFound):
+		return nil
+	default:
+		return err
+	}
+	if !s.affiliationService().IsAffiliated(user) {
+		return nil
+	}
+	orgs, err := s.identity.ListOrganizations(ctx)
+	if err != nil {
+		return err
+	}
+	userOrgID := ""
+	for _, org := range orgs {
+		if strings.EqualFold(strings.TrimSpace(org.Slug), strings.TrimSpace(user.OrgSlug)) {
+			userOrgID = strings.TrimSpace(org.ID)
+			break
+		}
+	}
+	if userOrgID == "" || userOrgID != teamID {
+		return errInviteAcceptWrongOrg
+	}
+	return nil
 }
 
 func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {

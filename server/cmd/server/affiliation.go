@@ -275,13 +275,6 @@ func (a *Affiliation) ApproveJoinRequest(ctx context.Context, requestID primitiv
 		return JoinRequest{}, err
 	}
 
-	if _, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, roles, false); err != nil {
-		return JoinRequest{}, err
-	}
-	if err := a.stampJoinRequestRoleLabels(ctx, req.RequesterUserID, roles); err != nil {
-		return JoinRequest{}, err
-	}
-
 	now := a.now().UTC()
 	req.Status = AffiliationStatusApproved
 	req.RoleSlugs = roles
@@ -291,6 +284,15 @@ func (a *Affiliation) ApproveJoinRequest(ctx context.Context, requestID primitiv
 	req.UpdatedAt = now
 	updated, err := a.store.UpdateJoinRequest(ctx, req)
 	if err != nil {
+		return JoinRequest{}, err
+	}
+
+	if _, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, roles, false); err != nil {
+		_ = a.compensateJoinRequestToPending(ctx, updated)
+		return JoinRequest{}, err
+	}
+	if err := a.stampJoinRequestRoleLabels(ctx, req.RequesterUserID, roles); err != nil {
+		_ = a.compensateJoinRequestToPending(ctx, updated)
 		return JoinRequest{}, err
 	}
 
@@ -433,17 +435,6 @@ func (a *Affiliation) ApproveOrganizationCreationRequest(ctx context.Context, re
 		return OrganizationCreationRequest{}, IdentityOrg{}, err
 	}
 
-	org, err := a.identity.CreateOrganizationAsAdmin(ctx, req.ProposedName)
-	if err != nil {
-		return OrganizationCreationRequest{}, IdentityOrg{}, err
-	}
-	if _, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, nil, true); err != nil {
-		return OrganizationCreationRequest{}, IdentityOrg{}, err
-	}
-	if err := a.stampOrgAdminLabel(ctx, req.RequesterUserID); err != nil {
-		return OrganizationCreationRequest{}, IdentityOrg{}, err
-	}
-
 	now := a.now().UTC()
 	req.Status = AffiliationStatusApproved
 	req.RejectReason = ""
@@ -452,6 +443,20 @@ func (a *Affiliation) ApproveOrganizationCreationRequest(ctx context.Context, re
 	req.UpdatedAt = now
 	updated, err := a.store.UpdateOrganizationCreationRequest(ctx, req)
 	if err != nil {
+		return OrganizationCreationRequest{}, IdentityOrg{}, err
+	}
+
+	org, err := a.identity.CreateOrganizationAsAdmin(ctx, req.ProposedName)
+	if err != nil {
+		_ = a.compensateOrganizationCreationRequestToPending(ctx, updated)
+		return OrganizationCreationRequest{}, IdentityOrg{}, err
+	}
+	if _, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, nil, true); err != nil {
+		a.compensateOrganizationCreationAfterIdentity(ctx, updated, org)
+		return OrganizationCreationRequest{}, IdentityOrg{}, err
+	}
+	if err := a.stampOrgAdminLabel(ctx, req.RequesterUserID); err != nil {
+		a.compensateOrganizationCreationAfterIdentity(ctx, updated, org)
 		return OrganizationCreationRequest{}, IdentityOrg{}, err
 	}
 
@@ -502,6 +507,38 @@ func (a *Affiliation) RejectOrganizationCreationRequest(ctx context.Context, req
 		})
 	}
 	return updated, nil
+}
+
+func (a *Affiliation) compensateJoinRequestToPending(ctx context.Context, req JoinRequest) error {
+	now := a.now().UTC()
+	req.Status = AffiliationStatusPending
+	req.RejectReason = ""
+	req.DecidedByUserID = ""
+	req.DecidedAt = time.Time{}
+	req.UpdatedAt = now
+	_, err := a.store.UpdateJoinRequest(ctx, req)
+	return err
+}
+
+func (a *Affiliation) compensateOrganizationCreationRequestToPending(ctx context.Context, req OrganizationCreationRequest) error {
+	now := a.now().UTC()
+	req.Status = AffiliationStatusPending
+	req.RejectReason = ""
+	req.DecidedByUserID = ""
+	req.DecidedAt = time.Time{}
+	req.UpdatedAt = now
+	_, err := a.store.UpdateOrganizationCreationRequest(ctx, req)
+	return err
+}
+
+// compensateOrganizationCreationAfterIdentity reverts the request to pending and best-effort
+// deletes the org created during approve. If DeleteOrganizationAsAdmin fails or is unavailable,
+// status is still reverted so the request can be retried after manual cleanup.
+func (a *Affiliation) compensateOrganizationCreationAfterIdentity(ctx context.Context, req OrganizationCreationRequest, org IdentityOrg) {
+	_ = a.compensateOrganizationCreationRequestToPending(ctx, req)
+	if slug := strings.TrimSpace(org.Slug); slug != "" {
+		_ = a.identity.DeleteOrganizationAsAdmin(ctx, slug)
+	}
 }
 
 func (a *Affiliation) loadPendingOrganizationCreationRequest(ctx context.Context, requestID primitive.ObjectID) (OrganizationCreationRequest, error) {

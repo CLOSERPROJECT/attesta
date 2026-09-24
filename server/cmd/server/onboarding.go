@@ -77,7 +77,7 @@ func (s *Server) requireUnaffiliatedOnboarding(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return nil, false
 	}
-	if s.affiliationService().IsAffiliated(IdentityUser{OrgSlug: user.OrgSlug}) {
+	if s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
 		http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 		return nil, false
 	}

@@ -1557,3 +1557,232 @@ func TestAffiliationLeaveOrganizationThenJoinAllowed(t *testing.T) {
 		t.Fatalf("join status = %q", saved.Status)
 	}
 }
+
+func TestApproveJoinRequestCompensatesWhenIdentityFails(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "joiner@example.com", Labels: []string{"customKeep"}},
+	}
+	identity := joinRequestTestIdentity(users)
+	var savedID primitive.ObjectID
+	var calls []string
+	identity.addOrganizationUserByIDAsAdminFunc = func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+		loaded, err := store.LoadJoinRequestByID(ctx, savedID)
+		if err != nil || loaded == nil || loaded.Status != AffiliationStatusApproved {
+			t.Fatalf("expected approved status before identity add: loaded=%+v err=%v", loaded, err)
+		}
+		calls = append(calls, "add")
+		return IdentityMembership{}, errors.New("add membership failed")
+	}
+	identity.updateUserLabelsFunc = func(_ context.Context, _ string, _ []string) (IdentityUser, error) {
+		calls = append(calls, "labels")
+		return IdentityUser{}, nil
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+
+	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	savedID = saved.ID
+
+	_, err = aff.ApproveJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "acme"})
+	if err == nil || err.Error() != "add membership failed" {
+		t.Fatalf("err=%v", err)
+	}
+	if len(calls) != 1 || calls[0] != "add" {
+		t.Fatalf("calls=%v", calls)
+	}
+	loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+		t.Fatalf("loaded=%+v err=%v", loaded, err)
+	}
+	if loaded.DecidedByUserID != "" || !loaded.DecidedAt.IsZero() || loaded.RejectReason != "" {
+		t.Fatalf("decided fields not cleared: %+v", loaded)
+	}
+	if len(mailer.Messages()) != 0 {
+		t.Fatalf("mail must not send after identity failure: %+v", mailer.Messages())
+	}
+}
+
+func TestApproveJoinRequestCompensatesWhenStampLabelsFails(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "joiner@example.com", Labels: []string{"customKeep"}},
+	}
+	identity := joinRequestTestIdentity(users)
+	var calls []string
+	var added bool
+	identity.addOrganizationUserByIDAsAdminFunc = func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+		calls = append(calls, "add")
+		added = true
+		return IdentityMembership{ID: "mem-1", UserID: userID, RoleSlugs: roleSlugs}, nil
+	}
+	identity.updateUserLabelsFunc = func(_ context.Context, _ string, _ []string) (IdentityUser, error) {
+		calls = append(calls, "labels")
+		return IdentityUser{}, errors.New("stamp labels failed")
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+
+	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	_, err = aff.ApproveJoinRequest(ctx, saved.ID, IdentityUser{ID: "admin-1", OrgSlug: "acme"})
+	if err == nil || err.Error() != "stamp labels failed" {
+		t.Fatalf("err=%v", err)
+	}
+	if !added || len(calls) != 2 || calls[0] != "add" || calls[1] != "labels" {
+		t.Fatalf("calls=%v added=%v", calls, added)
+	}
+	loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+		t.Fatalf("loaded=%+v err=%v", loaded, err)
+	}
+	if len(mailer.Messages()) != 0 {
+		t.Fatalf("mail must not send after identity failure: %+v", mailer.Messages())
+	}
+}
+
+func TestApproveOrganizationCreationRequestCompensatesWhenCreateOrgFails(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "founder@example.com"},
+	}
+	var savedID primitive.ObjectID
+	var calls []string
+	identity := &fakeIdentityStore{
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			return users[userID], nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+			return nil, ErrIdentityNotFound
+		},
+		createOrganizationAsAdminFunc: func(_ context.Context, name string) (IdentityOrg, error) {
+			loaded, err := store.LoadOrganizationCreationRequestByID(ctx, savedID)
+			if err != nil || loaded == nil || loaded.Status != AffiliationStatusApproved {
+				t.Fatalf("expected approved before create: loaded=%+v err=%v", loaded, err)
+			}
+			calls = append(calls, "create")
+			return IdentityOrg{}, errors.New("create org failed")
+		},
+		addOrganizationUserByIDAsAdminFunc: func(_ context.Context, _, _ string, _ []string, _ bool) (IdentityMembership, error) {
+			calls = append(calls, "add")
+			return IdentityMembership{}, nil
+		},
+		deleteOrganizationAsAdminFunc: func(_ context.Context, _ string) error {
+			calls = append(calls, "delete")
+			return nil
+		},
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Org",
+		ProposedSlug:    "new-org",
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	savedID = saved.ID
+
+	_, _, err = aff.ApproveOrganizationCreationRequest(ctx, saved.ID, IdentityUser{ID: "admin-1"})
+	if err == nil || err.Error() != "create org failed" {
+		t.Fatalf("err=%v", err)
+	}
+	if len(calls) != 1 || calls[0] != "create" {
+		t.Fatalf("calls=%v", calls)
+	}
+	loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+		t.Fatalf("loaded=%+v err=%v", loaded, err)
+	}
+	if len(mailer.Messages()) != 0 {
+		t.Fatalf("mail must not send: %+v", mailer.Messages())
+	}
+}
+
+func TestApproveOrganizationCreationRequestCompensatesWhenAddMembershipFails(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "founder@example.com"},
+	}
+	var calls []string
+	var deletedSlug string
+	identity := &fakeIdentityStore{
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			return users[userID], nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+			return nil, ErrIdentityNotFound
+		},
+		createOrganizationAsAdminFunc: func(_ context.Context, name string) (IdentityOrg, error) {
+			calls = append(calls, "create")
+			return IdentityOrg{ID: "team-1", Slug: "new-org", Name: name}, nil
+		},
+		addOrganizationUserByIDAsAdminFunc: func(_ context.Context, orgSlug, userID string, _ []string, isOrgAdmin bool) (IdentityMembership, error) {
+			calls = append(calls, "add")
+			return IdentityMembership{}, errors.New("add membership failed")
+		},
+		deleteOrganizationAsAdminFunc: func(_ context.Context, orgSlug string) error {
+			calls = append(calls, "delete")
+			deletedSlug = orgSlug
+			return nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, _ string, _ []string) (IdentityUser, error) {
+			calls = append(calls, "labels")
+			return IdentityUser{}, nil
+		},
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Org",
+		ProposedSlug:    "new-org",
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	_, _, err = aff.ApproveOrganizationCreationRequest(ctx, saved.ID, IdentityUser{ID: "admin-1"})
+	if err == nil || err.Error() != "add membership failed" {
+		t.Fatalf("err=%v", err)
+	}
+	if len(calls) != 3 || calls[0] != "create" || calls[1] != "add" || calls[2] != "delete" {
+		t.Fatalf("calls=%v", calls)
+	}
+	if deletedSlug != "new-org" {
+		t.Fatalf("deletedSlug=%q", deletedSlug)
+	}
+	loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+		t.Fatalf("loaded=%+v err=%v", loaded, err)
+	}
+	if loaded.DecidedByUserID != "" || !loaded.DecidedAt.IsZero() {
+		t.Fatalf("decided fields not cleared: %+v", loaded)
+	}
+	if len(mailer.Messages()) != 0 {
+		t.Fatalf("mail must not send: %+v", mailer.Messages())
+	}
+}
