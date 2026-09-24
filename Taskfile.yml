@@ -97,7 +97,7 @@ tasks:
     cmds:
       - task: start
       - |
-          sh -c '
+          bash -c '
           set -euo pipefail
           primary="$(git worktree list --porcelain | awk "/^worktree / { print substr(\$0, 10); exit }")"
           docker compose -f "$primary/deployment/docker-compose.local.yaml" stop attesta
