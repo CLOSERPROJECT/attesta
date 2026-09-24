@@ -38,6 +38,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   text-align: left;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 /* Same chip metrics in the toggle and the dropdown options. */
@@ -80,6 +83,13 @@
 .roles-picker-toggle-icon .icon-svg {
   width: 18px;
   height: 18px;
+}
+
+.roles-picker-toggle:hover:not(:disabled),
+.roles-picker-toggle:focus-visible:not(:disabled) {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  outline: none;
 }
 
 .roles-picker-toggle[aria-expanded="true"] {

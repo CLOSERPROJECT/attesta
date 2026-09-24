@@ -47,10 +47,16 @@
 
 .dialog-head {
   display: flex;
+  flex-wrap: nowrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-5);
+}
+
+.dialog-head > div {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .dialog-title {
@@ -64,6 +70,7 @@
 }
 
 .dialog-close {
+  flex: 0 0 auto;
   transform: translate(calc(var(--space-2)), calc(-1 * var(--space-2)));
 }
 
@@ -79,11 +86,6 @@
 }
 
 @media (--sm-down) {
-  .dialog-head {
-    flex-wrap: wrap;
-    gap: var(--space-3);
-  }
-
   .dialog-actions {
     flex-direction: column;
   }
