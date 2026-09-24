@@ -745,6 +745,14 @@ func (a *appwriteIdentity) GetOrganizationLogo(ctx context.Context, fileID strin
 	}, nil
 }
 
+func defaultOperatorCatalogRole() IdentityRole {
+	return IdentityRole{
+		Slug:    "operator",
+		Name:    "Operator",
+		Palette: defaultRolePaletteFromInput("Operator"),
+	}
+}
+
 func (a *appwriteIdentity) createOrganizationWithClient(ctx context.Context, client appwriteclient.Client, name string) (IdentityOrg, error) {
 	name = strings.TrimSpace(name)
 	slug := canonifySlug(name)
@@ -755,6 +763,7 @@ func (a *appwriteIdentity) createOrganizationWithClient(ctx context.Context, cli
 	}
 	org := decodeIdentityOrg(team)
 	org.Slug = slug
+	org.Roles = []IdentityRole{defaultOperatorCatalogRole()}
 	if _, err := teams.New(a.adminClient).UpdatePrefs(team.Id, encodeIdentityOrgPrefs(org)); err != nil {
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}

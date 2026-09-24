@@ -305,8 +305,24 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	if createdOrg.Slug != "fresh-org" || createdOrg.Name != "Fresh Org" {
 		t.Fatalf("created org = %#v", createdOrg)
 	}
+	wantOperator := defaultOperatorCatalogRole()
+	if len(createdOrg.Roles) != 1 || createdOrg.Roles[0] != wantOperator {
+		t.Fatalf("created org roles = %#v, want [%#v]", createdOrg.Roles, wantOperator)
+	}
 	if createTeamBody["teamId"] != "fresh-org" || createTeamBody["name"] != "Fresh Org" {
 		t.Fatalf("create team body = %#v", createTeamBody)
+	}
+	if len(updatePrefsBodies) != 1 {
+		t.Fatalf("prefs calls after create = %d, want 1", len(updatePrefsBodies))
+	}
+	createPrefs, _ := updatePrefsBodies[0]["prefs"].(map[string]interface{})
+	createRoles, _ := createPrefs["roles"].([]interface{})
+	if len(createRoles) != 1 {
+		t.Fatalf("create prefs roles = %#v", createPrefs["roles"])
+	}
+	createRole, _ := createRoles[0].(map[string]interface{})
+	if createRole["slug"] != "operator" || createRole["name"] != "Operator" || createRole["palette"] != wantOperator.Palette {
+		t.Fatalf("create prefs operator role = %#v", createRole)
 	}
 	labels, _ := updatedLabelsBody["labels"].([]interface{})
 	if len(labels) != 1 || labels[0] != identityOrgAdminLabel {
@@ -401,6 +417,9 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	if createTeamSessionHeader != "" {
 		t.Fatalf("create admin team session header = %q, want empty", createTeamSessionHeader)
 	}
+	if len(createdAdminOrg.Roles) != 1 || createdAdminOrg.Roles[0] != defaultOperatorCatalogRole() {
+		t.Fatalf("created admin org roles = %#v", createdAdminOrg.Roles)
+	}
 
 	updatedAdminOrg, err := identity.UpdateOrganizationAsAdmin(context.Background(), "fresh-org", "Updated Org", "logo-1", []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "blue"}})
 	if err != nil {
@@ -463,8 +482,20 @@ func TestAppwriteIdentityCreateOrganizationShortensLongTeamID(t *testing.T) {
 	if prefs["slug"] != fullSlug {
 		t.Fatalf("prefs slug = %#v, want %q", prefs["slug"], fullSlug)
 	}
+	wantOperator := defaultOperatorCatalogRole()
+	roles, _ := prefs["roles"].([]interface{})
+	if len(roles) != 1 {
+		t.Fatalf("prefs roles = %#v", prefs["roles"])
+	}
+	role, _ := roles[0].(map[string]interface{})
+	if role["slug"] != "operator" || role["name"] != "Operator" || role["palette"] != wantOperator.Palette {
+		t.Fatalf("prefs operator role = %#v", role)
+	}
 	if createdOrg.ID != shortTeamID || createdOrg.Slug != fullSlug || createdOrg.Name != longName {
 		t.Fatalf("created org = %#v", createdOrg)
+	}
+	if len(createdOrg.Roles) != 1 || createdOrg.Roles[0] != wantOperator {
+		t.Fatalf("created org roles = %#v", createdOrg.Roles)
 	}
 }
 
