@@ -97,6 +97,48 @@ func (a *Affiliation) IsAffiliated(user IdentityUser) bool {
 	return strings.TrimSpace(user.OrgSlug) != ""
 }
 
+// EnsureInviteOrgSlugCompatible returns nil when user may be invited into orgSlug.
+// Unaffiliated users are always compatible; affiliated users must already match orgSlug.
+func (a *Affiliation) EnsureInviteOrgSlugCompatible(user IdentityUser, orgSlug string) error {
+	if !a.IsAffiliated(user) {
+		return nil
+	}
+	if strings.EqualFold(strings.TrimSpace(user.OrgSlug), strings.TrimSpace(orgSlug)) {
+		return nil
+	}
+	return ErrAffiliationAlreadyAffiliated
+}
+
+// EnsureInviteAcceptCompatible blocks affiliated users from accepting invites into a different org.
+// Unaffiliated users and GetUserByID not-found (new invitees) are allowed through.
+func (a *Affiliation) EnsureInviteAcceptCompatible(ctx context.Context, userID, teamID string) error {
+	user, err := a.identity.GetUserByID(ctx, userID)
+	switch {
+	case err == nil:
+		// continue
+	case errors.Is(err, ErrIdentityNotFound):
+		return nil
+	default:
+		return err
+	}
+	if !a.IsAffiliated(user) {
+		return nil
+	}
+	org, err := a.identity.GetOrganizationBySlug(ctx, user.OrgSlug)
+	switch {
+	case err == nil:
+		// continue
+	case errors.Is(err, ErrIdentityNotFound):
+		return ErrAffiliationAlreadyAffiliated
+	default:
+		return err
+	}
+	if org == nil || strings.TrimSpace(org.ID) != teamID {
+		return ErrAffiliationAlreadyAffiliated
+	}
+	return nil
+}
+
 // LeaveOrganization removes the session user from their organization when allowed.
 // Sole org admins are blocked until another org admin exists.
 func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret string, user IdentityUser) error {

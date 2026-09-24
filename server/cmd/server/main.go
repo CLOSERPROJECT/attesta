@@ -1473,7 +1473,7 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 		logCapabilityCheckError(err, "cerbos check failed for org admin navigation")
 	}
 	base.ShowMyOrgLink = showMyOrgLink
-	if strings.TrimSpace(user.OrgSlug) != "" {
+	if s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
 		base.ShowLeaveOrganization = true
 		base.LeaveOrganizationPath = leaveOrganizationPath()
 	}
@@ -2631,9 +2631,9 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := s.guardInviteAcceptAffiliation(r.Context(), teamID, userID); err != nil {
+	if err := s.affiliationService().EnsureInviteAcceptCompatible(r.Context(), userID, teamID); err != nil {
 		switch {
-		case errors.Is(err, errInviteAcceptWrongOrg):
+		case errors.Is(err, ErrAffiliationAlreadyAffiliated):
 			http.Error(w, "already belongs to another organization", http.StatusBadRequest)
 		default:
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to accept invite", err, "failed invite affiliation gate team=%s user=%s", teamID, userID)
@@ -2656,38 +2656,6 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		logRequestError(r, err, "failed to load invited user after accepting invite")
 	}
 	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
-}
-
-var errInviteAcceptWrongOrg = errors.New("invite accept: already belongs to another organization")
-
-// guardInviteAcceptAffiliation blocks affiliated users from accepting invites into a different org.
-// Unaffiliated users and GetUserByID not-found (new invitees) are allowed through.
-func (s *Server) guardInviteAcceptAffiliation(ctx context.Context, teamID, userID string) error {
-	user, err := s.identity.GetUserByID(ctx, userID)
-	switch {
-	case err == nil:
-		// continue
-	case errors.Is(err, ErrIdentityNotFound):
-		return nil
-	default:
-		return err
-	}
-	if !s.affiliationService().IsAffiliated(user) {
-		return nil
-	}
-	org, err := s.identity.GetOrganizationBySlug(ctx, user.OrgSlug)
-	switch {
-	case err == nil:
-		// continue
-	case errors.Is(err, ErrIdentityNotFound):
-		return errInviteAcceptWrongOrg
-	default:
-		return err
-	}
-	if org == nil || strings.TrimSpace(org.ID) != teamID {
-		return errInviteAcceptWrongOrg
-	}
-	return nil
 }
 
 func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
@@ -3421,7 +3389,7 @@ func (s *Server) inviteOrganizationAdminWithSession(ctx context.Context, session
 	existingUser, err := s.identity.GetUserByEmail(ctx, email)
 	switch {
 	case err == nil:
-		if existingUser.OrgSlug != "" && !strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(org.Slug)) {
+		if err := s.affiliationService().EnsureInviteOrgSlugCompatible(existingUser, org.Slug); err != nil {
 			return "", errPlatformAdminInviteCrossOrg
 		}
 	case err != nil && !errors.Is(err, ErrIdentityNotFound):
@@ -4582,23 +4550,26 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		existingUser, err := s.identity.GetUserByEmail(r.Context(), email)
 		switch {
-		case err == nil && existingUser.OrgSlug != "" && !strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(admin.OrgSlug)):
-			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
-			return
-		case err == nil && strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(admin.OrgSlug)):
-			labels := make([]string, 0, len(businessRoles)+1)
-			for _, roleSlug := range businessRoles {
-				labels = append(labels, encodeIdentityRoleLabel(roleSlug))
-			}
-			if isOrgAdmin {
-				labels = append(labels, identityOrgAdminLabel)
-			}
-			if _, err := s.identity.UpdateUserLabels(r.Context(), existingUser.ID, labels); err != nil {
-				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for existing user %s in organization %s", existingUser.ID, admin.OrgSlug)
+		case err == nil:
+			if err := s.affiliationService().EnsureInviteOrgSlugCompatible(existingUser, admin.OrgSlug); err != nil {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
 				return
 			}
-			http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
-			return
+			if strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(admin.OrgSlug)) {
+				labels := make([]string, 0, len(businessRoles)+1)
+				for _, roleSlug := range businessRoles {
+					labels = append(labels, encodeIdentityRoleLabel(roleSlug))
+				}
+				if isOrgAdmin {
+					labels = append(labels, identityOrgAdminLabel)
+				}
+				if _, err := s.identity.UpdateUserLabels(r.Context(), existingUser.ID, labels); err != nil {
+					s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to update user roles"}, err, "failed to update labels for existing user %s in organization %s", existingUser.ID, admin.OrgSlug)
+					return
+				}
+				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+				return
+			}
 		case err != nil && !errors.Is(err, ErrIdentityNotFound):
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"}, err, "failed to look up existing user %s during invite", email)
 			return

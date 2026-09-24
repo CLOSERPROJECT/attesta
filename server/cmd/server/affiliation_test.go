@@ -23,6 +23,126 @@ func TestAffiliationIsAffiliated(t *testing.T) {
 	}
 }
 
+func TestAffiliationEnsureInviteOrgSlugCompatible(t *testing.T) {
+	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, time.Now)
+
+	t.Run("unaffiliated ok", func(t *testing.T) {
+		if err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u"}, "acme"); err != nil {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("whitespace org slug unaffiliated ok", func(t *testing.T) {
+		if err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u", OrgSlug: "  "}, "acme"); err != nil {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("same org ok", func(t *testing.T) {
+		if err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u", OrgSlug: "Acme"}, "acme"); err != nil {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("cross org rejected", func(t *testing.T) {
+		err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u", OrgSlug: "acme"}, "other")
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
+func TestAffiliationEnsureInviteAcceptCompatible(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("user not found ok", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+				return IdentityUser{}, ErrIdentityNotFound
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now)
+		if err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme"); err != nil {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("unaffiliated ok", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "new@example.com"}, nil
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now)
+		if err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme"); err != nil {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("same org ok", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "m@example.com", OrgSlug: "acme"}, nil
+			},
+			getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+				if slug != "acme" {
+					return nil, ErrIdentityNotFound
+				}
+				return &IdentityOrg{ID: "team-acme", Slug: "acme"}, nil
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now)
+		if err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme"); err != nil {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("cross org rejected", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "m@example.com", OrgSlug: "acme"}, nil
+			},
+			getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+				return &IdentityOrg{ID: "team-acme", Slug: "acme"}, nil
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now)
+		err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-other")
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("org missing rejected", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "m@example.com", OrgSlug: "ghost"}, nil
+			},
+			getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+				return nil, ErrIdentityNotFound
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now)
+		err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme")
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("get user failure propagates", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+				return IdentityUser{}, errors.New("identity down")
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now)
+		err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme")
+		if err == nil || err.Error() != "identity down" {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
 func TestAffiliationPendingIntentEmpty(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

@@ -63,7 +63,7 @@ Open self-serve account creation (email + password). A registered user may have 
 _Avoid_: Closed signup, invite-only registration (as the product default)
 
 **Invitation**:
-An organization-admin-initiated (or platform-admin-initiated) outbound membership offer to an email, with roles chosen by the inviter. Distinct from a join request.
+An organization-admin-initiated (or platform-admin-initiated) outbound membership offer to an email, with roles chosen by the inviter. Distinct from a join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization.
 _Avoid_: Join request, membership request (when meaning outbound invite)
 
 **Join request**:
