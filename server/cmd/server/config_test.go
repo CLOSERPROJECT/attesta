@@ -845,17 +845,35 @@ func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 	}
 }
 
-func TestWorkflowCatalogRejectsEnabledDPPWithoutSubjectData(t *testing.T) {
+// A stream that enables the DPP without subject data must still load: one
+// stream's presentation config must never take down the whole catalog, and the
+// credential builders derive the UNTP-required fields.
+func TestWorkflowCatalogLoadsEnabledDPPWithoutSubjectData(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
 
 	server := &Server{configDir: tempDir}
-	_, err := server.workflowCatalog()
-	if err == nil {
-		t.Fatal("expected dpp.productCategory validation error")
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
 	}
-	if !strings.Contains(err.Error(), "dpp.productCategory is required") {
-		t.Fatalf("unexpected error: %v", err)
+	cfg, ok := catalog["workflow"]
+	if !ok || !cfg.DPP.Enabled {
+		t.Fatalf("catalog = %#v, want the dpp stream loaded", catalog)
+	}
+	if cfg.DPP.ProductCategory != nil || cfg.DPP.ProducedAtFacility != nil || cfg.DPP.CountryOfProduction != nil {
+		t.Fatalf("subject config = %#v, want left unset", cfg.DPP)
+	}
+}
+
+func TestWorkflowCatalogRejectsIncompleteDPPSubjectBlocks(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n  productCategory:\n    code: \"41601\"\n")
+
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
+	if err == nil || !strings.Contains(err.Error(), "dpp.productCategory needs both code and name") {
+		t.Fatalf("err = %v, want partial productCategory rejected", err)
 	}
 }
 

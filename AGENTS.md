@@ -144,6 +144,7 @@ Backend environment variables are read in `main()` (`server/cmd/server/main.go` 
 - `APPWRITE_ORG_ASSETS_BUCKET` (default `org-assets`)
 - `WORKFLOW_CONFIG` (default `config/workflow.yaml`); `WORKFLOW_CONFIG_DIR` overrides the catalog directory
 - `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size via `attachmentMaxBytes()`
+- `DPP_COUNTRY_OF_PRODUCTION` — country used on UNTP passports when a stream does not declare one (`"NL"` or `"NL,Netherlands"`); unset emits ISO 3166-1 `ZZ` / "Unspecified"
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD` — platform admin credentials; both required to enable the console
 - `ANYONE_CAN_CREATE_ACCOUNT`
 - `SESSION_TTL_DAYS`, `COOKIE_SECURE`
@@ -233,7 +234,7 @@ Download endpoint `handleDownloadProcessAttachment` streams GridFS content and s
   - HTML landing page (template: `server/templates/pages/dpp.html`) — default link
   - UNTP Digital Product Passport credential JSON (`Accept: application/json` or `?format=json`)
   - UNTP Identity Resolver linkset, RFC 9264 (`?linkType=linkset|all|dpp|dte|pip`, or `Accept: application/linkset+json`)
-  - `GET /01/{gtin}/10/{lot}/21/{serial}/events` — UNTP Digital Traceability Event credential (one ModifyEvent per completed substep)
+  - `GET /01/{gtin}/10/{lot}/21/{serial}/events` — UNTP Digital Traceability Event credential (one GS1 EPCIS 2.0 `ObjectEvent` per completed substep; substep input values ride in the `attesta:substep` EPCIS extension)
   - UNTP implementation details: `docs/untp.md`
 - DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
 - Process page downloads panel now shows a DPP link when `process.DPP` exists.

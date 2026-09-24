@@ -229,6 +229,8 @@
           {{ template "process_body" . }}
         {{ else if eq .Body "dpp_body" }}
           {{ template "dpp_body" . }}
+        {{ else if eq .Body "untp_vocabulary_body" }}
+          {{ template "untp_vocabulary_body" . }}
         {{ end }}
       </main>
 {{ template "site_footer" . }}
