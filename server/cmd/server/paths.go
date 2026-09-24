@@ -19,6 +19,10 @@ func onboardingRequestOrganizationPath() string {
 	return "/my/onboarding/request-organization"
 }
 
+func leaveOrganizationPath() string {
+	return "/my/leave-organization"
+}
+
 func streamPath(key string) string {
 	return "/my/streams/" + strings.TrimSpace(key)
 }

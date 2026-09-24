@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// Domain errors for affiliation submit/approve/reject flows.
+// Domain errors for affiliation submit/approve/reject/leave flows.
 var (
 	ErrAffiliationAlreadyAffiliated      = errors.New("affiliation: already affiliated")
 	ErrAffiliationPendingExists          = errors.New("affiliation: pending request exists")
@@ -21,6 +21,8 @@ var (
 	ErrAffiliationInvalidName            = errors.New("affiliation: organization name is required")
 	ErrAffiliationInvalidRoles           = errors.New("affiliation: invalid roles")
 	ErrAffiliationOrganizationSlugExists = errors.New("affiliation: organization slug already exists")
+	ErrAffiliationNotAffiliated          = errors.New("affiliation: not affiliated")
+	ErrAffiliationSoleOrgAdmin           = errors.New("affiliation: sole organization admin")
 )
 
 const (
@@ -68,8 +70,7 @@ type OrganizationCreationRequest struct {
 	DecidedAt       time.Time                `bson:"decidedAt,omitempty"`
 }
 
-// Affiliation owns affiliation-domain queries and join / organization-creation commands.
-// Leave remains for a later ticket.
+// Affiliation owns affiliation-domain queries and join / organization-creation / leave commands.
 type Affiliation struct {
 	identity IdentityStore
 	store    Store
@@ -94,6 +95,73 @@ func NewAffiliation(identity IdentityStore, store Store, mailer Mailer, now func
 
 func (a *Affiliation) IsAffiliated(user IdentityUser) bool {
 	return strings.TrimSpace(user.OrgSlug) != ""
+}
+
+// LeaveOrganization removes the session user from their organization when allowed.
+// Sole org admins are blocked until another org admin exists.
+func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret string, user IdentityUser) error {
+	if !a.IsAffiliated(user) {
+		return ErrAffiliationNotAffiliated
+	}
+
+	current, err := a.identity.GetCurrentUser(ctx, sessionSecret)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(current.ID) != strings.TrimSpace(user.ID) {
+		return ErrIdentityUnauthorized
+	}
+	if !a.IsAffiliated(current) {
+		return ErrAffiliationNotAffiliated
+	}
+
+	orgSlug := strings.TrimSpace(current.OrgSlug)
+	if current.IsOrgAdmin {
+		users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug)
+		if listErr != nil {
+			return listErr
+		}
+		adminCount := 0
+		for _, orgUser := range users {
+			if orgUser.IsOrgAdmin {
+				adminCount++
+			}
+		}
+		if adminCount < 2 {
+			return ErrAffiliationSoleOrgAdmin
+		}
+	}
+
+	membershipID := strings.TrimSpace(current.MembershipID)
+	if membershipID == "" {
+		return ErrIdentityNotFound
+	}
+	if err := a.identity.DeleteOrganizationMembership(ctx, sessionSecret, orgSlug, membershipID); err != nil {
+		return err
+	}
+
+	userID := strings.TrimSpace(current.ID)
+	if userID == "" {
+		return nil
+	}
+	targetUser, getErr := a.identity.GetUserByID(ctx, userID)
+	if getErr != nil {
+		if errors.Is(getErr, ErrIdentityNotFound) {
+			return nil
+		}
+		return getErr
+	}
+	labels := make([]string, 0, len(targetUser.Labels))
+	for _, label := range targetUser.Labels {
+		if isManagedIdentityLabel(label) {
+			continue
+		}
+		labels = append(labels, strings.TrimSpace(label))
+	}
+	if _, err := a.identity.UpdateUserLabels(ctx, userID, labels); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *Affiliation) PendingJoinRequestForUser(ctx context.Context, userID string) (*JoinRequest, error) {

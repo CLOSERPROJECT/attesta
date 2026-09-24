@@ -1307,3 +1307,253 @@ func joinRequestTestIdentity(users map[string]IdentityUser) *fakeIdentityStore {
 func fixedNow() time.Time {
 	return time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 }
+
+func TestAffiliationLeaveOrganizationNotAffiliated(t *testing.T) {
+	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, fixedNow)
+	err := aff.LeaveOrganization(context.Background(), "session", IdentityUser{ID: "user-1"})
+	if !errors.Is(err, ErrAffiliationNotAffiliated) {
+		t.Fatalf("LeaveOrganization error = %v, want %v", err, ErrAffiliationNotAffiliated)
+	}
+}
+
+func TestAffiliationLeaveOrganizationMemberAllowed(t *testing.T) {
+	ctx := context.Background()
+	mailer := &recordingMailer{}
+	var deleted struct {
+		sessionSecret string
+		orgSlug       string
+		membershipID  string
+	}
+	var updatedLabels []string
+	var updatedUserID string
+	usersByID := map[string]IdentityUser{
+		"member-1": {
+			ID:           "member-1",
+			Email:        "member@example.com",
+			OrgSlug:      "acme",
+			MembershipID: "mem-member",
+			Labels:       []string{"custom:keep", encodeIdentityRoleLabel("viewer"), identityOrgAdminLabel},
+			IsOrgAdmin:   false,
+		},
+	}
+	identity := &fakeIdentityStore{
+		getCurrentUserFunc: func(_ context.Context, sessionSecret string) (IdentityUser, error) {
+			if sessionSecret != "session-member" {
+				return IdentityUser{}, ErrIdentityUnauthorized
+			}
+			return usersByID["member-1"], nil
+		},
+		listOrganizationUsersFunc: func(_ context.Context, orgSlug string) ([]IdentityUser, error) {
+			t.Fatalf("ListOrganizationUsers should not run for non-admin leave, org=%q", orgSlug)
+			return nil, nil
+		},
+		deleteOrganizationMembershipFunc: func(_ context.Context, sessionSecret, orgSlug, membershipID string) error {
+			deleted.sessionSecret = sessionSecret
+			deleted.orgSlug = orgSlug
+			deleted.membershipID = membershipID
+			u := usersByID["member-1"]
+			u.OrgSlug = ""
+			u.MembershipID = ""
+			usersByID["member-1"] = u
+			return nil
+		},
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			user, ok := usersByID[userID]
+			if !ok {
+				return IdentityUser{}, ErrIdentityNotFound
+			}
+			return user, nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+			updatedUserID = userID
+			updatedLabels = append([]string(nil), labels...)
+			user := usersByID[userID]
+			user.Labels = append([]string(nil), labels...)
+			usersByID[userID] = user
+			return user, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), mailer, fixedNow)
+
+	err := aff.LeaveOrganization(ctx, "session-member", IdentityUser{
+		ID:      "member-1",
+		OrgSlug: "acme",
+	})
+	if err != nil {
+		t.Fatalf("LeaveOrganization: %v", err)
+	}
+	if deleted.sessionSecret != "session-member" || deleted.orgSlug != "acme" || deleted.membershipID != "mem-member" {
+		t.Fatalf("delete params = %#v", deleted)
+	}
+	if updatedUserID != "member-1" {
+		t.Fatalf("updated user id = %q", updatedUserID)
+	}
+	if len(updatedLabels) != 1 || updatedLabels[0] != "custom:keep" {
+		t.Fatalf("updated labels = %#v, want [custom:keep]", updatedLabels)
+	}
+	if msgs := mailer.Messages(); len(msgs) != 0 {
+		t.Fatalf("expected no mail on leave, got %#v", msgs)
+	}
+}
+
+func TestAffiliationLeaveOrganizationOrgAdminWithPeerAllowed(t *testing.T) {
+	ctx := context.Background()
+	mailer := &recordingMailer{}
+	var deletedMembershipID string
+	usersByID := map[string]IdentityUser{
+		"admin-1": {
+			ID:           "admin-1",
+			Email:        "owner@example.com",
+			OrgSlug:      "acme",
+			MembershipID: "mem-admin-1",
+			Labels:       []string{identityOrgAdminLabel, "custom:keep"},
+			IsOrgAdmin:   true,
+		},
+	}
+	identity := &fakeIdentityStore{
+		getCurrentUserFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+			return usersByID["admin-1"], nil
+		},
+		listOrganizationUsersFunc: func(_ context.Context, orgSlug string) ([]IdentityUser, error) {
+			if orgSlug != "acme" {
+				return nil, nil
+			}
+			return []IdentityUser{
+				{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true},
+				{ID: "admin-2", OrgSlug: "acme", IsOrgAdmin: true},
+			}, nil
+		},
+		deleteOrganizationMembershipFunc: func(_ context.Context, _, _, membershipID string) error {
+			deletedMembershipID = membershipID
+			return nil
+		},
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			return usersByID[userID], nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+			user := usersByID[userID]
+			user.Labels = append([]string(nil), labels...)
+			usersByID[userID] = user
+			return user, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), mailer, fixedNow)
+
+	if err := aff.LeaveOrganization(ctx, "session", IdentityUser{ID: "admin-1", OrgSlug: "acme"}); err != nil {
+		t.Fatalf("LeaveOrganization: %v", err)
+	}
+	if deletedMembershipID != "mem-admin-1" {
+		t.Fatalf("membership id = %q", deletedMembershipID)
+	}
+	if got := usersByID["admin-1"].Labels; len(got) != 1 || got[0] != "custom:keep" {
+		t.Fatalf("labels after leave = %#v", got)
+	}
+	if msgs := mailer.Messages(); len(msgs) != 0 {
+		t.Fatalf("expected no mail on leave, got %#v", msgs)
+	}
+}
+
+func TestAffiliationLeaveOrganizationSoleOrgAdminDenied(t *testing.T) {
+	ctx := context.Background()
+	var deleteCalled bool
+	var labelsCalled bool
+	identity := &fakeIdentityStore{
+		getCurrentUserFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+			return IdentityUser{
+				ID:           "admin-1",
+				OrgSlug:      "acme",
+				MembershipID: "mem-admin-1",
+				IsOrgAdmin:   true,
+				Labels:       []string{identityOrgAdminLabel},
+			}, nil
+		},
+		listOrganizationUsersFunc: func(_ context.Context, _ string) ([]IdentityUser, error) {
+			return []IdentityUser{
+				{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true},
+				{ID: "member-1", OrgSlug: "acme", IsOrgAdmin: false},
+			}, nil
+		},
+		deleteOrganizationMembershipFunc: func(_ context.Context, _, _, _ string) error {
+			deleteCalled = true
+			return nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, _ string, labels []string) (IdentityUser, error) {
+			labelsCalled = true
+			return IdentityUser{Labels: labels}, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, fixedNow)
+
+	err := aff.LeaveOrganization(ctx, "session", IdentityUser{ID: "admin-1", OrgSlug: "acme"})
+	if !errors.Is(err, ErrAffiliationSoleOrgAdmin) {
+		t.Fatalf("LeaveOrganization error = %v, want %v", err, ErrAffiliationSoleOrgAdmin)
+	}
+	if deleteCalled || labelsCalled {
+		t.Fatalf("sole admin leave must not mutate: delete=%v labels=%v", deleteCalled, labelsCalled)
+	}
+}
+
+func TestAffiliationLeaveOrganizationSessionUserMismatch(t *testing.T) {
+	identity := &fakeIdentityStore{
+		getCurrentUserFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+			return IdentityUser{ID: "other-user", OrgSlug: "acme", MembershipID: "mem-1"}, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, fixedNow)
+	err := aff.LeaveOrganization(context.Background(), "session", IdentityUser{ID: "user-1", OrgSlug: "acme"})
+	if !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("LeaveOrganization error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+}
+
+func TestAffiliationLeaveOrganizationThenJoinAllowed(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	left := false
+	identity := joinRequestTestIdentity(map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "member@example.com"},
+	})
+	identity.getCurrentUserFunc = func(_ context.Context, _ string) (IdentityUser, error) {
+		if left {
+			return IdentityUser{ID: "user-1", Email: "member@example.com"}, nil
+		}
+		return IdentityUser{
+			ID:           "user-1",
+			Email:        "member@example.com",
+			OrgSlug:      "acme",
+			MembershipID: "mem-1",
+			IsOrgAdmin:   false,
+			Labels:       []string{encodeIdentityRoleLabel("viewer")},
+		}, nil
+	}
+	identity.deleteOrganizationMembershipFunc = func(_ context.Context, _, _, _ string) error {
+		left = true
+		return nil
+	}
+	identity.updateUserLabelsFunc = func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+		return IdentityUser{ID: userID, Labels: labels}, nil
+	}
+	identity.getUserByIDFunc = func(_ context.Context, userID string) (IdentityUser, error) {
+		if left {
+			return IdentityUser{ID: userID, Email: "member@example.com", Labels: []string{"custom:keep"}}, nil
+		}
+		return IdentityUser{
+			ID:      userID,
+			Email:   "member@example.com",
+			OrgSlug: "acme",
+			Labels:  []string{"custom:keep", encodeIdentityRoleLabel("viewer")},
+		}, nil
+	}
+	aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
+
+	if err := aff.LeaveOrganization(ctx, "session", IdentityUser{ID: "user-1", OrgSlug: "acme"}); err != nil {
+		t.Fatalf("LeaveOrganization: %v", err)
+	}
+	saved, err := aff.SubmitJoinRequest(ctx, IdentityUser{ID: "user-1", Email: "member@example.com"}, "acme", []string{"viewer"})
+	if err != nil {
+		t.Fatalf("SubmitJoinRequest after leave: %v", err)
+	}
+	if saved.Status != AffiliationStatusPending {
+		t.Fatalf("join status = %q", saved.Status)
+	}
+}

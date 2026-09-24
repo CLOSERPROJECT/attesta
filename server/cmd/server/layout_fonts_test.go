@@ -52,4 +52,27 @@ func TestLayoutShowsAccountMenuWhenLoggedIn(t *testing.T) {
 	if strings.Contains(body, `href="/login"`) {
 		t.Fatalf("expected no topbar Login link when logged in, got:\n%s", body)
 	}
+	if strings.Contains(body, "Leave organization") {
+		t.Fatalf("expected no leave organization when not affiliated, got:\n%s", body)
+	}
+}
+
+func TestLayoutShowsLeaveOrganizationWhenAffiliated(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var rendered bytes.Buffer
+	view := PageBase{
+		ShowLogout:            true,
+		ShowLeaveOrganization: true,
+		LeaveOrganizationPath: leaveOrganizationPath(),
+	}
+	if err := tmpl.ExecuteTemplate(&rendered, "layout.html", view); err != nil {
+		t.Fatalf("ExecuteTemplate() error = %v", err)
+	}
+	body := rendered.String()
+	if !strings.Contains(body, `action="/my/leave-organization"`) {
+		t.Fatalf("expected leave organization form action, got:\n%s", body)
+	}
+	if !strings.Contains(body, "Leave organization") {
+		t.Fatalf("expected Leave organization label, got:\n%s", body)
+	}
 }

@@ -181,6 +181,17 @@
                           My organization
                         </a>
                       {{ end }}
+                      {{ if .ShowLeaveOrganization }}
+                        <form method="post" action="{{ .LeaveOrganizationPath }}">
+                          <button
+                            type="submit"
+                            class="account-menu-item account-menu-item-danger"
+                          >
+                            {{ template "icon-door-open" . }}
+                            Leave organization
+                          </button>
+                        </form>
+                      {{ end }}
                       <form method="post" action="/logout">
                         <button
                           type="submit"

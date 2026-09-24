@@ -276,16 +276,18 @@ type RoleMeta struct {
 }
 
 type PageBase struct {
-	Body            string
-	ViteDevServer   string
-	WorkflowKey     string
-	WorkflowName    string
-	WorkflowPath    string
-	UserEmail       string
-	IsPlatformAdmin bool
-	ShowAdminLink   bool
-	ShowMyOrgLink   bool
-	ShowLogout      bool
+	Body                   string
+	ViteDevServer          string
+	WorkflowKey            string
+	WorkflowName           string
+	WorkflowPath           string
+	UserEmail              string
+	IsPlatformAdmin        bool
+	ShowAdminLink          bool
+	ShowMyOrgLink          bool
+	ShowLeaveOrganization  bool
+	LeaveOrganizationPath  string
+	ShowLogout             bool
 }
 
 type PublicCatalogResponse struct {
@@ -1458,6 +1460,10 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 		logCapabilityCheckError(err, "cerbos check failed for org admin navigation")
 	}
 	base.ShowMyOrgLink = showMyOrgLink
+	if strings.TrimSpace(user.OrgSlug) != "" {
+		base.ShowLeaveOrganization = true
+		base.LeaveOrganizationPath = leaveOrganizationPath()
+	}
 	return base
 }
 
@@ -2067,6 +2073,9 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	case rest == "onboarding" || strings.HasPrefix(rest, "onboarding/"):
 		s.handleOnboardingRoutes(w, cloneRequestWithPath(r, "/"+rest))
+		return
+	case rest == "leave-organization":
+		s.handleLeaveOrganization(w, r)
 		return
 	default:
 		http.NotFound(w, r)
