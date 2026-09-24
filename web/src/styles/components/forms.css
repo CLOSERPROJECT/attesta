@@ -60,10 +60,6 @@
   font-size: var(--text-sm);
 }
 
-.auth-switch {
-  text-align: center;
-}
-
 .password-field {
   position: relative;
   display: flex;

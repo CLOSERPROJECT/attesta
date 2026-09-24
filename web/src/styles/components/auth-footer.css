@@ -1,0 +1,30 @@
+/*
+ * Auth footer — cross-link under login/signup forms (CSS-only).
+ *
+ * footer.auth-footer
+ *   hr
+ *   p.auth-footer-switch
+ *     a
+ *
+ * Markup: {{ template "auth_footer" (dict "Prompt" "…" "Href" "…" "LinkLabel" "…") }}
+ */
+
+.auth-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-10);
+}
+
+.auth-footer > hr {
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.auth-footer-switch {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}

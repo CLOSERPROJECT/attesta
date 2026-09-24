@@ -55,11 +55,11 @@ func TestLoginTemplateShowsPlaceholdersAndSignupSwitch(t *testing.T) {
 	if !strings.Contains(body, `data-target="password"`) {
 		t.Fatalf("expected password toggle target, got: %s", body)
 	}
-	if !strings.Contains(body, `class="u-divider"`) {
-		t.Fatalf("expected separator under CTA, got: %s", body)
+	if !strings.Contains(body, `class="auth-footer"`) {
+		t.Fatalf("expected auth footer under CTA, got: %s", body)
 	}
-	if !strings.Contains(body, `class="muted auth-switch"`) {
-		t.Fatalf("expected centered auth switch, got: %s", body)
+	if !strings.Contains(body, `class="auth-footer-switch"`) {
+		t.Fatalf("expected auth footer switch copy, got: %s", body)
 	}
 	if !strings.Contains(body, `href="/signup"`) || !strings.Contains(body, "Sign up") {
 		t.Fatalf("expected signup cross-link, got: %s", body)
@@ -90,11 +90,11 @@ func TestSignupTemplateShowsConfirmPasswordAndLoginSwitch(t *testing.T) {
 	if !strings.Contains(body, `placeholder="you@example.com"`) {
 		t.Fatalf("expected email placeholder, got: %s", body)
 	}
-	if !strings.Contains(body, `class="u-divider"`) {
-		t.Fatalf("expected separator under CTA, got: %s", body)
+	if !strings.Contains(body, `class="auth-footer"`) {
+		t.Fatalf("expected auth footer under CTA, got: %s", body)
 	}
-	if !strings.Contains(body, `class="muted auth-switch"`) {
-		t.Fatalf("expected centered auth switch, got: %s", body)
+	if !strings.Contains(body, `class="auth-footer-switch"`) {
+		t.Fatalf("expected auth footer switch copy, got: %s", body)
 	}
 	if !strings.Contains(body, `href="/login"`) || !strings.Contains(body, "Log in") {
 		t.Fatalf("expected login cross-link, got: %s", body)

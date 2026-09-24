@@ -46,7 +46,7 @@ Import new component/page modules from the matching barrel (`components.css` / `
 - `components/dpp_history_step.html` styles live under `pages/dpp.css` (`.dpp-history-*`)
 - `attachment_carousel.html` (templates root) → `components/substep-body.css`
 - `substep_override_editor.html` (templates root) → `components/substep-override.css`
-- Auth pages (`login`, `signup`, `invite`, `reset_*`) → `components/forms.css` (no per-page CSS module)
+- Auth pages (`login`, `signup`, `invite`, `reset_*`) → `components/forms.css` (no per-page CSS module); login/signup cross-link footer → `components/auth-footer.css` (`auth_footer`)
 
 Root templates still pending migration (`error_banner.html`, `icons.html`, `role_palette_options.html`, …) live under `server/templates/`. Migrate one at a time when a task needs them.
 
