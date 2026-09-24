@@ -645,16 +645,35 @@ func ensureDeciderOrgMatches(decidedBy IdentityUser, orgSlug string) error {
 	return nil
 }
 
+// RequestableJoinRoles returns catalog roles that may be requested when joining an organization.
+// Org-admin roles are never requestable.
+func (a *Affiliation) RequestableJoinRoles(org IdentityOrg) []Role {
+	return requestableJoinRoles(org)
+}
+
+func requestableJoinRoles(org IdentityOrg) []Role {
+	roles := rolesFromIdentityOrg(org)
+	out := make([]Role, 0, len(roles))
+	for _, role := range roles {
+		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+			continue
+		}
+		out = append(out, role)
+	}
+	return out
+}
+
 func validateJoinRequestRoles(org IdentityOrg, roleSlugs []string) ([]string, error) {
 	roles := canonifyRoleSlugs(roleSlugs)
 	if len(roles) == 0 {
 		return nil, ErrAffiliationInvalidRoles
 	}
+	allowed := make(map[string]struct{}, len(org.Roles))
+	for _, role := range requestableJoinRoles(org) {
+		allowed[canonifySlug(role.Slug)] = struct{}{}
+	}
 	for _, slug := range roles {
-		if containsRole([]string{slug}, "org-admin") || containsRole([]string{slug}, "org_admin") {
-			return nil, ErrAffiliationInvalidRoles
-		}
-		if !identityOrgHasRole(org, slug) {
+		if _, ok := allowed[slug]; !ok {
 			return nil, ErrAffiliationInvalidRoles
 		}
 	}

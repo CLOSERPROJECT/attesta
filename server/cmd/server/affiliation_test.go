@@ -839,6 +839,27 @@ func TestListPendingOrganizationCreationRequestsFiltersNonPending(t *testing.T) 
 	}
 }
 
+func TestAffiliationRequestableJoinRoles(t *testing.T) {
+	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, fixedNow)
+	org := IdentityOrg{
+		Slug: "acme",
+		Name: "Acme",
+		Roles: []IdentityRole{
+			{Slug: "viewer", Name: "Viewer"},
+			{Slug: "org-admin", Name: "Org Admin"},
+			{Slug: "org_admin", Name: "Org Admin Underscore"},
+			{Slug: "editor", Name: "Editor"},
+		},
+	}
+	got := aff.RequestableJoinRoles(org)
+	if len(got) != 2 {
+		t.Fatalf("RequestableJoinRoles len=%d, want 2; got=%+v", len(got), got)
+	}
+	if got[0].Slug != "viewer" || got[1].Slug != "editor" {
+		t.Fatalf("RequestableJoinRoles=%+v, want viewer then editor", got)
+	}
+}
+
 func TestSubmitJoinRequestHappyPath(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

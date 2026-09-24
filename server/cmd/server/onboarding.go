@@ -215,7 +215,7 @@ func (s *Server) renderOnboardingJoin(w http.ResponseWriter, r *http.Request, us
 		case err == nil && org != nil:
 			view.SelectedOrgSlug = strings.TrimSpace(org.Slug)
 			view.SelectedOrgName = strings.TrimSpace(org.Name)
-			view.SelectedOrgRoles = joinRequestCatalogRoles(*org)
+			view.SelectedOrgRoles = s.affiliationService().RequestableJoinRoles(*org)
 		case errors.Is(err, ErrIdentityNotFound), err == nil && org == nil:
 			if view.FormError == "" {
 				view.FormError = "organization not found"
@@ -285,18 +285,6 @@ func onboardingJoinSelectHref(searchQuery, orgSlug string) string {
 		href += "?" + encoded
 	}
 	return href
-}
-
-func joinRequestCatalogRoles(org IdentityOrg) []Role {
-	roles := rolesFromIdentityOrg(org)
-	out := make([]Role, 0, len(roles))
-	for _, role := range roles {
-		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
-			continue
-		}
-		out = append(out, role)
-	}
-	return out
 }
 
 type affiliationFormErrorMessages struct {
