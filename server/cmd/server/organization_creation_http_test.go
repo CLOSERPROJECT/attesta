@@ -40,11 +40,11 @@ func TestHandleOnboardingRequestOrganizationSubmitAndPending(t *testing.T) {
 	if postRec.Code != http.StatusSeeOther {
 		t.Fatalf("submit status = %d, want %d body=%q", postRec.Code, http.StatusSeeOther, postRec.Body.String())
 	}
-	if loc := postRec.Header().Get("Location"); loc != "/my/onboarding/request-organization" {
-		t.Fatalf("submit location = %q", loc)
+	if loc := postRec.Header().Get("Location"); loc != "/my/onboarding" {
+		t.Fatalf("submit location = %q, want /my/onboarding", loc)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/my/onboarding/request-organization", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/my/onboarding", nil)
 	getReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	getRec := httptest.NewRecorder()
 	server.handleMyRoutes(getRec, getReq)
@@ -57,13 +57,22 @@ func TestHandleOnboardingRequestOrganizationSubmitAndPending(t *testing.T) {
 		"Pending organization creation request",
 		"Fresh Org",
 		"fresh-org",
+		"Undo",
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q in pending page, got:\n%s", want, body)
+			t.Fatalf("expected %q in pending hub, got:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `name="name"`) {
-		t.Fatalf("expected no submit form while pending, got:\n%s", body)
+	if strings.Contains(body, `name="name"`) || strings.Contains(body, `href="/my/onboarding/request-organization"`) {
+		t.Fatalf("expected no request form/CTA while pending, got:\n%s", body)
+	}
+
+	childReq := httptest.NewRequest(http.MethodGet, "/my/onboarding/request-organization", nil)
+	childReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	childRec := httptest.NewRecorder()
+	server.handleMyRoutes(childRec, childReq)
+	if childRec.Code != http.StatusSeeOther || childRec.Header().Get("Location") != "/my/onboarding" {
+		t.Fatalf("pending request child = %d %q, want 303 /my/onboarding", childRec.Code, childRec.Header().Get("Location"))
 	}
 }
 

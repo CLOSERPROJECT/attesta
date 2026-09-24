@@ -1,0 +1,100 @@
+{{/* Used on /my/organization for affiliated members (not org-admin console). */}}
+
+{{ define "organization_home_body" }}
+<section class="stack u-max-w-prose u-mx-auto">
+  <section class="page-header">
+    <div class="page-header-head">
+      <div class="page-header-body">
+        {{ if .OrganizationLogoURL }}
+          <img
+            src="{{ .OrganizationLogoURL }}"
+            alt="{{ .OrganizationName }} logo"
+            width="64"
+            height="64"
+          />
+        {{ end }}
+        <h1>{{ .OrganizationName }}</h1>
+        <p>Your organization</p>
+      </div>
+    </div>
+  </section>
+
+  {{ template "error_banner.html" . }}
+
+  <section class="panel">
+    <div class="panel-heading">
+      <h2>Your roles</h2>
+      <p>Roles assigned to you in this organization</p>
+    </div>
+    {{ if .Roles }}
+      <div class="role-pill-row">
+        {{ range .Roles }}
+          <span
+            class="pill pill-lg role-pill"
+            data-role-palette="{{ .Palette }}"
+          >{{ .Name }}</span>
+        {{ end }}
+      </div>
+    {{ else }}
+      <div class="empty-state">
+        <p class="empty-state-title">No roles assigned yet.</p>
+      </div>
+    {{ end }}
+  </section>
+
+  {{ if .ShowManageOrgLink }}
+    <a class="btn btn-secondary" href="{{ .ManageOrgHref }}">Manage organization</a>
+  {{ end }}
+
+  <button
+    type="button"
+    class="btn btn-danger"
+    onclick="document.getElementById('leave-organization-dialog').showModal()"
+  >
+    Leave organization
+  </button>
+
+  <dialog id="leave-organization-dialog" class="dialog">
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <div>
+          <h3 class="dialog-title u-text-danger">
+            Leave organization
+          </h3>
+          <p class="dialog-subtitle">{{ .OrganizationName }}</p>
+        </div>
+        <button
+          type="button"
+          class="btn btn-ghost btn-icon dialog-close"
+          onclick="document.getElementById('leave-organization-dialog').close()"
+        >
+          {{ template "icon-close" . }}
+        </button>
+      </header>
+      <p class="u-m-0 u-mb-5">
+        You will lose access to this organization’s streams and data until you
+        join again. If you are the only organization admin, you must add another
+        admin before you can leave.
+      </p>
+      <form method="post" action="{{ .LeavePath }}" class="input-form">
+        <div class="dialog-actions">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            onclick="document.getElementById('leave-organization-dialog').close()"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-danger">
+            Leave organization
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</section>
+{{ end }}
+
+{{ define "organization_home.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

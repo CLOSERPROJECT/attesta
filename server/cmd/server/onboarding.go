@@ -4,38 +4,50 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
 const onboardingJoinSearchLimit = 12
 
+const (
+	onboardingPendingKindJoin        = "join"
+	onboardingPendingKindOrgCreation = "org_creation"
+)
+
 type OnboardingHubView struct {
 	PageBase
-	JoinHref       string
-	RequestOrgHref string
-	HomeHref       string
+	JoinHref           string
+	RequestOrgHref     string
+	Pending            bool
+	PendingKind        string
+	PendingOrgName     string
+	PendingOrgSlug     string
+	PendingRoles       string
+	PendingName        string
+	PendingSlug        string
+	PendingCreated     string
+	WithdrawActionHref string
+	FormError          string
 }
 
 type OnboardingRequestOrganizationView struct {
 	PageBase
-	BackHref       string
-	FormError      string
-	NameValue      string
-	Pending        bool
-	PendingName    string
-	PendingSlug    string
-	PendingCreated string
+	Breadcrumbs BreadcrumbsView
+	FormError   string
+	NameValue   string
 }
 
 type OnboardingJoinOrgResult struct {
 	Slug       string
 	Name       string
-	SelectHref string
+	LogoURL    string
+	DialogHref string
 }
 
 type OnboardingJoinView struct {
 	PageBase
-	BackHref         string
+	Breadcrumbs      BreadcrumbsView
 	FormError        string
 	SearchQuery      string
 	Results          []OnboardingJoinOrgResult
@@ -43,11 +55,13 @@ type OnboardingJoinView struct {
 	SelectedOrgSlug  string
 	SelectedOrgName  string
 	SelectedOrgRoles []Role
-	Pending          bool
-	PendingOrgSlug   string
-	PendingOrgName   string
-	PendingRoles     string
-	PendingCreated   string
+	CurrentPage      int
+	TotalPages       int
+	PageNumbers      []int
+	HasPreviousPage  bool
+	HasNextPage      bool
+	PreviousPage     int
+	NextPage         int
 }
 
 func (s *Server) handleOnboardingRoutes(w http.ResponseWriter, r *http.Request) {
@@ -76,21 +90,122 @@ func (s *Server) requireUnaffiliatedOnboarding(w http.ResponseWriter, r *http.Re
 	return user, true
 }
 
-func (s *Server) handleOnboardingHub(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+func (s *Server) redirectOnboardingIfPending(w http.ResponseWriter, r *http.Request, user *AccountUser) bool {
+	hasPending, err := s.affiliationService().HasPendingAffiliationIntent(r.Context(), identityUserForAffiliation(user).ID)
+	if err != nil {
+		logRequestError(r, err, "failed to check pending affiliation for %s", user.Email)
+		http.Error(w, "failed to load onboarding status", http.StatusInternalServerError)
+		return true
 	}
+	if hasPending {
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+		return true
+	}
+	return false
+}
+
+func (s *Server) handleOnboardingHub(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireUnaffiliatedOnboarding(w, r)
 	if !ok {
 		return
 	}
-	view := OnboardingHubView{
-		PageBase:       s.pageBaseForUser(user, "onboarding_body", "", ""),
-		JoinHref:       onboardingJoinPath(),
-		RequestOrgHref: onboardingRequestOrganizationPath(),
-		HomeHref:       appHomePath,
+	switch r.Method {
+	case http.MethodGet:
+		s.renderOnboardingHub(w, r, user, "")
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse onboarding hub form")
+			return
+		}
+		if strings.TrimSpace(r.FormValue("intent")) != "withdraw" {
+			http.Error(w, "unsupported intent", http.StatusBadRequest)
+			return
+		}
+		identityUser := identityUserForAffiliation(user)
+		aff := s.affiliationService()
+		joinPending, err := aff.PendingJoinRequestForUser(r.Context(), identityUser.ID)
+		if err != nil {
+			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to withdraw", err, "failed to load pending join for withdraw %s", user.Email)
+			return
+		}
+		if joinPending != nil {
+			if err := aff.WithdrawPendingJoinRequest(r.Context(), identityUser); err != nil {
+				s.renderOnboardingHub(w, r, user, affiliationWithdrawFormError(err))
+				return
+			}
+			http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+			return
+		}
+		orgPending, err := aff.PendingOrganizationCreationRequestForUser(r.Context(), identityUser.ID)
+		if err != nil {
+			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to withdraw", err, "failed to load pending org creation for withdraw %s", user.Email)
+			return
+		}
+		if orgPending != nil {
+			if err := aff.WithdrawPendingOrganizationCreationRequest(r.Context(), identityUser); err != nil {
+				s.renderOnboardingHub(w, r, user, affiliationWithdrawFormError(err))
+				return
+			}
+			http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) renderOnboardingHub(w http.ResponseWriter, r *http.Request, user *AccountUser, formError string) {
+	view := OnboardingHubView{
+		PageBase:           s.pageBaseForUser(user, "onboarding_body", "", ""),
+		JoinHref:           onboardingJoinPath(),
+		RequestOrgHref:     onboardingRequestOrganizationPath(),
+		WithdrawActionHref: onboardingPath(),
+		FormError:          strings.TrimSpace(formError),
+	}
+	identityUser := identityUserForAffiliation(user)
+	aff := s.affiliationService()
+
+	joinPending, err := aff.PendingJoinRequestForUser(r.Context(), identityUser.ID)
+	if err != nil {
+		logRequestError(r, err, "failed to load pending join request for %s", user.Email)
+		http.Error(w, "failed to load onboarding status", http.StatusInternalServerError)
+		return
+	}
+	if joinPending != nil {
+		view.Pending = true
+		view.PendingKind = onboardingPendingKindJoin
+		view.PendingOrgSlug = joinPending.OrgSlug
+		view.PendingRoles = strings.Join(joinPending.RoleSlugs, ", ")
+		view.PendingCreated = humanReadableTraceabilityTime(joinPending.CreatedAt)
+		if s.identity != nil {
+			if org, orgErr := s.identity.GetOrganizationBySlug(r.Context(), joinPending.OrgSlug); orgErr == nil && org != nil {
+				view.PendingOrgName = strings.TrimSpace(org.Name)
+			}
+		}
+		if view.PendingOrgName == "" {
+			view.PendingOrgName = joinPending.OrgSlug
+		}
+		if err := s.tmpl.ExecuteTemplate(w, "onboarding.html", view); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	orgPending, err := aff.PendingOrganizationCreationRequestForUser(r.Context(), identityUser.ID)
+	if err != nil {
+		logRequestError(r, err, "failed to load pending organization creation request for %s", user.Email)
+		http.Error(w, "failed to load onboarding status", http.StatusInternalServerError)
+		return
+	}
+	if orgPending != nil {
+		view.Pending = true
+		view.PendingKind = onboardingPendingKindOrgCreation
+		view.PendingName = orgPending.ProposedName
+		view.PendingSlug = orgPending.ProposedSlug
+		view.PendingCreated = humanReadableTraceabilityTime(orgPending.CreatedAt)
+	}
+
 	if err := s.tmpl.ExecuteTemplate(w, "onboarding.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -101,9 +216,18 @@ func (s *Server) handleOnboardingJoin(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if s.redirectOnboardingIfPending(w, r, user) {
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
-		s.renderOnboardingJoin(w, r, user, "", strings.TrimSpace(r.URL.Query().Get("q")), strings.TrimSpace(r.URL.Query().Get("org")))
+		searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
+		page := parsePositiveInt(r.URL.Query().Get("page"), 1)
+		if isHTMXRequest(r) && htmxTargetID(r) == "join-org-dialog-body" {
+			s.renderOnboardingJoinDialog(w, r, user, "", strings.TrimSpace(r.URL.Query().Get("org")), searchQuery, page)
+			return
+		}
+		s.renderOnboardingJoin(w, r, user, "", searchQuery, "", page)
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
 			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse join request form")
@@ -112,12 +236,13 @@ func (s *Server) handleOnboardingJoin(w http.ResponseWriter, r *http.Request) {
 		orgSlug := strings.TrimSpace(r.FormValue("org_slug"))
 		roles := requestedRoleSlugs(r.Form)
 		searchQuery := strings.TrimSpace(r.FormValue("q"))
+		page := parsePositiveInt(r.FormValue("page"), 1)
 		_, err := s.affiliationService().SubmitJoinRequest(r.Context(), identityUserForAffiliation(user), orgSlug, roles)
 		if err != nil {
-			s.renderOnboardingJoin(w, r, user, affiliationJoinRequestFormError(err), searchQuery, orgSlug)
+			s.renderOnboardingJoin(w, r, user, affiliationJoinRequestFormError(err), searchQuery, orgSlug, page)
 			return
 		}
-		http.Redirect(w, r, onboardingJoinPath(), http.StatusSeeOther)
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -126,6 +251,9 @@ func (s *Server) handleOnboardingJoin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOnboardingRequestOrganization(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireUnaffiliatedOnboarding(w, r)
 	if !ok {
+		return
+	}
+	if s.redirectOnboardingIfPending(w, r, user) {
 		return
 	}
 	switch r.Method {
@@ -142,70 +270,146 @@ func (s *Server) handleOnboardingRequestOrganization(w http.ResponseWriter, r *h
 			s.renderOnboardingRequestOrganization(w, r, user, affiliationOrganizationCreationFormError(err), name)
 			return
 		}
-		http.Redirect(w, r, onboardingRequestOrganizationPath(), http.StatusSeeOther)
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func (s *Server) renderOnboardingJoin(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, searchQuery, selectedOrgSlug string) {
+func (s *Server) renderOnboardingJoin(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, searchQuery, selectedOrgSlug string, requestedPage int) {
+	view, ok := s.buildOnboardingJoinView(w, r, user, formError, searchQuery, selectedOrgSlug, requestedPage)
+	if !ok {
+		return
+	}
+	templateName := "onboarding_join.html"
+	if isHTMXRequest(r) && htmxTargetID(r) == "onboarding-join-results" {
+		templateName = "onboarding_join_results"
+	}
+	if err := s.tmpl.ExecuteTemplate(w, templateName, view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) renderOnboardingJoinDialog(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, selectedOrgSlug, searchQuery string, page int) {
+	view, ok := s.buildOnboardingJoinDialogView(w, r, user, formError, selectedOrgSlug, searchQuery, page)
+	if !ok {
+		return
+	}
+	if err := s.tmpl.ExecuteTemplate(w, "onboarding_join_dialog", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) buildOnboardingJoinDialogView(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, selectedOrgSlug, searchQuery string, page int) (OnboardingJoinView, bool) {
 	view := OnboardingJoinView{
-		PageBase:        s.pageBaseForUser(user, "onboarding_join_body", "", ""),
-		BackHref:        onboardingPath(),
 		FormError:       strings.TrimSpace(formError),
 		SearchQuery:     strings.TrimSpace(searchQuery),
 		SelectedOrgSlug: strings.TrimSpace(selectedOrgSlug),
+		CurrentPage:     page,
 	}
-	if user != nil {
-		pending, err := s.affiliationService().PendingJoinRequestForUser(r.Context(), identityUserForAffiliation(user).ID)
-		if err != nil {
-			logRequestError(r, err, "failed to load pending join request for %s", user.Email)
-			http.Error(w, "failed to load join request", http.StatusInternalServerError)
-			return
+	if view.CurrentPage < 1 {
+		view.CurrentPage = 1
+	}
+	if view.SelectedOrgSlug == "" || s.identity == nil {
+		if view.FormError == "" {
+			view.FormError = "organization not found"
 		}
-		if pending != nil {
-			view.Pending = true
-			view.PendingOrgSlug = pending.OrgSlug
-			view.PendingRoles = strings.Join(pending.RoleSlugs, ", ")
-			view.PendingCreated = humanReadableTraceabilityTime(pending.CreatedAt)
-			view.FormError = ""
-			view.SearchQuery = ""
-			view.SelectedOrgSlug = ""
-			if s.identity != nil {
-				if org, orgErr := s.identity.GetOrganizationBySlug(r.Context(), pending.OrgSlug); orgErr == nil && org != nil {
-					view.PendingOrgName = org.Name
-				}
-			}
-			if view.PendingOrgName == "" {
-				view.PendingOrgName = pending.OrgSlug
-			}
-			if err := s.tmpl.ExecuteTemplate(w, "onboarding_join.html", view); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-			return
+		view.SelectedOrgSlug = ""
+		return view, true
+	}
+	org, err := s.identity.GetOrganizationBySlug(r.Context(), view.SelectedOrgSlug)
+	switch {
+	case err == nil && org != nil:
+		view.SelectedOrgSlug = strings.TrimSpace(org.Slug)
+		view.SelectedOrgName = strings.TrimSpace(org.Name)
+		view.SelectedOrgRoles = s.affiliationService().RequestableJoinRoles(*org)
+	case errors.Is(err, ErrIdentityNotFound), err == nil && org == nil:
+		if view.FormError == "" {
+			view.FormError = "organization not found"
 		}
+		view.SelectedOrgSlug = ""
+	default:
+		logRequestError(r, err, "failed to load organization %s for join onboarding dialog", view.SelectedOrgSlug)
+		http.Error(w, "failed to load organization", http.StatusInternalServerError)
+		return OnboardingJoinView{}, false
+	}
+	return view, true
+}
+
+func (s *Server) buildOnboardingJoinView(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, searchQuery, selectedOrgSlug string, requestedPage int) (OnboardingJoinView, bool) {
+	view := OnboardingJoinView{
+		PageBase:        s.pageBaseForUser(user, "onboarding_join_body", "", ""),
+		Breadcrumbs:     buildOnboardingJoinBreadcrumbs(),
+		FormError:       strings.TrimSpace(formError),
+		SearchQuery:     strings.TrimSpace(searchQuery),
+		SelectedOrgSlug: strings.TrimSpace(selectedOrgSlug),
+		CurrentPage:     1,
+		TotalPages:      1,
+		PreviousPage:    1,
+		NextPage:        1,
 	}
 
-	if view.SearchQuery != "" && s.identity != nil {
+	// Empty search browses the full catalog (paginated); non-empty q filters by name/slug.
+	if s.identity != nil {
 		view.HasSearched = true
-		page, err := s.identity.ListOrganizationsPage(r.Context(), IdentityOrgListOptions{
+		if requestedPage < 1 {
+			requestedPage = 1
+		}
+		offset := (requestedPage - 1) * onboardingJoinSearchLimit
+		orgPage, err := s.identity.ListOrganizationsPage(r.Context(), IdentityOrgListOptions{
 			Search: view.SearchQuery,
 			Limit:  onboardingJoinSearchLimit,
-			Offset: 0,
+			Offset: offset,
 		})
 		if err != nil {
 			logRequestError(r, err, "failed to search organizations for join onboarding")
 			http.Error(w, "failed to search organizations", http.StatusInternalServerError)
-			return
+			return OnboardingJoinView{}, false
 		}
-		view.Results = make([]OnboardingJoinOrgResult, 0, len(page.Organizations))
-		for _, org := range page.Organizations {
+
+		currentPage := normalizeOnboardingJoinPage(requestedPage, orgPage.Total)
+		if currentPage != requestedPage {
+			offset = (currentPage - 1) * onboardingJoinSearchLimit
+			orgPage, err = s.identity.ListOrganizationsPage(r.Context(), IdentityOrgListOptions{
+				Search: view.SearchQuery,
+				Limit:  onboardingJoinSearchLimit,
+				Offset: offset,
+			})
+			if err != nil {
+				logRequestError(r, err, "failed to search organizations for join onboarding")
+				http.Error(w, "failed to search organizations", http.StatusInternalServerError)
+				return OnboardingJoinView{}, false
+			}
+		}
+
+		totalPages := 1
+		if orgPage.Total > 0 {
+			totalPages = (orgPage.Total + onboardingJoinSearchLimit - 1) / onboardingJoinSearchLimit
+		}
+		pageNumbers := make([]int, 0, totalPages)
+		for page := 1; page <= totalPages; page++ {
+			pageNumbers = append(pageNumbers, page)
+		}
+
+		view.CurrentPage = currentPage
+		view.TotalPages = totalPages
+		view.PageNumbers = pageNumbers
+		view.HasPreviousPage = currentPage > 1
+		view.HasNextPage = currentPage < totalPages
+		view.PreviousPage = max(currentPage-1, 1)
+		view.NextPage = min(currentPage+1, totalPages)
+		view.Results = make([]OnboardingJoinOrgResult, 0, len(orgPage.Organizations))
+		for _, org := range orgPage.Organizations {
 			slug := strings.TrimSpace(org.Slug)
-			view.Results = append(view.Results, OnboardingJoinOrgResult{
+			result := OnboardingJoinOrgResult{
 				Slug:       slug,
 				Name:       strings.TrimSpace(org.Name),
-				SelectHref: onboardingJoinSelectHref(view.SearchQuery, slug),
-			})
+				DialogHref: onboardingJoinDialogHref(view.SearchQuery, slug, currentPage),
+			}
+			if slug != "" && strings.TrimSpace(org.LogoFileID) != "" {
+				result.LogoURL = "/organization/logo/" + url.PathEscape(slug)
+			}
+			view.Results = append(view.Results, result)
 		}
 	}
 
@@ -224,37 +428,33 @@ func (s *Server) renderOnboardingJoin(w http.ResponseWriter, r *http.Request, us
 		default:
 			logRequestError(r, err, "failed to load organization %s for join onboarding", view.SelectedOrgSlug)
 			http.Error(w, "failed to load organization", http.StatusInternalServerError)
-			return
+			return OnboardingJoinView{}, false
 		}
 	}
 
-	if err := s.tmpl.ExecuteTemplate(w, "onboarding_join.html", view); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	return view, true
+}
+
+func normalizeOnboardingJoinPage(raw int, totalItems int) int {
+	totalPages := 1
+	if totalItems > 0 {
+		totalPages = (totalItems + onboardingJoinSearchLimit - 1) / onboardingJoinSearchLimit
 	}
+	if raw < 1 {
+		return 1
+	}
+	if raw > totalPages {
+		return totalPages
+	}
+	return raw
 }
 
 func (s *Server) renderOnboardingRequestOrganization(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, nameValue string) {
 	view := OnboardingRequestOrganizationView{
-		PageBase:  s.pageBaseForUser(user, "onboarding_request_organization_body", "", ""),
-		BackHref:  onboardingPath(),
-		FormError: strings.TrimSpace(formError),
-		NameValue: strings.TrimSpace(nameValue),
-	}
-	if user != nil {
-		pending, err := s.affiliationService().PendingOrganizationCreationRequestForUser(r.Context(), identityUserForAffiliation(user).ID)
-		if err != nil {
-			logRequestError(r, err, "failed to load pending organization creation request for %s", user.Email)
-			http.Error(w, "failed to load organization creation request", http.StatusInternalServerError)
-			return
-		}
-		if pending != nil {
-			view.Pending = true
-			view.PendingName = pending.ProposedName
-			view.PendingSlug = pending.ProposedSlug
-			view.PendingCreated = humanReadableTraceabilityTime(pending.CreatedAt)
-			view.FormError = ""
-			view.NameValue = ""
-		}
+		PageBase:    s.pageBaseForUser(user, "onboarding_request_organization_body", "", ""),
+		Breadcrumbs: buildOnboardingRequestOrganizationBreadcrumbs(),
+		FormError:   strings.TrimSpace(formError),
+		NameValue:   strings.TrimSpace(nameValue),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "onboarding_request_organization.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -272,13 +472,16 @@ func identityUserForAffiliation(user *AccountUser) IdentityUser {
 	}
 }
 
-func onboardingJoinSelectHref(searchQuery, orgSlug string) string {
+func onboardingJoinDialogHref(searchQuery, orgSlug string, page int) string {
 	values := url.Values{}
+	if slug := strings.TrimSpace(orgSlug); slug != "" {
+		values.Set("org", slug)
+	}
 	if q := strings.TrimSpace(searchQuery); q != "" {
 		values.Set("q", q)
 	}
-	if slug := strings.TrimSpace(orgSlug); slug != "" {
-		values.Set("org", slug)
+	if page > 1 {
+		values.Set("page", strconv.Itoa(page))
 	}
 	href := onboardingJoinPath()
 	if encoded := values.Encode(); encoded != "" {
@@ -327,7 +530,7 @@ func affiliationJoinRequestFormError(err error) string {
 		PendingExists:     "you already have a pending affiliation request",
 		NotFound:          "organization not found",
 		NotPending:        "join request is not pending",
-		InvalidRoles:      "select one or more roles from the organization catalog",
+		InvalidRoles:      "select one or more organization roles",
 		Default:           "failed to process join request",
 	})
 }
@@ -344,6 +547,14 @@ func affiliationOrganizationCreationFormError(err error) string {
 	})
 }
 
+func affiliationWithdrawFormError(err error) string {
+	return mapAffiliationFormError(err, affiliationFormErrorMessages{
+		NotFound:   "no pending request to undo",
+		NotPending: "request is not pending",
+		Default:    "failed to undo request",
+	})
+}
+
 func affiliationJoinDecideFormError(err error) string {
 	return mapAffiliationFormError(err, affiliationFormErrorMessages{
 		AlreadyAffiliated: "requester already belongs to an organization",
@@ -352,4 +563,9 @@ func affiliationJoinDecideFormError(err error) string {
 		InvalidRoles:      "requested roles are no longer valid",
 		Default:           "failed to process join request",
 	})
+}
+
+func isAppHomePath(path string) bool {
+	path = strings.TrimSpace(path)
+	return path == appHomePath || path == appHomePath+"/"
 }

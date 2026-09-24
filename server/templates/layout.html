@@ -176,21 +176,10 @@
                         </a>
                       {{ end }}
                       {{ if .ShowMyOrgLink }}
-                        <a href="/my/organization/profile" class="account-menu-item">
+                        <a href="/my/organization" class="account-menu-item">
                           {{ template "icon-users-group" . }}
                           My organization
                         </a>
-                      {{ end }}
-                      {{ if .ShowLeaveOrganization }}
-                        <form method="post" action="{{ .LeaveOrganizationPath }}">
-                          <button
-                            type="submit"
-                            class="account-menu-item account-menu-item-danger"
-                          >
-                            {{ template "icon-door-open" . }}
-                            Leave organization
-                          </button>
-                        </form>
                       {{ end }}
                       <form method="post" action="/logout">
                         <button
@@ -246,6 +235,8 @@
           {{ template "onboarding_join_body" . }}
         {{ else if eq .Body "onboarding_request_organization_body" }}
           {{ template "onboarding_request_organization_body" . }}
+        {{ else if eq .Body "organization_home_body" }}
+          {{ template "organization_home_body" . }}
         {{ end }}
       </main>
 {{ template "site_footer" . }}

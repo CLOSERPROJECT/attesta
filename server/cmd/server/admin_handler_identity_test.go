@@ -3490,6 +3490,54 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("delete last catalog role is rejected", func(t *testing.T) {
+		org := &IdentityOrg{
+			ID:   "team-1",
+			Slug: "acme",
+			Name: "Acme Org",
+			Roles: []IdentityRole{
+				{Slug: "operator", Name: "Operator"},
+			},
+		}
+		updateCalled := false
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			store:      NewMemoryStore(),
+			identity: &fakeIdentityStore{
+				getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+					return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"}, nil
+				},
+				getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+					current := *org
+					return &current, nil
+				},
+				updateOrganizationFunc: func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error) {
+					updateCalled = true
+					return IdentityOrg{}, errors.New("update should not be called")
+				},
+				listOrganizationUsersFunc:       func(ctx context.Context, orgSlug string) ([]IdentityUser, error) { return nil, nil },
+				listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) { return nil, nil },
+			},
+			tmpl:        testTemplates(),
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/roles", strings.NewReader("intent=delete_role&role_slug=operator"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminRoles(rec, req)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "organizations must keep at least one catalog role") {
+			t.Fatalf("response = %d %q", rec.Code, rec.Body.String())
+		}
+		if updateCalled {
+			t.Fatal("expected update organization not to be called")
+		}
+	})
+
 	t.Run("role in use blocks edit and delete", func(t *testing.T) {
 		org := &IdentityOrg{
 			ID:   "team-1",

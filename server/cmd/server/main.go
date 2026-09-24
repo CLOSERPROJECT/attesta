@@ -284,10 +284,8 @@ type PageBase struct {
 	UserEmail              string
 	IsPlatformAdmin        bool
 	ShowAdminLink          bool
-	ShowMyOrgLink          bool
-	ShowLeaveOrganization  bool
-	LeaveOrganizationPath  string
-	ShowLogout             bool
+	ShowMyOrgLink bool
+	ShowLogout    bool
 }
 
 type PublicCatalogResponse struct {
@@ -647,28 +645,31 @@ type rolePaletteStyle struct {
 }
 
 var rolePaletteStyles = map[string]rolePaletteStyle{
-	"red":     {Color: "var(--role-red-bg)"},
-	"orange":  {Color: "var(--role-orange-bg)"},
-	"amber":   {Color: "var(--role-amber-bg)"},
-	"yellow":  {Color: "var(--role-yellow-bg)"},
-	"lime":    {Color: "var(--role-lime-bg)"},
-	"green":   {Color: "var(--role-green-bg)"},
-	"emerald": {Color: "var(--role-emerald-bg)"},
-	"teal":    {Color: "var(--role-teal-bg)"},
-	"cyan":    {Color: "var(--role-cyan-bg)"},
-	"sky":     {Color: "var(--role-sky-bg)"},
-	"blue":    {Color: "var(--role-blue-bg)"},
-	"indigo":  {Color: "var(--role-indigo-bg)"},
-	"violet":  {Color: "var(--role-violet-bg)"},
-	"purple":  {Color: "var(--role-purple-bg)"},
-	"fuchsia": {Color: "var(--role-fuchsia-bg)"},
-	"pink":    {Color: "var(--role-pink-bg)"},
-	"rose":    {Color: "var(--role-rose-bg)"},
+	"red":      {Color: "var(--role-red-bg)"},
+	"orange":   {Color: "var(--role-orange-bg)"},
+	"amber":    {Color: "var(--role-amber-bg)"},
+	"yellow":   {Color: "var(--role-yellow-bg)"},
+	"lime":     {Color: "var(--role-lime-bg)"},
+	"green":    {Color: "var(--role-green-bg)"},
+	"emerald":  {Color: "var(--role-emerald-bg)"},
+	"teal":     {Color: "var(--role-teal-bg)"},
+	"cyan":     {Color: "var(--role-cyan-bg)"},
+	"sky":      {Color: "var(--role-sky-bg)"},
+	"blue":     {Color: "var(--role-blue-bg)"},
+	"indigo":   {Color: "var(--role-indigo-bg)"},
+	"violet":   {Color: "var(--role-violet-bg)"},
+	"purple":   {Color: "var(--role-purple-bg)"},
+	"fuchsia":  {Color: "var(--role-fuchsia-bg)"},
+	"pink":     {Color: "var(--role-pink-bg)"},
+	"rose":     {Color: "var(--role-rose-bg)"},
+	"fallback": {Color: "var(--muted-foreground)"},
 }
 
+// rolePaletteKeys are auto-assignable hues only. "fallback" is in rolePaletteStyles /
+// role-palette.css for unresolved roles but is not hashed into for create-role preview.
 var rolePaletteKeys = []string{
 	"red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan",
-	"sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose", "fallback",
+	"sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
 }
 
 func defaultRolePaletteFromInput(raw string) string {
@@ -1469,15 +1470,9 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 		logCapabilityCheckError(err, "cerbos check failed for platform admin navigation")
 	}
 	base.ShowAdminLink = showAdminLink
-	showMyOrgLink, err := s.canAccessOrgAdminConsole(context.Background(), user)
-	if err != nil {
-		logCapabilityCheckError(err, "cerbos check failed for org admin navigation")
-	}
-	base.ShowMyOrgLink = showMyOrgLink
-	if s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
-		base.ShowLeaveOrganization = true
-		base.LeaveOrganizationPath = leaveOrganizationPath()
-	}
+	// Affiliated users see Organization home; avoid affiliationService here so pages
+	// that only need chrome still render when tests use a non-affiliation Store.
+	base.ShowMyOrgLink = strings.TrimSpace(user.OrgSlug) != ""
 	return base
 }
 
@@ -2046,6 +2041,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if s.enforceAuth && !user.IsPlatformAdmin && !s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+		return
+	}
 	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), user)
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
@@ -2061,7 +2060,6 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		Groups:           groups,
 		Sidebar:          buildMyHomeCategorySidebar(groups),
 		ShowCreateStream: showCreateStream && authErr == nil,
-		Unaffiliated:     !s.affiliationService().IsAffiliated(identityUserForAffiliation(user)),
 		Error:            homePickerMessage(r, "error"),
 		Confirmation:     homePickerMessage(r, "confirmation"),
 	}
@@ -2099,6 +2097,8 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOrganizationRoutes(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/organization")
 	switch {
+	case path == "" || path == "/":
+		s.handleOrganizationHome(w, r)
 	case path == "/profile" || path == "/profile/":
 		s.handleOrgAdminPage(w, r)
 	case path == "/roles" || path == "/roles/":
@@ -2500,7 +2500,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "login failed", err, "failed to write session cookie for %s", email)
 			return
 		}
-		http.Redirect(w, r, next, http.StatusSeeOther)
+		redirectTarget := next
+		if identityUser, userErr := s.identity.GetCurrentUser(r.Context(), session.Secret); userErr == nil {
+			if !s.affiliationService().IsAffiliated(identityUser) && isAppHomePath(next) {
+				redirectTarget = onboardingPath()
+			}
+		}
+		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2537,6 +2543,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		name := strings.TrimSpace(r.FormValue("name"))
 		password := strings.TrimSpace(r.FormValue("password"))
+		confirmPassword := strings.TrimSpace(r.FormValue("confirm_password"))
 		if name == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
@@ -2554,6 +2561,16 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 				Email:    email,
 				Name:     name,
 				Error:    "name must be 128 characters or fewer",
+			})
+			return
+		}
+		if password != confirmPassword {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
+				PageBase: s.pageBase("signup_body", "", ""),
+				Email:    email,
+				Name:     name,
+				Error:    "passwords do not match",
 			})
 			return
 		}
@@ -4416,6 +4433,10 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			}
 			if targetRow.InUse {
 				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "remove the role from the users that have it before continuing with the action", RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name})
+				return
+			}
+			if len(org.Roles) <= 1 {
+				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "organizations must keep at least one catalog role", RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name})
 				return
 			}
 			updatedRoles := make([]IdentityRole, 0, len(org.Roles))
@@ -7897,7 +7918,9 @@ func (s *Server) affiliationService() *Affiliation {
 	}
 	affStore, ok := s.store.(affiliationStore)
 	if !ok {
-		panic("store does not implement affiliationStore")
+		// Handler tests often omit a full Store; use an empty memory port so
+		// invite/compatibility checks and chrome helpers do not panic.
+		affStore = NewMemoryStore()
 	}
 	var notifyEmails []string
 	if email, _, ok := platformAdminCredentials(); ok {

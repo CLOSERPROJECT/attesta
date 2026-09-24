@@ -1,66 +1,34 @@
 {{/* Used on /my/onboarding/request-organization for Organization creation requests. */}}
 
 {{ define "onboarding_request_organization_body" }}
-<section class="stack u-max-w-3xl u-mx-auto">
+<section class="stack u-max-w-prose u-mx-auto">
   <section class="page-header">
-    <div class="page-header-head">
-      <div class="page-header-body">
-        <h1>Request a new organization</h1>
-        {{ if .Pending }}
-          <p>Your organization creation request is pending platform admin review.</p>
-        {{ else }}
-          <p>Submit an organization creation request. A platform admin will approve or reject it.</p>
-        {{ end }}
-      </div>
+    {{ template "breadcrumbs" .Breadcrumbs }}
+    <div class="page-header-body">
+      <h1>Request a new organization</h1>
+      <p>Submit an organization creation request. A platform admin will approve or reject it.</p>
     </div>
   </section>
 
-  {{ if .Pending }}
-    <section class="panel">
-      <div class="panel-heading">
-        <h2>Pending organization creation request</h2>
-        <p>You can submit another request only after this one is decided.</p>
+  <section class="panel">
+    <form method="post" action="/my/onboarding/request-organization" class="input-form">
+      <div class="form-field">
+        <label for="org-creation-name">Organization name</label>
+        <input
+          id="org-creation-name"
+          name="name"
+          type="text"
+          value="{{ .NameValue }}"
+          required
+          autocomplete="organization"
+        />
       </div>
-      <dl class="stack">
-        <div>
-          <dt class="muted">Organization name</dt>
-          <dd>{{ .PendingName }}</dd>
-        </div>
-        <div>
-          <dt class="muted">Proposed slug</dt>
-          <dd>{{ .PendingSlug }}</dd>
-        </div>
-        {{ if .PendingCreated }}
-          <div>
-            <dt class="muted">Submitted</dt>
-            <dd>{{ .PendingCreated }}</dd>
-          </div>
-        {{ end }}
-      </dl>
-    </section>
-  {{ else }}
-    <section class="panel">
-      <form method="post" action="/my/onboarding/request-organization" class="input-form">
-        <div class="form-field">
-          <label for="org-creation-name">Organization name</label>
-          <input
-            id="org-creation-name"
-            name="name"
-            type="text"
-            value="{{ .NameValue }}"
-            required
-            autocomplete="organization"
-          />
-        </div>
-        {{ if .FormError }}
-          <p class="error">{{ .FormError }}</p>
-        {{ end }}
-        <button class="btn btn-primary" type="submit">Submit organization creation request</button>
-      </form>
-    </section>
-  {{ end }}
-
-  <p class="muted"><a href="{{ .BackHref }}">Back to onboarding</a></p>
+      {{ if .FormError }}
+        <p class="error">{{ .FormError }}</p>
+      {{ end }}
+      <button class="btn btn-primary" type="submit">Submit organization creation request</button>
+    </form>
+  </section>
 </section>
 {{ end }}
 

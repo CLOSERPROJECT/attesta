@@ -1974,6 +1974,7 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 			authorizer: fakeAuthorizer{},
 			tmpl:       homePickerTemplates(),
 			configDir:  t.TempDir(),
+			store:      NewMemoryStore(),
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/my", nil)
@@ -1992,6 +1993,7 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 			authorizer: fakeAuthorizer{},
 			tmpl:       template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`)),
 			configDir:  tempDir,
+			store:      NewMemoryStore(),
 			configProvider: func() (RuntimeConfig, error) {
 				return RuntimeConfig{}, errors.New("not used")
 			},

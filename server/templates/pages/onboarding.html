@@ -1,20 +1,78 @@
 {{/* Used on /my/onboarding for unaffiliated account setup. */}}
 
 {{ define "onboarding_body" }}
-<section class="stack u-max-w-3xl u-mx-auto">
+<section class="stack u-max-w-prose u-mx-auto">
   <section class="page-header">
     <div class="page-header-head">
       <div class="page-header-body">
         <h1>Get started</h1>
-        <p>Join an existing organization or request a new one before you can use streams.</p>
+        {{ if .Pending }}
+          <p>Your request is pending review. You can undo it to choose a different path.</p>
+        {{ else }}
+          <p>Join an existing organization or request a new one before you can use streams.</p>
+        {{ end }}
       </div>
     </div>
   </section>
-  <div class="stack">
-    <a class="btn btn-primary" href="{{ .JoinHref }}">Join an organization</a>
-    <a class="btn btn-secondary" href="{{ .RequestOrgHref }}">Request a new organization</a>
-  </div>
-  <p class="muted"><a href="{{ .HomeHref }}">Back to streams</a></p>
+
+  {{ if .Pending }}
+    <section class="panel">
+      <div class="panel-heading">
+        {{ if eq .PendingKind "join" }}
+          <h2>Pending join request</h2>
+          <p>Waiting for organization admin review.</p>
+        {{ else }}
+          <h2>Pending organization creation request</h2>
+          <p>Waiting for platform admin review.</p>
+        {{ end }}
+      </div>
+      <dl class="stack">
+        {{ if eq .PendingKind "join" }}
+          <div>
+            <dt class="muted">Organization</dt>
+            <dd>{{ .PendingOrgName }}</dd>
+          </div>
+          <div>
+            <dt class="muted">Slug</dt>
+            <dd>{{ .PendingOrgSlug }}</dd>
+          </div>
+          {{ if .PendingRoles }}
+            <div>
+              <dt class="muted">Requested roles</dt>
+              <dd>{{ .PendingRoles }}</dd>
+            </div>
+          {{ end }}
+        {{ else }}
+          <div>
+            <dt class="muted">Organization name</dt>
+            <dd>{{ .PendingName }}</dd>
+          </div>
+          <div>
+            <dt class="muted">Proposed slug</dt>
+            <dd>{{ .PendingSlug }}</dd>
+          </div>
+        {{ end }}
+        {{ if .PendingCreated }}
+          <div>
+            <dt class="muted">Submitted</dt>
+            <dd>{{ .PendingCreated }}</dd>
+          </div>
+        {{ end }}
+      </dl>
+      {{ if .FormError }}
+        <p class="error">{{ .FormError }}</p>
+      {{ end }}
+      <form method="post" action="{{ .WithdrawActionHref }}" class="input-form">
+        <input type="hidden" name="intent" value="withdraw" />
+        <button class="btn btn-secondary" type="submit">Undo</button>
+      </form>
+    </section>
+  {{ else }}
+    <div class="stack">
+      <a class="btn btn-primary" href="{{ .JoinHref }}">Join an organization</a>
+      <a class="btn btn-secondary" href="{{ .RequestOrgHref }}">Request a new organization</a>
+    </div>
+  {{ end }}
 </section>
 {{ end }}
 
