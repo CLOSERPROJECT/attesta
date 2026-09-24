@@ -590,7 +590,7 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 	t.Setenv("ANYONE_CAN_CREATE_ACCOUNT", "true")
 	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 
-	t.Run("without organization redirects to org admin bootstrap", func(t *testing.T) {
+	t.Run("without organization redirects to onboarding", func(t *testing.T) {
 		var createdEmail string
 		var createdPassword string
 		var sessionEmail string
@@ -623,8 +623,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/my/organization/profile" {
-			t.Fatalf("location = %q, want /my/organization/profile", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/my/onboarding" {
+			t.Fatalf("location = %q, want /my/onboarding", rec.Header().Get("Location"))
 		}
 		if createdEmail != "new@example.com" || createdPassword != "secure-password" {
 			t.Fatalf("create account args = %q/%q", createdEmail, createdPassword)

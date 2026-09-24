@@ -311,6 +311,7 @@ type HomeWorkflowPickerView struct {
 	Groups           []MyHomeStreamGroupView
 	Sidebar          CategorySidebarView
 	ShowCreateStream bool
+	Unaffiliated     bool
 	Error            string
 	Confirmation     string
 }
@@ -2022,6 +2023,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		Groups:           groups,
 		Sidebar:          buildMyHomeCategorySidebar(groups),
 		ShowCreateStream: showCreateStream && authErr == nil,
+		Unaffiliated:     !s.affiliationService().IsAffiliated(IdentityUser{OrgSlug: user.OrgSlug}),
 		Error:            homePickerMessage(r, "error"),
 		Confirmation:     homePickerMessage(r, "confirmation"),
 	}
@@ -2044,6 +2046,9 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	case rest == "organization" || strings.HasPrefix(rest, "organization/"):
 		s.handleOrganizationRoutes(w, cloneRequestWithPath(r, "/"+rest))
+		return
+	case rest == "onboarding" || strings.HasPrefix(rest, "onboarding/"):
+		s.handleOnboardingRoutes(w, cloneRequestWithPath(r, "/"+rest))
 		return
 	default:
 		http.NotFound(w, r)
@@ -2518,8 +2523,8 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		redirectTarget := appHomePath
-		if strings.TrimSpace(identityUser.OrgSlug) == "" {
-			redirectTarget = organizationPath("profile")
+		if !s.affiliationService().IsAffiliated(identityUser) {
+			redirectTarget = onboardingPath()
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return

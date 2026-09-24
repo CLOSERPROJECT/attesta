@@ -7,6 +7,18 @@ import (
 
 const appHomePath = "/my"
 
+func onboardingPath() string {
+	return "/my/onboarding"
+}
+
+func onboardingJoinPath() string {
+	return "/my/onboarding/join"
+}
+
+func onboardingRequestOrganizationPath() string {
+	return "/my/onboarding/request-organization"
+}
+
 func streamPath(key string) string {
 	return "/my/streams/" + strings.TrimSpace(key)
 }

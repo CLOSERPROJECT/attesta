@@ -229,6 +229,10 @@
           {{ template "process_body" . }}
         {{ else if eq .Body "dpp_body" }}
           {{ template "dpp_body" . }}
+        {{ else if eq .Body "onboarding_body" }}
+          {{ template "onboarding_body" . }}
+        {{ else if eq .Body "onboarding_stub_body" }}
+          {{ template "onboarding_stub_body" . }}
         {{ end }}
       </main>
 {{ template "site_footer" . }}

@@ -1,0 +1,23 @@
+{{/* Used on /my/onboarding for unaffiliated account setup. */}}
+
+{{ define "onboarding_body" }}
+<section class="stack u-max-w-3xl u-mx-auto">
+  <section class="page-header">
+    <div class="page-header-head">
+      <div class="page-header-body">
+        <h1>Get started</h1>
+        <p>Join an existing organization or request a new one before you can use streams.</p>
+      </div>
+    </div>
+  </section>
+  <div class="stack">
+    <a class="btn btn-primary" href="{{ .JoinHref }}">Join an organization</a>
+    <a class="btn btn-secondary" href="{{ .RequestOrgHref }}">Request a new organization</a>
+  </div>
+  <p class="muted"><a href="{{ .HomeHref }}">Back to streams</a></p>
+</section>
+{{ end }}
+
+{{ define "onboarding.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

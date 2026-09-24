@@ -167,7 +167,7 @@ Common environment variables:
 - `APPWRITE_ORG_ASSETS_BUCKET` - default `org-assets`
 - `WORKFLOW_CONFIG` - default `config/workflow.yaml`
 - `ATTACHMENT_MAX_BYTES` - default 25 MiB
-- `ANYONE_CAN_CREATE_ACCOUNT`
+- `ANYONE_CAN_CREATE_ACCOUNT` - default `true` (open registration); set `false` as an emergency kill switch for signup
 - `SESSION_TTL_DAYS`
 - `COOKIE_SECURE`
 
@@ -224,7 +224,7 @@ Before deploying:
 
 1. Set Appwrite project, API key, invite URL, reset URL, and org assets bucket.
 2. Set `COOKIE_SECURE=true` behind HTTPS.
-3. Keep `ANYONE_CAN_CREATE_ACCOUNT=false` unless public signup is intended.
+3. Open registration is the product default (`ANYONE_CAN_CREATE_ACCOUNT` defaults to `true`); set it to `false` only as an emergency kill switch.
 4. Verify MongoDB and Cerbos connectivity.
 5. Bootstrap initial organizations and org-admin users in Appwrite.
 6. Confirm stream YAML organization and role slugs match Appwrite state.
