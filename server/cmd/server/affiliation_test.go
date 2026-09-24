@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -224,4 +225,500 @@ func TestServerAffiliationServiceSmoke(t *testing.T) {
 	if err != nil || saved.ID == (primitive.ObjectID{}) {
 		t.Fatalf("SaveJoinRequest via server service: saved=%+v err=%v", saved, err)
 	}
+}
+
+func TestSubmitOrganizationCreationRequestHappyPath(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	aff := NewAffiliation(&fakeIdentityStore{}, store, mailer, fixedNow)
+
+	t.Setenv("ADMIN_EMAIL", "platform@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
+	user := IdentityUser{ID: "user-1", Email: "founder@example.com"}
+	saved, err := aff.SubmitOrganizationCreationRequest(ctx, user, "  New Org  ")
+	if err != nil {
+		t.Fatalf("SubmitOrganizationCreationRequest: %v", err)
+	}
+	if saved.ID.IsZero() || saved.Status != AffiliationStatusPending {
+		t.Fatalf("saved=%+v", saved)
+	}
+	if saved.ProposedName != "New Org" || saved.ProposedSlug != "new-org" {
+		t.Fatalf("name/slug=%q/%q", saved.ProposedName, saved.ProposedSlug)
+	}
+	if saved.RequesterUserID != "user-1" || saved.RequesterEmail != "founder@example.com" {
+		t.Fatalf("requester fields=%+v", saved)
+	}
+
+	msgs := mailer.Messages()
+	if len(msgs) != 1 {
+		t.Fatalf("messages=%d, want 1", len(msgs))
+	}
+	if msgs[0].Kind != MailKindOrgCreationSubmitted {
+		t.Fatalf("kind=%q", msgs[0].Kind)
+	}
+	if len(msgs[0].To) != 1 || msgs[0].To[0] != "platform@example.com" {
+		t.Fatalf("to=%v", msgs[0].To)
+	}
+
+	pending, err := aff.ListPendingOrganizationCreationRequests(ctx)
+	if err != nil || len(pending) != 1 || pending[0].ID != saved.ID {
+		t.Fatalf("pending=%v err=%v", pending, err)
+	}
+}
+
+func TestSubmitOrganizationCreationRequestInvariants(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("ADMIN_EMAIL", "platform@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
+	t.Run("empty name", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u"}, "  ")
+		if !errors.Is(err, ErrAffiliationInvalidName) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("already affiliated", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", OrgSlug: "acme"}, "New Org")
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("pending create exists", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
+		if _, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "First"); err != nil {
+			t.Fatalf("first submit: %v", err)
+		}
+		_, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "Second")
+		if !errors.Is(err, ErrAffiliationPendingExists) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("pending join exists", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
+		if _, err := aff.SaveJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "u",
+			RequesterEmail:  "u@example.com",
+			OrgSlug:         "acme",
+		}); err != nil {
+			t.Fatalf("SaveJoinRequest: %v", err)
+		}
+		_, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "New Org")
+		if !errors.Is(err, ErrAffiliationPendingExists) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("slug already exists", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+				if slug == "taken-org" {
+					return &IdentityOrg{ID: "org-1", Slug: "taken-org", Name: "Taken Org"}, nil
+				}
+				return nil, ErrIdentityNotFound
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "Taken Org")
+		if !errors.Is(err, ErrAffiliationOrganizationSlugExists) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
+func TestSubmitOrganizationCreationRequestMailFailureDoesNotFailCommand(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("ADMIN_EMAIL", "platform@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
+	mailer := &recordingMailer{err: errors.New("smtp down")}
+	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), mailer, fixedNow)
+	saved, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "New Org")
+	if err != nil {
+		t.Fatalf("submit should succeed despite mail failure: %v", err)
+	}
+	if saved.Status != AffiliationStatusPending {
+		t.Fatalf("saved=%+v", saved)
+	}
+	if len(mailer.Messages()) != 1 {
+		t.Fatalf("expected mail attempt recorded")
+	}
+}
+
+func TestApproveOrganizationCreationRequestHappyPath(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+
+	var createdName string
+	var addedSlug, addedUserID string
+	var addedAsAdmin bool
+	var updatedLabels []string
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "founder@example.com", Labels: []string{"customKeep"}},
+	}
+	identity := &fakeIdentityStore{
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			user, ok := users[userID]
+			if !ok {
+				return IdentityUser{}, ErrIdentityNotFound
+			}
+			return user, nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+			return nil, ErrIdentityNotFound
+		},
+		createOrganizationAsAdminFunc: func(_ context.Context, name string) (IdentityOrg, error) {
+			createdName = name
+			return IdentityOrg{ID: "team-1", Slug: "new-org", Name: name}, nil
+		},
+		addOrganizationUserByIDAsAdminFunc: func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+			addedSlug, addedUserID, addedAsAdmin = orgSlug, userID, isOrgAdmin
+			if len(roleSlugs) != 0 {
+				t.Fatalf("roleSlugs=%v, want nil/empty", roleSlugs)
+			}
+			return IdentityMembership{ID: "mem-1", UserID: userID, IsOrgAdmin: isOrgAdmin}, nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+			updatedLabels = append([]string(nil), labels...)
+			user := users[userID]
+			user.Labels = append([]string(nil), labels...)
+			users[userID] = user
+			return user, nil
+		},
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+
+	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Org",
+		ProposedSlug:    "new-org",
+	})
+	if err != nil {
+		t.Fatalf("seed request: %v", err)
+	}
+
+	decidedBy := IdentityUser{ID: "admin-1", Email: "platform@example.com"}
+	updated, org, err := aff.ApproveOrganizationCreationRequest(ctx, saved.ID, decidedBy)
+	if err != nil {
+		t.Fatalf("ApproveOrganizationCreationRequest: %v", err)
+	}
+	if updated.Status != AffiliationStatusApproved || updated.DecidedByUserID != "admin-1" {
+		t.Fatalf("updated=%+v", updated)
+	}
+	if updated.DecidedAt.IsZero() {
+		t.Fatal("expected DecidedAt")
+	}
+	if org.Slug != "new-org" || createdName != "New Org" {
+		t.Fatalf("org=%+v createdName=%q", org, createdName)
+	}
+	if addedSlug != "new-org" || addedUserID != "user-1" || !addedAsAdmin {
+		t.Fatalf("add membership slug=%q user=%q admin=%v", addedSlug, addedUserID, addedAsAdmin)
+	}
+	if len(updatedLabels) != 2 || updatedLabels[0] != "customKeep" || updatedLabels[1] != identityOrgAdminLabel {
+		t.Fatalf("labels=%v", updatedLabels)
+	}
+
+	msgs := mailer.Messages()
+	if len(msgs) != 1 || msgs[0].Kind != MailKindOrgCreationApproved {
+		t.Fatalf("messages=%+v", msgs)
+	}
+	if len(msgs[0].To) != 1 || msgs[0].To[0] != "founder@example.com" {
+		t.Fatalf("to=%v", msgs[0].To)
+	}
+
+	pending, err := aff.ListPendingOrganizationCreationRequests(ctx)
+	if err != nil || len(pending) != 0 {
+		t.Fatalf("pending after approve=%v err=%v", pending, err)
+	}
+}
+
+func TestApproveOrganizationCreationRequestInvariants(t *testing.T) {
+	ctx := context.Background()
+	decidedBy := IdentityUser{ID: "admin-1"}
+
+	t.Run("not found", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, _, err := aff.ApproveOrganizationCreationRequest(ctx, primitive.NewObjectID(), decidedBy)
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("not pending", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			ProposedName:    "New Org",
+			ProposedSlug:    "new-org",
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		saved.Status = AffiliationStatusRejected
+		if _, err := store.UpdateOrganizationCreationRequest(ctx, saved); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		_, _, err = aff.ApproveOrganizationCreationRequest(ctx, saved.ID, decidedBy)
+		if !errors.Is(err, ErrAffiliationNotPending) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("requester now affiliated leaves pending", func(t *testing.T) {
+		store := NewMemoryStore()
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "u@example.com", OrgSlug: "other"}, nil
+			},
+		}
+		aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			ProposedName:    "New Org",
+			ProposedSlug:    "new-org",
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		_, _, err = aff.ApproveOrganizationCreationRequest(ctx, saved.ID, decidedBy)
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+			t.Fatalf("err=%v", err)
+		}
+		loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
+			t.Fatalf("loaded=%+v err=%v", loaded, err)
+		}
+	})
+
+	t.Run("slug collision", func(t *testing.T) {
+		store := NewMemoryStore()
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "u@example.com"}, nil
+			},
+			getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+				if slug == "new-org" {
+					return &IdentityOrg{ID: "existing", Slug: "new-org", Name: "Existing"}, nil
+				}
+				return nil, ErrIdentityNotFound
+			},
+		}
+		aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			ProposedName:    "New Org",
+			ProposedSlug:    "new-org",
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		_, _, err = aff.ApproveOrganizationCreationRequest(ctx, saved.ID, decidedBy)
+		if !errors.Is(err, ErrAffiliationOrganizationSlugExists) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
+func TestApproveOrganizationCreationRequestMailFailureDoesNotFailCommand(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{err: errors.New("smtp down")}
+	users := map[string]IdentityUser{
+		"user-1": {ID: "user-1", Email: "founder@example.com"},
+	}
+	identity := &fakeIdentityStore{
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			return users[userID], nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+			return nil, ErrIdentityNotFound
+		},
+		createOrganizationAsAdminFunc: func(_ context.Context, name string) (IdentityOrg, error) {
+			return IdentityOrg{ID: "team-1", Slug: "new-org", Name: name}, nil
+		},
+		addOrganizationUserByIDAsAdminFunc: func(_ context.Context, orgSlug, userID string, _ []string, isOrgAdmin bool) (IdentityMembership, error) {
+			return IdentityMembership{ID: "mem-1", UserID: userID, IsOrgAdmin: isOrgAdmin}, nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+			user := users[userID]
+			user.Labels = append([]string(nil), labels...)
+			users[userID] = user
+			return user, nil
+		},
+	}
+	aff := NewAffiliation(identity, store, mailer, fixedNow)
+	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Org",
+		ProposedSlug:    "new-org",
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	updated, _, err := aff.ApproveOrganizationCreationRequest(ctx, saved.ID, IdentityUser{ID: "admin-1"})
+	if err != nil {
+		t.Fatalf("approve should succeed despite mail failure: %v", err)
+	}
+	if updated.Status != AffiliationStatusApproved {
+		t.Fatalf("updated=%+v", updated)
+	}
+}
+
+func TestRejectOrganizationCreationRequestAndResubmit(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("ADMIN_EMAIL", "platform@example.com")
+	t.Setenv("ADMIN_PASSWORD", "secret")
+
+	store := NewMemoryStore()
+	mailer := &recordingMailer{}
+	aff := NewAffiliation(&fakeIdentityStore{}, store, mailer, fixedNow)
+	user := IdentityUser{ID: "user-1", Email: "founder@example.com"}
+
+	saved, err := aff.SubmitOrganizationCreationRequest(ctx, user, "New Org")
+	if err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	rejected, err := aff.RejectOrganizationCreationRequest(ctx, saved.ID, IdentityUser{ID: "admin-1"}, "duplicate brand")
+	if err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+	if rejected.Status != AffiliationStatusRejected || rejected.RejectReason != "duplicate brand" {
+		t.Fatalf("rejected=%+v", rejected)
+	}
+	if rejected.DecidedByUserID != "admin-1" || rejected.DecidedAt.IsZero() {
+		t.Fatalf("decision fields=%+v", rejected)
+	}
+
+	msgs := mailer.Messages()
+	if len(msgs) != 2 {
+		t.Fatalf("messages=%d, want submit+reject", len(msgs))
+	}
+	if msgs[1].Kind != MailKindOrgCreationRejected || msgs[1].To[0] != "founder@example.com" {
+		t.Fatalf("reject mail=%+v", msgs[1])
+	}
+
+	pending, err := aff.HasPendingAffiliationIntent(ctx, user.ID)
+	if err != nil || pending {
+		t.Fatalf("pending after reject=%v err=%v", pending, err)
+	}
+
+	resubmitted, err := aff.SubmitOrganizationCreationRequest(ctx, user, "Fresh Org")
+	if err != nil {
+		t.Fatalf("resubmit: %v", err)
+	}
+	if resubmitted.Status != AffiliationStatusPending || resubmitted.ProposedSlug != "fresh-org" {
+		t.Fatalf("resubmitted=%+v", resubmitted)
+	}
+}
+
+func TestRejectOrganizationCreationRequestInvariants(t *testing.T) {
+	ctx := context.Background()
+	decidedBy := IdentityUser{ID: "admin-1"}
+
+	t.Run("not found", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, fixedNow)
+		_, err := aff.RejectOrganizationCreationRequest(ctx, primitive.NewObjectID(), decidedBy, "")
+		if !errors.Is(err, ErrAffiliationNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("not pending", func(t *testing.T) {
+		store := NewMemoryStore()
+		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
+		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+			RequesterUserID: "user-1",
+			RequesterEmail:  "u@example.com",
+			ProposedName:    "New Org",
+			ProposedSlug:    "new-org",
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		saved.Status = AffiliationStatusApproved
+		if _, err := store.UpdateOrganizationCreationRequest(ctx, saved); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		_, err = aff.RejectOrganizationCreationRequest(ctx, saved.ID, decidedBy, "late")
+		if !errors.Is(err, ErrAffiliationNotPending) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+}
+
+func TestRejectOrganizationCreationRequestMailFailureDoesNotFailCommand(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	mailer := &recordingMailer{err: errors.New("smtp down")}
+	aff := NewAffiliation(&fakeIdentityStore{}, store, mailer, fixedNow)
+	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Org",
+		ProposedSlug:    "new-org",
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	updated, err := aff.RejectOrganizationCreationRequest(ctx, saved.ID, IdentityUser{ID: "admin-1"}, "nope")
+	if err != nil {
+		t.Fatalf("reject should succeed despite mail failure: %v", err)
+	}
+	if updated.Status != AffiliationStatusRejected {
+		t.Fatalf("updated=%+v", updated)
+	}
+}
+
+func TestListPendingOrganizationCreationRequestsFiltersNonPending(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
+
+	pendingReq, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-1",
+		RequesterEmail:  "a@example.com",
+		ProposedName:    "Pending Org",
+		ProposedSlug:    "pending-org",
+	})
+	if err != nil {
+		t.Fatalf("seed pending: %v", err)
+	}
+	rejected, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		RequesterUserID: "user-2",
+		RequesterEmail:  "b@example.com",
+		ProposedName:    "Rejected Org",
+		ProposedSlug:    "rejected-org",
+	})
+	if err != nil {
+		t.Fatalf("seed rejected: %v", err)
+	}
+	rejected.Status = AffiliationStatusRejected
+	if _, err := store.UpdateOrganizationCreationRequest(ctx, rejected); err != nil {
+		t.Fatalf("mark rejected: %v", err)
+	}
+
+	listed, err := aff.ListPendingOrganizationCreationRequests(ctx)
+	if err != nil || len(listed) != 1 || listed[0].ID != pendingReq.ID {
+		t.Fatalf("listed=%v err=%v", listed, err)
+	}
+}
+
+func fixedNow() time.Time {
+	return time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 }

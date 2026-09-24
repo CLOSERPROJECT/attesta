@@ -426,6 +426,7 @@ type PlatformAdminView struct {
 	NextPage                 int
 	MatchedOrganizations     int
 	Organizations            []PlatformAdminOrganizationRow
+	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
 	InviteLink               string
 	Confirmation             string
 	OrganizationError        string
@@ -435,6 +436,15 @@ type PlatformAdminView struct {
 	InviteError              string
 	InviteDialogEmail        string
 	Error                    string
+}
+
+type PlatformAdminOrgCreationRequestRow struct {
+	ID             string
+	RequesterEmail string
+	ProposedName   string
+	ProposedSlug   string
+	CreatedAt      string
+	CreatedAtISO   string
 }
 
 type PlatformAdminOrganizationRow struct {
@@ -3406,31 +3416,56 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		pageNumbers = append(pageNumbers, page)
 	}
 	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
+	pendingRows := platformAdminOrgCreationRequestRows(context.Background(), s)
 	view := PlatformAdminView{
-		PageBase:                 s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		ActivePanel:              "organizations",
-		Breadcrumbs:              buildPlatformAdminBreadcrumbs("organizations"),
-		SearchQuery:              errs.SearchQuery,
-		CurrentPage:              currentPage,
-		TotalPages:               totalPages,
-		PageNumbers:              pageNumbers,
-		HasPreviousPage:          currentPage > 1,
-		HasNextPage:              currentPage < totalPages,
-		PreviousPage:             max(currentPage-1, 1),
-		NextPage:                 min(currentPage+1, totalPages),
-		MatchedOrganizations:     orgPage.Total,
-		Organizations:            rows,
-		Confirmation:             strings.TrimSpace(confirmation),
-		OrganizationError:        errs.Organization,
-		OrganizationDialogAction: errs.DialogAction,
-		OrganizationDialogSlug:   errs.OrgSlug,
-		OrganizationDialogName:   errs.OrgName,
-		InviteError:              errs.Invite,
-		InviteDialogEmail:        errs.InviteEmail,
-		Error:                    firstNonEmpty(errs.Organization, errs.Invite),
+		PageBase:                   s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		ActivePanel:                "organizations",
+		Breadcrumbs:                buildPlatformAdminBreadcrumbs("organizations"),
+		SearchQuery:                errs.SearchQuery,
+		CurrentPage:                currentPage,
+		TotalPages:                 totalPages,
+		PageNumbers:                pageNumbers,
+		HasPreviousPage:            currentPage > 1,
+		HasNextPage:                currentPage < totalPages,
+		PreviousPage:               max(currentPage-1, 1),
+		NextPage:                   min(currentPage+1, totalPages),
+		MatchedOrganizations:       orgPage.Total,
+		Organizations:              rows,
+		PendingOrgCreationRequests: pendingRows,
+		Confirmation:               strings.TrimSpace(confirmation),
+		OrganizationError:          errs.Organization,
+		OrganizationDialogAction:   errs.DialogAction,
+		OrganizationDialogSlug:     errs.OrgSlug,
+		OrganizationDialogName:     errs.OrgName,
+		InviteError:                errs.Invite,
+		InviteDialogEmail:          errs.InviteEmail,
+		Error:                      firstNonEmpty(errs.Organization, errs.Invite),
 	}
 	view.Console = platformAdminConsole(view)
 	return view
+}
+
+func platformAdminOrgCreationRequestRows(ctx context.Context, s *Server) []PlatformAdminOrgCreationRequestRow {
+	if s == nil || s.store == nil {
+		return nil
+	}
+	pending, err := s.affiliationService().ListPendingOrganizationCreationRequests(ctx)
+	if err != nil {
+		log.Printf("failed to list pending organization creation requests: %v", err)
+		return nil
+	}
+	rows := make([]PlatformAdminOrgCreationRequestRow, 0, len(pending))
+	for _, req := range pending {
+		rows = append(rows, PlatformAdminOrgCreationRequestRow{
+			ID:             req.ID.Hex(),
+			RequesterEmail: strings.TrimSpace(req.RequesterEmail),
+			ProposedName:   strings.TrimSpace(req.ProposedName),
+			ProposedSlug:   strings.TrimSpace(req.ProposedSlug),
+			CreatedAt:      humanReadableTraceabilityTime(req.CreatedAt),
+			CreatedAtISO:   req.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	return rows
 }
 
 func (s *Server) renderPlatformAdmin(w http.ResponseWriter, r *http.Request, user *AccountUser, confirmation string, errs PlatformAdminErrors) {
@@ -3546,6 +3581,35 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		switch intent {
+		case "approve_org_creation":
+			requestIDHex := strings.TrimSpace(r.FormValue("request_id"))
+			requestID, err := primitive.ObjectIDFromHex(requestIDHex)
+			if err != nil {
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization creation request not found", SearchQuery: searchQuery, Page: page})
+				return
+			}
+			_, _, err = s.affiliationService().ApproveOrganizationCreationRequest(r.Context(), requestID, identityUserForAffiliation(admin))
+			if err != nil {
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: affiliationOrganizationCreationFormError(err), SearchQuery: searchQuery, Page: page})
+				return
+			}
+			redirectPlatformAdminWithMessage(w, r, searchQuery, page, "organization creation request approved")
+			return
+		case "reject_org_creation":
+			requestIDHex := strings.TrimSpace(r.FormValue("request_id"))
+			requestID, err := primitive.ObjectIDFromHex(requestIDHex)
+			if err != nil {
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: "organization creation request not found", SearchQuery: searchQuery, Page: page})
+				return
+			}
+			reason := strings.TrimSpace(r.FormValue("reason"))
+			_, err = s.affiliationService().RejectOrganizationCreationRequest(r.Context(), requestID, identityUserForAffiliation(admin), reason)
+			if err != nil {
+				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: affiliationOrganizationCreationFormError(err), SearchQuery: searchQuery, Page: page})
+				return
+			}
+			redirectPlatformAdminWithMessage(w, r, searchQuery, page, "organization creation request rejected")
+			return
 		case "create_org":
 			name := strings.TrimSpace(r.FormValue("name"))
 			inviteEmail := strings.ToLower(strings.TrimSpace(r.FormValue("invite_email")))
@@ -4101,7 +4165,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !userHasOrganizationContext(user) {
-		s.renderOrgAdminWithErrors(w, r, user, "", "", OrgAdminErrors{Organization: "create organization first"})
+		s.renderOrgAdminWithErrors(w, r, user, "", "", OrgAdminErrors{Organization: "request organization creation via onboarding"})
 		return
 	}
 	switch r.Method {
@@ -4332,62 +4396,11 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		intent = "invite"
 	}
 	if !userHasOrganizationContext(admin) {
-		if intent != "create_org" {
-			s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: "create organization first"})
-			return
-		}
-		name := strings.TrimSpace(r.FormValue("name"))
-		if name == "" {
-			s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: "organization name is required"})
-			return
-		}
-		orgSlug := canonifySlug(name)
-		if existing, err := s.identity.GetOrganizationBySlug(r.Context(), orgSlug); err == nil && existing != nil {
-			s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
-			return
-		}
-		logoUpload, logoErrMsg := s.readOrganizationLogoUpload(r)
-		if logoErrMsg != "" {
-			s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: logoErrMsg})
-			return
-		}
-		sessionSecret, err := sessionSecretFromRequest(r)
-		if err != nil {
-			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for organization creation")
-			return
-		}
-		createdOrg, err := s.identity.CreateOrganization(r.Context(), sessionSecret, name)
-		if err != nil {
-			if isDuplicateSlugError(err) {
-				s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: "organization slug already exists"})
-				return
-			}
-			s.logAndRenderOrgAdminError(w, r, admin, "", "", OrgAdminErrors{Organization: "failed to create organization"}, err, "failed to create organization %s", name)
-			return
-		}
-		if logoUpload != nil {
-			logoFile, err := s.identity.UploadOrganizationLogo(r.Context(), createdOrg.Slug, IdentityFile{
-				Filename:    logoUpload.Filename,
-				ContentType: logoUpload.ContentType,
-				Data:        logoUpload.Data,
-			})
-			if err != nil {
-				s.logAndRenderOrgAdminError(w, r, admin, "", "", OrgAdminErrors{Organization: "failed to upload logo"}, err, "failed to upload logo for organization %s", createdOrg.Slug)
-				return
-			}
-			createdOrg, err = s.identity.UpdateOrganization(r.Context(), sessionSecret, createdOrg.Slug, createdOrg.Name, logoFile.ID, createdOrg.Roles)
-			if err != nil {
-				s.logAndRenderOrgAdminError(w, r, admin, createdOrg.Slug, "", OrgAdminErrors{Organization: "failed to update organization"}, err, "failed to attach logo to organization %s", createdOrg.Slug)
-				return
-			}
-		}
-		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+		s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: "request organization creation via onboarding"})
 		return
 	}
 
 	switch intent {
-	case "create_org":
-		s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Organization: "organization already exists for your account"})
 	case "invite":
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		if email == "" {

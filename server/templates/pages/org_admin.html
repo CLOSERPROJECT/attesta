@@ -14,36 +14,16 @@
       <div class="rail-layout">
         <section class="panel">
           <div class="panel-heading">
+            <h2>Organization required</h2>
             <p>
-              Your org admin invite is not assigned to an organization yet.
-              Create one now to continue.
+              Your account is not assigned to an organization yet.
+              Submit an organization creation request from onboarding, or wait for an invitation.
             </p>
           </div>
-          <form
-            method="post"
-            action="/my/organization/users"
-            class="input-form"
-            enctype="multipart/form-data"
-          >
-            <input type="hidden" name="intent" value="create_org" />
-            <div class="form-field">
-              <label for="org-name">Organization name</label>
-              <input id="org-name" name="name" type="text" required />
-            </div>
-            <div class="form-field">
-              <label for="org-logo">Organization logo</label>
-              <input
-                id="org-logo"
-                name="logo"
-                type="file"
-                accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
-              />
-            </div>
-            {{ if .OrganizationError }}
-              <p class="error">{{ .OrganizationError }}</p>
-            {{ end }}
-            <button class="btn btn-primary" type="submit">Create organization</button>
-          </form>
+          {{ if .OrganizationError }}
+            <p class="error">{{ .OrganizationError }}</p>
+          {{ end }}
+          <a class="btn btn-primary" href="/my/onboarding/request-organization">Request a new organization</a>
         </section>
       </div>
     {{ else }}

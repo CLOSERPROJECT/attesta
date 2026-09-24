@@ -210,8 +210,7 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	var out bytes.Buffer
-	view := PlatformAdminView{
-	}
+	view := PlatformAdminView{}
 	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
 		t.Fatalf("render platform_admin_body: %v", err)
 	}
@@ -224,6 +223,7 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		`href="/admin/organizations"`,
 		`href="/admin/categories"`,
 		`class="panel rail-layout-main"`,
+		"Pending organization requests",
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Organizations</h2>",
@@ -235,14 +235,19 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		}
 	}
 
-	headIdx := strings.Index(body, `class="panel-head-actions"`)
-	headingIdx := strings.Index(body, `class="panel-heading"`)
-	btnIdx := strings.Index(body, `onclick="document.getElementById('create-org-dialog').showModal()"`)
-	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
-		t.Fatal("expected panel-head-actions, panel-heading, and action button")
+	orgsHeadingIdx := strings.Index(body, "<h2>Organizations</h2>")
+	if orgsHeadingIdx == -1 {
+		t.Fatal("expected Organizations heading")
 	}
-	if !(headIdx < headingIdx && headingIdx < btnIdx) {
-		t.Fatalf("expected panel-heading before action button inside panel-head-actions block")
+	headIdx := strings.LastIndex(body[:orgsHeadingIdx], `class="panel-head-actions"`)
+	headingIdx := strings.LastIndex(body[:orgsHeadingIdx], `class="panel-heading"`)
+	btnIdx := strings.Index(body[orgsHeadingIdx:], `onclick="document.getElementById('create-org-dialog').showModal()"`)
+	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
+		t.Fatal("expected panel-head-actions, panel-heading, and action button around Organizations")
+	}
+	btnIdx += orgsHeadingIdx
+	if !(headIdx < headingIdx && headingIdx < orgsHeadingIdx && orgsHeadingIdx < btnIdx) {
+		t.Fatalf("expected panel-heading before action button inside Organizations panel-head-actions block")
 	}
 }
 

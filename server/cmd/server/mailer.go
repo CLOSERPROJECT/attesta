@@ -26,6 +26,7 @@ func (noopMailer) Send(context.Context, MailMessage) error { return nil }
 type recordingMailer struct {
 	mu       sync.Mutex
 	messages []MailMessage
+	err      error
 }
 
 func (m *recordingMailer) Send(_ context.Context, msg MailMessage) error {
@@ -36,7 +37,7 @@ func (m *recordingMailer) Send(_ context.Context, msg MailMessage) error {
 		cloned.To = append([]string(nil), msg.To...)
 	}
 	m.messages = append(m.messages, cloned)
-	return nil
+	return m.err
 }
 
 func (m *recordingMailer) Messages() []MailMessage {

@@ -93,39 +93,57 @@ func TestHandleOnboardingStubPages(t *testing.T) {
 	}
 	server := &Server{
 		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		store:       NewMemoryStore(),
 		tmpl:        parseTestTemplates(t),
 		authorizer:  fakeAuthorizer{},
 		enforceAuth: true,
 		now:         func() time.Time { return now },
 	}
 
-	cases := []struct {
-		path string
-		want string
-	}{
-		{path: "/my/onboarding/join", want: "Join an organization"},
-		{path: "/my/onboarding/request-organization", want: "Request a new organization"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.path, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
-			req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
-			rec := httptest.NewRecorder()
-			server.handleMyRoutes(rec, req)
+	t.Run("join stub", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleMyRoutes(rec, req)
 
-			if rec.Code != http.StatusOK {
-				t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, "Join an organization") {
+			t.Fatalf("expected join title, got:\n%s", body)
+		}
+		if !strings.Contains(body, "Coming soon") {
+			t.Fatalf("expected coming soon copy, got:\n%s", body)
+		}
+		if !strings.Contains(body, `href="/my/onboarding"`) {
+			t.Fatalf("expected back link to onboarding, got:\n%s", body)
+		}
+	})
+
+	t.Run("request organization form", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/my/onboarding/request-organization", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleMyRoutes(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		body := rec.Body.String()
+		for _, want := range []string{
+			"Request a new organization",
+			"organization creation request",
+			`name="name"`,
+			"Submit organization creation request",
+			`href="/my/onboarding"`,
+		} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("expected %q, got:\n%s", want, body)
 			}
-			body := rec.Body.String()
-			if !strings.Contains(body, tc.want) {
-				t.Fatalf("expected %q, got:\n%s", tc.want, body)
-			}
-			if !strings.Contains(body, "Coming soon") {
-				t.Fatalf("expected coming soon copy, got:\n%s", body)
-			}
-			if !strings.Contains(body, `href="/my/onboarding"`) {
-				t.Fatalf("expected back link to onboarding, got:\n%s", body)
-			}
-		})
-	}
+		}
+		if strings.Contains(body, "Coming soon") {
+			t.Fatalf("did not expect stub copy, got:\n%s", body)
+		}
+	})
 }

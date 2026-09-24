@@ -10,6 +10,80 @@
   {{ if eq .ActivePanel "categories" }}
     {{ template "platform_admin_categories_panel" . }}
   {{ else }}
+    <section class="panel-block panel-block-spaced">
+      <div class="panel-heading">
+        <h2>Pending organization requests</h2>
+        <p>Review organization creation requests from unaffiliated users</p>
+      </div>
+      {{ if .PendingOrgCreationRequests }}
+        <ul class="list-rows">
+          {{ range .PendingOrgCreationRequests }}
+            <li class="list-row">
+              <div class="list-row-main">
+                <div class="platform-admin-item-copy">
+                  <p class="platform-admin-item-name">{{ .ProposedName }}</p>
+                  <p class="muted">
+                    {{ .ProposedSlug }}
+                    {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
+                    {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
+                  </p>
+                </div>
+              </div>
+              <div class="list-row-actions">
+                <form method="post" action="/admin/organizations" class="panel-actions">
+                  <input type="hidden" name="intent" value="approve_org_creation" />
+                  <input type="hidden" name="request_id" value="{{ .ID }}" />
+                  <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                  <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
+                  <button class="btn btn-primary btn-xs" type="submit">Approve</button>
+                </form>
+                <button
+                  type="button"
+                  class="btn btn-ghost-danger btn-xs"
+                  onclick="document.getElementById('reject-org-creation-{{ .ID }}').showModal()"
+                >
+                  Reject
+                </button>
+              </div>
+
+              <dialog id="reject-org-creation-{{ .ID }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3 class="dialog-title">Reject organization creation request</h3>
+                      <p class="dialog-subtitle">{{ .ProposedName }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('reject-org-creation-{{ .ID }}').close()"
+                    >
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <form method="post" action="/admin/organizations" class="input-form">
+                    <input type="hidden" name="intent" value="reject_org_creation" />
+                    <input type="hidden" name="request_id" value="{{ .ID }}" />
+                    <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                    <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
+                    <div class="form-field">
+                      <label for="reject-reason-{{ .ID }}">Reason (optional)</label>
+                      <input id="reject-reason-{{ .ID }}" name="reason" type="text" />
+                    </div>
+                    <div class="dialog-actions">
+                      <button class="btn btn-danger" type="submit">Reject request</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            </li>
+          {{ end }}
+        </ul>
+      {{ else }}
+        <p class="muted">No pending organization creation requests.</p>
+      {{ end }}
+    </section>
+
     <div class="panel-head-actions">
       <div class="panel-heading">
         <h2>Organizations</h2>
