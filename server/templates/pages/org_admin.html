@@ -97,12 +97,12 @@
         });
       };
       const applySuggestedPalette = () => {
-        if (!roleNameInput) {
+        if (!autoPaletteEnabled || !roleNameInput) {
           updatePalettePreview();
           return;
         }
         const nextPalette = suggestedPalette(roleNameInput.value);
-        if (nextPalette) {
+        if (nextPalette && paletteKeys.includes(nextPalette)) {
           paletteSelect.value = nextPalette;
         }
         updatePalettePreview();
@@ -125,7 +125,9 @@
         swatch.style.setProperty("--swatch-bg", option.getAttribute("data-role-color") || "var(--muted-foreground)");
         label.textContent = option.text.trim();
         check.className = "roles-picker-option-check";
-        check.textContent = "Selected";
+        check.setAttribute("aria-hidden", "true");
+        check.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg icon-svg-md" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>';
         button.appendChild(swatch);
         button.appendChild(label);
         button.appendChild(check);
@@ -175,8 +177,9 @@
       }
       if (paletteAutoCapable) {
         applySuggestedPalette();
+      } else {
+        updatePalettePreview();
       }
-      updatePalettePreview();
     });
 
     const addRoleDialog = document.getElementById("add-role-dialog");
@@ -198,148 +201,6 @@
     if (addUserDialog && {{if or .InviteError .InviteLink}}true{{else}}false{{end}} && !addUserDialog.open) {
       addUserDialog.showModal();
     }
-
-    const rolePickers = Array.from(document.querySelectorAll("[data-role-picker]"));
-    const closeAllPickers = (except) => {
-      rolePickers.forEach((picker) => {
-        if (picker === except) {
-          return;
-        }
-        const menu = picker.querySelector("[data-role-picker-menu]");
-        const toggle = picker.querySelector("[data-role-picker-toggle]");
-        if (!menu || !toggle) {
-          return;
-        }
-        menu.hidden = true;
-        toggle.setAttribute("aria-expanded", "false");
-      });
-    };
-
-    rolePickers.forEach((picker) => {
-      const toggle = picker.querySelector("[data-role-picker-toggle]");
-      const toggleLabel = picker.querySelector("[data-role-picker-toggle-label]");
-      const menu = picker.querySelector("[data-role-picker-menu]");
-      const search = picker.querySelector("[data-role-picker-search]");
-      const empty = picker.querySelector("[data-role-picker-empty]");
-      const hiddenInputs = picker.querySelector("[data-role-picker-hidden-inputs]");
-      const optionButtons = Array.from(picker.querySelectorAll("[data-role-picker-option]"));
-      if (!toggle || !toggleLabel || !menu || !hiddenInputs) {
-        return;
-      }
-
-      const selected = new Set();
-      optionButtons.forEach((button) => {
-        if (button.getAttribute("data-selected") === "true") {
-          selected.add(button.getAttribute("data-value"));
-        }
-      });
-
-      const syncHiddenInputs = () => {
-        hiddenInputs.innerHTML = "";
-        optionButtons.forEach((button) => {
-          const value = button.getAttribute("data-value");
-          if (!value || !selected.has(value)) {
-            return;
-          }
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = "roles";
-          input.value = value;
-          hiddenInputs.appendChild(input);
-        });
-      };
-
-      const updateToggleLabel = () => {
-        if (selected.size === 0) {
-          toggleLabel.textContent = "Select roles";
-          return;
-        }
-        if (selected.size === 1) {
-          const selectedButton = optionButtons.find((button) => {
-            const value = button.getAttribute("data-value");
-            return value && selected.has(value);
-          });
-          toggleLabel.textContent = selectedButton ? selectedButton.getAttribute("data-label") || "1 role selected" : "1 role selected";
-          return;
-        }
-        toggleLabel.textContent = [...selected].join(", ");
-      };
-
-      const updateOptionState = () => {
-        optionButtons.forEach((button) => {
-          const value = button.getAttribute("data-value");
-          const isSelected = !!value && selected.has(value);
-          button.setAttribute("aria-pressed", isSelected ? "true" : "false");
-          if (isSelected) {
-            button.classList.add("is-selected");
-          } else {
-            button.classList.remove("is-selected");
-          }
-        });
-      };
-
-      const applySearchFilter = () => {
-        const query = search ? search.value.trim().toLowerCase() : "";
-        let visibleCount = 0;
-        optionButtons.forEach((button) => {
-          const item = button.closest("li");
-          const label = (button.getAttribute("data-label") || "").toLowerCase();
-          const match = query === "" || label.includes(query);
-          if (item) {
-            item.hidden = !match;
-          }
-          if (match) {
-            visibleCount++;
-          }
-        });
-        if (empty) {
-          empty.hidden = visibleCount > 0;
-        }
-      };
-
-      if (optionButtons.length === 0) {
-        toggleLabel.textContent = "No roles available";
-        toggle.disabled = true;
-        menu.hidden = true;
-        return;
-      }
-
-      toggle.addEventListener("click", () => {
-        const isOpen = !menu.hidden;
-        closeAllPickers(picker);
-        menu.hidden = isOpen;
-        toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
-        if (!isOpen && search) {
-          search.focus();
-        }
-      });
-
-      optionButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          const value = button.getAttribute("data-value");
-          if (!value) {
-            return;
-          }
-          if (selected.has(value)) {
-            selected.delete(value);
-          } else {
-            selected.add(value);
-          }
-          updateOptionState();
-          updateToggleLabel();
-          syncHiddenInputs();
-        });
-      });
-
-      if (search) {
-        search.addEventListener("input", applySearchFilter);
-      }
-
-      updateOptionState();
-      updateToggleLabel();
-      syncHiddenInputs();
-      applySearchFilter();
-    });
 
     const inviteCopyButtons = Array.from(document.querySelectorAll(".js-invite-copy"));
     inviteCopyButtons.forEach((button) => {
@@ -400,17 +261,6 @@
         if (!picker.contains(event.target)) {
           const menu = picker.querySelector("[data-role-palette-menu]");
           const toggle = picker.querySelector("[data-role-palette-toggle]");
-          if (!menu || !toggle) {
-            return;
-          }
-          menu.hidden = true;
-          toggle.setAttribute("aria-expanded", "false");
-        }
-      });
-      rolePickers.forEach((picker) => {
-        if (!picker.contains(event.target)) {
-          const menu = picker.querySelector("[data-role-picker-menu]");
-          const toggle = picker.querySelector("[data-role-picker-toggle]");
           if (!menu || !toggle) {
             return;
           }
@@ -764,7 +614,9 @@
         {{ end }}
       </ul>
     {{ else }}
-      <p class="muted">No organization roles yet</p>
+      <div class="empty-state">
+        <p class="empty-state-title">No organization roles yet</p>
+      </div>
     {{ end }}
 
     <dialog
@@ -924,7 +776,9 @@
           {{ end }}
         </ul>
       {{ else }}
-        <p class="muted">No pending join requests</p>
+        <div class="empty-state">
+          <p class="empty-state-title">No pending join requests</p>
+        </div>
       {{ end }}
     </div>
 
@@ -1029,65 +883,7 @@
                   />
                   <div class="form-field">
                     <label>Roles</label>
-                    <div class="roles-picker" data-role-picker>
-                      <button
-                        type="button"
-                        class="roles-picker-toggle"
-                        data-role-picker-toggle
-                        aria-expanded="false"
-                      >
-                        <span data-role-picker-toggle-label
-                          >Select roles</span
-                        >
-                        <span
-                          class="roles-picker-toggle-icon"
-                          aria-hidden="true"
-                        >
-                          {{ template "icon-chevron-down" . }}
-                        </span>
-                      </button>
-                      <div
-                        class="roles-picker-menu"
-                        data-role-picker-menu
-                        hidden
-                      >
-                        <input
-                          type="search"
-                          class="roles-picker-search"
-                          data-role-picker-search
-                          placeholder="Search roles..."
-                        />
-                        <ul class="roles-picker-options">
-                          {{ range .RoleOptions }}
-                            <li>
-                              <button
-                                type="button"
-                                class="roles-picker-option"
-                                data-role-picker-option
-                                data-value="{{ .Slug }}"
-                                data-label="{{ .Name }} ({{ .Slug }})"
-                                {{ if .Selected }}
-                                  data-selected="true"
-                                {{ end }}
-                              >
-                                <span>{{ .Name }} ({{ .Slug }})</span>
-                                <span class="roles-picker-option-check"
-                                  >Selected</span
-                                >
-                              </button>
-                            </li>
-                          {{ end }}
-                        </ul>
-                        <p
-                          class="roles-picker-empty"
-                          data-role-picker-empty
-                          hidden
-                        >
-                          No roles match your search
-                        </p>
-                      </div>
-                      <div data-role-picker-hidden-inputs></div>
-                    </div>
+                    {{ template "roles_picker" (rolesPickerFromOrgAdminOptions .RoleOptions false) }}
                   </div>
                   <div
                     class="dialog-actions"
@@ -1155,7 +951,9 @@
         {{ end }}
       </ul>
     {{ else }}
-      <p class="muted">No organization users yet</p>
+      <div class="empty-state">
+        <p class="empty-state-title">No organization users yet</p>
+      </div>
     {{ end }}
 
     <dialog
@@ -1187,56 +985,7 @@
           </div>
           <div class="form-field">
             <label>Roles</label>
-            <div class="roles-picker" data-role-picker>
-              <button
-                type="button"
-                class="roles-picker-toggle"
-                data-role-picker-toggle
-                aria-expanded="false"
-              >
-                <span data-role-picker-toggle-label>Select roles</span>
-                <span
-                  class="roles-picker-toggle-icon"
-                  aria-hidden="true"
-                >
-                  {{ template "icon-chevron-down" . }}
-                </span>
-              </button>
-              <div class="roles-picker-menu" data-role-picker-menu hidden>
-                <input
-                  type="search"
-                  class="roles-picker-search"
-                  data-role-picker-search
-                  placeholder="Search roles..."
-                />
-                <ul class="roles-picker-options">
-                  {{ range .Roles }}
-                    <li>
-                      <button
-                        type="button"
-                        class="roles-picker-option"
-                        data-role-picker-option
-                        data-value="{{ .Slug }}"
-                        data-label="{{ .Name }} ({{ .Slug }})"
-                      >
-                        <span>{{ .Name }} ({{ .Slug }})</span>
-                        <span class="roles-picker-option-check"
-                          >Selected</span
-                        >
-                      </button>
-                    </li>
-                  {{ end }}
-                </ul>
-                <p
-                  class="roles-picker-empty"
-                  data-role-picker-empty
-                  hidden
-                >
-                  No roles match your search
-                </p>
-              </div>
-              <div data-role-picker-hidden-inputs></div>
-            </div>
+            {{ template "roles_picker" (rolesPickerFromRoles .Roles false) }}
           </div>
           {{ if .InviteError }}
             <p class="error">{{ .InviteError }}</p>

@@ -1,0 +1,230 @@
+/* roles_picker — multi-select role chips (shared by org admin + onboarding join).
+ *
+ * Markup:
+ *   .roles-picker[data-role-picker][+data-role-picker-require-selection]
+ *     button.roles-picker-toggle[data-role-picker-toggle]
+ *       span.roles-picker-toggle-chips[data-role-picker-toggle-label]
+ *       span.roles-picker-toggle-icon
+ *     .roles-picker-menu[data-role-picker-menu]
+ *       label.roles-picker-search-field
+ *         .icon-svg (search)
+ *         input.roles-picker-search[data-role-picker-search]
+ *         button.roles-picker-search-clear[data-role-picker-search-clear]
+ *       ul.roles-picker-options > li > button.roles-picker-option[data-role-picker-option]
+ *         .pill.role-pill[data-role-palette]
+ *         .roles-picker-option-check
+ *       .empty-state[data-role-picker-empty]
+ *     [data-role-picker-hidden-inputs]
+ */
+
+.roles-picker {
+  position: relative;
+}
+
+.roles-picker-toggle {
+  width: 100%;
+  box-sizing: border-box;
+  /* Shared pill row + vertical padding + border — stable empty vs selected. */
+  min-height: calc(var(--text-xs) * var(--leading-normal) + 4px + 2 * var(--space-2) + 2px);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+/* Same chip metrics in the toggle and the dropdown options. */
+.roles-picker .role-pill {
+  line-height: calc(var(--text-xs) * var(--leading-normal));
+}
+
+.roles-picker-toggle-chips,
+.roles-picker-toggle [data-role-palette-toggle-label] {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  /* Match .roles-picker .role-pill (line-height + 1px pad + 1px border each side). */
+  min-height: calc(var(--text-xs) * var(--leading-normal) + 4px);
+  font-size: var(--text-sm);
+  line-height: calc(var(--text-xs) * var(--leading-normal) + 4px);
+  color: var(--muted-foreground);
+}
+
+.roles-picker-toggle-chips:has(.role-pill) {
+  color: inherit;
+}
+
+.roles-picker-toggle-chips:not(:has(.role-pill)) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roles-picker-toggle-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  transition: transform 180ms ease;
+}
+
+.roles-picker-toggle-icon .icon-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.roles-picker-toggle[aria-expanded="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.roles-picker-toggle[aria-expanded="true"] .roles-picker-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.roles-picker-toggle:disabled {
+  cursor: not-allowed;
+  color: var(--muted-foreground);
+}
+
+.roles-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  box-shadow: 0 12px 24px var(--shadow-dropdown);
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.roles-picker-menu[hidden] {
+  display: none;
+}
+
+.roles-picker-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  /* Total height including border; matches clear-btn row (btn-xs + inset). */
+  min-height: 34px;
+  padding: 2px;
+  padding-left: var(--space-2);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+}
+
+.roles-picker-search-field:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.roles-picker-search-field .roles-picker-search {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+}
+
+.roles-picker-search-field .roles-picker-search:focus,
+.roles-picker-search-field .roles-picker-search:focus-visible {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.roles-picker-search-field .roles-picker-search::placeholder {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+/* Hide the native WebKit cancel control; we render a btn-icon clear instead. */
+.roles-picker-search-field .roles-picker-search::-webkit-search-decoration,
+.roles-picker-search-field .roles-picker-search::-webkit-search-cancel-button {
+  /* stylelint-disable-next-line property-no-vendor-prefix -- required for WebKit search cancel */
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+.roles-picker-search-clear {
+  flex: 0 0 auto;
+}
+
+.roles-picker-search-clear[hidden] {
+  display: none;
+}
+
+.roles-picker-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.roles-picker-options[hidden] {
+  display: none;
+}
+
+.roles-picker-option {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--foreground);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.roles-picker-option:hover {
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+
+.roles-picker-option.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
+}
+
+.roles-picker-option-check {
+  display: none;
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+}
+
+.roles-picker-option.is-selected .roles-picker-option-check {
+  display: inline-flex;
+  color: var(--foreground);
+}

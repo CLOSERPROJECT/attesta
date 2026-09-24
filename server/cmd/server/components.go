@@ -412,3 +412,42 @@ type AdminConsoleView struct {
 	MainTemplate string
 	MainData     any
 }
+
+// RolesPickerOption is one selectable role in templates/components/roles_picker.html.
+type RolesPickerOption struct {
+	Slug     string
+	Name     string
+	Palette  string
+	Selected bool
+}
+
+// RolesPickerView is the view model for templates/components/roles_picker.html.
+type RolesPickerView struct {
+	Options          []RolesPickerOption
+	RequireSelection bool
+}
+
+func rolesPickerFromRoles(roles []Role, requireSelection bool) RolesPickerView {
+	options := make([]RolesPickerOption, 0, len(roles))
+	for _, role := range roles {
+		options = append(options, RolesPickerOption{
+			Slug:    role.Slug,
+			Name:    role.Name,
+			Palette: role.Palette,
+		})
+	}
+	return RolesPickerView{Options: options, RequireSelection: requireSelection}
+}
+
+func rolesPickerFromOrgAdminOptions(options []OrgAdminRoleOption, requireSelection bool) RolesPickerView {
+	out := make([]RolesPickerOption, 0, len(options))
+	for _, option := range options {
+		out = append(out, RolesPickerOption{
+			Slug:     option.Slug,
+			Name:     option.Name,
+			Palette:  option.Palette,
+			Selected: option.Selected,
+		})
+	}
+	return RolesPickerView{Options: out, RequireSelection: requireSelection}
+}

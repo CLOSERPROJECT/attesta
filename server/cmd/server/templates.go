@@ -27,6 +27,8 @@ func templateFuncs() template.FuncMap {
 		"effectiveSubstepBodyMode": effectiveSubstepBodyMode,
 		"platformAdminConsole":     platformAdminConsole,
 		"orgAdminConsole":          orgAdminConsole,
+		"rolesPickerFromRoles":     rolesPickerFromRoles,
+		"rolesPickerFromOrgAdminOptions": rolesPickerFromOrgAdminOptions,
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: odd number of arguments")

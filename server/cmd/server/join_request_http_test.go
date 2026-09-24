@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,11 +78,11 @@ func TestHandleOnboardingJoinSubmitAndPending(t *testing.T) {
 	if postRec.Code != http.StatusSeeOther {
 		t.Fatalf("submit status = %d, want %d body=%q", postRec.Code, http.StatusSeeOther, postRec.Body.String())
 	}
-	if loc := postRec.Header().Get("Location"); loc != "/my/onboarding/join" {
-		t.Fatalf("submit location = %q", loc)
+	if loc := postRec.Header().Get("Location"); loc != "/my/onboarding" {
+		t.Fatalf("submit location = %q, want /my/onboarding", loc)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/my/onboarding/join", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/my/onboarding", nil)
 	getReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	getRec := httptest.NewRecorder()
 	server.handleMyRoutes(getRec, getReq)
@@ -95,13 +96,22 @@ func TestHandleOnboardingJoinSubmitAndPending(t *testing.T) {
 		"Acme Org",
 		"acme",
 		"viewer, editor",
+		"Undo",
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q in pending page, got:\n%s", want, body)
+			t.Fatalf("expected %q in pending hub, got:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `name="org_slug"`) || strings.Contains(body, `name="q"`) {
-		t.Fatalf("expected no submit/search form while pending, got:\n%s", body)
+	if strings.Contains(body, `name="org_slug"`) || strings.Contains(body, `href="/my/onboarding/join"`) {
+		t.Fatalf("expected no join form/CTA while pending, got:\n%s", body)
+	}
+
+	childReq := httptest.NewRequest(http.MethodGet, "/my/onboarding/join", nil)
+	childReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	childRec := httptest.NewRecorder()
+	server.handleMyRoutes(childRec, childReq)
+	if childRec.Code != http.StatusSeeOther || childRec.Header().Get("Location") != "/my/onboarding" {
+		t.Fatalf("pending join child = %d %q, want 303 /my/onboarding", childRec.Code, childRec.Header().Get("Location"))
 	}
 }
 
@@ -160,7 +170,7 @@ func TestHandleOnboardingJoinSearchOmitsOrgAdminRole(t *testing.T) {
 	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
 	identity.listOrganizationsPageFunc = func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
 		if strings.TrimSpace(opts.Search) == "" {
-			t.Fatal("expected non-empty search")
+			t.Fatal("expected non-empty search for this test")
 		}
 		return IdentityOrgPage{
 			Organizations: []IdentityOrg{{ID: "team-1", Slug: "acme", Name: "Acme Org"}},
@@ -187,7 +197,241 @@ func TestHandleOnboardingJoinSearchOmitsOrgAdminRole(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=acme&org=acme", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=acme", nil)
+	listReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	listRec := httptest.NewRecorder()
+	server.handleMyRoutes(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d, want %d body=%q", listRec.Code, http.StatusOK, listRec.Body.String())
+	}
+	listBody := listRec.Body.String()
+	for _, want := range []string{
+		`class="breadcrumbs"`,
+		">Onboarding<",
+		`href="/my/onboarding"`,
+		"Acme Org",
+		`class="list-row"`,
+		`hx-get="/my/onboarding/join?org=acme&amp;q=acme"`,
+		`hx-target="#join-org-dialog-body"`,
+		`id="join-org-dialog"`,
+		`id="join-org-dialog-body"`,
+	} {
+		if !strings.Contains(listBody, want) {
+			t.Fatalf("expected %q in join list page, got:\n%s", want, listBody)
+		}
+	}
+	if strings.Contains(listBody, `<span class="muted">acme</span>`) {
+		t.Fatalf("join results must not show org slug, got:\n%s", listBody)
+	}
+
+	dialogReq := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=acme&org=acme", nil)
+	dialogReq.Header.Set("HX-Request", "true")
+	dialogReq.Header.Set("HX-Target", "join-org-dialog-body")
+	dialogReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	dialogRec := httptest.NewRecorder()
+	server.handleMyRoutes(dialogRec, dialogReq)
+	if dialogRec.Code != http.StatusOK {
+		t.Fatalf("dialog status = %d, want %d body=%q", dialogRec.Code, http.StatusOK, dialogRec.Body.String())
+	}
+	dialogBody := dialogRec.Body.String()
+	for _, want := range []string{
+		`data-join-dialog-card`,
+		`data-role-picker`,
+		`data-role-picker-option`,
+		`data-role-picker-require-selection`,
+		`data-role-picker-submit`,
+		`data-value="viewer"`,
+		`data-label="Viewer"`,
+		"Submit join request",
+		"Acme Org",
+	} {
+		if !strings.Contains(dialogBody, want) {
+			t.Fatalf("expected %q in join dialog partial, got:\n%s", want, dialogBody)
+		}
+	}
+	if strings.Contains(dialogBody, "Viewer (viewer)") {
+		t.Fatalf("join role picker must show pills, not name+slug, got:\n%s", dialogBody)
+	}
+	if strings.Contains(dialogBody, `data-value="org-admin"`) {
+		t.Fatalf("join role picker must omit org-admin, got:\n%s", dialogBody)
+	}
+	if strings.Contains(dialogBody, `type="checkbox" name="roles"`) {
+		t.Fatalf("expected roles-picker dialog, not inline checkboxes, got:\n%s", dialogBody)
+	}
+	if strings.Contains(dialogBody, "Join an organization") {
+		t.Fatalf("dialog partial must not include full page, got:\n%s", dialogBody)
+	}
+}
+
+func TestHandleOnboardingJoinSearchPagination(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-join-pagination"
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-page",
+		Email:          "pager@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	var sawOpts IdentityOrgListOptions
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.listOrganizationsPageFunc = func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+		sawOpts = opts
+		orgs := make([]IdentityOrg, 0, onboardingJoinSearchLimit)
+		for i := 0; i < onboardingJoinSearchLimit; i++ {
+			n := opts.Offset + i + 1
+			orgs = append(orgs, IdentityOrg{
+				ID:   "team-" + strconv.Itoa(n),
+				Slug: "org-" + strconv.Itoa(n),
+				Name: "Org " + strconv.Itoa(n),
+			})
+		}
+		return IdentityOrgPage{Organizations: orgs, Total: 25}, nil
+	}
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=org&page=2", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleMyRoutes(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if sawOpts.Search != "org" || sawOpts.Limit != onboardingJoinSearchLimit || sawOpts.Offset != onboardingJoinSearchLimit {
+		t.Fatalf("list opts = %+v, want search=org limit=%d offset=%d", sawOpts, onboardingJoinSearchLimit, onboardingJoinSearchLimit)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`aria-label="Organizations pagination"`,
+		`href="/my/onboarding/join?q=org"`,
+		`href="/my/onboarding/join?q=org&amp;page=3"`,
+		"Org 13",
+		`hx-get="/my/onboarding/join?org=org-13&amp;page=2&amp;q=org"`,
+		`hx-target="#join-org-dialog-body"`,
+		`class="empty-state"`,
+	} {
+		if want == `class="empty-state"` {
+			if strings.Contains(body, want) {
+				t.Fatalf("did not expect empty-state when results exist, got:\n%s", body)
+			}
+			continue
+		}
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in paginated join page, got:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, `>Select</a>`) {
+		t.Fatalf("expected whole-row links, not Select buttons, got:\n%s", body)
+	}
+}
+
+func TestHandleOnboardingJoinBrowseAllPagination(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-join-browse"
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-browse",
+		Email:          "browser@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	var sawOpts IdentityOrgListOptions
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.listOrganizationsPageFunc = func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+		sawOpts = opts
+		orgs := make([]IdentityOrg, 0, onboardingJoinSearchLimit)
+		for i := 0; i < onboardingJoinSearchLimit; i++ {
+			n := opts.Offset + i + 1
+			orgs = append(orgs, IdentityOrg{
+				ID:   "team-" + strconv.Itoa(n),
+				Slug: "org-" + strconv.Itoa(n),
+				Name: "Org " + strconv.Itoa(n),
+			})
+		}
+		return IdentityOrgPage{Organizations: orgs, Total: 25}, nil
+	}
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?page=2", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleMyRoutes(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if sawOpts.Search != "" || sawOpts.Limit != onboardingJoinSearchLimit || sawOpts.Offset != onboardingJoinSearchLimit {
+		t.Fatalf("list opts = %+v, want empty search limit=%d offset=%d", sawOpts, onboardingJoinSearchLimit, onboardingJoinSearchLimit)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="breadcrumbs"`,
+		">Onboarding<",
+		`href="/my/onboarding"`,
+		`aria-label="Organizations pagination"`,
+		`href="/my/onboarding/join"`,
+		`href="/my/onboarding/join?page=3"`,
+		"Org 13",
+		`hx-get="/my/onboarding/join?org=org-13&amp;page=2"`,
+		`hx-target="#join-org-dialog-body"`,
+		`hx-trigger="input changed delay:200ms, search"`,
+		`id="onboarding-join-results"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in browse-all join page, got:\n%s", want, body)
+		}
+	}
+}
+
+func TestHandleOnboardingJoinHTMXResultsPartial(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-join-htmx"
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-htmx",
+		Email:          "htmx@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.listOrganizationsPageFunc = func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+		return IdentityOrgPage{
+			Organizations: []IdentityOrg{{
+				ID:         "team-1",
+				Slug:       "acme",
+				Name:       "Acme Org",
+				LogoFileID: "logo-1",
+			}},
+			Total: 1,
+		}, nil
+	}
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=acme", nil)
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "onboarding-join-results")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
 	server.handleMyRoutes(rec, req)
@@ -197,17 +441,60 @@ func TestHandleOnboardingJoinSearchOmitsOrgAdminRole(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		"Find an organization",
+		`id="onboarding-join-results"`,
 		"Acme Org",
-		`name="roles" value="viewer"`,
-		"Submit join request",
+		`src="/organization/logo/acme"`,
+		`class="list-row"`,
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q in join page, got:\n%s", want, body)
+			t.Fatalf("expected %q in HTMX partial, got:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `name="roles" value="org-admin"`) {
-		t.Fatalf("join role picker must omit org-admin, got:\n%s", body)
+	if strings.Contains(body, "Join an organization") || strings.Contains(body, `id="join-org-search"`) {
+		t.Fatalf("HTMX results partial must not include full page chrome, got:\n%s", body)
+	}
+}
+
+func TestHandleOnboardingJoinSearchEmptyState(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-join-empty"
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-empty",
+		Email:          "empty@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.listOrganizationsPageFunc = func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+		return IdentityOrgPage{Organizations: nil, Total: 0}, nil
+	}
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=zzz", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleMyRoutes(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="empty-state"`,
+		`class="empty-state-title">No organizations match your search<`,
+		`class="empty-state-hint">Try a different name.<`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in empty join search, got:\n%s", want, body)
+		}
 	}
 }
 
