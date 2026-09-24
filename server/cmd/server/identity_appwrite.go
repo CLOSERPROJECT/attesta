@@ -87,11 +87,12 @@ func (a *appwriteIdentity) CreateAccount(ctx context.Context, email, password, n
 	if err := ctx.Err(); err != nil {
 		return IdentityUser{}, err
 	}
+	email = strings.TrimSpace(email)
 	user, err := account.New(a.sessionClient).Create(
 		id.Unique(),
-		strings.TrimSpace(email),
+		email,
 		password,
-		account.New(a.sessionClient).WithCreateName(strings.TrimSpace(name)),
+		account.New(a.sessionClient).WithCreateName(identityAccountDisplayName(email, name)),
 	)
 	if err != nil {
 		return IdentityUser{}, normalizeIdentityError(err)

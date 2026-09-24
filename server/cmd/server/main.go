@@ -378,6 +378,7 @@ type LoginView struct {
 type SignupView struct {
 	PageBase
 	Email string
+	Name  string
 	Error string
 }
 
@@ -2534,17 +2535,39 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+		name := strings.TrimSpace(r.FormValue("name"))
 		password := strings.TrimSpace(r.FormValue("password"))
+		if name == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
+				PageBase: s.pageBase("signup_body", "", ""),
+				Email:    email,
+				Name:     name,
+				Error:    "name is required",
+			})
+			return
+		}
+		if len(name) > 128 {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
+				PageBase: s.pageBase("signup_body", "", ""),
+				Email:    email,
+				Name:     name,
+				Error:    "name must be 128 characters or fewer",
+			})
+			return
+		}
 		if err := validatePassword(password); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
 				PageBase: s.pageBase("signup_body", "", ""),
 				Email:    email,
+				Name:     name,
 				Error:    err.Error(),
 			})
 			return
 		}
-		if _, err := s.identity.CreateAccount(r.Context(), email, password, ""); err != nil && !errors.Is(err, ErrIdentityUnauthorized) {
+		if _, err := s.identity.CreateAccount(r.Context(), email, password, name); err != nil && !errors.Is(err, ErrIdentityUnauthorized) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to create account for %s", email)
 			return
 		}

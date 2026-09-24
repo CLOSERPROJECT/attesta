@@ -916,7 +916,7 @@ func TestAppwriteIdentityCreateAccountAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAccount error: %v", err)
 	}
-	if createPath != "/v1/account" || createBody["email"] != "new@example.com" || createBody["password"] != "very-secure-password" {
+	if createPath != "/v1/account" || createBody["email"] != "new@example.com" || createBody["password"] != "very-secure-password" || createBody["name"] != "new" {
 		t.Fatalf("create account request = %q %#v", createPath, createBody)
 	}
 	if user.Email != "new@example.com" || user.ID != "user-1" {

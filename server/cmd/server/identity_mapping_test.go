@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestIdentityAccountDisplayName(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		email, name, want string
+	}{
+		{"giovanniabb@gmail.com", "", "giovanniabb"},
+		{"user@example.com", "Ada", "Ada"},
+		{"@example.com", "", "user"},
+		{"", "", "user"},
+		{"x@" + strings.Repeat("a", 200), strings.Repeat("n", 200), strings.Repeat("n", 128)},
+	}
+	for _, tc := range cases {
+		if got := identityAccountDisplayName(tc.email, tc.name); got != tc.want {
+			t.Fatalf("identityAccountDisplayName(%q, %q) = %q, want %q", tc.email, tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestIdentityRoleLabelsRoundTrip(t *testing.T) {
 	labels := []string{
 		identityOrgAdminLabel,

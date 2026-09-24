@@ -9,6 +9,16 @@
         <p class="u-text-danger">{{ .Error }}</p>
       {{ end }}
       <form method="post" action="/signup" class="input-form">
+        <label for="signup-name">Name</label>
+        <input
+          id="signup-name"
+          name="name"
+          type="text"
+          value="{{ .Name }}"
+          maxlength="128"
+          autocomplete="name"
+          required
+        />
         <label for="signup-email">Email</label>
         <input
           id="signup-email"
