@@ -56,7 +56,7 @@ func TestHandleOnboardingHubPendingOrgCreationAndWithdraw(t *testing.T) {
 	for _, want := range []string{
 		"Pending organization creation request",
 		"Fresh Co",
-		"fresh-co",
+		`id="undo-request-dialog"`,
 		`name="intent" value="withdraw"`,
 	} {
 		if !strings.Contains(body, want) {

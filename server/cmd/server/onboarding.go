@@ -176,16 +176,18 @@ func (s *Server) renderOnboardingHub(w http.ResponseWriter, r *http.Request, use
 		view.Pending = true
 		view.PendingKind = onboardingPendingKindJoin
 		view.PendingOrgSlug = joinPending.OrgSlug
-		view.PendingRoles = strings.Join(joinPending.RoleSlugs, ", ")
 		view.PendingCreated = humanReadableTraceabilityTime(joinPending.CreatedAt)
+		var orgRoles []IdentityRole
 		if s.identity != nil {
 			if org, orgErr := s.identity.GetOrganizationBySlug(r.Context(), joinPending.OrgSlug); orgErr == nil && org != nil {
 				view.PendingOrgName = strings.TrimSpace(org.Name)
+				orgRoles = org.Roles
 			}
 		}
 		if view.PendingOrgName == "" {
 			view.PendingOrgName = joinPending.OrgSlug
 		}
+		view.PendingRoles = roleLabelsForSlugs(orgRoles, joinPending.RoleSlugs)
 		if err := s.tmpl.ExecuteTemplate(w, "onboarding.html", view); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -563,6 +565,34 @@ func affiliationJoinDecideFormError(err error) string {
 		InvalidRoles:      "requested roles are no longer valid",
 		Default:           "failed to process join request",
 	})
+}
+
+func roleLabelsForSlugs(roles []IdentityRole, slugs []string) string {
+	bySlug := make(map[string]string, len(roles))
+	for _, role := range roles {
+		slug := strings.TrimSpace(role.Slug)
+		if slug == "" {
+			continue
+		}
+		name := strings.TrimSpace(role.Name)
+		if name == "" {
+			name = slug
+		}
+		bySlug[slug] = name
+	}
+	labels := make([]string, 0, len(slugs))
+	for _, slug := range slugs {
+		slug = strings.TrimSpace(slug)
+		if slug == "" {
+			continue
+		}
+		if label, ok := bySlug[slug]; ok {
+			labels = append(labels, label)
+		} else {
+			labels = append(labels, slug)
+		}
+	}
+	return strings.Join(labels, ", ")
 }
 
 func isAppHomePath(path string) bool {

@@ -109,7 +109,14 @@ func TestHandleOnboardingHubPendingAndWithdraw(t *testing.T) {
 		if strings.TrimSpace(slug) != "acme" {
 			return nil, ErrIdentityNotFound
 		}
-		return &IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"}, nil
+		return &IdentityOrg{
+			ID:   "team-1",
+			Slug: "acme",
+			Name: "Acme Org",
+			Roles: []IdentityRole{
+				{Slug: "viewer", Name: "Viewer"},
+			},
+		}, nil
 	}
 	server := &Server{
 		identity:    identity,
@@ -144,10 +151,11 @@ func TestHandleOnboardingHubPendingAndWithdraw(t *testing.T) {
 	for _, want := range []string{
 		"Pending join request",
 		"Acme Org",
-		"acme",
-		"viewer",
+		"Viewer",
+		`id="undo-request-dialog"`,
+		`onclick="document.getElementById('undo-request-dialog').showModal()"`,
 		`name="intent" value="withdraw"`,
-		"Undo",
+		"Undo request",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in pending hub, got:\n%s", want, body)

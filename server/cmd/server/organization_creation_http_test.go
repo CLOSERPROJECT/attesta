@@ -56,8 +56,8 @@ func TestHandleOnboardingRequestOrganizationSubmitAndPending(t *testing.T) {
 	for _, want := range []string{
 		"Pending organization creation request",
 		"Fresh Org",
-		"fresh-org",
-		"Undo",
+		`id="undo-request-dialog"`,
+		"Undo request",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in pending hub, got:\n%s", want, body)

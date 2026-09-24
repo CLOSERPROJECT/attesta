@@ -94,9 +94,9 @@ func TestHandleOnboardingJoinSubmitAndPending(t *testing.T) {
 	for _, want := range []string{
 		"Pending join request",
 		"Acme Org",
-		"acme",
-		"viewer, editor",
-		"Undo",
+		"Viewer, Editor",
+		`id="undo-request-dialog"`,
+		"Undo request",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in pending hub, got:\n%s", want, body)

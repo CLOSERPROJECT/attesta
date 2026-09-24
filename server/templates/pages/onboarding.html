@@ -1,81 +1,133 @@
-{{/* Used on /my/onboarding for unaffiliated account setup. */}}
-
-{{ define "onboarding_body" }}
+{{/* Used on /my/onboarding for unaffiliated account setup. */}} {{ define
+"onboarding_body" }}
 <section class="stack u-max-w-prose u-mx-auto">
   <section class="page-header">
     <div class="page-header-head">
       <div class="page-header-body">
         <h1>Get started</h1>
         {{ if .Pending }}
-          <p>Your request is pending review. You can undo it to choose a different path.</p>
+        <p>
+          Your request is pending review. You can undo it to choose a different
+          path.
+        </p>
         {{ else }}
-          <p>Join an existing organization or request a new one before you can use streams.</p>
+        <p>
+          Join an existing organization or request a new one before you can use
+          streams.
+        </p>
         {{ end }}
       </div>
     </div>
   </section>
 
   {{ if .Pending }}
-    <section class="panel">
-      <div class="panel-heading">
+  <section class="onboarding-pending">
+    <div class="panel-heading onboarding-pending-heading">
+      {{ template "icon-clock" . }}
+      <div class="onboarding-pending-heading-copy">
         {{ if eq .PendingKind "join" }}
-          <h2>Pending join request</h2>
-          <p>Waiting for organization admin review.</p>
+        <h2>Pending join request</h2>
+        <p>Waiting for organization admin review.</p>
         {{ else }}
-          <h2>Pending organization creation request</h2>
-          <p>Waiting for platform admin review.</p>
+        <h2>Pending organization creation request</h2>
+        <p>Waiting for platform admin review.</p>
         {{ end }}
       </div>
-      <dl class="stack">
-        {{ if eq .PendingKind "join" }}
-          <div>
-            <dt class="muted">Organization</dt>
-            <dd>{{ .PendingOrgName }}</dd>
-          </div>
-          <div>
-            <dt class="muted">Slug</dt>
-            <dd>{{ .PendingOrgSlug }}</dd>
-          </div>
-          {{ if .PendingRoles }}
-            <div>
-              <dt class="muted">Requested roles</dt>
-              <dd>{{ .PendingRoles }}</dd>
-            </div>
-          {{ end }}
-        {{ else }}
-          <div>
-            <dt class="muted">Organization name</dt>
-            <dd>{{ .PendingName }}</dd>
-          </div>
-          <div>
-            <dt class="muted">Proposed slug</dt>
-            <dd>{{ .PendingSlug }}</dd>
-          </div>
-        {{ end }}
-        {{ if .PendingCreated }}
-          <div>
-            <dt class="muted">Submitted</dt>
-            <dd>{{ .PendingCreated }}</dd>
-          </div>
-        {{ end }}
-      </dl>
-      {{ if .FormError }}
-        <p class="error">{{ .FormError }}</p>
-      {{ end }}
-      <form method="post" action="{{ .WithdrawActionHref }}" class="input-form">
-        <input type="hidden" name="intent" value="withdraw" />
-        <button class="btn btn-secondary" type="submit">Undo</button>
-      </form>
-    </section>
-  {{ else }}
-    <div class="stack">
-      <a class="btn btn-primary" href="{{ .JoinHref }}">Join an organization</a>
-      <a class="btn btn-secondary" href="{{ .RequestOrgHref }}">Request a new organization</a>
     </div>
+    <hr />
+    <dl class="onboarding-pending-meta">
+      {{ if eq .PendingKind "join" }}
+      <div>
+        <dt>Organization</dt>
+        <dd>{{ .PendingOrgName }}</dd>
+      </div>
+      {{ if .PendingRoles }}
+      <div>
+        <dt>Requested roles</dt>
+        <dd>{{ .PendingRoles }}</dd>
+      </div>
+      {{ end }} {{ else }}
+      <div>
+        <dt>Organization name</dt>
+        <dd>{{ .PendingName }}</dd>
+      </div>
+      {{ end }} {{ if .PendingCreated }}
+      <div>
+        <dt>Submitted</dt>
+        <dd>{{ .PendingCreated }}</dd>
+      </div>
+      {{ end }}
+    </dl>
+    {{ if .FormError }}
+    <p class="error">{{ .FormError }}</p>
+    {{ end }}
+    <div class="onboarding-pending-actions">
+      <button
+        type="button"
+        class="btn btn-ghost-danger"
+        onclick="document.getElementById('undo-request-dialog').showModal()"
+      >
+        {{ template "icon-undo" . }} Undo request
+      </button>
+    </div>
+    <dialog id="undo-request-dialog" class="dialog">
+      <div class="dialog-card">
+        <header class="dialog-head">
+          <div>
+            <h3 class="dialog-title u-text-danger">Undo request</h3>
+            <p class="dialog-subtitle">
+              {{ if eq .PendingKind "join" }}{{ .PendingOrgName }}{{ else }}{{ .PendingName }}{{ end }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost btn-icon dialog-close"
+            onclick="document.getElementById('undo-request-dialog').close()"
+          >
+            {{ template "icon-close" . }}
+          </button>
+        </header>
+        <p class="u-m-0 u-mb-5">
+          {{ if eq .PendingKind "join" }}
+            This withdraws your join request. You can request to join again
+            later.
+          {{ else }}
+            This withdraws your organization creation request. You can submit a
+            new one later.
+          {{ end }}
+        </p>
+        <form
+          method="post"
+          action="{{ .WithdrawActionHref }}"
+          class="input-form"
+        >
+          <input type="hidden" name="intent" value="withdraw" />
+          <div class="dialog-actions">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              onclick="document.getElementById('undo-request-dialog').close()"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-danger">
+              {{ template "icon-undo" . }} Undo request
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  </section>
+  {{ else }}
+  <div class="onboarding-actions">
+    <a class="btn btn-lg btn-primary" href="{{ .JoinHref }}"
+      >Join an organization</a
+    >
+    <a class="btn btn-lg btn-secondary" href="{{ .RequestOrgHref }}"
+      >Request a new organization</a
+    >
+  </div>
   {{ end }}
 </section>
-{{ end }}
-
-{{ define "onboarding.html" }}
-  {{ template "layout.html" . }}
-{{ end }}
+{{ end }} {{ define "onboarding.html" }} {{ template "layout.html" . }} {{ end
+}}
