@@ -299,59 +299,69 @@ func joinRequestCatalogRoles(org IdentityOrg) []Role {
 	return out
 }
 
-func affiliationJoinRequestFormError(err error) string {
+type affiliationFormErrorMessages struct {
+	AlreadyAffiliated      string
+	PendingExists          string
+	NotFound               string
+	NotPending             string
+	InvalidRoles           string
+	InvalidName            string
+	OrganizationSlugExists string
+	Default                string
+}
+
+func mapAffiliationFormError(err error, messages affiliationFormErrorMessages) string {
 	switch {
 	case err == nil:
 		return ""
-	case errors.Is(err, ErrAffiliationAlreadyAffiliated):
-		return "you already belong to an organization"
-	case errors.Is(err, ErrAffiliationPendingExists):
-		return "you already have a pending affiliation request"
-	case errors.Is(err, ErrAffiliationNotFound):
-		return "organization not found"
-	case errors.Is(err, ErrAffiliationInvalidRoles):
-		return "select one or more roles from the organization catalog"
-	case errors.Is(err, ErrAffiliationNotPending):
-		return "join request is not pending"
+	case messages.AlreadyAffiliated != "" && errors.Is(err, ErrAffiliationAlreadyAffiliated):
+		return messages.AlreadyAffiliated
+	case messages.PendingExists != "" && errors.Is(err, ErrAffiliationPendingExists):
+		return messages.PendingExists
+	case messages.NotFound != "" && errors.Is(err, ErrAffiliationNotFound):
+		return messages.NotFound
+	case messages.NotPending != "" && errors.Is(err, ErrAffiliationNotPending):
+		return messages.NotPending
+	case messages.InvalidRoles != "" && errors.Is(err, ErrAffiliationInvalidRoles):
+		return messages.InvalidRoles
+	case messages.InvalidName != "" && errors.Is(err, ErrAffiliationInvalidName):
+		return messages.InvalidName
+	case messages.OrganizationSlugExists != "" && errors.Is(err, ErrAffiliationOrganizationSlugExists):
+		return messages.OrganizationSlugExists
 	default:
-		return "failed to process join request"
+		return messages.Default
 	}
+}
+
+func affiliationJoinRequestFormError(err error) string {
+	return mapAffiliationFormError(err, affiliationFormErrorMessages{
+		AlreadyAffiliated: "you already belong to an organization",
+		PendingExists:     "you already have a pending affiliation request",
+		NotFound:          "organization not found",
+		NotPending:        "join request is not pending",
+		InvalidRoles:      "select one or more roles from the organization catalog",
+		Default:           "failed to process join request",
+	})
 }
 
 func affiliationOrganizationCreationFormError(err error) string {
-	switch {
-	case err == nil:
-		return ""
-	case errors.Is(err, ErrAffiliationInvalidName):
-		return "organization name is required"
-	case errors.Is(err, ErrAffiliationAlreadyAffiliated):
-		return "you already belong to an organization"
-	case errors.Is(err, ErrAffiliationPendingExists):
-		return "you already have a pending affiliation request"
-	case errors.Is(err, ErrAffiliationOrganizationSlugExists):
-		return "organization slug already exists"
-	case errors.Is(err, ErrAffiliationNotFound):
-		return "organization creation request not found"
-	case errors.Is(err, ErrAffiliationNotPending):
-		return "organization creation request is not pending"
-	default:
-		return "failed to process organization creation request"
-	}
+	return mapAffiliationFormError(err, affiliationFormErrorMessages{
+		AlreadyAffiliated:      "you already belong to an organization",
+		PendingExists:          "you already have a pending affiliation request",
+		NotFound:               "organization creation request not found",
+		NotPending:             "organization creation request is not pending",
+		InvalidName:            "organization name is required",
+		OrganizationSlugExists: "organization slug already exists",
+		Default:                "failed to process organization creation request",
+	})
 }
 
 func affiliationJoinDecideFormError(err error) string {
-	switch {
-	case err == nil:
-		return ""
-	case errors.Is(err, ErrAffiliationNotFound):
-		return "join request not found"
-	case errors.Is(err, ErrAffiliationNotPending):
-		return "join request is not pending"
-	case errors.Is(err, ErrAffiliationAlreadyAffiliated):
-		return "requester already belongs to an organization"
-	case errors.Is(err, ErrAffiliationInvalidRoles):
-		return "requested roles are no longer valid"
-	default:
-		return "failed to process join request"
-	}
+	return mapAffiliationFormError(err, affiliationFormErrorMessages{
+		AlreadyAffiliated: "requester already belongs to an organization",
+		NotFound:          "join request not found",
+		NotPending:        "join request is not pending",
+		InvalidRoles:      "requested roles are no longer valid",
+		Default:           "failed to process join request",
+	})
 }

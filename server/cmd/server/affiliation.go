@@ -187,14 +187,6 @@ func (a *Affiliation) HasPendingAffiliationIntent(ctx context.Context, userID st
 	return orgReq != nil, nil
 }
 
-func (a *Affiliation) SaveJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error) {
-	return a.store.InsertJoinRequest(ctx, req)
-}
-
-func (a *Affiliation) LoadJoinRequestByID(ctx context.Context, id primitive.ObjectID) (*JoinRequest, error) {
-	return a.store.LoadJoinRequestByID(ctx, id)
-}
-
 func (a *Affiliation) SubmitJoinRequest(ctx context.Context, user IdentityUser, orgSlug string, roleSlugs []string) (JoinRequest, error) {
 	orgSlug = strings.TrimSpace(orgSlug)
 	if orgSlug == "" {
@@ -220,7 +212,7 @@ func (a *Affiliation) SubmitJoinRequest(ctx context.Context, user IdentityUser, 
 		return JoinRequest{}, err
 	}
 
-	saved, err := a.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := a.store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: strings.TrimSpace(user.ID),
 		RequesterEmail:  strings.TrimSpace(user.Email),
 		OrgSlug:         org.Slug,
@@ -348,14 +340,6 @@ func (a *Affiliation) RejectJoinRequest(ctx context.Context, requestID primitive
 	return updated, nil
 }
 
-func (a *Affiliation) SaveOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error) {
-	return a.store.InsertOrganizationCreationRequest(ctx, req)
-}
-
-func (a *Affiliation) LoadOrganizationCreationRequestByID(ctx context.Context, id primitive.ObjectID) (*OrganizationCreationRequest, error) {
-	return a.store.LoadOrganizationCreationRequestByID(ctx, id)
-}
-
 func (a *Affiliation) SubmitOrganizationCreationRequest(ctx context.Context, user IdentityUser, name string) (OrganizationCreationRequest, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -379,7 +363,7 @@ func (a *Affiliation) SubmitOrganizationCreationRequest(ctx context.Context, use
 		return OrganizationCreationRequest{}, err
 	}
 
-	saved, err := a.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := a.store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: strings.TrimSpace(user.ID),
 		RequesterEmail:  strings.TrimSpace(user.Email),
 		ProposedName:    name,

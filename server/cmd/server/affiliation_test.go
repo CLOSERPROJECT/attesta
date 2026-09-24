@@ -58,14 +58,14 @@ func TestAffiliationJoinRequestRoundTrip(t *testing.T) {
 	store := NewMemoryStore()
 	aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, time.Now)
 
-	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "user@example.com",
 		OrgSlug:         "acme",
 		RoleSlugs:       []string{"viewer", "editor"},
 	})
 	if err != nil {
-		t.Fatalf("SaveJoinRequest: %v", err)
+		t.Fatalf("InsertJoinRequest: %v", err)
 	}
 	if saved.ID.IsZero() {
 		t.Fatal("expected assigned ID")
@@ -77,7 +77,7 @@ func TestAffiliationJoinRequestRoundTrip(t *testing.T) {
 		t.Fatal("expected created/updated timestamps")
 	}
 
-	loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+	loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 	if err != nil {
 		t.Fatalf("LoadJoinRequestByID: %v", err)
 	}
@@ -124,20 +124,20 @@ func TestAffiliationOrganizationCreationRequestRoundTrip(t *testing.T) {
 	store := NewMemoryStore()
 	aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, time.Now)
 
-	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-2",
 		RequesterEmail:  "founder@example.com",
 		ProposedName:    "New Org",
 		ProposedSlug:    "new-org",
 	})
 	if err != nil {
-		t.Fatalf("SaveOrganizationCreationRequest: %v", err)
+		t.Fatalf("InsertOrganizationCreationRequest: %v", err)
 	}
 	if saved.ID.IsZero() || saved.Status != AffiliationStatusPending {
 		t.Fatalf("saved=%+v", saved)
 	}
 
-	loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+	loaded, err := store.LoadOrganizationCreationRequestByID(ctx, saved.ID)
 	if err != nil || loaded == nil || loaded.ProposedSlug != "new-org" {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
 	}
@@ -217,13 +217,13 @@ func TestServerAffiliationServiceSmoke(t *testing.T) {
 	}
 
 	// Ensure Store round-trip works through the wired service.
-	saved, err := aff.SaveJoinRequest(context.Background(), JoinRequest{
+	saved, err := store.InsertJoinRequest(context.Background(), JoinRequest{
 		RequesterUserID: "u",
 		RequesterEmail:  "u@example.com",
 		OrgSlug:         "acme",
 	})
 	if err != nil || saved.ID == (primitive.ObjectID{}) {
-		t.Fatalf("SaveJoinRequest via server service: saved=%+v err=%v", saved, err)
+		t.Fatalf("InsertJoinRequest via store: saved=%+v err=%v", saved, err)
 	}
 }
 
@@ -304,12 +304,12 @@ func TestSubmitOrganizationCreationRequestInvariants(t *testing.T) {
 	t.Run("pending join exists", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
-		if _, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		if _, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "u",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
 		}); err != nil {
-			t.Fatalf("SaveJoinRequest: %v", err)
+			t.Fatalf("InsertJoinRequest: %v", err)
 		}
 		_, err := aff.SubmitOrganizationCreationRequest(ctx, IdentityUser{ID: "u", Email: "u@example.com"}, "New Org")
 		if !errors.Is(err, ErrAffiliationPendingExists) {
@@ -397,7 +397,7 @@ func TestApproveOrganizationCreationRequestHappyPath(t *testing.T) {
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
 
-	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "founder@example.com",
 		ProposedName:    "New Org",
@@ -457,7 +457,7 @@ func TestApproveOrganizationCreationRequestInvariants(t *testing.T) {
 	t.Run("not pending", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			ProposedName:    "New Org",
@@ -484,7 +484,7 @@ func TestApproveOrganizationCreationRequestInvariants(t *testing.T) {
 			},
 		}
 		aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			ProposedName:    "New Org",
@@ -497,7 +497,7 @@ func TestApproveOrganizationCreationRequestInvariants(t *testing.T) {
 		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
 			t.Fatalf("err=%v", err)
 		}
-		loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+		loaded, err := store.LoadOrganizationCreationRequestByID(ctx, saved.ID)
 		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 			t.Fatalf("loaded=%+v err=%v", loaded, err)
 		}
@@ -517,7 +517,7 @@ func TestApproveOrganizationCreationRequestInvariants(t *testing.T) {
 			},
 		}
 		aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			ProposedName:    "New Org",
@@ -561,7 +561,7 @@ func TestApproveOrganizationCreationRequestMailFailureDoesNotFailCommand(t *test
 		},
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
-	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "founder@example.com",
 		ProposedName:    "New Org",
@@ -642,7 +642,7 @@ func TestRejectOrganizationCreationRequestInvariants(t *testing.T) {
 	t.Run("not pending", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			ProposedName:    "New Org",
@@ -667,7 +667,7 @@ func TestRejectOrganizationCreationRequestMailFailureDoesNotFailCommand(t *testi
 	store := NewMemoryStore()
 	mailer := &recordingMailer{err: errors.New("smtp down")}
 	aff := NewAffiliation(&fakeIdentityStore{}, store, mailer, fixedNow)
-	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "founder@example.com",
 		ProposedName:    "New Org",
@@ -690,7 +690,7 @@ func TestListPendingOrganizationCreationRequestsFiltersNonPending(t *testing.T) 
 	store := NewMemoryStore()
 	aff := NewAffiliation(&fakeIdentityStore{}, store, &recordingMailer{}, fixedNow)
 
-	pendingReq, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	pendingReq, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "a@example.com",
 		ProposedName:    "Pending Org",
@@ -699,7 +699,7 @@ func TestListPendingOrganizationCreationRequestsFiltersNonPending(t *testing.T) 
 	if err != nil {
 		t.Fatalf("seed pending: %v", err)
 	}
-	rejected, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	rejected, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-2",
 		RequesterEmail:  "b@example.com",
 		ProposedName:    "Rejected Org",
@@ -782,7 +782,7 @@ func TestSubmitJoinRequestInvariants(t *testing.T) {
 	t.Run("pending create exists", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
-		if _, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		if _, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 			RequesterUserID: "u",
 			RequesterEmail:  "u@example.com",
 			ProposedName:    "New Org",
@@ -888,7 +888,7 @@ func TestApproveJoinRequestHappyPath(t *testing.T) {
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
 
-	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "joiner@example.com",
 		OrgSlug:         "acme",
@@ -959,7 +959,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 	t.Run("not pending", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
@@ -981,7 +981,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 	t.Run("decider org mismatch", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
@@ -994,7 +994,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 		if !errors.Is(err, ErrAffiliationNotFound) {
 			t.Fatalf("err=%v", err)
 		}
-		loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+		loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 			t.Fatalf("loaded=%+v err=%v", loaded, err)
 		}
@@ -1006,7 +1006,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 			"user-1": {ID: "user-1", Email: "u@example.com", OrgSlug: "other"},
 		}
 		aff := NewAffiliation(joinRequestTestIdentity(users), store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
@@ -1019,7 +1019,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
 			t.Fatalf("err=%v", err)
 		}
-		loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+		loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 			t.Fatalf("loaded=%+v err=%v", loaded, err)
 		}
@@ -1046,7 +1046,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 			}, nil
 		}
 		aff := NewAffiliation(identity, store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
@@ -1059,7 +1059,7 @@ func TestApproveJoinRequestInvariants(t *testing.T) {
 		if !errors.Is(err, ErrAffiliationInvalidRoles) {
 			t.Fatalf("err=%v", err)
 		}
-		loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+		loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 		if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 			t.Fatalf("loaded=%+v err=%v", loaded, err)
 		}
@@ -1084,7 +1084,7 @@ func TestApproveJoinRequestMailFailureDoesNotFailCommand(t *testing.T) {
 		return user, nil
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
-	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "joiner@example.com",
 		OrgSlug:         "acme",
@@ -1162,7 +1162,7 @@ func TestRejectJoinRequestInvariants(t *testing.T) {
 	t.Run("not pending", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
@@ -1184,7 +1184,7 @@ func TestRejectJoinRequestInvariants(t *testing.T) {
 	t.Run("decider org mismatch", func(t *testing.T) {
 		store := NewMemoryStore()
 		aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
-		saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+		saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 			RequesterUserID: "user-1",
 			RequesterEmail:  "u@example.com",
 			OrgSlug:         "acme",
@@ -1205,7 +1205,7 @@ func TestRejectJoinRequestMailFailureDoesNotFailCommand(t *testing.T) {
 	store := NewMemoryStore()
 	mailer := &recordingMailer{err: errors.New("smtp down")}
 	aff := NewAffiliation(joinRequestTestIdentity(nil), store, mailer, fixedNow)
-	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "joiner@example.com",
 		OrgSlug:         "acme",
@@ -1228,7 +1228,7 @@ func TestListPendingJoinRequestsFiltersNonPending(t *testing.T) {
 	store := NewMemoryStore()
 	aff := NewAffiliation(joinRequestTestIdentity(nil), store, &recordingMailer{}, fixedNow)
 
-	pendingReq, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	pendingReq, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "a@example.com",
 		OrgSlug:         "acme",
@@ -1237,7 +1237,7 @@ func TestListPendingJoinRequestsFiltersNonPending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed pending: %v", err)
 	}
-	rejected, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	rejected, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-2",
 		RequesterEmail:  "b@example.com",
 		OrgSlug:         "acme",
@@ -1250,7 +1250,7 @@ func TestListPendingJoinRequestsFiltersNonPending(t *testing.T) {
 	if _, err := store.UpdateJoinRequest(ctx, rejected); err != nil {
 		t.Fatalf("mark rejected: %v", err)
 	}
-	if _, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	if _, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-3",
 		RequesterEmail:  "c@example.com",
 		OrgSlug:         "other",
@@ -1582,7 +1582,7 @@ func TestApproveJoinRequestCompensatesWhenIdentityFails(t *testing.T) {
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
 
-	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "joiner@example.com",
 		OrgSlug:         "acme",
@@ -1600,7 +1600,7 @@ func TestApproveJoinRequestCompensatesWhenIdentityFails(t *testing.T) {
 	if len(calls) != 1 || calls[0] != "add" {
 		t.Fatalf("calls=%v", calls)
 	}
-	loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+	loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
 	}
@@ -1633,7 +1633,7 @@ func TestApproveJoinRequestCompensatesWhenStampLabelsFails(t *testing.T) {
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
 
-	saved, err := aff.SaveJoinRequest(ctx, JoinRequest{
+	saved, err := store.InsertJoinRequest(ctx, JoinRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "joiner@example.com",
 		OrgSlug:         "acme",
@@ -1650,7 +1650,7 @@ func TestApproveJoinRequestCompensatesWhenStampLabelsFails(t *testing.T) {
 	if !added || len(calls) != 2 || calls[0] != "add" || calls[1] != "labels" {
 		t.Fatalf("calls=%v added=%v", calls, added)
 	}
-	loaded, err := aff.LoadJoinRequestByID(ctx, saved.ID)
+	loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
 	}
@@ -1693,7 +1693,7 @@ func TestApproveOrganizationCreationRequestCompensatesWhenCreateOrgFails(t *test
 		},
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
-	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "founder@example.com",
 		ProposedName:    "New Org",
@@ -1711,7 +1711,7 @@ func TestApproveOrganizationCreationRequestCompensatesWhenCreateOrgFails(t *test
 	if len(calls) != 1 || calls[0] != "create" {
 		t.Fatalf("calls=%v", calls)
 	}
-	loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+	loaded, err := store.LoadOrganizationCreationRequestByID(ctx, saved.ID)
 	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
 	}
@@ -1755,7 +1755,7 @@ func TestApproveOrganizationCreationRequestCompensatesWhenAddMembershipFails(t *
 		},
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
-	saved, err := aff.SaveOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+	saved, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
 		RequesterUserID: "user-1",
 		RequesterEmail:  "founder@example.com",
 		ProposedName:    "New Org",
@@ -1775,7 +1775,7 @@ func TestApproveOrganizationCreationRequestCompensatesWhenAddMembershipFails(t *
 	if deletedSlug != "new-org" {
 		t.Fatalf("deletedSlug=%q", deletedSlug)
 	}
-	loaded, err := aff.LoadOrganizationCreationRequestByID(ctx, saved.ID)
+	loaded, err := store.LoadOrganizationCreationRequestByID(ctx, saved.ID)
 	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
 	}
