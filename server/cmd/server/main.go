@@ -764,6 +764,7 @@ func main() {
 		viteDevServer:  strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 		enforceAuth:    true,
 		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
+		mailer:         newMailerFromEnv(),
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
 	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
