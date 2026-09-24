@@ -279,12 +279,13 @@ func (a *Affiliation) ApproveJoinRequest(ctx context.Context, requestID primitiv
 		return JoinRequest{}, err
 	}
 
-	if _, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, roles, false); err != nil {
+	membership, err := a.identity.AddOrganizationUserByIDAsAdmin(ctx, org.Slug, req.RequesterUserID, roles, false)
+	if err != nil {
 		_ = a.compensateJoinRequestToPending(ctx, updated)
 		return JoinRequest{}, err
 	}
 	if err := a.stampJoinRequestRoleLabels(ctx, req.RequesterUserID, roles); err != nil {
-		_ = a.compensateJoinRequestToPending(ctx, updated)
+		a.compensateJoinRequestAfterIdentity(ctx, updated, org.Slug, membership.ID)
 		return JoinRequest{}, err
 	}
 
@@ -494,25 +495,25 @@ func (a *Affiliation) RejectOrganizationCreationRequest(ctx context.Context, req
 }
 
 func (a *Affiliation) compensateJoinRequestToPending(ctx context.Context, req JoinRequest) error {
-	now := a.now().UTC()
-	req.Status = AffiliationStatusPending
-	req.RejectReason = ""
-	req.DecidedByUserID = ""
-	req.DecidedAt = time.Time{}
-	req.UpdatedAt = now
+	req.Status, req.RejectReason, req.DecidedByUserID, req.DecidedAt, req.UpdatedAt = clearAffiliationDecision(a.now().UTC())
 	_, err := a.store.UpdateJoinRequest(ctx, req)
 	return err
 }
 
 func (a *Affiliation) compensateOrganizationCreationRequestToPending(ctx context.Context, req OrganizationCreationRequest) error {
-	now := a.now().UTC()
-	req.Status = AffiliationStatusPending
-	req.RejectReason = ""
-	req.DecidedByUserID = ""
-	req.DecidedAt = time.Time{}
-	req.UpdatedAt = now
+	req.Status, req.RejectReason, req.DecidedByUserID, req.DecidedAt, req.UpdatedAt = clearAffiliationDecision(a.now().UTC())
 	_, err := a.store.UpdateOrganizationCreationRequest(ctx, req)
 	return err
+}
+
+// compensateJoinRequestAfterIdentity best-effort deletes the membership created during approve
+// (when membershipID is set), then reverts the request to pending. If delete fails, status is
+// still reverted so the request can be retried after manual cleanup.
+func (a *Affiliation) compensateJoinRequestAfterIdentity(ctx context.Context, req JoinRequest, orgSlug, membershipID string) {
+	if id := strings.TrimSpace(membershipID); id != "" {
+		_ = a.identity.DeleteOrganizationMembershipAsAdmin(ctx, strings.TrimSpace(orgSlug), id)
+	}
+	_ = a.compensateJoinRequestToPending(ctx, req)
 }
 
 // compensateOrganizationCreationAfterIdentity reverts the request to pending and best-effort
@@ -525,34 +526,46 @@ func (a *Affiliation) compensateOrganizationCreationAfterIdentity(ctx context.Co
 	}
 }
 
+func clearAffiliationDecision(now time.Time) (status AffiliationRequestStatus, rejectReason, decidedByUserID string, decidedAt, updatedAt time.Time) {
+	return AffiliationStatusPending, "", "", time.Time{}, now
+}
+
+func mapPendingAffiliationLoad(err error, found bool, status AffiliationRequestStatus) error {
+	switch {
+	case err == nil && found:
+		if status != AffiliationStatusPending {
+			return ErrAffiliationNotPending
+		}
+		return nil
+	case errors.Is(err, mongo.ErrNoDocuments), err == nil && !found:
+		return ErrAffiliationNotFound
+	default:
+		return err
+	}
+}
+
 func (a *Affiliation) loadPendingOrganizationCreationRequest(ctx context.Context, requestID primitive.ObjectID) (OrganizationCreationRequest, error) {
 	req, err := a.store.LoadOrganizationCreationRequestByID(ctx, requestID)
-	switch {
-	case err == nil && req != nil:
-		if req.Status != AffiliationStatusPending {
-			return OrganizationCreationRequest{}, ErrAffiliationNotPending
-		}
-		return *req, nil
-	case errors.Is(err, mongo.ErrNoDocuments), err == nil && req == nil:
-		return OrganizationCreationRequest{}, ErrAffiliationNotFound
-	default:
-		return OrganizationCreationRequest{}, err
+	var status AffiliationRequestStatus
+	if req != nil {
+		status = req.Status
 	}
+	if mapErr := mapPendingAffiliationLoad(err, req != nil, status); mapErr != nil {
+		return OrganizationCreationRequest{}, mapErr
+	}
+	return *req, nil
 }
 
 func (a *Affiliation) loadPendingJoinRequest(ctx context.Context, requestID primitive.ObjectID) (JoinRequest, error) {
 	req, err := a.store.LoadJoinRequestByID(ctx, requestID)
-	switch {
-	case err == nil && req != nil:
-		if req.Status != AffiliationStatusPending {
-			return JoinRequest{}, ErrAffiliationNotPending
-		}
-		return *req, nil
-	case errors.Is(err, mongo.ErrNoDocuments), err == nil && req == nil:
-		return JoinRequest{}, ErrAffiliationNotFound
-	default:
-		return JoinRequest{}, err
+	var status AffiliationRequestStatus
+	if req != nil {
+		status = req.Status
 	}
+	if mapErr := mapPendingAffiliationLoad(err, req != nil, status); mapErr != nil {
+		return JoinRequest{}, mapErr
+	}
+	return *req, nil
 }
 
 func (a *Affiliation) loadOrganizationBySlug(ctx context.Context, slug string) (IdentityOrg, error) {

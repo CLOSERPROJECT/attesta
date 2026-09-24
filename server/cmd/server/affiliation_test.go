@@ -1621,15 +1621,20 @@ func TestApproveJoinRequestCompensatesWhenStampLabelsFails(t *testing.T) {
 	}
 	identity := joinRequestTestIdentity(users)
 	var calls []string
-	var added bool
+	var deletedOrgSlug, deletedMembershipID string
 	identity.addOrganizationUserByIDAsAdminFunc = func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
 		calls = append(calls, "add")
-		added = true
 		return IdentityMembership{ID: "mem-1", UserID: userID, RoleSlugs: roleSlugs}, nil
 	}
 	identity.updateUserLabelsFunc = func(_ context.Context, _ string, _ []string) (IdentityUser, error) {
 		calls = append(calls, "labels")
 		return IdentityUser{}, errors.New("stamp labels failed")
+	}
+	identity.deleteOrganizationMembershipAsAdminFunc = func(_ context.Context, orgSlug, membershipID string) error {
+		calls = append(calls, "delete")
+		deletedOrgSlug = orgSlug
+		deletedMembershipID = membershipID
+		return nil
 	}
 	aff := NewAffiliation(identity, store, mailer, fixedNow)
 
@@ -1647,12 +1652,18 @@ func TestApproveJoinRequestCompensatesWhenStampLabelsFails(t *testing.T) {
 	if err == nil || err.Error() != "stamp labels failed" {
 		t.Fatalf("err=%v", err)
 	}
-	if !added || len(calls) != 2 || calls[0] != "add" || calls[1] != "labels" {
-		t.Fatalf("calls=%v added=%v", calls, added)
+	if len(calls) != 3 || calls[0] != "add" || calls[1] != "labels" || calls[2] != "delete" {
+		t.Fatalf("calls=%v", calls)
+	}
+	if deletedOrgSlug != "acme" || deletedMembershipID != "mem-1" {
+		t.Fatalf("delete args org=%q membership=%q", deletedOrgSlug, deletedMembershipID)
 	}
 	loaded, err := store.LoadJoinRequestByID(ctx, saved.ID)
 	if err != nil || loaded == nil || loaded.Status != AffiliationStatusPending {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
+	}
+	if loaded.DecidedByUserID != "" || !loaded.DecidedAt.IsZero() || loaded.RejectReason != "" {
+		t.Fatalf("decided fields not cleared: %+v", loaded)
 	}
 	if len(mailer.Messages()) != 0 {
 		t.Fatalf("mail must not send after identity failure: %+v", mailer.Messages())

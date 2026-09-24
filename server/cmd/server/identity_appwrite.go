@@ -668,6 +668,18 @@ func (a *appwriteIdentity) DeleteOrganizationMembership(ctx context.Context, ses
 	return normalizeIdentityError(err)
 }
 
+func (a *appwriteIdentity) DeleteOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return err
+	}
+	_, err = teams.New(a.adminClient).DeleteMembership(strings.TrimSpace(org.ID), strings.TrimSpace(membershipID))
+	return normalizeIdentityError(err)
+}
+
 func (a *appwriteIdentity) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {
 	if err := ctx.Err(); err != nil {
 		return IdentityFile{}, err

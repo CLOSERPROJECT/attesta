@@ -526,6 +526,7 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	var updateMembershipKeyHeader string
 	var updateMembershipBody map[string]interface{}
 	var deleteMembershipSessionHeader string
+	var deleteMembershipKeyHeader string
 	var userSearch string
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -567,6 +568,7 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["rapprover","attestaOrgAdmin"]}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/teams/acme-team/memberships/membership-1":
 			deleteMembershipSessionHeader = r.Header.Get("X-Appwrite-Session")
+			deleteMembershipKeyHeader = r.Header.Get("X-Appwrite-Key")
 			_, _ = w.Write([]byte(`{}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
@@ -655,6 +657,15 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	}
 	if updateMembershipSessionHeader != "" {
 		t.Fatalf("admin update session header = %q, want empty", updateMembershipSessionHeader)
+	}
+
+	deleteMembershipSessionHeader = ""
+	deleteMembershipKeyHeader = ""
+	if err := identity.DeleteOrganizationMembershipAsAdmin(context.Background(), "acme", "membership-1"); err != nil {
+		t.Fatalf("DeleteOrganizationMembershipAsAdmin error: %v", err)
+	}
+	if deleteMembershipKeyHeader != "api-key-1" || deleteMembershipSessionHeader != "" {
+		t.Fatalf("admin delete headers key=%q session=%q", deleteMembershipKeyHeader, deleteMembershipSessionHeader)
 	}
 }
 
@@ -1540,6 +1551,9 @@ func TestAppwriteIdentityMethodsRespectCanceledContext(t *testing.T) {
 	if err := identity.DeleteOrganizationMembership(ctx, "session-secret", "acme", "membership-1"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("DeleteOrganizationMembership error = %v, want %v", err, context.Canceled)
 	}
+	if err := identity.DeleteOrganizationMembershipAsAdmin(ctx, "acme", "membership-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("DeleteOrganizationMembershipAsAdmin error = %v, want %v", err, context.Canceled)
+	}
 	if _, err := identity.UploadOrganizationLogo(ctx, "acme", IdentityFile{Filename: "logo.png", Data: []byte("png")}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("UploadOrganizationLogo error = %v, want %v", err, context.Canceled)
 	}
@@ -1948,6 +1962,12 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			name: "delete organization membership",
 			run: func() error {
 				return identity.DeleteOrganizationMembership(ctx, "session-secret", "acme", "membership-1")
+			},
+		},
+		{
+			name: "delete organization membership as admin",
+			run: func() error {
+				return identity.DeleteOrganizationMembershipAsAdmin(ctx, "acme", "membership-1")
 			},
 		},
 		{

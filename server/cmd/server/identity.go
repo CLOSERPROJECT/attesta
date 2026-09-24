@@ -43,6 +43,7 @@ type IdentityStore interface {
 	UpdateOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
+	DeleteOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string) error
 	InviteOrganizationUserAsAdmin(ctx context.Context, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	DeleteOrganizationLogo(ctx context.Context, fileID string) error

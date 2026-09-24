@@ -37,6 +37,7 @@ type fakeIdentityStore struct {
 	updateOrganizationMembershipAsAdminFunc func(ctx context.Context, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	updateUserLabelsFunc                    func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	deleteOrganizationMembershipFunc        func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
+	deleteOrganizationMembershipAsAdminFunc func(ctx context.Context, orgSlug, membershipID string) error
 	inviteOrganizationUserAsAdminFunc       func(ctx context.Context, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	uploadOrganizationLogoFunc              func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	deleteOrganizationLogoFunc              func(ctx context.Context, fileID string) error
@@ -278,6 +279,13 @@ func (f *fakeIdentityStore) UpdateUserLabels(ctx context.Context, userID string,
 func (f *fakeIdentityStore) DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
 	if f.deleteOrganizationMembershipFunc != nil {
 		return f.deleteOrganizationMembershipFunc(ctx, sessionSecret, orgSlug, membershipID)
+	}
+	return nil
+}
+
+func (f *fakeIdentityStore) DeleteOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string) error {
+	if f.deleteOrganizationMembershipAsAdminFunc != nil {
+		return f.deleteOrganizationMembershipAsAdminFunc(ctx, orgSlug, membershipID)
 	}
 	return nil
 }
