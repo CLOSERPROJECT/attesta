@@ -80,7 +80,9 @@
           {{ end }}
         </ul>
       {{ else }}
-        <p class="muted">No pending organization creation requests.</p>
+        <div class="empty-state">
+          <p class="empty-state-title">No pending organization creation requests.</p>
+        </div>
       {{ end }}
     </section>
 
@@ -411,7 +413,9 @@
         {{ end }}
       </ul>
     {{ else }}
-      <p class="muted platform-admin-taxonomy-empty">No categories yet</p>
+      <div class="empty-state">
+        <p class="empty-state-title">No categories yet</p>
+      </div>
     {{ end }}
 
     {{ if and .CategoriesEditor.Form.Open (eq .CategoriesEditor.Form.Mode "create") (eq .CategoriesEditor.Form.Level "group") }}
@@ -732,7 +736,8 @@
             <div class="list-row-actions">
               <button
                 type="button"
-                class="platform-admin-invite-button"
+                class="btn btn-ghost btn-icon btn-xs platform-admin-invite-button"
+                aria-label="Invite organization admin"
                 onclick="document.getElementById('invite-org-{{ .Slug }}').showModal()"
               >
                 {{ template "icon-invite-org-admin" . }}
@@ -817,9 +822,9 @@
                         {{ end }}
                       </ul>
                     {{ else }}
-                      <p class="muted platform-admin-empty-note">
-                        No accepted org admins yet
-                      </p>
+                      <div class="empty-state">
+                        <p class="empty-state-title">No accepted org admins yet</p>
+                      </div>
                     {{ end }}
                   </div>
                   <div>
@@ -833,9 +838,9 @@
                         {{ end }}
                       </ul>
                     {{ else }}
-                      <p class="muted platform-admin-empty-note">
-                        No pending org admin invites
-                      </p>
+                      <div class="empty-state">
+                        <p class="empty-state-title">No pending org admin invites</p>
+                      </div>
                     {{ end }}
                   </div>
                 </div>
@@ -955,7 +960,9 @@
         {{ end }}
       </ul>
     {{ else }}
-      <p class="muted">No organizations match your search</p>
+      <div class="empty-state">
+        <p class="empty-state-title">No organizations match your search</p>
+      </div>
     {{ end }}
 
     {{ if gt .TotalPages 1 }}

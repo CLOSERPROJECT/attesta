@@ -21,6 +21,10 @@
   text-align: center;
 }
 
+.empty-state[hidden] {
+  display: none;
+}
+
 .empty-state .icon-svg {
   width: 24px;
   height: 24px;

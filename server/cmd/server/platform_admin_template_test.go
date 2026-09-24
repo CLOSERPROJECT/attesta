@@ -140,6 +140,9 @@ func TestPlatformAdminCategoriesPanelEmptyState(t *testing.T) {
 	if !strings.Contains(body, "No categories yet") {
 		t.Fatalf("expected empty state message, got:\n%s", body)
 	}
+	if !strings.Contains(body, `class="empty-state"`) {
+		t.Fatalf("expected empty-state markup, got:\n%s", body)
+	}
 	if !strings.Contains(body, "0 categories · 0 subcategories") {
 		t.Fatalf("expected empty meta pill counts, got:\n%s", body)
 	}

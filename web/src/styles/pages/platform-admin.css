@@ -71,14 +71,12 @@
 }
 
 .platform-admin-invite-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
   color: var(--primary);
 }
 
-.platform-admin-invite-button:hover {
-  opacity: 0.85;
+.platform-admin-invite-button:hover:not(:disabled, .is-disabled) {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
 }
 
 .platform-admin-pagination {
@@ -115,11 +113,6 @@
 
 .platform-admin-admin-summary > div > h4.muted {
   margin-bottom: var(--space-3);
-}
-
-.platform-admin-admin-summary .platform-admin-empty-note {
-  font-size: var(--text-sm);
-  margin: 0;
 }
 
 .platform-admin-admin-list {
@@ -362,10 +355,6 @@ summary.platform-admin-taxonomy-category-head::marker {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-}
-
-.platform-admin-taxonomy-empty {
-  margin: var(--space-3) 0 0;
 }
 
 .platform-admin-taxonomy-meta-pill {

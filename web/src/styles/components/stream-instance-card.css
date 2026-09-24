@@ -72,16 +72,6 @@
   color: var(--stream-terminated);
 }
 
-.stream-instance-card-empty {
-  padding: var(--space-3) var(--space-3);
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--foreground) 10%, var(--muted));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .stream-instance-card-head {
   display: flex;
   align-items: center;
