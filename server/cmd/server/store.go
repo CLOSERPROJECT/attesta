@@ -65,6 +65,18 @@ type Store interface {
 	// contents change. Used to invalidate the workflow catalog cache across processes
 	// (e.g. seed-categories CLI while the server keeps running).
 	TaxonomyRevision(ctx context.Context) (int64, error)
+
+	InsertJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
+	LoadJoinRequestByID(ctx context.Context, id primitive.ObjectID) (*JoinRequest, error)
+	UpdateJoinRequest(ctx context.Context, req JoinRequest) (JoinRequest, error)
+	ListJoinRequestsByOrg(ctx context.Context, orgSlug string) ([]JoinRequest, error)
+	FindPendingJoinRequestByUser(ctx context.Context, userID string) (*JoinRequest, error)
+
+	InsertOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
+	LoadOrganizationCreationRequestByID(ctx context.Context, id primitive.ObjectID) (*OrganizationCreationRequest, error)
+	UpdateOrganizationCreationRequest(ctx context.Context, req OrganizationCreationRequest) (OrganizationCreationRequest, error)
+	ListOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error)
+	FindPendingOrganizationCreationRequestByUser(ctx context.Context, userID string) (*OrganizationCreationRequest, error)
 }
 
 type Organization struct {
@@ -599,14 +611,16 @@ func (s *MongoStore) attachmentsBucket() (gridFSBucketPort, error) {
 }
 
 type MemoryStore struct {
-	mu                sync.RWMutex
-	processes         map[primitive.ObjectID]Process
-	notarizations     []Notarization
-	attachments       map[primitive.ObjectID]memoryAttachment
-	formataStreams    map[primitive.ObjectID]FormataBuilderStream
-	categories        map[string]Category
-	subCategories     map[string]SubCategory
-	taxonomyRevision  int64
+	mu                             sync.RWMutex
+	processes                      map[primitive.ObjectID]Process
+	notarizations                  []Notarization
+	attachments                    map[primitive.ObjectID]memoryAttachment
+	formataStreams                 map[primitive.ObjectID]FormataBuilderStream
+	categories                     map[string]Category
+	subCategories                  map[string]SubCategory
+	taxonomyRevision               int64
+	joinRequests                   map[primitive.ObjectID]JoinRequest
+	organizationCreationRequests   map[primitive.ObjectID]OrganizationCreationRequest
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -624,11 +638,13 @@ type memoryAttachment struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		processes:      map[primitive.ObjectID]Process{},
-		attachments:    map[primitive.ObjectID]memoryAttachment{},
-		formataStreams: map[primitive.ObjectID]FormataBuilderStream{},
-		categories:     map[string]Category{},
-		subCategories:  map[string]SubCategory{},
+		processes:                    map[primitive.ObjectID]Process{},
+		attachments:                  map[primitive.ObjectID]memoryAttachment{},
+		formataStreams:               map[primitive.ObjectID]FormataBuilderStream{},
+		categories:                   map[string]Category{},
+		subCategories:                map[string]SubCategory{},
+		joinRequests:                 map[primitive.ObjectID]JoinRequest{},
+		organizationCreationRequests: map[primitive.ObjectID]OrganizationCreationRequest{},
 	}
 }
 

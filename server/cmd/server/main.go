@@ -146,6 +146,8 @@ type Server struct {
 	store              Store
 	process            *ProcessService
 	identity           IdentityStore
+	mailer             Mailer
+	affiliation        *Affiliation
 	tmpl               *template.Template
 	authorizer         Authorizer
 	sse                *SSEHub
@@ -7747,6 +7749,18 @@ func (s *Server) processService() *ProcessService {
 	}
 	s.process = &ProcessService{store: s.store, now: s.now}
 	return s.process
+}
+
+func (s *Server) affiliationService() *Affiliation {
+	if s.affiliation != nil {
+		return s.affiliation
+	}
+	mailer := s.mailer
+	if mailer == nil {
+		mailer = noopMailer{}
+	}
+	s.affiliation = NewAffiliation(s.identity, s.store, mailer, s.now)
+	return s.affiliation
 }
 
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {
