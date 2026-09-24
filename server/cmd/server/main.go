@@ -527,12 +527,13 @@ type OrgAdminRoleRow struct {
 }
 
 type OrgAdminUserRow struct {
-	UserID      string
-	Email       string
-	Status      string
-	Activated   bool
-	IsOrgAdmin  bool
-	RoleOptions []OrgAdminRoleOption
+	UserID                 string
+	Email                  string
+	Status                 string
+	Activated              bool
+	IsOrgAdmin             bool
+	OrgAdminStandingLocked bool
+	RoleOptions            []OrgAdminRoleOption
 }
 
 type OrgAdminInviteRow struct {
@@ -2957,6 +2958,36 @@ func requestedRoleSlugs(form url.Values) []string {
 	return canonifyRoleSlugs([]string{legacyRole})
 }
 
+// formRequestsOrgAdmin reports whether the form grants Org admin standing
+// (separate from Organization roles in "roles").
+func formRequestsOrgAdmin(form url.Values) bool {
+	if form == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(form.Get("is_org_admin"))) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+func isOrgAdminRoleSlug(slug string) bool {
+	return containsRole([]string{slug}, "org-admin") || containsRole([]string{slug}, "org_admin")
+}
+
+// organizationCatalogRoles returns Organization roles only (never Org admin standing).
+func organizationCatalogRoles(roles []Role) []Role {
+	out := make([]Role, 0, len(roles))
+	for _, role := range roles {
+		if isOrgAdminRoleSlug(role.Slug) {
+			continue
+		}
+		out = append(out, role)
+	}
+	return out
+}
+
 func accountMatchesOrg(user *AccountUser, orgID primitive.ObjectID, orgSlug string) bool {
 	if user == nil || user.OrgID == nil {
 		return false
@@ -3057,9 +3088,12 @@ func identityOrgHasRole(org IdentityOrg, roleSlug string) bool {
 	return false
 }
 
+// ensureOrgAdminRoleOption reserves the Org admin slug when checking role-name
+// collisions. Org admin is membership standing, not a Role catalog entry — do not
+// use this to populate role pickers.
 func ensureOrgAdminRoleOption(roles []Role) []Role {
 	for _, role := range roles {
-		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
+		if isOrgAdminRoleSlug(role.Slug) {
 			return roles
 		}
 	}
@@ -3919,10 +3953,7 @@ func organizationRoleInUse(roleSlug string, users []OrgAdminUserRow, invites []O
 
 func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgAdminInviteRow) []OrgAdminRoleRow {
 	rows := make([]OrgAdminRoleRow, 0, len(roles))
-	for _, role := range roles {
-		if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
-			continue
-		}
+	for _, role := range organizationCatalogRoles(roles) {
 		rows = append(rows, OrgAdminRoleRow{
 			Slug:    strings.TrimSpace(role.Slug),
 			Name:    strings.TrimSpace(role.Name),
@@ -3934,23 +3965,31 @@ func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgA
 }
 
 func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []IdentityUser) []OrgAdminUserRow {
-	orgUsers := make([]OrgAdminUserRow, 0, len(users))
+	eligible := make([]IdentityUser, 0, len(users))
+	adminCount := 0
 	for _, orgUser := range users {
 		if isPlatformAdminIdentityUser(orgUser) {
 			continue
 		}
+		eligible = append(eligible, orgUser)
+		if orgUser.IsOrgAdmin {
+			adminCount++
+		}
+	}
+
+	orgUsers := make([]OrgAdminUserRow, 0, len(eligible))
+	for _, orgUser := range eligible {
 		roleSlugs := decodeIdentityRoleLabels(orgUser.Labels)
 		roleOptions := make([]OrgAdminRoleOption, 0, len(rolePills))
 		for _, role := range rolePills {
-			selected := containsRole(roleSlugs, role.Slug)
-			if containsRole([]string{role.Slug}, "org-admin") || containsRole([]string{role.Slug}, "org_admin") {
-				selected = orgUser.IsOrgAdmin
+			if isOrgAdminRoleSlug(role.Slug) {
+				continue
 			}
 			roleOptions = append(roleOptions, OrgAdminRoleOption{
 				Slug:     role.Slug,
 				Name:     role.Name,
 				Palette:  role.Palette,
-				Selected: selected,
+				Selected: containsRole(roleSlugs, role.Slug),
 			})
 		}
 		userID := strings.TrimSpace(orgUser.ID)
@@ -3958,12 +3997,13 @@ func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []I
 			userID = strings.TrimSpace(orgUser.Email)
 		}
 		orgUsers = append(orgUsers, OrgAdminUserRow{
-			UserID:      userID,
-			Email:       orgUser.Email,
-			Status:      orgUser.Status,
-			Activated:   !strings.EqualFold(strings.TrimSpace(orgUser.Status), "pending") && !strings.EqualFold(strings.TrimSpace(orgUser.Status), "invited"),
-			IsOrgAdmin:  orgUser.IsOrgAdmin,
-			RoleOptions: roleOptions,
+			UserID:                 userID,
+			Email:                  orgUser.Email,
+			Status:                 orgUser.Status,
+			Activated:              !strings.EqualFold(strings.TrimSpace(orgUser.Status), "pending") && !strings.EqualFold(strings.TrimSpace(orgUser.Status), "invited"),
+			IsOrgAdmin:             orgUser.IsOrgAdmin,
+			OrgAdminStandingLocked: orgUser.IsOrgAdmin && adminCount < 2,
+			RoleOptions:            roleOptions,
 		})
 	}
 	return orgUsers
@@ -4034,8 +4074,7 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 		return Organization{}, nil, nil, nil, ErrIdentityNotFound
 	}
 	org := organizationFromIdentityOrg(*orgIdentity)
-	roles := rolesFromIdentityOrg(*orgIdentity)
-	roles = ensureOrgAdminRoleOption(roles)
+	roles := organizationCatalogRoles(rolesFromIdentityOrg(*orgIdentity))
 	rolePills := buildOrgAdminRolePills(roles)
 
 	identityUsers, identityUsersErr := s.identity.ListOrganizationUsers(ctx, org.Slug)
@@ -4527,26 +4566,23 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		selectedRoles := requestedRoleSlugs(r.Form)
-		allowedRoles := ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org))
+		isOrgAdmin := formRequestsOrgAdmin(r.Form)
+		allowedRoles := organizationCatalogRoles(rolesFromIdentityOrg(*org))
 		allowed := make(map[string]struct{}, len(allowedRoles))
 		for _, role := range allowedRoles {
 			allowed[strings.TrimSpace(role.Slug)] = struct{}{}
 		}
 		for _, roleSlug := range selectedRoles {
+			if isOrgAdminRoleSlug(roleSlug) {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "Org admin is not an organization role"})
+				return
+			}
 			if _, ok := allowed[strings.TrimSpace(roleSlug)]; !ok {
 				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "role not found"})
 				return
 			}
 		}
-		isOrgAdmin := containsRole(selectedRoles, "org-admin")
-		businessRoles := make([]string, 0, len(selectedRoles))
-		for _, roleSlug := range selectedRoles {
-			if containsRole([]string{roleSlug}, "org-admin") || containsRole([]string{roleSlug}, "org_admin") {
-				isOrgAdmin = true
-				continue
-			}
-			businessRoles = append(businessRoles, roleSlug)
-		}
+		businessRoles := append([]string(nil), selectedRoles...)
 		memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
 		if err != nil {
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to list memberships for organization %s during invite", admin.OrgSlug)
@@ -4571,12 +4607,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
-			if roleSlugsKey(append(append([]string{}, membership.RoleSlugs...), func() []string {
-				if membership.IsOrgAdmin {
-					return []string{"org-admin"}
-				}
-				return nil
-			}()...)) == roleSlugsKey(selectedRoles) {
+			if roleSlugsKey(membership.RoleSlugs) == roleSlugsKey(businessRoles) && membership.IsOrgAdmin == isOrgAdmin {
 				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
@@ -4724,20 +4755,44 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		selectedRoles := requestedRoleSlugs(r.Form)
-		allowedRoles := ensureOrgAdminRoleOption(rolesFromIdentityOrg(*org))
+		isOrgAdmin := formRequestsOrgAdmin(r.Form)
+		allowedRoles := organizationCatalogRoles(rolesFromIdentityOrg(*org))
 		allowed := make(map[string]struct{}, len(allowedRoles))
 		for _, role := range allowedRoles {
 			allowed[strings.TrimSpace(role.Slug)] = struct{}{}
 		}
 		for _, roleSlug := range selectedRoles {
+			if isOrgAdminRoleSlug(roleSlug) {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "Org admin is not an organization role"})
+				return
+			}
 			if _, ok := allowed[strings.TrimSpace(roleSlug)]; !ok {
 				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "role not found"})
 				return
 			}
 		}
-		if firstNonEmpty(target.ID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) && !containsRole(selectedRoles, "org-admin") {
-			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove org-admin from your own account"})
+		if firstNonEmpty(target.ID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) && !isOrgAdmin {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove Org admin standing from your own account"})
 			return
+		}
+		if target.IsOrgAdmin && !isOrgAdmin {
+			otherAdmins := 0
+			for _, orgUser := range targetUsers {
+				if isPlatformAdminIdentityUser(orgUser) {
+					continue
+				}
+				if !orgUser.IsOrgAdmin {
+					continue
+				}
+				if firstNonEmpty(orgUser.ID, orgUser.Email) == firstNonEmpty(target.ID, target.Email) {
+					continue
+				}
+				otherAdmins++
+			}
+			if otherAdmins == 0 {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove Org admin standing from the only Org admin"})
+				return
+			}
 		}
 		labels := make([]string, 0, len(target.Labels)+len(selectedRoles)+1)
 		for _, label := range target.Labels {
@@ -4746,12 +4801,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			}
 			labels = append(labels, strings.TrimSpace(label))
 		}
-		isOrgAdmin := containsRole(selectedRoles, "org-admin")
 		for _, roleSlug := range selectedRoles {
-			if containsRole([]string{roleSlug}, "org-admin") || containsRole([]string{roleSlug}, "org_admin") {
-				isOrgAdmin = true
-				continue
-			}
 			labels = append(labels, encodeIdentityRoleLabel(roleSlug))
 		}
 		if isOrgAdmin {

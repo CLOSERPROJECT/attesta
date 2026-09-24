@@ -818,7 +818,7 @@
               </span>
               <div class="user-tags">
                 {{ range .RoleOptions }}
-                  {{ if and .Selected (not (or (eq .Slug "org-admin") (eq .Slug "org_admin"))) }}
+                  {{ if .Selected }}
                     <span
                       class="pill role-pill"
                       data-role-palette="{{ .Palette }}"
@@ -869,7 +869,7 @@
                 <form
                   method="post"
                   action="/my/organization/users"
-                  class="input-form"
+                  class="input-form input-form-loose"
                 >
                   <input
                     type="hidden"
@@ -882,8 +882,30 @@
                     value="{{ .UserID }}"
                   />
                   <div class="form-field">
-                    <label>Roles</label>
+                    <label>Organization roles</label>
                     {{ template "roles_picker" (rolesPickerFromOrgAdminOptions .RoleOptions false) }}
+                  </div>
+                  <div class="form-field">
+                    {{ if .OrgAdminStandingLocked }}
+                      <input type="hidden" name="is_org_admin" value="1" />
+                    {{ end }}
+                    <label class="form-check{{ if .OrgAdminStandingLocked }} is-disabled{{ end }}">
+                      <input
+                        type="checkbox"
+                        {{ if not .OrgAdminStandingLocked }}name="is_org_admin"{{ end }}
+                        value="1"
+                        {{ if .IsOrgAdmin }}checked{{ end }}
+                        {{ if .OrgAdminStandingLocked }}disabled{{ end }}
+                      />
+                      <span>Make Org admin</span>
+                    </label>
+                    <p class="form-field-hint">
+                      {{ if .OrgAdminStandingLocked }}
+                        This is the only Org admin. Add another before removing standing.
+                      {{ else }}
+                        Can manage organization profile, roles, and members.
+                      {{ end }}
+                    </p>
                   </div>
                   <div
                     class="dialog-actions"
@@ -977,15 +999,24 @@
           </button>
         </header>
 
-        <form method="post" action="/my/organization/users" class="input-form">
+        <form method="post" action="/my/organization/users" class="input-form input-form-loose">
           <input type="hidden" name="intent" value="invite" />
           <div class="form-field">
             <label for="user-email">Email</label>
             <input id="user-email" name="email" type="email" required />
           </div>
           <div class="form-field">
-            <label>Roles</label>
+            <label>Organization roles</label>
             {{ template "roles_picker" (rolesPickerFromRoles .Roles false) }}
+          </div>
+          <div class="form-field">
+            <label class="form-check">
+              <input type="checkbox" name="is_org_admin" value="1" />
+              <span>Make Org admin</span>
+            </label>
+            <p class="form-field-hint">
+              Can manage organization profile, roles, and members.
+            </p>
           </div>
           {{ if .InviteError }}
             <p class="error">{{ .InviteError }}</p>

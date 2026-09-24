@@ -2202,7 +2202,7 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 	}
 
 	targetID := "user-2"
-	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId="+targetID+"&roles=approver&roles=org-admin"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId="+targetID+"&roles=approver&is_org_admin=1"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2230,7 +2230,7 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 	if selfRec.Code != http.StatusOK {
 		t.Fatalf("self status = %d, want %d", selfRec.Code, http.StatusOK)
 	}
-	if !strings.Contains(selfRec.Body.String(), "cannot remove org-admin from your own account") {
+	if !strings.Contains(selfRec.Body.String(), "cannot remove Org admin standing from your own account") {
 		t.Fatalf("expected self-protection message, got %q", selfRec.Body.String())
 	}
 }
@@ -2366,7 +2366,7 @@ func TestHandleOrgAdminUsersInviteWithIdentity(t *testing.T) {
 		now:         func() time.Time { return now },
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver&roles=org-admin"))
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=new%40example.com&roles=approver&is_org_admin=1"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
@@ -2828,7 +2828,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		}
 		server := &Server{
 			authorizer: fakeAuthorizer{}, store: NewMemoryStore(), identity: fake, tmpl: testTemplates(), enforceAuth: true, now: func() time.Time { return now }}
-		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver&roles=org-admin"))
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-2&roles=approver&is_org_admin=1"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()

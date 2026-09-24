@@ -430,6 +430,8 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		`onclick="document.getElementById('add-user-dialog').showModal()"`,
 		"Add user",
 		`name="intent" value="invite"`,
+		`name="is_org_admin"`,
+		"Organization roles",
 		"Create invite",
 		"Pending join requests",
 		"<h2>Users</h2>",
@@ -437,6 +439,9 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in members panel markup, got:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, `data-value="org-admin"`) {
+		t.Fatalf("invite and manage-user role pickers must not list Org admin as a role, got:\n%s", body)
 	}
 
 	pendingIdx := strings.Index(body, "Pending join requests")

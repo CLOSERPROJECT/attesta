@@ -429,7 +429,7 @@ type RolesPickerView struct {
 
 func rolesPickerFromRoles(roles []Role, requireSelection bool) RolesPickerView {
 	options := make([]RolesPickerOption, 0, len(roles))
-	for _, role := range roles {
+	for _, role := range organizationCatalogRoles(roles) {
 		options = append(options, RolesPickerOption{
 			Slug:    role.Slug,
 			Name:    role.Name,
@@ -442,6 +442,9 @@ func rolesPickerFromRoles(roles []Role, requireSelection bool) RolesPickerView {
 func rolesPickerFromOrgAdminOptions(options []OrgAdminRoleOption, requireSelection bool) RolesPickerView {
 	out := make([]RolesPickerOption, 0, len(options))
 	for _, option := range options {
+		if isOrgAdminRoleSlug(option.Slug) {
+			continue
+		}
 		out = append(out, RolesPickerOption{
 			Slug:     option.Slug,
 			Name:     option.Name,

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -71,6 +72,38 @@ func TestRolesPickerTemplateEmptyOptions(t *testing.T) {
 	}
 	if strings.Contains(body, `data-role-picker-menu`) {
 		t.Fatalf("empty picker must not render menu, got: %s", body)
+	}
+}
+
+func TestRolesPickerFromRolesOmitsOrgAdminStanding(t *testing.T) {
+	view := rolesPickerFromRoles([]Role{
+		{Slug: "org-admin", Name: "Org Admin"},
+		{Slug: "viewer", Name: "Viewer", Palette: "sky"},
+	}, false)
+	if len(view.Options) != 1 || view.Options[0].Slug != "viewer" {
+		t.Fatalf("roles picker options = %#v, want viewer only", view.Options)
+	}
+
+	selected := rolesPickerFromOrgAdminOptions([]OrgAdminRoleOption{
+		{Slug: "org-admin", Name: "Org Admin", Selected: true},
+		{Slug: "viewer", Name: "Viewer", Palette: "sky", Selected: true},
+	}, false)
+	if len(selected.Options) != 1 || selected.Options[0].Slug != "viewer" || !selected.Options[0].Selected {
+		t.Fatalf("org-admin options picker = %#v, want selected viewer only", selected.Options)
+	}
+}
+
+func TestFormRequestsOrgAdmin(t *testing.T) {
+	if formRequestsOrgAdmin(nil) {
+		t.Fatal("nil form must not request Org admin")
+	}
+	for _, raw := range []string{"1", "true", "ON", "yes"} {
+		if !formRequestsOrgAdmin(url.Values{"is_org_admin": {raw}}) {
+			t.Fatalf("expected Org admin for %q", raw)
+		}
+	}
+	if formRequestsOrgAdmin(url.Values{"is_org_admin": {"0"}}) {
+		t.Fatal("0 must not request Org admin")
 	}
 }
 

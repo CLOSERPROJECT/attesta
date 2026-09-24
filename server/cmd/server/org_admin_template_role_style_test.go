@@ -12,7 +12,6 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 	view := OrgAdminView{
 		ActivePanel: "members",
 		Roles: []Role{
-			{Slug: "org-admin", Name: "Org Admin"},
 			{Slug: "qa-reviewer", Name: "QA Reviewer"},
 		},
 		Users: []OrgAdminUserRow{
@@ -22,12 +21,6 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 				Activated:  true,
 				IsOrgAdmin: true,
 				RoleOptions: []OrgAdminRoleOption{
-					{
-						Slug:     "org-admin",
-						Name:     "Org Admin",
-						Palette:  "red",
-						Selected: true,
-					},
 					{
 						Slug:     "qa-reviewer",
 						Name:     "QA Reviewer",
@@ -82,6 +75,91 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 	}
 	if !strings.Contains(tagsBlock, "QA Reviewer") {
 		t.Fatalf("expected non-admin role pill in user-tags block, got: %s", tagsBlock)
+	}
+
+	manageStart := strings.Index(body, `id="manage-user-user-1"`)
+	if manageStart < 0 {
+		t.Fatalf("expected manage-user dialog, got body: %s", body)
+	}
+	manageEnd := strings.Index(body[manageStart:], `</dialog>`)
+	if manageEnd < 0 {
+		t.Fatalf("expected manage-user dialog close, got body: %s", body)
+	}
+	manageDialog := body[manageStart : manageStart+manageEnd]
+	for _, want := range []string{
+		`name="is_org_admin"`,
+		`value="1"`,
+		"checked",
+		"Organization roles",
+	} {
+		if !strings.Contains(manageDialog, want) {
+			t.Fatalf("expected %q in manage-user dialog, got: %s", want, manageDialog)
+		}
+	}
+	if strings.Contains(manageDialog, `data-value="org-admin"`) {
+		t.Fatalf("manage-user roles picker must not list Org admin, got: %s", manageDialog)
+	}
+}
+
+func TestOrgAdminTemplateLocksSoleOrgAdminStanding(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	view := OrgAdminView{
+		ActivePanel: "members",
+		Users: []OrgAdminUserRow{
+			{
+				UserID:                 "user-1",
+				Email:                  "owner@example.com",
+				Activated:              true,
+				IsOrgAdmin:             true,
+				OrgAdminStandingLocked: true,
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "org_admin_body", view); err != nil {
+		t.Fatalf("render org admin template: %v", err)
+	}
+	body := out.String()
+	manageStart := strings.Index(body, `id="manage-user-user-1"`)
+	if manageStart < 0 {
+		t.Fatalf("expected manage-user dialog, got:\n%s", body)
+	}
+	manageEnd := strings.Index(body[manageStart:], `</dialog>`)
+	if manageEnd < 0 {
+		t.Fatal("expected manage-user dialog close")
+	}
+	manageDialog := body[manageStart : manageStart+manageEnd]
+	for _, want := range []string{
+		`type="hidden" name="is_org_admin" value="1"`,
+		"disabled",
+		"is-disabled",
+		"This is the only Org admin",
+	} {
+		if !strings.Contains(manageDialog, want) {
+			t.Fatalf("expected %q in locked manage-user dialog, got:\n%s", want, manageDialog)
+		}
+	}
+}
+
+func TestBuildOrgAdminUserRowsLocksSoleOrgAdmin(t *testing.T) {
+	sole := buildOrgAdminUserRowsFromIdentity(nil, []IdentityUser{
+		{ID: "admin-1", Email: "owner@example.com", IsOrgAdmin: true, Status: "active"},
+		{ID: "member-1", Email: "member@example.com", IsOrgAdmin: false, Status: "active"},
+	})
+	if len(sole) != 2 {
+		t.Fatalf("rows = %d, want 2", len(sole))
+	}
+	if !sole[0].OrgAdminStandingLocked || sole[1].OrgAdminStandingLocked {
+		t.Fatalf("standing lock = admin:%v member:%v", sole[0].OrgAdminStandingLocked, sole[1].OrgAdminStandingLocked)
+	}
+
+	shared := buildOrgAdminUserRowsFromIdentity(nil, []IdentityUser{
+		{ID: "admin-1", Email: "owner@example.com", IsOrgAdmin: true, Status: "active"},
+		{ID: "admin-2", Email: "co@example.com", IsOrgAdmin: true, Status: "active"},
+	})
+	if shared[0].OrgAdminStandingLocked || shared[1].OrgAdminStandingLocked {
+		t.Fatalf("shared admins must not lock standing: %#v", shared)
 	}
 }
 
