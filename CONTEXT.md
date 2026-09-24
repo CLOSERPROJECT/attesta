@@ -27,8 +27,12 @@ The view of one stream instance: its timeline (steps and substeps), completion c
 _Avoid_: Process page, action list
 
 **Stream picker**:
-The authenticated screen at `/my` where an operator chooses which stream (blueprint) to open. Public marketing content lives at `/` and does not redirect logged-in users to `/my`.
+The authenticated screen at `/my` where an affiliated operator chooses which stream (blueprint) to open. Public marketing content lives at `/` and does not redirect logged-in users to `/my`.
 _Avoid_: Home, workflow picker
+
+**Onboarding**:
+The unaffiliated-user flow to obtain an Affiliation: join an organization, request a new organization, or wait on / withdraw a pending request. Narrow reading-width layout.
+_Avoid_: Signup (account creation), registration wizard
 
 **Public stream card**:
 A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), live stream-instance metrics (total count plus active-or-completed activity, or that none exist yet), and participating **organizations**. Distinct UI from the authenticated stream picker card. Not clickable in v1.
@@ -63,20 +67,48 @@ Open self-serve account creation (email + password). A registered user may have 
 _Avoid_: Closed signup, invite-only registration (as the product default)
 
 **Invitation**:
-An organization-admin-initiated (or platform-admin-initiated) outbound membership offer to an email, with roles chosen by the inviter. Distinct from a join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization.
+An Org-admin-initiated (or platform-admin-initiated) outbound membership offer to an email. The inviter may grant Org admin standing and/or one or more Organization roles — those are separate choices. Distinct from a Join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization.
 _Avoid_: Join request, membership request (when meaning outbound invite)
 
 **Join request**:
-A registered user’s inbound ask to join an existing organization, naming one or more roles from that organization’s role catalog (not org-admin). Org admins approve or reject; approval grants membership with those roles.
-_Avoid_: Invite, application (vague), membership (the lasting affiliation)
+A registered user’s inbound ask to join an existing organization as a Member, naming one or more Organization roles. Org admins approve or reject; approval grants Member standing with those Organization roles (never Org admin standing). While pending, the requester may withdraw the request (it is removed, as if never submitted).
+_Avoid_: Invite, application (vague), membership (the lasting affiliation), requesting Org admin
 
 **Organization creation request**:
-A registered user’s ask to create a new organization. Platform admins approve or reject; approval creates the organization and makes the requester its org admin. Platform admins may still create organizations directly without a request.
+A registered user’s ask to create a new organization. Platform admins approve or reject; approval creates the organization and grants the requester Org admin standing. Platform admins may still create organizations directly without a request. While pending, the requester may withdraw the request (it is removed, as if never submitted).
 _Avoid_: Org signup, self-serve org (when meaning live create without approval)
 
 **Affiliation**:
-A user’s membership in at most one organization at a time. Unaffiliated means zero organizations. Switching requires leaving (or being removed) before a new join or creation request can complete.
+A user’s membership in at most one organization at a time. Unaffiliated means zero organizations. Switching requires leaving (or being removed) before a new join or creation request can complete. The stream picker is for affiliated users only; unaffiliated users (including those with a pending join or creation request) go through onboarding instead. Within an Affiliation, standing (Org admin vs Member) is independent of which Organization roles the user holds.
 _Avoid_: Multi-org membership, active org switcher, workspace
+
+**Org admin**:
+Privileged standing within an Affiliation: can manage organization profile, Role catalog, and members. Orthogonal to Organization roles — an Org admin may hold zero or more Organization roles. Never an entry in the Role catalog.
+_Avoid_: Treating Org admin as a catalog / Organization role, “org-admin” as one more role among peers (in domain docs)
+
+**Member**:
+An affiliated user without Org admin standing. May hold zero or more Organization roles.
+_Avoid_: Regular member, non-admin (as primary terms), conflating Member with Organization role
+
+**Role catalog**:
+The set of Organization roles an Organization defines (name, slug, palette). Does not include Org admin.
+_Avoid_: Catalog (alone — also means stream catalog), putting Org admin in the catalog
+
+**Organization role**:
+One named entry in a Role catalog. Affiliated users (Org admin or Member) may each hold zero or more. Chosen on Join request and (alongside standing) on Invitation; matched to Stream substep gates by slug.
+_Avoid_: Catalog role, org role (vague), membership role, Org admin
+
+**Stream role**:
+A role named on a Stream blueprint to gate Substeps. Matched to Organization roles by slug; not itself a Role catalog entry.
+_Avoid_: Catalog role, workflow role (in domain docs), Organization role (when meaning the blueprint gate)
+
+**Organization home**:
+The affiliated user’s screen for their current organization: org identity (name, logo), the user’s Organization roles, and leave. Distinct from the Org admin console sections (profile edit, Role catalog, members).
+_Avoid_: Account page, My Org settings (when meaning admin console), org admin console
+
+**Operator**:
+The default Organization role created with every new organization so Members have a joinable role. An organization must keep at least one Organization role in its Role catalog.
+_Avoid_: Default member, basic role, Org admin, catalog role
 
 **Stream dashboard**:
 The screen at `/my/streams/:key/` listing stream instances for one stream, with status navigation and a read-only timeline preview.
