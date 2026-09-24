@@ -56,6 +56,28 @@ _Avoid_: Metadata (vague), tags, executable config
 A party that owns steps in a stream blueprint (team in Appwrite; listed under the stream’s organizations).
 _Avoid_: Department, company, team (in domain docs — Appwrite may still say team)
 
+### Auth & affiliation
+
+**Registration**:
+Open self-serve account creation (email + password). A registered user may have zero organizations until a join or creation path completes.
+_Avoid_: Closed signup, invite-only registration (as the product default)
+
+**Invitation**:
+An organization-admin-initiated (or platform-admin-initiated) outbound membership offer to an email, with roles chosen by the inviter. Distinct from a join request.
+_Avoid_: Join request, membership request (when meaning outbound invite)
+
+**Join request**:
+A registered user’s inbound ask to join an existing organization, naming one or more roles from that organization’s role catalog (not org-admin). Org admins approve or reject; approval grants membership with those roles.
+_Avoid_: Invite, application (vague), membership (the lasting affiliation)
+
+**Organization creation request**:
+A registered user’s ask to create a new organization. Platform admins approve or reject; approval creates the organization and makes the requester its org admin. Platform admins may still create organizations directly without a request.
+_Avoid_: Org signup, self-serve org (when meaning live create without approval)
+
+**Affiliation**:
+A user’s membership in at most one organization at a time. Unaffiliated means zero organizations. Switching requires leaving (or being removed) before a new join or creation request can complete.
+_Avoid_: Multi-org membership, active org switcher, workspace
+
 **Stream dashboard**:
 The screen at `/my/streams/:key/` listing stream instances for one stream, with status navigation and a read-only timeline preview.
 _Avoid_: Home, workflow home
