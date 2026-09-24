@@ -88,13 +88,14 @@ type affiliationStore interface {
 
 // Affiliation owns affiliation-domain queries and join / organization-creation / leave commands.
 type Affiliation struct {
-	identity IdentityStore
-	store    affiliationStore
-	mailer   Mailer
-	now      func() time.Time
+	identity                  IdentityStore
+	store                     affiliationStore
+	mailer                    Mailer
+	now                       func() time.Time
+	platformAdminNotifyEmails []string
 }
 
-func NewAffiliation(identity IdentityStore, store affiliationStore, mailer Mailer, now func() time.Time) *Affiliation {
+func NewAffiliation(identity IdentityStore, store affiliationStore, mailer Mailer, now func() time.Time, platformAdminNotifyEmails []string) *Affiliation {
 	if mailer == nil {
 		mailer = noopMailer{}
 	}
@@ -102,11 +103,30 @@ func NewAffiliation(identity IdentityStore, store affiliationStore, mailer Maile
 		now = time.Now
 	}
 	return &Affiliation{
-		identity: identity,
-		store:    store,
-		mailer:   mailer,
-		now:      now,
+		identity:                  identity,
+		store:                     store,
+		mailer:                    mailer,
+		now:                       now,
+		platformAdminNotifyEmails: normalizePlatformAdminNotifyEmails(platformAdminNotifyEmails),
 	}
+}
+
+func normalizePlatformAdminNotifyEmails(emails []string) []string {
+	if len(emails) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(emails))
+	for _, email := range emails {
+		email = strings.TrimSpace(email)
+		if email == "" {
+			continue
+		}
+		out = append(out, email)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (a *Affiliation) IsAffiliated(user IdentityUser) bool {
@@ -397,10 +417,10 @@ func (a *Affiliation) SubmitOrganizationCreationRequest(ctx context.Context, use
 		return OrganizationCreationRequest{}, err
 	}
 
-	if adminEmail, _, ok := platformAdminCredentials(); ok {
+	if len(a.platformAdminNotifyEmails) > 0 {
 		a.notify(ctx, MailMessage{
 			Kind:    MailKindOrgCreationSubmitted,
-			To:      []string{adminEmail},
+			To:      append([]string(nil), a.platformAdminNotifyEmails...),
 			Subject: "Organization creation request: " + name,
 			Body: fmt.Sprintf(
 				"Requester %s submitted an organization creation request for %q (slug %q).",

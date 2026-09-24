@@ -7876,7 +7876,11 @@ func (s *Server) affiliationService() *Affiliation {
 	if !ok {
 		panic("store does not implement affiliationStore")
 	}
-	s.affiliation = NewAffiliation(s.identity, affStore, mailer, s.now)
+	var notifyEmails []string
+	if email, _, ok := platformAdminCredentials(); ok {
+		notifyEmails = []string{email}
+	}
+	s.affiliation = NewAffiliation(s.identity, affStore, mailer, s.now, notifyEmails)
 	return s.affiliation
 }
 
