@@ -41,12 +41,13 @@ Import new component/page modules from the matching barrel (`components.css` / `
 - `pages/home.css` also styles stream dashboard nav panels used by `pages/stream.html`
 - `pages/public-home.css` ↔ `pages/public_home.html` (marketing landing; uses shared app topbar + `site_footer`)
 - `components/site_footer.html` → `components/site-footer.css` (shared chrome footer on all layout pages)
+- `components/role_pill_row.html` → `components/role-pill-row.css` (`.role-pill-row*`; pill primitives stay in `shared.css`)
 - `pages/org-admin-page.css` ↔ `pages/org_admin.html` (page shell); widgets/pickers stay in `components/org-admin.css`
 - `components/stream.css` is a cluster (sort toolbar, `.status-tag*` via `status_tag`) — not paired 1:1 with a `stream_*.html` component
 - `components/dpp_history_step.html` styles live under `pages/dpp.css` (`.dpp-history-*`)
 - `attachment_carousel.html` (templates root) → `components/substep-body.css`
 - `substep_override_editor.html` (templates root) → `components/substep-override.css`
-- Auth pages (`login`, `signup`, `invite`, `reset_*`) → `components/forms.css` (no per-page CSS module)
+- Auth pages (`login`, `signup`, `invite`, `reset_*`) → `components/forms.css` (no per-page CSS module); login/signup cross-link footer → `components/auth-footer.css` (`auth_footer`)
 
 Root templates still pending migration (`error_banner.html`, `icons.html`, `role_palette_options.html`, …) live under `server/templates/`. Migrate one at a time when a task needs them.
 
@@ -126,6 +127,7 @@ Appwrite { slug, name, palette }  →  backend (orgSlug, roleSlug)  →  data-ro
 Writes persist `palette` only; legacy `color` CSS-var strings fall back via `rolePaletteKeyFromStyle()`. `GET /api/catalog` returns `palette`. Unknown → `"fallback"`. Lookup: step `organization:` → `(stepOrg, roleSlug)`; else first org containing the slug. Keys stay in sync via `TestRolePaletteKeysMatchCSS`.
 
 ```html
+{{ template "role_pill_row" (rolePillRowFromOrgAdminOptions .Roles "sm") }}
 <span class="role-pill" data-role-palette="{{ .Palette }}">{{ .Label }}</span>
 {{ template "status_tag" .Status }}
 ```
@@ -170,6 +172,8 @@ All other dynamic theming uses `data-*`, not inline custom properties.
 ```bash
 cd web && npm run build   # → web/dist/assets/main.css (served at /static/)
 task css:lint
+task templates:fmt        # optional: format server/templates with djLint
+task templates:check      # format gate (no write)
 ```
 
 `task css:lint`:
@@ -177,6 +181,8 @@ task css:lint
 1. Template inline styles — `deployment/scripts/check-template-inline-styles.sh`
 2. Breakpoint guard — no literal `@media (width … px)` outside `breakpoints.css`
 3. stylelint — no hex/rgb outside `tokens.css`, no new `!important`
+
+Go `html/template` files under `server/templates/` are formatted with **djLint** (`djlint.toml`, profile `golang`) — not Prettier or the built-in HTML formatter. CLI and the editor both call `deployment/scripts/djlint.sh` (mise-pinned).
 
 ## Adding new UI
 

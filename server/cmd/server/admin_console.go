@@ -86,3 +86,43 @@ func orgAdminConsole(view OrgAdminView) AdminConsoleView {
 		MainData:     view,
 	}
 }
+
+// RoleDialogAutoOpen reports whether a role dialog should reopen after a failed POST.
+func (v OrgAdminView) RoleDialogAutoOpen(action, slug string) bool {
+	if strings.TrimSpace(v.RoleError) == "" {
+		return false
+	}
+	if strings.TrimSpace(v.RoleDialogAction) != action {
+		return false
+	}
+	if action == "create" {
+		return true
+	}
+	return slug != "" && strings.TrimSpace(v.RoleDialogSlug) == slug
+}
+
+// InviteDialogAutoOpen reports whether the add-user dialog should reopen.
+func (v OrgAdminView) InviteDialogAutoOpen() bool {
+	return strings.TrimSpace(v.InviteError) != "" || strings.TrimSpace(v.InviteLink) != ""
+}
+
+// OrganizationDialogAutoOpen reports whether an org dialog should reopen after a failed POST.
+func (v PlatformAdminView) OrganizationDialogAutoOpen(action, slug string) bool {
+	if strings.TrimSpace(v.OrganizationDialogAction) != action {
+		return false
+	}
+	switch action {
+	case "create":
+		return strings.TrimSpace(v.OrganizationError) != ""
+	case "invite":
+		return strings.TrimSpace(v.InviteError) != "" &&
+			slug != "" &&
+			strings.TrimSpace(v.OrganizationDialogSlug) == slug
+	case "edit", "delete":
+		return strings.TrimSpace(v.OrganizationError) != "" &&
+			slug != "" &&
+			strings.TrimSpace(v.OrganizationDialogSlug) == slug
+	default:
+		return false
+	}
+}

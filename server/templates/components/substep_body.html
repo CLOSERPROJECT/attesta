@@ -6,22 +6,7 @@
       {{- .InputKey -}}
     </p>
   {{ end }}
-  <div class="role-pill-row u-m-0">
-    <span class="role-pill-label">
-      {{- if eq .Status "done" -}}
-        Completed by role:
-      {{- else -}}
-        Required role{{ if not (eq (len .RoleBadges) 1) }}s{{ end }}:
-      {{- end -}}
-    </span>
-    {{ range .RoleBadges }}
-      <span
-        class="pill pill-sm role-pill"
-        data-role-palette="{{ .Palette }}"
-        >{{ .Label }}</span
-      >
-    {{ end }}
-  </div>
+  {{ template "role_pill_row" (rolePillRowFromSubstepBody .) }}
   <hr class="u-divider-flush" />
   {{ $mode := effectiveSubstepBodyMode . }}
   {{ if eq $mode "message" }}

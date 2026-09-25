@@ -4,6 +4,14 @@
   gap: 22px;
 }
 
+.input-form-loose {
+  gap: calc(22px + var(--space-2));
+}
+
+.dialog-head:has(+ .input-form-loose) {
+  margin-bottom: calc(22px + var(--space-4));
+}
+
 .input-form > label {
   display: flex;
   flex-direction: column;
@@ -19,6 +27,7 @@
 }
 
 .form-field > label {
+  line-height: 1;
   font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
@@ -114,4 +123,36 @@
   color: var(--foreground);
   font-family: inherit;
   font-size: var(--text-base);
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.form-check.is-disabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.form-check input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.form-check.is-disabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.form-field-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
 }

@@ -1,0 +1,21 @@
+/*
+ * Role pill row — read-only list of palette-colored role pills (full component).
+ *
+ * div.role-pill-row[.u-m-0?]
+ *   span.role-pill-label?          — optional prefix (“Required roles:”)
+ *   span.pill.role-pill[.pill-sm|.pill-lg][data-role-palette]
+ *
+ * Pill primitives (.pill, .pill-sm, .pill-lg, .role-pill) stay in shared.css.
+ */
+
+.role-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-1);
+}
+
+.role-pill-label {
+  margin-right: var(--space-1);
+  font-size: var(--text-xs);
+}

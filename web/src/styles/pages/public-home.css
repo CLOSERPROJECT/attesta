@@ -218,24 +218,6 @@ h2.public-home-results-category-name {
   color: var(--muted-foreground);
 }
 
-.public-home-stream-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-6);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--primary) 4%, transparent);
-  color: var(--muted-foreground);
-}
-
-.public-home-stream-empty p {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-}
-
 .public-home-stream-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));

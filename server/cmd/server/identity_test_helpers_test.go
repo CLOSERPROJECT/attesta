@@ -28,6 +28,7 @@ type fakeIdentityStore struct {
 	listOrganizationsPageFunc               func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error)
 	listOrganizationMembershipsFunc         func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
 	listOrganizationMembershipsLiteFunc     func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
+	listUserMembershipsFunc                 func(ctx context.Context, userID string) ([]IdentityMembership, error)
 	listOrganizationUsersFunc               func(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	getOrganizationBySlugFunc               func(ctx context.Context, slug string) (*IdentityOrg, error)
 	updateOrganizationFunc                  func(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
@@ -37,6 +38,7 @@ type fakeIdentityStore struct {
 	updateOrganizationMembershipAsAdminFunc func(ctx context.Context, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	updateUserLabelsFunc                    func(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	deleteOrganizationMembershipFunc        func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
+	deleteOrganizationMembershipAsAdminFunc func(ctx context.Context, orgSlug, membershipID string) error
 	inviteOrganizationUserAsAdminFunc       func(ctx context.Context, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	uploadOrganizationLogoFunc              func(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	deleteOrganizationLogoFunc              func(ctx context.Context, fileID string) error
@@ -219,6 +221,13 @@ func (f *fakeIdentityStore) ListOrganizationMembershipsLite(ctx context.Context,
 	return f.ListOrganizationMemberships(ctx, org.Slug)
 }
 
+func (f *fakeIdentityStore) ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error) {
+	if f.listUserMembershipsFunc != nil {
+		return f.listUserMembershipsFunc(ctx, userID)
+	}
+	return nil, nil
+}
+
 func (f *fakeIdentityStore) ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
 	if f.listOrganizationUsersFunc != nil {
 		return f.listOrganizationUsersFunc(ctx, orgSlug)
@@ -278,6 +287,13 @@ func (f *fakeIdentityStore) UpdateUserLabels(ctx context.Context, userID string,
 func (f *fakeIdentityStore) DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
 	if f.deleteOrganizationMembershipFunc != nil {
 		return f.deleteOrganizationMembershipFunc(ctx, sessionSecret, orgSlug, membershipID)
+	}
+	return nil
+}
+
+func (f *fakeIdentityStore) DeleteOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string) error {
+	if f.deleteOrganizationMembershipAsAdminFunc != nil {
+		return f.deleteOrganizationMembershipAsAdminFunc(ctx, orgSlug, membershipID)
 	}
 	return nil
 }

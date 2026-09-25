@@ -210,8 +210,7 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	var out bytes.Buffer
-	view := PlatformAdminView{
-	}
+	view := PlatformAdminView{}
 	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
 		t.Fatalf("render platform_admin_body: %v", err)
 	}
@@ -224,9 +223,11 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		`href="/admin/organizations"`,
 		`href="/admin/categories"`,
 		`class="panel rail-layout-main"`,
+		`class="panel-section"`,
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Organizations</h2>",
+		"Create and manage organizations",
 		`class="btn btn-primary"`,
 		"Add organization",
 	} {
@@ -235,14 +236,28 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		}
 	}
 
-	headIdx := strings.Index(body, `class="panel-head-actions"`)
-	headingIdx := strings.Index(body, `class="panel-heading"`)
-	btnIdx := strings.Index(body, `onclick="document.getElementById('create-org-dialog').showModal()"`)
-	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
-		t.Fatal("expected panel-head-actions, panel-heading, and action button")
+	if strings.Contains(body, "Pending organization requests") {
+		t.Fatalf("did not expect pending requests block when empty, got:\n%s", body)
 	}
-	if !(headIdx < headingIdx && headingIdx < btnIdx) {
-		t.Fatalf("expected panel-heading before action button inside panel-head-actions block")
+	if strings.Contains(body, "organizations found") {
+		t.Fatalf("did not expect organizations found count, got:\n%s", body)
+	}
+
+	orgsHeadingIdx := strings.Index(body, "<h2>Organizations</h2>")
+	if orgsHeadingIdx == -1 {
+		t.Fatal("expected Organizations heading")
+	}
+	headIdx := strings.LastIndex(body[:orgsHeadingIdx], `class="panel-head-actions"`)
+	headingIdx := strings.LastIndex(body[:orgsHeadingIdx], `class="panel-heading"`)
+	descIdx := strings.Index(body[orgsHeadingIdx:], "Create and manage organizations")
+	btnIdx := strings.Index(body[orgsHeadingIdx:], `onclick="document.getElementById('create-org-dialog').showModal()"`)
+	if headIdx == -1 || headingIdx == -1 || descIdx == -1 || btnIdx == -1 {
+		t.Fatal("expected panel-head-actions, panel-heading, description, and action button around Organizations")
+	}
+	descIdx += orgsHeadingIdx
+	btnIdx += orgsHeadingIdx
+	if !(headIdx < headingIdx && headingIdx < orgsHeadingIdx && orgsHeadingIdx < descIdx && descIdx < btnIdx) {
+		t.Fatalf("expected panel-heading with description before action button inside Organizations panel-head-actions block")
 	}
 }
 
@@ -372,7 +387,7 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	rolesSection := body[sectionStart:]
 
 	for _, want := range []string{
-		`class="org-admin-panel-section"`,
+		`class="panel-section"`,
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Roles</h2>",
@@ -412,6 +427,20 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		Roles: []Role{
 			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald"},
 		},
+		PendingJoinRequests: []OrgAdminJoinRequestRow{
+			{ID: "join-1", RequesterEmail: "join@example.com"},
+		},
+		Invites: []OrgAdminInviteRow{
+			{
+				MembershipID: "membership-pending",
+				Email:        "pending@example.com",
+				Status:       "pending",
+				Roles: []OrgAdminRoleOption{
+					{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald"},
+				},
+				CreatedAtLabel: "20 Mar 2026 at 10:00 UTC",
+			},
+		},
 	}
 
 	var out bytes.Buffer
@@ -425,11 +454,58 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		`onclick="document.getElementById('add-user-dialog').showModal()"`,
 		"Add user",
 		`name="intent" value="invite"`,
+		`name="is_org_admin"`,
+		"Organization roles",
 		"Create invite",
+		"Pending join requests",
+		"join@example.com",
+		"Pending invites",
+		"pending@example.com",
+		`data-role-palette="emerald"`,
+		"QA Reviewer",
+		"Invited on: 20 Mar 2026 at 10:00 UTC",
+		`name="intent" value="delete_invite"`,
+		`name="membership_id" value="membership-pending"`,
+		`aria-label="Delete invite"`,
+		"<h2>Users</h2>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in members panel markup, got:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, `data-value="org-admin"`) {
+		t.Fatalf("invite and manage-user role pickers must not list Org admin as a role, got:\n%s", body)
+	}
+
+	pendingIdx := strings.Index(body, "Pending join requests")
+	invitesIdx := strings.Index(body, "Pending invites")
+	usersIdx := strings.Index(body, "<h2>Users</h2>")
+	if pendingIdx == -1 || invitesIdx == -1 || usersIdx == -1 || !(pendingIdx < invitesIdx && invitesIdx < usersIdx) {
+		t.Fatalf("expected Pending join requests, then Pending invites, then Users heading")
+	}
+
+	emptyView := OrgAdminView{
+		ActivePanel:  "members",
+		Organization: Organization{Name: "Acme Org", Slug: "acme-org"},
+	}
+	var emptyOut bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&emptyOut, "org_admin_body", emptyView); err != nil {
+		t.Fatalf("render empty org_admin_body: %v", err)
+	}
+	emptyBody := emptyOut.String()
+	for _, gone := range []string{
+		"Pending join requests",
+		"Pending invites",
+		"No pending join requests",
+		"No invites yet",
+		"Invites I sent",
+	} {
+		if strings.Contains(emptyBody, gone) {
+			t.Fatalf("empty members panel must not contain %q, got:\n%s", gone, emptyBody)
+		}
+	}
+	if !strings.Contains(emptyBody, "<h2>Users</h2>") {
+		t.Fatalf("expected Users heading in empty members panel, got:\n%s", emptyBody)
 	}
 }
 

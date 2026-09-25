@@ -1,0 +1,40 @@
+{{/* Used on /my/onboarding/request-organization for Organization creation requests. */}}
+
+{{ define "onboarding_request_organization_body" }}
+<section class="stack u-max-w-prose u-mx-auto">
+  <section class="page-header">
+    {{ template "back_link" .BackLink }}
+    <div class="page-header-body">
+      <h1>Request a new organization</h1>
+      <p>Submit an organization creation request. A platform admin will approve or reject it.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form method="post" action="/my/onboarding/request-organization" class="input-form">
+      <div class="form-field">
+        <label for="org-creation-name">Organization name</label>
+        <input
+          id="org-creation-name"
+          name="name"
+          type="text"
+          value="{{ .NameValue }}"
+          placeholder="Your organization name"
+          required
+          autocomplete="organization"
+        />
+      </div>
+      {{ if .FormError }}
+        <p class="error">{{ .FormError }}</p>
+      {{ end }}
+      <div class="onboarding-request-actions">
+        <button class="btn btn-primary" type="submit">Submit organization creation request</button>
+      </div>
+    </form>
+  </section>
+</section>
+{{ end }}
+
+{{ define "onboarding_request_organization.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

@@ -32,12 +32,13 @@
 
 .breadcrumbs-item:not(:last-child)::after {
   content: "/";
-  color: color-mix(in srgb, var(--muted-foreground) 55%, var(--background));
+  color: var(--muted-foreground);
   font-weight: var(--font-normal);
 }
 
-/* Mix toward background (not transparent — transparent pulls toward black in srgb).
- * Beat reset `a { color: var(--primary) }` for link / visited / current. */
+/* Beat reset `a { color: var(--primary) }` for link / visited / current.
+ * Use the token directly — do not color-mix with --background (dark theme
+ * sets background to a gradient, which breaks color-mix). */
 .breadcrumbs a.breadcrumbs-link,
 .breadcrumbs a.breadcrumbs-link:link,
 .breadcrumbs a.breadcrumbs-link:visited,
@@ -45,7 +46,7 @@
 .breadcrumbs a.breadcrumbs-link:active,
 .breadcrumbs a.breadcrumbs-link[aria-current="page"],
 .breadcrumbs .breadcrumbs-current {
-  color: color-mix(in srgb, var(--muted-foreground) 55%, var(--background));
+  color: var(--muted-foreground);
   font-weight: var(--font-normal);
   text-decoration: none;
 }

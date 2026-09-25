@@ -179,10 +179,40 @@ func TestHomePickerBodyTemplateRendersEmptyState(t *testing.T) {
 	for _, gone := range []string{
 		`nav-drawer-trigger`,
 		`category-sidebar`,
+		`href="/my/onboarding/join"`,
 	} {
 		if strings.Contains(body, gone) {
 			t.Fatalf("empty home picker must not render %q, got: %s", gone, body)
 		}
+	}
+}
+
+func TestHomePickerBodyTemplateRendersUnaffiliatedEmptyState(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	view := HomeWorkflowPickerView{
+		PageBase:     PageBase{Body: "home_picker_body"},
+		Unaffiliated: true,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "home_picker_body", view); err != nil {
+		t.Fatalf("render home_picker_body template: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`class="empty-state"`,
+		"No streams available",
+		"You are not part of an organization yet",
+		`href="/my/onboarding/join"`,
+		`href="/my/onboarding/request-organization"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in unaffiliated empty home picker, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "Streams for your organization and roles will appear here.") {
+		t.Fatalf("unaffiliated empty state must not imply org membership, got: %s", body)
 	}
 }
 

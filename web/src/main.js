@@ -1220,12 +1220,241 @@ function promoteToasts(root = document) {
   }
 }
 
+const createRolePill = (label, palette) => {
+  const pill = document.createElement("span");
+  pill.className = "pill pill-sm role-pill";
+  if (palette) {
+    pill.setAttribute("data-role-palette", palette);
+  }
+  pill.textContent = label;
+  return pill;
+};
+
+const closeRolePickers = (root = document, except = null) => {
+  const scope =
+    root instanceof Element || root instanceof Document ? root : document;
+  for (const picker of scope.querySelectorAll("[data-role-picker]")) {
+    if (picker === except) {
+      continue;
+    }
+    const menu = picker.querySelector("[data-role-picker-menu]");
+    const toggle = picker.querySelector("[data-role-picker-toggle]");
+    if (!menu || !toggle) {
+      continue;
+    }
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  }
+};
+
+const initRolePickers = (root = document) => {
+  const scope =
+    root instanceof Element || root instanceof Document ? root : document;
+  for (const picker of scope.querySelectorAll("[data-role-picker]")) {
+    if (!(picker instanceof HTMLElement)) {
+      continue;
+    }
+    if (picker.dataset.rolePickerReady === "true") {
+      continue;
+    }
+    const toggle = picker.querySelector("[data-role-picker-toggle]");
+    const toggleLabel = picker.querySelector("[data-role-picker-toggle-label]");
+    const menu = picker.querySelector("[data-role-picker-menu]");
+    const search = picker.querySelector("[data-role-picker-search]");
+    const searchClear = picker.querySelector("[data-role-picker-search-clear]");
+    const empty = picker.querySelector("[data-role-picker-empty]");
+    const hiddenInputs = picker.querySelector("[data-role-picker-hidden-inputs]");
+    const optionsList = picker.querySelector(".roles-picker-options");
+    const optionButtons = Array.from(
+      picker.querySelectorAll("[data-role-picker-option]"),
+    );
+    if (!toggle || !toggleLabel) {
+      continue;
+    }
+
+    picker.dataset.rolePickerReady = "true";
+
+    const selected = new Set();
+    for (const button of optionButtons) {
+      if (button.getAttribute("data-selected") === "true") {
+        const value = button.getAttribute("data-value");
+        if (value) {
+          selected.add(value);
+        }
+      }
+    }
+
+    const syncHiddenInputs = () => {
+      if (!hiddenInputs) {
+        return;
+      }
+      hiddenInputs.innerHTML = "";
+      for (const button of optionButtons) {
+        const value = button.getAttribute("data-value");
+        if (!value || !selected.has(value)) {
+          continue;
+        }
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "roles";
+        input.value = value;
+        hiddenInputs.appendChild(input);
+      }
+    };
+
+    const syncSubmit = () => {
+      if (!picker.hasAttribute("data-role-picker-require-selection")) {
+        return;
+      }
+      const form = picker.closest("form");
+      const submit = form?.querySelector("[data-role-picker-submit]");
+      if (!(submit instanceof HTMLButtonElement)) {
+        return;
+      }
+      submit.disabled = selected.size === 0 || optionButtons.length === 0;
+    };
+
+    const updateToggleLabel = () => {
+      toggleLabel.replaceChildren();
+      if (optionButtons.length === 0) {
+        toggleLabel.textContent = "No roles available";
+        return;
+      }
+      if (selected.size === 0) {
+        toggleLabel.textContent = "Select roles";
+        return;
+      }
+      for (const button of optionButtons) {
+        const value = button.getAttribute("data-value");
+        if (!value || !selected.has(value)) {
+          continue;
+        }
+        const label = button.getAttribute("data-label") || value;
+        const palette = button.getAttribute("data-palette") || "";
+        toggleLabel.appendChild(createRolePill(label, palette));
+      }
+    };
+
+    const updateOptionState = () => {
+      for (const button of optionButtons) {
+        const value = button.getAttribute("data-value");
+        const isSelected = !!value && selected.has(value);
+        button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+        button.classList.toggle("is-selected", isSelected);
+      }
+    };
+
+    const applySearchFilter = () => {
+      const query = search ? search.value.trim().toLowerCase() : "";
+      let visibleCount = 0;
+      for (const button of optionButtons) {
+        const item = button.closest("li");
+        const label = (button.getAttribute("data-label") || "").toLowerCase();
+        const match = query === "" || label.includes(query);
+        if (item) {
+          item.hidden = !match;
+        }
+        if (match) {
+          visibleCount += 1;
+        }
+      }
+      if (optionsList) {
+        optionsList.hidden = visibleCount === 0;
+      }
+      if (empty) {
+        empty.hidden = visibleCount > 0;
+      }
+      if (searchClear instanceof HTMLElement) {
+        searchClear.hidden = !search || search.value.length === 0;
+      }
+    };
+
+    if (optionButtons.length === 0) {
+      toggleLabel.textContent = "No roles available";
+      toggle.disabled = true;
+      if (menu) {
+        menu.hidden = true;
+      }
+      syncSubmit();
+      continue;
+    }
+
+    if (!menu || !hiddenInputs) {
+      continue;
+    }
+
+    toggle.addEventListener("click", () => {
+      const isOpen = !menu.hidden;
+      closeRolePickers(document, picker);
+      menu.hidden = isOpen;
+      toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      if (!isOpen && search) {
+        search.focus();
+      }
+    });
+
+    for (const button of optionButtons) {
+      button.addEventListener("click", () => {
+        const value = button.getAttribute("data-value");
+        if (!value) {
+          return;
+        }
+        if (selected.has(value)) {
+          selected.delete(value);
+        } else {
+          selected.add(value);
+        }
+        updateOptionState();
+        updateToggleLabel();
+        syncHiddenInputs();
+        syncSubmit();
+      });
+    }
+
+    if (search) {
+      search.addEventListener("input", applySearchFilter);
+    }
+
+    if (searchClear instanceof HTMLButtonElement && search) {
+      searchClear.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        search.value = "";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.focus();
+      });
+    }
+
+    updateOptionState();
+    updateToggleLabel();
+    syncHiddenInputs();
+    syncSubmit();
+    applySearchFilter();
+  }
+};
+
+const openAutoOpenDialogs = (root = document) => {
+  const scope = root instanceof Element || root instanceof Document ? root : document;
+  for (const dialog of scope.querySelectorAll("dialog[data-auto-open]")) {
+    if (!(dialog instanceof HTMLDialogElement) || dialog.open) {
+      continue;
+    }
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   formatLocalDateTimes(document);
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
   focusNextActionInput();
   promoteToasts(document);
+  initRolePickers(document);
+  openAutoOpenDialogs(document);
 });
 
 document.addEventListener("click", (event) => {
@@ -1241,12 +1470,17 @@ document.addEventListener("click", (event) => {
       dropdown.removeAttribute("open");
     }
   }
+  if (!target.closest("[data-role-picker]")) {
+    closeRolePickers(document);
+  }
 });
 
 document.body.addEventListener("htmx:afterSwap", (event) => {
   if (event.target instanceof Element) {
     formatLocalDateTimes(event.target);
     promoteToasts(event.target);
+    initRolePickers(event.target);
+    openAutoOpenDialogs(event.target);
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);

@@ -181,6 +181,16 @@
                           My organization
                         </a>
                       {{ end }}
+                      {{ if .ShowAccountSettings }}
+                        <button
+                          type="button"
+                          class="account-menu-item"
+                          onclick="document.getElementById('account-settings-dialog').showModal()"
+                        >
+                          {{ template "icon-settings" . }}
+                          Account settings
+                        </button>
+                      {{ end }}
                       <form method="post" action="/logout">
                         <button
                           type="submit"
@@ -193,6 +203,100 @@
                     </section>
                   </div>
                 </details>
+                {{ if .ShowAccountSettings }}
+                  <dialog id="account-settings-dialog" class="dialog">
+                    <div class="dialog-card">
+                      <header class="dialog-head dialog-head-ruled">
+                        <div>
+                          <h3 class="dialog-title">Account settings</h3>
+                          <p class="dialog-subtitle">
+                            {{ if .AccountOrgName }}
+                              {{ .AccountOrgName }}
+                            {{ else }}
+                              Your organization
+                            {{ end }}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-icon dialog-close"
+                          onclick="document.getElementById('account-settings-dialog').close()"
+                        >
+                          {{ template "icon-close" . }}
+                        </button>
+                      </header>
+                      <div class="u-flex-center u-justify-between u-gap-4">
+                        <div>
+                          <p class="u-m-0">Leave organization</p>
+                          {{ if and (not .CanLeave) .LeaveReason }}
+                            <p class="form-field-hint">{{ .LeaveReason }}</p>
+                          {{ end }}
+                        </div>
+                        {{ if .CanLeave }}
+                          <button
+                            type="button"
+                            class="btn btn-danger"
+                            onclick="document.getElementById('account-settings-dialog').close(); document.getElementById('leave-organization-dialog').showModal()"
+                          >
+                            Leave organization
+                          </button>
+                        {{ else }}
+                          <button
+                            type="button"
+                            class="btn btn-danger"
+                            disabled
+                            title="{{ .LeaveReason }}"
+                          >
+                            Leave organization
+                          </button>
+                        {{ end }}
+                      </div>
+                    </div>
+                  </dialog>
+                  {{ if .CanLeave }}
+                    <dialog id="leave-organization-dialog" class="dialog">
+                      <div class="dialog-card">
+                        <header class="dialog-head">
+                          <div>
+                            <h3 class="dialog-title u-text-danger">
+                              Leave organization
+                            </h3>
+                            <p class="dialog-subtitle">{{ .AccountOrgName }}</p>
+                          </div>
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-icon dialog-close"
+                            onclick="document.getElementById('leave-organization-dialog').close()"
+                          >
+                            {{ template "icon-close" . }}
+                          </button>
+                        </header>
+                        <p class="u-m-0 u-mb-5">
+                          You will lose access to this organization’s streams and
+                          data until you join again.
+                        </p>
+                        <form
+                          method="post"
+                          action="{{ .LeavePath }}"
+                          class="input-form"
+                        >
+                          <div class="dialog-actions">
+                            <button
+                              type="button"
+                              class="btn btn-ghost"
+                              onclick="document.getElementById('leave-organization-dialog').close()"
+                            >
+                              Cancel
+                            </button>
+                            <button type="submit" class="btn btn-danger">
+                              Leave organization
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </dialog>
+                  {{ end }}
+                {{ end }}
               {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
                 <a href="/login" class="btn btn-ghost btn-lg nav-action">
                   {{ template "icon-log-in" . }}
@@ -231,6 +335,12 @@
           {{ template "dpp_body" . }}
         {{ else if eq .Body "untp_vocabulary_body" }}
           {{ template "untp_vocabulary_body" . }}
+        {{ else if eq .Body "onboarding_body" }}
+          {{ template "onboarding_body" . }}
+        {{ else if eq .Body "onboarding_join_body" }}
+          {{ template "onboarding_join_body" . }}
+        {{ else if eq .Body "onboarding_request_organization_body" }}
+          {{ template "onboarding_request_organization_body" . }}
         {{ end }}
       </main>
 {{ template "site_footer" . }}

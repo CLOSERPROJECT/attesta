@@ -1,0 +1,232 @@
+{{/* Used on /my/onboarding/join for organization join requests. */}}
+
+{{ define "onboarding_join_body" }}
+<section class="stack u-max-w-prose u-mx-auto">
+  <section class="page-header">
+    {{ template "back_link" .BackLink }}
+    <div class="page-header-body">
+      <h1>Join an organization</h1>
+      <p>Search for an organization and request membership.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form
+      method="get"
+      action="/my/onboarding/join"
+      class="input-form"
+      id="onboarding-join-search"
+    >
+      <input type="hidden" name="page" value="1" />
+      <div class="form-field">
+        <label for="join-org-search">Organization search</label>
+        <input
+          id="join-org-search"
+          name="q"
+          type="search"
+          value="{{ .SearchQuery }}"
+          placeholder="Filter by name..."
+          autocomplete="off"
+          hx-get="/my/onboarding/join"
+          hx-target="#onboarding-join-results"
+          hx-select="#onboarding-join-results"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-include="#onboarding-join-search"
+          hx-trigger="input changed delay:200ms, search"
+        />
+      </div>
+      <noscript>
+        <button class="btn btn-secondary" type="submit">Search</button>
+      </noscript>
+    </form>
+
+    {{ template "onboarding_join_results" . }}
+  </section>
+
+  <dialog
+    id="join-org-dialog"
+    class="dialog dialog-overflow"
+  >
+    <div id="join-org-dialog-body">
+      {{ if .SelectedOrgSlug }}
+        {{ template "onboarding_join_dialog" . }}
+      {{ end }}
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      const dialog = document.getElementById("join-org-dialog");
+      const dialogBody = document.getElementById("join-org-dialog-body");
+
+      const openJoinDialog = () => {
+        if (dialog && !dialog.open) {
+          dialog.showModal();
+        }
+      };
+
+      if (dialogBody && dialogBody.querySelector("[data-join-dialog-card]")) {
+        openJoinDialog();
+      }
+
+      document.body.addEventListener("htmx:afterSwap", (event) => {
+        if (event.target !== dialogBody) {
+          return;
+        }
+        openJoinDialog();
+      });
+    })();
+  </script>
+
+  {{ if and .FormError (not .SelectedOrgSlug) }}
+    <p class="error">{{ .FormError }}</p>
+  {{ end }}
+</section>
+{{ end }}
+
+{{ define "onboarding_join_dialog" }}
+  <div class="dialog-card" data-join-dialog-card>
+    <header class="dialog-head">
+      <div>
+        <h3 class="dialog-title">Request to join {{ .SelectedOrgName }}</h3>
+        <p class="dialog-subtitle">
+          Choose one or more organization roles for your membership.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-ghost btn-icon dialog-close"
+        onclick="document.getElementById('join-org-dialog').close()"
+      >
+        {{ template "icon-close" . }}
+      </button>
+    </header>
+
+    <form method="post" action="/my/onboarding/join" class="input-form">
+      <input type="hidden" name="org_slug" value="{{ .SelectedOrgSlug }}" />
+      <input type="hidden" name="q" value="{{ .SearchQuery }}" />
+      <input type="hidden" name="page" value="{{ .CurrentPage }}" />
+      <div class="form-field">
+        <label>Roles</label>
+        {{ if .SelectedOrgRoles }}
+          {{ template "roles_picker" (rolesPickerFromRoles .SelectedOrgRoles true) }}
+        {{ else }}
+          <div class="empty-state">
+            <p class="empty-state-title">This organization has no requestable roles yet.</p>
+          </div>
+        {{ end }}
+      </div>
+      {{ if .FormError }}
+        <p class="error">{{ .FormError }}</p>
+      {{ end }}
+      <div class="dialog-actions">
+        <button
+          class="btn btn-primary"
+          type="submit"
+          data-role-picker-submit
+          disabled
+        >
+          Submit join request
+        </button>
+      </div>
+    </form>
+  </div>
+{{ end }}
+
+{{ define "onboarding_join_results" }}
+  <div id="onboarding-join-results">
+    {{ if .HasSearched }}
+      {{ if .Results }}
+        <ul class="list-rows">
+          {{ range .Results }}
+            <li>
+              <button
+                type="button"
+                class="list-row"
+                hx-get="{{ .DialogHref }}"
+                hx-target="#join-org-dialog-body"
+                hx-swap="innerHTML"
+              >
+                <div class="list-row-main">
+                  {{ if .LogoURL }}
+                    <img
+                      src="{{ .LogoURL }}"
+                      alt=""
+                      class="org-profile-logo org-profile-logo-sm"
+                    />
+                  {{ else }}
+                    <span
+                      class="org-profile-logo-placeholder org-profile-logo-placeholder-sm"
+                      aria-hidden="true"
+                    >
+                      {{ template "icon-building-grid" . }}
+                    </span>
+                  {{ end }}
+                  <span>{{ .Name }}</span>
+                </div>
+              </button>
+            </li>
+          {{ end }}
+        </ul>
+        {{ if gt .TotalPages 1 }}
+          <nav
+            class="platform-admin-pagination"
+            aria-label="Organizations pagination"
+          >
+            <div class="platform-admin-pagination-pages">
+              <a
+                class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
+                href="/my/onboarding/join{{- if or .SearchQuery (gt .PreviousPage 1) -}}?{{- if .SearchQuery -}}q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}&amp;{{- end -}}{{- end -}}{{- if gt .PreviousPage 1 -}}page={{ .PreviousPage }}{{- end -}}{{- end -}}"
+                hx-get="/my/onboarding/join{{- if or .SearchQuery (gt .PreviousPage 1) -}}?{{- if .SearchQuery -}}q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}&amp;{{- end -}}{{- end -}}{{- if gt .PreviousPage 1 -}}page={{ .PreviousPage }}{{- end -}}{{- end -}}"
+                hx-target="#onboarding-join-results"
+                hx-select="#onboarding-join-results"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+              >
+                {{ template "icon-chevron-left" . }}
+              </a>
+              {{ range .PageNumbers }}
+                <a
+                  class="{{ if eq . $.CurrentPage }}btn btn-primary{{ else }}btn btn-secondary{{ end }}"
+                  href="/my/onboarding/join{{- if or $.SearchQuery (gt . 1) -}}?{{- if $.SearchQuery -}}q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&amp;{{- end -}}{{- end -}}{{- if gt . 1 -}}page={{ . }}{{- end -}}{{- end -}}"
+                  hx-get="/my/onboarding/join{{- if or $.SearchQuery (gt . 1) -}}?{{- if $.SearchQuery -}}q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&amp;{{- end -}}{{- end -}}{{- if gt . 1 -}}page={{ . }}{{- end -}}{{- end -}}"
+                  hx-target="#onboarding-join-results"
+                  hx-select="#onboarding-join-results"
+                  hx-swap="outerHTML"
+                  hx-push-url="true"
+                  >{{ . }}</a
+                >
+              {{ end }}
+              <a
+                class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
+                href="/my/onboarding/join{{- if or .SearchQuery (gt .NextPage 1) -}}?{{- if .SearchQuery -}}q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}&amp;{{- end -}}{{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{- end -}}{{- end -}}"
+                hx-get="/my/onboarding/join{{- if or .SearchQuery (gt .NextPage 1) -}}?{{- if .SearchQuery -}}q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}&amp;{{- end -}}{{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{- end -}}{{- end -}}"
+                hx-target="#onboarding-join-results"
+                hx-select="#onboarding-join-results"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+              >
+                {{ template "icon-chevron-right" . }}
+              </a>
+            </div>
+          </nav>
+        {{ end }}
+      {{ else }}
+        <div class="empty-state">
+          {{ if .SearchQuery }}
+            <p class="empty-state-title">No organizations match your search</p>
+            <p class="empty-state-hint">Try a different name.</p>
+          {{ else }}
+            <p class="empty-state-title">No organizations yet</p>
+            <p class="empty-state-hint">Request a new organization from onboarding, or ask an admin to create one.</p>
+          {{ end }}
+        </div>
+      {{ end }}
+    {{ end }}
+  </div>
+{{ end }}
+
+{{ define "onboarding_join.html" }}
+  {{ template "layout.html" . }}
+{{ end }}
