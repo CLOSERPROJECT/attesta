@@ -11,7 +11,7 @@ import (
 func TestLayoutRendersFooterContent(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	var rendered bytes.Buffer
-	view := PageBase{}
+	view := PageBase{BuildVersion: "1.abc1234"}
 
 	if err := tmpl.ExecuteTemplate(&rendered, "layout.html", view); err != nil {
 		t.Fatalf("ExecuteTemplate() error = %v", err)
@@ -27,6 +27,9 @@ func TestLayoutRendersFooterContent(t *testing.T) {
 	}
 	if !strings.Contains(body, "site-footer") {
 		t.Fatalf("expected footer markup in layout, got %q", body)
+	}
+	if !strings.Contains(body, "Version: 1.abc1234") {
+		t.Fatalf("expected build version in footer, got %q", body)
 	}
 	if strings.Contains(body, `href="/about"`) {
 		t.Fatalf("expected about link to be removed, got %q", body)

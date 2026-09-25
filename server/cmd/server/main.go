@@ -162,6 +162,7 @@ type Server struct {
 	viteDevServer      string
 	enforceAuth        bool
 	formataArchURL     string
+	buildVersion       string
 }
 
 type SSEHub struct {
@@ -277,6 +278,7 @@ type RoleMeta struct {
 
 type PageBase struct {
 	Body                   string
+	BuildVersion           string
 	ViteDevServer          string
 	WorkflowKey            string
 	WorkflowName           string
@@ -779,6 +781,7 @@ func main() {
 		viteDevServer:  strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 		enforceAuth:    true,
 		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
+		buildVersion:   applicationVersion(),
 		mailer:         newMailerFromEnv(),
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
@@ -1362,6 +1365,7 @@ func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Reques
 func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	base := PageBase{
 		Body:          body,
+		BuildVersion:  s.buildVersion,
 		ViteDevServer: s.viteDevServer,
 		WorkflowKey:   strings.TrimSpace(workflowKey),
 		WorkflowName:  strings.TrimSpace(workflowName),

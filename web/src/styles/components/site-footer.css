@@ -117,10 +117,22 @@
   color: var(--muted-foreground);
 }
 
-.site-footer-meta > p {
+.site-footer-legal-meta > p {
   margin: 0;
   font-size: var(--text-xs);
   line-height: 1rem;
+}
+
+.site-footer-legal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.site-footer-version {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  opacity: 0.65;
 }
 
 .site-footer-socials {
