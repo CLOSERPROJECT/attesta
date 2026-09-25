@@ -37,8 +37,17 @@
   color: var(--muted-foreground);
 }
 
-#platform-admin-results .list-rows {
+#platform-admin-results .list-rows,
+#platform-admin-results .empty-state {
   margin-top: var(--space-5);
+}
+
+.platform-admin-results-footer {
+  margin-top: var(--space-5);
+}
+
+.platform-admin-results-footer .platform-admin-pagination {
+  margin-top: 0;
 }
 
 .platform-admin-item-copy {

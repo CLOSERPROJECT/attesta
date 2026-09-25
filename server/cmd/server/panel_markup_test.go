@@ -223,10 +223,11 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		`href="/admin/organizations"`,
 		`href="/admin/categories"`,
 		`class="panel rail-layout-main"`,
-		"Pending organization requests",
+		`class="panel-section"`,
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Organizations</h2>",
+		"Create and manage organizations",
 		`class="btn btn-primary"`,
 		"Add organization",
 	} {
@@ -235,19 +236,28 @@ func TestPlatformAdminPanelMarkup(t *testing.T) {
 		}
 	}
 
+	if strings.Contains(body, "Pending organization requests") {
+		t.Fatalf("did not expect pending requests block when empty, got:\n%s", body)
+	}
+	if strings.Contains(body, "organizations found") {
+		t.Fatalf("did not expect organizations found count, got:\n%s", body)
+	}
+
 	orgsHeadingIdx := strings.Index(body, "<h2>Organizations</h2>")
 	if orgsHeadingIdx == -1 {
 		t.Fatal("expected Organizations heading")
 	}
 	headIdx := strings.LastIndex(body[:orgsHeadingIdx], `class="panel-head-actions"`)
 	headingIdx := strings.LastIndex(body[:orgsHeadingIdx], `class="panel-heading"`)
+	descIdx := strings.Index(body[orgsHeadingIdx:], "Create and manage organizations")
 	btnIdx := strings.Index(body[orgsHeadingIdx:], `onclick="document.getElementById('create-org-dialog').showModal()"`)
-	if headIdx == -1 || headingIdx == -1 || btnIdx == -1 {
-		t.Fatal("expected panel-head-actions, panel-heading, and action button around Organizations")
+	if headIdx == -1 || headingIdx == -1 || descIdx == -1 || btnIdx == -1 {
+		t.Fatal("expected panel-head-actions, panel-heading, description, and action button around Organizations")
 	}
+	descIdx += orgsHeadingIdx
 	btnIdx += orgsHeadingIdx
-	if !(headIdx < headingIdx && headingIdx < orgsHeadingIdx && orgsHeadingIdx < btnIdx) {
-		t.Fatalf("expected panel-heading before action button inside Organizations panel-head-actions block")
+	if !(headIdx < headingIdx && headingIdx < orgsHeadingIdx && orgsHeadingIdx < descIdx && descIdx < btnIdx) {
+		t.Fatalf("expected panel-heading with description before action button inside Organizations panel-head-actions block")
 	}
 }
 

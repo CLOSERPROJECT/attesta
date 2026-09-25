@@ -8,13 +8,13 @@
   {{ if eq .ActivePanel "categories" }}
     {{ template "platform_admin_categories_panel" . }}
   {{ else }}
-    <div class="panel-section">
-      <section class="panel-block">
-        <div class="panel-heading">
-          <h2>Pending organization requests</h2>
-          <p>Review organization creation requests from unaffiliated users</p>
-        </div>
-        {{ if .PendingOrgCreationRequests }}
+    <section class="panel-section">
+      {{ if .PendingOrgCreationRequests }}
+        <div class="panel-block">
+          <div class="panel-heading">
+            <h2>Pending organization requests</h2>
+            <p>Review organization creation requests from unaffiliated users</p>
+          </div>
           <ul class="list-rows">
             {{ range .PendingOrgCreationRequests }}
               <li class="list-row">
@@ -75,17 +75,16 @@
               </li>
             {{ end }}
           </ul>
-        {{ else }}
-          <div class="empty-state">
-            <p class="empty-state-title">No pending organization creation requests.</p>
-          </div>
-        {{ end }}
-      </section>
+        </div>
+
+        <hr />
+      {{ end }}
 
       <div class="panel-block">
         <div class="panel-head-actions">
           <div class="panel-heading">
             <h2>Organizations</h2>
+            <p>Create and manage organizations</p>
           </div>
           <button class="btn btn-primary"
                   type="button"
@@ -120,7 +119,7 @@
 
         {{ template "platform_admin_results" . }}
       </div>
-    </div>
+    </section>
 
     <dialog id="create-org-dialog"
             class="dialog"
@@ -582,10 +581,6 @@
 
 {{ define "platform_admin_results" }}
   <div id="platform-admin-results">
-    <p class="muted">
-      {{ .MatchedOrganizations }}
-      organization{{ if ne .MatchedOrganizations 1 }}s{{ end }} found.
-    </p>
     {{ if and .Error (eq .OrganizationDialogAction "") }}
       <p class="error">{{ .Error }}</p>
     {{ end }}
@@ -788,63 +783,70 @@
           </li>
         {{ end }}
       </ul>
+
+      {{ if gt .TotalPages 1 }}
+        <footer class="platform-admin-results-footer">
+          <nav class="platform-admin-pagination"
+               aria-label="Organizations pagination">
+            <div class="platform-admin-pagination-pages">
+              <a class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}" href="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
+                      &
+                    {{- end -}}
+                  {{- end -}}{{- if gt .PreviousPage 1 -}}
+                    page={{ .PreviousPage }}
+                  {{- end -}}
+                {{- end -}}" hx-get="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
+                      &
+                    {{- end -}}
+                  {{- end -}}{{- if gt .PreviousPage 1 -}}
+                    page={{ .PreviousPage }}
+                  {{- end -}}
+                {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">
+                {{ template "icon-chevron-left" . }}
+              </a>
+              {{ range .PageNumbers }}
+                <a class="{{ if eq . $.CurrentPage }} btn btn-primary {{ else }} btn btn-secondary {{ end }}" href="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
+                    ?{{- if $.SearchQuery -}}
+                      q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                    {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+                  {{- end -}}" hx-get="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
+                    ?{{- if $.SearchQuery -}}
+                      q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                    {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+                  {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">{{ . }}</a>
+              {{ end }}
+              <a class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}" href="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                      &
+                    {{ end }}
+                  {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+                {{- end -}}" hx-get="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                      &
+                    {{ end }}
+                  {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+                {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">
+                {{ template "icon-chevron-right" . }}
+              </a>
+            </div>
+          </nav>
+        </footer>
+      {{ end }}
     {{ else }}
       <div class="empty-state">
-        <p class="empty-state-title">No organizations match your search</p>
+        {{ if .SearchQuery }}
+          <p class="empty-state-title">No organizations match your search</p>
+          <p class="empty-state-hint">Try a different name.</p>
+        {{ else }}
+          <p class="empty-state-title">No organizations yet</p>
+        {{ end }}
       </div>
-    {{ end }}
-
-    {{ if gt .TotalPages 1 }}
-      <nav class="platform-admin-pagination"
-           aria-label="Organizations pagination">
-        <div class="platform-admin-pagination-pages">
-          <a class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}" href="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
-                  &
-                {{- end -}}
-              {{- end -}}{{- if gt .PreviousPage 1 -}}
-                page={{ .PreviousPage }}
-              {{- end -}}
-            {{- end -}}" hx-get="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
-                  &
-                {{- end -}}
-              {{- end -}}{{- if gt .PreviousPage 1 -}}
-                page={{ .PreviousPage }}
-              {{- end -}}
-            {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">
-            {{ template "icon-chevron-left" . }}
-          </a>
-          {{ range .PageNumbers }}
-            <a class="{{ if eq . $.CurrentPage }} btn btn-primary {{ else }} btn btn-secondary {{ end }}" href="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
-                ?{{- if $.SearchQuery -}}
-                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
-                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
-              {{- end -}}" hx-get="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
-                ?{{- if $.SearchQuery -}}
-                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
-                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
-              {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">{{ . }}</a>
-          {{ end }}
-          <a class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}" href="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
-                  &
-                {{ end }}
-              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
-            {{- end -}}" hx-get="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
-                  &
-                {{ end }}
-              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
-            {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">
-            {{ template "icon-chevron-right" . }}
-          </a>
-        </div>
-      </nav>
     {{ end }}
   </div>
 {{ end }}
