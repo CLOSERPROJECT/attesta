@@ -1,0 +1,49 @@
+{{/* Explicit Turnstile render gate for login and signup forms. */}}
+
+{{ define "turnstile_gate_script" }}
+  <script>
+    window.initializeTurnstileGates = () => {
+      document.querySelectorAll("[data-turnstile-gate]").forEach((gate) => {
+        const form = document.getElementById(gate.dataset.turnstileForm);
+        const widget = gate.querySelector("[data-turnstile-widget]");
+        const error = gate.querySelector("[data-turnstile-error]");
+        const tokenInput = form?.querySelector("[name='cf-turnstile-response']");
+        const sitekey = gate.dataset.turnstileSitekey;
+        if (!form || !widget || !error || !tokenInput || !sitekey || !window.turnstile) {
+          return;
+        }
+
+        const lockForm = (message) => {
+          tokenInput.value = "";
+          form.hidden = true;
+          gate.hidden = false;
+          error.textContent = message || "";
+          error.hidden = !message;
+        };
+        const widgetID = window.turnstile.render(widget, {
+          sitekey,
+          callback: (token) => {
+            tokenInput.value = token;
+            error.hidden = true;
+            gate.hidden = true;
+            form.hidden = false;
+            form.querySelector("input:not([type='hidden'])")?.focus();
+          },
+          "error-callback": () => lockForm("Verification could not be completed. Please try again."),
+          "expired-callback": () => lockForm("Verification expired. Please try again."),
+        });
+        form.addEventListener("submit", (event) => {
+          if (tokenInput.value) {
+            return;
+          }
+          event.preventDefault();
+          lockForm("Verification expired. Please try again.");
+          window.turnstile.reset(widgetID);
+        });
+      });
+    };
+  </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=initializeTurnstileGates"
+          async
+          defer></script>
+{{ end }}

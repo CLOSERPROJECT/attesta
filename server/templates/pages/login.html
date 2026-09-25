@@ -7,37 +7,48 @@
         <h1>Login</h1>
         <p>Use your account credentials to continue</p>
       </div>
-      <form method="post" action="/login" class="input-form">
+      {{ if .TurnstileSiteKey }}
+        <section class="turnstile-gate"
+                 data-turnstile-gate
+                 data-turnstile-form="login-form"
+                 data-turnstile-sitekey="{{ .TurnstileSiteKey }}">
+          <p class="turnstile-gate-copy">First, verify that you are human.</p>
+          <div class="turnstile-gate-widget cf-turnstile" data-turnstile-widget></div>
+          <p class="turnstile-gate-error" data-turnstile-error hidden></p>
+        </section>
+      {{ end }}
+      <form method="post"
+            action="/login"
+            class="input-form"
+            id="login-form"
+            {{ if .TurnstileSiteKey }}hidden{{ end }}>
         <input type="hidden" name="next" value="{{ .Next }}" />
+        {{ if .TurnstileSiteKey }}
+          <input type="hidden" name="cf-turnstile-response" />
+        {{ end }}
         <div class="form-field">
           <label for="email">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value="{{ .Email }}"
-            placeholder="you@example.com"
-            autocomplete="email"
-            required
-          />
+          <input id="email"
+                 name="email"
+                 type="email"
+                 value="{{ .Email }}"
+                 placeholder="you@example.com"
+                 autocomplete="email"
+                 required />
         </div>
         <div class="form-field">
           <label for="password">Password</label>
           <div class="password-field">
-            <input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Your password"
-              autocomplete="current-password"
-              required
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              data-target="password"
-              aria-label="Toggle password visibility"
-            >
+            <input id="password"
+                   name="password"
+                   type="password"
+                   placeholder="Your password"
+                   autocomplete="current-password"
+                   required />
+            <button type="button"
+                    class="toggle-password"
+                    data-target="password"
+                    aria-label="Toggle password visibility">
               {{ template "icon-eye" . }}
               {{ template "icon-eye-off" . }}
             </button>
@@ -59,6 +70,9 @@
       {{ end }}
     </section>
   </div>
+  {{ if .TurnstileSiteKey }}
+    {{ template "turnstile_gate_script" . }}
+  {{ end }}
   {{ template "toggle_password_script" . }}
 {{ end }}
 

@@ -5,49 +5,58 @@
         <h1>Sign Up</h1>
         <p>Create an account to continue</p>
       </div>
-      <form method="post" action="/signup" class="input-form" id="signup-form">
+      {{ if .TurnstileSiteKey }}
+        <section class="turnstile-gate"
+                 data-turnstile-gate
+                 data-turnstile-form="signup-form"
+                 data-turnstile-sitekey="{{ .TurnstileSiteKey }}">
+          <p class="turnstile-gate-copy">First, verify that you are human.</p>
+          <div class="turnstile-gate-widget cf-turnstile" data-turnstile-widget></div>
+          <p class="turnstile-gate-error" data-turnstile-error hidden></p>
+        </section>
+      {{ end }}
+      <form method="post"
+            action="/signup"
+            class="input-form"
+            id="signup-form"
+            {{ if .TurnstileSiteKey }}hidden{{ end }}>
+        {{ if .TurnstileSiteKey }}
+          <input type="hidden" name="cf-turnstile-response" />
+        {{ end }}
         <div class="form-field">
           <label for="signup-name">Name</label>
-          <input
-            id="signup-name"
-            name="name"
-            type="text"
-            value="{{ .Name }}"
-            placeholder="Your name"
-            maxlength="128"
-            autocomplete="name"
-            required
-          />
+          <input id="signup-name"
+                 name="name"
+                 type="text"
+                 value="{{ .Name }}"
+                 placeholder="Your name"
+                 maxlength="128"
+                 autocomplete="name"
+                 required />
         </div>
         <div class="form-field">
           <label for="signup-email">Email</label>
-          <input
-            id="signup-email"
-            name="email"
-            type="email"
-            value="{{ .Email }}"
-            placeholder="you@example.com"
-            autocomplete="email"
-            required
-          />
+          <input id="signup-email"
+                 name="email"
+                 type="email"
+                 value="{{ .Email }}"
+                 placeholder="you@example.com"
+                 autocomplete="email"
+                 required />
         </div>
         <div class="form-field">
           <label for="signup-password">Password</label>
           <div class="password-field">
-            <input
-              id="signup-password"
-              name="password"
-              type="password"
-              placeholder="At least 12 characters"
-              autocomplete="new-password"
-              required
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              data-target="signup-password"
-              aria-label="Toggle password visibility"
-            >
+            <input id="signup-password"
+                   name="password"
+                   type="password"
+                   placeholder="At least 12 characters"
+                   autocomplete="new-password"
+                   required />
+            <button type="button"
+                    class="toggle-password"
+                    data-target="signup-password"
+                    aria-label="Toggle password visibility">
               {{ template "icon-eye" . }}
               {{ template "icon-eye-off" . }}
             </button>
@@ -56,20 +65,16 @@
         <div class="form-field">
           <label for="confirm-password">Confirm password</label>
           <div class="password-field">
-            <input
-              id="confirm-password"
-              name="confirm_password"
-              type="password"
-              placeholder="Re-enter your password"
-              autocomplete="new-password"
-              required
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              data-target="confirm-password"
-              aria-label="Toggle confirm password visibility"
-            >
+            <input id="confirm-password"
+                   name="confirm_password"
+                   type="password"
+                   placeholder="Re-enter your password"
+                   autocomplete="new-password"
+                   required />
+            <button type="button"
+                    class="toggle-password"
+                    data-target="confirm-password"
+                    aria-label="Toggle confirm password visibility">
               {{ template "icon-eye" . }}
               {{ template "icon-eye-off" . }}
             </button>
@@ -85,6 +90,9 @@
       {{ template "auth_footer" (dict "Prompt" "Already have an account?" "Href" "/login" "LinkLabel" "Log in") }}
     </section>
   </div>
+  {{ if .TurnstileSiteKey }}
+    {{ template "turnstile_gate_script" . }}
+  {{ end }}
   {{ template "toggle_password_script" . }}
   <script>
     const signupForm = document.getElementById("signup-form");
