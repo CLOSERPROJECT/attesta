@@ -163,6 +163,10 @@ type Server struct {
 	enforceAuth        bool
 	formataArchURL     string
 	buildVersion       string
+	turnstileSiteKey   string
+	turnstileSecretKey string
+	turnstileClient    *http.Client
+	turnstileVerifyURL string
 }
 
 type SSEHub struct {
@@ -280,6 +284,7 @@ type PageBase struct {
 	Body                   string
 	BuildVersion           string
 	ViteDevServer          string
+	TurnstileSiteKey       string
 	WorkflowKey            string
 	WorkflowName           string
 	WorkflowPath           string
@@ -783,6 +788,9 @@ func main() {
 		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 		buildVersion:   applicationVersion(),
 		mailer:         newMailerFromEnv(),
+		turnstileSiteKey:   strings.TrimSpace(os.Getenv("TURNSTILE_SITE_KEY")),
+		turnstileSecretKey: strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
+		turnstileClient:    http.DefaultClient,
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
 	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
@@ -1364,11 +1372,12 @@ func (s *Server) logAndRenderOrgAdminError(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) pageBase(body, workflowKey, workflowName string) PageBase {
 	base := PageBase{
-		Body:          body,
-		BuildVersion:  s.buildVersion,
-		ViteDevServer: s.viteDevServer,
-		WorkflowKey:   strings.TrimSpace(workflowKey),
-		WorkflowName:  strings.TrimSpace(workflowName),
+		Body:             body,
+		BuildVersion:     s.buildVersion,
+		ViteDevServer:    s.viteDevServer,
+		TurnstileSiteKey: s.configuredTurnstileSiteKey(),
+		WorkflowKey:      strings.TrimSpace(workflowKey),
+		WorkflowName:     strings.TrimSpace(workflowName),
 	}
 	if base.WorkflowKey != "" {
 		base.WorkflowPath = streamPath(base.WorkflowKey)
@@ -2468,6 +2477,19 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		password := strings.TrimSpace(r.FormValue("password"))
 		next := safeNextPath(r, appHomePath)
+		if err := s.verifyTurnstile(r); err != nil {
+			logRequestError(r, err, "failed to verify login turnstile response")
+			view := LoginView{
+				PageBase:   s.pageBase("login_body", "", ""),
+				Email:      email,
+				Next:       next,
+				Error:      "Verification failed. Please try again.",
+				ShowSignup: anyoneCanCreateAccount(),
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "login.html", view)
+			return
+		}
 
 		if adminEmail, adminPassword, ok := platformAdminCredentials(); ok && strings.EqualFold(email, adminEmail) {
 			if subtle.ConstantTimeCompare([]byte(password), []byte(adminPassword)) != 1 {
@@ -2601,6 +2623,17 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 				Email:    email,
 				Name:     name,
 				Error:    err.Error(),
+			})
+			return
+		}
+		if err := s.verifyTurnstile(r); err != nil {
+			logRequestError(r, err, "failed to verify signup turnstile response")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = s.tmpl.ExecuteTemplate(w, "signup.html", SignupView{
+				PageBase: s.pageBase("signup_body", "", ""),
+				Email:    email,
+				Name:     name,
+				Error:    "Verification failed. Please try again.",
 			})
 			return
 		}
