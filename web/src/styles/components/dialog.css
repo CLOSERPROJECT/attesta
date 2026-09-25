@@ -1,7 +1,7 @@
 /*
  * Dialog — modal shell (CSS-only component).
  *
- * dialog.dialog[.dialog-overflow]
+ * dialog.dialog[.dialog-overflow][data-auto-open?]
  *   div.dialog-card
  *     header.dialog-head
  *       div
@@ -15,6 +15,7 @@
  * Modifiers (add only when needed):
  *   .dialog-wide — wide shell (add to this file when 2+ pages need it; until then use page-scoped rules)
  *   .dialog-overflow — allow flyouts (palette/role pickers) to extend outside the shell
+ *   data-auto-open — server asks main.js to call showModal() on load / after HTMX swap
  *
  * Page-specific: stream preview sizing → pages/stream.css (#stream-preview-dialog)
  */

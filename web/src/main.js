@@ -1433,6 +1433,20 @@ const initRolePickers = (root = document) => {
   }
 };
 
+const openAutoOpenDialogs = (root = document) => {
+  const scope = root instanceof Element || root instanceof Document ? root : document;
+  for (const dialog of scope.querySelectorAll("dialog[data-auto-open]")) {
+    if (!(dialog instanceof HTMLDialogElement) || dialog.open) {
+      continue;
+    }
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   formatLocalDateTimes(document);
   void initializeFormataForms(document);
@@ -1440,6 +1454,7 @@ document.addEventListener("DOMContentLoaded", () => {
   focusNextActionInput();
   promoteToasts(document);
   initRolePickers(document);
+  openAutoOpenDialogs(document);
 });
 
 document.addEventListener("click", (event) => {
@@ -1465,6 +1480,7 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
     formatLocalDateTimes(event.target);
     promoteToasts(event.target);
     initRolePickers(event.target);
+    openAutoOpenDialogs(event.target);
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);

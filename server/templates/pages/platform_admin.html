@@ -132,7 +132,11 @@
 
     {{ template "platform_admin_results" . }}
 
-    <dialog id="create-org-dialog" class="dialog">
+    <dialog
+      id="create-org-dialog"
+      class="dialog"
+      {{ dataAutoOpen (.OrganizationDialogAutoOpen "create" "") }}
+    >
       <div class="dialog-card">
         <header class="dialog-head">
           <div>
@@ -203,15 +207,6 @@
         </form>
       </div>
     </dialog>
-
-    <script>
-      (function () {
-        const createDialog = document.getElementById("create-org-dialog");
-        if (createDialog && {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}true{{ else }}false{{ end }} && !createDialog.open) {
-          createDialog.showModal();
-        }
-      })();
-    </script>
   {{ end }}
 {{ end }}
 
@@ -760,7 +755,11 @@
               </button>
             </div>
 
-            <dialog id="invite-org-{{ .Slug }}" class="dialog">
+            <dialog
+              id="invite-org-{{ .Slug }}"
+              class="dialog"
+              {{ dataAutoOpen ($.OrganizationDialogAutoOpen "invite" .Slug) }}
+            >
               <div class="dialog-card">
                 <header class="dialog-head">
                   <div>
@@ -847,7 +846,11 @@
               </div>
             </dialog>
 
-            <dialog id="edit-org-{{ .Slug }}" class="dialog">
+            <dialog
+              id="edit-org-{{ .Slug }}"
+              class="dialog"
+              {{ dataAutoOpen ($.OrganizationDialogAutoOpen "edit" .Slug) }}
+            >
               <div class="dialog-card">
                 <header class="dialog-head">
                   <div>
@@ -915,7 +918,11 @@
               </div>
             </dialog>
 
-            <dialog id="delete-org-{{ .Slug }}" class="dialog">
+            <dialog
+              id="delete-org-{{ .Slug }}"
+              class="dialog"
+              {{ dataAutoOpen ($.OrganizationDialogAutoOpen "delete" .Slug) }}
+            >
               <div class="dialog-card">
                 <header class="dialog-head">
                   <div>
@@ -1049,24 +1056,6 @@
       </nav>
     {{ end }}
   </div>
-<script>
-  (function () {
-    const inviteDialog = document.getElementById("invite-org-{{.OrganizationDialogSlug}}");
-    if (inviteDialog && {{if and .InviteError (eq .OrganizationDialogAction "invite") .OrganizationDialogSlug}}true{{else}}false{{end}} && !inviteDialog.open) {
-      inviteDialog.showModal();
-    }
-
-    const editDialog = document.getElementById("edit-org-{{.OrganizationDialogSlug}}");
-    if (editDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "edit") .OrganizationDialogSlug}}true{{else}}false{{end}} && !editDialog.open) {
-      editDialog.showModal();
-    }
-
-    const deleteDialog = document.getElementById("delete-org-{{.OrganizationDialogSlug}}");
-    if (deleteDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "delete") .OrganizationDialogSlug}}true{{else}}false{{end}} && !deleteDialog.open) {
-      deleteDialog.showModal();
-    }
-  })();
-</script>
 {{ end }}
 
 {{ define "platform_admin.html" }}

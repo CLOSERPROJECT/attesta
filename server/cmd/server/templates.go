@@ -29,6 +29,7 @@ func templateFuncs() template.FuncMap {
 		"orgAdminConsole":          orgAdminConsole,
 		"rolesPickerFromRoles":     rolesPickerFromRoles,
 		"rolesPickerFromOrgAdminOptions": rolesPickerFromOrgAdminOptions,
+		"dataAutoOpen":             dataAutoOpen,
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: odd number of arguments")
@@ -47,6 +48,13 @@ func templateFuncs() template.FuncMap {
 			return strings.ReplaceAll(s, old, new)
 		},
 	}
+}
+
+func dataAutoOpen(open bool) template.HTMLAttr {
+	if !open {
+		return ""
+	}
+	return "data-auto-open"
 }
 
 // withTemplateFuncs registers shared funcs plus render, which executes a named

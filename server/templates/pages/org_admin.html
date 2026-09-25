@@ -182,26 +182,6 @@
       }
     });
 
-    const addRoleDialog = document.getElementById("add-role-dialog");
-    if (addRoleDialog && {{if and .RoleError (eq .RoleDialogAction "create")}}true{{else}}false{{end}} && !addRoleDialog.open) {
-      addRoleDialog.showModal();
-    }
-
-    const editRoleDialog = document.getElementById("edit-role-{{.RoleDialogSlug}}");
-    if (editRoleDialog && {{if and .RoleError (eq .RoleDialogAction "edit") .RoleDialogSlug}}true{{else}}false{{end}} && !editRoleDialog.open) {
-      editRoleDialog.showModal();
-    }
-
-    const deleteRoleDialog = document.getElementById("delete-role-{{.RoleDialogSlug}}");
-    if (deleteRoleDialog && {{if and .RoleError (eq .RoleDialogAction "delete") .RoleDialogSlug}}true{{else}}false{{end}} && !deleteRoleDialog.open) {
-      deleteRoleDialog.showModal();
-    }
-
-    const addUserDialog = document.getElementById("add-user-dialog");
-    if (addUserDialog && {{if or .InviteError .InviteLink}}true{{else}}false{{end}} && !addUserDialog.open) {
-      addUserDialog.showModal();
-    }
-
     const inviteCopyButtons = Array.from(document.querySelectorAll(".js-invite-copy"));
     inviteCopyButtons.forEach((button) => {
       let resetTimer = null;
@@ -426,6 +406,7 @@
               <dialog
                 id="edit-role-{{ .Slug }}"
                 class="dialog dialog-overflow"
+                {{ dataAutoOpen ($.RoleDialogAutoOpen "edit" .Slug) }}
               >
                 <div class="dialog-card">
                   <header class="dialog-head">
@@ -548,6 +529,7 @@
               <dialog
                 id="delete-role-{{ .Slug }}"
                 class="dialog"
+                {{ dataAutoOpen ($.RoleDialogAutoOpen "delete" .Slug) }}
               >
                 <div class="dialog-card">
                   <header class="dialog-head">
@@ -622,6 +604,7 @@
     <dialog
       id="add-role-dialog"
       class="dialog dialog-overflow"
+      {{ dataAutoOpen (.RoleDialogAutoOpen "create" "") }}
     >
       <div class="dialog-card">
         <header class="dialog-head">
@@ -782,6 +765,7 @@
       {{ end }}
     </div>
 
+    <div class="panel-block panel-block-spaced">
     <div class="panel-head-actions">
       <div class="panel-heading">
         <h2>Users</h2>
@@ -977,10 +961,12 @@
         <p class="empty-state-title">No organization users yet</p>
       </div>
     {{ end }}
+  </div>
 
     <dialog
       id="add-user-dialog"
       class="dialog dialog-overflow"
+      {{ dataAutoOpen .InviteDialogAutoOpen }}
     >
       <div class="dialog-card">
         <header class="dialog-head">
