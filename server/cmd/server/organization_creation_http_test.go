@@ -314,16 +314,13 @@ func TestHandleOrgAdminUsersSelfServeCreateOrgGone(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.handleOrgAdminUsers(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 	if createCalls != 0 {
 		t.Fatalf("create calls = %d, want 0", createCalls)
 	}
-	if !strings.Contains(rec.Body.String(), "request organization creation via onboarding") {
-		t.Fatalf("expected onboarding redirect message, got %q", rec.Body.String())
-	}
-	if strings.Contains(rec.Body.String(), `name="intent" value="create_org"`) {
-		t.Fatalf("expected self-serve create form gone, got %q", rec.Body.String())
+	if loc := rec.Header().Get("Location"); loc != onboardingPath() {
+		t.Fatalf("location = %q, want %q", loc, onboardingPath())
 	}
 }

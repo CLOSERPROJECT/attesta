@@ -475,7 +475,6 @@ type OrgAdminView struct {
 	ActivePanel            string
 	Organization           Organization
 	OrganizationLogoURL    string
-	NeedsOrganizationSetup bool
 	OrganizationError      string
 	RoleError              string
 	RoleDialogAction       string
@@ -3117,6 +3116,10 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return nil, false
 	}
+	if !userHasOrganizationContext(user) {
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+		return nil, false
+	}
 	return user, true
 }
 
@@ -4135,34 +4138,16 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 }
 
 func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request, user *AccountUser, orgSlug, inviteLink string, errs OrgAdminErrors) {
+	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
+		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+		return
+	}
+
 	errs.Organization = strings.TrimSpace(errs.Organization)
 	errs.Role = strings.TrimSpace(errs.Role)
 	errs.Invite = strings.TrimSpace(errs.Invite)
 	errs.Users = strings.TrimSpace(errs.Users)
 	activePanel := resolveOrgAdminActivePanel(r, errs, inviteLink)
-
-	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
-		view := OrgAdminView{
-			PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
-			Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
-			ActivePanel:            activePanel,
-			NeedsOrganizationSetup: true,
-			OrganizationError:      errs.Organization,
-			RoleError:              errs.Role,
-			RoleDialogAction:       strings.TrimSpace(errs.RoleAction),
-			RoleDialogSlug:         strings.TrimSpace(errs.RoleSlug),
-			RoleDialogName:         strings.TrimSpace(errs.RoleName),
-			RoleDialogPalette:      strings.TrimSpace(errs.RolePalette),
-			InviteError:            errs.Invite,
-			UsersError:             errs.Users,
-			InviteLink:             strings.TrimSpace(inviteLink),
-			Error:                  firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
-		}
-		if err := s.tmpl.ExecuteTemplate(w, "org_admin.html", view); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
 
 	org, roles, orgUsers, orgInvites, err := s.loadOrgAdminState(context.Background(), user, orgSlug)
 	if err != nil {
@@ -4188,7 +4173,6 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 		ActivePanel:            activePanel,
 		Organization:           org,
 		OrganizationLogoURL:    organizationPath("logo/" + strings.TrimSpace(org.LogoAttachmentID)),
-		NeedsOrganizationSetup: false,
 		OrganizationError:      errs.Organization,
 		RoleError:              errs.Role,
 		RoleDialogAction:       strings.TrimSpace(errs.RoleAction),
@@ -4353,10 +4337,6 @@ func (s *Server) handleOrgAdminPage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireOrgAdmin(w, r)
 	if !ok {
-		return
-	}
-	if !userHasOrganizationContext(user) {
-		s.renderOrgAdminWithErrors(w, r, user, "", "", OrgAdminErrors{Organization: "request organization creation via onboarding"})
 		return
 	}
 	switch r.Method {
@@ -4589,10 +4569,6 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 	intent := strings.TrimSpace(r.FormValue("intent"))
 	if intent == "" {
 		intent = "invite"
-	}
-	if !userHasOrganizationContext(admin) {
-		s.renderOrgAdminWithErrors(w, r, admin, "", "", OrgAdminErrors{Organization: "request organization creation via onboarding"})
-		return
 	}
 
 	switch intent {

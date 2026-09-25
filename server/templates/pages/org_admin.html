@@ -3,32 +3,7 @@
 {{ define "org_admin_body" }}
 
   <div class="stack u-max-w-7xl u-mx-auto">
-    {{ if .NeedsOrganizationSetup }}
-      <section class="page-header">
-        {{ template "breadcrumbs" .Breadcrumbs }}
-        <div class="page-header-body">
-          <h1>Organization admin dashboard</h1>
-          <p>Manage organization settings, roles, and members</p>
-        </div>
-      </section>
-      <div class="rail-layout">
-        <section class="panel">
-          <div class="panel-heading">
-            <h2>Organization required</h2>
-            <p>
-              Your account is not assigned to an organization yet.
-              Submit an organization creation request from onboarding, or wait for an invitation.
-            </p>
-          </div>
-          {{ if .OrganizationError }}
-            <p class="error">{{ .OrganizationError }}</p>
-          {{ end }}
-          <a class="btn btn-primary" href="/my/onboarding/request-organization">Request a new organization</a>
-        </section>
-      </div>
-    {{ else }}
-      {{ template "admin_console" (orgAdminConsole .) }}
-    {{ end }}
+    {{ template "admin_console" (orgAdminConsole .) }}
   </div>
 
   <script>

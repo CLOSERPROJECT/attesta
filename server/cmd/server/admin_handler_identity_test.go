@@ -3320,8 +3320,8 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminRoles(rec, req)
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "request organization creation via onboarding") {
-			t.Fatalf("response = %d %q", rec.Code, rec.Body.String())
+		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != onboardingPath() {
+			t.Fatalf("response = %d %q", rec.Code, rec.Header().Get("Location"))
 		}
 	})
 
@@ -3679,7 +3679,7 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("actions without org context require onboarding", func(t *testing.T) {
+	t.Run("actions without org context redirect to onboarding", func(t *testing.T) {
 		server := baseServer(IdentityUser{ID: "user-1", Email: "owner@example.com", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"})
 
 		reqInvite := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=invite&email=user%40example.com"))
@@ -3687,8 +3687,8 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 		reqInvite.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recInvite := httptest.NewRecorder()
 		server.handleOrgAdminUsers(recInvite, reqInvite)
-		if recInvite.Code != http.StatusOK || !strings.Contains(recInvite.Body.String(), "request organization creation via onboarding") {
-			t.Fatalf("invite response = %d %q", recInvite.Code, recInvite.Body.String())
+		if recInvite.Code != http.StatusSeeOther || recInvite.Header().Get("Location") != onboardingPath() {
+			t.Fatalf("invite response = %d %q", recInvite.Code, recInvite.Header().Get("Location"))
 		}
 
 		reqCreate := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
@@ -3696,8 +3696,8 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 		reqCreate.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recCreate := httptest.NewRecorder()
 		server.handleOrgAdminUsers(recCreate, reqCreate)
-		if recCreate.Code != http.StatusOK || !strings.Contains(recCreate.Body.String(), "request organization creation via onboarding") {
-			t.Fatalf("create response = %d %q", recCreate.Code, recCreate.Body.String())
+		if recCreate.Code != http.StatusSeeOther || recCreate.Header().Get("Location") != onboardingPath() {
+			t.Fatalf("create response = %d %q", recCreate.Code, recCreate.Header().Get("Location"))
 		}
 	})
 
