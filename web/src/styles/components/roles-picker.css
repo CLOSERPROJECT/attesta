@@ -24,6 +24,7 @@
 .roles-picker-toggle {
   width: 100%;
   box-sizing: border-box;
+
   /* Shared pill row + vertical padding + border — stable empty vs selected. */
   min-height: calc(var(--text-xs) * var(--leading-normal) + 4px + 2 * var(--space-2) + 2px);
   padding: var(--space-2) var(--space-3);
@@ -56,6 +57,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
+
   /* Match .roles-picker .role-pill (line-height + 1px pad + 1px border each side). */
   min-height: calc(var(--text-xs) * var(--leading-normal) + 4px);
   font-size: var(--text-sm);
@@ -130,6 +132,7 @@
   align-items: center;
   gap: var(--space-2);
   box-sizing: border-box;
+
   /* Total height including border; matches clear-btn row (btn-xs + inset). */
   min-height: 34px;
   padding: 2px;

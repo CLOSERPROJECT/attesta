@@ -1753,7 +1753,10 @@ func TestAppwriteIdentityDirectTeamLookupAndCurrentUserFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCurrentUser error: %v", err)
 	}
-	if user.OrgSlug != "team-1" || user.OrgName != "Acme Org" {
+	if user.OrgSlug != "" || user.OrgName != "" || user.MembershipID != "" {
+		t.Fatalf("deleted team must clear org fields, got %#v", user)
+	}
+	if !user.IsOrgAdmin || user.Email != "org-admin@example.com" {
 		t.Fatalf("user = %#v", user)
 	}
 }

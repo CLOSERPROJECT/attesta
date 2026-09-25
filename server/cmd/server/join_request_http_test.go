@@ -206,8 +206,7 @@ func TestHandleOnboardingJoinSearchOmitsOrgAdminRole(t *testing.T) {
 	}
 	listBody := listRec.Body.String()
 	for _, want := range []string{
-		`class="breadcrumbs"`,
-		">Onboarding<",
+		"Get started",
 		`href="/my/onboarding"`,
 		"Acme Org",
 		`class="list-row"`,
@@ -380,8 +379,7 @@ func TestHandleOnboardingJoinBrowseAllPagination(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		`class="breadcrumbs"`,
-		">Onboarding<",
+		"Get started",
 		`href="/my/onboarding"`,
 		`aria-label="Organizations pagination"`,
 		`href="/my/onboarding/join"`,
