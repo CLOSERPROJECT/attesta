@@ -34,6 +34,8 @@ type IdentityStore interface {
 	// Prefer org.ID (Appwrite team ID) when known — e.g. from ListOrganizationsPage —
 	// so slug≠team-ID orgs still resolve without an unpaged ListOrganizations fallback.
 	ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
+	// ListUserMemberships returns all team memberships for a user (confirmed and pending).
+	ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
@@ -106,6 +108,8 @@ type IdentityFile struct {
 type IdentityMembership struct {
 	ID              string
 	TeamID          string
+	OrgSlug         string
+	OrgName         string
 	UserID          string
 	Email           string
 	MembershipRoles []string

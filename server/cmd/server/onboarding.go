@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -28,7 +29,19 @@ type OnboardingHubView struct {
 	PendingSlug        string
 	PendingCreated     string
 	WithdrawActionHref string
+	Invites            []OnboardingInviteView
+	InviteActionHref   string
 	FormError          string
+}
+
+type OnboardingInviteView struct {
+	MembershipID string
+	OrgName      string
+	OrgSlug      string
+	Roles        string
+	InvitedAt    string
+	DialogAccept string
+	DialogReject string
 }
 
 type OnboardingRequestOrganizationView struct {
@@ -117,39 +130,59 @@ func (s *Server) handleOnboardingHub(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusBadRequest, "invalid form", err, "failed to parse onboarding hub form")
 			return
 		}
-		if strings.TrimSpace(r.FormValue("intent")) != "withdraw" {
+		intent := strings.TrimSpace(r.FormValue("intent"))
+		identityUser := identityUserForAffiliation(user)
+		aff := s.affiliationService()
+		switch intent {
+		case "accept_invite":
+			membershipID := strings.TrimSpace(r.FormValue("membership_id"))
+			if err := aff.AcceptPendingInvite(r.Context(), identityUser, membershipID); err != nil {
+				s.renderOnboardingHub(w, r, user, affiliationInviteFormError(err))
+				return
+			}
+			http.Redirect(w, r, appHomePath, http.StatusSeeOther)
+			return
+		case "reject_invite":
+			membershipID := strings.TrimSpace(r.FormValue("membership_id"))
+			if err := aff.RejectPendingInvite(r.Context(), identityUser, membershipID); err != nil {
+				s.renderOnboardingHub(w, r, user, affiliationInviteFormError(err))
+				return
+			}
+			http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+			return
+		case "withdraw":
+			joinPending, err := aff.PendingJoinRequestForUser(r.Context(), identityUser.ID)
+			if err != nil {
+				logAndHTTPError(w, r, http.StatusInternalServerError, "failed to withdraw", err, "failed to load pending join for withdraw %s", user.Email)
+				return
+			}
+			if joinPending != nil {
+				if err := aff.WithdrawPendingJoinRequest(r.Context(), identityUser); err != nil {
+					s.renderOnboardingHub(w, r, user, affiliationWithdrawFormError(err))
+					return
+				}
+				http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+				return
+			}
+			orgPending, err := aff.PendingOrganizationCreationRequestForUser(r.Context(), identityUser.ID)
+			if err != nil {
+				logAndHTTPError(w, r, http.StatusInternalServerError, "failed to withdraw", err, "failed to load pending org creation for withdraw %s", user.Email)
+				return
+			}
+			if orgPending != nil {
+				if err := aff.WithdrawPendingOrganizationCreationRequest(r.Context(), identityUser); err != nil {
+					s.renderOnboardingHub(w, r, user, affiliationWithdrawFormError(err))
+					return
+				}
+				http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+				return
+			}
+			http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
+			return
+		default:
 			http.Error(w, "unsupported intent", http.StatusBadRequest)
 			return
 		}
-		identityUser := identityUserForAffiliation(user)
-		aff := s.affiliationService()
-		joinPending, err := aff.PendingJoinRequestForUser(r.Context(), identityUser.ID)
-		if err != nil {
-			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to withdraw", err, "failed to load pending join for withdraw %s", user.Email)
-			return
-		}
-		if joinPending != nil {
-			if err := aff.WithdrawPendingJoinRequest(r.Context(), identityUser); err != nil {
-				s.renderOnboardingHub(w, r, user, affiliationWithdrawFormError(err))
-				return
-			}
-			http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
-			return
-		}
-		orgPending, err := aff.PendingOrganizationCreationRequestForUser(r.Context(), identityUser.ID)
-		if err != nil {
-			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to withdraw", err, "failed to load pending org creation for withdraw %s", user.Email)
-			return
-		}
-		if orgPending != nil {
-			if err := aff.WithdrawPendingOrganizationCreationRequest(r.Context(), identityUser); err != nil {
-				s.renderOnboardingHub(w, r, user, affiliationWithdrawFormError(err))
-				return
-			}
-			http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -161,10 +194,44 @@ func (s *Server) renderOnboardingHub(w http.ResponseWriter, r *http.Request, use
 		JoinHref:           onboardingJoinPath(),
 		RequestOrgHref:     onboardingRequestOrganizationPath(),
 		WithdrawActionHref: onboardingPath(),
+		InviteActionHref:   onboardingPath(),
 		FormError:          strings.TrimSpace(formError),
 	}
 	identityUser := identityUserForAffiliation(user)
 	aff := s.affiliationService()
+
+	if invites, err := aff.ListPendingInvitesForUser(r.Context(), identityUser.ID); err != nil {
+		logRequestError(r, err, "failed to load pending invites for %s", user.Email)
+		http.Error(w, "failed to load onboarding status", http.StatusInternalServerError)
+		return
+	} else if len(invites) > 0 {
+		view.Invites = make([]OnboardingInviteView, 0, len(invites))
+		for i, invite := range invites {
+			var orgRoles []IdentityRole
+			if s.identity != nil {
+				if org, orgErr := s.identity.GetOrganizationBySlug(r.Context(), invite.OrgSlug); orgErr == nil && org != nil {
+					orgRoles = org.Roles
+				}
+			}
+			roles := roleLabelsForSlugs(orgRoles, invite.RoleSlugs)
+			if invite.IsOrgAdmin {
+				if roles != "" {
+					roles = "Org admin, " + roles
+				} else {
+					roles = "Org admin"
+				}
+			}
+			view.Invites = append(view.Invites, OnboardingInviteView{
+				MembershipID: invite.MembershipID,
+				OrgName:      invite.OrgName,
+				OrgSlug:      invite.OrgSlug,
+				Roles:        roles,
+				InvitedAt:    humanReadableTraceabilityTime(invite.InvitedAt),
+				DialogAccept: fmt.Sprintf("accept-invite-dialog-%d", i),
+				DialogReject: fmt.Sprintf("reject-invite-dialog-%d", i),
+			})
+		}
+	}
 
 	joinPending, err := aff.PendingJoinRequestForUser(r.Context(), identityUser.ID)
 	if err != nil {
@@ -554,6 +621,14 @@ func affiliationWithdrawFormError(err error) string {
 		NotFound:   "no pending request to undo",
 		NotPending: "request is not pending",
 		Default:    "failed to undo request",
+	})
+}
+
+func affiliationInviteFormError(err error) string {
+	return mapAffiliationFormError(err, affiliationFormErrorMessages{
+		AlreadyAffiliated: "you already belong to an organization",
+		NotFound:          "invite not found or already handled",
+		Default:           "failed to process invite",
 	})
 }
 

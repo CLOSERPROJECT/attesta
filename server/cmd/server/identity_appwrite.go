@@ -980,6 +980,31 @@ func (a *appwriteIdentity) getOrganizationByTeamID(ctx context.Context, teamID s
 	return &org, nil
 }
 
+func (a *appwriteIdentity) ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, nil
+	}
+	membershipList, err := users.New(a.adminClient).ListMemberships(userID)
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	out := make([]IdentityMembership, 0, len(membershipList.Memberships))
+	for idx := range membershipList.Memberships {
+		membership := membershipList.Memberships[idx]
+		var org *IdentityOrg
+		if resolved, orgErr := a.getOrganizationByTeamID(ctx, membership.TeamId); orgErr == nil {
+			org = resolved
+		}
+		identity := membershipFromAppwrite(&membership, org)
+		out = append(out, identity)
+	}
+	return out, nil
+}
+
 func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) IdentityMembership {
 	if membership == nil {
 		return IdentityMembership{}
@@ -997,6 +1022,8 @@ func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) Ide
 	}
 	if org != nil {
 		identity.TeamID = strings.TrimSpace(org.ID)
+		identity.OrgSlug = strings.TrimSpace(org.Slug)
+		identity.OrgName = strings.TrimSpace(org.Name)
 	}
 	if invitedAt, err := parseAppwriteTime(membership.Invited); err == nil {
 		identity.InvitedAt = invitedAt

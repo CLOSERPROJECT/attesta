@@ -6,9 +6,15 @@
                icon-clock
                .onboarding-pending-heading-copy > h2 + p
              dl.onboarding-pending-meta
-             form.onboarding-pending-actions > button.btn.btn-ghost-danger
+             .onboarding-pending-actions > button.btn
+   pages/onboarding.html — pending invite card (success tone)
+   Markup: section.onboarding-pending.onboarding-invite
    pages/onboarding_request_organization.html — submit row
    Markup: .onboarding-request-actions > button.btn */
+
+.onboarding-pending.onboarding-invite + .onboarding-actions {
+  margin-top: var(--space-2);
+}
 
 .onboarding-actions {
   display: flex;
@@ -47,6 +53,16 @@
     color-mix(in srgb, var(--warning-muted-foreground) 35%, transparent);
   border-radius: 4px;
   color: var(--warning-muted-foreground);
+}
+
+.onboarding-pending.onboarding-invite {
+  background: var(--success-muted);
+  border-color: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 35%,
+    transparent
+  );
+  color: var(--success-muted-foreground);
 }
 
 .onboarding-pending .panel-heading {
@@ -91,6 +107,14 @@
   );
 }
 
+.onboarding-pending.onboarding-invite hr {
+  border-color: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 50%,
+    transparent
+  );
+}
+
 .onboarding-pending-meta > div {
   display: flex;
   flex-direction: column;
@@ -116,6 +140,8 @@
 .onboarding-request-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   transform: translateY(var(--space-3)) translateX(var(--space-3));
 }

@@ -1,135 +1,244 @@
 {{/* Used on /my/onboarding for unaffiliated account setup. */}} {{ define
-"onboarding_body" }}
-<section class="stack u-max-w-prose u-mx-auto">
-  <section class="page-header">
-    <div class="page-header-head">
-      <div class="page-header-body">
-        <h1>Get started</h1>
-        {{ if .Pending }}
-        <p>
-          Your request is pending review. You can undo it to choose a different
-          path.
-        </p>
-        {{ else }}
-        <p>
-          Join an existing organization or request a new one before you can use
-          streams.
-        </p>
-        {{ end }}
-      </div>
-    </div>
-  </section>
-
-  {{ if .Pending }}
-  <section class="onboarding-pending">
-    <div class="panel-heading onboarding-pending-heading">
-      {{ template "icon-clock" . }}
-      <div class="onboarding-pending-heading-copy">
-        {{ if eq .PendingKind "join" }}
-        <h2>Pending join request</h2>
-        <p>Waiting for organization admin review.</p>
-        {{ else }}
-        <h2>Pending organization creation request</h2>
-        <p>Waiting for platform admin review.</p>
-        {{ end }}
-      </div>
-    </div>
-    <hr />
-    <dl class="onboarding-pending-meta">
-      {{ if eq .PendingKind "join" }}
-      <div>
-        <dt>Organization</dt>
-        <dd>{{ .PendingOrgName }}</dd>
-      </div>
-      {{ if .PendingRoles }}
-      <div>
-        <dt>Requested roles</dt>
-        <dd>{{ .PendingRoles }}</dd>
-      </div>
-      {{ end }} {{ else }}
-      <div>
-        <dt>Organization name</dt>
-        <dd>{{ .PendingName }}</dd>
-      </div>
-      {{ end }} {{ if .PendingCreated }}
-      <div>
-        <dt>Submitted</dt>
-        <dd>{{ .PendingCreated }}</dd>
-      </div>
-      {{ end }}
-    </dl>
-    {{ if .FormError }}
-    <p class="error">{{ .FormError }}</p>
-    {{ end }}
-    <div class="onboarding-pending-actions">
-      <button
-        type="button"
-        class="btn btn-ghost-danger"
-        onclick="document.getElementById('undo-request-dialog').showModal()"
-      >
-        {{ template "icon-undo" . }} Undo request
-      </button>
-    </div>
-    <dialog id="undo-request-dialog" class="dialog">
-      <div class="dialog-card">
-        <header class="dialog-head">
-          <div>
-            <h3 class="dialog-title u-text-danger">Undo request</h3>
-            <p class="dialog-subtitle">
-              {{ if eq .PendingKind "join" }}{{ .PendingOrgName }}{{ else }}{{ .PendingName }}{{ end }}
+  "onboarding_body" }}
+  <section class="stack u-max-w-prose u-mx-auto">
+    <section class="page-header">
+      <div class="page-header-head">
+        <div class="page-header-body">
+          <h1>Get started</h1>
+          {{ if .Pending }}
+            <p>
+              Your request is pending review. You can undo it to choose a different
+              path.
             </p>
-          </div>
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon dialog-close"
-            onclick="document.getElementById('undo-request-dialog').close()"
-          >
-            {{ template "icon-close" . }}
-          </button>
-        </header>
-        <p class="u-m-0 u-mb-5">
-          {{ if eq .PendingKind "join" }}
-            This withdraws your join request. You can request to join again
-            later.
+          {{ else if .Invites }}
+            <p>
+              You have an organization invite. Accept it below, or choose another
+              path.
+            </p>
           {{ else }}
-            This withdraws your organization creation request. You can submit a
-            new one later.
+            <p>
+              Join an existing organization or request a new one before you can use
+              streams.
+            </p>
           {{ end }}
-        </p>
-        <form
-          method="post"
-          action="{{ .WithdrawActionHref }}"
-          class="input-form"
-        >
-          <input type="hidden" name="intent" value="withdraw" />
-          <div class="dialog-actions">
-            <button
-              type="button"
-              class="btn btn-ghost"
-              onclick="document.getElementById('undo-request-dialog').close()"
-            >
-              Cancel
-            </button>
-            <button type="submit" class="btn btn-danger">
-              {{ template "icon-undo" . }} Undo request
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
-    </dialog>
+    </section>
+
+    {{ if .FormError }}
+      <p class="error">{{ .FormError }}</p>
+    {{ end }}
+
+    {{ range .Invites }}
+      <section class="onboarding-pending onboarding-invite">
+        <div class="panel-heading onboarding-pending-heading">
+          {{ template "icon-check-circle" . }}
+          <div class="onboarding-pending-heading-copy">
+            <h2>Organization invite</h2>
+            <p>You've been invited to join this organization.</p>
+          </div>
+        </div>
+        <hr />
+        <dl class="onboarding-pending-meta">
+          <div>
+            <dt>Organization</dt>
+            <dd>
+              {{ .OrgName }}
+            </dd>
+          </div>
+          {{ if .Roles }}
+            <div>
+              <dt>Roles</dt>
+              <dd>
+                {{ .Roles }}
+              </dd>
+            </div>
+          {{ end }}
+          {{ if .InvitedAt }}
+            <div>
+              <dt>Invited</dt>
+              <dd>
+                {{ .InvitedAt }}
+              </dd>
+            </div>
+          {{ end }}
+        </dl>
+        <div class="onboarding-pending-actions">
+          <button type="button"
+                  class="btn btn-ghost-danger"
+                  onclick="document.getElementById('{{ .DialogReject }}').showModal()">
+            {{ template "icon-close" . }} Decline
+          </button>
+          <button type="button"
+                  class="btn btn-primary"
+                  onclick="document.getElementById('{{ .DialogAccept }}').showModal()">
+            {{ template "icon-check" . }} Accept invite
+          </button>
+        </div>
+        <dialog id="{{ .DialogAccept }}" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
+              <div>
+                <h3 class="dialog-title">Accept invite</h3>
+                <p class="dialog-subtitle">{{ .OrgName }}</p>
+              </div>
+              <button type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('{{ .DialogAccept }}').close()">
+                {{ template "icon-close" . }}
+              </button>
+            </header>
+            <p class="u-m-0 u-mb-5">
+              Join {{ .OrgName }} with the roles in this invite? You will leave
+              onboarding and start using the organization.
+            </p>
+            <form method="post" action="{{ $.InviteActionHref }}" class="input-form">
+              <input type="hidden" name="intent" value="accept_invite" />
+              <input type="hidden" name="membership_id" value="{{ .MembershipID }}" />
+              <div class="dialog-actions">
+                <button type="button"
+                        class="btn btn-ghost"
+                        onclick="document.getElementById('{{ .DialogAccept }}').close()">Cancel</button>
+                <button type="submit" class="btn btn-primary">{{ template "icon-check" . }} Accept invite</button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+        <dialog id="{{ .DialogReject }}" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
+              <div>
+                <h3 class="dialog-title u-text-danger">Decline invite</h3>
+                <p class="dialog-subtitle">{{ .OrgName }}</p>
+              </div>
+              <button type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('{{ .DialogReject }}').close()">
+                {{ template "icon-close" . }}
+              </button>
+            </header>
+            <p class="u-m-0 u-mb-5">
+              This declines the invite from {{ .OrgName }}. You can be invited again
+              later.
+            </p>
+            <form method="post" action="{{ $.InviteActionHref }}" class="input-form">
+              <input type="hidden" name="intent" value="reject_invite" />
+              <input type="hidden" name="membership_id" value="{{ .MembershipID }}" />
+              <div class="dialog-actions">
+                <button type="button"
+                        class="btn btn-ghost"
+                        onclick="document.getElementById('{{ .DialogReject }}').close()">Cancel</button>
+                <button type="submit" class="btn btn-danger">
+                  {{ template "icon-close" . }} Decline invite
+                </button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      </section>
+    {{ end }}
+
+    {{ if .Pending }}
+      <section class="onboarding-pending">
+        <div class="panel-heading onboarding-pending-heading">
+          {{ template "icon-clock" . }}
+          <div class="onboarding-pending-heading-copy">
+            {{ if eq .PendingKind "join" }}
+              <h2>Pending join request</h2>
+              <p>Waiting for organization admin review.</p>
+            {{ else }}
+              <h2>Pending organization creation request</h2>
+              <p>Waiting for platform admin review.</p>
+            {{ end }}
+          </div>
+        </div>
+        <hr />
+        <dl class="onboarding-pending-meta">
+          {{ if eq .PendingKind "join" }}
+            <div>
+              <dt>Organization</dt>
+              <dd>
+                {{ .PendingOrgName }}
+              </dd>
+            </div>
+            {{ if .PendingRoles }}
+              <div>
+                <dt>Requested roles</dt>
+                <dd>
+                  {{ .PendingRoles }}
+                </dd>
+              </div>
+            {{ end }} {{ else }}
+            <div>
+              <dt>Organization name</dt>
+              <dd>
+                {{ .PendingName }}
+              </dd>
+            </div>
+          {{ end }} {{ if .PendingCreated }}
+            <div>
+              <dt>Submitted</dt>
+              <dd>
+                {{ .PendingCreated }}
+              </dd>
+            </div>
+          {{ end }}
+        </dl>
+        <div class="onboarding-pending-actions">
+          <button type="button"
+                  class="btn btn-ghost-danger"
+                  onclick="document.getElementById('undo-request-dialog').showModal()">
+            {{ template "icon-undo" . }} Undo request
+          </button>
+        </div>
+        <dialog id="undo-request-dialog" class="dialog">
+          <div class="dialog-card">
+            <header class="dialog-head">
+              <div>
+                <h3 class="dialog-title u-text-danger">Undo request</h3>
+                <p class="dialog-subtitle">
+                  {{ if eq .PendingKind "join" }}{{ .PendingOrgName }}{{ else }}{{ .PendingName }}{{ end }}
+                </p>
+              </div>
+              <button type="button"
+                      class="btn btn-ghost btn-icon dialog-close"
+                      onclick="document.getElementById('undo-request-dialog').close()">
+                {{ template "icon-close" . }}
+              </button>
+            </header>
+            <p class="u-m-0 u-mb-5">
+              {{ if eq .PendingKind "join" }}
+                This withdraws your join request. You can request to join again
+                later.
+              {{ else }}
+                This withdraws your organization creation request. You can submit a
+                new one later.
+              {{ end }}
+            </p>
+            <form method="post" action="{{ .WithdrawActionHref }}" class="input-form">
+              <input type="hidden" name="intent" value="withdraw" />
+              <div class="dialog-actions">
+                <button type="button"
+                        class="btn btn-ghost"
+                        onclick="document.getElementById('undo-request-dialog').close()">Cancel</button>
+                <button type="submit" class="btn btn-danger">{{ template "icon-undo" . }} Undo request</button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      </section>
+    {{ else }}
+      <div class="onboarding-actions">
+        <a class="btn btn-lg btn-primary" href="{{ .JoinHref }}">
+          {{ template "icon-users-group" . }}
+          <span>Join an organization</span>
+        </a>
+        <a class="btn btn-lg btn-secondary" href="{{ .RequestOrgHref }}">
+          {{ template "icon-building-grid" . }}
+          <span>Request a new organization</span>
+        </a>
+      </div>
+    {{ end }}
   </section>
-  {{ else }}
-  <div class="onboarding-actions">
-    <a class="btn btn-lg btn-primary" href="{{ .JoinHref }}">
-      {{ template "icon-users-group" . }}
-      <span>Join an organization</span>
-    </a>
-    <a class="btn btn-lg btn-secondary" href="{{ .RequestOrgHref }}">
-      {{ template "icon-building-grid" . }}
-      <span>Request a new organization</span>
-    </a>
-  </div>
-  {{ end }}
-</section>
 {{ end }} {{ define "onboarding.html" }} {{ template "layout.html" . }} {{ end
 }}

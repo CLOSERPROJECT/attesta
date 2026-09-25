@@ -296,6 +296,100 @@ func (a *Affiliation) HasPendingAffiliationIntent(ctx context.Context, userID st
 	return orgReq != nil, nil
 }
 
+// PendingInvite is an unconfirmed Appwrite team membership offered to the user.
+type PendingInvite struct {
+	MembershipID string
+	OrgSlug      string
+	OrgName      string
+	RoleSlugs    []string
+	IsOrgAdmin   bool
+	InvitedAt    time.Time
+}
+
+func (a *Affiliation) ListPendingInvitesForUser(ctx context.Context, userID string) ([]PendingInvite, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" || a.identity == nil {
+		return nil, nil
+	}
+	memberships, err := a.identity.ListUserMemberships(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]PendingInvite, 0)
+	for _, membership := range memberships {
+		if membership.Confirmed {
+			continue
+		}
+		orgSlug := strings.TrimSpace(membership.OrgSlug)
+		if orgSlug == "" {
+			orgSlug = strings.TrimSpace(membership.TeamID)
+		}
+		if orgSlug == "" || strings.TrimSpace(membership.ID) == "" {
+			continue
+		}
+		orgName := strings.TrimSpace(membership.OrgName)
+		if orgName == "" {
+			orgName = orgSlug
+		}
+		out = append(out, PendingInvite{
+			MembershipID: strings.TrimSpace(membership.ID),
+			OrgSlug:      orgSlug,
+			OrgName:      orgName,
+			RoleSlugs:    append([]string(nil), membership.RoleSlugs...),
+			IsOrgAdmin:   membership.IsOrgAdmin,
+			InvitedAt:    membership.InvitedAt,
+		})
+	}
+	return out, nil
+}
+
+func (a *Affiliation) findPendingInvite(ctx context.Context, userID, membershipID string) (PendingInvite, error) {
+	membershipID = strings.TrimSpace(membershipID)
+	if membershipID == "" {
+		return PendingInvite{}, ErrAffiliationNotFound
+	}
+	invites, err := a.ListPendingInvitesForUser(ctx, userID)
+	if err != nil {
+		return PendingInvite{}, err
+	}
+	for _, invite := range invites {
+		if invite.MembershipID == membershipID {
+			return invite, nil
+		}
+	}
+	return PendingInvite{}, ErrAffiliationNotFound
+}
+
+// AcceptPendingInvite confirms a pending invite without the email secret by replacing
+// the unconfirmed membership with a granted (confirmed) membership and stamping labels.
+func (a *Affiliation) AcceptPendingInvite(ctx context.Context, user IdentityUser, membershipID string) error {
+	if a.IsAffiliated(user) {
+		return ErrAffiliationAlreadyAffiliated
+	}
+	invite, err := a.findPendingInvite(ctx, user.ID, membershipID)
+	if err != nil {
+		return err
+	}
+	if err := a.identity.DeleteOrganizationMembershipAsAdmin(ctx, invite.OrgSlug, invite.MembershipID); err != nil {
+		return err
+	}
+	if err := a.grantOrganizationMembership(ctx, invite.OrgSlug, user.ID, invite.RoleSlugs, invite.IsOrgAdmin); err != nil {
+		return err
+	}
+	_ = a.WithdrawPendingJoinRequest(ctx, user)
+	_ = a.WithdrawPendingOrganizationCreationRequest(ctx, user)
+	return nil
+}
+
+// RejectPendingInvite deletes an unconfirmed invite membership for the current user.
+func (a *Affiliation) RejectPendingInvite(ctx context.Context, user IdentityUser, membershipID string) error {
+	invite, err := a.findPendingInvite(ctx, user.ID, membershipID)
+	if err != nil {
+		return err
+	}
+	return a.identity.DeleteOrganizationMembershipAsAdmin(ctx, invite.OrgSlug, invite.MembershipID)
+}
+
 func (a *Affiliation) SubmitJoinRequest(ctx context.Context, user IdentityUser, orgSlug string, roleSlugs []string) (JoinRequest, error) {
 	orgSlug = strings.TrimSpace(orgSlug)
 	if orgSlug == "" {

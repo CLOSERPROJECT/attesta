@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -322,4 +323,185 @@ func TestHandleOnboardingJoinAndRequestPages(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestHandleOnboardingHubPendingInviteAcceptAndReject(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-onboarding-invite"
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-invitee",
+		Email:          "invitee@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.getOrganizationBySlugFunc = func(ctx context.Context, slug string) (*IdentityOrg, error) {
+		if strings.TrimSpace(slug) != "acme" {
+			return nil, ErrIdentityNotFound
+		}
+		return &IdentityOrg{
+			ID:   "team-acme",
+			Slug: "acme",
+			Name: "Acme Org",
+			Roles: []IdentityRole{
+				{Slug: "viewer", Name: "Viewer"},
+			},
+		}, nil
+	}
+	pendingMemberships := []IdentityMembership{{
+		ID:         "membership-invite-1",
+		TeamID:     "team-acme",
+		OrgSlug:    "acme",
+		OrgName:    "Acme Org",
+		UserID:     "user-invitee",
+		Email:      "invitee@example.com",
+		RoleSlugs:  []string{"viewer"},
+		Confirmed:  false,
+		InvitedAt:  now,
+	}}
+	identity.listUserMembershipsFunc = func(ctx context.Context, userID string) ([]IdentityMembership, error) {
+		if userID != "user-invitee" {
+			return nil, nil
+		}
+		return append([]IdentityMembership(nil), pendingMemberships...), nil
+	}
+	var deletedMembershipID string
+	var grantedUserID string
+	var stampedLabels []string
+	identity.deleteOrganizationMembershipAsAdminFunc = func(ctx context.Context, orgSlug, membershipID string) error {
+		if orgSlug != "acme" {
+			t.Fatalf("delete orgSlug=%q", orgSlug)
+		}
+		deletedMembershipID = membershipID
+		pendingMemberships = nil
+		return nil
+	}
+	identity.addOrganizationUserByIDAsAdminFunc = func(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+		grantedUserID = userID
+		return IdentityMembership{ID: "membership-confirmed", OrgSlug: orgSlug, UserID: userID, RoleSlugs: roleSlugs, Confirmed: true, IsOrgAdmin: isOrgAdmin}, nil
+	}
+	identity.updateUserLabelsFunc = func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+		stampedLabels = append([]string(nil), labels...)
+		return IdentityUser{ID: userID, Email: "invitee@example.com", Labels: labels, OrgSlug: "acme"}, nil
+	}
+	identity.getUserByIDFunc = func(ctx context.Context, userID string) (IdentityUser, error) {
+		return IdentityUser{ID: userID, Email: "invitee@example.com"}, nil
+	}
+
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/my/onboarding", nil)
+	getReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	getRec := httptest.NewRecorder()
+	server.handleMyRoutes(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%q", getRec.Code, getRec.Body.String())
+	}
+	body := getRec.Body.String()
+	for _, want := range []string{
+		"Organization invite",
+		"Acme Org",
+		"Viewer",
+		`class="onboarding-pending onboarding-invite"`,
+		`id="accept-invite-dialog-0"`,
+		`id="reject-invite-dialog-0"`,
+		`name="intent" value="accept_invite"`,
+		`name="intent" value="reject_invite"`,
+		`name="membership_id" value="membership-invite-1"`,
+		`href="/my/onboarding/join"`,
+		`href="/my/onboarding/request-organization"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in invite hub, got:\n%s", want, body)
+		}
+	}
+
+	acceptReq := httptest.NewRequest(http.MethodPost, "/my/onboarding", strings.NewReader("intent=accept_invite&membership_id=membership-invite-1"))
+	acceptReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	acceptReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	acceptRec := httptest.NewRecorder()
+	pendingMemberships = []IdentityMembership{{
+		ID: "membership-invite-1", TeamID: "team-acme", OrgSlug: "acme", OrgName: "Acme Org",
+		UserID: "user-invitee", RoleSlugs: []string{"viewer"}, Confirmed: false, InvitedAt: now,
+	}}
+	server.handleMyRoutes(acceptRec, acceptReq)
+	if acceptRec.Code != http.StatusSeeOther || acceptRec.Header().Get("Location") != "/my" {
+		t.Fatalf("accept status=%d loc=%q", acceptRec.Code, acceptRec.Header().Get("Location"))
+	}
+	if deletedMembershipID != "membership-invite-1" || grantedUserID != "user-invitee" {
+		t.Fatalf("deleted=%q granted=%q", deletedMembershipID, grantedUserID)
+	}
+	if len(stampedLabels) == 0 || stampedLabels[0] != encodeIdentityRoleLabel("viewer") {
+		t.Fatalf("labels=%#v", stampedLabels)
+	}
+
+	pendingMemberships = []IdentityMembership{{
+		ID: "membership-invite-1", TeamID: "team-acme", OrgSlug: "acme", OrgName: "Acme Org",
+		UserID: "user-invitee", RoleSlugs: []string{"viewer"}, Confirmed: false, InvitedAt: now,
+	}}
+	deletedMembershipID = ""
+	rejectReq := httptest.NewRequest(http.MethodPost, "/my/onboarding", strings.NewReader("intent=reject_invite&membership_id=membership-invite-1"))
+	rejectReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rejectReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rejectRec := httptest.NewRecorder()
+	server.handleMyRoutes(rejectRec, rejectReq)
+	if rejectRec.Code != http.StatusSeeOther || rejectRec.Header().Get("Location") != "/my/onboarding" {
+		t.Fatalf("reject status=%d loc=%q", rejectRec.Code, rejectRec.Header().Get("Location"))
+	}
+	if deletedMembershipID != "membership-invite-1" {
+		t.Fatalf("reject deleted=%q", deletedMembershipID)
+	}
+}
+
+func TestAffiliationPendingInviteAcceptReject(t *testing.T) {
+	ctx := context.Background()
+	identity := &fakeIdentityStore{}
+	aff := NewAffiliation(identity, NewMemoryStore(), nil, nil, nil)
+
+	identity.listUserMembershipsFunc = func(ctx context.Context, userID string) ([]IdentityMembership, error) {
+		return []IdentityMembership{{
+			ID: "m1", TeamID: "team-acme", OrgSlug: "acme", OrgName: "Acme",
+			UserID: userID, RoleSlugs: []string{"viewer"}, IsOrgAdmin: true, Confirmed: false,
+		}}, nil
+	}
+	var deleted string
+	identity.deleteOrganizationMembershipAsAdminFunc = func(ctx context.Context, orgSlug, membershipID string) error {
+		deleted = orgSlug + ":" + membershipID
+		return nil
+	}
+	identity.addOrganizationUserByIDAsAdminFunc = func(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+		if !isOrgAdmin || len(roleSlugs) != 1 || roleSlugs[0] != "viewer" {
+			t.Fatalf("grant roles=%v admin=%v", roleSlugs, isOrgAdmin)
+		}
+		return IdentityMembership{ID: "m2", Confirmed: true}, nil
+	}
+	identity.updateUserLabelsFunc = func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+		return IdentityUser{ID: userID, Labels: labels}, nil
+	}
+	identity.getUserByIDFunc = func(ctx context.Context, userID string) (IdentityUser, error) {
+		return IdentityUser{ID: userID, Email: "a@example.com"}, nil
+	}
+
+	user := IdentityUser{ID: "user-1", Email: "a@example.com"}
+	invites, err := aff.ListPendingInvitesForUser(ctx, user.ID)
+	if err != nil || len(invites) != 1 || !invites[0].IsOrgAdmin {
+		t.Fatalf("invites=%#v err=%v", invites, err)
+	}
+	if err := aff.AcceptPendingInvite(ctx, user, "m1"); err != nil {
+		t.Fatalf("AcceptPendingInvite: %v", err)
+	}
+	if deleted != "acme:m1" {
+		t.Fatalf("deleted=%q", deleted)
+	}
+	if err := aff.RejectPendingInvite(ctx, user, "missing"); !errors.Is(err, ErrAffiliationNotFound) {
+		t.Fatalf("RejectPendingInvite missing = %v", err)
+	}
 }
