@@ -24,124 +24,213 @@ func TestAffiliationIsAffiliated(t *testing.T) {
 	}
 }
 
-func TestAffiliationEnsureInviteOrgSlugCompatible(t *testing.T) {
-	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+func TestAffiliationInviteUserCompatibility(t *testing.T) {
+	ctx := context.Background()
 
 	t.Run("unaffiliated ok", func(t *testing.T) {
-		if err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u"}, "acme"); err != nil {
-			t.Fatalf("err=%v", err)
+		var invited bool
+		identity := &fakeIdentityStore{
+			getUserByEmailFunc: func(_ context.Context, email string) (IdentityUser, error) {
+				return IdentityUser{ID: "u", Email: email}, nil
+			},
+			inviteOrganizationUserFunc: func(_ context.Context, _, orgSlug, email, _ string, _ []string, isOrgAdmin bool) (IdentityMembership, error) {
+				invited = true
+				if orgSlug != "acme" || email != "a@example.com" || !isOrgAdmin {
+					t.Fatalf("unexpected invite org=%s email=%s admin=%v", orgSlug, email, isOrgAdmin)
+				}
+				return IdentityMembership{ID: "m1", Confirmed: false}, nil
+			},
 		}
-	})
-
-	t.Run("whitespace org slug unaffiliated ok", func(t *testing.T) {
-		if err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u", OrgSlug: "  "}, "acme"); err != nil {
-			t.Fatalf("err=%v", err)
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+		result, err := aff.InviteUser(ctx, InviteUserCommand{
+			OrgSlug: "acme", Email: "a@example.com", RedirectURL: "http://x/invite/accept",
+			IsOrgAdmin: true, SessionSecret: "sess",
+		})
+		if err != nil || result.Membership.ID != "m1" || !invited {
+			t.Fatalf("result=%#v err=%v invited=%v", result, err, invited)
 		}
 	})
 
 	t.Run("same org ok", func(t *testing.T) {
-		if err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u", OrgSlug: "Acme"}, "acme"); err != nil {
+		identity := &fakeIdentityStore{
+			getUserByEmailFunc: func(_ context.Context, email string) (IdentityUser, error) {
+				return IdentityUser{ID: "u", Email: email, OrgSlug: "Acme"}, nil
+			},
+			inviteOrganizationUserFunc: func(_ context.Context, _, _, _ string, _ string, _ []string, _ bool) (IdentityMembership, error) {
+				return IdentityMembership{ID: "m1"}, nil
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+		if _, err := aff.InviteUser(ctx, InviteUserCommand{
+			OrgSlug: "acme", Email: "a@example.com", SessionSecret: "sess",
+		}); err != nil {
 			t.Fatalf("err=%v", err)
 		}
 	})
 
 	t.Run("cross org rejected", func(t *testing.T) {
-		err := aff.EnsureInviteOrgSlugCompatible(IdentityUser{ID: "u", OrgSlug: "acme"}, "other")
+		identity := &fakeIdentityStore{
+			getUserByEmailFunc: func(_ context.Context, email string) (IdentityUser, error) {
+				return IdentityUser{ID: "u", Email: email, OrgSlug: "acme"}, nil
+			},
+			inviteOrganizationUserFunc: func(_ context.Context, _, _, _ string, _ string, _ []string, _ bool) (IdentityMembership, error) {
+				t.Fatal("must not invite")
+				return IdentityMembership{}, nil
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+		_, err := aff.InviteUser(ctx, InviteUserCommand{
+			OrgSlug: "other", Email: "a@example.com", SessionSecret: "sess",
+		})
 		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
 			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("unknown email uses admin path", func(t *testing.T) {
+		var adminPath bool
+		identity := &fakeIdentityStore{
+			getUserByEmailFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+				return IdentityUser{}, ErrIdentityNotFound
+			},
+			inviteOrganizationUserAsAdminFunc: func(_ context.Context, orgSlug, email, _ string, roles []string, isOrgAdmin bool) (IdentityMembership, error) {
+				adminPath = true
+				if orgSlug != "acme" || email != "new@example.com" || isOrgAdmin || len(roles) != 1 || roles[0] != "viewer" {
+					t.Fatalf("unexpected admin invite")
+				}
+				return IdentityMembership{ID: "m2"}, nil
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+		if _, err := aff.InviteUser(ctx, InviteUserCommand{
+			OrgSlug: "acme", Email: "new@example.com", RoleSlugs: []string{"viewer"},
+		}); err != nil || !adminPath {
+			t.Fatalf("err=%v adminPath=%v", err, adminPath)
 		}
 	})
 }
 
-func TestAffiliationEnsureInviteAcceptCompatible(t *testing.T) {
+func TestAffiliationAcceptInvitationSecretPath(t *testing.T) {
 	ctx := context.Background()
+	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
 
-	t.Run("user not found ok", func(t *testing.T) {
-		identity := &fakeIdentityStore{
-			getUserByIDFunc: func(_ context.Context, _ string) (IdentityUser, error) {
-				return IdentityUser{}, ErrIdentityNotFound
-			},
-		}
-		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
-		if err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme"); err != nil {
-			t.Fatalf("err=%v", err)
-		}
-	})
-
-	t.Run("unaffiliated ok", func(t *testing.T) {
+	t.Run("cross org rejected without AcceptInvite", func(t *testing.T) {
+		acceptCalled := false
 		identity := &fakeIdentityStore{
 			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
-				return IdentityUser{ID: userID, Email: "new@example.com"}, nil
-			},
-		}
-		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
-		if err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme"); err != nil {
-			t.Fatalf("err=%v", err)
-		}
-	})
-
-	t.Run("same org ok", func(t *testing.T) {
-		identity := &fakeIdentityStore{
-			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
-				return IdentityUser{ID: userID, Email: "m@example.com", OrgSlug: "acme"}, nil
+				return IdentityUser{ID: userID, OrgSlug: "acme"}, nil
 			},
 			getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
-				if slug != "acme" {
-					return nil, ErrIdentityNotFound
+				return &IdentityOrg{ID: "team-acme", Slug: slug}, nil
+			},
+			acceptInviteFunc: func(_ context.Context, _, _, _, _ string) (IdentitySession, error) {
+				acceptCalled = true
+				return IdentitySession{}, errors.New("nope")
+			},
+		}
+		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+		_, err := aff.AcceptInvitation(ctx, InvitationAccept{
+			TeamID: "team-other", MembershipID: "m1", UserID: "u1", Secret: "s1",
+		})
+		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) || acceptCalled {
+			t.Fatalf("err=%v acceptCalled=%v", err, acceptCalled)
+		}
+	})
+
+	t.Run("unaffiliated accepts and reports password need", func(t *testing.T) {
+		identity := &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID}, nil
+			},
+			acceptInviteFunc: func(_ context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
+				if teamID != "team-acme" || membershipID != "m1" || userID != "u1" || secret != "s1" {
+					t.Fatalf("unexpected accept args")
 				}
-				return &IdentityOrg{ID: "team-acme", Slug: "acme"}, nil
+				return fakeIdentitySession("sess", userID, now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(_ context.Context, _ string) (IdentityUser, error) {
+				return IdentityUser{ID: "u1", PasswordSet: false}, nil
 			},
 		}
 		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
-		if err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme"); err != nil {
-			t.Fatalf("err=%v", err)
+		result, err := aff.AcceptInvitation(ctx, InvitationAccept{
+			TeamID: "team-acme", MembershipID: "m1", UserID: "u1", Secret: "s1",
+		})
+		if err != nil || !result.HasSession || !result.NeedsPassword || result.Session.Secret != "sess" {
+			t.Fatalf("result=%#v err=%v", result, err)
 		}
 	})
+}
 
-	t.Run("cross org rejected", func(t *testing.T) {
-		identity := &fakeIdentityStore{
-			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
-				return IdentityUser{ID: userID, Email: "m@example.com", OrgSlug: "acme"}, nil
-			},
-			getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
-				return &IdentityOrg{ID: "team-acme", Slug: "acme"}, nil
-			},
-		}
-		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
-		err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-other")
-		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
-			t.Fatalf("err=%v", err)
-		}
+func TestAffiliationAcceptInvitationRestoresInviteOnGrantFailure(t *testing.T) {
+	ctx := context.Background()
+	var restored bool
+	identity := &fakeIdentityStore{
+		listUserMembershipsFunc: func(_ context.Context, userID string) ([]IdentityMembership, error) {
+			return []IdentityMembership{{
+				ID: "m1", OrgSlug: "acme", UserID: userID, RoleSlugs: []string{"viewer"}, Confirmed: false,
+			}}, nil
+		},
+		deleteOrganizationMembershipAsAdminFunc: func(_ context.Context, _, _ string) error {
+			return nil
+		},
+		addOrganizationUserByIDAsAdminFunc: func(_ context.Context, _, _ string, _ []string, _ bool) (IdentityMembership, error) {
+			return IdentityMembership{}, errors.New("grant failed")
+		},
+		inviteOrganizationUserAsAdminFunc: func(_ context.Context, orgSlug, email, redirect string, roles []string, isOrgAdmin bool) (IdentityMembership, error) {
+			restored = true
+			if orgSlug != "acme" || email != "a@example.com" || redirect != "http://x/invite/accept" || isOrgAdmin || len(roles) != 1 {
+				t.Fatalf("unexpected restore")
+			}
+			return IdentityMembership{ID: "m-restored"}, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
+	_, err := aff.AcceptInvitation(ctx, InvitationAccept{
+		User: IdentityUser{ID: "u1", Email: "a@example.com"}, MembershipID: "m1",
+		RedirectURL: "http://x/invite/accept",
 	})
+	if err == nil || !restored {
+		t.Fatalf("err=%v restored=%v", err, restored)
+	}
+}
 
-	t.Run("org missing rejected", func(t *testing.T) {
-		identity := &fakeIdentityStore{
-			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
-				return IdentityUser{ID: userID, Email: "m@example.com", OrgSlug: "ghost"}, nil
-			},
-			getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
-				return nil, ErrIdentityNotFound
-			},
-		}
-		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
-		err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme")
-		if !errors.Is(err, ErrAffiliationAlreadyAffiliated) {
-			t.Fatalf("err=%v", err)
-		}
-	})
+func TestAffiliationCancelPendingInvite(t *testing.T) {
+	ctx := context.Background()
+	var deleted, strippedUser string
+	identity := &fakeIdentityStore{
+		listOrganizationMembershipsFunc: func(_ context.Context, orgSlug string) ([]IdentityMembership, error) {
+			return []IdentityMembership{
+				{ID: "pending", OrgSlug: orgSlug, UserID: "u1", Confirmed: false, Email: "a@example.com"},
+				{ID: "confirmed", OrgSlug: orgSlug, UserID: "u2", Confirmed: true},
+			}, nil
+		},
+		deleteOrganizationMembershipFunc: func(_ context.Context, secret, orgSlug, membershipID string) error {
+			deleted = secret + ":" + orgSlug + ":" + membershipID
+			return nil
+		},
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			return IdentityUser{ID: userID, Labels: []string{encodeIdentityRoleLabel("viewer"), "keep-me"}}, nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+			strippedUser = userID
+			if len(labels) != 1 || labels[0] != "keep-me" {
+				t.Fatalf("labels=%v", labels)
+			}
+			return IdentityUser{ID: userID, Labels: labels}, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
 
-	t.Run("get user failure propagates", func(t *testing.T) {
-		identity := &fakeIdentityStore{
-			getUserByIDFunc: func(_ context.Context, _ string) (IdentityUser, error) {
-				return IdentityUser{}, errors.New("identity down")
-			},
-		}
-		aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, time.Now, nil)
-		err := aff.EnsureInviteAcceptCompatible(ctx, "user-1", "team-acme")
-		if err == nil || err.Error() != "identity down" {
-			t.Fatalf("err=%v", err)
-		}
-	})
+	if err := aff.CancelPendingInvite(ctx, "sess", "acme", "confirmed"); !errors.Is(err, ErrAffiliationNotFound) {
+		t.Fatalf("confirmed err=%v", err)
+	}
+	if err := aff.CancelPendingInvite(ctx, "sess", "acme", "pending"); err != nil {
+		t.Fatalf("pending err=%v", err)
+	}
+	if deleted != "sess:acme:pending" || strippedUser != "u1" {
+		t.Fatalf("deleted=%q stripped=%q", deleted, strippedUser)
+	}
 }
 
 func TestAffiliationPendingIntentEmpty(t *testing.T) {

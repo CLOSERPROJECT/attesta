@@ -136,7 +136,11 @@ func (s *Server) handleOnboardingHub(w http.ResponseWriter, r *http.Request) {
 		switch intent {
 		case "accept_invite":
 			membershipID := strings.TrimSpace(r.FormValue("membership_id"))
-			if err := aff.AcceptPendingInvite(r.Context(), identityUser, membershipID); err != nil {
+			if _, err := aff.AcceptInvitation(r.Context(), InvitationAccept{
+				User:         identityUser,
+				MembershipID: membershipID,
+				RedirectURL:  inviteRedirectURL(r),
+			}); err != nil {
 				s.renderOnboardingHub(w, r, user, affiliationInviteFormError(err))
 				return
 			}

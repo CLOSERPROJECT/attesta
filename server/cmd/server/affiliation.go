@@ -23,6 +23,7 @@ var (
 	ErrAffiliationOrganizationSlugExists = errors.New("affiliation: organization slug already exists")
 	ErrAffiliationNotAffiliated          = errors.New("affiliation: not affiliated")
 	ErrAffiliationSoleOrgAdmin           = errors.New("affiliation: sole organization admin")
+	ErrAffiliationInviteAcceptFailed     = errors.New("affiliation: invite accept failed")
 )
 
 const (
@@ -88,7 +89,8 @@ type affiliationStore interface {
 	ListPendingOrganizationCreationRequests(ctx context.Context) ([]OrganizationCreationRequest, error)
 }
 
-// Affiliation owns affiliation-domain queries and join / organization-creation / leave commands.
+// Affiliation owns affiliation-domain queries and join / organization-creation /
+// leave / invitation commands.
 type Affiliation struct {
 	identity                  IdentityStore
 	store                     affiliationStore
@@ -135,9 +137,9 @@ func (a *Affiliation) IsAffiliated(user IdentityUser) bool {
 	return strings.TrimSpace(user.OrgSlug) != ""
 }
 
-// EnsureInviteOrgSlugCompatible returns nil when user may be invited into orgSlug.
+// ensureInviteOrgSlugCompatible returns nil when user may be invited into orgSlug.
 // Unaffiliated users are always compatible; affiliated users must already match orgSlug.
-func (a *Affiliation) EnsureInviteOrgSlugCompatible(user IdentityUser, orgSlug string) error {
+func (a *Affiliation) ensureInviteOrgSlugCompatible(user IdentityUser, orgSlug string) error {
 	if !a.IsAffiliated(user) {
 		return nil
 	}
@@ -147,9 +149,9 @@ func (a *Affiliation) EnsureInviteOrgSlugCompatible(user IdentityUser, orgSlug s
 	return ErrAffiliationAlreadyAffiliated
 }
 
-// EnsureInviteAcceptCompatible blocks affiliated users from accepting invites into a different org.
+// ensureInviteAcceptCompatible blocks affiliated users from accepting invites into a different org.
 // Unaffiliated users and GetUserByID not-found (new invitees) are allowed through.
-func (a *Affiliation) EnsureInviteAcceptCompatible(ctx context.Context, userID, teamID string) error {
+func (a *Affiliation) ensureInviteAcceptCompatible(ctx context.Context, userID, teamID string) error {
 	user, err := a.identity.GetUserByID(ctx, userID)
 	switch {
 	case err == nil:
@@ -358,27 +360,6 @@ func (a *Affiliation) findPendingInvite(ctx context.Context, userID, membershipI
 		}
 	}
 	return PendingInvite{}, ErrAffiliationNotFound
-}
-
-// AcceptPendingInvite confirms a pending invite without the email secret by replacing
-// the unconfirmed membership with a granted (confirmed) membership and stamping labels.
-func (a *Affiliation) AcceptPendingInvite(ctx context.Context, user IdentityUser, membershipID string) error {
-	if a.IsAffiliated(user) {
-		return ErrAffiliationAlreadyAffiliated
-	}
-	invite, err := a.findPendingInvite(ctx, user.ID, membershipID)
-	if err != nil {
-		return err
-	}
-	if err := a.identity.DeleteOrganizationMembershipAsAdmin(ctx, invite.OrgSlug, invite.MembershipID); err != nil {
-		return err
-	}
-	if err := a.grantOrganizationMembership(ctx, invite.OrgSlug, user.ID, invite.RoleSlugs, invite.IsOrgAdmin); err != nil {
-		return err
-	}
-	_ = a.WithdrawPendingJoinRequest(ctx, user)
-	_ = a.WithdrawPendingOrganizationCreationRequest(ctx, user)
-	return nil
 }
 
 // RejectPendingInvite deletes an unconfirmed invite membership for the current user.

@@ -2674,29 +2674,34 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := s.affiliationService().EnsureInviteAcceptCompatible(r.Context(), userID, teamID); err != nil {
+	result, err := s.affiliationService().AcceptInvitation(r.Context(), InvitationAccept{
+		TeamID:       teamID,
+		MembershipID: membershipID,
+		UserID:       userID,
+		Secret:       secret,
+	})
+	if err != nil {
 		switch {
 		case errors.Is(err, ErrAffiliationAlreadyAffiliated):
 			http.Error(w, "already belongs to another organization", http.StatusBadRequest)
+		case errors.Is(err, ErrAffiliationInviteAcceptFailed):
+			logAndHTTPError(w, r, http.StatusBadRequest, "failed to accept invite", err, "failed to accept invite team=%s membership=%s user=%s", teamID, membershipID, userID)
 		default:
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to accept invite", err, "failed invite affiliation gate team=%s user=%s", teamID, userID)
 		}
 		return
 	}
-	session, err := s.identity.AcceptInvite(r.Context(), teamID, membershipID, userID, secret)
-	if err != nil {
-		logAndHTTPError(w, r, http.StatusBadRequest, "failed to accept invite", err, "failed to accept invite team=%s membership=%s user=%s", teamID, membershipID, userID)
+	if !result.HasSession {
+		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to accept invite", errors.New("missing invite session"), "invite accept missing session team=%s user=%s", teamID, userID)
 		return
 	}
-	if err := s.writeSessionCookie(w, r, session); err != nil {
+	if err := s.writeSessionCookie(w, r, result.Session); err != nil {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to login", err, "failed to write invite session cookie for user %s", userID)
 		return
 	}
-	if identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret); err == nil && !identityUser.PasswordSet {
+	if result.NeedsPassword {
 		http.Redirect(w, r, "/invite/password", http.StatusSeeOther)
 		return
-	} else if err != nil {
-		logRequestError(r, err, "failed to load invited user after accepting invite")
 	}
 	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 }
@@ -3466,16 +3471,17 @@ func (s *Server) inviteOrganizationAdminWithSession(ctx context.Context, session
 		}
 		return "org admin access updated", nil
 	}
-	existingUser, err := s.identity.GetUserByEmail(ctx, email)
-	switch {
-	case err == nil:
-		if err := s.affiliationService().EnsureInviteOrgSlugCompatible(existingUser, org.Slug); err != nil {
+	if _, err := s.affiliationService().InviteUser(ctx, InviteUserCommand{
+		OrgSlug:       org.Slug,
+		Email:         email,
+		RedirectURL:   redirectURL,
+		RoleSlugs:     nil,
+		IsOrgAdmin:    true,
+		SessionSecret: sessionSecret,
+	}); err != nil {
+		if errors.Is(err, ErrAffiliationAlreadyAffiliated) {
 			return "", errPlatformAdminInviteCrossOrg
 		}
-	case err != nil && !errors.Is(err, ErrIdentityNotFound):
-		return "", err
-	}
-	if _, err := s.identity.InviteOrganizationUser(ctx, sessionSecret, org.Slug, email, redirectURL, nil, true); err != nil {
 		return "", err
 	}
 	return "invite sent", nil
@@ -4660,10 +4666,6 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 		existingUser, err := s.identity.GetUserByEmail(r.Context(), email)
 		switch {
 		case err == nil:
-			if err := s.affiliationService().EnsureInviteOrgSlugCompatible(existingUser, admin.OrgSlug); err != nil {
-				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
-				return
-			}
 			if strings.EqualFold(strings.TrimSpace(existingUser.OrgSlug), strings.TrimSpace(admin.OrgSlug)) {
 				labels := make([]string, 0, len(businessRoles)+1)
 				for _, roleSlug := range businessRoles {
@@ -4679,6 +4681,10 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 				return
 			}
+			if s.affiliationService().IsAffiliated(existingUser) {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
+				return
+			}
 		case err != nil && !errors.Is(err, ErrIdentityNotFound):
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to load existing user"}, err, "failed to look up existing user %s during invite", email)
 			return
@@ -4688,7 +4694,18 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for invite creation in %s", admin.OrgSlug)
 			return
 		}
-		if _, err := s.identity.InviteOrganizationUser(r.Context(), sessionSecret, admin.OrgSlug, email, inviteRedirectURL(r), businessRoles, isOrgAdmin); err != nil {
+		if _, err := s.affiliationService().InviteUser(r.Context(), InviteUserCommand{
+			OrgSlug:       admin.OrgSlug,
+			Email:         email,
+			RedirectURL:   inviteRedirectURL(r),
+			RoleSlugs:     businessRoles,
+			IsOrgAdmin:    isOrgAdmin,
+			SessionSecret: sessionSecret,
+		}); err != nil {
+			if errors.Is(err, ErrAffiliationAlreadyAffiliated) {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "email already belongs to another organization"})
+				return
+			}
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Invite: "failed to create invite"}, err, "failed to create invite for %s in organization %s", email, admin.OrgSlug)
 			return
 		}
@@ -4911,55 +4928,18 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite is required"})
 			return
 		}
-		memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
-		if err != nil {
-			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"}, err, "failed to list memberships for organization %s during invite delete", admin.OrgSlug)
-			return
-		}
-		var target *IdentityMembership
-		for idx := range memberships {
-			if strings.TrimSpace(memberships[idx].ID) != membershipID {
-				continue
-			}
-			target = &memberships[idx]
-			break
-		}
-		if target == nil || target.Confirmed {
-			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"})
-			return
-		}
-		if isPlatformAdminMembership(*target) {
-			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"})
-			return
-		}
 		sessionSecret, err := sessionSecretFromRequest(r)
 		if err != nil {
 			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for invite delete in %s", admin.OrgSlug)
 			return
 		}
-		if err := s.identity.DeleteOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, target.ID); err != nil {
-			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, err, "failed to delete invite membership %s in organization %s", target.ID, admin.OrgSlug)
-			return
-		}
-		if strings.TrimSpace(target.UserID) != "" {
-			targetUser, getErr := s.identity.GetUserByID(r.Context(), target.UserID)
-			if getErr != nil && !errors.Is(getErr, ErrIdentityNotFound) {
-				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, getErr, "failed to load deleted invite user %s in organization %s", target.UserID, admin.OrgSlug)
+		if err := s.affiliationService().CancelPendingInvite(r.Context(), sessionSecret, admin.OrgSlug, membershipID); err != nil {
+			if errors.Is(err, ErrAffiliationNotFound) {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"})
 				return
 			}
-			if getErr == nil {
-				labels := make([]string, 0, len(targetUser.Labels))
-				for _, label := range targetUser.Labels {
-					if isManagedIdentityLabel(label) {
-						continue
-					}
-					labels = append(labels, strings.TrimSpace(label))
-				}
-				if _, err := s.identity.UpdateUserLabels(r.Context(), target.UserID, labels); err != nil {
-					s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, err, "failed to clear labels for deleted invite user %s in organization %s", target.UserID, admin.OrgSlug)
-					return
-				}
-			}
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, err, "failed to delete invite membership %s in organization %s", membershipID, admin.OrgSlug)
+			return
 		}
 		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	case "approve_join":
