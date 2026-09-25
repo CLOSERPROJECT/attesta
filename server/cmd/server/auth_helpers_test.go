@@ -319,6 +319,25 @@ func TestRequireOrgAdmin(t *testing.T) {
 			t.Fatalf("user = %#v", user)
 		}
 	})
+
+	t.Run("org admin without organization redirects", func(t *testing.T) {
+		unaffiliated := AccountUser{ID: primitive.NewObjectID(), Email: "orphan@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}
+		orphanServer := &Server{
+			authorizer:  fakeAuthorizer{},
+			identity:    testIdentityForSessions(now, map[string]AccountUser{"session-orphan": unaffiliated}),
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		req := httptest.NewRequest(http.MethodGet, "/my/organization/profile", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-orphan"})
+		rec := httptest.NewRecorder()
+		if _, ok := orphanServer.requireOrgAdmin(rec, req); ok {
+			t.Fatal("expected requireOrgAdmin to reject unaffiliated org admin")
+		}
+		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != onboardingPath() {
+			t.Fatalf("response = %d %q", rec.Code, rec.Header().Get("Location"))
+		}
+	})
 }
 
 func TestRequirePlatformAdmin(t *testing.T) {

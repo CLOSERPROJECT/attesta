@@ -1,0 +1,11 @@
+{{ define "org_pending_row" }}
+  <div class="list-row-main list-row-main-stack">
+    <p>{{ .Email }}</p>
+    <div class="u-flex-center u-flex-wrap u-gap-2">
+      {{ template "role_pill_row" .Roles }}
+      {{ if .Date }}
+        <p class="muted u-text-xs">{{ .DateLabel }}: {{ .Date }}</p>
+      {{ end }}
+    </div>
+  </div>
+{{ end }}

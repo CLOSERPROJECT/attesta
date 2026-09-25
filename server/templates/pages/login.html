@@ -16,18 +16,27 @@
             name="email"
             type="email"
             value="{{ .Email }}"
+            placeholder="you@example.com"
+            autocomplete="email"
             required
           />
         </div>
         <div class="form-field">
           <label for="password">Password</label>
           <div class="password-field">
-            <input id="password" name="password" type="password" required />
-
+            <input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="Your password"
+              autocomplete="current-password"
+              required
+            />
             <button
               type="button"
               class="toggle-password"
-              aria-label="Toggle password"
+              data-target="password"
+              aria-label="Toggle password visibility"
             >
               {{ template "icon-eye" . }}
               {{ template "icon-eye-off" . }}
@@ -46,26 +55,11 @@
         </div>
       </form>
       {{ if .ShowSignup }}
-        <p class="muted">Need an account? <a href="/signup">Sign up</a></p>
+        {{ template "auth_footer" (dict "Prompt" "Need an account?" "Href" "/signup" "LinkLabel" "Sign up") }}
       {{ end }}
     </section>
   </div>
-  <script>
-    const toggle = document.querySelector(".toggle-password");
-    const input = document.querySelector("#password");
-
-    toggle.addEventListener("click", () => {
-      const isPassword = input.type === "password";
-      input.type = isPassword ? "text" : "password";
-
-      toggle.querySelector(".icon-eye").style.display = isPassword
-        ? "none"
-        : "block";
-      toggle.querySelector(".icon-eye-off").style.display = isPassword
-        ? "block"
-        : "none";
-    });
-  </script>
+  {{ template "toggle_password_script" . }}
 {{ end }}
 
 {{ define "login.html" }}

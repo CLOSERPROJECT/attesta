@@ -18,8 +18,11 @@
  *       p?
  *     …content…
  *
- * Inner block:
- *   div.panel-block[.panel-block-spaced]
+ * Stacked blocks (spacing from container gap, not child margins):
+ *   .panel-section
+ *     .panel-block                 (groups heading + body as one flex item)
+ *     hr?
+ *     .panel-block
  *
  * Modifiers:
  *   section.panel.panel-sticky   (sticky rail at --md-up)
@@ -75,12 +78,10 @@
   flex-wrap: wrap;
 }
 
-.panel-block {
-  margin-top: var(--space-5);
-}
-
-.panel-block-spaced {
-  margin-bottom: var(--space-3);
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
 }
 
 @media (--md-up) {

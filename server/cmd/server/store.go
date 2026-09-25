@@ -599,14 +599,16 @@ func (s *MongoStore) attachmentsBucket() (gridFSBucketPort, error) {
 }
 
 type MemoryStore struct {
-	mu                sync.RWMutex
-	processes         map[primitive.ObjectID]Process
-	notarizations     []Notarization
-	attachments       map[primitive.ObjectID]memoryAttachment
-	formataStreams    map[primitive.ObjectID]FormataBuilderStream
-	categories        map[string]Category
-	subCategories     map[string]SubCategory
-	taxonomyRevision  int64
+	mu                             sync.RWMutex
+	processes                      map[primitive.ObjectID]Process
+	notarizations                  []Notarization
+	attachments                    map[primitive.ObjectID]memoryAttachment
+	formataStreams                 map[primitive.ObjectID]FormataBuilderStream
+	categories                     map[string]Category
+	subCategories                  map[string]SubCategory
+	taxonomyRevision               int64
+	joinRequests                   map[primitive.ObjectID]JoinRequest
+	organizationCreationRequests   map[primitive.ObjectID]OrganizationCreationRequest
 
 	InsertProcessErr  error
 	LoadProcessErr    error
@@ -624,11 +626,13 @@ type memoryAttachment struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		processes:      map[primitive.ObjectID]Process{},
-		attachments:    map[primitive.ObjectID]memoryAttachment{},
-		formataStreams: map[primitive.ObjectID]FormataBuilderStream{},
-		categories:     map[string]Category{},
-		subCategories:  map[string]SubCategory{},
+		processes:                    map[primitive.ObjectID]Process{},
+		attachments:                  map[primitive.ObjectID]memoryAttachment{},
+		formataStreams:               map[primitive.ObjectID]FormataBuilderStream{},
+		categories:                   map[string]Category{},
+		subCategories:                map[string]SubCategory{},
+		joinRequests:                 map[primitive.ObjectID]JoinRequest{},
+		organizationCreationRequests: map[primitive.ObjectID]OrganizationCreationRequest{},
 	}
 }
 

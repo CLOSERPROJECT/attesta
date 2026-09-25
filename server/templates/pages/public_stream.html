@@ -1,10 +1,7 @@
 {{ define "public_stream_body" }}
 <div class="public-stream">
   <header class="public-stream-header">
-    <a class="public-stream-back" href="{{ .HomeHref }}">
-      {{ template "icon-arrow-left" . }}
-      Home
-    </a>
+    {{ template "back_link" (dict "Href" .HomeHref "Label" "Home") }}
     <div class="public-stream-title-wrapper">
       <h1 class="public-stream-title">{{ .Header.Name }}</h1>
       {{ if .Header.PassportEnabled }}

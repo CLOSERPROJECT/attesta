@@ -1,0 +1,100 @@
+{{/* Multi-select role picker with colored role pills. */}}
+
+{{ define "roles_picker" }}
+  <div
+    class="roles-picker"
+    data-role-picker
+    {{- if .RequireSelection }} data-role-picker-require-selection{{ end }}
+  >
+    <button
+      type="button"
+      class="roles-picker-toggle"
+      data-role-picker-toggle
+      aria-expanded="false"
+      {{- if not .Options }} disabled{{ end }}
+    >
+      <span class="roles-picker-toggle-chips" data-role-picker-toggle-label>
+        {{- if not .Options -}}
+          No roles available
+        {{- else -}}
+          {{- $hasSelected := false -}}
+          {{- range .Options -}}
+            {{- if .Selected -}}
+              {{- $hasSelected = true -}}
+              <span
+                class="pill pill-sm role-pill"
+                data-role-palette="{{ .Palette }}"
+                >{{ .Name }}</span
+              >
+            {{- end -}}
+          {{- end -}}
+          {{- if not $hasSelected -}}
+            Select roles
+          {{- end -}}
+        {{- end -}}
+      </span>
+      <span class="roles-picker-toggle-icon" aria-hidden="true">
+        {{ template "icon-chevron-down" . }}
+      </span>
+    </button>
+    {{ if .Options }}
+      <div class="roles-picker-menu" data-role-picker-menu hidden>
+        <label class="roles-picker-search-field">
+          {{ template "icon-search" . }}
+          <input
+            type="search"
+            class="roles-picker-search"
+            data-role-picker-search
+            placeholder="Search roles..."
+            autocomplete="off"
+          />
+          <button
+            type="button"
+            class="btn btn-ghost btn-icon btn-xs roles-picker-search-clear"
+            data-role-picker-search-clear
+            hidden
+            aria-label="Clear search"
+          >
+            {{ template "icon-close" . }}
+          </button>
+        </label>
+        <ul class="roles-picker-options">
+          {{ range .Options }}
+            <li>
+              <button
+                type="button"
+                class="roles-picker-option"
+                data-role-picker-option
+                data-value="{{ .Slug }}"
+                data-label="{{ .Name }}"
+                data-palette="{{ .Palette }}"
+                {{- if .Selected }} data-selected="true"{{ end }}
+              >
+                <span
+                  class="pill pill-sm role-pill"
+                  data-role-palette="{{ .Palette }}"
+                  >{{ .Name }}</span
+                >
+                <span class="roles-picker-option-check" aria-hidden="true">
+                  {{ template "icon-check" . }}
+                </span>
+              </button>
+            </li>
+          {{ end }}
+        </ul>
+        <div class="empty-state" data-role-picker-empty hidden>
+          {{ template "icon-search" . }}
+          <p class="empty-state-title">No roles match your search</p>
+          <p class="empty-state-hint">Try a different name.</p>
+        </div>
+      </div>
+      <div data-role-picker-hidden-inputs>
+        {{ range .Options }}
+          {{ if .Selected }}
+            <input type="hidden" name="roles" value="{{ .Slug }}" />
+          {{ end }}
+        {{ end }}
+      </div>
+    {{ end }}
+  </div>
+{{ end }}

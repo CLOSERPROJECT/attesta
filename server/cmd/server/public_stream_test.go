@@ -230,7 +230,7 @@ func TestPublicStreamBodyTemplateRendersSections(t *testing.T) {
 	body := out.String()
 	for _, want := range []string{
 		`class="public-stream"`,
-		`class="public-stream-back"`,
+		`class="back-link"`,
 		`href="/?category=supply-chain&amp;subCategory=procurement"`,
 		"Pilot Workflow",
 		"Gallium batches",
@@ -366,7 +366,7 @@ func TestHandlePublicStreamHomeHrefUncategorized(t *testing.T) {
 		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `class="public-stream-back" href="/"`) {
+	if !strings.Contains(body, `class="back-link" href="/"`) {
 		t.Fatalf("expected Home href=/, got: %s", body)
 	}
 	if strings.Contains(body, "category=") {

@@ -3,14 +3,14 @@
  *
  * Heading only (no actions):
  *   section.page-header
- *     nav.breadcrumbs?               (from template breadcrumbs)
+ *     nav.breadcrumbs? | a.back-link? (breadcrumbs or back_link)
  *     div.page-header-body
  *       h1                           (title; optional span[aria-hidden] + span.page-header-subtitle)
  *       p?                           (description)
  *
  * With actions:
  *   section.page-header
- *     nav.breadcrumbs?
+ *     nav.breadcrumbs? | a.back-link?
  *     div.page-header-head
  *       div.page-header-body
  *         …                          (same as above)

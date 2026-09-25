@@ -115,18 +115,6 @@ svg.bi {
   border-color: var(--role-chroma);
 }
 
-.role-pill-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-1);
-}
-
-.role-pill-label {
-  margin-right: var(--space-1);
-  font-size: var(--text-xs);
-}
-
 .pill-accent {
   --pill: var(--highlight);
 }

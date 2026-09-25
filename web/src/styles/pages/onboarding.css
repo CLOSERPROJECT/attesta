@@ -1,0 +1,157 @@
+/* pages/onboarding.html — CTA pair under the page header.
+   Markup: .onboarding-actions > a.btn > .icon-svg + span
+   pages/onboarding.html — pending join / org-creation card
+   Markup: section.onboarding-pending
+             .panel-heading.onboarding-pending-heading
+               icon-clock
+               .onboarding-pending-heading-copy > h2 + p
+             dl.onboarding-pending-meta
+             .onboarding-pending-actions > button.btn
+   pages/onboarding.html — pending invite card (success tone)
+   Markup: section.onboarding-pending.onboarding-invite
+   pages/onboarding_request_organization.html — submit row
+   Markup: .onboarding-request-actions > button.btn */
+
+.onboarding-pending.onboarding-invite + .onboarding-actions {
+  margin-top: var(--space-2);
+}
+
+.onboarding-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
+.onboarding-actions .btn {
+  flex-direction: column;
+  flex: 1 1 0;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: var(--space-6) var(--space-4);
+  font-size: var(--text-base);
+  line-height: var(--leading-tight);
+  text-align: center;
+  white-space: normal;
+}
+
+.onboarding-actions .btn .icon-svg {
+  width: 48px;
+  height: 48px;
+  stroke-width: 1.25;
+}
+
+.onboarding-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--warning-muted);
+  border: 1px solid
+    color-mix(in srgb, var(--warning-muted-foreground) 35%, transparent);
+  border-radius: 4px;
+  color: var(--warning-muted-foreground);
+}
+
+.onboarding-pending.onboarding-invite {
+  background: var(--success-muted);
+  border-color: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 35%,
+    transparent
+  );
+  color: var(--success-muted-foreground);
+}
+
+.onboarding-pending .panel-heading {
+  margin-bottom: 0;
+}
+
+.onboarding-pending-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.onboarding-pending-heading .icon-svg {
+  width: 24px;
+  height: 24px;
+  margin-top: 0.2em;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.onboarding-pending-heading-copy {
+  min-width: 0;
+}
+
+.onboarding-pending .panel-heading h2,
+.onboarding-pending .panel-heading p {
+  color: inherit;
+}
+
+.onboarding-pending-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-10);
+  margin: 0;
+}
+
+.onboarding-pending hr {
+  border-color: color-mix(
+    in srgb,
+    var(--warning-muted-foreground) 50%,
+    transparent
+  );
+}
+
+.onboarding-pending.onboarding-invite hr {
+  border-color: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 50%,
+    transparent
+  );
+}
+
+.onboarding-pending-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.onboarding-pending-meta dt,
+.onboarding-pending-meta dd {
+  margin: 0;
+  color: inherit;
+}
+
+.onboarding-pending-meta dt {
+  font-weight: var(--font-semibold);
+}
+
+.onboarding-pending-meta dd {
+  font-weight: var(--font-normal);
+}
+
+.onboarding-pending-actions,
+.onboarding-request-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  transform: translateY(var(--space-3)) translateX(var(--space-3));
+}
+
+@media (--sm-down) {
+  .onboarding-actions {
+    flex-wrap: wrap;
+  }
+
+  .onboarding-actions .btn {
+    flex-basis: 100%;
+  }
+}

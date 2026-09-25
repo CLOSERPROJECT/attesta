@@ -59,6 +59,9 @@ services:
       APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}
       APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}
       APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: attesta@localhost
     ports:
       - "3030:3000"
     networks:

@@ -28,7 +28,8 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: true}, nil
 			},
 		},
-		now: time.Now,
+		store: NewMemoryStore(),
+		now:   time.Now,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
@@ -61,7 +62,8 @@ func TestHandleInviteAcceptRedirectsToInvitePasswordWhenUnset(t *testing.T) {
 				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: false}, nil
 			},
 		},
-		now: time.Now,
+		store: NewMemoryStore(),
+		now:   time.Now,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
@@ -114,7 +116,8 @@ func TestHandleInviteAcceptBranches(t *testing.T) {
 					return IdentitySession{}, errors.New("boom")
 				},
 			},
-			now: time.Now,
+			store: NewMemoryStore(),
+			now:   time.Now,
 		}
 		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
 		rec := httptest.NewRecorder()
@@ -131,7 +134,8 @@ func TestHandleInviteAcceptBranches(t *testing.T) {
 					return IdentitySession{UserID: userID}, nil
 				},
 			},
-			now: time.Now,
+			store: NewMemoryStore(),
+			now:   time.Now,
 		}
 		req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
 		rec := httptest.NewRecorder()

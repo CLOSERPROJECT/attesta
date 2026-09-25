@@ -305,8 +305,24 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	if createdOrg.Slug != "fresh-org" || createdOrg.Name != "Fresh Org" {
 		t.Fatalf("created org = %#v", createdOrg)
 	}
+	wantOperator := defaultOperatorCatalogRole()
+	if len(createdOrg.Roles) != 1 || createdOrg.Roles[0] != wantOperator {
+		t.Fatalf("created org roles = %#v, want [%#v]", createdOrg.Roles, wantOperator)
+	}
 	if createTeamBody["teamId"] != "fresh-org" || createTeamBody["name"] != "Fresh Org" {
 		t.Fatalf("create team body = %#v", createTeamBody)
+	}
+	if len(updatePrefsBodies) != 1 {
+		t.Fatalf("prefs calls after create = %d, want 1", len(updatePrefsBodies))
+	}
+	createPrefs, _ := updatePrefsBodies[0]["prefs"].(map[string]interface{})
+	createRoles, _ := createPrefs["roles"].([]interface{})
+	if len(createRoles) != 1 {
+		t.Fatalf("create prefs roles = %#v", createPrefs["roles"])
+	}
+	createRole, _ := createRoles[0].(map[string]interface{})
+	if createRole["slug"] != "operator" || createRole["name"] != "Operator" || createRole["palette"] != wantOperator.Palette {
+		t.Fatalf("create prefs operator role = %#v", createRole)
 	}
 	labels, _ := updatedLabelsBody["labels"].([]interface{})
 	if len(labels) != 1 || labels[0] != identityOrgAdminLabel {
@@ -401,6 +417,9 @@ func TestAppwriteIdentityOrganizationOperations(t *testing.T) {
 	if createTeamSessionHeader != "" {
 		t.Fatalf("create admin team session header = %q, want empty", createTeamSessionHeader)
 	}
+	if len(createdAdminOrg.Roles) != 1 || createdAdminOrg.Roles[0] != defaultOperatorCatalogRole() {
+		t.Fatalf("created admin org roles = %#v", createdAdminOrg.Roles)
+	}
 
 	updatedAdminOrg, err := identity.UpdateOrganizationAsAdmin(context.Background(), "fresh-org", "Updated Org", "logo-1", []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "blue"}})
 	if err != nil {
@@ -463,8 +482,20 @@ func TestAppwriteIdentityCreateOrganizationShortensLongTeamID(t *testing.T) {
 	if prefs["slug"] != fullSlug {
 		t.Fatalf("prefs slug = %#v, want %q", prefs["slug"], fullSlug)
 	}
+	wantOperator := defaultOperatorCatalogRole()
+	roles, _ := prefs["roles"].([]interface{})
+	if len(roles) != 1 {
+		t.Fatalf("prefs roles = %#v", prefs["roles"])
+	}
+	role, _ := roles[0].(map[string]interface{})
+	if role["slug"] != "operator" || role["name"] != "Operator" || role["palette"] != wantOperator.Palette {
+		t.Fatalf("prefs operator role = %#v", role)
+	}
 	if createdOrg.ID != shortTeamID || createdOrg.Slug != fullSlug || createdOrg.Name != longName {
 		t.Fatalf("created org = %#v", createdOrg)
+	}
+	if len(createdOrg.Roles) != 1 || createdOrg.Roles[0] != wantOperator {
+		t.Fatalf("created org roles = %#v", createdOrg.Roles)
 	}
 }
 
@@ -526,6 +557,7 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	var updateMembershipKeyHeader string
 	var updateMembershipBody map[string]interface{}
 	var deleteMembershipSessionHeader string
+	var deleteMembershipKeyHeader string
 	var userSearch string
 
 	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -567,6 +599,7 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 			_, _ = w.Write([]byte(`{"$id":"member-1","email":"member@example.com","status":true,"labels":["rapprover","attestaOrgAdmin"]}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/teams/acme-team/memberships/membership-1":
 			deleteMembershipSessionHeader = r.Header.Get("X-Appwrite-Session")
+			deleteMembershipKeyHeader = r.Header.Get("X-Appwrite-Key")
 			_, _ = w.Write([]byte(`{}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
@@ -655,6 +688,15 @@ func TestAppwriteIdentityMembershipOperations(t *testing.T) {
 	}
 	if updateMembershipSessionHeader != "" {
 		t.Fatalf("admin update session header = %q, want empty", updateMembershipSessionHeader)
+	}
+
+	deleteMembershipSessionHeader = ""
+	deleteMembershipKeyHeader = ""
+	if err := identity.DeleteOrganizationMembershipAsAdmin(context.Background(), "acme", "membership-1"); err != nil {
+		t.Fatalf("DeleteOrganizationMembershipAsAdmin error: %v", err)
+	}
+	if deleteMembershipKeyHeader != "api-key-1" || deleteMembershipSessionHeader != "" {
+		t.Fatalf("admin delete headers key=%q session=%q", deleteMembershipKeyHeader, deleteMembershipSessionHeader)
 	}
 }
 
@@ -769,27 +811,67 @@ func TestAppwriteIdentityMembershipOperationErrors(t *testing.T) {
 }
 
 func TestAppwriteIdentityListOrganizationMembershipsPendingMembership(t *testing.T) {
-	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/v1/teams/acme":
-			_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
-		case "/v1/teams/acme/memberships":
-			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iapprover"]}]}`))
-		default:
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-	}))
-	defer appwriteAPI.Close()
+	t.Run("without user id keeps invite roles", func(t *testing.T) {
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/v1/teams/acme":
+				_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
+			case "/v1/teams/acme/memberships":
+				_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iapprover"]}]}`))
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
 
-	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
-	memberships, err := identity.ListOrganizationMemberships(context.Background(), "acme")
-	if err != nil {
-		t.Fatalf("ListOrganizationMemberships error: %v", err)
-	}
-	if len(memberships) != 1 || memberships[0].Email != "pending@example.com" || memberships[0].Confirmed {
-		t.Fatalf("memberships = %#v", memberships)
-	}
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+		memberships, err := identity.ListOrganizationMemberships(context.Background(), "acme")
+		if err != nil {
+			t.Fatalf("ListOrganizationMemberships error: %v", err)
+		}
+		if len(memberships) != 1 || memberships[0].Email != "pending@example.com" || memberships[0].Confirmed {
+			t.Fatalf("memberships = %#v", memberships)
+		}
+		if len(memberships[0].RoleSlugs) != 1 || memberships[0].RoleSlugs[0] != "approver" {
+			t.Fatalf("pending role slugs = %#v", memberships[0].RoleSlugs)
+		}
+	})
+
+	t.Run("with user id keeps invite roles not empty labels", func(t *testing.T) {
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/v1/teams/acme":
+				_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
+			case "/v1/teams/acme/memberships":
+				_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"user-pending","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iqa-reviewer","owner"]}]}`))
+			case "/v1/users/user-pending":
+				_, _ = w.Write([]byte(`{"$id":"user-pending","email":"pending@example.com","status":true,"labels":[]}`))
+			case "/v1/users/user-pending/memberships":
+				_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"user-pending","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iqa-reviewer","owner"]}]}`))
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
+
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+		memberships, err := identity.ListOrganizationMemberships(context.Background(), "acme")
+		if err != nil {
+			t.Fatalf("ListOrganizationMemberships error: %v", err)
+		}
+		if len(memberships) != 1 {
+			t.Fatalf("memberships = %#v", memberships)
+		}
+		got := memberships[0]
+		if got.Confirmed || got.Email != "pending@example.com" || !got.IsOrgAdmin {
+			t.Fatalf("membership = %#v", got)
+		}
+		if len(got.RoleSlugs) != 1 || got.RoleSlugs[0] != "qa-reviewer" {
+			t.Fatalf("pending invite roles overwritten by labels: %#v", got.RoleSlugs)
+		}
+	})
 }
 
 func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *testing.T) {
@@ -905,7 +987,7 @@ func TestAppwriteIdentityCreateAccountAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAccount error: %v", err)
 	}
-	if createPath != "/v1/account" || createBody["email"] != "new@example.com" || createBody["password"] != "very-secure-password" {
+	if createPath != "/v1/account" || createBody["email"] != "new@example.com" || createBody["password"] != "very-secure-password" || createBody["name"] != "new" {
 		t.Fatalf("create account request = %q %#v", createPath, createBody)
 	}
 	if user.Email != "new@example.com" || user.ID != "user-1" {
@@ -1215,11 +1297,14 @@ func TestAppwriteIdentityGetUserByIDAndGetOrganizationBySlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserByID error: %v", err)
 	}
-	if user.Status != "pending" {
-		t.Fatalf("status = %q, want pending", user.Status)
+	if user.OrgSlug != "" {
+		t.Fatalf("OrgSlug = %q, want empty for unconfirmed invite", user.OrgSlug)
 	}
-	if !user.IsOrgAdmin {
-		t.Fatal("expected org admin derived from owner membership role")
+	if user.IsOrgAdmin {
+		t.Fatal("pending invite must not grant org admin")
+	}
+	if user.Status != "active" {
+		t.Fatalf("status = %q, want active while invite is still unconfirmed", user.Status)
 	}
 
 	org, err := identity.GetOrganizationBySlug(context.Background(), "acme")
@@ -1540,6 +1625,9 @@ func TestAppwriteIdentityMethodsRespectCanceledContext(t *testing.T) {
 	if err := identity.DeleteOrganizationMembership(ctx, "session-secret", "acme", "membership-1"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("DeleteOrganizationMembership error = %v, want %v", err, context.Canceled)
 	}
+	if err := identity.DeleteOrganizationMembershipAsAdmin(ctx, "acme", "membership-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("DeleteOrganizationMembershipAsAdmin error = %v, want %v", err, context.Canceled)
+	}
 	if _, err := identity.UploadOrganizationLogo(ctx, "acme", IdentityFile{Filename: "logo.png", Data: []byte("png")}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("UploadOrganizationLogo error = %v, want %v", err, context.Canceled)
 	}
@@ -1665,8 +1753,95 @@ func TestAppwriteIdentityDirectTeamLookupAndCurrentUserFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCurrentUser error: %v", err)
 	}
-	if user.OrgSlug != "team-1" || user.OrgName != "Acme Org" {
+	if user.OrgSlug != "" || user.OrgName != "" || user.MembershipID != "" {
+		t.Fatalf("deleted team must clear org fields, got %#v", user)
+	}
+	if !user.IsOrgAdmin || user.Email != "org-admin@example.com" {
 		t.Fatalf("user = %#v", user)
+	}
+}
+
+func TestAppwriteIdentityListUserMemberships(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/users/user-1/memberships":
+			_, _ = w.Write([]byte(`{"total":2,"memberships":[
+				{"$id":"mem-1","userId":"user-1","teamId":"team-1","teamName":"Acme","confirm":true,"roles":["owner"],"userEmail":"a@example.com"},
+				{"$id":"mem-2","userId":"user-1","teamId":"missing-team","teamName":"Gone","confirm":true,"roles":["member"],"userEmail":"a@example.com"}
+			]}`))
+		case "/v1/users/boom/memberships":
+			http.Error(w, `{"message":"nope"}`, http.StatusInternalServerError)
+		case "/v1/teams/team-1":
+			_, _ = w.Write([]byte(`{"$id":"team-1","name":"Acme Org","prefs":{"slug":"acme"}}`))
+		case "/v1/teams/missing-team":
+			http.NotFound(w, r)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client()).(*appwriteIdentity)
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := identity.ListUserMemberships(canceled, "user-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled ctx error = %v", err)
+	}
+	empty, err := identity.ListUserMemberships(context.Background(), "  ")
+	if err != nil || empty != nil {
+		t.Fatalf("blank userID = %#v %v", empty, err)
+	}
+	if _, err := identity.ListUserMemberships(context.Background(), "boom"); err == nil {
+		t.Fatal("expected list memberships error")
+	}
+	got, err := identity.ListUserMemberships(context.Background(), "user-1")
+	if err != nil {
+		t.Fatalf("ListUserMemberships: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("memberships = %#v", got)
+	}
+	if got[0].OrgSlug != "acme" || got[0].OrgName != "Acme Org" {
+		t.Fatalf("resolved membership = %#v", got[0])
+	}
+	if got[1].TeamID != "missing-team" || got[1].OrgSlug != "" {
+		t.Fatalf("unresolved membership = %#v", got[1])
+	}
+}
+
+func TestAppwriteIdentityListOrganizationMembershipsLite(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/teams/team-1/memberships", "/v1/teams/acme/memberships":
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"mem-1","userId":"user-1","teamId":"team-1","teamName":"Acme","confirm":true,"roles":["owner"],"userEmail":"a@example.com"}]}`))
+		case "/v1/teams/acme":
+			_, _ = w.Write([]byte(`{"$id":"team-1","name":"Acme Org","prefs":{"slug":"acme"}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client()).(*appwriteIdentity)
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := identity.ListOrganizationMembershipsLite(canceled, IdentityOrg{ID: "team-1"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled ctx error = %v", err)
+	}
+	if _, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{}); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("empty org error = %v", err)
+	}
+	byID, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"})
+	if err != nil || len(byID) != 1 || byID[0].ID != "mem-1" {
+		t.Fatalf("by ID = %#v %v", byID, err)
+	}
+	bySlug, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{Slug: "acme"})
+	if err != nil || len(bySlug) != 1 {
+		t.Fatalf("by slug = %#v %v", bySlug, err)
 	}
 }
 
@@ -1686,12 +1861,17 @@ func TestIdentityAppwriteHelpers(t *testing.T) {
 		t.Fatal("expected parseAppwriteTime error")
 	}
 
-	selected := selectPrimaryMembership([]models.Membership{
+	if selected := selectPrimaryMembership([]models.Membership{
 		{Id: "pending-1", Confirm: false},
 		{Id: "pending-2", Confirm: false},
-	})
-	if selected == nil || selected.Id != "pending-1" {
-		t.Fatalf("selected = %#v, want pending-1", selected)
+	}); selected != nil {
+		t.Fatalf("selected = %#v, want nil for unconfirmed-only memberships", selected)
+	}
+	if selected := selectPrimaryMembership([]models.Membership{
+		{Id: "pending-1", Confirm: false},
+		{Id: "confirmed-1", Confirm: true},
+	}); selected == nil || selected.Id != "confirmed-1" {
+		t.Fatalf("selected = %#v, want confirmed-1", selected)
 	}
 	if !hasMembershipRole([]string{"member", "owner"}, identityMembershipOwnerRole) {
 		t.Fatal("expected owner membership role")
@@ -1948,6 +2128,12 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			name: "delete organization membership",
 			run: func() error {
 				return identity.DeleteOrganizationMembership(ctx, "session-secret", "acme", "membership-1")
+			},
+		},
+		{
+			name: "delete organization membership as admin",
+			run: func() error {
+				return identity.DeleteOrganizationMembershipAsAdmin(ctx, "acme", "membership-1")
 			},
 		},
 		{
