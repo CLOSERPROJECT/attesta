@@ -380,6 +380,12 @@ func (v StreamInstanceDetailView) StreamTimeline() StreamTimelineView {
 	}
 }
 
+// BackLinkView is the view model for templates/components/back_link.html.
+type BackLinkView struct {
+	Href  string
+	Label string
+}
+
 // BreadcrumbItem is one crumb in templates/components/breadcrumbs.html.
 type BreadcrumbItem struct {
 	Label   string

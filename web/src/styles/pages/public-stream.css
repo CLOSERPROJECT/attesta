@@ -5,7 +5,7 @@
  *
  * div.public-stream
  *   header.public-stream-header
- *     a.public-stream-back (+ icon-arrow-left)
+ *     a.back-link (+ icon-arrow-left)
  *     .public-stream-title-wrapper > h1.public-stream-title + span.public-stream-dpp-beside?
  *     p.public-stream-description?
  *     span.public-stream-dpp-below?  (shown on sm-down; beside hidden)
@@ -52,32 +52,6 @@
   gap: var(--space-2);
   padding-bottom: var(--space-6);
   border-bottom: 1px solid var(--border);
-}
-
-.public-stream-back,
-.public-stream-back:link,
-.public-stream-back:visited,
-.public-stream-back:active {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  width: fit-content;
-  color: var(--primary);
-  font-size: var(--text-sm);
-  line-height: 1.25rem;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.public-stream-back:hover {
-  text-decoration: underline;
-}
-
-.public-stream-back .icon-svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  pointer-events: none;
 }
 
 .public-stream-title {
