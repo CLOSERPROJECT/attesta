@@ -186,8 +186,8 @@ func TestOrgAdminTemplateLastInviteCopyButton(t *testing.T) {
 	if strings.Contains(compactBody, `class="secondary js-invite-copy"`) || strings.Contains(compactBody, `data-copy-invite-link="/invite/token-pending"`) {
 		t.Fatalf("did not expect invite copy button markup, got body: %s", body)
 	}
-	if !strings.Contains(compactBody, `if (addUserDialog && true && !addUserDialog.open)`) {
-		t.Fatalf("expected add-user dialog reopen script when invite link is present, got body: %s", body)
+	if !strings.Contains(compactBody, `id="add-user-dialog" class="dialog dialog-overflow" data-auto-open`) {
+		t.Fatalf("expected add-user dialog data-auto-open when invite link is present, got body: %s", body)
 	}
 	if strings.Contains(body, "Last invite:") {
 		t.Fatalf("last invite text should be hidden, got body: %s", body)

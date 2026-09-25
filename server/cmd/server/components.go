@@ -413,6 +413,15 @@ type RolePillRowView struct {
 	Class string
 }
 
+// OrgPendingRowView is the view model for templates/components/org_pending_row.html.
+// Shared main content for pending join requests and pending invites (list-row-main stack).
+type OrgPendingRowView struct {
+	Email     string
+	Roles     RolePillRowView
+	DateLabel string
+	Date      string
+}
+
 // AdminConsoleNavItem is one soft-nav link in templates/components/admin_console.html.
 type AdminConsoleNavItem struct {
 	Href   string

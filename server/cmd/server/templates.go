@@ -31,8 +31,10 @@ func templateFuncs() template.FuncMap {
 		"rolesPickerFromOrgAdminOptions": rolesPickerFromOrgAdminOptions,
 		"rolePillRowFromOrgAdminOptions": rolePillRowFromOrgAdminOptions,
 		"rolePillRowSelectedFromOrgAdminOptions": rolePillRowSelectedFromOrgAdminOptions,
-		"rolePillRowFromSubstepBody": rolePillRowFromSubstepBody,
-		"dataAutoOpen":             dataAutoOpen,
+		"rolePillRowFromSubstepBody":             rolePillRowFromSubstepBody,
+		"orgPendingRowFromJoinRequest":           orgPendingRowFromJoinRequest,
+		"orgPendingRowFromInvite":                orgPendingRowFromInvite,
+		"dataAutoOpen":                           dataAutoOpen,
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: odd number of arguments")

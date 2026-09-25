@@ -85,6 +85,7 @@ button.list-row:focus-visible {
 
 .list-row-main p {
   margin: 0;
+  line-height: 1;
 }
 
 .list-row-actions {

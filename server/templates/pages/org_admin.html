@@ -536,24 +536,16 @@
 
 {{ define "org_admin_members_panel" }}
   <section class="panel-section" id="org-admin-panel-members">
-    <div class="panel-block">
-      <div class="panel-heading">
-        <h2>Pending join requests</h2>
-        <p>Review requests from users who asked to join this organization</p>
-      </div>
-      {{ if .PendingJoinRequests }}
+    {{ if .PendingJoinRequests }}
+      <div class="panel-block">
+        <div class="panel-heading">
+          <h2>Pending join requests</h2>
+          <p>Review requests from users who asked to join this organization</p>
+        </div>
         <ul class="list-rows">
           {{ range .PendingJoinRequests }}
             <li class="list-row">
-              <div class="list-row-main list-row-main-stack">
-                <p>{{ .RequesterEmail }}</p>
-                <div class="u-flex-center u-flex-wrap u-gap-2">
-                  {{ template "role_pill_row" (rolePillRowFromOrgAdminOptions .Roles "sm") }}
-                  {{ if .CreatedAt }}
-                    <p class="muted u-text-xs">Requested on: {{ .CreatedAt }}</p>
-                  {{ end }}
-                </div>
-              </div>
+              {{ template "org_pending_row" (orgPendingRowFromJoinRequest .) }}
               <div class="list-row-actions">
                 <form method="post" action="/my/organization/users" class="panel-actions">
                   <input type="hidden" name="intent" value="approve_join" />
@@ -599,20 +591,68 @@
             </li>
           {{ end }}
         </ul>
-      {{ else }}
-        <div class="empty-state">
-          <p class="empty-state-title">No pending join requests</p>
-        </div>
-      {{ end }}
-    </div>
+      </div>
 
-    <hr />
+      <hr />
+    {{ end }}
+
+    {{ if .Invites }}
+      <div class="panel-block">
+        <div class="panel-heading">
+          <h2>Pending invites</h2>
+          <p>Invites waiting to be accepted</p>
+        </div>
+        <ul class="list-rows">
+          {{ range .Invites }}
+            <li class="list-row">
+              {{ template "org_pending_row" (orgPendingRowFromInvite .) }}
+              <div class="list-row-actions">
+                <button type="button"
+                        class="btn btn-ghost-danger btn-icon btn-xs"
+                        aria-label="Delete invite"
+                        onclick="document.getElementById('delete-invite-{{ .MembershipID }}').showModal()">
+                  {{ template "icon-trash" . }}
+                </button>
+              </div>
+              <dialog id="delete-invite-{{ .MembershipID }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3 class="dialog-title u-text-danger">Delete invite</h3>
+                      <p class="dialog-subtitle">{{ .Email }}</p>
+                    </div>
+                    <button type="button"
+                            class="btn btn-ghost btn-icon dialog-close"
+                            onclick="document.getElementById('delete-invite-{{ .MembershipID }}').close()">
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <p class="u-m-0 u-mb-5">
+                    This cancels the pending invite. The recipient will no longer
+                    be able to join with this invitation.
+                  </p>
+                  <form method="post" action="/my/organization/users" class="input-form">
+                    <input type="hidden" name="intent" value="delete_invite" />
+                    <input type="hidden" name="membership_id" value="{{ .MembershipID }}" />
+                    <div class="dialog-actions">
+                      <button type="submit" class="btn btn-danger">Delete invite</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            </li>
+          {{ end }}
+        </ul>
+      </div>
+
+      <hr />
+    {{ end }}
 
     <div class="panel-block">
       <div class="panel-head-actions">
         <div class="panel-heading">
           <h2>Users</h2>
-          <p>Members and invites for your organization</p>
+          <p>Members of your organization</p>
         </div>
         <button class="btn btn-primary"
                 type="button"

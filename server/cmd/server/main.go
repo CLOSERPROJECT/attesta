@@ -536,13 +536,16 @@ type OrgAdminUserRow struct {
 }
 
 type OrgAdminInviteRow struct {
-	Email      string
-	RoleSlugs  []string
-	InviteLink string
-	CreatedAt  time.Time
-	ExpiresAt  time.Time
-	UsedAt     *time.Time
-	Status     string
+	MembershipID   string
+	Email          string
+	RoleSlugs      []string
+	Roles          []OrgAdminRoleOption
+	InviteLink     string
+	CreatedAt      time.Time
+	CreatedAtLabel string
+	ExpiresAt      time.Time
+	UsedAt         *time.Time
+	Status         string
 }
 
 type organizationLogoUpload struct {
@@ -4057,7 +4060,7 @@ func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []I
 	return orgUsers
 }
 
-func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, now time.Time) []OrgAdminInviteRow {
+func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, roles []Role, now time.Time) []OrgAdminInviteRow {
 	orgInvites := make([]OrgAdminInviteRow, 0, len(memberships))
 	for _, membership := range memberships {
 		status := "accepted"
@@ -4081,15 +4084,29 @@ func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, no
 			usedAt = &joinedAt
 		}
 		orgInvites = append(orgInvites, OrgAdminInviteRow{
-			Email:     membership.Email,
-			RoleSlugs: roleSlugs,
-			CreatedAt: membership.InvitedAt,
-			ExpiresAt: expiresAt,
-			UsedAt:    usedAt,
-			Status:    status,
+			MembershipID:   strings.TrimSpace(membership.ID),
+			Email:          membership.Email,
+			RoleSlugs:      roleSlugs,
+			Roles:          roleOptionsForSlugs(roles, roleSlugs),
+			CreatedAt:      membership.InvitedAt,
+			CreatedAtLabel: humanReadableTraceabilityTime(membership.InvitedAt),
+			ExpiresAt:      expiresAt,
+			UsedAt:         usedAt,
+			Status:         status,
 		})
 	}
 	return orgInvites
+}
+
+func pendingOrgAdminInviteRows(invites []OrgAdminInviteRow) []OrgAdminInviteRow {
+	pending := make([]OrgAdminInviteRow, 0, len(invites))
+	for _, invite := range invites {
+		if !strings.EqualFold(strings.TrimSpace(invite.Status), "pending") {
+			continue
+		}
+		pending = append(pending, invite)
+	}
+	return pending
 }
 
 func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug string, roles []Role) ([]OrgAdminJoinRequestRow, error) {
@@ -4132,7 +4149,7 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 	orgUsers := buildOrgAdminUserRowsFromIdentity(rolePills, identityUsers)
 
 	if memberships, membershipsErr := s.identity.ListOrganizationMemberships(ctx, org.Slug); membershipsErr == nil {
-		return org, roles, orgUsers, buildOrgAdminInviteRowsFromMemberships(memberships, s.nowUTC()), nil
+		return org, roles, orgUsers, buildOrgAdminInviteRowsFromMemberships(memberships, roles, s.nowUTC()), nil
 	}
 	return org, roles, orgUsers, nil, nil
 }
@@ -4154,6 +4171,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	}
 	rolePills := buildOrgAdminRolePills(roles)
 	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
+	pendingInvites := pendingOrgAdminInviteRows(orgInvites)
 
 	pendingJoinRows, pendingJoinErr := orgAdminPendingJoinRequestRows(context.Background(), s, org.Slug, roles)
 	if pendingJoinErr != nil {
@@ -4180,7 +4198,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 		RolePills:              rolePills,
 		RoleRows:               roleRows,
 		Users:                  orgUsers,
-		Invites:                orgInvites,
+		Invites:                pendingInvites,
 		PendingJoinRequests:    pendingJoinRows,
 		InviteLink:             strings.TrimSpace(inviteLink),
 		Error:                  firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
@@ -4369,7 +4387,7 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 			s.logAndRenderOrgAdminError(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "failed to load organization users"}, membershipsErr, "failed to list organization memberships for role action in %s", user.OrgSlug)
 			return
 		}
-		roleRows := buildOrgAdminRoleRows(rolesFromIdentityOrg(*org), buildOrgAdminUserRowsFromIdentity(buildOrgAdminRolePills(rolesFromIdentityOrg(*org)), orgUsers), buildOrgAdminInviteRowsFromMemberships(memberships, s.nowUTC()))
+		roleRows := buildOrgAdminRoleRows(rolesFromIdentityOrg(*org), buildOrgAdminUserRowsFromIdentity(buildOrgAdminRolePills(rolesFromIdentityOrg(*org)), orgUsers), buildOrgAdminInviteRowsFromMemberships(memberships, rolesFromIdentityOrg(*org), s.nowUTC()))
 
 		findRoleRow := func(roleSlug string) *OrgAdminRoleRow {
 			for idx := range roleRows {
@@ -4884,6 +4902,63 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			if _, err := s.identity.UpdateUserLabels(r.Context(), target.UserID, labels); err != nil {
 				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, err, "failed to clear labels for deleted user %s in organization %s", target.UserID, admin.OrgSlug)
 				return
+			}
+		}
+		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+	case "delete_invite":
+		membershipID := strings.TrimSpace(r.FormValue("membership_id"))
+		if membershipID == "" {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite is required"})
+			return
+		}
+		memberships, err := s.identity.ListOrganizationMemberships(r.Context(), admin.OrgSlug)
+		if err != nil {
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"}, err, "failed to list memberships for organization %s during invite delete", admin.OrgSlug)
+			return
+		}
+		var target *IdentityMembership
+		for idx := range memberships {
+			if strings.TrimSpace(memberships[idx].ID) != membershipID {
+				continue
+			}
+			target = &memberships[idx]
+			break
+		}
+		if target == nil || target.Confirmed {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"})
+			return
+		}
+		if isPlatformAdminMembership(*target) {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "invite not found"})
+			return
+		}
+		sessionSecret, err := sessionSecretFromRequest(r)
+		if err != nil {
+			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for invite delete in %s", admin.OrgSlug)
+			return
+		}
+		if err := s.identity.DeleteOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, target.ID); err != nil {
+			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, err, "failed to delete invite membership %s in organization %s", target.ID, admin.OrgSlug)
+			return
+		}
+		if strings.TrimSpace(target.UserID) != "" {
+			targetUser, getErr := s.identity.GetUserByID(r.Context(), target.UserID)
+			if getErr != nil && !errors.Is(getErr, ErrIdentityNotFound) {
+				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, getErr, "failed to load deleted invite user %s in organization %s", target.UserID, admin.OrgSlug)
+				return
+			}
+			if getErr == nil {
+				labels := make([]string, 0, len(targetUser.Labels))
+				for _, label := range targetUser.Labels {
+					if isManagedIdentityLabel(label) {
+						continue
+					}
+					labels = append(labels, strings.TrimSpace(label))
+				}
+				if _, err := s.identity.UpdateUserLabels(r.Context(), target.UserID, labels); err != nil {
+					s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete invite"}, err, "failed to clear labels for deleted invite user %s in organization %s", target.UserID, admin.OrgSlug)
+					return
+				}
 			}
 		}
 		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)

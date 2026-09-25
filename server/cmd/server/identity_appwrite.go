@@ -1010,12 +1010,19 @@ func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) Ide
 
 func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
 	identity := membershipFromAppwrite(membership, org)
-	if identity.UserID != "" {
-		if user, err := a.GetUserByID(ctx, identity.UserID); err == nil {
-			identity.Email = user.Email
-			identity.RoleSlugs = decodeIdentityRoleLabels(user.Labels)
-			identity.IsOrgAdmin = user.IsOrgAdmin
-		}
+	if identity.UserID == "" {
+		return identity
+	}
+	user, err := a.GetUserByID(ctx, identity.UserID)
+	if err != nil {
+		return identity
+	}
+	identity.Email = user.Email
+	// Pending invites carry intended roles on the membership; user labels are only
+	// authoritative after the invite is accepted.
+	if identity.Confirmed {
+		identity.RoleSlugs = decodeIdentityRoleLabels(user.Labels)
+		identity.IsOrgAdmin = user.IsOrgAdmin
 	}
 	return identity
 }

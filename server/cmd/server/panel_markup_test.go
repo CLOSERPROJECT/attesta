@@ -417,6 +417,20 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		Roles: []Role{
 			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald"},
 		},
+		PendingJoinRequests: []OrgAdminJoinRequestRow{
+			{ID: "join-1", RequesterEmail: "join@example.com"},
+		},
+		Invites: []OrgAdminInviteRow{
+			{
+				MembershipID: "membership-pending",
+				Email:        "pending@example.com",
+				Status:       "pending",
+				Roles: []OrgAdminRoleOption{
+					{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald"},
+				},
+				CreatedAtLabel: "20 Mar 2026 at 10:00 UTC",
+			},
+		},
 	}
 
 	var out bytes.Buffer
@@ -434,6 +448,15 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		"Organization roles",
 		"Create invite",
 		"Pending join requests",
+		"join@example.com",
+		"Pending invites",
+		"pending@example.com",
+		`data-role-palette="emerald"`,
+		"QA Reviewer",
+		"Invited on: 20 Mar 2026 at 10:00 UTC",
+		`name="intent" value="delete_invite"`,
+		`name="membership_id" value="membership-pending"`,
+		`aria-label="Delete invite"`,
 		"<h2>Users</h2>",
 	} {
 		if !strings.Contains(body, want) {
@@ -445,9 +468,34 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 	}
 
 	pendingIdx := strings.Index(body, "Pending join requests")
+	invitesIdx := strings.Index(body, "Pending invites")
 	usersIdx := strings.Index(body, "<h2>Users</h2>")
-	if pendingIdx == -1 || usersIdx == -1 || !(pendingIdx < usersIdx) {
-		t.Fatalf("expected Pending join requests section before Users heading")
+	if pendingIdx == -1 || invitesIdx == -1 || usersIdx == -1 || !(pendingIdx < invitesIdx && invitesIdx < usersIdx) {
+		t.Fatalf("expected Pending join requests, then Pending invites, then Users heading")
+	}
+
+	emptyView := OrgAdminView{
+		ActivePanel:  "members",
+		Organization: Organization{Name: "Acme Org", Slug: "acme-org"},
+	}
+	var emptyOut bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&emptyOut, "org_admin_body", emptyView); err != nil {
+		t.Fatalf("render empty org_admin_body: %v", err)
+	}
+	emptyBody := emptyOut.String()
+	for _, gone := range []string{
+		"Pending join requests",
+		"Pending invites",
+		"No pending join requests",
+		"No invites yet",
+		"Invites I sent",
+	} {
+		if strings.Contains(emptyBody, gone) {
+			t.Fatalf("empty members panel must not contain %q, got:\n%s", gone, emptyBody)
+		}
+	}
+	if !strings.Contains(emptyBody, "<h2>Users</h2>") {
+		t.Fatalf("expected Users heading in empty members panel, got:\n%s", emptyBody)
 	}
 }
 

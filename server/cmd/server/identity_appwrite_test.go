@@ -811,27 +811,67 @@ func TestAppwriteIdentityMembershipOperationErrors(t *testing.T) {
 }
 
 func TestAppwriteIdentityListOrganizationMembershipsPendingMembership(t *testing.T) {
-	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/v1/teams/acme":
-			_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
-		case "/v1/teams/acme/memberships":
-			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iapprover"]}]}`))
-		default:
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-	}))
-	defer appwriteAPI.Close()
+	t.Run("without user id keeps invite roles", func(t *testing.T) {
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/v1/teams/acme":
+				_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
+			case "/v1/teams/acme/memberships":
+				_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iapprover"]}]}`))
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
 
-	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
-	memberships, err := identity.ListOrganizationMemberships(context.Background(), "acme")
-	if err != nil {
-		t.Fatalf("ListOrganizationMemberships error: %v", err)
-	}
-	if len(memberships) != 1 || memberships[0].Email != "pending@example.com" || memberships[0].Confirmed {
-		t.Fatalf("memberships = %#v", memberships)
-	}
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+		memberships, err := identity.ListOrganizationMemberships(context.Background(), "acme")
+		if err != nil {
+			t.Fatalf("ListOrganizationMemberships error: %v", err)
+		}
+		if len(memberships) != 1 || memberships[0].Email != "pending@example.com" || memberships[0].Confirmed {
+			t.Fatalf("memberships = %#v", memberships)
+		}
+		if len(memberships[0].RoleSlugs) != 1 || memberships[0].RoleSlugs[0] != "approver" {
+			t.Fatalf("pending role slugs = %#v", memberships[0].RoleSlugs)
+		}
+	})
+
+	t.Run("with user id keeps invite roles not empty labels", func(t *testing.T) {
+		appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/v1/teams/acme":
+				_, _ = w.Write([]byte(`{"$id":"acme","name":"Acme Org","prefs":{"schemaVersion":1,"slug":"acme"}}`))
+			case "/v1/teams/acme/memberships":
+				_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"user-pending","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iqa-reviewer","owner"]}]}`))
+			case "/v1/users/user-pending":
+				_, _ = w.Write([]byte(`{"$id":"user-pending","email":"pending@example.com","status":true,"labels":[]}`))
+			case "/v1/users/user-pending/memberships":
+				_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"membership-1","userId":"user-pending","userEmail":"pending@example.com","teamId":"acme","teamName":"Acme Org","confirm":false,"roles":["member","iqa-reviewer","owner"]}]}`))
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+		}))
+		defer appwriteAPI.Close()
+
+		identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+		memberships, err := identity.ListOrganizationMemberships(context.Background(), "acme")
+		if err != nil {
+			t.Fatalf("ListOrganizationMemberships error: %v", err)
+		}
+		if len(memberships) != 1 {
+			t.Fatalf("memberships = %#v", memberships)
+		}
+		got := memberships[0]
+		if got.Confirmed || got.Email != "pending@example.com" || !got.IsOrgAdmin {
+			t.Fatalf("membership = %#v", got)
+		}
+		if len(got.RoleSlugs) != 1 || got.RoleSlugs[0] != "qa-reviewer" {
+			t.Fatalf("pending invite roles overwritten by labels: %#v", got.RoleSlugs)
+		}
+	})
 }
 
 func TestAppwriteIdentityListOrganizationMembershipsLiteSkipsUserHydration(t *testing.T) {

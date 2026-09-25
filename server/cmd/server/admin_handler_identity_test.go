@@ -2565,6 +2565,102 @@ func TestHandleOrgAdminUsersDeleteUserWithIdentity(t *testing.T) {
 	}
 }
 
+func TestHandleOrgAdminUsersDeleteInviteWithIdentity(t *testing.T) {
+	now := time.Now().UTC()
+	deletedMemberships := []string{}
+	updatedUsers := map[string][]string{}
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"}, nil
+			},
+			listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+				return []IdentityMembership{
+					{ID: "membership-1", UserID: "user-1", Email: "owner@example.com", Confirmed: true},
+					{ID: "membership-pending", UserID: "user-pending", Email: "pending@example.com", Confirmed: false},
+					{ID: "membership-accepted", UserID: "user-2", Email: "member@example.com", Confirmed: true},
+				}, nil
+			},
+			deleteOrganizationMembershipFunc: func(ctx context.Context, sessionSecret, orgSlug, membershipID string) error {
+				deletedMemberships = append(deletedMemberships, membershipID)
+				return nil
+			},
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "pending@example.com", Labels: []string{"custom:keep", encodeIdentityRoleLabel("approver")}, Status: "pending"}, nil
+			},
+			updateUserLabelsFunc: func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+				updatedUsers[userID] = append([]string(nil), labels...)
+				return IdentityUser{ID: userID, Labels: labels}, nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				org := IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"}
+				return &org, nil
+			},
+			listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+				return []IdentityUser{{ID: "user-1", Email: "owner@example.com", OrgSlug: "acme", Labels: []string{identityOrgAdminLabel}, IsOrgAdmin: true, Status: "active"}}, nil
+			},
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_invite&membership_id=membership-pending"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusSeeOther, rec.Body.String())
+	}
+	if rec.Header().Get("Location") != "/my/organization/members" {
+		t.Fatalf("location = %q, want /my/organization/members", rec.Header().Get("Location"))
+	}
+	if len(deletedMemberships) != 1 || deletedMemberships[0] != "membership-pending" {
+		t.Fatalf("deleted memberships = %#v", deletedMemberships)
+	}
+	if labels := updatedUsers["user-pending"]; len(labels) != 1 || labels[0] != "custom:keep" {
+		t.Fatalf("updated user labels = %#v", updatedUsers)
+	}
+
+	t.Run("rejects accepted membership", func(t *testing.T) {
+		deletedMemberships = nil
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_invite&membership_id=membership-accepted"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "invite not found") {
+			t.Fatalf("expected invite not found, got %q", rec.Body.String())
+		}
+		if len(deletedMemberships) != 0 {
+			t.Fatalf("deleted memberships = %#v, want none", deletedMemberships)
+		}
+	})
+
+	t.Run("requires membership id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=delete_invite"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handleOrgAdminUsers(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "invite is required") {
+			t.Fatalf("expected invite is required, got %q", rec.Body.String())
+		}
+	})
+}
+
 func TestIdentityOrgAdminHelpers(t *testing.T) {
 	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)); !strings.Contains(got, "/invite/accept") {
 		t.Fatalf("invite redirect = %q", got)
@@ -2590,9 +2686,14 @@ func TestIdentityOrgAdminHelpers(t *testing.T) {
 	rows := buildOrgAdminInviteRowsFromMemberships([]IdentityMembership{
 		{Email: "pending@example.com", RoleSlugs: []string{"approver"}, Confirmed: false, InvitedAt: time.Now().Add(-8 * 24 * time.Hour)},
 		{Email: "accepted@example.com", RoleSlugs: []string{"approver"}, Confirmed: true, JoinedAt: time.Now()},
-	}, time.Now())
-	if len(rows) != 2 || rows[0].Status != "expired" || rows[1].Status != "accepted" {
+		{Email: "waiting@example.com", RoleSlugs: []string{"approver"}, Confirmed: false, InvitedAt: time.Now()},
+	}, []Role{{Slug: "approver", Name: "Approver"}}, time.Now())
+	if len(rows) != 3 || rows[0].Status != "expired" || rows[1].Status != "accepted" || rows[2].Status != "pending" {
 		t.Fatalf("invite rows = %#v", rows)
+	}
+	pendingOnly := pendingOrgAdminInviteRows(rows)
+	if len(pendingOnly) != 1 || pendingOnly[0].Email != "waiting@example.com" {
+		t.Fatalf("pending invite rows = %#v", pendingOnly)
 	}
 }
 
@@ -3658,6 +3759,7 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 			{body: "", want: "email is required"},
 			{body: "intent=set_roles", want: "user is required"},
 			{body: "intent=delete_user", want: "user is required"},
+			{body: "intent=delete_invite", want: "invite is required"},
 		}
 		for _, tc := range tests {
 			req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader(tc.body))
