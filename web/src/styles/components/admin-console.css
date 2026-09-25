@@ -1,0 +1,16 @@
+/*
+ * Admin console — soft-nav shell (header + rail).
+ *
+ *   div.admin-console[#…]
+ *     section.page-header
+ *     div.rail-layout.rail-layout-ready
+ *       section.panel.panel-sticky
+ *         nav.sidebar-nav
+ *       section.panel.rail-layout-main
+ */
+
+.admin-console > .page-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-10);
+  margin-bottom: var(--space-10);
+}
