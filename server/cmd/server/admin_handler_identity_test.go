@@ -789,6 +789,9 @@ func TestHandleAdminOrgsUpdateAndDeleteOrganizationWithPlatformAdmin(t *testing.
 					org := IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org", LogoFileID: "logo-1"}
 					return &org, nil
 				},
+				listOrganizationMembershipsFunc: func(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+					return nil, nil
+				},
 				deleteOrganizationAsAdminFunc: func(ctx context.Context, orgSlug string) error {
 					deletedOrgSlug = orgSlug
 					return nil

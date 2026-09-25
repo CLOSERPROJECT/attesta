@@ -291,6 +291,11 @@ func (a *appwriteIdentity) GetCurrentUser(ctx context.Context, sessionSecret str
 		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
 			identity.OrgSlug = org.Slug
 			identity.OrgName = org.Name
+		} else if errors.Is(orgErr, ErrIdentityNotFound) {
+			// Team was deleted but membership listing still pointed at it.
+			identity.OrgSlug = ""
+			identity.OrgName = ""
+			identity.MembershipID = ""
 		}
 	}
 	return identity, nil
@@ -314,6 +319,10 @@ func (a *appwriteIdentity) GetUserByID(ctx context.Context, userID string) (Iden
 		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
 			identity.OrgSlug = org.Slug
 			identity.OrgName = org.Name
+		} else if errors.Is(orgErr, ErrIdentityNotFound) {
+			identity.OrgSlug = ""
+			identity.OrgName = ""
+			identity.MembershipID = ""
 		}
 	}
 	return identity, nil

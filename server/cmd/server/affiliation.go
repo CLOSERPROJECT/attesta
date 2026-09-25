@@ -179,6 +179,44 @@ func (a *Affiliation) ensureInviteAcceptCompatible(ctx context.Context, userID, 
 	return nil
 }
 
+// DeleteOrganization removes an organization as platform admin and clears former
+// members' managed labels. Appwrite deletes team memberships with the team; labels
+// do not cascade, so without this step founders keep org-admin/role labels after
+// delete. Ghost memberships (team gone, ListMemberships stale) can also leave
+// OrgSlug set until identity resolve clears it.
+func (a *Affiliation) DeleteOrganization(ctx context.Context, orgSlug string) error {
+	orgSlug = strings.TrimSpace(orgSlug)
+	if orgSlug == "" {
+		return ErrAffiliationNotFound
+	}
+	memberships, err := a.identity.ListOrganizationMembershipsLite(ctx, IdentityOrg{Slug: orgSlug})
+	if err != nil {
+		return err
+	}
+	userIDs := make([]string, 0, len(memberships))
+	seen := map[string]struct{}{}
+	for _, m := range memberships {
+		uid := strings.TrimSpace(m.UserID)
+		if uid == "" {
+			continue
+		}
+		if _, ok := seen[uid]; ok {
+			continue
+		}
+		seen[uid] = struct{}{}
+		userIDs = append(userIDs, uid)
+	}
+	if err := a.identity.DeleteOrganizationAsAdmin(ctx, orgSlug); err != nil {
+		return err
+	}
+	for _, userID := range userIDs {
+		if err := a.stripManagedIdentityLabels(ctx, userID); err != nil && !errors.Is(err, ErrIdentityNotFound) {
+			log.Printf("affiliation: strip labels after deleting org %s user %s: %v", orgSlug, userID, err)
+		}
+	}
+	return nil
+}
+
 // LeaveOrganization removes the session user from their organization when allowed.
 // Sole org admins are blocked until another org admin exists.
 func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret string, user IdentityUser) error {

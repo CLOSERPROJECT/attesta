@@ -3875,7 +3875,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			previousLogoFileID := strings.TrimSpace(org.LogoFileID)
-			if err := s.identity.DeleteOrganizationAsAdmin(r.Context(), currentSlug); err != nil {
+			if err := s.affiliationService().DeleteOrganization(r.Context(), currentSlug); err != nil {
 				s.logAndRenderPlatformAdminError(w, r, admin, "", PlatformAdminErrors{Organization: "failed to delete organization", DialogAction: "delete", OrgSlug: currentSlug, OrgName: org.Name, SearchQuery: searchQuery, Page: page}, err, "failed to delete organization %s", currentSlug)
 				return
 			}

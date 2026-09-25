@@ -18,15 +18,13 @@
           <ul class="list-rows">
             {{ range .PendingOrgCreationRequests }}
               <li class="list-row">
-                <div class="list-row-main">
-                  <div class="platform-admin-item-copy">
-                    <p class="platform-admin-item-name">{{ .ProposedName }}</p>
-                    <p class="muted">
-                      {{ .ProposedSlug }}
-                      {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
-                      {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
-                    </p>
-                  </div>
+                <div class="list-row-main list-row-main-stack">
+                  <p class="platform-admin-item-name">{{ .ProposedName }}</p>
+                  <p class="muted u-text-xs">
+                    {{ .ProposedSlug }}
+                    {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
+                    {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
+                  </p>
                 </div>
                 <div class="list-row-actions">
                   <form method="post" action="/admin/organizations" class="panel-actions">
@@ -34,12 +32,15 @@
                     <input type="hidden" name="request_id" value="{{ .ID }}" />
                     <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
                     <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
-                    <button class="btn btn-primary btn-xs" type="submit">Approve</button>
+                    <button class="btn btn-ghost btn-icon btn-xs"
+                            type="submit"
+                            aria-label="Approve">{{ template "icon-check" . }}</button>
                   </form>
                   <button type="button"
-                          class="btn btn-ghost-danger btn-xs"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
+                          aria-label="Reject"
                           onclick="document.getElementById('reject-org-creation-{{ .ID }}').showModal()">
-                    Reject
+                    {{ template "icon-close" . }}
                   </button>
                 </div>
 

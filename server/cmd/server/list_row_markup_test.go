@@ -100,6 +100,15 @@ func TestPlatformAdminListRowMarkup(t *testing.T) {
 				OrgAdminStatusClassName: "accepted",
 			},
 		},
+		PendingOrgCreationRequests: []PlatformAdminOrgCreationRequestRow{
+			{
+				ID:             "req-1",
+				ProposedName:   "Fresh Org",
+				ProposedSlug:   "fresh-org",
+				RequesterEmail: "newbie@example.com",
+				CreatedAt:      "1 Mar 2026 at 12:00 UTC",
+			},
+		},
 	}
 
 	var out bytes.Buffer
@@ -129,6 +138,32 @@ func TestPlatformAdminListRowMarkup(t *testing.T) {
 	} {
 		if strings.Contains(body, legacy) {
 			t.Fatalf("did not expect legacy class %q in platform admin markup", legacy)
+		}
+	}
+
+	var pendingOut bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&pendingOut, "platform_admin_main", view); err != nil {
+		t.Fatalf("render platform_admin_main: %v", err)
+	}
+	pendingBody := pendingOut.String()
+	for _, want := range []string{
+		`class="list-row-main list-row-main-stack"`,
+		`aria-label="Approve"`,
+		`aria-label="Reject"`,
+		`name="intent" value="approve_org_creation"`,
+		`name="intent" value="reject_org_creation"`,
+		"Fresh Org",
+	} {
+		if !strings.Contains(pendingBody, want) {
+			t.Fatalf("expected %q in pending org creation markup, got:\n%s", want, pendingBody)
+		}
+	}
+	for _, legacy := range []string{
+		`>Approve</button>`,
+		`>Reject</button>`,
+	} {
+		if strings.Contains(pendingBody, legacy) {
+			t.Fatalf("did not expect labeled approve/reject button %q; use icon buttons", legacy)
 		}
 	}
 }
