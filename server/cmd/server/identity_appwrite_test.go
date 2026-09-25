@@ -1297,11 +1297,14 @@ func TestAppwriteIdentityGetUserByIDAndGetOrganizationBySlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserByID error: %v", err)
 	}
-	if user.Status != "pending" {
-		t.Fatalf("status = %q, want pending", user.Status)
+	if user.OrgSlug != "" {
+		t.Fatalf("OrgSlug = %q, want empty for unconfirmed invite", user.OrgSlug)
 	}
-	if !user.IsOrgAdmin {
-		t.Fatal("expected org admin derived from owner membership role")
+	if user.IsOrgAdmin {
+		t.Fatal("pending invite must not grant org admin")
+	}
+	if user.Status != "active" {
+		t.Fatalf("status = %q, want active while invite is still unconfirmed", user.Status)
 	}
 
 	org, err := identity.GetOrganizationBySlug(context.Background(), "acme")
@@ -1771,12 +1774,17 @@ func TestIdentityAppwriteHelpers(t *testing.T) {
 		t.Fatal("expected parseAppwriteTime error")
 	}
 
-	selected := selectPrimaryMembership([]models.Membership{
+	if selected := selectPrimaryMembership([]models.Membership{
 		{Id: "pending-1", Confirm: false},
 		{Id: "pending-2", Confirm: false},
-	})
-	if selected == nil || selected.Id != "pending-1" {
-		t.Fatalf("selected = %#v, want pending-1", selected)
+	}); selected != nil {
+		t.Fatalf("selected = %#v, want nil for unconfirmed-only memberships", selected)
+	}
+	if selected := selectPrimaryMembership([]models.Membership{
+		{Id: "pending-1", Confirm: false},
+		{Id: "confirmed-1", Confirm: true},
+	}); selected == nil || selected.Id != "confirmed-1" {
+		t.Fatalf("selected = %#v, want confirmed-1", selected)
 	}
 	if !hasMembershipRole([]string{"member", "owner"}, identityMembershipOwnerRole) {
 		t.Fatal("expected owner membership role")

@@ -910,15 +910,14 @@ func toIdentityUser(user *models.User, memberships []models.Membership) Identity
 }
 
 func selectPrimaryMembership(memberships []models.Membership) *models.Membership {
+	// Only confirmed memberships affiliate a user. Unconfirmed invites must not
+	// set OrgSlug / org-admin, or /my skips onboarding as if the invite were accepted.
 	for idx := range memberships {
 		if memberships[idx].Confirm {
 			return &memberships[idx]
 		}
 	}
-	if len(memberships) == 0 {
-		return nil
-	}
-	return &memberships[0]
+	return nil
 }
 
 func decodeIdentityOrgs(teamList *models.TeamList) []IdentityOrg {
