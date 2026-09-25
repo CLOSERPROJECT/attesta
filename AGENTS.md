@@ -1,280 +1,39 @@
 # AGENTS.md
 
-## Repository overview
-This repo is a small end-to-end demo:
+## Working here
 
-- **Backend**: Go HTTP server (net/http) rendering HTML templates, using **MongoDB** for persistence and **GridFS** for file uploads.
-- **Frontend**: Vite-built JS/CSS bundle, plus **HTMX** in templates and **SSE** for live updates.
-- **Authorization**: **Cerbos** policy engine for “can complete substep” checks.
+- Keep changes minimal and localized. Match established patterns after reading the
+  relevant code, especially `server/cmd/server/main.go` for HTTP behavior.
+- Ask before making a breaking change to routes, workflow configuration, or
+  persistence.
+- Preserve unrelated work in a dirty tree. Do not commit, push, or change
+  external systems unless asked.
 
-See: `README.md`, `QUICKSTART.md`, `DOCKER.md`, `docs/css.md` (CSS rules), `.agents/skills/attesta-ui-components` (extract/place UI components).
+## Source guidance
 
-## Current auth/org status (2026-07)
-- Demo impersonation has been removed from production code paths.
-- Session auth is active (`attesta_session` cookie). Regular users store an Appwrite session secret; platform admin uses a separate env-derived session value (`platform-admin:…`).
-- Public homepage is `/` (marketing/landing). Authenticated stream picker is `/my` (`appHomePath`). No auto-redirect from `/` to `/my` when logged in.
-- Stream dashboard is `/my/streams/:key/` (lists stream instances for one stream).
-- Legacy `/w/`, `/org-admin/`, `/dashboard`, and `/w/:key/dashboard` are not registered (hard cut → 404).
-- Admin consoles:
-  - Platform admin: `/admin` (redirects to `/admin/organizations`); sections `/admin/organizations`, `/admin/categories`; logo `/admin/organizations/logo/:id`
-  - Org admin: `/my/organization/profile`, `/my/organization/roles`, `/my/organization/members` (forms `POST /my/organization/users`, `POST /my/organization/roles`)
-- Platform admin is env-driven (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). On startup the server ensures that account exists in Appwrite (`bootstrapPlatformAdminIdentity`). Cerbos policy `platform_admin_console` gates console access.
-- Auth/org state now lives in Appwrite:
-  - orgs -> teams
-  - role catalog -> team prefs (`roles[].palette` resolved to CSS via `data-role-palette` on templates)
-  - accepted roles -> user labels
-  - invites -> memberships
-  - signup/login/reset -> Appwrite account/session/recovery flows
-- Global topbar now renders role-aware admin links on authenticated pages:
-  - Platform admin sees `Admin` (`/admin`)
-  - Org admin with org context sees `My Org` (`/my/organization/profile`)
-- Workflow YAML supports `organizations`, `roles`, step-level `organization`, and substep `roles`.
-- Slug collisions on org and role creation now surface explicit `... slug already exists` errors in admin UIs.
-- Org admin members section (`/my/organization/members`; forms still `POST /my/organization/users`) supports:
-  - invites with zero-to-many roles (`roles` multi-select, `intent=invite`)
-  - "Invites I sent" with derived statuses (`pending`, `accepted`, `expired`)
-  - user role editing (`intent=set_roles`) and soft-delete (`intent=delete_user`) with self-protection checks.
+- **Architecture:** for system boundaries or where behavior lives, read
+  [`docs/architecture.md`](docs/architecture.md).
+- **Operations:** for setup, commands, ports, Docker, or worktrees, read
+  [`README.md`](README.md), [`QUICKSTART.md`](QUICKSTART.md), and
+  [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
+  truth.
+- **Domain language:** for product terms, read [`CONTEXT.md`](CONTEXT.md).
+- **Open work:** for deferred design or migration work, read
+  [`docs/open-work.md`](docs/open-work.md).
+- **DPP/UNTP:** for Digital Link or credential behavior, read
+  [`docs/untp.md`](docs/untp.md) and the implementation it names.
+- **Templates and CSS:** before changing `server/templates/` or
+  `web/src/styles/`, read [`docs/css.md`](docs/css.md) and use the
+  `attesta-ui-components` skill for component extraction or placement.
 
-## Agent behavior expectations
+## Invariants
 
-When acting as a coding agent in this repository:
-
-- Prefer **minimal, localized changes**
-- Do not refactor for style or architecture unless explicitly requested
-- Match existing patterns, even if they are imperfect
-- Read `docs/css.md` before changing templates or styles in `web/src/styles/`
-- Use `.agents/skills/attesta-ui-components` when extracting or placing templates, view structs, or component CSS
-- Read relevant code before making changes (especially `server/cmd/server/main.go`)
-- Ask before making breaking changes to routes, workflow config, or persistence
-
-## Layout
-- `server/` — Go module (`server/go.mod`)
-  - `server/cmd/server/` — single `package main`; route wiring and most handlers in `main.go`, with domain logic peeled into focused files: `timeline_builder.go`, `substep_views_builder.go`, `stream_instance_detail.go`, `stream_step_summary.go`, `done_by_identity.go`, `dpp.go`, `components.go`, `authorizer.go`, `store.go`, `identity*.go`, `formata_builder.go`, `role_meta.go`, `templates.go`.
-  - `server/templates/` — Go `html/template` templates (`layout.html` at root; full screens in `pages/`; reusable partials in `components/` as they are migrated).
-  - `server/config/workflow.yaml` — runtime workflow + departments + users.
-- `web/` — Vite project
-  - `web/src/main.js` — SSE + partial refresh client logic.
-  - `web/src/styles/` — layered CSS (`tokens.css`, `role-palette.css`, …; see `docs/css.md`).
-  - `web/dist/` — build output (served by backend as static assets).
-- `cerbos/` — Cerbos configuration and policies
-  - `cerbos/config/config.yaml`
-  - `cerbos/policies/substep_policy.yaml`
-- `deployment/` — Dockerfiles + Compose for local/Coolify/ephemeral builds
-- `Taskfile.yml` — common developer commands.
-
-## Tooling / versions
-Observed requirements:
-- Go **1.25.x** (CI pins 1.25.5 via mise; see `mise.toml`, `.github/workflows/tests.yml`)
-- Node.js **18+** (see `README.md`, `web/package.json`, `deployment/Dockerfile.*`)
-- Docker + Docker Compose (see `README.md`, `QUICKSTART.md`, `DOCKER.md`)
-- `task` (Taskfile runner; used in CI)
-- **djLint** for Go `html/template` format/lint (`pipx:djlint` in `mise.toml`; config `djlint.toml`, profile `golang`)
-
-## Essential commands
-### Backend (Go)
-Run the server (from repo root):
-```bash
-cd server
-go mod tidy
-go run ./cmd/server
-```
-
-Backend unit tests with a 90% gate (from repo root):
-```bash
-task cover
-```
-
-### Templates (djLint)
-```bash
-mise install          # installs pipx:djlint among other tools
-task templates:fmt    # rewrite server/templates
-task templates:check  # CI-style format gate (no write)
-task templates:lint   # lint rules only
-```
-
-Both Taskfile and the Cursor/VS Code djLint extension run through `deployment/scripts/djlint.sh` (`mise exec -- djlint`), so teammates do not need shims on PATH or machine-specific `executablePath` settings.
-
-Do **not** use Prettier / the built-in HTML formatter on `server/templates/**/*.html` — they mangle `{{ }}`. Install recommended workspace extensions (`monosans.djlint`, `hverlin.mise-vscode`). Format Document uses djLint + `djlint.toml`.
-
-### Frontend (Vite)
-Build bundle (backend expects `../web/dist` to exist):
-```bash
-cd web
-npm install
-npm run build
-```
-
-Dev server (if you’re working on the web bundle):
-```bash
-cd web
-npm run dev
-```
-
-### Docker / infra
-Docker Compose files are under `deployment/`.
-
-Bring up stack:
-```bash
-docker compose -f deployment/docker-compose.local.yaml up -d
-```
-
-Taskfile shortcut:
-```bash
-task start
-```
-
-Host-dev (air + Vite HMR; shared infra + per-checkout ports):
-```bash
-task dev
-```
-
-### Git worktrees
-Linked checkouts live under `.worktrees/` (gitignored). Prefer Taskfile over raw `git worktree add`:
-
-```bash
-task worktree:add -- <branch>   # create, symlink primary .env, init submodules, write .env.local ports
-cd .worktrees/<branch>
-task start                      # shared stack; no-op if already healthy (Compose always from primary)
-task dev                        # prints http://localhost:<PORT> (Vite on VITE_PORT)
-```
-
-Constraints agents must respect:
-- **One shared Docker stack** (Mongo / Appwrite / Cerbos / Mailpit). Do not invent per-worktree Compose projects.
-- Per-checkout ports live in gitignored `.env.local` (`PORT`, `VITE_PORT`). Open the URL `task dev` prints; override with `PORT=… VITE_PORT=…` when needed.
-- `task stop` / `task reset` / `task purge` affect **all** worktrees.
-- Cerbos policy bind-mounts come from the **primary** checkout while the stack is up.
-- Details: README “Git worktrees”; scripts under `deployment/scripts/` (`worktree-env.sh`, `worktree-ports.sh`, `infra-up.sh`, `dev-env.sh`, `dev-stop-local.sh`).
-
-## Runtime configuration
-Backend environment variables are read in `main()` (`server/cmd/server/main.go` env bootstrap). Common vars:
-- `MONGODB_URI` (default `mongodb://localhost:27017`)
-- `CERBOS_URL` (default `http://localhost:3592`)
-- `APPWRITE_ENDPOINT` (default `http://appwrite/v1`)
-- `APPWRITE_PROJECT_ID`
-- `APPWRITE_API_KEY`
-- `APPWRITE_INVITE_REDIRECT_URL`
-- `APPWRITE_RESET_REDIRECT_URL`
-- `APPWRITE_ORG_ASSETS_BUCKET` (default `org-assets`)
-- `WORKFLOW_CONFIG` (default `config/workflow.yaml`); `WORKFLOW_CONFIG_DIR` overrides the catalog directory
-- `ATTACHMENT_MAX_BYTES` (default 25 MiB) — max upload size via `attachmentMaxBytes()`
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD` — platform admin credentials; both required to enable the console
-- `ANYONE_CAN_CREATE_ACCOUNT`
-- `SESSION_TTL_DAYS`, `COOKIE_SECURE`
-
-Example env file: `.env.example`.
-
-Workflow YAML lives under `server/config/` (and optional `WORKFLOW_CONFIG_DIR`). Runtime lookup uses `Server.runtimeConfig()` → `configProvider` (tests) or `workflowByKey()` / catalog reload — not a `getConfig()` helper.
-
-## Backend architecture notes (what to know before changing things)
-### HTTP routes
-Global routes are registered in `Server.newMux()` (`server/cmd/server/main.go`). Authenticated app routes mount at `/my/` via `handleMyRoutes` → `handleStreamRoutes` / `handleOrganizationRoutes` → `handleProcessRoutes`. URL helpers live in `paths.go` (`appHomePath`, `streamPath`, `streamInstancePath`, `organizationPath`).
-
-**Global (public / auth entry):**
-- `GET /` — public homepage (`handlePublicHome`)
-- `GET/POST /login`, `GET/POST /signup`, `POST /logout` (login default redirect → `/my`)
-- `GET /invite/…`, `GET/POST /reset`, `GET/POST /reset/…`
-- `GET /admin` — platform admin entry (redirects to `/admin/organizations`)
-- `GET/POST /admin/organizations`, `GET/POST /admin/organizations/` (platform admin org console; logo at `/admin/organizations/logo/:id`)
-- `GET/POST /admin/categories` (platform admin category taxonomy)
-- `GET /organization/logo/:slug` — public org logo asset
-- `GET /01/…` — public DPP Digital Link
-- `GET /events` — legacy SSE mux entry (production UI uses stream-scoped path below)
-
-**Authenticated (`/my/…`):**
-- `GET /my` — stream picker (`handleHome`)
-- `GET /my/organization/profile`, `/my/organization/roles`, `/my/organization/members` (org settings sections); `POST /my/organization/users`, `POST /my/organization/roles`; `/my/organization/formata-builder`, …
-
-**Stream-scoped (`/my/streams/:key/…`):**
-- `GET /my/streams/:key/` — stream dashboard (instance list + timeline preview)
-- `POST /my/streams/:key/instance/start`
-- `GET /my/streams/:key/instance/:id` — stream instance detail page
-- `GET /my/streams/:key/instance/:id/content` — HTMX/SSE content partial (replaces old `/timeline`)
-- `GET /my/streams/:key/instance/:id/downloads` — downloads partial
-- `POST /my/streams/:key/instance/:id/terminate`
-- `POST /my/streams/:key/instance/:id/substep/:substepId/complete`
-- `GET/POST /my/streams/:key/instance/:id/substep/:substepId/override`
-- `GET /my/streams/:key/instance/:id/attachment/:attachmentId/file` — attachment download
-- Export downloads: `files.zip`, `notarized.json`, `merkle.json` under `/my/streams/:key/instance/:id/…`
-- `GET /my/streams/:key/events?processId=…` or `?role=…` — stream-scoped SSE (used by `web/src/main.js`)
-- `POST /my/streams/:key/delete` — delete saved Formata stream (when permitted)
-
-Legacy `/w/`, `/org-admin/`, `/dashboard`, and `/w/:key/dashboard` return 404 (`TestLegacyRoutesGone`, `TestLegacyOrgAdminRoutesReturnNotFound`).
-
-### Actor/role identity
-Session auth via `attesta_session` cookie:
-- Regular users: Appwrite session secret from login/signup/invite flows (`readSession()`, `currentUser()` in `main.go`)
-- Platform admin: env-derived session value (`platform-admin:…` via `platformAdminSessionValue()`)
-- Request actor for Cerbos/completion: `Actor` built from authenticated user + workflow context (org slug, role slugs, `workflowKey`)
-
-Demo impersonation (`demo_user` cookie, `readActor()`, `handleImpersonate()`) is removed from production code; `demo_user` may still appear in older tests.
-
-### Authorization (Cerbos)
-The backend checks whether a substep can be completed via Cerbos:
-- client: `CerbosAuthorizer` in `server/cmd/server/authorizer.go`
-- policy: `cerbos/policies/substep_policy.yaml`
-
-Cerbos request includes `sequenceOk` and role requirements (`CerbosAuthorizer` in `authorizer.go`).
-
-### Process progress keys (Mongo gotcha)
-Substep IDs contain dots (e.g. `1.1`). MongoDB field names cannot contain dots, so progress map keys are encoded:
-- encode for storage: `encodeProgressKey()` replaces `.` with `_`
-- decode for reads: `normalizeProgressKeys()` replaces `_` with `.`
-
-When touching progress persistence, follow this pattern (see `MongoStore.UpdateProcessProgress()` in `store.go`).
-
-### File uploads / downloads
-- Completion payloads are either scalar (`ParseForm`) or file (`ParseMultipartForm`) based on workflow `inputType`.
-- File uploads are size-limited with `http.MaxBytesReader` and `ATTACHMENT_MAX_BYTES`.
-- Files are stored in **Mongo GridFS** bucket named **`attachments`** (`store.go`).
-- Metadata is stored in `attachments.files` (see `LoadAttachmentByID()` in `store.go`).
-
-Download endpoint `handleDownloadProcessAttachment` streams GridFS content and sets `Content-Disposition` with a sanitized filename (`sanitizeAttachmentFilename()` in `main.go`).
-
-### SSE (server) + partial refresh (web)
-- SSE hub is `SSEHub` (`main.go`).
-- Backend emits:
-  - `event: process-updated` for process streams
-  - `event: role-updated` for role dashboards
-  (see `handleEvents()` in `main.go`; stream-scoped at `/my/streams/:key/events`).
-- Frontend listens via `EventSource` and refreshes partial HTML via `fetch()` (`web/src/main.js`).
-
-### DPP / GS1 Digital Link
-- Workflow YAML supports optional `dpp:` config (`enabled`, `gtin`, `lotInputKey`, `lotDefault`, `serialInputKey`, `serialStrategy`, plus presentation fields).
-- `gtin` is normalized/validated at config load (must resolve to 14 digits when enabled).
-- On first transition to process `done`, backend stores `process.dpp` (`gtin`, `lot`, `serial`, `generatedAt`) and keeps identifiers stable on repeated completion calls.
-- Public Digital Link route is `GET /01/{gtin}/10/{lot}/21/{serial}` (UNTP Identity Resolver URL, ISO/IEC 18975 structured path):
-  - HTML landing page (template: `server/templates/pages/dpp.html`) — default link
-  - UNTP Digital Product Passport credential JSON (`Accept: application/json` or `?format=json`)
-  - UNTP Identity Resolver linkset, RFC 9264 (`?linkType=linkset|all|dpp|dte|pip`, or `Accept: application/linkset+json`)
-  - `GET /01/{gtin}/10/{lot}/21/{serial}/events` — UNTP Digital Traceability Event credential (one ModifyEvent per completed substep)
-  - UNTP implementation details: `docs/untp.md`
-- DPP HTML traceability now renders user-entered values and file download links inline per substep (no separate Documents section).
-- Process page downloads panel now shows a DPP link when `process.DPP` exists.
-
-## Templates and static assets
-- Templates load from `server/templates/*.html`, `server/templates/pages/*.html`, and `server/templates/components/*.html` via `parseTemplates()` in `server/cmd/server/templates.go`. Custom funcs in `templateFuncs()` include `dict` for inline map literals and typed wrappers such as `streamTimelineStep` / `streamTimelineSubstep` (e.g. `{{ template "stream_timeline_step" (streamTimelineStep . $.HideStatus) }}`).
-- **Template define names** match the file stem (no extension): e.g. `components/stream_card.html` → `{{ define "stream_card" }}`. Page wrappers and body blocks still use legacy `*.html` / `*_body` defines until migrated. Primary CSS uses the same stem under `web/src/styles/components/` or `pages/` (underscore → kebab); exceptions in `docs/css.md`.
-- **Shared view structs** for reusable components live in `server/cmd/server/components.go` (`SubstepBodyView`, `StreamInstanceDetailView`, `StreamCardView`, …). Use struct literals at call sites — no fluent `With*` builders unless there is real logic. Page/view assembly is partially peeled (`stream_instance_detail.go`, `substep_views_builder.go`, `timeline_builder.go`); remaining handlers stay in `main.go`.
-- **Component tiers** (full / CSS-only / cluster): see `.agents/skills/attesta-ui-components`. CSS-only markup contracts and layer rules: `docs/css.md`. Migrate one component at a time.
-- Substep bodies (`server/templates/components/substep_body.html`) dispatch on explicit **`Mode`** (`preview`|`actionable`|`result`|`message`) via `effectiveSubstepBodyMode`; builders set `SubstepBodyView.Mode` (`resolveSubstepBodyMode` in `components.go`).
-- Stream timeline (`server/templates/components/stream_timeline.html`) renders the step/substep accordion tree on stream instance detail and stream dashboard preview; inner define `stream_timeline_step` calls `substep_shell` via `(streamTimelineSubstep . $.HideStatus)`; `substep_shell` dispatches to `substep_body` with `TimelineSubstep.Body` (`*SubstepBodyView`).
-- Stream instance detail partial (`stream_instance_detail_content`) is built by `buildStreamInstanceDetailView` in `stream_instance_detail.go` and exposed on `ProcessPageView.Detail` (`StreamInstanceDetailView`).
-- Locked Formata substeps render `.js-formata-host[data-formata-disabled="true"]` in preview mode; when disabled, the builder link is replaced by “Locked: complete previous steps first.”
-- Static assets are served from `../web/dist` under `/static/` (`newMux()` in `main.go`).
-- Layout template includes HTMX via an external script tag (`server/templates/layout.html`).
-
-## Testing patterns
-- Unit tests live next to code in `server/cmd/server/*_test.go`.
-- Most handler tests use `httptest.NewRequest`/`httptest.NewRecorder` and a `MemoryStore` (`store.go`).
-- Integration tests are behind build tag `integration` (`server/cmd/server/integration_complete_test.go`) and skip if dependencies are unavailable.
-
-## Deployment files
-Observed Dockerfiles:
-- `deployment/Dockerfile.coolify` — builds web bundle + Go binary into a small runtime image.
-- `deployment/Dockerfile.ephemeral` — same as coolify, but with an entrypoint that optionally runs a seed script (`deployment/ephemeral-entrypoint.sh`).
-- `deployment/Dockerfile.cerbos` — builds Cerbos image with repo config/policies.
-
-## Known gotchas / inconsistencies (as checked in this repo)
-- `DOCKER.md` lists Cerbos image `ghcr.io/cerbos/cerbos:0.39.0`, but `deployment/docker-compose.local.yaml` and `deployment/Dockerfile.cerbos` use **0.50.0**.
-- `Taskfile.yml` includes a `cerbos-health` task that runs `curl`.
-- Host-dev from a linked worktree: do not hardcode `:3000` / `:5173` — use `.env.local` (or printed `task dev` URL). Do not run a second Compose stack from the worktree path.
+- Progress keys containing dots are encoded for Mongo storage (`.` becomes
+  `_`) and normalized on reads. Preserve that boundary when changing progress
+  persistence.
+- Format and check Go templates with djLint (`task templates:fmt`,
+  `task templates:check`, `task templates:lint`); do not use a generic HTML
+  formatter on Go templates.
+- Worktrees share one Docker stack. Use the ports in each checkout's
+  `.env.local` or the URL printed by `task dev`; `task stop`, `task reset`, and
+  `task purge` affect every worktree.
