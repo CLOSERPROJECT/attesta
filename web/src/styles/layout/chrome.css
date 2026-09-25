@@ -1,4 +1,6 @@
 .topbar {
+  position: relative;
+  z-index: 50;
   padding: var(--space-5) 32px;
   border-bottom: 1px solid var(--border);
   background: var(--secondary);

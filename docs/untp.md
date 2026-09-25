@@ -6,8 +6,11 @@ publishes verifiable product data behind identifiers it already controls. The
 GS1 Digital Link (`/01/{gtin}/10/{lot}/21/{serial}`) doubles as the UNTP
 Identity Resolver URL (ISO/IEC 18975 structured path, no query parameters).
 
-Spec: <https://untp.unece.org/docs/specification/Architecture> (v1.0 work in
-progress — this implementation targets the published v0.7.0 model shapes).
+The implementation follows the protocol concepts and wire formats named below;
+its compatibility is defined by the code and tests, not by a claimed UNTP
+release version. Consult the [UNTP architecture
+specification](https://untp.unece.org/docs/specification/Architecture) before
+changing interoperable payloads.
 
 ## Endpoints
 

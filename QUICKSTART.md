@@ -49,9 +49,9 @@ go run ./cmd/server
 
 ## Open the demo
 - Appwrite Console: http://localhost
-- Public homepage: http://localhost:3030/
-- Stream picker (after login): http://localhost:3030/my
-- Backoffice: http://localhost:3030/backoffice
+- Public homepage: http://localhost:3000/
+- Stream picker (after login): http://localhost:3000/my
+- Platform admin (when enabled): http://localhost:3000/admin
 - Mailpit: http://localhost:8025
 
 After login, the stream picker is at `/my`. Stream and instance routes live under `/my/streams/{workflowKey}/...` (legacy `/w/` and `/org-admin/` paths return 404).
