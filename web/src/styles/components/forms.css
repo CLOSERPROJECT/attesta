@@ -27,6 +27,7 @@
 }
 
 .form-field > label {
+  line-height: 1;
   font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
