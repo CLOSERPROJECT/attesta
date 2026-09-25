@@ -570,10 +570,12 @@
             <li class="list-row">
               <div class="list-row-main list-row-main-stack">
                 <p>{{ .RequesterEmail }}</p>
-                {{ template "role_pill_row" (rolePillRowFromOrgAdminOptions .Roles "sm") }}
-                {{ if .CreatedAt }}
-                  <p class="muted u-text-xs">{{ .CreatedAt }}</p>
-                {{ end }}
+                <div class="u-flex-center u-flex-wrap u-gap-2">
+                  {{ template "role_pill_row" (rolePillRowFromOrgAdminOptions .Roles "sm") }}
+                  {{ if .CreatedAt }}
+                    <p class="muted u-text-xs">Requested on: {{ .CreatedAt }}</p>
+                  {{ end }}
+                </div>
               </div>
               <div class="list-row-actions">
                 <form method="post" action="/my/organization/users" class="panel-actions">
@@ -626,6 +628,8 @@
         </div>
       {{ end }}
     </div>
+
+    <hr />
 
     <div class="panel-block panel-block-spaced">
       <div class="panel-head-actions">

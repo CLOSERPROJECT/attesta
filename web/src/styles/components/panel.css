@@ -75,14 +75,6 @@
   flex-wrap: wrap;
 }
 
-.panel-block {
-  margin-top: var(--space-5);
-}
-
-.panel-block-spaced {
-  margin-bottom: var(--space-3);
-}
-
 @media (--md-up) {
   .panel-sticky {
     position: sticky;
