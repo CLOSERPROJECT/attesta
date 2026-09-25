@@ -32,7 +32,11 @@
   width: 14px;
   height: 14px;
   border-radius: 4px;
-  background: color-mix(in srgb, var(--swatch-bg, var(--muted-foreground)) 10%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--swatch-bg, var(--muted-foreground)) 10%,
+    transparent
+  );
   border: 1px solid var(--swatch-bg, var(--border));
   flex: 0 0 auto;
 }
@@ -41,7 +45,11 @@
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  background: color-mix(in srgb, var(--swatch-bg, var(--muted-foreground)) 10%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--swatch-bg, var(--muted-foreground)) 10%,
+    transparent
+  );
   border: 1px solid var(--swatch-bg, var(--border));
   flex: 0 0 auto;
 }
@@ -123,4 +131,10 @@ hr {
 .org-admin-dialog-role-pill {
   display: flex;
   justify-content: center;
+}
+
+.org-admin-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
 }
