@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -184,6 +185,39 @@ func TestAffiliationLeaveGateBlocksSoleOrgAdmin(t *testing.T) {
 	if !canLeave || reason != "" {
 		t.Fatalf("shared admins can leave: canLeave=%v reason=%q", canLeave, reason)
 	}
+
+	canLeave, reason = affiliationLeaveGate(context.Background(), identity, nil)
+	if canLeave || reason != "" {
+		t.Fatalf("nil user: canLeave=%v reason=%q", canLeave, reason)
+	}
+	canLeave, reason = affiliationLeaveGate(context.Background(), identity, &AccountUser{
+		IdentityUserID: "member-1",
+		Email:          "member@example.com",
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"viewer"},
+	})
+	if !canLeave || reason != "" {
+		t.Fatalf("member: canLeave=%v reason=%q", canLeave, reason)
+	}
+	canLeave, reason = affiliationLeaveGate(context.Background(), nil, &AccountUser{
+		IdentityUserID: "admin-1",
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"org-admin"},
+	})
+	if !canLeave || reason != "" {
+		t.Fatalf("nil identity: canLeave=%v reason=%q", canLeave, reason)
+	}
+	identity.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+		return nil, errors.New("list failed")
+	}
+	canLeave, reason = affiliationLeaveGate(context.Background(), identity, &AccountUser{
+		IdentityUserID: "admin-1",
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"org-admin"},
+	})
+	if !canLeave || reason != "" {
+		t.Fatalf("list error fail-open: canLeave=%v reason=%q", canLeave, reason)
+	}
 }
 
 func TestPageBaseForUserAccountSettingsAffiliatedMember(t *testing.T) {
@@ -247,6 +281,79 @@ func TestPageBaseForUserHidesAccountSettingsWhenUnaffiliated(t *testing.T) {
 	}, "home_picker_body", "", "")
 	if base.ShowAccountSettings {
 		t.Fatal("unaffiliated must not see Account settings")
+	}
+}
+
+func TestPopulateAccountSettingsEdges(t *testing.T) {
+	server := &Server{}
+	server.populateAccountSettings(nil, &AccountUser{OrgSlug: "acme"})
+	server.populateAccountSettings(&PageBase{}, nil)
+
+	base := &PageBase{}
+	server.populateAccountSettings(base, &AccountUser{
+		OrgSlug:   "acme",
+		RoleSlugs: []string{"org-admin"},
+	})
+	if !base.ShowAccountSettings || base.AccountOrgName != "acme" || !base.CanLeave {
+		t.Fatalf("nil identity settings = %#v", base)
+	}
+
+	base = &PageBase{}
+	server.identity = &fakeIdentityStore{
+		getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+			return nil, ErrIdentityNotFound
+		},
+	}
+	server.populateAccountSettings(base, &AccountUser{OrgSlug: "acme", RoleSlugs: []string{"viewer"}})
+	if base.AccountOrgName != "acme" {
+		t.Fatalf("missing org keeps slug name = %q", base.AccountOrgName)
+	}
+
+	base = &PageBase{}
+	server.identity = &fakeIdentityStore{
+		getOrganizationBySlugFunc: func(_ context.Context, _ string) (*IdentityOrg, error) {
+			return &IdentityOrg{Slug: "acme", Name: "   "}, nil
+		},
+	}
+	server.populateAccountSettings(base, &AccountUser{OrgSlug: "acme", RoleSlugs: []string{"viewer"}})
+	if base.AccountOrgName != "acme" {
+		t.Fatalf("blank org name keeps slug = %q", base.AccountOrgName)
+	}
+}
+
+func TestHandleOrganizationRootCerbosErrorFallsThroughToHome(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-org-root-cerbos"
+	account := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "member-1",
+		Email:          "member@example.com",
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"viewer"},
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	server := &Server{
+		identity: testIdentityForSessions(now, map[string]AccountUser{sessionID: account}),
+		store:    NewMemoryStore(),
+		tmpl:     parseTestTemplates(t),
+		authorizer: fakeAuthorizer{
+			accessDecide: func(user *AccountUser, resourceKind, _ string, _ map[string]interface{}, action string) (bool, error) {
+				if resourceKind == cerbosResourceOrgAdminConsole {
+					return false, errors.New("cerbos down")
+				}
+				return fakeCanAccessDecision(user, resourceKind, nil, action), nil
+			},
+		},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodGet, organizationPath(""), nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleMyRoutes(rec, req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != appHomePath {
+		t.Fatalf("status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 }
 

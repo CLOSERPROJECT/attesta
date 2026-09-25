@@ -1761,6 +1761,90 @@ func TestAppwriteIdentityDirectTeamLookupAndCurrentUserFallback(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityListUserMemberships(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/users/user-1/memberships":
+			_, _ = w.Write([]byte(`{"total":2,"memberships":[
+				{"$id":"mem-1","userId":"user-1","teamId":"team-1","teamName":"Acme","confirm":true,"roles":["owner"],"userEmail":"a@example.com"},
+				{"$id":"mem-2","userId":"user-1","teamId":"missing-team","teamName":"Gone","confirm":true,"roles":["member"],"userEmail":"a@example.com"}
+			]}`))
+		case "/v1/users/boom/memberships":
+			http.Error(w, `{"message":"nope"}`, http.StatusInternalServerError)
+		case "/v1/teams/team-1":
+			_, _ = w.Write([]byte(`{"$id":"team-1","name":"Acme Org","prefs":{"slug":"acme"}}`))
+		case "/v1/teams/missing-team":
+			http.NotFound(w, r)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client()).(*appwriteIdentity)
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := identity.ListUserMemberships(canceled, "user-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled ctx error = %v", err)
+	}
+	empty, err := identity.ListUserMemberships(context.Background(), "  ")
+	if err != nil || empty != nil {
+		t.Fatalf("blank userID = %#v %v", empty, err)
+	}
+	if _, err := identity.ListUserMemberships(context.Background(), "boom"); err == nil {
+		t.Fatal("expected list memberships error")
+	}
+	got, err := identity.ListUserMemberships(context.Background(), "user-1")
+	if err != nil {
+		t.Fatalf("ListUserMemberships: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("memberships = %#v", got)
+	}
+	if got[0].OrgSlug != "acme" || got[0].OrgName != "Acme Org" {
+		t.Fatalf("resolved membership = %#v", got[0])
+	}
+	if got[1].TeamID != "missing-team" || got[1].OrgSlug != "" {
+		t.Fatalf("unresolved membership = %#v", got[1])
+	}
+}
+
+func TestAppwriteIdentityListOrganizationMembershipsLite(t *testing.T) {
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/teams/team-1/memberships", "/v1/teams/acme/memberships":
+			_, _ = w.Write([]byte(`{"total":1,"memberships":[{"$id":"mem-1","userId":"user-1","teamId":"team-1","teamName":"Acme","confirm":true,"roles":["owner"],"userEmail":"a@example.com"}]}`))
+		case "/v1/teams/acme":
+			_, _ = w.Write([]byte(`{"$id":"team-1","name":"Acme Org","prefs":{"slug":"acme"}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client()).(*appwriteIdentity)
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := identity.ListOrganizationMembershipsLite(canceled, IdentityOrg{ID: "team-1"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled ctx error = %v", err)
+	}
+	if _, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{}); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("empty org error = %v", err)
+	}
+	byID, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{ID: "team-1", Slug: "acme", Name: "Acme Org"})
+	if err != nil || len(byID) != 1 || byID[0].ID != "mem-1" {
+		t.Fatalf("by ID = %#v %v", byID, err)
+	}
+	bySlug, err := identity.ListOrganizationMembershipsLite(context.Background(), IdentityOrg{Slug: "acme"})
+	if err != nil || len(bySlug) != 1 {
+		t.Fatalf("by slug = %#v %v", bySlug, err)
+	}
+}
+
 func TestIdentityAppwriteHelpers(t *testing.T) {
 	if got := encodeIdentityRoleLabel("   "); got != "" {
 		t.Fatalf("encodeIdentityRoleLabel blank = %q, want empty", got)

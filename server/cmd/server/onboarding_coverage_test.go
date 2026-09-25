@@ -820,6 +820,83 @@ func TestMapAffiliationFormErrorBranches(t *testing.T) {
 	if got := affiliationWithdrawFormError(ErrAffiliationNotPending); got != "request is not pending" {
 		t.Fatalf("withdraw not pending=%q", got)
 	}
+	if got := affiliationInviteFormError(ErrAffiliationAlreadyAffiliated); got != "you already belong to an organization" {
+		t.Fatalf("invite already affiliated=%q", got)
+	}
+	if got := affiliationInviteFormError(ErrAffiliationNotFound); got != "invite not found or already handled" {
+		t.Fatalf("invite not found=%q", got)
+	}
+	if got := affiliationInviteFormError(errors.New("boom")); got != "failed to process invite" {
+		t.Fatalf("invite default=%q", got)
+	}
+}
+
+func TestOnboardingHubInviteErrorsAndPendingLoadFailure(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-invite-errors"
+	account := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-invitee",
+		Email:          "invitee@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: account})
+	identity.listUserMembershipsFunc = func(ctx context.Context, userID string) ([]IdentityMembership, error) {
+		return nil, errors.New("invite list failed")
+	}
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodGet, onboardingPath(), nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleMyRoutes(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("pending invite load status=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	identity.listUserMembershipsFunc = func(ctx context.Context, userID string) ([]IdentityMembership, error) {
+		return nil, nil
+	}
+	server.tmpl = parseTestTemplates(t)
+
+	acceptReq := httptest.NewRequest(http.MethodPost, onboardingPath(), strings.NewReader("intent=accept_invite&membership_id=missing"))
+	acceptReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	acceptReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	acceptRec := httptest.NewRecorder()
+	server.handleMyRoutes(acceptRec, acceptReq)
+	if acceptRec.Code != http.StatusOK || !strings.Contains(acceptRec.Body.String(), "invite not found or already handled") {
+		t.Fatalf("accept error status=%d body=%q", acceptRec.Code, acceptRec.Body.String())
+	}
+
+	rejectReq := httptest.NewRequest(http.MethodPost, onboardingPath(), strings.NewReader("intent=reject_invite&membership_id=missing"))
+	rejectReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rejectReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rejectRec := httptest.NewRecorder()
+	server.handleMyRoutes(rejectRec, rejectReq)
+	if rejectRec.Code != http.StatusOK || !strings.Contains(rejectRec.Body.String(), "invite not found or already handled") {
+		t.Fatalf("reject error status=%d body=%q", rejectRec.Code, rejectRec.Body.String())
+	}
+}
+
+func TestRoleLabelsForSlugsEdges(t *testing.T) {
+	if got := roleLabelsForSlugs(nil, nil); got != "" {
+		t.Fatalf("empty=%q", got)
+	}
+	got := roleLabelsForSlugs([]IdentityRole{
+		{Slug: "", Name: "ignored"},
+		{Slug: "viewer", Name: ""},
+		{Slug: "editor", Name: "Editor"},
+	}, []string{"", "missing", "viewer", "editor"})
+	if got != "missing, viewer, Editor" {
+		t.Fatalf("labels=%q", got)
+	}
 }
 
 func TestRoleMetaIndexEdges(t *testing.T) {
