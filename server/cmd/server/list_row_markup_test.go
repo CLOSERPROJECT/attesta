@@ -81,7 +81,7 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 	snippet := rolesBody[rowIdx:]
 	mainIdx := strings.Index(snippet, `class="list-row-main"`)
 	actionsIdx := strings.Index(snippet, `class="list-row-actions"`)
-	pillIdx := strings.Index(snippet, `class="pill pill-lg role-pill"`)
+	pillIdx := strings.Index(snippet, `class="pill role-pill"`)
 	if mainIdx < 0 || actionsIdx < 0 || pillIdx < 0 {
 		t.Fatal("expected list-row-main, list-row-actions, and role pill")
 	}
