@@ -286,4 +286,6 @@ European Union nor the granting authority can be held responsible for them.
 
 - [QUICKSTART.md](QUICKSTART.md) - step-by-step local setup.
 - [DOCKER.md](DOCKER.md) - Docker Compose, Coolify, and preview deployment notes.
+- [docs/architecture.md](docs/architecture.md) - system boundaries and source navigation.
+- [docs/untp.md](docs/untp.md) - Digital Product Passport and UNTP implementation.
 - [Taskfile.yml](Taskfile.yml) - available local commands.

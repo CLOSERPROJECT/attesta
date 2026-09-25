@@ -39,7 +39,7 @@ docker compose -f deployment/docker-compose.local.yaml up -d
 
 Open:
 - Appwrite Console: http://localhost
-- App: http://localhost:3030
+- App: http://localhost:3000
 - Mailpit: http://localhost:8025
 
 After first boot:
