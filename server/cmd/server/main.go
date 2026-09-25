@@ -497,7 +497,7 @@ type OrgAdminView struct {
 type OrgAdminJoinRequestRow struct {
 	ID             string
 	RequesterEmail string
-	RoleSlugs      string
+	Roles          []OrgAdminRoleOption
 	CreatedAt      string
 }
 
@@ -3931,6 +3931,51 @@ func buildOrgAdminRolePills(roles []Role) []OrgAdminRoleOption {
 	return rolePills
 }
 
+// roleOptionsForSlugs resolves requested role slugs against the org catalog for pill display.
+func roleOptionsForSlugs(catalog []Role, slugs []string) []OrgAdminRoleOption {
+	bySlug := make(map[string]Role, len(catalog))
+	for _, role := range catalog {
+		key := canonifySlug(role.Slug)
+		if key == "" {
+			continue
+		}
+		bySlug[key] = role
+	}
+	out := make([]OrgAdminRoleOption, 0, len(slugs))
+	seen := make(map[string]struct{}, len(slugs))
+	for _, slug := range canonifyRoleSlugs(slugs) {
+		key := canonifySlug(slug)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		if role, ok := bySlug[key]; ok {
+			name := strings.TrimSpace(role.Name)
+			if name == "" {
+				name = role.Slug
+			}
+			out = append(out, OrgAdminRoleOption{
+				Slug:    role.Slug,
+				Name:    name,
+				Palette: role.Palette,
+			})
+			continue
+		}
+		name := slug
+		if isOrgAdminRoleSlug(slug) {
+			name = "Org Admin"
+		}
+		out = append(out, OrgAdminRoleOption{
+			Slug: slug,
+			Name: name,
+		})
+	}
+	return out
+}
+
 func organizationRoleInUse(roleSlug string, users []OrgAdminUserRow, invites []OrgAdminInviteRow) bool {
 	trimmedRoleSlug := strings.TrimSpace(roleSlug)
 	if trimmedRoleSlug == "" {
@@ -4044,7 +4089,7 @@ func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, no
 	return orgInvites
 }
 
-func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug string) ([]OrgAdminJoinRequestRow, error) {
+func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug string, roles []Role) ([]OrgAdminJoinRequestRow, error) {
 	if s == nil || s.store == nil {
 		return nil, nil
 	}
@@ -4057,7 +4102,7 @@ func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug stri
 		rows = append(rows, OrgAdminJoinRequestRow{
 			ID:             req.ID.Hex(),
 			RequesterEmail: strings.TrimSpace(req.RequesterEmail),
-			RoleSlugs:      strings.Join(req.RoleSlugs, ", "),
+			Roles:          roleOptionsForSlugs(roles, req.RoleSlugs),
 			CreatedAt:      humanReadableTraceabilityTime(req.CreatedAt),
 		})
 	}
@@ -4130,7 +4175,7 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	rolePills := buildOrgAdminRolePills(roles)
 	roleRows := buildOrgAdminRoleRows(roles, orgUsers, orgInvites)
 
-	pendingJoinRows, pendingJoinErr := orgAdminPendingJoinRequestRows(context.Background(), s, org.Slug)
+	pendingJoinRows, pendingJoinErr := orgAdminPendingJoinRequestRows(context.Background(), s, org.Slug, roles)
 	if pendingJoinErr != nil {
 		log.Printf("failed to load pending join requests for org %s: %v", org.Slug, pendingJoinErr)
 		http.Error(w, "failed to load pending join requests", http.StatusInternalServerError)

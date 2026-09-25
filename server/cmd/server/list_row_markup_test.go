@@ -20,6 +20,9 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 				UserID:    "user-1",
 				Email:     "member@example.com",
 				Activated: true,
+				RoleOptions: []OrgAdminRoleOption{
+					{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", Selected: true},
+				},
 			},
 		},
 	}
@@ -49,7 +52,7 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 	membersBody := membersOut.String()
 	for _, want := range []string{
 		`class="user-email"`,
-		`class="user-tags"`,
+		`class="role-pill-row"`,
 	} {
 		if !strings.Contains(membersBody, want) {
 			t.Fatalf("expected %q in members markup, got:\n%s", want, membersBody)

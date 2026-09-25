@@ -569,7 +569,9 @@ func TestHandleOrgAdminMembersPendingJoinRequests(t *testing.T) {
 	for _, want := range []string{
 		"Pending join requests",
 		"newbie@example.com",
-		"viewer",
+		"Viewer",
+		`class="pill pill-sm role-pill"`,
+		`class="role-pill-row"`,
 		saved.ID.Hex(),
 		`name="intent" value="approve_join"`,
 		`name="intent" value="reject_join"`,

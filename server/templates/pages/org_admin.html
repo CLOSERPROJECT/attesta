@@ -568,22 +568,27 @@
         <ul class="list-rows">
           {{ range .PendingJoinRequests }}
             <li class="list-row">
-              <div class="list-row-main">
+              <div class="list-row-main list-row-main-stack">
                 <p>{{ .RequesterEmail }}</p>
-                <p class="muted">
-                  {{ if .RoleSlugs }}{{ .RoleSlugs }}{{ end }}
-                  {{ if .CreatedAt }}{{ if .RoleSlugs }} · {{ end }}{{ .CreatedAt }}{{ end }}
-                </p>
+                {{ template "role_pill_row" (rolePillRowFromOrgAdminOptions .Roles "sm") }}
+                {{ if .CreatedAt }}
+                  <p class="muted u-text-xs">{{ .CreatedAt }}</p>
+                {{ end }}
               </div>
               <div class="list-row-actions">
                 <form method="post" action="/my/organization/users" class="panel-actions">
                   <input type="hidden" name="intent" value="approve_join" />
                   <input type="hidden" name="request_id" value="{{ .ID }}" />
-                  <button class="btn btn-primary btn-xs" type="submit">Approve</button>
+                  <button class="btn btn-ghost btn-icon btn-xs"
+                          type="submit"
+                          aria-label="Approve">{{ template "icon-check" . }}</button>
                 </form>
                 <button type="button"
-                        class="btn btn-ghost-danger btn-xs"
-                        onclick="document.getElementById('reject-join-{{ .ID }}').showModal()">Reject</button>
+                        class="btn btn-ghost-danger btn-icon btn-xs"
+                        aria-label="Reject"
+                        onclick="document.getElementById('reject-join-{{ .ID }}').showModal()">
+                  {{ template "icon-close" . }}
+                </button>
               </div>
 
               <dialog id="reject-join-{{ .ID }}" class="dialog">
@@ -654,13 +659,7 @@
                     <span class="pill role-pill pill-accent">Pending invite</span>
                   {{ end }}
                 </span>
-                <div class="user-tags">
-                  {{ range .RoleOptions }}
-                    {{ if .Selected }}
-                      <span class="pill role-pill" data-role-palette="{{ .Palette }}">{{ .Name }}</span>
-                    {{ end }}
-                  {{ end }}
-                </div>
+                {{ template "role_pill_row" (rolePillRowSelectedFromOrgAdminOptions .RoleOptions "") }}
               </div>
               <div class="list-row-actions">
                 <button type="button"

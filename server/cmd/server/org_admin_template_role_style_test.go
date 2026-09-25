@@ -61,20 +61,20 @@ func TestOrgAdminTemplateRolePillRendersCSSVariables(t *testing.T) {
 		t.Fatalf("expected exactly one icon in user-email block, got %d in %s", got, emailBlock)
 	}
 
-	tagsStart := strings.Index(body, `<div class="user-tags">`)
+	tagsStart := strings.Index(body, `class="role-pill-row"`)
 	if tagsStart < 0 {
-		t.Fatalf("expected user-tags block in output, got body: %s", body)
+		t.Fatalf("expected role-pill-row block in output, got body: %s", body)
 	}
 	tagsEnd := strings.Index(body[tagsStart:], `</div>`)
 	if tagsEnd < 0 {
-		t.Fatalf("expected user-tags closing tag in output, got body: %s", body)
+		t.Fatalf("expected role-pill-row closing tag in output, got body: %s", body)
 	}
 	tagsBlock := body[tagsStart : tagsStart+tagsEnd]
 	if strings.Contains(tagsBlock, "Org Admin") {
-		t.Fatalf("org-admin pill should be hidden from user-tags block, got: %s", tagsBlock)
+		t.Fatalf("org-admin pill should be hidden from role-pill-row, got: %s", tagsBlock)
 	}
 	if !strings.Contains(tagsBlock, "QA Reviewer") {
-		t.Fatalf("expected non-admin role pill in user-tags block, got: %s", tagsBlock)
+		t.Fatalf("expected non-admin role pill in role-pill-row, got: %s", tagsBlock)
 	}
 
 	manageStart := strings.Index(body, `id="manage-user-user-1"`)
