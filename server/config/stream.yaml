@@ -493,3 +493,15 @@ dpp:
   productName: Indium recycling audit
   productDescription: Shipment intake, inspection, and approval with traceable checkpoints
   ownerName: Attesta Demo Operator
+  productCategory:
+    code: "41601"
+    name: Tungsten, molybdenum, tantalum, magnesium, cobalt, cadmium, titanium, zirconium, beryllium, gallium, hafnium, indium, niobium, rhenium and thallium, germanium and vanadium, unwrought, and powders thereof, except powders of magnesium; waste and scrap of gallium, hafnium, indium, niobium, rhenium, germanium and vanadium; cobalt mattes and other intermediate products of cobalt metallurgy
+    schemeId: https://unstats.un.org/unsd/classifications/Econ/cpc/
+    schemeName: UN Central Product Classification (CPC)
+  producedAtFacility:
+    id: https://attesta.demo/facility/indium-recycling
+    name: Attesta Demo Indium Recycling Plant
+    registeredId: demo-indium-recycling
+  countryOfProduction:
+    countryCode: NL
+    countryName: Netherlands

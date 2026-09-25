@@ -1,0 +1,68 @@
+.untp-vocabulary-page {
+  min-width: 0;
+}
+
+.untp-vocabulary-intro {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.untp-vocabulary-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+}
+
+.untp-vocabulary-meta dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.untp-vocabulary-meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.untp-vocabulary-meta-note {
+  margin-left: var(--space-2);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.untp-vocabulary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.untp-vocabulary-term {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.untp-vocabulary-term-name {
+  font-family: var(--font-mono);
+  font-weight: var(--font-semibold);
+  overflow-wrap: anywhere;
+}
+
+.untp-vocabulary-term-description {
+  margin: 0;
+}
+
+.untp-vocabulary-term-example,
+.untp-vocabulary-term-iri {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.untp-vocabulary-term-iri {
+  font-family: var(--font-mono);
+}

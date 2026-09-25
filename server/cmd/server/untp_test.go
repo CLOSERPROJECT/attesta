@@ -40,6 +40,18 @@ func TestBuildUNTPDPPCredential(t *testing.T) {
 		ProductName:        "Recycled Gallium Batch",
 		ProductDescription: "Gallium intake and refinement",
 		OwnerName:          "Attesta Demo Operator",
+		ProductCategory: &DPPProductCategory{
+			Code:       "41601",
+			Name:       "Gallium, unwrought",
+			SchemeID:   untpCPCSchemeID,
+			SchemeName: untpCPCSchemeName,
+		},
+		ProducedAtFacility: &DPPFacility{
+			ID:           "https://dl.example.com/facility/refinery",
+			Name:         "Demo Refinery",
+			RegisteredID: "ref-001",
+		},
+		CountryOfProduction: &DPPCountry{CountryCode: "NL", CountryName: "Netherlands"},
 	}
 	process := untpTestProcess()
 	link := untpTestLink()
@@ -74,6 +86,15 @@ func TestBuildUNTPDPPCredential(t *testing.T) {
 	}
 	if subject.BatchNumber != "LOT-001" || subject.ItemNumber != "SERIAL-001" || subject.IDGranularity != "item" {
 		t.Fatalf("subject batch/serial/granularity = %#v", subject)
+	}
+	if len(subject.ProductCategory) != 1 || subject.ProductCategory[0].Code != "41601" || subject.ProductCategory[0].SchemeID != untpCPCSchemeID {
+		t.Fatalf("productCategory = %#v", subject.ProductCategory)
+	}
+	if subject.ProducedAtFacility == nil || subject.ProducedAtFacility.ID != "https://dl.example.com/facility/refinery" || subject.ProducedAtFacility.Name != "Demo Refinery" {
+		t.Fatalf("producedAtFacility = %#v", subject.ProducedAtFacility)
+	}
+	if subject.CountryOfProduction == nil || subject.CountryOfProduction.CountryCode != "NL" {
+		t.Fatalf("countryOfProduction = %#v", subject.CountryOfProduction)
 	}
 	if subject.IDScheme.ID != gs1DigitalLinkSchemeID || subject.IDScheme.Name != "GS1 Digital Link" {
 		t.Fatalf("idScheme = %#v", subject.IDScheme)
@@ -117,8 +138,75 @@ func TestBuildUNTPDPPCredentialFallbacks(t *testing.T) {
 	}
 }
 
+// The UNTP Product subject requires productCategory, producedAtFacility and
+// countryOfProduction. A stream that configures none of them must still yield
+// all three, or the published credential is schema-invalid.
+func TestBuildUNTPDPPCredentialDerivesRequiredSubjectFields(t *testing.T) {
+	cfg := testRuntimeConfig()
+	cfg.Workflow.CategorySlug = "supply-chain"
+	cfg.Workflow.SubCategorySlug = "battery-cells"
+	cfg.Workflow.Steps[0].OrganizationSlug = "org1"
+	cfg.Organizations = []WorkflowOrganization{{Slug: "org1", Name: "Organization 1"}}
+	cfg.DPP.ProductCategory = nil
+	cfg.DPP.ProducedAtFacility = nil
+	cfg.DPP.CountryOfProduction = nil
+
+	credential := buildUNTPDPPCredential("https://dl.example.com", cfg, "workflow", untpTestProcess(), untpTestLink())
+	subject := credential.CredentialSubject.(UNTPProduct)
+
+	if len(subject.ProductCategory) != 1 {
+		t.Fatalf("productCategory = %#v", subject.ProductCategory)
+	}
+	category := subject.ProductCategory[0]
+	if category.Code != "battery-cells" || category.Name != "Battery cells" {
+		t.Fatalf("derived category = %#v, want the stream taxonomy path", category)
+	}
+	if category.SchemeID != "https://dl.example.com/vocabulary/untp/categories" || category.SchemeName != untpCategorySchemeName {
+		t.Fatalf("derived scheme = %#v, want the Attesta scheme, not UN CPC", category)
+	}
+	if subject.ProducedAtFacility == nil || subject.ProducedAtFacility.Name != "Organization 1" {
+		t.Fatalf("derived facility = %#v, want the step organization", subject.ProducedAtFacility)
+	}
+	if subject.ProducedAtFacility.ID != "https://dl.example.com/organization/org1" {
+		t.Fatalf("derived facility id = %q", subject.ProducedAtFacility.ID)
+	}
+	if subject.CountryOfProduction == nil || subject.CountryOfProduction.CountryCode != untpUnknownCountryCode {
+		t.Fatalf("derived country = %#v, want an explicit unspecified code", subject.CountryOfProduction)
+	}
+}
+
+func TestBuildUNTPDPPCredentialUsesDeploymentCountry(t *testing.T) {
+	t.Setenv("DPP_COUNTRY_OF_PRODUCTION", "NL,Netherlands")
+	cfg := testRuntimeConfig()
+	cfg.DPP.CountryOfProduction = nil
+
+	credential := buildUNTPDPPCredential("https://dl.example.com", cfg, "workflow", untpTestProcess(), untpTestLink())
+	country := credential.CredentialSubject.(UNTPProduct).CountryOfProduction
+
+	if country == nil || country.CountryCode != "NL" || country.CountryName != "Netherlands" {
+		t.Fatalf("country = %#v, want the deployment default", country)
+	}
+}
+
+func TestBuildUNTPDPPCredentialUncategorizedStreamCategory(t *testing.T) {
+	cfg := testRuntimeConfig()
+	cfg.Workflow.CategorySlug = ""
+	cfg.Workflow.SubCategorySlug = ""
+	cfg.DPP.ProductCategory = nil
+
+	credential := buildUNTPDPPCredential("https://dl.example.com", cfg, "workflow", untpTestProcess(), untpTestLink())
+	category := credential.CredentialSubject.(UNTPProduct).ProductCategory
+
+	if len(category) != 1 || category[0].Code != untpUnclassifiedCode || category[0].Name != untpUnclassifiedName {
+		t.Fatalf("category = %#v, want an explicit unclassified value", category)
+	}
+}
+
 func TestBuildUNTPTraceabilityEvents(t *testing.T) {
 	cfg := testRuntimeConfig()
+	cfg.Roles = []WorkflowRole{{OrgSlug: "org1", Slug: "dep1", Name: "Department 1", UNTpRole: "operator"}}
+	cfg.DPP.ProducedAtFacility = &DPPFacility{ID: "https://dl.example.com/facility/refinery", Name: "Demo Refinery"}
+
 	process := untpTestProcess()
 	step := process.Progress["1.1"]
 	step.Data = map[string]interface{}{
@@ -138,45 +226,56 @@ func TestBuildUNTPTraceabilityEvents(t *testing.T) {
 		t.Fatalf("events = %d, want 1 (only done substeps)", len(events))
 	}
 	event := events[0]
-	if strings.Join(event.Type, ",") != "ModifyEvent,LifecycleEvent" {
-		t.Fatalf("event type = %#v", event.Type)
+	if event.Type != "ObjectEvent" || event.Action != "OBSERVE" || event.BizStep != "inspecting" {
+		t.Fatalf("epcis event dispatch = %#v", event)
 	}
 	wantID := "https://dl.example.com" + link + "/events#1.1"
-	if event.ID != wantID {
-		t.Fatalf("event id = %q, want %q", event.ID, wantID)
+	if event.EventID != wantID {
+		t.Fatalf("eventID = %q, want %q", event.EventID, wantID)
 	}
-	if event.Name != "A" {
-		t.Fatalf("event name = %q", event.Name)
+	if event.EventTime != "2026-03-05T14:30:00Z" || event.EventTimeZoneOffset != "+00:00" {
+		t.Fatalf("event time = %q %q", event.EventTime, event.EventTimeZoneOffset)
 	}
-	if event.EventDate != "2026-03-05T14:30:00Z" {
-		t.Fatalf("eventDate = %q", event.EventDate)
+	if len(event.EPCList) != 1 || event.EPCList[0] != "https://dl.example.com"+link {
+		t.Fatalf("epcList = %#v", event.EPCList)
 	}
-	if event.ActivityType.Code != "1.1" || event.ActivityType.Name != "A" || event.ActivityType.SchemeID != "https://dl.example.com" || event.ActivityType.SchemeName != "Demo workflow" {
-		t.Fatalf("activityType = %#v", event.ActivityType)
+	if event.ReadPoint == nil || event.ReadPoint.ID != "https://dl.example.com/facility/refinery" {
+		t.Fatalf("readPoint = %#v", event.ReadPoint)
 	}
-	if len(event.ModifiedProduct) != 1 || event.ModifiedProduct[0].Disposition != "active" {
-		t.Fatalf("modifiedProduct = %#v", event.ModifiedProduct)
+	if event.BizLocation == nil || event.BizLocation.ID != "https://dl.example.com/facility/refinery" {
+		t.Fatalf("bizLocation = %#v", event.BizLocation)
 	}
-	product := event.ModifiedProduct[0].Product
-	if product.ID != "https://dl.example.com"+link || product.BatchNumber != "LOT-001" || product.ItemNumber != "SERIAL-001" || product.IDGranularity != "item" {
-		t.Fatalf("event product = %#v", product)
+	if event.Substep.SubstepID != "1.1" || event.Substep.Title != "A" || event.Substep.StepID != "1" {
+		t.Fatalf("substep record = %#v", event.Substep)
 	}
-	if len(event.RelatedParty) != 1 || event.RelatedParty[0].Role != "dep1" || event.RelatedParty[0].Party.Name != "u1" {
-		t.Fatalf("relatedParty = %#v", event.RelatedParty)
+	if event.Substep.Role != "dep1" || event.Substep.UNTPRole != "operator" || event.Substep.CompletedBy != "u1" {
+		t.Fatalf("substep actor = %#v", event.Substep)
 	}
-	if event.RelatedParty[0].Party.ID != "https://dl.example.com/#actor=u1" {
-		t.Fatalf("party id = %q", event.RelatedParty[0].Party.ID)
+	input, ok := event.Substep.Input.(map[string]interface{})
+	if !ok || input["value"] != float64(1) {
+		t.Fatalf("substep input = %#v, want entered value preserved", event.Substep.Input)
 	}
-	if len(event.RelatedDocument) != 1 || event.RelatedDocument[0].LinkURL != "https://dl.example.com"+link+"/attachment/65f2a79b8e7f7d8f3c7c99aa/file" {
-		t.Fatalf("relatedDocument = %#v", event.RelatedDocument)
+	if _, present := input["attachment"]; present {
+		t.Fatalf("substep input = %#v, want attachment metadata excluded", input)
 	}
-	if event.RelatedDocument[0].LinkName != "cert.pdf" || event.RelatedDocument[0].MediaType != "application/pdf" {
-		t.Fatalf("relatedDocument meta = %#v", event.RelatedDocument[0])
+	if event.Substep.Digest != "sha256:"+digestPayload(step.Data) {
+		t.Fatalf("substep digest = %q", event.Substep.Digest)
+	}
+	if len(event.BizTransactionList) != 1 {
+		t.Fatalf("bizTransactionList = %#v", event.BizTransactionList)
+	}
+	txn := event.BizTransactionList[0]
+	if txn.BizTransaction != "https://dl.example.com"+link+"/attachment/65f2a79b8e7f7d8f3c7c99aa/file" {
+		t.Fatalf("attachment transaction = %#v", txn)
+	}
+	if txn.Type != "https://dl.example.com/vocabulary/untp/attachment" {
+		t.Fatalf("attachment transaction type = %q", txn.Type)
 	}
 }
 
 func TestBuildUNTPTraceabilityEventsRoleFallback(t *testing.T) {
 	cfg := testRuntimeConfig()
+	cfg.Roles = []WorkflowRole{{OrgSlug: "org1", Slug: "dep1", Name: "Department 1", UNTpRole: "operator"}}
 	process := untpTestProcess()
 	step := process.Progress["1.1"]
 	step.DoneBy = &Actor{ID: "u1"}
@@ -185,8 +284,41 @@ func TestBuildUNTPTraceabilityEventsRoleFallback(t *testing.T) {
 
 	events := buildUNTPTraceabilityEvents("", cfg.Workflow, cfg, process, link)
 
-	if len(events) != 1 || events[0].RelatedParty[0].Role != "dep1" {
-		t.Fatalf("events = %#v, want DoneBy role fallback to substep role", events)
+	if len(events) != 1 || events[0].Substep.UNTPRole != "operator" {
+		t.Fatalf("events = %#v, want substep role fallback mapped via untpRole", events)
+	}
+}
+
+func TestBuildUNTPTraceabilityEventsOmitsUNTPRoleForUnmappedRole(t *testing.T) {
+	cfg := testRuntimeConfig()
+	cfg.Roles = append(cfg.Roles, WorkflowRole{OrgSlug: "org1", Slug: "dep2", Name: "Department 2"})
+	process := untpTestProcess()
+	step := process.Progress["1.1"]
+	step.DoneBy = &Actor{ID: "u2", Role: "dep2"}
+	process.Progress["1.1"] = step
+	link := untpTestLink()
+
+	events := buildUNTPTraceabilityEvents("https://dl.example.com", cfg.Workflow, cfg, process, link)
+
+	if len(events) != 1 || events[0].Substep.Role != "dep2" || events[0].Substep.UNTPRole != "" {
+		t.Fatalf("events = %#v, want untpRole omitted for role without mapping", events)
+	}
+}
+
+// EPCIS requires eventTime on every event, and substeps completed before
+// DoneAt was recorded have none.
+func TestBuildUNTPTraceabilityEventsFallsBackToPassportTimeWithoutDoneAt(t *testing.T) {
+	cfg := testRuntimeConfig()
+	process := untpTestProcess()
+	step := process.Progress["1.1"]
+	step.DoneAt = nil
+	process.Progress["1.1"] = step
+	link := untpTestLink()
+
+	events := buildUNTPTraceabilityEvents("https://dl.example.com", cfg.Workflow, cfg, process, link)
+
+	if len(events) != 1 || events[0].EventTime != "2026-03-06T08:00:00Z" {
+		t.Fatalf("events = %#v, want passport generation time as eventTime", events)
 	}
 }
 
@@ -252,7 +384,6 @@ func TestUntpLinksetScope(t *testing.T) {
 		}
 	}
 }
-
 func untpTestServer(t *testing.T) (*Server, *MemoryStore, Process) {
 	t.Helper()
 	tempDir := t.TempDir()
@@ -372,15 +503,23 @@ func TestHandleDigitalLinkEvents(t *testing.T) {
 	}
 	var payload struct {
 		Type              []string          `json:"type"`
+		Context           []interface{}     `json:"@context"`
 		ID                string            `json:"id"`
 		ValidFrom         string            `json:"validFrom"`
-		CredentialSubject []UNTPModifyEvent `json:"credentialSubject"`
+		CredentialSubject []UNTPObjectEvent `json:"credentialSubject"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode events credential: %v", err)
 	}
 	if strings.Join(payload.Type, ",") != "DigitalTraceabilityEvent,VerifiableCredential" {
 		t.Fatalf("type = %#v", payload.Type)
+	}
+	if len(payload.Context) != 4 || payload.Context[2] != untpEPCISContext {
+		t.Fatalf("context = %#v, want VCDM + UNTP + EPCIS + extension namespace", payload.Context)
+	}
+	namespace, ok := payload.Context[3].(map[string]interface{})
+	if !ok || namespace["attesta"] != "http://dl.example.com/vocabulary/untp/" {
+		t.Fatalf("inline context = %#v", payload.Context[3])
 	}
 	if payload.ID != "http://dl.example.com"+link+"/events" {
 		t.Fatalf("credential id = %q", payload.ID)
@@ -389,14 +528,15 @@ func TestHandleDigitalLinkEvents(t *testing.T) {
 		t.Fatalf("events = %d, want 1", len(payload.CredentialSubject))
 	}
 	event := payload.CredentialSubject[0]
-	if event.EventDate != "2026-03-05T14:30:00Z" {
-		t.Fatalf("eventDate = %q", event.EventDate)
+	if event.EventTime != "2026-03-05T14:30:00Z" || event.Action != "OBSERVE" {
+		t.Fatalf("event = %#v", event)
 	}
-	if len(event.RelatedParty) != 1 || event.RelatedParty[0].Role != "dep1" || event.RelatedParty[0].Party.Name != "u1" {
-		t.Fatalf("relatedParty = %#v", event.RelatedParty)
+	if len(event.EPCList) != 1 || event.EPCList[0] != "http://dl.example.com"+link {
+		t.Fatalf("epcList = %#v", event.EPCList)
 	}
-	if len(event.ModifiedProduct) != 1 || event.ModifiedProduct[0].Product.BatchNumber != "LOT-001" {
-		t.Fatalf("modifiedProduct = %#v", event.ModifiedProduct)
+	input, ok := event.Substep.Input.(map[string]interface{})
+	if !ok || input["value"] != float64(1) {
+		t.Fatalf("substep input = %#v, want served entered values", event.Substep.Input)
 	}
 }
 

@@ -1,0 +1,67 @@
+{{/* Served at /vocabulary/untp/ — human reference for the Attesta EPCIS user
+extension carried by UNTP Digital Traceability Event credentials. */}}
+{{ define "untp_vocabulary_body" }}
+<div class="stack untp-vocabulary-page u-mx-auto">
+  <section class="page-header">
+    <div class="page-header-head">
+      <div class="page-header-body">
+        <h1>Attesta UNTP extension vocabulary</h1>
+      </div>
+      <div class="untp-vocabulary-intro">
+        <p>
+          UNTP Digital Traceability Event credentials carry GS1 EPCIS 2.0
+          events. EPCIS has no property for the values a workflow substep
+          captures, so each event carries them in an
+          <code>attesta:substep</code> extension bound to this namespace.
+        </p>
+        <dl class="untp-vocabulary-meta">
+          <dt>Namespace</dt>
+          <dd><code>{{ .NamespaceIRI }}</code></dd>
+          <dt>JSON-LD context</dt>
+          <dd>
+            <a href="{{ .ContextURL }}">{{ .ContextURL }}</a>
+            <span class="untp-vocabulary-meta-note"
+              >Accept: application/ld+json</span
+            >
+          </dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+  <hr class="u-divider-10" />
+  <section class="panel">
+    <div class="panel-heading">
+      <h2>Terms</h2>
+    </div>
+    <ul class="untp-vocabulary-list">
+      {{ range .RootTerms }}
+        <li class="untp-vocabulary-term">
+          <code class="untp-vocabulary-term-name">attesta:{{ .Term }}</code>
+          <p class="untp-vocabulary-term-description">{{ .Description }}</p>
+          <span class="untp-vocabulary-term-iri">{{ .IRI }}</span>
+        </li>
+      {{ end }}
+    </ul>
+
+    <hr class="u-divider-10" />
+    <div class="panel-heading">
+      <h2>Properties of <code>attesta:substep</code></h2>
+    </div>
+    <ul class="untp-vocabulary-list">
+      {{ range .SubstepTerms }}
+        <li class="untp-vocabulary-term">
+          <code class="untp-vocabulary-term-name">{{ .Term }}</code>
+          <p class="untp-vocabulary-term-description">{{ .Description }}</p>
+          {{ if .Example }}
+            <span class="untp-vocabulary-term-example"
+              >Example: <code>{{ .Example }}</code></span
+            >
+          {{ end }}
+          <span class="untp-vocabulary-term-iri">{{ .IRI }}</span>
+        </li>
+      {{ end }}
+    </ul>
+  </section>
+</div>
+{{ end }}
+{{ define "untp_vocabulary.html" }} {{ template "layout.html" . }} {{ end }}

@@ -817,7 +817,7 @@ func TestWorkflowCatalogRejectsEnabledDPPWithInvalidGTIN(t *testing.T) {
 
 func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 	tempDir := t.TempDir()
-	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n  productCategory:\n    code: \"41601\"\n    name: \"Gallium, unwrought\"\n  producedAtFacility:\n    id: \"https://example.com/facility/1\"\n    name: \"Refinery\"\n  countryOfProduction:\n    countryCode: \"NL\"\n")
 
 	server := &Server{configDir: tempDir}
 	catalog, err := server.workflowCatalog()
@@ -836,6 +836,44 @@ func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 	}
 	if cfg.DPP.SerialStrategy != "process_id_hex" {
 		t.Fatalf("dpp.serialStrategy = %q, want %q", cfg.DPP.SerialStrategy, "process_id_hex")
+	}
+	if cfg.DPP.ProductCategory == nil || cfg.DPP.ProductCategory.SchemeID != untpCPCSchemeID || cfg.DPP.ProductCategory.SchemeName != untpCPCSchemeName {
+		t.Fatalf("productCategory scheme = %#v, want UN CPC defaults", cfg.DPP.ProductCategory)
+	}
+	if cfg.DPP.ProducedAtFacility == nil || cfg.DPP.CountryOfProduction == nil || cfg.DPP.CountryOfProduction.CountryCode != "NL" {
+		t.Fatalf("subject config = %#v", cfg.DPP)
+	}
+}
+
+// A stream that enables the DPP without subject data must still load: one
+// stream's presentation config must never take down the whole catalog, and the
+// credential builders derive the UNTP-required fields.
+func TestWorkflowCatalogLoadsEnabledDPPWithoutSubjectData(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
+
+	server := &Server{configDir: tempDir}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	cfg, ok := catalog["workflow"]
+	if !ok || !cfg.DPP.Enabled {
+		t.Fatalf("catalog = %#v, want the dpp stream loaded", catalog)
+	}
+	if cfg.DPP.ProductCategory != nil || cfg.DPP.ProducedAtFacility != nil || cfg.DPP.CountryOfProduction != nil {
+		t.Fatalf("subject config = %#v, want left unset", cfg.DPP)
+	}
+}
+
+func TestWorkflowCatalogRejectsIncompleteDPPSubjectBlocks(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n  productCategory:\n    code: \"41601\"\n")
+
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
+	if err == nil || !strings.Contains(err.Error(), "dpp.productCategory needs both code and name") {
+		t.Fatalf("err = %v, want partial productCategory rejected", err)
 	}
 }
 
@@ -900,6 +938,7 @@ func writeWorkflowConfigWithCategories(t *testing.T, path, name, inputType, cate
 		"  - orgSlug: \"org1\"\n" +
 		"    slug: \"dep1\"\n" +
 		"    name: \"Department 1\"\n" +
+		"    untpRole: \"operator\"\n" +
 		"users:\n" +
 		"  - id: \"u1\"\n" +
 		"    name: \"User 1\"\n" +
