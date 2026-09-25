@@ -2,8 +2,8 @@
 <div class="public-home-stream-results" id="public-home-stream-results">
   {{ template "public_home_stream_group" . }}
   {{ if not .Streams }}
-  <div class="public-home-stream-empty">
-    <p>No public streams in this category yet.</p>
+  <div class="empty-state">
+    <p class="empty-state-title">No public streams in this category yet.</p>
     <a class="btn btn-secondary btn-sm" href="{{ .CreateStreamHref }}">
       {{ template "icon-plus" . }} Create a stream
     </a>

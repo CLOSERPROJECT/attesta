@@ -1,118 +1,171 @@
 {{/* Used on /admin/organizations to render platform administration page */}}
 
 {{ define "platform_admin_body" }}
-  <div class="stack u-max-w-7xl u-mx-auto">
-    {{ template "admin_console" (platformAdminConsole .) }}
-  </div>
+  <div class="stack u-max-w-7xl u-mx-auto">{{ template "admin_console" (platformAdminConsole .) }}</div>
 {{ end }}
 
 {{ define "platform_admin_main" }}
   {{ if eq .ActivePanel "categories" }}
     {{ template "platform_admin_categories_panel" . }}
   {{ else }}
-    <div class="panel-head-actions">
-      <div class="panel-heading">
-        <h2>Organizations</h2>
+    <section class="panel-section">
+      {{ if .PendingOrgCreationRequests }}
+        <div class="panel-block">
+          <div class="panel-heading">
+            <h2>Pending organization requests</h2>
+            <p>Review organization creation requests from unaffiliated users</p>
+          </div>
+          <ul class="list-rows">
+            {{ range .PendingOrgCreationRequests }}
+              <li class="list-row">
+                <div class="list-row-main list-row-main-stack">
+                  <p class="platform-admin-item-name">{{ .ProposedName }}</p>
+                  <p class="muted u-text-xs">
+                    {{ .ProposedSlug }}
+                    {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
+                    {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
+                  </p>
+                </div>
+                <div class="list-row-actions">
+                  <form method="post" action="/admin/organizations" class="panel-actions">
+                    <input type="hidden" name="intent" value="approve_org_creation" />
+                    <input type="hidden" name="request_id" value="{{ .ID }}" />
+                    <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                    <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
+                    <button class="btn btn-ghost btn-icon btn-xs"
+                            type="submit"
+                            aria-label="Approve">{{ template "icon-check" . }}</button>
+                  </form>
+                  <button type="button"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
+                          aria-label="Reject"
+                          onclick="document.getElementById('reject-org-creation-{{ .ID }}').showModal()">
+                    {{ template "icon-close" . }}
+                  </button>
+                </div>
+
+                <dialog id="reject-org-creation-{{ .ID }}" class="dialog">
+                  <div class="dialog-card">
+                    <header class="dialog-head">
+                      <div>
+                        <h3 class="dialog-title">Reject organization creation request</h3>
+                        <p class="dialog-subtitle">{{ .ProposedName }}</p>
+                      </div>
+                      <button type="button"
+                              class="btn btn-ghost btn-icon dialog-close"
+                              onclick="document.getElementById('reject-org-creation-{{ .ID }}').close()">
+                        {{ template "icon-close" . }}
+                      </button>
+                    </header>
+                    <form method="post" action="/admin/organizations" class="input-form">
+                      <input type="hidden" name="intent" value="reject_org_creation" />
+                      <input type="hidden" name="request_id" value="{{ .ID }}" />
+                      <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
+                      <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
+                      <div class="form-field">
+                        <label for="reject-reason-{{ .ID }}">Reason (optional)</label>
+                        <input id="reject-reason-{{ .ID }}" name="reason" type="text" />
+                      </div>
+                      <div class="dialog-actions">
+                        <button class="btn btn-danger" type="submit">Reject request</button>
+                      </div>
+                    </form>
+                  </div>
+                </dialog>
+              </li>
+            {{ end }}
+          </ul>
+        </div>
+
+        <hr />
+      {{ end }}
+
+      <div class="panel-block">
+        <div class="panel-head-actions">
+          <div class="panel-heading">
+            <h2>Organizations</h2>
+            <p>Create and manage organizations</p>
+          </div>
+          <button class="btn btn-primary"
+                  type="button"
+                  onclick="document.getElementById('create-org-dialog').showModal()">
+            {{ template "icon-plus" . }}
+            Add organization
+          </button>
+        </div>
+
+        <form method="get"
+              action="/admin/organizations"
+              class="platform-admin-search"
+              id="platform-admin-search">
+          <input type="hidden" name="page" value="1" />
+          <label class="platform-admin-search-field" for="platform-admin-search-input">
+            {{ template "icon-search" . }}
+            <input id="platform-admin-search-input"
+                   type="search"
+                   name="q"
+                   value="{{ .SearchQuery }}"
+                   placeholder="Search organizations by name"
+                   autocomplete="off"
+                   hx-get="/admin/organizations"
+                   hx-target="#platform-admin-results"
+                   hx-select="#platform-admin-results"
+                   hx-swap="outerHTML"
+                   hx-push-url="true"
+                   hx-include="#platform-admin-search"
+                   hx-trigger="input changed delay:200ms, search" />
+          </label>
+        </form>
+
+        {{ template "platform_admin_results" . }}
       </div>
-      <button
-        class="btn btn-primary"
-        type="button"
-        onclick="document.getElementById('create-org-dialog').showModal()"
-      >
-        {{ template "icon-plus" . }}
-        Add organization
-      </button>
-    </div>
+    </section>
 
-    <form
-      method="get"
-      action="/admin/organizations"
-      class="platform-admin-search"
-      id="platform-admin-search"
-    >
-      <input type="hidden" name="page" value="1" />
-      <label
-        class="platform-admin-search-field"
-        for="platform-admin-search-input"
-      >
-        {{ template "icon-search" . }}
-        <input
-          id="platform-admin-search-input"
-          type="search"
-          name="q"
-          value="{{ .SearchQuery }}"
-          placeholder="Search organizations by name"
-          autocomplete="off"
-          hx-get="/admin/organizations"
-          hx-target="#platform-admin-results"
-          hx-select="#platform-admin-results"
-          hx-swap="outerHTML"
-          hx-push-url="true"
-          hx-include="#platform-admin-search"
-          hx-trigger="input changed delay:200ms, search"
-        />
-      </label>
-    </form>
-
-    {{ template "platform_admin_results" . }}
-
-    <dialog id="create-org-dialog" class="dialog">
+    <dialog id="create-org-dialog"
+            class="dialog"
+            {{ dataAutoOpen (.OrganizationDialogAutoOpen "create" "") }}>
       <div class="dialog-card">
         <header class="dialog-head">
           <div>
             <h3 class="dialog-title">New organization</h3>
-            <p class="dialog-subtitle">
-              Add a new organization to the platform
-            </p>
+            <p class="dialog-subtitle">Add a new organization to the platform</p>
           </div>
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon dialog-close"
-            onclick="document.getElementById('create-org-dialog').close()"
-          >
-            {{ template "icon-close" . }}
-          </button>
+          <button type="button"
+                  class="btn btn-ghost btn-icon dialog-close"
+                  onclick="document.getElementById('create-org-dialog').close()">{{ template "icon-close" . }}</button>
         </header>
-        <form
-          method="post"
-          action="/admin/organizations"
-          class="input-form"
-          enctype="multipart/form-data"
-        >
+        <form method="post"
+              action="/admin/organizations"
+              class="input-form"
+              enctype="multipart/form-data">
           <input type="hidden" name="intent" value="create_org" />
           <input type="hidden" name="q" value="{{ .SearchQuery }}" />
           <input type="hidden" name="page" value="{{ .CurrentPage }}" />
           <div class="form-field">
             <label for="org-name">Organization name *</label>
-            <input
-              id="org-name"
-              name="name"
-              type="text"
-              value="{{ if eq .OrganizationDialogAction "create" }}
+            <input id="org-name"
+                   name="name"
+                   type="text"
+                   value="{{ if eq .OrganizationDialogAction "create" }}
                 {{ .OrganizationDialogName }}
               {{ end }}"
-              required
-            />
+                   required />
           </div>
           <div class="form-field">
             <label for="org-logo">Organization logo</label>
-            <input
-              id="org-logo"
-              name="logo"
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
-            />
+            <input id="org-logo"
+                   name="logo"
+                   type="file"
+                   accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
           </div>
           <div class="form-field">
             <label for="org-admin-email">Organization admin email</label>
-            <input
-              id="org-admin-email"
-              name="invite_email"
-              type="email"
-              value="{{ if eq .OrganizationDialogAction "create" }}
+            <input id="org-admin-email"
+                   name="invite_email"
+                   type="email"
+                   value="{{ if eq .OrganizationDialogAction "create" }}
                 {{ .InviteDialogEmail }}
-              {{ end }}"
-            />
+              {{ end }}" />
             <small class="muted">
               Invite the first org admin now, or add more org admins later from
               the organization invite action.
@@ -127,15 +180,6 @@
         </form>
       </div>
     </dialog>
-
-    <script>
-      (function () {
-        const createDialog = document.getElementById("create-org-dialog");
-        if (createDialog && {{ if and .OrganizationError (eq .OrganizationDialogAction "create") }}true{{ else }}false{{ end }} && !createDialog.open) {
-          createDialog.showModal();
-        }
-      })();
-    </script>
   {{ end }}
 {{ end }}
 
@@ -146,13 +190,11 @@
         <h2>Categories</h2>
         <p>Manage stream discovery taxonomy</p>
       </div>
-      <button
-        class="btn btn-primary"
-        type="button"
-        hx-get="/admin/categories?new=group"
-        hx-target="#platform-admin-categories"
-        hx-swap="outerHTML"
-      >
+      <button class="btn btn-primary"
+              type="button"
+              hx-get="/admin/categories?new=group"
+              hx-target="#platform-admin-categories"
+              hx-swap="outerHTML">
         {{ template "icon-plus" . }}
         Add category
       </button>
@@ -173,10 +215,8 @@
     {{ if .CategoriesEditor.Categories }}
       <ul class="platform-admin-taxonomy-list">
         {{ range $category := .CategoriesEditor.Categories }}
-          <li
-            class="platform-admin-taxonomy-category"
-            style="view-transition-name: taxonomy-group-{{ $category.Slug }}"
-          >
+          <li class="platform-admin-taxonomy-category"
+              style="view-transition-name: taxonomy-group-{{ $category.Slug }}">
             {{ if and $.CategoriesEditor.Form.Open (eq $.CategoriesEditor.Form.Mode "edit") (eq $.CategoriesEditor.Form.Level "group") (eq $.CategoriesEditor.Form.Slug $category.Slug) }}
               <div class="platform-admin-taxonomy-category-head">
                 {{ template "platform_admin_categories_form" $.CategoriesEditor }}
@@ -185,17 +225,14 @@
             {{ else }}
               <details class="platform-admin-taxonomy-category-details" open>
                 <summary class="platform-admin-taxonomy-category-head">
-                  <span class="platform-admin-taxonomy-category-chevron" aria-hidden="true">
-                    {{ template "icon-chevron-right" $ }}
-                  </span>
+                  <span class="platform-admin-taxonomy-category-chevron"
+                        aria-hidden="true">{{ template "icon-chevron-right" $ }}</span>
                   <div class="platform-admin-taxonomy-row">
                     {{ if $category.IconURL }}
                       <span class="platform-admin-taxonomy-icon-well platform-admin-taxonomy-icon-well--group">
-                        <img
-                          src="{{ $category.IconURL }}"
-                          alt=""
-                          class="platform-admin-taxonomy-icon"
-                        />
+                        <img src="{{ $category.IconURL }}"
+                             alt=""
+                             class="platform-admin-taxonomy-icon" />
                       </span>
                     {{ end }}
                     <div class="platform-admin-taxonomy-meta">
@@ -203,91 +240,69 @@
                     </div>
                     <div class="platform-admin-taxonomy-actions">
                       <div class="platform-admin-taxonomy-action-group">
-                        <button
-                          class="btn btn-ghost btn-icon btn-xs"
-                          type="button"
-                          aria-label="Add subcategory"
-                          hx-get="/admin/categories?new=sub&amp;parent={{ $category.Slug | urlquery }}"
-                          hx-target="#platform-admin-categories"
-                          hx-swap="outerHTML"
-                        >
-                          {{ template "icon-plus" $ }}
-                        </button>
+                        <button class="btn btn-ghost btn-icon btn-xs"
+                                type="button"
+                                aria-label="Add subcategory"
+                                hx-get="/admin/categories?new=sub&amp;parent={{ $category.Slug | urlquery }}"
+                                hx-target="#platform-admin-categories"
+                                hx-swap="outerHTML">{{ template "icon-plus" $ }}</button>
                       </div>
                       <div class="platform-admin-taxonomy-action-group">
                         <div class="platform-admin-taxonomy-reorder">
-                          <form
-                            class="platform-admin-taxonomy-reorder-form"
-                            hx-post="/admin/categories"
-                            hx-target="#platform-admin-categories"
-                            hx-swap="outerHTML transition:true"
-                            hx-sync="#platform-admin-categories:queue all"
-                            hx-disabled-elt=".platform-admin-taxonomy-reorder"
-                          >
+                          <form class="platform-admin-taxonomy-reorder-form"
+                                hx-post="/admin/categories"
+                                hx-target="#platform-admin-categories"
+                                hx-swap="outerHTML transition:true"
+                                hx-sync="#platform-admin-categories:queue all"
+                                hx-disabled-elt=".platform-admin-taxonomy-reorder">
                             <input type="hidden" name="intent" value="reorder" />
                             <input type="hidden" name="slug" value="{{ $category.Slug }}" />
                             <input type="hidden" name="direction" value="up" />
-                            <button
-                              class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-up"
-                              type="submit"
-                              aria-label="Move category up"
-                              {{ if not $category.CanMoveUp }}disabled{{ end }}
-                            >
+                            <button class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-up"
+                                    type="submit"
+                                    aria-label="Move category up"
+                                    {{ if not $category.CanMoveUp }}disabled{{ end }}>
                               {{ template "icon-arrow-up" $ }}
                             </button>
                           </form>
-                          <form
-                            class="platform-admin-taxonomy-reorder-form"
-                            hx-post="/admin/categories"
-                            hx-target="#platform-admin-categories"
-                            hx-swap="outerHTML transition:true"
-                            hx-sync="#platform-admin-categories:queue all"
-                            hx-disabled-elt=".platform-admin-taxonomy-reorder"
-                          >
+                          <form class="platform-admin-taxonomy-reorder-form"
+                                hx-post="/admin/categories"
+                                hx-target="#platform-admin-categories"
+                                hx-swap="outerHTML transition:true"
+                                hx-sync="#platform-admin-categories:queue all"
+                                hx-disabled-elt=".platform-admin-taxonomy-reorder">
                             <input type="hidden" name="intent" value="reorder" />
                             <input type="hidden" name="slug" value="{{ $category.Slug }}" />
                             <input type="hidden" name="direction" value="down" />
-                            <button
-                              class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-down"
-                              type="submit"
-                              aria-label="Move category down"
-                              {{ if not $category.CanMoveDown }}disabled{{ end }}
-                            >
+                            <button class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-down"
+                                    type="submit"
+                                    aria-label="Move category down"
+                                    {{ if not $category.CanMoveDown }}disabled{{ end }}>
                               {{ template "icon-arrow-down" $ }}
                             </button>
                           </form>
                         </div>
                       </div>
                       <div class="platform-admin-taxonomy-action-group">
-                        <button
-                          class="btn btn-ghost btn-icon btn-xs"
-                          type="button"
-                          aria-label="Edit category"
-                          hx-get="/admin/categories?edit=group&amp;slug={{ $category.Slug | urlquery }}"
-                          hx-target="#platform-admin-categories"
-                          hx-swap="outerHTML"
-                        >
-                          {{ template "icon-pencil" $ }}
-                        </button>
+                        <button class="btn btn-ghost btn-icon btn-xs"
+                                type="button"
+                                aria-label="Edit category"
+                                hx-get="/admin/categories?edit=group&amp;slug={{ $category.Slug | urlquery }}"
+                                hx-target="#platform-admin-categories"
+                                hx-swap="outerHTML">{{ template "icon-pencil" $ }}</button>
                         {{ if $category.CanDelete }}
-                          <button
-                            class="btn btn-ghost-danger btn-icon btn-xs"
-                            type="button"
-                            aria-label="Delete category"
-                            onclick="document.getElementById('delete-group-{{ $category.Slug }}').showModal()"
-                          >
+                          <button class="btn btn-ghost-danger btn-icon btn-xs"
+                                  type="button"
+                                  aria-label="Delete category"
+                                  onclick="document.getElementById('delete-group-{{ $category.Slug }}').showModal()">
                             {{ template "icon-trash" $ }}
                           </button>
                         {{ else }}
-                          <button
-                            class="btn btn-ghost-danger btn-icon btn-xs"
-                            type="button"
-                            aria-label="Delete category"
-                            disabled
-                            title="{{ $category.DeleteReason }}"
-                          >
-                            {{ template "icon-trash" $ }}
-                          </button>
+                          <button class="btn btn-ghost-danger btn-icon btn-xs"
+                                  type="button"
+                                  aria-label="Delete category"
+                                  disabled
+                                  title="{{ $category.DeleteReason }}">{{ template "icon-trash" $ }}</button>
                         {{ end }}
                       </div>
                     </div>
@@ -303,26 +318,20 @@
                         <h3 class="dialog-title u-text-danger">Delete category</h3>
                         <p class="dialog-subtitle">{{ $category.Name }}</p>
                       </div>
-                      <button
-                        type="button"
-                        class="btn btn-ghost btn-icon dialog-close"
-                        onclick="document.getElementById('delete-group-{{ $category.Slug }}').close()"
-                      >
+                      <button type="button"
+                              class="btn btn-ghost btn-icon dialog-close"
+                              onclick="document.getElementById('delete-group-{{ $category.Slug }}').close()">
                         {{ template "icon-close" $ }}
                       </button>
                     </header>
-                    <p class="u-m-0 u-mb-5">
-                      This will permanently remove the category. Confirm only if you want to continue.
-                    </p>
-                    <form
-                      method="post"
-                      action="/admin/categories"
-                      class="input-form"
-                      hx-post="/admin/categories"
-                      hx-target="#platform-admin-categories"
-                      hx-swap="outerHTML"
-                      hx-sync="#platform-admin-categories:queue all"
-                    >
+                    <p class="u-m-0 u-mb-5">This will permanently remove the category. Confirm only if you want to continue.</p>
+                    <form method="post"
+                          action="/admin/categories"
+                          class="input-form"
+                          hx-post="/admin/categories"
+                          hx-target="#platform-admin-categories"
+                          hx-swap="outerHTML"
+                          hx-sync="#platform-admin-categories:queue all">
                       <input type="hidden" name="intent" value="delete" />
                       <input type="hidden" name="slug" value="{{ $category.Slug }}" />
                       <div class="dialog-actions">
@@ -337,7 +346,9 @@
         {{ end }}
       </ul>
     {{ else }}
-      <p class="muted platform-admin-taxonomy-empty">No categories yet</p>
+      <div class="empty-state">
+        <p class="empty-state-title">No categories yet</p>
+      </div>
     {{ end }}
 
     {{ if and .CategoriesEditor.Form.Open (eq .CategoriesEditor.Form.Mode "create") (eq .CategoriesEditor.Form.Level "group") }}
@@ -352,10 +363,8 @@
   {{ if $category.SubCategories }}
     <ul class="platform-admin-taxonomy-sub-list">
       {{ range $category.SubCategories }}
-        <li
-          class="platform-admin-taxonomy-sub"
-          style="view-transition-name: taxonomy-leaf-{{ $category.Slug }}-{{ .Slug }}"
-        >
+        <li class="platform-admin-taxonomy-sub"
+            style="view-transition-name: taxonomy-leaf-{{ $category.Slug }}-{{ .Slug }}">
           {{ if and $editor.Form.Open (eq $editor.Form.Mode "edit") (eq $editor.Form.Level "leaf") (eq $editor.Form.ParentSlug $category.Slug) (eq $editor.Form.Slug .Slug) }}
             {{ template "platform_admin_categories_form" $editor }}
           {{ else }}
@@ -363,11 +372,9 @@
               <div class="platform-admin-taxonomy-row">
                 {{ if .IconURL }}
                   <span class="platform-admin-taxonomy-icon-well platform-admin-taxonomy-icon-well--leaf">
-                    <img
-                      src="{{ .IconURL }}"
-                      alt=""
-                      class="platform-admin-taxonomy-icon platform-admin-taxonomy-icon--leaf"
-                    />
+                    <img src="{{ .IconURL }}"
+                         alt=""
+                         class="platform-admin-taxonomy-icon platform-admin-taxonomy-icon--leaf" />
                   </span>
                 {{ end }}
                 <div class="platform-admin-taxonomy-meta">
@@ -379,65 +386,47 @@
               {{ end }}
               <div class="platform-admin-taxonomy-sub-footer">
                 <div class="platform-admin-taxonomy-reorder">
-                  <form
-                    class="platform-admin-taxonomy-reorder-form"
-                    hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
-                    hx-target="#platform-admin-categories"
-                    hx-swap="outerHTML transition:true"
-                    hx-sync="#platform-admin-categories:queue all"
-                    hx-disabled-elt=".platform-admin-taxonomy-reorder"
-                  >
+                  <form class="platform-admin-taxonomy-reorder-form"
+                        hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
+                        hx-target="#platform-admin-categories"
+                        hx-swap="outerHTML transition:true"
+                        hx-sync="#platform-admin-categories:queue all"
+                        hx-disabled-elt=".platform-admin-taxonomy-reorder">
                     <input type="hidden" name="intent" value="reorder" />
                     <input type="hidden" name="slug" value="{{ .Slug }}" />
                     <input type="hidden" name="direction" value="up" />
-                    <button
-                      class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-up"
-                      type="submit"
-                      aria-label="Move subcategory up"
-                      {{ if not .CanMoveUp }}disabled{{ end }}
-                    >
-                      {{ template "icon-arrow-up" $ }}
-                    </button>
+                    <button class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-up"
+                            type="submit"
+                            aria-label="Move subcategory up"
+                            {{ if not .CanMoveUp }}disabled{{ end }}>{{ template "icon-arrow-up" $ }}</button>
                   </form>
-                  <form
-                    class="platform-admin-taxonomy-reorder-form"
-                    hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
-                    hx-target="#platform-admin-categories"
-                    hx-swap="outerHTML transition:true"
-                    hx-sync="#platform-admin-categories:queue all"
-                    hx-disabled-elt=".platform-admin-taxonomy-reorder"
-                  >
+                  <form class="platform-admin-taxonomy-reorder-form"
+                        hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
+                        hx-target="#platform-admin-categories"
+                        hx-swap="outerHTML transition:true"
+                        hx-sync="#platform-admin-categories:queue all"
+                        hx-disabled-elt=".platform-admin-taxonomy-reorder">
                     <input type="hidden" name="intent" value="reorder" />
                     <input type="hidden" name="slug" value="{{ .Slug }}" />
                     <input type="hidden" name="direction" value="down" />
-                    <button
-                      class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-down"
-                      type="submit"
-                      aria-label="Move subcategory down"
-                      {{ if not .CanMoveDown }}disabled{{ end }}
-                    >
-                      {{ template "icon-arrow-down" $ }}
-                    </button>
+                    <button class="btn btn-ghost btn-icon btn-xs platform-admin-taxonomy-reorder-down"
+                            type="submit"
+                            aria-label="Move subcategory down"
+                            {{ if not .CanMoveDown }}disabled{{ end }}>{{ template "icon-arrow-down" $ }}</button>
                   </form>
                 </div>
                 <div class="platform-admin-taxonomy-sub-primary-actions">
-                  <button
-                    class="btn btn-ghost btn-icon btn-xs"
-                    type="button"
-                    aria-label="Edit subcategory"
-                    hx-get="/admin/categories?edit=sub&amp;parent={{ $category.Slug | urlquery }}&amp;slug={{ .Slug | urlquery }}"
-                    hx-target="#platform-admin-categories"
-                    hx-swap="outerHTML"
-                  >
-                    {{ template "icon-pencil" $ }}
-                  </button>
+                  <button class="btn btn-ghost btn-icon btn-xs"
+                          type="button"
+                          aria-label="Edit subcategory"
+                          hx-get="/admin/categories?edit=sub&amp;parent={{ $category.Slug | urlquery }}&amp;slug={{ .Slug | urlquery }}"
+                          hx-target="#platform-admin-categories"
+                          hx-swap="outerHTML">{{ template "icon-pencil" $ }}</button>
                   {{ if .CanDelete }}
-                    <button
-                      class="btn btn-ghost-danger btn-icon btn-xs"
-                      type="button"
-                      aria-label="Delete subcategory"
-                      onclick="document.getElementById('delete-sub-{{ $category.Slug }}-{{ .Slug }}').showModal()"
-                    >
+                    <button class="btn btn-ghost-danger btn-icon btn-xs"
+                            type="button"
+                            aria-label="Delete subcategory"
+                            onclick="document.getElementById('delete-sub-{{ $category.Slug }}-{{ .Slug }}').showModal()">
                       {{ template "icon-trash" $ }}
                     </button>
                     <dialog id="delete-sub-{{ $category.Slug }}-{{ .Slug }}" class="dialog">
@@ -447,26 +436,20 @@
                             <h3 class="dialog-title u-text-danger">Delete subcategory</h3>
                             <p class="dialog-subtitle">{{ .Name }}</p>
                           </div>
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-icon dialog-close"
-                            onclick="document.getElementById('delete-sub-{{ $category.Slug }}-{{ .Slug }}').close()"
-                          >
+                          <button type="button"
+                                  class="btn btn-ghost btn-icon dialog-close"
+                                  onclick="document.getElementById('delete-sub-{{ $category.Slug }}-{{ .Slug }}').close()">
                             {{ template "icon-close" $ }}
                           </button>
                         </header>
-                        <p class="u-m-0 u-mb-5">
-                          This will permanently remove the subcategory. Confirm only if you want to continue.
-                        </p>
-                        <form
-                          method="post"
-                          action="/admin/categories/{{ $category.Slug }}/subcategories"
-                          class="input-form"
-                          hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
-                          hx-target="#platform-admin-categories"
-                          hx-swap="outerHTML"
-                          hx-sync="#platform-admin-categories:queue all"
-                        >
+                        <p class="u-m-0 u-mb-5">This will permanently remove the subcategory. Confirm only if you want to continue.</p>
+                        <form method="post"
+                              action="/admin/categories/{{ $category.Slug }}/subcategories"
+                              class="input-form"
+                              hx-post="/admin/categories/{{ $category.Slug }}/subcategories"
+                              hx-target="#platform-admin-categories"
+                              hx-swap="outerHTML"
+                              hx-sync="#platform-admin-categories:queue all">
                           <input type="hidden" name="intent" value="delete" />
                           <input type="hidden" name="slug" value="{{ .Slug }}" />
                           <div class="dialog-actions">
@@ -476,15 +459,11 @@
                       </div>
                     </dialog>
                   {{ else }}
-                    <button
-                      class="btn btn-ghost-danger btn-icon btn-xs"
-                      type="button"
-                      aria-label="Delete subcategory"
-                      disabled
-                      title="{{ .DeleteReason }}"
-                    >
-                      {{ template "icon-trash" $ }}
-                    </button>
+                    <button class="btn btn-ghost-danger btn-icon btn-xs"
+                            type="button"
+                            aria-label="Delete subcategory"
+                            disabled
+                            title="{{ .DeleteReason }}">{{ template "icon-trash" $ }}</button>
                   {{ end }}
                 </div>
               </div>
@@ -502,129 +481,106 @@
 {{ end }}
 
 {{ define "platform_admin_categories_form" }}
-  <form
-    method="post"
-    action="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
-    class="input-form platform-admin-categories-form"
-    {{ if eq .Form.Mode "create" }}id="categories-editor-form"{{ end }}
-    hx-post="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
-    hx-target="#platform-admin-categories"
-    hx-swap="outerHTML"
-  >
-    <input
-      type="hidden"
-      name="intent"
-      value="{{ if eq .Form.Mode "create" }}create{{ else }}update{{ end }}"
-    />
-    {{ if and (eq .Form.Mode "edit") (eq .Form.Level "group") }}
+<form method="post"
+      action="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
+      class="input-form platform-admin-categories-form"
+      {{ if eq .Form.Mode "create" }}id="categories-editor-form"
+      {{ end }}
+      hx-post="{{ if eq .Form.Level "leaf" }}/admin/categories/{{ .Form.ParentSlug }}/subcategories{{ else }}/admin/categories{{ end }}"
+      hx-target="#platform-admin-categories"
+      hx-swap="outerHTML">
+  <input type="hidden"
+         name="intent"
+         value="{{ if eq .Form.Mode "create" }}create{{ else }}update{{ end }}" />
+  {{ if and (eq .Form.Mode "edit") (eq .Form.Level "group") }}
+    <input type="hidden" name="slug" value="{{ .Form.Slug }}" />
+  {{ end }}
+  {{ if eq .Form.Level "leaf" }}
+    <input type="hidden" name="parent" value="{{ .Form.ParentSlug }}" />
+    {{ if eq .Form.Mode "edit" }}
       <input type="hidden" name="slug" value="{{ .Form.Slug }}" />
     {{ end }}
+  {{ end }}
+  <h3 class="platform-admin-categories-form-title">
     {{ if eq .Form.Level "leaf" }}
-      <input type="hidden" name="parent" value="{{ .Form.ParentSlug }}" />
-      {{ if eq .Form.Mode "edit" }}
-        <input type="hidden" name="slug" value="{{ .Form.Slug }}" />
-      {{ end }}
+      {{ if eq .Form.Mode "create" }}New subcategory{{ else }}Edit subcategory{{ end }}
+    {{ else }}
+      {{ if eq .Form.Mode "create" }}New category{{ else }}Edit category{{ end }}
     {{ end }}
-    <h3 class="platform-admin-categories-form-title">
-      {{ if eq .Form.Level "leaf" }}
-        {{ if eq .Form.Mode "create" }}New subcategory{{ else }}Edit subcategory{{ end }}
-      {{ else }}
-        {{ if eq .Form.Mode "create" }}New category{{ else }}Edit category{{ end }}
-      {{ end }}
-    </h3>
+  </h3>
+  <div class="form-field">
+    <label for="categories-editor-name">Name</label>
+    <input id="categories-editor-name"
+           name="name"
+           type="text"
+           value="{{ .Form.Name }}"
+           required />
+  </div>
+  {{ if eq .Form.Level "leaf" }}
     <div class="form-field">
-      <label for="categories-editor-name">Name</label>
-      <input
-        id="categories-editor-name"
-        name="name"
-        type="text"
-        value="{{ .Form.Name }}"
-        required
-      />
+      <label for="categories-editor-description">Description</label>
+      <textarea id="categories-editor-description" name="description" rows="4">{{ .Form.Description }}</textarea>
     </div>
-    {{ if eq .Form.Level "leaf" }}
-      <div class="form-field">
-        <label for="categories-editor-description">Description</label>
-        <textarea
-          id="categories-editor-description"
-          name="description"
-          rows="4"
-        >{{ .Form.Description }}</textarea>
-      </div>
-    {{ end }}
-    <div class="form-field">
-      <label for="categories-editor-icon-toggle">Icon</label>
-      <div
-        class="platform-admin-taxonomy-icon-picker{{ if .Form.Icon }} is-selected{{ end }}"
-        data-taxonomy-icon-picker
-      >
-        <input type="hidden" name="icon" value="{{ .Form.Icon }}" />
-        <button
-          type="button"
-          id="categories-editor-icon-toggle"
-          class="platform-admin-taxonomy-icon-picker-toggle"
-          data-taxonomy-icon-picker-toggle
-          aria-label="Choose icon"
-          aria-expanded="false"
-        >
-          {{ if .Form.Icon }}
-            <img
-              src="/static/taxonomy/{{ .Form.Icon }}.svg"
-              alt=""
-              class="platform-admin-taxonomy-icon-picker-preview"
-              data-taxonomy-icon-preview
-            />
-          {{ else }}
-            <span class="muted">Choose icon</span>
-          {{ end }}
-        </button>
-        <div class="platform-admin-taxonomy-icon-grid" hidden>
-          {{ range .IconKeys }}
-            <button
-              type="button"
-              class="platform-admin-taxonomy-icon-option{{ if eq $.Form.Icon . }} is-selected{{ end }}"
-              data-taxonomy-icon-option="{{ . }}"
-              aria-label="{{ . }}"
-            >
-              <img src="/static/taxonomy/{{ . }}.svg" alt="" />
-            </button>
-          {{ end }}
-        </div>
-      </div>
-    </div>
-    {{ if .Form.Error }}
-      <p class="error">{{ .Form.Error }}</p>
-    {{ end }}
-    <div class="dialog-actions">
-      <button
-        class="btn btn-secondary"
-        type="button"
-        hx-get="/admin/categories"
-        hx-target="#platform-admin-categories"
-        hx-swap="outerHTML"
-      >
-        {{ template "icon-close" $ }}
-        Cancel
-      </button>
-      <button class="btn btn-primary" type="submit">
-        {{ if eq .Form.Mode "create" }}
-          {{ template "icon-plus" $ }}
-          Create
+  {{ end }}
+  <div class="form-field">
+    <label for="categories-editor-icon-toggle">Icon</label>
+    <div class="platform-admin-taxonomy-icon-picker{{ if .Form.Icon }} is-selected{{ end }}"
+         data-taxonomy-icon-picker>
+      <input type="hidden" name="icon" value="{{ .Form.Icon }}" />
+      <button type="button"
+              id="categories-editor-icon-toggle"
+              class="platform-admin-taxonomy-icon-picker-toggle"
+              data-taxonomy-icon-picker-toggle
+              aria-label="Choose icon"
+              aria-expanded="false">
+        {{ if .Form.Icon }}
+          <img src="/static/taxonomy/{{ .Form.Icon }}.svg"
+               alt=""
+               class="platform-admin-taxonomy-icon-picker-preview"
+               data-taxonomy-icon-preview />
         {{ else }}
-          {{ template "icon-pencil" $ }}
-          Save
+          <span class="muted">Choose icon</span>
         {{ end }}
       </button>
+      <div class="platform-admin-taxonomy-icon-grid" hidden>
+        {{ range .IconKeys }}
+          <button type="button"
+                  class="platform-admin-taxonomy-icon-option{{ if eq $.Form.Icon . }} is-selected{{ end }}"
+                  data-taxonomy-icon-option="{{ . }}"
+                  aria-label="{{ . }}">
+            <img src="/static/taxonomy/{{ . }}.svg" alt="" />
+          </button>
+        {{ end }}
+      </div>
     </div>
+  </div>
+  {{ if .Form.Error }}
+    <p class="error">{{ .Form.Error }}</p>
+  {{ end }}
+  <div class="dialog-actions">
+    <button class="btn btn-secondary"
+            type="button"
+            hx-get="/admin/categories"
+            hx-target="#platform-admin-categories"
+            hx-swap="outerHTML">
+      {{ template "icon-close" $ }}
+      Cancel
+    </button>
+    <button class="btn btn-primary" type="submit">
+      {{ if eq .Form.Mode "create" }}
+        {{ template "icon-plus" $ }}
+        Create
+      {{ else }}
+        {{ template "icon-pencil" $ }}
+        Save
+      {{ end }}
+    </button>
+  </div>
   </form>
 {{ end }}
 
 {{ define "platform_admin_results" }}
   <div id="platform-admin-results">
-    <p class="muted">
-      {{ .MatchedOrganizations }}
-      organization{{ if ne .MatchedOrganizations 1 }}s{{ end }} found.
-    </p>
     {{ if and .Error (eq .OrganizationDialogAction "") }}
       <p class="error">{{ .Error }}</p>
     {{ end }}
@@ -634,67 +590,52 @@
           <li class="list-row">
             <div class="list-row-main">
               {{ if .LogoAttachmentID }}
-                <img
-                  src="/admin/organizations/logo/{{ .LogoAttachmentID }}"
-                  alt="{{ .Name }} logo"
-                  class="org-profile-logo org-profile-logo-sm"
-                />
+                <img src="/admin/organizations/logo/{{ .LogoAttachmentID }}"
+                     alt="{{ .Name }} logo"
+                     class="org-profile-logo org-profile-logo-sm" />
               {{ else }}
-                <span
-                  class="org-profile-logo-placeholder org-profile-logo-placeholder-sm"
-                >
-                  {{ template "icon-no-org" . }}
-                </span>
+                <span class="org-profile-logo-placeholder org-profile-logo-placeholder-sm">{{ template "icon-no-org" . }}</span>
               {{ end }}
               <div class="platform-admin-item-copy">
                 <p class="platform-admin-item-name">{{ .Name }}</p>
-                <p
-                  class="platform-admin-item-status platform-admin-item-status-{{ .OrgAdminStatusClassName }}"
-                >
+                <p class="platform-admin-item-status platform-admin-item-status-{{ .OrgAdminStatusClassName }}">
                   {{ .OrgAdminStatus }}
                 </p>
               </div>
             </div>
             <div class="list-row-actions">
-              <button
-                type="button"
-                class="platform-admin-invite-button"
-                onclick="document.getElementById('invite-org-{{ .Slug }}').showModal()"
-              >
+              <button type="button"
+                      class="btn btn-ghost btn-icon btn-xs platform-admin-invite-button"
+                      aria-label="Invite organization admin"
+                      onclick="document.getElementById('invite-org-{{ .Slug }}').showModal()">
                 {{ template "icon-invite-org-admin" . }}
               </button>
-              <button
-                type="button"
-                class="btn btn-ghost btn-icon btn-xs"
-                aria-label="Edit organization"
-                onclick="document.getElementById('edit-org-{{ .Slug }}').showModal()"
-              >
+              <button type="button"
+                      class="btn btn-ghost btn-icon btn-xs"
+                      aria-label="Edit organization"
+                      onclick="document.getElementById('edit-org-{{ .Slug }}').showModal()">
                 {{ template "icon-settings" . }}
               </button>
-              <button
-                type="button"
-                class="btn btn-ghost-danger btn-icon btn-xs"
-                aria-label="Delete organization"
-                onclick="document.getElementById('delete-org-{{ .Slug }}').showModal()"
-              >
+              <button type="button"
+                      class="btn btn-ghost-danger btn-icon btn-xs"
+                      aria-label="Delete organization"
+                      onclick="document.getElementById('delete-org-{{ .Slug }}').showModal()">
                 {{ template "icon-trash" . }}
               </button>
             </div>
 
-            <dialog id="invite-org-{{ .Slug }}" class="dialog">
+            <dialog id="invite-org-{{ .Slug }}"
+                    class="dialog"
+                    {{ dataAutoOpen ($.OrganizationDialogAutoOpen "invite" .Slug) }}>
               <div class="dialog-card">
                 <header class="dialog-head">
                   <div>
-                    <h3 class="dialog-title">
-                      Invite organization admin
-                    </h3>
+                    <h3 class="dialog-title">Invite organization admin</h3>
                     <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-icon dialog-close"
-                    onclick="document.getElementById('invite-org-{{ .Slug }}').close()"
-                  >
+                  <button type="button"
+                          class="btn btn-ghost btn-icon dialog-close"
+                          onclick="document.getElementById('invite-org-{{ .Slug }}').close()">
                     {{ template "icon-close" . }}
                   </button>
                 </header>
@@ -702,40 +643,28 @@
                   <input type="hidden" name="intent" value="invite_org_admin" />
                   <input type="hidden" name="org_slug" value="{{ .Slug }}" />
                   <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
-                  <input
-                    type="hidden"
-                    name="page"
-                    value="{{ $.CurrentPage }}"
-                  />
+                  <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
                   <div class="form-field">
-                    <label for="invite-email-{{ .Slug }}"
-                      >Org admin email</label
-                    >
-                    <input
-                      id="invite-email-{{ .Slug }}"
-                      name="email"
-                      type="email"
-                      value="{{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) }}
+                    <label for="invite-email-{{ .Slug }}">Org admin email</label>
+                    <input id="invite-email-{{ .Slug }}"
+                           name="email"
+                           type="email"
+                           value="{{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) }}
                         {{ $.InviteDialogEmail }}
                       {{ end }}"
-                      required
-                    />
+                           required />
                   </div>
                   {{ if and (eq $.OrganizationDialogAction "invite") (eq $.OrganizationDialogSlug .Slug) $.InviteError }}
                     <p class="error">{{ $.InviteError }}</p>
                   {{ end }}
                   <div class="dialog-actions">
-                    <button class="btn btn-primary" type="submit">
-                      Create org admin invite
-                    </button>
+                    <button class="btn btn-primary" type="submit">Create org admin invite</button>
                   </div>
                 </form>
                 <hr class="u-divider-5" />
                 <div class="platform-admin-admin-summary">
                   <div>
-                    <h4 class="muted">
-                      Current org admins
-                    </h4>
+                    <h4 class="muted">Current org admins</h4>
                     {{ if .OrgAdminEmails }}
                       <ul class="platform-admin-admin-list">
                         {{ range .OrgAdminEmails }}
@@ -743,15 +672,13 @@
                         {{ end }}
                       </ul>
                     {{ else }}
-                      <p class="muted platform-admin-empty-note">
-                        No accepted org admins yet
-                      </p>
+                      <div class="empty-state">
+                        <p class="empty-state-title">No accepted org admins yet</p>
+                      </div>
                     {{ end }}
                   </div>
                   <div>
-                    <h4 class="muted">
-                      Pending invites
-                    </h4>
+                    <h4 class="muted">Pending invites</h4>
                     {{ if .PendingOrgAdminEmails }}
                       <ul class="platform-admin-admin-list">
                         {{ range .PendingOrgAdminEmails }}
@@ -759,97 +686,79 @@
                         {{ end }}
                       </ul>
                     {{ else }}
-                      <p class="muted platform-admin-empty-note">
-                        No pending org admin invites
-                      </p>
+                      <div class="empty-state">
+                        <p class="empty-state-title">No pending org admin invites</p>
+                      </div>
                     {{ end }}
                   </div>
                 </div>
               </div>
             </dialog>
 
-            <dialog id="edit-org-{{ .Slug }}" class="dialog">
+            <dialog id="edit-org-{{ .Slug }}"
+                    class="dialog"
+                    {{ dataAutoOpen ($.OrganizationDialogAutoOpen "edit" .Slug) }}>
               <div class="dialog-card">
                 <header class="dialog-head">
                   <div>
                     <h3 class="dialog-title">Edit organization</h3>
                     <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-icon dialog-close"
-                    onclick="document.getElementById('edit-org-{{ .Slug }}').close()"
-                  >
+                  <button type="button"
+                          class="btn btn-ghost btn-icon dialog-close"
+                          onclick="document.getElementById('edit-org-{{ .Slug }}').close()">
                     {{ template "icon-close" . }}
                   </button>
                 </header>
-                <form
-                  method="post"
-                  action="/admin/organizations"
-                  class="input-form"
-                  enctype="multipart/form-data"
-                >
+                <form method="post"
+                      action="/admin/organizations"
+                      class="input-form"
+                      enctype="multipart/form-data">
                   <input type="hidden" name="intent" value="set_org" />
                   <input type="hidden" name="org_slug" value="{{ .Slug }}" />
                   <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
-                  <input
-                    type="hidden"
-                    name="page"
-                    value="{{ $.CurrentPage }}"
-                  />
+                  <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
                   <div class="form-field">
-                    <label for="edit-org-name-{{ .Slug }}"
-                      >Organization name</label
-                    >
-                    <input
-                      id="edit-org-name-{{ .Slug }}"
-                      name="name"
-                      type="text"
-                      {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationDialogName }}
-                        value="{{ $.OrganizationDialogName }}"
-                      {{ else }}
-                        value="{{ .Name }}"
-                      {{ end }}
-                      required
-                    />
+                    <label for="edit-org-name-{{ .Slug }}">Organization name</label>
+                    <input id="edit-org-name-{{ .Slug }}"
+                           name="name"
+                           type="text"
+                           {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationDialogName }}
+                           value="{{ $.OrganizationDialogName }}"
+                           {{ else }}
+                           value="{{ .Name }}"
+                           {{ end }}
+                           required />
                   </div>
                   <div class="form-field">
-                    <label for="edit-org-logo-{{ .Slug }}"
-                      >Organization logo</label
-                    >
-                    <input
-                      id="edit-org-logo-{{ .Slug }}"
-                      name="logo"
-                      type="file"
-                      accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
-                    />
+                    <label for="edit-org-logo-{{ .Slug }}">Organization logo</label>
+                    <input id="edit-org-logo-{{ .Slug }}"
+                           name="logo"
+                           type="file"
+                           accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" />
                   </div>
                   {{ if and (eq $.OrganizationDialogAction "edit") (eq $.OrganizationDialogSlug .Slug) $.OrganizationError }}
                     <p class="error">{{ $.OrganizationError }}</p>
                   {{ end }}
                   <div class="dialog-actions">
-                    <button class="btn btn-primary" type="submit">
-                      Update organization data
-                    </button>
+                    <button class="btn btn-primary" type="submit">Update organization data</button>
                   </div>
                 </form>
               </div>
             </dialog>
 
-            <dialog id="delete-org-{{ .Slug }}" class="dialog">
+            <dialog id="delete-org-{{ .Slug }}"
+                    class="dialog"
+                    {{ dataAutoOpen ($.OrganizationDialogAutoOpen "delete" .Slug) }}>
               <div class="dialog-card">
                 <header class="dialog-head">
                   <div>
-                    <h3 class="dialog-title u-text-danger">
-                      Danger zone - Delete organization
-                    </h3>
+                    <h3 class="dialog-title u-text-danger">Danger zone - Delete organization</h3>
                     <p class="dialog-subtitle">{{ .Name }}</p>
                   </div>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-icon dialog-close"
-                    onclick="document.getElementById('delete-org-{{ .Slug }}').close()"
-                  >
+                  <button type="button"
+                          class="btn btn-ghost btn-icon dialog-close"
+                          onclick="document.getElementById('delete-org-{{ .Slug }}').close()">
                     {{ template "icon-close" . }}
                   </button>
                 </header>
@@ -864,15 +773,9 @@
                   <input type="hidden" name="intent" value="delete_org" />
                   <input type="hidden" name="org_slug" value="{{ .Slug }}" />
                   <input type="hidden" name="q" value="{{ $.SearchQuery }}" />
-                  <input
-                    type="hidden"
-                    name="page"
-                    value="{{ $.CurrentPage }}"
-                  />
+                  <input type="hidden" name="page" value="{{ $.CurrentPage }}" />
                   <div class="dialog-actions">
-                    <button type="submit" class="btn btn-danger">
-                      Delete organization
-                    </button>
+                    <button type="submit" class="btn btn-danger">Delete organization</button>
                   </div>
                 </form>
               </div>
@@ -880,112 +783,72 @@
           </li>
         {{ end }}
       </ul>
-    {{ else }}
-      <p class="muted">No organizations match your search</p>
-    {{ end }}
 
-    {{ if gt .TotalPages 1 }}
-      <nav
-        class="platform-admin-pagination"
-        aria-label="Organizations pagination"
-      >
-        <div class="platform-admin-pagination-pages">
-          <a
-            class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
-            href="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
-                  &
-                {{- end -}}
-              {{- end -}}{{- if gt .PreviousPage 1 -}}
-                page={{ .PreviousPage }}
-              {{- end -}}
-            {{- end -}}"
-            hx-get="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
-                  &
-                {{- end -}}
-              {{- end -}}{{- if gt .PreviousPage 1 -}}
-                page={{ .PreviousPage }}
-              {{- end -}}
-            {{- end -}}"
-            hx-target="#platform-admin-results"
-            hx-select="#platform-admin-results"
-            hx-swap="outerHTML"
-            hx-push-url="true"
-          >
-            {{ template "icon-chevron-left" . }}
-          </a>
-          {{ range .PageNumbers }}
-            <a
-              class="{{ if eq . $.CurrentPage }}
-                btn btn-primary
-              {{ else }}
-                btn btn-secondary
-              {{ end }}"
-              href="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
-                ?{{- if $.SearchQuery -}}
-                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
-                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
-              {{- end -}}"
-              hx-get="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
-                ?{{- if $.SearchQuery -}}
-                  q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
-                {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
-              {{- end -}}"
-              hx-target="#platform-admin-results"
-              hx-select="#platform-admin-results"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-              >{{ . }}</a
-            >
-          {{ end }}
-          <a
-            class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
-            href="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
-                  &
-                {{ end }}
-              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
-            {{- end -}}"
-            hx-get="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
-              ?{{- if .SearchQuery -}}
-                q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
-                  &
-                {{ end }}
-              {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
-            {{- end -}}"
-            hx-target="#platform-admin-results"
-            hx-select="#platform-admin-results"
-            hx-swap="outerHTML"
-            hx-push-url="true"
-          >
-            {{ template "icon-chevron-right" . }}
-          </a>
-        </div>
-      </nav>
+      {{ if gt .TotalPages 1 }}
+        <footer class="platform-admin-results-footer">
+          <nav class="platform-admin-pagination"
+               aria-label="Organizations pagination">
+            <div class="platform-admin-pagination-pages">
+              <a class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}" href="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
+                      &
+                    {{- end -}}
+                  {{- end -}}{{- if gt .PreviousPage 1 -}}
+                    page={{ .PreviousPage }}
+                  {{- end -}}
+                {{- end -}}" hx-get="/admin/organizations{{- if or .SearchQuery (gt .PreviousPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .PreviousPage 1 -}}
+                      &
+                    {{- end -}}
+                  {{- end -}}{{- if gt .PreviousPage 1 -}}
+                    page={{ .PreviousPage }}
+                  {{- end -}}
+                {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">
+                {{ template "icon-chevron-left" . }}
+              </a>
+              {{ range .PageNumbers }}
+                <a class="{{ if eq . $.CurrentPage }} btn btn-primary {{ else }} btn btn-secondary {{ end }}" href="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
+                    ?{{- if $.SearchQuery -}}
+                      q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                    {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+                  {{- end -}}" hx-get="/admin/organizations{{- if or $.SearchQuery (gt . 1) -}}
+                    ?{{- if $.SearchQuery -}}
+                      q={{ $.SearchQuery | urlquery }}{{- if gt . 1 -}}&{{ end }}
+                    {{- end -}}{{- if gt . 1 -}}page={{ . }}{{ end }}
+                  {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">{{ . }}</a>
+              {{ end }}
+              <a class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}" href="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                      &
+                    {{ end }}
+                  {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+                {{- end -}}" hx-get="/admin/organizations{{- if or .SearchQuery (gt .NextPage 1) -}}
+                  ?{{- if .SearchQuery -}}
+                    q={{ .SearchQuery | urlquery }}{{- if gt .NextPage 1 -}}
+                      &
+                    {{ end }}
+                  {{- end -}}{{- if gt .NextPage 1 -}}page={{ .NextPage }}{{ end }}
+                {{- end -}}" hx-target="#platform-admin-results" hx-select="#platform-admin-results" hx-swap="outerHTML" hx-push-url="true">
+                {{ template "icon-chevron-right" . }}
+              </a>
+            </div>
+          </nav>
+        </footer>
+      {{ end }}
+    {{ else }}
+      <div class="empty-state">
+        {{ if .SearchQuery }}
+          <p class="empty-state-title">No organizations match your search</p>
+          <p class="empty-state-hint">Try a different name.</p>
+        {{ else }}
+          <p class="empty-state-title">No organizations yet</p>
+        {{ end }}
+      </div>
     {{ end }}
   </div>
-<script>
-  (function () {
-    const inviteDialog = document.getElementById("invite-org-{{.OrganizationDialogSlug}}");
-    if (inviteDialog && {{if and .InviteError (eq .OrganizationDialogAction "invite") .OrganizationDialogSlug}}true{{else}}false{{end}} && !inviteDialog.open) {
-      inviteDialog.showModal();
-    }
-
-    const editDialog = document.getElementById("edit-org-{{.OrganizationDialogSlug}}");
-    if (editDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "edit") .OrganizationDialogSlug}}true{{else}}false{{end}} && !editDialog.open) {
-      editDialog.showModal();
-    }
-
-    const deleteDialog = document.getElementById("delete-org-{{.OrganizationDialogSlug}}");
-    if (deleteDialog && {{if and .OrganizationError (eq .OrganizationDialogAction "delete") .OrganizationDialogSlug}}true{{else}}false{{end}} && !deleteDialog.open) {
-      deleteDialog.showModal();
-    }
-  })();
-</script>
 {{ end }}
 
 {{ define "platform_admin.html" }}

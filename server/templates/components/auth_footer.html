@@ -1,0 +1,9 @@
+{{/* Cross-link footer under auth forms (login ↔ signup). */}} {{ define
+"auth_footer" }}
+<footer class="auth-footer">
+  <hr />
+  <p class="auth-footer-switch">
+    {{ .Prompt }} <a href="{{ .Href }}">{{ .LinkLabel }}</a>
+  </p>
+</footer>
+{{ end }}

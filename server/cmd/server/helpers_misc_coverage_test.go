@@ -224,7 +224,7 @@ func TestOrganizationLogoAdditionalBranches(t *testing.T) {
 	t.Run("generic save failure", func(t *testing.T) {
 		server := &Server{
 			authorizer: fakeAuthorizer{},
-			store:      &failingSaveAttachmentStore{Store: NewMemoryStore(), err: errors.New("boom")},
+			store:      &failingSaveAttachmentStore{MemoryStore: NewMemoryStore(), err: errors.New("boom")},
 			now:        time.Now,
 		}
 		req := organizationLogoRequest(t, "logo.png", "", []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
@@ -236,7 +236,7 @@ func TestOrganizationLogoAdditionalBranches(t *testing.T) {
 }
 
 type failingSaveAttachmentStore struct {
-	Store
+	*MemoryStore
 	err error
 }
 

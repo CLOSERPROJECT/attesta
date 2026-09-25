@@ -17,6 +17,23 @@ type identityInviteRoles struct {
 	BusinessRoles   []string
 }
 
+// identityAccountDisplayName returns an Appwrite-safe account name (1–128 chars).
+// When name is empty, the email local part is used so open signup can omit a name field.
+func identityAccountDisplayName(email, name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		local, _, _ := strings.Cut(strings.TrimSpace(email), "@")
+		name = strings.TrimSpace(local)
+	}
+	if name == "" {
+		name = "user"
+	}
+	if len(name) > 128 {
+		return name[:128]
+	}
+	return name
+}
+
 func encodeIdentityRoleLabel(slug string) string {
 	slug = strings.TrimSpace(slug)
 	if slug == "" {

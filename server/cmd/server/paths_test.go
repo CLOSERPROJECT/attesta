@@ -37,6 +37,21 @@ func TestAppHomePath(t *testing.T) {
 	}
 }
 
+func TestOnboardingPaths(t *testing.T) {
+	if got := onboardingPath(); got != "/my/onboarding" {
+		t.Fatalf("onboardingPath = %q", got)
+	}
+	if got := onboardingJoinPath(); got != "/my/onboarding/join" {
+		t.Fatalf("onboardingJoinPath = %q", got)
+	}
+	if got := onboardingRequestOrganizationPath(); got != "/my/onboarding/request-organization" {
+		t.Fatalf("onboardingRequestOrganizationPath = %q", got)
+	}
+	if got := leaveOrganizationPath(); got != "/my/leave-organization" {
+		t.Fatalf("leaveOrganizationPath = %q", got)
+	}
+}
+
 func TestPublicStreamPath(t *testing.T) {
 	if got := publicStreamPath("  wf-a  "); got != "/streams/wf-a" {
 		t.Fatalf("publicStreamPath = %q, want /streams/wf-a", got)

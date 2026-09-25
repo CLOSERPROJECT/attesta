@@ -3,12 +3,17 @@
  *
  * ul.list-rows
  *   li.list-row
- *     div.list-row-main
+ *     div.list-row-main[.list-row-main-stack?]
  *       …domain content…
  *     div.list-row-actions
  *       button | span.muted…
  *     p.error?
  *     dialog.dialog…?
+ *   OR (whole-row link / action)
+ *   li
+ *     a.list-row | button.list-row
+ *       div.list-row-main
+ *         …domain content…
  *
  * Layout: flex (not grid) so optional error/dialog siblings are not extra columns.
  * Closed <dialog> uses UA display:none and does not affect flex layout.
@@ -17,9 +22,14 @@
 .list-rows {
   list-style: none;
   padding: 0;
-  margin: var(--space-3) 0 0;
+  margin: var(--space-4) 0 0;
   display: grid;
   gap: var(--space-1);
+}
+
+.list-rows > li:has(> a.list-row),
+.list-rows > li:has(> button.list-row) {
+  display: contents;
 }
 
 .list-row {
@@ -33,13 +43,49 @@
   background: var(--secondary);
 }
 
+a.list-row,
+button.list-row {
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+button.list-row {
+  width: 100%;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+a.list-row:hover,
+a.list-row:focus-visible,
+button.list-row:hover,
+button.list-row:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  outline: none;
+}
+
 .list-row-main {
   flex: 1 1 0;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-1) var(--space-4);
+}
+
+.list-row-main-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  row-gap: var(--space-2);
+}
+
+.list-row-main p {
+  margin: 0;
+  line-height: 1;
 }
 
 .list-row-actions {

@@ -87,11 +87,12 @@ func (a *appwriteIdentity) CreateAccount(ctx context.Context, email, password, n
 	if err := ctx.Err(); err != nil {
 		return IdentityUser{}, err
 	}
+	email = strings.TrimSpace(email)
 	user, err := account.New(a.sessionClient).Create(
 		id.Unique(),
-		strings.TrimSpace(email),
+		email,
 		password,
-		account.New(a.sessionClient).WithCreateName(strings.TrimSpace(name)),
+		account.New(a.sessionClient).WithCreateName(identityAccountDisplayName(email, name)),
 	)
 	if err != nil {
 		return IdentityUser{}, normalizeIdentityError(err)
@@ -290,6 +291,11 @@ func (a *appwriteIdentity) GetCurrentUser(ctx context.Context, sessionSecret str
 		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
 			identity.OrgSlug = org.Slug
 			identity.OrgName = org.Name
+		} else if errors.Is(orgErr, ErrIdentityNotFound) {
+			// Team was deleted but membership listing still pointed at it.
+			identity.OrgSlug = ""
+			identity.OrgName = ""
+			identity.MembershipID = ""
 		}
 	}
 	return identity, nil
@@ -313,6 +319,10 @@ func (a *appwriteIdentity) GetUserByID(ctx context.Context, userID string) (Iden
 		if org, orgErr := a.getOrganizationByTeamID(ctx, identity.OrgSlug); orgErr == nil && org != nil {
 			identity.OrgSlug = org.Slug
 			identity.OrgName = org.Name
+		} else if errors.Is(orgErr, ErrIdentityNotFound) {
+			identity.OrgSlug = ""
+			identity.OrgName = ""
+			identity.MembershipID = ""
 		}
 	}
 	return identity, nil
@@ -668,6 +678,18 @@ func (a *appwriteIdentity) DeleteOrganizationMembership(ctx context.Context, ses
 	return normalizeIdentityError(err)
 }
 
+func (a *appwriteIdentity) DeleteOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	org, err := a.GetOrganizationBySlug(ctx, orgSlug)
+	if err != nil {
+		return err
+	}
+	_, err = teams.New(a.adminClient).DeleteMembership(strings.TrimSpace(org.ID), strings.TrimSpace(membershipID))
+	return normalizeIdentityError(err)
+}
+
 func (a *appwriteIdentity) UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error) {
 	if err := ctx.Err(); err != nil {
 		return IdentityFile{}, err
@@ -732,6 +754,14 @@ func (a *appwriteIdentity) GetOrganizationLogo(ctx context.Context, fileID strin
 	}, nil
 }
 
+func defaultOperatorCatalogRole() IdentityRole {
+	return IdentityRole{
+		Slug:    "operator",
+		Name:    "Operator",
+		Palette: defaultRolePaletteFromInput("Operator"),
+	}
+}
+
 func (a *appwriteIdentity) createOrganizationWithClient(ctx context.Context, client appwriteclient.Client, name string) (IdentityOrg, error) {
 	name = strings.TrimSpace(name)
 	slug := canonifySlug(name)
@@ -742,6 +772,7 @@ func (a *appwriteIdentity) createOrganizationWithClient(ctx context.Context, cli
 	}
 	org := decodeIdentityOrg(team)
 	org.Slug = slug
+	org.Roles = []IdentityRole{defaultOperatorCatalogRole()}
 	if _, err := teams.New(a.adminClient).UpdatePrefs(team.Id, encodeIdentityOrgPrefs(org)); err != nil {
 		return IdentityOrg{}, normalizeIdentityError(err)
 	}
@@ -888,15 +919,14 @@ func toIdentityUser(user *models.User, memberships []models.Membership) Identity
 }
 
 func selectPrimaryMembership(memberships []models.Membership) *models.Membership {
+	// Only confirmed memberships affiliate a user. Unconfirmed invites must not
+	// set OrgSlug / org-admin, or /my skips onboarding as if the invite were accepted.
 	for idx := range memberships {
 		if memberships[idx].Confirm {
 			return &memberships[idx]
 		}
 	}
-	if len(memberships) == 0 {
-		return nil
-	}
-	return &memberships[0]
+	return nil
 }
 
 func decodeIdentityOrgs(teamList *models.TeamList) []IdentityOrg {
@@ -959,6 +989,31 @@ func (a *appwriteIdentity) getOrganizationByTeamID(ctx context.Context, teamID s
 	return &org, nil
 }
 
+func (a *appwriteIdentity) ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, nil
+	}
+	membershipList, err := users.New(a.adminClient).ListMemberships(userID)
+	if err != nil {
+		return nil, normalizeIdentityError(err)
+	}
+	out := make([]IdentityMembership, 0, len(membershipList.Memberships))
+	for idx := range membershipList.Memberships {
+		membership := membershipList.Memberships[idx]
+		var org *IdentityOrg
+		if resolved, orgErr := a.getOrganizationByTeamID(ctx, membership.TeamId); orgErr == nil {
+			org = resolved
+		}
+		identity := membershipFromAppwrite(&membership, org)
+		out = append(out, identity)
+	}
+	return out, nil
+}
+
 func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) IdentityMembership {
 	if membership == nil {
 		return IdentityMembership{}
@@ -976,6 +1031,8 @@ func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) Ide
 	}
 	if org != nil {
 		identity.TeamID = strings.TrimSpace(org.ID)
+		identity.OrgSlug = strings.TrimSpace(org.Slug)
+		identity.OrgName = strings.TrimSpace(org.Name)
 	}
 	if invitedAt, err := parseAppwriteTime(membership.Invited); err == nil {
 		identity.InvitedAt = invitedAt
@@ -988,12 +1045,19 @@ func membershipFromAppwrite(membership *models.Membership, org *IdentityOrg) Ide
 
 func (a *appwriteIdentity) toIdentityMembership(ctx context.Context, membership *models.Membership, org *IdentityOrg) IdentityMembership {
 	identity := membershipFromAppwrite(membership, org)
-	if identity.UserID != "" {
-		if user, err := a.GetUserByID(ctx, identity.UserID); err == nil {
-			identity.Email = user.Email
-			identity.RoleSlugs = decodeIdentityRoleLabels(user.Labels)
-			identity.IsOrgAdmin = user.IsOrgAdmin
-		}
+	if identity.UserID == "" {
+		return identity
+	}
+	user, err := a.GetUserByID(ctx, identity.UserID)
+	if err != nil {
+		return identity
+	}
+	identity.Email = user.Email
+	// Pending invites carry intended roles on the membership; user labels are only
+	// authoritative after the invite is accepted.
+	if identity.Confirmed {
+		identity.RoleSlugs = decodeIdentityRoleLabels(user.Labels)
+		identity.IsOrgAdmin = user.IsOrgAdmin
 	}
 	return identity
 }

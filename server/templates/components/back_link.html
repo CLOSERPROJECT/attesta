@@ -1,0 +1,9 @@
+{{/* Primary green back link with arrow. See back-link.css for markup contract. */}}
+{{ define "back_link" }}
+  {{ if and .Href .Label }}
+    <a class="back-link" href="{{ .Href }}">
+      {{ template "icon-arrow-left" . }}
+      {{ .Label }}
+    </a>
+  {{ end }}
+{{ end }}

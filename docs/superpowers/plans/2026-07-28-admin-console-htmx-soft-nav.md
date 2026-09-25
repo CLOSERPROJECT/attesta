@@ -644,17 +644,12 @@ go test ./cmd/server/ -count=1 -run 'TestOrgAdminTemplateRendersSidebarPanels' -
 
 - [ ] **Step 3: Restructure `org_admin.html`**
 
-1. `NeedsOrganizationSetup`: keep existing setup form UI (no `admin_console` soft-nav).
-2. Otherwise:
+1. Org-admin pages require organization context (`requireOrgAdmin` redirects unaffiliated users to onboarding). Always render `admin_console`.
 
 ```html
 {{ define "org_admin_body" }}
   <div class="stack u-max-w-7xl u-mx-auto">
-    {{ if .NeedsOrganizationSetup }}
-      {{/* existing setup header + form */}}
-    {{ else }}
-      {{ template "admin_console" .Console }}
-    {{ end }}
+    {{ template "admin_console" .Console }}
   </div>
   {{/* keep role/member dialogs required by the active panel; drop inactive panel dialogs if unused */}}
 {{ end }}
@@ -672,13 +667,13 @@ go test ./cmd/server/ -count=1 -run 'TestOrgAdminTemplateRendersSidebarPanels' -
 
 Split existing panel sections into `org_admin_profile_panel` / `org_admin_roles_panel` / `org_admin_members_panel` defines (move markup out of the triple-`hidden` sections).
 
-3. Delete the panel-switcher IIFE (`data-org-admin-shell`, `history.pushState`, `preventDefault` on nav). **Keep** role-palette picker / invite-copy / other scripts that do not depend on multi-panel shell — if they are intertwined, split carefully so palette pickers still work on roles/members panels.
+2. Delete the panel-switcher IIFE (`data-org-admin-shell`, `history.pushState`, `preventDefault` on nav). **Keep** role-palette picker / invite-copy / other scripts that do not depend on multi-panel shell — if they are intertwined, split carefully so palette pickers still work on roles/members panels.
 
 - [ ] **Step 4: Wire `Console` + HTMX in `renderOrgAdminWithErrors`**
 
 ```go
 view.Console = orgAdminConsole(view)
-if !view.NeedsOrganizationSetup && wantsAdminConsolePartial(r) {
+if wantsAdminConsolePartial(r) {
 	_ = s.tmpl.ExecuteTemplate(w, "admin_console", view.Console)
 	return
 }

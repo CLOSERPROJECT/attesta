@@ -34,6 +34,8 @@ type IdentityStore interface {
 	// Prefer org.ID (Appwrite team ID) when known — e.g. from ListOrganizationsPage —
 	// so slug≠team-ID orgs still resolve without an unpaged ListOrganizations fallback.
 	ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
+	// ListUserMemberships returns all team memberships for a user (confirmed and pending).
+	ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	UpdateOrganization(ctx context.Context, sessionSecret, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
@@ -43,6 +45,7 @@ type IdentityStore interface {
 	UpdateOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error)
 	DeleteOrganizationMembership(ctx context.Context, sessionSecret, orgSlug, membershipID string) error
+	DeleteOrganizationMembershipAsAdmin(ctx context.Context, orgSlug, membershipID string) error
 	InviteOrganizationUserAsAdmin(ctx context.Context, orgSlug, email, redirectURL string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 	UploadOrganizationLogo(ctx context.Context, orgSlug string, upload IdentityFile) (IdentityFile, error)
 	DeleteOrganizationLogo(ctx context.Context, fileID string) error
@@ -105,6 +108,8 @@ type IdentityFile struct {
 type IdentityMembership struct {
 	ID              string
 	TeamID          string
+	OrgSlug         string
+	OrgName         string
 	UserID          string
 	Email           string
 	MembershipRoles []string

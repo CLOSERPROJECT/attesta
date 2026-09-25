@@ -51,7 +51,16 @@
     <div class="empty-state">
       {{ template "icon-layers-2" . }}
       <p class="empty-state-title">No streams available</p>
-      <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
+      {{ if .Unaffiliated }}
+        <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
+        <p class="empty-state-hint">
+          <a href="/my/onboarding/join">Join an organization</a>
+          ·
+          <a href="/my/onboarding/request-organization">Request a new organization</a>
+        </p>
+      {{ else }}
+        <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
+      {{ end }}
     </div>
   {{ end }}
 </section>

@@ -13,13 +13,17 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 		ActivePanel:  "roles",
 		Organization: Organization{Name: "Acme Org", Slug: "acme-org"},
 		RoleRows: []OrgAdminRoleRow{
-			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", InUse: false},
+			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", InUse: false, CanDelete: true},
 		},
 		Users: []OrgAdminUserRow{
 			{
 				UserID:    "user-1",
 				Email:     "member@example.com",
 				Activated: true,
+				CanDelete: true,
+				RoleOptions: []OrgAdminRoleOption{
+					{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", Selected: true},
+				},
 			},
 		},
 	}
@@ -49,7 +53,7 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 	membersBody := membersOut.String()
 	for _, want := range []string{
 		`class="user-email"`,
-		`class="user-tags"`,
+		`class="role-pill-row"`,
 	} {
 		if !strings.Contains(membersBody, want) {
 			t.Fatalf("expected %q in members markup, got:\n%s", want, membersBody)
@@ -77,7 +81,7 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 	snippet := rolesBody[rowIdx:]
 	mainIdx := strings.Index(snippet, `class="list-row-main"`)
 	actionsIdx := strings.Index(snippet, `class="list-row-actions"`)
-	pillIdx := strings.Index(snippet, `class="pill pill-lg role-pill"`)
+	pillIdx := strings.Index(snippet, `class="pill role-pill"`)
 	if mainIdx < 0 || actionsIdx < 0 || pillIdx < 0 {
 		t.Fatal("expected list-row-main, list-row-actions, and role pill")
 	}
@@ -95,6 +99,15 @@ func TestPlatformAdminListRowMarkup(t *testing.T) {
 				Slug:                    "accepted",
 				OrgAdminStatus:          "At least one org admin accepted",
 				OrgAdminStatusClassName: "accepted",
+			},
+		},
+		PendingOrgCreationRequests: []PlatformAdminOrgCreationRequestRow{
+			{
+				ID:             "req-1",
+				ProposedName:   "Fresh Org",
+				ProposedSlug:   "fresh-org",
+				RequesterEmail: "newbie@example.com",
+				CreatedAt:      "1 Mar 2026 at 12:00 UTC",
 			},
 		},
 	}
@@ -126,6 +139,32 @@ func TestPlatformAdminListRowMarkup(t *testing.T) {
 	} {
 		if strings.Contains(body, legacy) {
 			t.Fatalf("did not expect legacy class %q in platform admin markup", legacy)
+		}
+	}
+
+	var pendingOut bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&pendingOut, "platform_admin_main", view); err != nil {
+		t.Fatalf("render platform_admin_main: %v", err)
+	}
+	pendingBody := pendingOut.String()
+	for _, want := range []string{
+		`class="list-row-main list-row-main-stack"`,
+		`aria-label="Approve"`,
+		`aria-label="Reject"`,
+		`name="intent" value="approve_org_creation"`,
+		`name="intent" value="reject_org_creation"`,
+		"Fresh Org",
+	} {
+		if !strings.Contains(pendingBody, want) {
+			t.Fatalf("expected %q in pending org creation markup, got:\n%s", want, pendingBody)
+		}
+	}
+	for _, legacy := range []string{
+		`>Approve</button>`,
+		`>Reject</button>`,
+	} {
+		if strings.Contains(pendingBody, legacy) {
+			t.Fatalf("did not expect labeled approve/reject button %q; use icon buttons", legacy)
 		}
 	}
 }

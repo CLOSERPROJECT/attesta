@@ -17,6 +17,7 @@ type StreamCardView struct {
 	EditAction        string
 	EditRequiresPurge bool
 	CanDelete         bool
+	DeleteReason      string
 	DeleteAction      string
 }
 
@@ -36,6 +37,7 @@ type ManagedPublicStreamCardView struct {
 	EditAction        string
 	EditRequiresPurge bool
 	CanDelete         bool
+	DeleteReason      string
 	DeleteAction      string
 }
 
@@ -380,6 +382,12 @@ func (v StreamInstanceDetailView) StreamTimeline() StreamTimelineView {
 	}
 }
 
+// BackLinkView is the view model for templates/components/back_link.html.
+type BackLinkView struct {
+	Href  string
+	Label string
+}
+
 // BreadcrumbItem is one crumb in templates/components/breadcrumbs.html.
 type BreadcrumbItem struct {
 	Label   string
@@ -390,6 +398,30 @@ type BreadcrumbItem struct {
 // BreadcrumbsView is the view model for templates/components/breadcrumbs.html.
 type BreadcrumbsView struct {
 	Items []BreadcrumbItem
+}
+
+// RolePillView is one palette-colored pill in templates/components/role_pill_row.html.
+type RolePillView struct {
+	Label   string
+	Palette string
+}
+
+// RolePillRowView is the view model for templates/components/role_pill_row.html.
+// Size is "" (default), "sm", or "lg". Class is an optional extra class on the row (e.g. "u-m-0").
+type RolePillRowView struct {
+	Pills []RolePillView
+	Label string
+	Size  string
+	Class string
+}
+
+// OrgPendingRowView is the view model for templates/components/org_pending_row.html.
+// Shared main content for pending join requests and pending invites (list-row-main stack).
+type OrgPendingRowView struct {
+	Email     string
+	Roles     RolePillRowView
+	DateLabel string
+	Date      string
 }
 
 // AdminConsoleNavItem is one soft-nav link in templates/components/admin_console.html.
@@ -411,4 +443,46 @@ type AdminConsoleView struct {
 	NavItems     []AdminConsoleNavItem
 	MainTemplate string
 	MainData     any
+}
+
+// RolesPickerOption is one selectable role in templates/components/roles_picker.html.
+type RolesPickerOption struct {
+	Slug     string
+	Name     string
+	Palette  string
+	Selected bool
+}
+
+// RolesPickerView is the view model for templates/components/roles_picker.html.
+type RolesPickerView struct {
+	Options          []RolesPickerOption
+	RequireSelection bool
+}
+
+func rolesPickerFromRoles(roles []Role, requireSelection bool) RolesPickerView {
+	options := make([]RolesPickerOption, 0, len(roles))
+	for _, role := range organizationCatalogRoles(roles) {
+		options = append(options, RolesPickerOption{
+			Slug:    role.Slug,
+			Name:    role.Name,
+			Palette: role.Palette,
+		})
+	}
+	return RolesPickerView{Options: options, RequireSelection: requireSelection}
+}
+
+func rolesPickerFromOrgAdminOptions(options []OrgAdminRoleOption, requireSelection bool) RolesPickerView {
+	out := make([]RolesPickerOption, 0, len(options))
+	for _, option := range options {
+		if isOrgAdminRoleSlug(option.Slug) {
+			continue
+		}
+		out = append(out, RolesPickerOption{
+			Slug:     option.Slug,
+			Name:     option.Name,
+			Palette:  option.Palette,
+			Selected: option.Selected,
+		})
+	}
+	return RolesPickerView{Options: out, RequireSelection: requireSelection}
 }

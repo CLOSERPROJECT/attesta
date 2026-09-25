@@ -136,9 +136,9 @@ func buildMyHomeCategorySidebar(groups []MyHomeStreamGroupView) CategorySidebarV
 }
 
 // streamManagementFlags derives CanClone/CanEdit/CanDelete for managed stream cards.
-func (s *Server) streamManagementFlags(ctx context.Context, user *AccountUser, key string, stream FormataBuilderStream, hasProcesses, canEditSavedStreams bool) (canClone, canEdit, editRequiresPurge, canDelete bool) {
+func (s *Server) streamManagementFlags(ctx context.Context, user *AccountUser, key string, stream FormataBuilderStream, hasProcesses, canEditSavedStreams bool) (canClone, canEdit, editRequiresPurge, canDelete bool, deleteReason string) {
 	if s.authorizer == nil || user == nil {
-		return false, false, false, false
+		return false, false, false, false, ""
 	}
 	canClone = canEditSavedStreams
 	if canEditSavedStreams {
@@ -150,7 +150,14 @@ func (s *Server) streamManagementFlags(ctx context.Context, user *AccountUser, k
 	if allowed, err := s.authorizer.CanDeleteStream(ctx, user, key, formataStreamCreatorID(stream), hasProcesses); err == nil {
 		canDelete = allowed
 	}
-	return canClone, canEdit, editRequiresPurge, canDelete
+	if !canDelete {
+		if hasProcesses {
+			deleteReason = "Stream instances already exist"
+		} else {
+			deleteReason = "Only the creator or a platform admin can delete this"
+		}
+	}
+	return canClone, canEdit, editRequiresPurge, canDelete, deleteReason
 }
 
 func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]MyHomeStreamGroupView, error) {
@@ -212,7 +219,7 @@ func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]M
 		}
 		if stream, ok := streamsByKey[key]; ok {
 			hasProcesses := card.InstanceCount > 0
-			managed.CanClone, managed.CanEdit, managed.EditRequiresPurge, managed.CanDelete = s.streamManagementFlags(ctx, user, key, stream, hasProcesses, canEditSavedStreams)
+			managed.CanClone, managed.CanEdit, managed.EditRequiresPurge, managed.CanDelete, managed.DeleteReason = s.streamManagementFlags(ctx, user, key, stream, hasProcesses, canEditSavedStreams)
 		}
 		cardsByKey[key] = managed
 	}
