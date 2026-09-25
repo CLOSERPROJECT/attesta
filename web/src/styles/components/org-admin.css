@@ -126,9 +126,3 @@ hr {
   display: flex;
   justify-content: center;
 }
-
-.org-admin-panel-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-10);
-}

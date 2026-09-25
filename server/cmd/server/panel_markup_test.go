@@ -377,7 +377,7 @@ func TestOrgAdminRolesPanelMarkup(t *testing.T) {
 	rolesSection := body[sectionStart:]
 
 	for _, want := range []string{
-		`class="org-admin-panel-section"`,
+		`class="panel-section"`,
 		`class="panel-head-actions"`,
 		`class="panel-heading"`,
 		"<h2>Roles</h2>",
