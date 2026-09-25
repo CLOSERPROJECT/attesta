@@ -1686,6 +1686,62 @@ func TestAffiliationLeaveOrganizationMemberAllowed(t *testing.T) {
 	}
 }
 
+func TestAffiliationRemoveOrganizationMemberDeletesMembershipAndClearsLabels(t *testing.T) {
+	ctx := context.Background()
+	var deleted struct {
+		sessionSecret string
+		orgSlug       string
+		membershipID  string
+	}
+	var updatedLabels []string
+	var updatedUserID string
+	usersByID := map[string]IdentityUser{
+		"member-2": {
+			ID:     "member-2",
+			Email:  "member2@example.com",
+			Labels: []string{"custom:keep", encodeIdentityRoleLabel("viewer"), identityOrgAdminLabel},
+		},
+	}
+	identity := &fakeIdentityStore{
+		deleteOrganizationMembershipFunc: func(_ context.Context, sessionSecret, orgSlug, membershipID string) error {
+			deleted.sessionSecret = sessionSecret
+			deleted.orgSlug = orgSlug
+			deleted.membershipID = membershipID
+			return nil
+		},
+		getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+			user, ok := usersByID[userID]
+			if !ok {
+				return IdentityUser{}, ErrIdentityNotFound
+			}
+			return user, nil
+		},
+		updateUserLabelsFunc: func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+			updatedUserID = userID
+			updatedLabels = append([]string(nil), labels...)
+			user := usersByID[userID]
+			user.Labels = append([]string(nil), labels...)
+			usersByID[userID] = user
+			return user, nil
+		},
+	}
+	aff := NewAffiliation(identity, NewMemoryStore(), &recordingMailer{}, fixedNow, nil)
+
+	err := aff.RemoveOrganizationMember(ctx, "session-admin", "acme", "mem-member-2", "member-2")
+	if err != nil {
+		t.Fatalf("RemoveOrganizationMember: %v", err)
+	}
+	if deleted.sessionSecret != "session-admin" || deleted.orgSlug != "acme" || deleted.membershipID != "mem-member-2" {
+		t.Fatalf("delete params = %#v", deleted)
+	}
+	if updatedUserID != "member-2" {
+		t.Fatalf("updated user id = %q", updatedUserID)
+	}
+	if len(updatedLabels) != 1 || updatedLabels[0] != "custom:keep" {
+		t.Fatalf("updated labels = %#v, want [custom:keep]", updatedLabels)
+	}
+}
+
 func TestAffiliationLeaveOrganizationOrgAdminWithPeerAllowed(t *testing.T) {
 	ctx := context.Background()
 	mailer := &recordingMailer{}

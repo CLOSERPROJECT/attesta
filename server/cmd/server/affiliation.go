@@ -217,52 +217,6 @@ func (a *Affiliation) DeleteOrganization(ctx context.Context, orgSlug string) er
 	return nil
 }
 
-// LeaveOrganization removes the session user from their organization when allowed.
-// Sole org admins are blocked until another org admin exists.
-func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret string, user IdentityUser) error {
-	if !a.IsAffiliated(user) {
-		return ErrAffiliationNotAffiliated
-	}
-
-	current, err := a.identity.GetCurrentUser(ctx, sessionSecret)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(current.ID) != strings.TrimSpace(user.ID) {
-		return ErrIdentityUnauthorized
-	}
-	if !a.IsAffiliated(current) {
-		return ErrAffiliationNotAffiliated
-	}
-
-	orgSlug := strings.TrimSpace(current.OrgSlug)
-	if current.IsOrgAdmin {
-		users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug)
-		if listErr != nil {
-			return listErr
-		}
-		adminCount := 0
-		for _, orgUser := range users {
-			if orgUser.IsOrgAdmin {
-				adminCount++
-			}
-		}
-		if adminCount < 2 {
-			return ErrAffiliationSoleOrgAdmin
-		}
-	}
-
-	membershipID := strings.TrimSpace(current.MembershipID)
-	if membershipID == "" {
-		return ErrIdentityNotFound
-	}
-	if err := a.identity.DeleteOrganizationMembership(ctx, sessionSecret, orgSlug, membershipID); err != nil {
-		return err
-	}
-
-	return a.stripManagedIdentityLabels(ctx, current.ID)
-}
-
 func (a *Affiliation) PendingJoinRequestForUser(ctx context.Context, userID string) (*JoinRequest, error) {
 	return a.store.FindPendingJoinRequestByUser(ctx, userID)
 }

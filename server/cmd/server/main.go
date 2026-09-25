@@ -4899,27 +4899,9 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusUnauthorized, "unauthorized", err, "failed to read session secret for membership delete in %s", admin.OrgSlug)
 			return
 		}
-		if err := s.identity.DeleteOrganizationMembership(r.Context(), sessionSecret, admin.OrgSlug, target.ID); err != nil {
+		if err := s.affiliationService().RemoveOrganizationMember(r.Context(), sessionSecret, admin.OrgSlug, target.ID, target.UserID); err != nil {
 			s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, err, "failed to delete membership %s in organization %s", target.ID, admin.OrgSlug)
 			return
-		}
-		if strings.TrimSpace(target.UserID) != "" {
-			targetUser, getErr := s.identity.GetUserByID(r.Context(), target.UserID)
-			if getErr != nil && !errors.Is(getErr, ErrIdentityNotFound) {
-				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, getErr, "failed to load deleted membership user %s in organization %s", target.UserID, admin.OrgSlug)
-				return
-			}
-			labels := make([]string, 0, len(targetUser.Labels))
-			for _, label := range targetUser.Labels {
-				if isManagedIdentityLabel(label) {
-					continue
-				}
-				labels = append(labels, strings.TrimSpace(label))
-			}
-			if _, err := s.identity.UpdateUserLabels(r.Context(), target.UserID, labels); err != nil {
-				s.logAndRenderOrgAdminError(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "failed to delete user"}, err, "failed to clear labels for deleted user %s in organization %s", target.UserID, admin.OrgSlug)
-				return
-			}
 		}
 		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
 	case "delete_invite":
