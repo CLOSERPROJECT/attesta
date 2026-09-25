@@ -4023,25 +4023,17 @@ func organizationRoleInUse(roleSlug string, users []OrgAdminUserRow, invites []O
 
 func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgAdminInviteRow) []OrgAdminRoleRow {
 	catalog := organizationCatalogRoles(roles)
-	onlyOne := len(catalog) <= 1
 	rows := make([]OrgAdminRoleRow, 0, len(catalog))
 	for _, role := range catalog {
 		inUse := organizationRoleInUse(role.Slug, users, invites)
-		canDelete := !inUse && !onlyOne
-		deleteReason := ""
-		switch {
-		case inUse:
-			deleteReason = "Role in use"
-		case onlyOne:
-			deleteReason = "Organizations must keep at least one role."
-		}
+		decision := CanDeleteCatalogRole(len(catalog), inUse)
 		rows = append(rows, OrgAdminRoleRow{
 			Slug:         strings.TrimSpace(role.Slug),
 			Name:         strings.TrimSpace(role.Name),
 			Palette:      role.Palette,
 			InUse:        inUse,
-			CanDelete:    canDelete,
-			DeleteReason: deleteReason,
+			CanDelete:    decision.Allowed,
+			DeleteReason: decision.Reason,
 		})
 	}
 	return rows
@@ -4049,16 +4041,13 @@ func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgA
 
 func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []IdentityUser) []OrgAdminUserRow {
 	eligible := make([]IdentityUser, 0, len(users))
-	adminCount := 0
 	for _, orgUser := range users {
 		if isPlatformAdminIdentityUser(orgUser) {
 			continue
 		}
 		eligible = append(eligible, orgUser)
-		if orgUser.IsOrgAdmin {
-			adminCount++
-		}
 	}
+	adminCount := CountOrgAdmins(users)
 
 	orgUsers := make([]OrgAdminUserRow, 0, len(eligible))
 	for _, orgUser := range eligible {
@@ -4107,8 +4096,9 @@ func annotateOrgAdminUserRows(rows []OrgAdminUserRow, current *AccountUser) {
 			continue
 		}
 		rows[i].IsSelf = true
-		rows[i].CanDelete = false
-		rows[i].DeleteReason = "You can't delete your own account from here. Use Leave."
+		decision := CanDeleteMember(selfKey, strings.TrimSpace(rows[i].UserID))
+		rows[i].CanDelete = decision.Allowed
+		rows[i].DeleteReason = decision.Reason
 	}
 }
 
@@ -4509,7 +4499,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if targetRow.InUse {
-				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "remove the role from the users that have it before continuing with the action", RoleAction: "edit", RoleSlug: currentSlug, RoleName: targetRow.Name, RolePalette: targetRow.Palette})
+				decision := CanEditCatalogRole(true)
+				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: decision.Reason, RoleAction: "edit", RoleSlug: currentSlug, RoleName: targetRow.Name, RolePalette: targetRow.Palette})
 				return
 			}
 			roleSlug := canonifyIdentityRoleSlug(name)
@@ -4560,12 +4551,8 @@ func (s *Server) handleOrgAdminRoles(w http.ResponseWriter, r *http.Request) {
 				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "role not found", RoleAction: "delete", RoleSlug: currentSlug})
 				return
 			}
-			if targetRow.InUse {
-				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "remove the role from the users that have it before continuing with the action", RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name})
-				return
-			}
-			if len(org.Roles) <= 1 {
-				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: "organizations must keep at least one catalog role", RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name})
+			if decision := CanDeleteCatalogRole(len(org.Roles), targetRow.InUse); !decision.Allowed {
+				s.renderOrgAdminWithErrors(w, r, user, user.OrgSlug, "", OrgAdminErrors{Role: decision.Reason, RoleAction: "delete", RoleSlug: currentSlug, RoleName: targetRow.Name})
 				return
 			}
 			updatedRoles := make([]IdentityRole, 0, len(org.Roles))
@@ -4882,8 +4869,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				}
 				otherAdmins++
 			}
-			if otherAdmins == 0 {
-				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove Org admin from the only Org admin"})
+			if decision := CanChangeOrgAdmin(true, false, otherAdmins); !decision.Allowed {
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: decision.Reason})
 				return
 			}
 		}
@@ -4932,8 +4919,8 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "user not found"})
 			return
 		}
-		if firstNonEmpty(target.UserID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) {
-			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot delete yourself"})
+		if decision := CanDeleteMember(firstNonEmpty(admin.IdentityUserID, admin.Email), firstNonEmpty(target.UserID, target.Email)); !decision.Allowed {
+			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: decision.Reason})
 			return
 		}
 		sessionSecret, err := sessionSecretFromRequest(r)

@@ -150,7 +150,7 @@ func TestBuildOrgAdminRoleRowsLastRoleCannotDelete(t *testing.T) {
 	if rows[0].CanDelete {
 		t.Fatal("sole catalog role must not be deletable")
 	}
-	if rows[0].DeleteReason != "Organizations must keep at least one role." {
+	if rows[0].DeleteReason != reasonLastCatalogRole {
 		t.Fatalf("DeleteReason = %q", rows[0].DeleteReason)
 	}
 

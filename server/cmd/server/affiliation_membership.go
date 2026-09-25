@@ -28,22 +28,16 @@ func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret strin
 
 	orgSlug := strings.TrimSpace(current.OrgSlug)
 	var orgUsers []IdentityUser
+	users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug)
 	if current.IsOrgAdmin {
-		users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug)
 		if listErr != nil {
 			return listErr
 		}
 		orgUsers = users
-		adminCount := 0
-		for _, orgUser := range users {
-			if orgUser.IsOrgAdmin {
-				adminCount++
-			}
-		}
-		if adminCount < 2 {
+		if decision := CanLeaveOrganization(true, CountOrgAdmins(users)); !decision.Allowed {
 			return ErrAffiliationSoleOrgAdmin
 		}
-	} else if users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug); listErr == nil {
+	} else if listErr == nil {
 		orgUsers = users
 	}
 

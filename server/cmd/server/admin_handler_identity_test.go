@@ -2285,7 +2285,7 @@ func TestHandleOrgAdminUsersSetRolesBlocksSoleSelfDemote(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if !strings.Contains(rec.Body.String(), "cannot remove Org admin from the only Org admin") {
+	if !strings.Contains(rec.Body.String(), reasonSoleOrgAdminDemote) {
 		t.Fatalf("expected sole Org admin message, got %q", rec.Body.String())
 	}
 	if !hasIdentityLabel(users[0].Labels, identityOrgAdminLabel) {
@@ -3018,7 +3018,7 @@ func TestHandleOrgAdminUsersIdentityBranchErrors(t *testing.T) {
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminUsers(rec, req)
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "cannot delete yourself") {
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Use Leave.") {
 			t.Fatalf("delete self response = %d %q", rec.Code, rec.Body.String())
 		}
 	})
@@ -3767,7 +3767,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		rec := httptest.NewRecorder()
 		server.handleOrgAdminRoles(rec, req)
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "organizations must keep at least one catalog role") {
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), reasonLastCatalogRole) {
 			t.Fatalf("response = %d %q", rec.Code, rec.Body.String())
 		}
 		if updateCalled {
@@ -3815,7 +3815,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		reqEdit.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recEdit := httptest.NewRecorder()
 		server.handleOrgAdminRoles(recEdit, reqEdit)
-		if recEdit.Code != http.StatusOK || !strings.Contains(recEdit.Body.String(), "remove the role from the users that have it before continuing with the action") {
+		if recEdit.Code != http.StatusOK || !strings.Contains(recEdit.Body.String(), reasonRoleInUse) {
 			t.Fatalf("edit response = %d %q", recEdit.Code, recEdit.Body.String())
 		}
 
@@ -3824,7 +3824,7 @@ func TestHandleOrgAdminRolesIdentityAdditionalBranches(t *testing.T) {
 		reqDelete.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 		recDelete := httptest.NewRecorder()
 		server.handleOrgAdminRoles(recDelete, reqDelete)
-		if recDelete.Code != http.StatusOK || !strings.Contains(recDelete.Body.String(), "remove the role from the users that have it before continuing with the action") {
+		if recDelete.Code != http.StatusOK || !strings.Contains(recDelete.Body.String(), reasonRoleInUse) {
 			t.Fatalf("delete response = %d %q", recDelete.Code, recDelete.Body.String())
 		}
 	})

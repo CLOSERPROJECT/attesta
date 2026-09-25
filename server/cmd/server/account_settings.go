@@ -22,16 +22,8 @@ func affiliationLeaveGate(ctx context.Context, identity IdentityStore, user *Acc
 	if err != nil {
 		return true, ""
 	}
-	adminCount := 0
-	for _, orgUser := range users {
-		if orgUser.IsOrgAdmin {
-			adminCount++
-		}
-	}
-	if adminCount < 2 {
-		return false, "You're the only Org admin. Add another before leaving."
-	}
-	return true, ""
+	decision := CanLeaveOrganization(true, CountOrgAdmins(users))
+	return decision.Allowed, decision.Reason
 }
 
 func (s *Server) populateAccountSettings(base *PageBase, user *AccountUser) {

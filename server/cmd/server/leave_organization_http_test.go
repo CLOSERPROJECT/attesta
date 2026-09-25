@@ -134,7 +134,7 @@ func TestHandleLeaveOrganizationSoleAdminRedirectsHomeWithError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse location: %v", err)
 	}
-	if got := parsed.Query().Get("error"); !strings.Contains(got, "only organization admin") {
+	if got := parsed.Query().Get("error"); !strings.Contains(got, "only Org admin") {
 		t.Fatalf("error query = %q", got)
 	}
 	if deleteCalled {

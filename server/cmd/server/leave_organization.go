@@ -33,7 +33,7 @@ func (s *Server) handleLeaveOrganization(w http.ResponseWriter, r *http.Request)
 	case err == nil:
 		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
 	case errors.Is(err, ErrAffiliationSoleOrgAdmin):
-		redirectHomeWithMessage(w, r, "error", "You are the only organization admin. Add another admin before leaving.")
+		redirectHomeWithMessage(w, r, "error", reasonSoleOrgAdminLeave)
 	case errors.Is(err, ErrAffiliationNotAffiliated):
 		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
 	default:
