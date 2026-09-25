@@ -1634,8 +1634,19 @@ func TestAffiliationLeaveOrganizationMemberAllowed(t *testing.T) {
 			return usersByID["member-1"], nil
 		},
 		listOrganizationUsersFunc: func(_ context.Context, orgSlug string) ([]IdentityUser, error) {
-			t.Fatalf("ListOrganizationUsers should not run for non-admin leave, org=%q", orgSlug)
-			return nil, nil
+			if orgSlug != "acme" {
+				return nil, nil
+			}
+			return []IdentityUser{
+				{ID: "admin-1", Email: "owner@example.com", OrgSlug: "acme", IsOrgAdmin: true},
+				{ID: "member-1", Email: "member@example.com", OrgSlug: "acme", IsOrgAdmin: false},
+			}, nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+			if slug != "acme" {
+				return nil, ErrIdentityNotFound
+			}
+			return &IdentityOrg{Slug: "acme", Name: "Acme Org"}, nil
 		},
 		deleteOrganizationMembershipFunc: func(_ context.Context, sessionSecret, orgSlug, membershipID string) error {
 			deleted.sessionSecret = sessionSecret
@@ -1681,8 +1692,18 @@ func TestAffiliationLeaveOrganizationMemberAllowed(t *testing.T) {
 	if len(updatedLabels) != 1 || updatedLabels[0] != "custom:keep" {
 		t.Fatalf("updated labels = %#v, want [custom:keep]", updatedLabels)
 	}
-	if msgs := mailer.Messages(); len(msgs) != 0 {
-		t.Fatalf("expected no mail on leave, got %#v", msgs)
+	msgs := mailer.Messages()
+	if len(msgs) != 1 {
+		t.Fatalf("expected leave notify mail, got %#v", msgs)
+	}
+	if msgs[0].Kind != MailKindMemberLeft {
+		t.Fatalf("kind = %q", msgs[0].Kind)
+	}
+	if len(msgs[0].To) != 1 || msgs[0].To[0] != "owner@example.com" {
+		t.Fatalf("to = %#v", msgs[0].To)
+	}
+	if !strings.Contains(msgs[0].Subject, "Acme Org") {
+		t.Fatalf("subject = %q", msgs[0].Subject)
 	}
 }
 
@@ -1765,9 +1786,12 @@ func TestAffiliationLeaveOrganizationOrgAdminWithPeerAllowed(t *testing.T) {
 				return nil, nil
 			}
 			return []IdentityUser{
-				{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true},
-				{ID: "admin-2", OrgSlug: "acme", IsOrgAdmin: true},
+				{ID: "admin-1", Email: "owner@example.com", OrgSlug: "acme", IsOrgAdmin: true},
+				{ID: "admin-2", Email: "co@example.com", OrgSlug: "acme", IsOrgAdmin: true},
 			}, nil
+		},
+		getOrganizationBySlugFunc: func(_ context.Context, slug string) (*IdentityOrg, error) {
+			return &IdentityOrg{Slug: "acme", Name: "Acme Org"}, nil
 		},
 		deleteOrganizationMembershipFunc: func(_ context.Context, _, _, membershipID string) error {
 			deletedMembershipID = membershipID
@@ -1794,8 +1818,12 @@ func TestAffiliationLeaveOrganizationOrgAdminWithPeerAllowed(t *testing.T) {
 	if got := usersByID["admin-1"].Labels; len(got) != 1 || got[0] != "custom:keep" {
 		t.Fatalf("labels after leave = %#v", got)
 	}
-	if msgs := mailer.Messages(); len(msgs) != 0 {
-		t.Fatalf("expected no mail on leave, got %#v", msgs)
+	msgs := mailer.Messages()
+	if len(msgs) != 1 {
+		t.Fatalf("expected leave notify to peer admin, got %#v", msgs)
+	}
+	if msgs[0].Kind != MailKindMemberLeft || len(msgs[0].To) != 1 || msgs[0].To[0] != "co@example.com" {
+		t.Fatalf("leave mail = %#v", msgs[0])
 	}
 }
 

@@ -103,7 +103,7 @@ A role named on a Stream blueprint to gate Substeps. Matched to Organization rol
 _Avoid_: Catalog role, workflow role (in domain docs), Organization role (when meaning the blueprint gate)
 
 **Account settings**:
-The signed-in user’s modal for account-level actions on their current Affiliation (notably Leave). Distinct from the Org admin console.
+The affiliated user’s modal for account-level actions on their current Affiliation (notably Leave). Until other account-level options exist, the account-menu entry appears only when the user has an Affiliation. Distinct from the Org admin console.
 _Avoid_: Organization home, account page, My Org settings (when meaning admin console), org admin console
 
 **Leave**:

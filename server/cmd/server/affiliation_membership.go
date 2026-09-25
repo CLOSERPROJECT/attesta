@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 )
 
 // LeaveOrganization removes the session user from their organization when allowed.
 // Sole org admins are blocked until another org admin exists.
+// On success, remaining Org admins are emailed (log-and-continue on mail failure).
 func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret string, user IdentityUser) error {
 	if !a.IsAffiliated(user) {
 		return ErrAffiliationNotAffiliated
@@ -25,11 +27,13 @@ func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret strin
 	}
 
 	orgSlug := strings.TrimSpace(current.OrgSlug)
+	var orgUsers []IdentityUser
 	if current.IsOrgAdmin {
 		users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug)
 		if listErr != nil {
 			return listErr
 		}
+		orgUsers = users
 		adminCount := 0
 		for _, orgUser := range users {
 			if orgUser.IsOrgAdmin {
@@ -39,6 +43,8 @@ func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret strin
 		if adminCount < 2 {
 			return ErrAffiliationSoleOrgAdmin
 		}
+	} else if users, listErr := a.identity.ListOrganizationUsers(ctx, orgSlug); listErr == nil {
+		orgUsers = users
 	}
 
 	membershipID := strings.TrimSpace(current.MembershipID)
@@ -48,8 +54,12 @@ func (a *Affiliation) LeaveOrganization(ctx context.Context, sessionSecret strin
 	if err := a.identity.DeleteOrganizationMembership(ctx, sessionSecret, orgSlug, membershipID); err != nil {
 		return err
 	}
+	if err := a.stripManagedIdentityLabels(ctx, current.ID); err != nil {
+		return err
+	}
 
-	return a.stripManagedIdentityLabels(ctx, current.ID)
+	a.notifyMemberLeft(ctx, orgSlug, current, orgUsers)
+	return nil
 }
 
 // RemoveOrganizationMember deletes an organization membership as an org admin
@@ -64,4 +74,30 @@ func (a *Affiliation) RemoveOrganizationMember(ctx context.Context, sessionSecre
 		}
 	}
 	return nil
+}
+
+func (a *Affiliation) notifyMemberLeft(ctx context.Context, orgSlug string, leaver IdentityUser, orgUsers []IdentityUser) {
+	to := organizationAdminEmails(orgUsers, leaver.ID)
+	if len(to) == 0 {
+		return
+	}
+	orgName := strings.TrimSpace(orgSlug)
+	if org, err := a.identity.GetOrganizationBySlug(ctx, orgSlug); err == nil && org != nil {
+		if name := strings.TrimSpace(org.Name); name != "" {
+			orgName = name
+		}
+	}
+	leaverEmail := strings.TrimSpace(leaver.Email)
+	if leaverEmail == "" {
+		leaverEmail = strings.TrimSpace(leaver.ID)
+	}
+	a.notify(ctx, MailMessage{
+		Kind:    MailKindMemberLeft,
+		To:      to,
+		Subject: "Member left: " + orgName,
+		Body: fmt.Sprintf(
+			"%s left organization %q (slug %q).\n\nOpen: %s",
+			leaverEmail, orgName, orgSlug, a.actionURL("/my/organization/members"),
+		),
+	})
 }

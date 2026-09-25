@@ -3,7 +3,7 @@
  *
  * dialog.dialog[.dialog-overflow][data-auto-open?]
  *   div.dialog-card
- *     header.dialog-head
+ *     header.dialog-head[.dialog-head-ruled?]
  *       div
  *         h3.dialog-title[.u-text-danger?]
  *         p.dialog-subtitle?
@@ -73,6 +73,12 @@
 .dialog-close {
   flex: 0 0 auto;
   transform: translate(calc(var(--space-2)), calc(-1 * var(--space-2)));
+}
+
+.dialog-head-ruled {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
 }
 
 .dialog-actions {

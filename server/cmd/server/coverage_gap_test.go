@@ -156,7 +156,7 @@ func TestSMTPMailerSendCanceledAndAuth(t *testing.T) {
 	}
 }
 
-func TestHandleOrganizationHomeUnauthenticated(t *testing.T) {
+func TestHandleOrganizationRootUnauthenticated(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	server := &Server{
 		identity:    testIdentityForSessions(now, map[string]AccountUser{}),
@@ -359,7 +359,7 @@ func TestAdminCategoriesParseFormErrors(t *testing.T) {
 	}
 }
 
-func TestHandleOrganizationHomeDirectUnauth(t *testing.T) {
+func TestHandleOrganizationRootDirectUnauth(t *testing.T) {
 	server := &Server{
 		identity:    &fakeIdentityStore{},
 		store:       NewMemoryStore(),
@@ -370,7 +370,7 @@ func TestHandleOrganizationHomeDirectUnauth(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodGet, organizationPath(""), nil)
 	rec := httptest.NewRecorder()
-	server.handleOrganizationHome(rec, req)
+	server.handleOrganizationRoot(rec, req)
 	if rec.Code != http.StatusSeeOther && rec.Code != http.StatusUnauthorized && rec.Code != http.StatusFound {
 		t.Fatalf("status=%d", rec.Code)
 	}

@@ -284,8 +284,13 @@ type PageBase struct {
 	UserEmail              string
 	IsPlatformAdmin        bool
 	ShowAdminLink          bool
-	ShowMyOrgLink bool
-	ShowLogout    bool
+	ShowMyOrgLink          bool
+	ShowAccountSettings    bool
+	AccountOrgName         string
+	LeavePath              string
+	CanLeave               bool
+	LeaveReason            string
+	ShowLogout             bool
 }
 
 type PublicCatalogResponse struct {
@@ -1478,9 +1483,12 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 		logCapabilityCheckError(err, "cerbos check failed for platform admin navigation")
 	}
 	base.ShowAdminLink = showAdminLink
-	// Affiliated users see Organization home; avoid affiliationService here so pages
-	// that only need chrome still render when tests use a non-affiliation Store.
-	base.ShowMyOrgLink = strings.TrimSpace(user.OrgSlug) != ""
+	showMyOrg, orgErr := s.canAccessOrgAdminConsole(context.Background(), user)
+	if orgErr != nil {
+		logCapabilityCheckError(orgErr, "cerbos check failed for organization navigation")
+	}
+	base.ShowMyOrgLink = showMyOrg
+	s.populateAccountSettings(&base, user)
 	return base
 }
 
@@ -2106,7 +2114,7 @@ func (s *Server) handleOrganizationRoutes(w http.ResponseWriter, r *http.Request
 	path := strings.TrimPrefix(r.URL.Path, "/organization")
 	switch {
 	case path == "" || path == "/":
-		s.handleOrganizationHome(w, r)
+		s.handleOrganizationRoot(w, r)
 	case path == "/profile" || path == "/profile/":
 		s.handleOrgAdminPage(w, r)
 	case path == "/roles" || path == "/roles/":

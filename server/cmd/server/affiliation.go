@@ -33,6 +33,7 @@ const (
 	MailKindJoinSubmitted        = "affiliation.join.submitted"
 	MailKindJoinApproved         = "affiliation.join.approved"
 	MailKindJoinRejected         = "affiliation.join.rejected"
+	MailKindMemberLeft           = "affiliation.member.left"
 )
 
 type AffiliationRequestStatus string
@@ -843,16 +844,15 @@ func (a *Affiliation) stripManagedIdentityLabels(ctx context.Context, userID str
 	return err
 }
 
-func (a *Affiliation) notifyJoinSubmitted(ctx context.Context, req JoinRequest, org IdentityOrg) {
-	users, err := a.identity.ListOrganizationUsers(ctx, org.Slug)
-	if err != nil {
-		log.Printf("affiliation mail %s: list org admins for %s failed: %v", MailKindJoinSubmitted, org.Slug, err)
-		return
-	}
+func organizationAdminEmails(users []IdentityUser, excludeUserID string) []string {
+	exclude := strings.TrimSpace(excludeUserID)
 	to := make([]string, 0)
 	seen := map[string]struct{}{}
 	for _, user := range users {
 		if !user.IsOrgAdmin {
+			continue
+		}
+		if exclude != "" && strings.TrimSpace(user.ID) == exclude {
 			continue
 		}
 		email := strings.TrimSpace(user.Email)
@@ -866,6 +866,16 @@ func (a *Affiliation) notifyJoinSubmitted(ctx context.Context, req JoinRequest, 
 		seen[key] = struct{}{}
 		to = append(to, email)
 	}
+	return to
+}
+
+func (a *Affiliation) notifyJoinSubmitted(ctx context.Context, req JoinRequest, org IdentityOrg) {
+	users, err := a.identity.ListOrganizationUsers(ctx, org.Slug)
+	if err != nil {
+		log.Printf("affiliation mail %s: list org admins for %s failed: %v", MailKindJoinSubmitted, org.Slug, err)
+		return
+	}
+	to := organizationAdminEmails(users, "")
 	if len(to) == 0 {
 		log.Printf("affiliation mail %s: no org admins for %s", MailKindJoinSubmitted, org.Slug)
 		return
