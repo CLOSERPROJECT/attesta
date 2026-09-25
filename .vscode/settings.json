@@ -1,0 +1,9 @@
+{
+  "djlint.enableLinting": true,
+  "djlint.useVenv": false,
+  "djlint.useTildeAsIndent": false,
+  "djlint.executablePath": "deployment/scripts/djlint.sh",
+  "[html]": {
+    "editor.defaultFormatter": "monosans.djlint"
+  }
+}

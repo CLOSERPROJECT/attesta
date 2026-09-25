@@ -170,6 +170,8 @@ All other dynamic theming uses `data-*`, not inline custom properties.
 ```bash
 cd web && npm run build   # → web/dist/assets/main.css (served at /static/)
 task css:lint
+task templates:fmt        # optional: format server/templates with djLint
+task templates:check      # format gate (no write)
 ```
 
 `task css:lint`:
@@ -177,6 +179,8 @@ task css:lint
 1. Template inline styles — `deployment/scripts/check-template-inline-styles.sh`
 2. Breakpoint guard — no literal `@media (width … px)` outside `breakpoints.css`
 3. stylelint — no hex/rgb outside `tokens.css`, no new `!important`
+
+Go `html/template` files under `server/templates/` are formatted with **djLint** (`djlint.toml`, profile `golang`) — not Prettier or the built-in HTML formatter. CLI and the editor both call `deployment/scripts/djlint.sh` (mise-pinned).
 
 ## Adding new UI
 

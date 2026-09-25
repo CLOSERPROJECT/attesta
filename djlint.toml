@@ -1,0 +1,14 @@
+# Go html/template formatter + linter (https://djlint.com/docs/languages/golang/)
+# Format:  task templates:fmt
+# Check:   task templates:check
+# Lint:    task templates:lint
+
+profile = "golang"
+extension = "html"
+indent = 2
+max_line_length = 120
+use_gitignore = true
+preserve_blank_lines = true
+# Inline <script> blocks often mix JS with {{ }}; leave them alone.
+format_js = false
+format_css = false

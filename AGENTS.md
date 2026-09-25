@@ -68,6 +68,7 @@ Observed requirements:
 - Node.js **18+** (see `README.md`, `web/package.json`, `deployment/Dockerfile.*`)
 - Docker + Docker Compose (see `README.md`, `QUICKSTART.md`, `DOCKER.md`)
 - `task` (Taskfile runner; used in CI)
+- **djLint** for Go `html/template` format/lint (`pipx:djlint` in `mise.toml`; config `djlint.toml`, profile `golang`)
 
 ## Essential commands
 ### Backend (Go)
@@ -82,6 +83,18 @@ Backend unit tests with a 90% gate (from repo root):
 ```bash
 task cover
 ```
+
+### Templates (djLint)
+```bash
+mise install          # installs pipx:djlint among other tools
+task templates:fmt    # rewrite server/templates
+task templates:check  # CI-style format gate (no write)
+task templates:lint   # lint rules only
+```
+
+Both Taskfile and the Cursor/VS Code djLint extension run through `deployment/scripts/djlint.sh` (`mise exec -- djlint`), so teammates do not need shims on PATH or machine-specific `executablePath` settings.
+
+Do **not** use Prettier / the built-in HTML formatter on `server/templates/**/*.html` — they mangle `{{ }}`. Install recommended workspace extensions (`monosans.djlint`, `hverlin.mise-vscode`). Format Document uses djLint + `djlint.toml`.
 
 ### Frontend (Vite)
 Build bundle (backend expects `../web/dist` to exist):
