@@ -111,27 +111,3 @@ func TestBuildPlatformAdminBreadcrumbs(t *testing.T) {
 		}
 	}
 }
-
-func TestBuildOnboardingBreadcrumbs(t *testing.T) {
-	join := buildOnboardingJoinBreadcrumbs()
-	if len(join.Items) != 2 {
-		t.Fatalf("join len = %d", len(join.Items))
-	}
-	if join.Items[0].Label != "Onboarding" || join.Items[0].Href != onboardingPath() {
-		t.Fatalf("join root = %+v", join.Items[0])
-	}
-	if join.Items[1].Label != "Join an organization" || join.Items[1].Href != onboardingJoinPath() || !join.Items[1].Current {
-		t.Fatalf("join current = %+v", join.Items[1])
-	}
-
-	request := buildOnboardingRequestOrganizationBreadcrumbs()
-	if len(request.Items) != 2 {
-		t.Fatalf("request len = %d", len(request.Items))
-	}
-	if request.Items[0].Label != "Onboarding" || request.Items[0].Href != onboardingPath() {
-		t.Fatalf("request root = %+v", request.Items[0])
-	}
-	if request.Items[1].Label != "Request a new organization" || request.Items[1].Href != onboardingRequestOrganizationPath() || !request.Items[1].Current {
-		t.Fatalf("request current = %+v", request.Items[1])
-	}
-}

@@ -285,8 +285,8 @@ func TestHandleOnboardingJoinAndRequestPages(t *testing.T) {
 		body := rec.Body.String()
 		for _, want := range []string{
 			"Join an organization",
-			`class="breadcrumbs"`,
-			">Onboarding<",
+			`class="back-link"`,
+			"Get started",
 			`href="/my/onboarding"`,
 			`name="q"`,
 			`hx-trigger="input changed delay:200ms, search"`,
@@ -313,8 +313,8 @@ func TestHandleOnboardingJoinAndRequestPages(t *testing.T) {
 			"organization creation request",
 			`name="name"`,
 			"Submit organization creation request",
-			`class="breadcrumbs"`,
-			">Onboarding<",
+			`class="back-link"`,
+			"Get started",
 			`href="/my/onboarding"`,
 		} {
 			if !strings.Contains(body, want) {

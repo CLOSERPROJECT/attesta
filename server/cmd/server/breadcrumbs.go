@@ -38,20 +38,6 @@ func buildPlatformAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 	}}
 }
 
-func buildOnboardingJoinBreadcrumbs() BreadcrumbsView {
-	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Onboarding", Href: onboardingPath()},
-		{Label: "Join an organization", Href: onboardingJoinPath(), Current: true},
-	}}
-}
-
-func buildOnboardingRequestOrganizationBreadcrumbs() BreadcrumbsView {
-	return BreadcrumbsView{Items: []BreadcrumbItem{
-		{Label: "Onboarding", Href: onboardingPath()},
-		{Label: "Request a new organization", Href: onboardingRequestOrganizationPath(), Current: true},
-	}}
-}
-
 func platformAdminSectionLabel(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
 	case "categories":

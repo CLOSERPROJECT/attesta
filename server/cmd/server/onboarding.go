@@ -33,9 +33,9 @@ type OnboardingHubView struct {
 
 type OnboardingRequestOrganizationView struct {
 	PageBase
-	Breadcrumbs BreadcrumbsView
-	FormError   string
-	NameValue   string
+	BackLink  BackLinkView
+	FormError string
+	NameValue string
 }
 
 type OnboardingJoinOrgResult struct {
@@ -47,7 +47,7 @@ type OnboardingJoinOrgResult struct {
 
 type OnboardingJoinView struct {
 	PageBase
-	Breadcrumbs      BreadcrumbsView
+	BackLink         BackLinkView
 	FormError        string
 	SearchQuery      string
 	Results          []OnboardingJoinOrgResult
@@ -341,7 +341,7 @@ func (s *Server) buildOnboardingJoinDialogView(w http.ResponseWriter, r *http.Re
 func (s *Server) buildOnboardingJoinView(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, searchQuery, selectedOrgSlug string, requestedPage int) (OnboardingJoinView, bool) {
 	view := OnboardingJoinView{
 		PageBase:        s.pageBaseForUser(user, "onboarding_join_body", "", ""),
-		Breadcrumbs:     buildOnboardingJoinBreadcrumbs(),
+		BackLink:        BackLinkView{Href: onboardingPath(), Label: "Get started"},
 		FormError:       strings.TrimSpace(formError),
 		SearchQuery:     strings.TrimSpace(searchQuery),
 		SelectedOrgSlug: strings.TrimSpace(selectedOrgSlug),
@@ -453,10 +453,10 @@ func normalizeOnboardingJoinPage(raw int, totalItems int) int {
 
 func (s *Server) renderOnboardingRequestOrganization(w http.ResponseWriter, r *http.Request, user *AccountUser, formError, nameValue string) {
 	view := OnboardingRequestOrganizationView{
-		PageBase:    s.pageBaseForUser(user, "onboarding_request_organization_body", "", ""),
-		Breadcrumbs: buildOnboardingRequestOrganizationBreadcrumbs(),
-		FormError:   strings.TrimSpace(formError),
-		NameValue:   strings.TrimSpace(nameValue),
+		PageBase:  s.pageBaseForUser(user, "onboarding_request_organization_body", "", ""),
+		BackLink:  BackLinkView{Href: onboardingPath(), Label: "Get started"},
+		FormError: strings.TrimSpace(formError),
+		NameValue: strings.TrimSpace(nameValue),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "onboarding_request_organization.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
