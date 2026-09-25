@@ -83,7 +83,7 @@ Done when: the new or changed piece mirrors a same-tier neighbor (paths, define,
 - `StreamCardView` in `components.go`
 - Tests: `stream_card_test.go`
 
-Other full neighbors (same layout pattern): `stream_instance_card`, `stream_termination_details`, `breadcrumbs` (`Current: true` on last crumb; every crumb still has `Href`), `substep_shell` / `substep_body`, `dpp_history_step`.
+Other full neighbors (same layout pattern): `stream_instance_card`, `stream_termination_details`, `breadcrumbs` (`Current: true` on last crumb; every crumb still has `Href`), `role_pill_row` (`Size` `sm`|`lg`|`""`, optional `Label`), `substep_shell` / `substep_body`, `dpp_history_step`.
 
 **CSS-only / micro-partial:** copy markup from an existing page or micro-partial (`status_tag`, `tip`, `local_datetime`); read the CSS file header for the contract — do not invent a shared view struct.
 

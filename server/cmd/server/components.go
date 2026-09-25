@@ -398,6 +398,21 @@ type BreadcrumbsView struct {
 	Items []BreadcrumbItem
 }
 
+// RolePillView is one palette-colored pill in templates/components/role_pill_row.html.
+type RolePillView struct {
+	Label   string
+	Palette string
+}
+
+// RolePillRowView is the view model for templates/components/role_pill_row.html.
+// Size is "" (default), "sm", or "lg". Class is an optional extra class on the row (e.g. "u-m-0").
+type RolePillRowView struct {
+	Pills []RolePillView
+	Label string
+	Size  string
+	Class string
+}
+
 // AdminConsoleNavItem is one soft-nav link in templates/components/admin_console.html.
 type AdminConsoleNavItem struct {
 	Href   string

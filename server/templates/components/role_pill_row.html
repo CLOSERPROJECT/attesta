@@ -1,0 +1,15 @@
+{{ define "role_pill_row" }}
+  {{ if .Pills }}
+    <div class="role-pill-row{{ if .Class }} {{ .Class }}{{ end }}">
+      {{ if .Label }}
+        <span class="role-pill-label">{{ .Label }}</span>
+      {{ end }}
+      {{ range .Pills }}
+        <span
+          class="pill role-pill{{ if eq $.Size "sm" }} pill-sm{{ else if eq $.Size "lg" }} pill-lg{{ end }}"
+          {{ if .Palette }}data-role-palette="{{ .Palette }}"{{ end }}
+        >{{ .Label }}</span>
+      {{ end }}
+    </div>
+  {{ end }}
+{{ end }}

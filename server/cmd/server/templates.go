@@ -29,6 +29,9 @@ func templateFuncs() template.FuncMap {
 		"orgAdminConsole":          orgAdminConsole,
 		"rolesPickerFromRoles":     rolesPickerFromRoles,
 		"rolesPickerFromOrgAdminOptions": rolesPickerFromOrgAdminOptions,
+		"rolePillRowFromOrgAdminOptions": rolePillRowFromOrgAdminOptions,
+		"rolePillRowSelectedFromOrgAdminOptions": rolePillRowSelectedFromOrgAdminOptions,
+		"rolePillRowFromSubstepBody": rolePillRowFromSubstepBody,
 		"dataAutoOpen":             dataAutoOpen,
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {

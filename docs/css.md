@@ -41,6 +41,7 @@ Import new component/page modules from the matching barrel (`components.css` / `
 - `pages/home.css` also styles stream dashboard nav panels used by `pages/stream.html`
 - `pages/public-home.css` ↔ `pages/public_home.html` (marketing landing; uses shared app topbar + `site_footer`)
 - `components/site_footer.html` → `components/site-footer.css` (shared chrome footer on all layout pages)
+- `components/role_pill_row.html` → `components/role-pill-row.css` (`.role-pill-row*`; pill primitives stay in `shared.css`)
 - `pages/org-admin-page.css` ↔ `pages/org_admin.html` (page shell); widgets/pickers stay in `components/org-admin.css`
 - `components/stream.css` is a cluster (sort toolbar, `.status-tag*` via `status_tag`) — not paired 1:1 with a `stream_*.html` component
 - `components/dpp_history_step.html` styles live under `pages/dpp.css` (`.dpp-history-*`)
@@ -126,6 +127,7 @@ Appwrite { slug, name, palette }  →  backend (orgSlug, roleSlug)  →  data-ro
 Writes persist `palette` only; legacy `color` CSS-var strings fall back via `rolePaletteKeyFromStyle()`. `GET /api/catalog` returns `palette`. Unknown → `"fallback"`. Lookup: step `organization:` → `(stepOrg, roleSlug)`; else first org containing the slug. Keys stay in sync via `TestRolePaletteKeysMatchCSS`.
 
 ```html
+{{ template "role_pill_row" (rolePillRowFromOrgAdminOptions .Roles "sm") }}
 <span class="role-pill" data-role-palette="{{ .Palette }}">{{ .Label }}</span>
 {{ template "status_tag" .Status }}
 ```
