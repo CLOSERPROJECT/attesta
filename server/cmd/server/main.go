@@ -519,10 +519,12 @@ type OrgAdminRoleOption struct {
 }
 
 type OrgAdminRoleRow struct {
-	Slug    string
-	Name    string
-	Palette string
-	InUse   bool
+	Slug         string
+	Name         string
+	Palette      string
+	InUse        bool
+	CanDelete    bool
+	DeleteReason string
 }
 
 type OrgAdminUserRow struct {
@@ -531,7 +533,10 @@ type OrgAdminUserRow struct {
 	Status                 string
 	Activated              bool
 	IsOrgAdmin             bool
+	IsSelf                 bool
 	OrgAdminStandingLocked bool
+	CanDelete              bool
+	DeleteReason           string
 	RoleOptions            []OrgAdminRoleOption
 }
 
@@ -4009,13 +4014,26 @@ func organizationRoleInUse(roleSlug string, users []OrgAdminUserRow, invites []O
 }
 
 func buildOrgAdminRoleRows(roles []Role, users []OrgAdminUserRow, invites []OrgAdminInviteRow) []OrgAdminRoleRow {
-	rows := make([]OrgAdminRoleRow, 0, len(roles))
-	for _, role := range organizationCatalogRoles(roles) {
+	catalog := organizationCatalogRoles(roles)
+	onlyOne := len(catalog) <= 1
+	rows := make([]OrgAdminRoleRow, 0, len(catalog))
+	for _, role := range catalog {
+		inUse := organizationRoleInUse(role.Slug, users, invites)
+		canDelete := !inUse && !onlyOne
+		deleteReason := ""
+		switch {
+		case inUse:
+			deleteReason = "Role in use"
+		case onlyOne:
+			deleteReason = "Organizations must keep at least one role."
+		}
 		rows = append(rows, OrgAdminRoleRow{
-			Slug:    strings.TrimSpace(role.Slug),
-			Name:    strings.TrimSpace(role.Name),
-			Palette: role.Palette,
-			InUse:   organizationRoleInUse(role.Slug, users, invites),
+			Slug:         strings.TrimSpace(role.Slug),
+			Name:         strings.TrimSpace(role.Name),
+			Palette:      role.Palette,
+			InUse:        inUse,
+			CanDelete:    canDelete,
+			DeleteReason: deleteReason,
 		})
 	}
 	return rows
@@ -4060,10 +4078,30 @@ func buildOrgAdminUserRowsFromIdentity(rolePills []OrgAdminRoleOption, users []I
 			Activated:              !strings.EqualFold(strings.TrimSpace(orgUser.Status), "pending") && !strings.EqualFold(strings.TrimSpace(orgUser.Status), "invited"),
 			IsOrgAdmin:             orgUser.IsOrgAdmin,
 			OrgAdminStandingLocked: orgUser.IsOrgAdmin && adminCount < 2,
+			CanDelete:              true,
 			RoleOptions:            roleOptions,
 		})
 	}
 	return orgUsers
+}
+
+// annotateOrgAdminUserRows marks the current admin's row and disables self-delete.
+func annotateOrgAdminUserRows(rows []OrgAdminUserRow, current *AccountUser) {
+	if current == nil {
+		return
+	}
+	selfKey := firstNonEmpty(strings.TrimSpace(current.IdentityUserID), strings.TrimSpace(current.Email))
+	if selfKey == "" {
+		return
+	}
+	for i := range rows {
+		if strings.TrimSpace(rows[i].UserID) != selfKey {
+			continue
+		}
+		rows[i].IsSelf = true
+		rows[i].CanDelete = false
+		rows[i].DeleteReason = "You can't delete your own account from here. Use Leave."
+	}
 }
 
 func buildOrgAdminInviteRowsFromMemberships(memberships []IdentityMembership, roles []Role, now time.Time) []OrgAdminInviteRow {
@@ -4136,7 +4174,6 @@ func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug stri
 }
 
 func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSlug string) (Organization, []Role, []OrgAdminUserRow, []OrgAdminInviteRow, error) {
-	_ = user
 	if s.identity == nil {
 		return Organization{}, nil, nil, nil, ErrIdentityNotFound
 	}
@@ -4153,6 +4190,7 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 		return Organization{}, nil, nil, nil, identityUsersErr
 	}
 	orgUsers := buildOrgAdminUserRowsFromIdentity(rolePills, identityUsers)
+	annotateOrgAdminUserRows(orgUsers, user)
 
 	if memberships, membershipsErr := s.identity.ListOrganizationMemberships(ctx, org.Slug); membershipsErr == nil {
 		return org, roles, orgUsers, buildOrgAdminInviteRowsFromMemberships(memberships, roles, s.nowUTC()), nil
@@ -4822,10 +4860,6 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if firstNonEmpty(target.ID, target.Email) == firstNonEmpty(admin.IdentityUserID, admin.Email) && !isOrgAdmin {
-			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove Org admin standing from your own account"})
-			return
-		}
 		if target.IsOrgAdmin && !isOrgAdmin {
 			otherAdmins := 0
 			for _, orgUser := range targetUsers {
@@ -4841,7 +4875,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 				otherAdmins++
 			}
 			if otherAdmins == 0 {
-				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove Org admin standing from the only Org admin"})
+				s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "cannot remove Org admin from the only Org admin"})
 				return
 			}
 		}

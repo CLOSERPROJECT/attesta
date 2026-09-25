@@ -2222,11 +2222,152 @@ func TestHandleOrgAdminUsersSetRolesWithIdentity(t *testing.T) {
 
 	server.handleOrgAdminUsers(selfRec, selfReq)
 
-	if selfRec.Code != http.StatusOK {
-		t.Fatalf("self status = %d, want %d", selfRec.Code, http.StatusOK)
+	if selfRec.Code != http.StatusSeeOther {
+		t.Fatalf("self status = %d, want %d body=%q", selfRec.Code, http.StatusSeeOther, selfRec.Body.String())
 	}
-	if !strings.Contains(selfRec.Body.String(), "cannot remove Org admin standing from your own account") {
-		t.Fatalf("expected self-protection message, got %q", selfRec.Body.String())
+	if hasIdentityLabel(users[0].Labels, identityOrgAdminLabel) {
+		t.Fatalf("expected self demotion after peer admin exists, labels=%#v", users[0].Labels)
+	}
+}
+
+func TestHandleOrgAdminUsersSetRolesBlocksSoleSelfDemote(t *testing.T) {
+	now := time.Now().UTC()
+	users := []IdentityUser{
+		{
+			ID:         "user-1",
+			Email:      "owner@example.com",
+			OrgSlug:    "acme",
+			Labels:     []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")},
+			IsOrgAdmin: true,
+			Status:     "active",
+		},
+		{
+			ID:      "user-2",
+			Email:   "member@example.com",
+			OrgSlug: "acme",
+			Labels:  []string{encodeIdentityRoleLabel("qa-reviewer")},
+			Status:  "active",
+		},
+	}
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return users[0], nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				return &IdentityOrg{
+					ID:    "team-1",
+					Slug:  "acme",
+					Name:  "Acme Org",
+					Roles: []IdentityRole{{Slug: "qa-reviewer", Name: "QA Reviewer"}},
+				}, nil
+			},
+			listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+				return append([]IdentityUser(nil), users...), nil
+			},
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-1&roles=qa-reviewer"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "cannot remove Org admin from the only Org admin") {
+		t.Fatalf("expected sole Org admin message, got %q", rec.Body.String())
+	}
+	if !hasIdentityLabel(users[0].Labels, identityOrgAdminLabel) {
+		t.Fatal("sole admin labels must remain unchanged")
+	}
+}
+
+func TestHandleOrgAdminUsersSetRolesAllowsSelfDemoteWhenPeersExist(t *testing.T) {
+	now := time.Now().UTC()
+	users := []IdentityUser{
+		{
+			ID:         "user-1",
+			Email:      "owner@example.com",
+			OrgSlug:    "acme",
+			Labels:     []string{identityOrgAdminLabel, encodeIdentityRoleLabel("qa-reviewer")},
+			IsOrgAdmin: true,
+			Status:     "active",
+		},
+		{
+			ID:         "user-2",
+			Email:      "co@example.com",
+			OrgSlug:    "acme",
+			Labels:     []string{identityOrgAdminLabel},
+			IsOrgAdmin: true,
+			Status:     "active",
+		},
+	}
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      NewMemoryStore(),
+		identity: &fakeIdentityStore{
+			getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
+				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return users[0], nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				org := IdentityOrg{
+					ID:   "team-1",
+					Slug: "acme",
+					Name: "Acme Org",
+					Roles: []IdentityRole{
+						{Slug: "qa-reviewer", Name: "QA Reviewer"},
+					},
+				}
+				return &org, nil
+			},
+			listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+				return append([]IdentityUser(nil), users...), nil
+			},
+			updateUserLabelsFunc: func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+				for idx := range users {
+					if users[idx].ID != userID {
+						continue
+					}
+					users[idx].Labels = append([]string(nil), labels...)
+					users[idx].IsOrgAdmin = hasIdentityLabel(labels, identityOrgAdminLabel)
+					return users[idx], nil
+				}
+				return IdentityUser{}, ErrIdentityNotFound
+			},
+		},
+		tmpl:        testTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=set_roles&userId=user-1&roles=qa-reviewer"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+	rec := httptest.NewRecorder()
+	server.handleOrgAdminUsers(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusSeeOther, rec.Body.String())
+	}
+	if hasIdentityLabel(users[0].Labels, identityOrgAdminLabel) {
+		t.Fatalf("expected self demotion, labels=%#v", users[0].Labels)
+	}
+	if !hasIdentityLabel(users[1].Labels, identityOrgAdminLabel) {
+		t.Fatalf("peer admin must remain, labels=%#v", users[1].Labels)
 	}
 }
 
@@ -3233,7 +3374,7 @@ func TestLoadOrgAdminStateIdentityFallbacks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadOrgAdminState error: %v", err)
 	}
-	if gotOrg.Slug != "acme-org" || len(roles) != 2 || len(users) != 1 || invites != nil {
+	if gotOrg.Slug != "acme-org" || len(roles) != 1 || len(users) != 1 || invites != nil {
 		t.Fatalf("state = %#v %#v %#v %#v", gotOrg, roles, users, invites)
 	}
 }

@@ -83,7 +83,7 @@ A user’s membership in at most one organization at a time. Unaffiliated means 
 _Avoid_: Multi-org membership, active org switcher, workspace
 
 **Org admin**:
-Privileged standing within an Affiliation: can manage organization profile, Role catalog, and members. Orthogonal to Organization roles — an Org admin may hold zero or more Organization roles. Never an entry in the Role catalog.
+Privileged standing within an Affiliation: can manage organization profile, Role catalog, and members. Orthogonal to Organization roles — an Org admin may hold zero or more Organization roles. Never an entry in the Role catalog. An Org admin may grant or remove Org admin standing for any affiliated user (including themselves) when at least one other Org admin would remain; the sole Org admin’s standing cannot be removed. An Org admin cannot remove their own Affiliation via member delete — that exit is Leave.
 _Avoid_: Treating Org admin as a catalog / Organization role, “org-admin” as one more role among peers (in domain docs)
 
 **Member**:
@@ -102,9 +102,13 @@ _Avoid_: Catalog role, org role (vague), membership role, Org admin
 A role named on a Stream blueprint to gate Substeps. Matched to Organization roles by slug; not itself a Role catalog entry.
 _Avoid_: Catalog role, workflow role (in domain docs), Organization role (when meaning the blueprint gate)
 
-**Organization home**:
-The affiliated user’s screen for their current organization: org identity (name, logo), the user’s Organization roles, and leave. Distinct from the Org admin console sections (profile edit, Role catalog, members).
-_Avoid_: Account page, My Org settings (when meaning admin console), org admin console
+**Account settings**:
+The signed-in user’s modal for account-level actions on their current Affiliation (notably Leave). Distinct from the Org admin console.
+_Avoid_: Organization home, account page, My Org settings (when meaning admin console), org admin console
+
+**Leave**:
+The affiliated user’s action of ending their own Affiliation. Distinct from an Org admin removing another member. A sole Org admin cannot Leave until another Org admin exists.
+_Avoid_: Delete self, resign, unlink, soft-delete (when meaning self-serve exit)
 
 **Operator**:
 The default Organization role created with every new organization so Members have a joinable role. An organization must keep at least one Organization role in its Role catalog.

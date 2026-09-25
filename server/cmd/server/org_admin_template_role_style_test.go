@@ -134,11 +134,49 @@ func TestOrgAdminTemplateLocksSoleOrgAdminStanding(t *testing.T) {
 		`type="hidden" name="is_org_admin" value="1"`,
 		"disabled",
 		"is-disabled",
-		"This is the only Org admin",
+		"This is the only Org admin. Add another before removing this one.",
 	} {
 		if !strings.Contains(manageDialog, want) {
 			t.Fatalf("expected %q in locked manage-user dialog, got:\n%s", want, manageDialog)
 		}
+	}
+}
+
+func TestBuildOrgAdminRoleRowsLastRoleCannotDelete(t *testing.T) {
+	rows := buildOrgAdminRoleRows([]Role{{Slug: "operator", Name: "Operator"}}, nil, nil)
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	if rows[0].CanDelete {
+		t.Fatal("sole catalog role must not be deletable")
+	}
+	if rows[0].DeleteReason != "Organizations must keep at least one role." {
+		t.Fatalf("DeleteReason = %q", rows[0].DeleteReason)
+	}
+
+	two := buildOrgAdminRoleRows([]Role{
+		{Slug: "operator", Name: "Operator"},
+		{Slug: "approver", Name: "Approver"},
+	}, nil, nil)
+	if !two[0].CanDelete || !two[1].CanDelete {
+		t.Fatalf("unused roles should be deletable when more than one exist: %#v", two)
+	}
+}
+
+func TestAnnotateOrgAdminUserRowsDisablesSelfDelete(t *testing.T) {
+	rows := []OrgAdminUserRow{
+		{UserID: "admin-1", Email: "owner@example.com", CanDelete: true},
+		{UserID: "member-1", Email: "member@example.com", CanDelete: true},
+	}
+	annotateOrgAdminUserRows(rows, &AccountUser{IdentityUserID: "admin-1", Email: "owner@example.com"})
+	if !rows[0].IsSelf || rows[0].CanDelete {
+		t.Fatalf("self row = %#v", rows[0])
+	}
+	if !strings.Contains(rows[0].DeleteReason, "Use Leave") {
+		t.Fatalf("DeleteReason = %q", rows[0].DeleteReason)
+	}
+	if rows[1].IsSelf || !rows[1].CanDelete {
+		t.Fatalf("peer row = %#v", rows[1])
 	}
 }
 

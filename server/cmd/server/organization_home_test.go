@@ -70,11 +70,13 @@ func TestHandleOrganizationHomeAffiliatedMember(t *testing.T) {
 		`id="leave-organization-dialog"`,
 		`action="/my/leave-organization"`,
 		`class="dialog"`,
-		"only organization admin",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in organization home, got:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, "only organization admin") || strings.Contains(body, "only Org admin") {
+		t.Fatalf("non-admin member leave dialog must not mention sole-admin gate, got:\n%s", body)
 	}
 	if strings.Contains(body, "Manage organization") {
 		t.Fatal("non-admin member must not see Manage organization")
@@ -123,6 +125,7 @@ func TestOrganizationHomeLeaveDialogMarkup(t *testing.T) {
 		PageBase:         PageBase{Body: "organization_home_body"},
 		OrganizationName: "Acme Org",
 		LeavePath:        leaveOrganizationPath(),
+		CanLeave:         true,
 		Roles: []OrgAdminRoleOption{
 			{Slug: "viewer", Name: "Viewer", Palette: "blue"},
 		},
@@ -148,12 +151,73 @@ func TestOrganizationHomeLeaveDialogMarkup(t *testing.T) {
 		`class="dialog-subtitle"`,
 		`class="dialog-actions"`,
 		`action="/my/leave-organization"`,
-		"only organization admin",
 		`class="btn btn-danger"`,
 	} {
 		if !strings.Contains(dialog, want) {
 			t.Fatalf("expected %q in leave dialog markup, got:\n%s", want, dialog)
 		}
+	}
+	if strings.Contains(dialog, "only Org admin") || strings.Contains(dialog, "only organization admin") {
+		t.Fatalf("leave dialog must not repeat sole-admin gate copy, got:\n%s", dialog)
+	}
+}
+
+func TestOrganizationHomeLeaveGateBlocksSoleOrgAdmin(t *testing.T) {
+	identity := &fakeIdentityStore{
+		listOrganizationUsersFunc: func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+			return []IdentityUser{
+				{ID: "admin-1", Email: "owner@example.com", IsOrgAdmin: true},
+			}, nil
+		},
+	}
+	canLeave, reason := organizationHomeLeaveGate(context.Background(), identity, &AccountUser{
+		IdentityUserID: "admin-1",
+		Email:          "owner@example.com",
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"org-admin"},
+	})
+	if canLeave {
+		t.Fatal("sole Org admin must not leave")
+	}
+	if !strings.Contains(reason, "only Org admin") {
+		t.Fatalf("LeaveReason = %q", reason)
+	}
+
+	identity.listOrganizationUsersFunc = func(ctx context.Context, orgSlug string) ([]IdentityUser, error) {
+		return []IdentityUser{
+			{ID: "admin-1", Email: "owner@example.com", IsOrgAdmin: true},
+			{ID: "admin-2", Email: "co@example.com", IsOrgAdmin: true},
+		}, nil
+	}
+	canLeave, reason = organizationHomeLeaveGate(context.Background(), identity, &AccountUser{
+		IdentityUserID: "admin-1",
+		Email:          "owner@example.com",
+		OrgSlug:        "acme",
+		RoleSlugs:      []string{"org-admin"},
+	})
+	if !canLeave || reason != "" {
+		t.Fatalf("shared admins can leave: canLeave=%v reason=%q", canLeave, reason)
+	}
+}
+
+func TestOrganizationHomeLeaveBlockedMarkup(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	view := OrganizationHomeView{
+		OrganizationName: "Acme Org",
+		LeavePath:        leaveOrganizationPath(),
+		CanLeave:         false,
+		LeaveReason:      "You're the only Org admin. Add another before leaving.",
+	}
+	if err := tmpl.ExecuteTemplate(&out, "organization_home_body", view); err != nil {
+		t.Fatalf("ExecuteTemplate: %v", err)
+	}
+	body := out.String()
+	if strings.Contains(body, `id="leave-organization-dialog"`) {
+		t.Fatal("blocked leave must not render confirm dialog")
+	}
+	if !strings.Contains(body, `disabled`) || !strings.Contains(body, "only Org admin") {
+		t.Fatalf("expected disabled leave + reason, got:\n%s", body)
 	}
 }
 

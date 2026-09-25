@@ -17,6 +17,7 @@ type StreamCardView struct {
 	EditAction        string
 	EditRequiresPurge bool
 	CanDelete         bool
+	DeleteReason      string
 	DeleteAction      string
 }
 
@@ -36,6 +37,7 @@ type ManagedPublicStreamCardView struct {
 	EditAction        string
 	EditRequiresPurge bool
 	CanDelete         bool
+	DeleteReason      string
 	DeleteAction      string
 }
 

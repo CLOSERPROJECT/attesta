@@ -321,11 +321,6 @@
                           aria-label="Edit role"
                           title="Role in use"
                           disabled>{{ template "icon-settings-muted" . }}</button>
-                  <button type="button"
-                          class="btn btn-ghost-danger btn-icon btn-xs"
-                          aria-label="Delete role"
-                          title="Role in use"
-                          disabled>{{ template "icon-trash-muted" . }}</button>
                 {{ else }}
                   <span class="muted u-text-xs">Not used</span>
                   <button type="button"
@@ -334,15 +329,23 @@
                           onclick="document.getElementById('edit-role-{{ .Slug }}').showModal()">
                     {{ template "icon-settings" . }}
                   </button>
+                {{ end }}
+                {{ if .CanDelete }}
                   <button type="button"
                           class="btn btn-ghost-danger btn-icon btn-xs"
                           aria-label="Delete role"
                           onclick="document.getElementById('delete-role-{{ .Slug }}').showModal()">
                     {{ template "icon-trash" . }}
                   </button>
+                {{ else }}
+                  <button type="button"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
+                          aria-label="Delete role"
+                          title="{{ .DeleteReason }}"
+                          disabled>{{ template "icon-trash-muted" . }}</button>
                 {{ end }}
               </div>
-              {{ if and $.RoleError (or (eq $.RoleDialogAction "edit") (eq $.RoleDialogAction "delete")) (eq $.RoleDialogSlug .Slug) .InUse }}
+              {{ if and $.RoleError (or (eq $.RoleDialogAction "edit") (eq $.RoleDialogAction "delete")) (eq $.RoleDialogSlug .Slug) }}
                 <p class="error">{{ $.RoleError }}</p>
               {{ end }}
               {{ if not .InUse }}
@@ -419,40 +422,42 @@
                     </form>
                   </div>
                 </dialog>
-                <dialog id="delete-role-{{ .Slug }}"
-                        class="dialog"
-                        {{ dataAutoOpen ($.RoleDialogAutoOpen "delete" .Slug) }}>
-                  <div class="dialog-card">
-                    <header class="dialog-head">
-                      <div>
-                        <h3 class="dialog-title u-text-danger">Danger zone - Delete role</h3>
-                        <p class="dialog-subtitle">This action cannot be undone</p>
+                {{ if .CanDelete }}
+                  <dialog id="delete-role-{{ .Slug }}"
+                          class="dialog"
+                          {{ dataAutoOpen ($.RoleDialogAutoOpen "delete" .Slug) }}>
+                    <div class="dialog-card">
+                      <header class="dialog-head">
+                        <div>
+                          <h3 class="dialog-title u-text-danger">Danger zone - Delete role</h3>
+                          <p class="dialog-subtitle">This action cannot be undone</p>
+                        </div>
+                        <button type="button"
+                                class="btn btn-ghost btn-icon dialog-close"
+                                onclick="document.getElementById('delete-role-{{ .Slug }}').close()">
+                          {{ template "icon-close" . }}
+                        </button>
+                      </header>
+                      <div class="org-admin-dialog-role-pill">
+                        <span class="pill pill-lg role-pill" data-role-palette="{{ .Palette }}">{{ .Name }}</span>
                       </div>
-                      <button type="button"
-                              class="btn btn-ghost btn-icon dialog-close"
-                              onclick="document.getElementById('delete-role-{{ .Slug }}').close()">
-                        {{ template "icon-close" . }}
-                      </button>
-                    </header>
-                    <div class="org-admin-dialog-role-pill">
-                      <span class="pill pill-lg role-pill" data-role-palette="{{ .Palette }}">{{ .Name }}</span>
+                      <p>
+                        This will permanently remove the role from your
+                        organization. Confirm only if you want to continue.
+                      </p>
+                      {{ if and (eq $.RoleDialogAction "delete") (eq $.RoleDialogSlug .Slug) $.RoleError }}
+                        <p class="error">{{ $.RoleError }}</p>
+                      {{ end }}
+                      <form method="post" action="/my/organization/roles" class="input-form">
+                        <input type="hidden" name="intent" value="delete_role" />
+                        <input type="hidden" name="role_slug" value="{{ .Slug }}" />
+                        <div class="dialog-actions">
+                          <button type="submit" class="btn btn-danger">Delete role</button>
+                        </div>
+                      </form>
                     </div>
-                    <p>
-                      This will permanently remove the role from your
-                      organization. Confirm only if you want to continue.
-                    </p>
-                    {{ if and (eq $.RoleDialogAction "delete") (eq $.RoleDialogSlug .Slug) $.RoleError }}
-                      <p class="error">{{ $.RoleError }}</p>
-                    {{ end }}
-                    <form method="post" action="/my/organization/roles" class="input-form">
-                      <input type="hidden" name="intent" value="delete_role" />
-                      <input type="hidden" name="role_slug" value="{{ .Slug }}" />
-                      <div class="dialog-actions">
-                        <button type="submit" class="btn btn-danger">Delete role</button>
-                      </div>
-                    </form>
-                  </div>
-                </dialog>
+                  </dialog>
+                {{ end }}
               {{ end }}
             </li>
           {{ end }}
@@ -689,12 +694,20 @@
                         onclick="document.getElementById('manage-user-{{ .UserID }}').showModal()">
                   {{ template "icon-settings" . }}
                 </button>
-                <button type="button"
-                        class="btn btn-ghost-danger btn-icon btn-xs"
-                        aria-label="Delete user"
-                        onclick="document.getElementById('delete-user-{{ .UserID }}').showModal()">
-                  {{ template "icon-trash" . }}
-                </button>
+                {{ if .CanDelete }}
+                  <button type="button"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
+                          aria-label="Delete user"
+                          onclick="document.getElementById('delete-user-{{ .UserID }}').showModal()">
+                    {{ template "icon-trash" . }}
+                  </button>
+                {{ else }}
+                  <button type="button"
+                          class="btn btn-ghost-danger btn-icon btn-xs"
+                          aria-label="Delete user"
+                          title="{{ .DeleteReason }}"
+                          disabled>{{ template "icon-trash-muted" . }}</button>
+                {{ end }}
               </div>
               <dialog id="manage-user-{{ .UserID }}" class="dialog dialog-overflow">
                 <div class="dialog-card">
@@ -710,7 +723,8 @@
                     </button>
                   </header>
 
-                  <form method="post"
+                  <form id="manage-user-form-{{ .UserID }}"
+                        method="post"
                         action="/my/organization/users"
                         class="input-form input-form-loose">
                     <input type="hidden" name="intent" value="set_roles" />
@@ -734,45 +748,85 @@
                       </label>
                       <p class="form-field-hint">
                         {{ if .OrgAdminStandingLocked }}
-                          This is the only Org admin. Add another before removing standing.
+                          This is the only Org admin. Add another before removing this one.
                         {{ else }}
                           Can manage organization profile, roles, and members.
                         {{ end }}
                       </p>
                     </div>
                     <div class="dialog-actions">
-                      <button class="btn btn-primary" type="submit">Save roles</button>
+                      {{ if and .IsSelf .IsOrgAdmin (not .OrgAdminStandingLocked) }}
+                        <button class="btn btn-primary"
+                                type="button"
+                                onclick="(function(btn){ var f=btn.closest('form'); var cb=f.querySelector('input[name=is_org_admin]'); if(cb && !cb.checked){ document.getElementById('confirm-remove-org-admin-{{ .UserID }}').showModal(); return; } f.requestSubmit(); })(this)">
+                          Save roles
+                        </button>
+                      {{ else }}
+                        <button class="btn btn-primary" type="submit">Save roles</button>
+                      {{ end }}
                     </div>
                   </form>
                 </div>
               </dialog>
-              <dialog id="delete-user-{{ .UserID }}" class="dialog">
-                <div class="dialog-card">
-                  <header class="dialog-head">
-                    <div>
-                      <h3 class="dialog-title u-text-danger">Danger zone - Delete Account</h3>
-                      <p class="dialog-subtitle">{{ .Email }}</p>
-                    </div>
-                    <button type="button"
-                            class="btn btn-ghost btn-icon dialog-close"
-                            onclick="document.getElementById('delete-user-{{ .UserID }}').close()">
-                      {{ template "icon-close" . }}
-                    </button>
-                  </header>
-                  <p class="u-m-0 u-mb-5">
-                    This will remove the account from your organization.
-                    Confirm only if you want to permanently delete this
-                    user access.
-                  </p>
-                  <form method="post" action="/my/organization/users" class="input-form">
-                    <input type="hidden" name="intent" value="delete_user" />
-                    <input type="hidden" name="userId" value="{{ .UserID }}" />
+              {{ if and .IsSelf .IsOrgAdmin (not .OrgAdminStandingLocked) }}
+                <dialog id="confirm-remove-org-admin-{{ .UserID }}" class="dialog">
+                  <div class="dialog-card">
+                    <header class="dialog-head">
+                      <div>
+                        <h3 class="dialog-title u-text-danger">Remove Org admin</h3>
+                        <p class="dialog-subtitle">{{ .Email }}</p>
+                      </div>
+                      <button type="button"
+                              class="btn btn-ghost btn-icon dialog-close"
+                              onclick="document.getElementById('confirm-remove-org-admin-{{ .UserID }}').close()">
+                        {{ template "icon-close" . }}
+                      </button>
+                    </header>
+                    <p class="u-m-0 u-mb-5">You'll lose Org admin. Continue?</p>
                     <div class="dialog-actions">
-                      <button type="submit" class="btn btn-danger">Delete account</button>
+                      <button type="button"
+                              class="btn btn-ghost"
+                              onclick="document.getElementById('confirm-remove-org-admin-{{ .UserID }}').close()">
+                        Cancel
+                      </button>
+                      <button type="button"
+                              class="btn btn-danger"
+                              onclick="document.getElementById('confirm-remove-org-admin-{{ .UserID }}').close(); document.getElementById('manage-user-form-{{ .UserID }}').requestSubmit();">
+                        Remove Org admin
+                      </button>
                     </div>
-                  </form>
-                </div>
-              </dialog>
+                  </div>
+                </dialog>
+              {{ end }}
+              {{ if .CanDelete }}
+                <dialog id="delete-user-{{ .UserID }}" class="dialog">
+                  <div class="dialog-card">
+                    <header class="dialog-head">
+                      <div>
+                        <h3 class="dialog-title u-text-danger">Danger zone - Delete Account</h3>
+                        <p class="dialog-subtitle">{{ .Email }}</p>
+                      </div>
+                      <button type="button"
+                              class="btn btn-ghost btn-icon dialog-close"
+                              onclick="document.getElementById('delete-user-{{ .UserID }}').close()">
+                        {{ template "icon-close" . }}
+                      </button>
+                    </header>
+                    <p class="u-m-0 u-mb-5">
+                      This will remove the account from your organization.
+                      Confirm only if you want to permanently delete this
+                      user access.
+                    </p>
+                    <form method="post" action="/my/organization/users" class="input-form">
+                      <input type="hidden" name="intent" value="delete_user" />
+                      <input type="hidden" name="userId" value="{{ .UserID }}" />
+                      <div class="dialog-actions">
+                        <button type="submit" class="btn btn-danger">Delete account</button>
+                      </div>
+                    </form>
+                  </div>
+                </dialog>
+              {{ end }}
             </li>
           {{ end }}
         </ul>

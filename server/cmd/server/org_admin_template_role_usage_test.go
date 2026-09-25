@@ -13,16 +13,19 @@ func TestOrgAdminTemplateRoleUsageStates(t *testing.T) {
 		ActivePanel: "roles",
 		RoleRows: []OrgAdminRoleRow{
 			{
-				Slug:    "approver",
-				Name:    "Approver",
-				Palette: "blue",
-				InUse:   true,
+				Slug:         "approver",
+				Name:         "Approver",
+				Palette:      "blue",
+				InUse:        true,
+				CanDelete:    false,
+				DeleteReason: "Role in use",
 			},
 			{
-				Slug:    "qa-reviewer",
-				Name:    "QA Reviewer",
-				Palette: "emerald",
-				InUse:   false,
+				Slug:      "qa-reviewer",
+				Name:      "QA Reviewer",
+				Palette:   "emerald",
+				InUse:     false,
+				CanDelete: true,
 			},
 		},
 	}

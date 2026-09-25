@@ -226,9 +226,9 @@ func TestLeaveOrganizationEmptySessionUsesCookie(t *testing.T) {
 
 func TestStreamManagementFlagsNilAuthorizer(t *testing.T) {
 	server := &Server{}
-	clone, edit, purge, del := server.streamManagementFlags(context.Background(), &AccountUser{Email: "a@b.c"}, "k", FormataBuilderStream{}, false, true)
-	if clone || edit || purge || del {
-		t.Fatalf("expected all false, got %v %v %v %v", clone, edit, purge, del)
+	clone, edit, purge, del, reason := server.streamManagementFlags(context.Background(), &AccountUser{Email: "a@b.c"}, "k", FormataBuilderStream{}, false, true)
+	if clone || edit || purge || del || reason != "" {
+		t.Fatalf("expected all false/empty, got %v %v %v %v %q", clone, edit, purge, del, reason)
 	}
 }
 

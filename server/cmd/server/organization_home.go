@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -15,6 +16,8 @@ type OrganizationHomeView struct {
 	OrganizationLogoURL string
 	Roles               []OrgAdminRoleOption
 	LeavePath           string
+	CanLeave            bool
+	LeaveReason         string
 	ShowManageOrgLink   bool
 	ManageOrgHref       string
 	Error               string
@@ -59,6 +62,8 @@ func (s *Server) handleOrganizationHome(w http.ResponseWriter, r *http.Request) 
 		showManage = allowed
 	}
 
+	canLeave, leaveReason := organizationHomeLeaveGate(r.Context(), s.identity, user)
+
 	view := OrganizationHomeView{
 		PageBase:            s.pageBaseForUser(user, "organization_home_body", "", ""),
 		OrganizationName:    strings.TrimSpace(org.Name),
@@ -66,6 +71,8 @@ func (s *Server) handleOrganizationHome(w http.ResponseWriter, r *http.Request) 
 		OrganizationLogoURL: logoURL,
 		Roles:               roles,
 		LeavePath:           leaveOrganizationPath(),
+		CanLeave:            canLeave,
+		LeaveReason:         leaveReason,
 		ShowManageOrgLink:   showManage,
 		ManageOrgHref:       organizationPath("profile"),
 		Error:               homePickerMessage(r, "error"),
@@ -114,4 +121,30 @@ func memberRolesForOrganizationHome(user *AccountUser, org IdentityOrg) []OrgAdm
 		})
 	}
 	return out
+}
+
+func organizationHomeLeaveGate(ctx context.Context, identity IdentityStore, user *AccountUser) (canLeave bool, leaveReason string) {
+	if user == nil {
+		return false, ""
+	}
+	if !userIsOrgAdmin(user) {
+		return true, ""
+	}
+	if identity == nil {
+		return true, ""
+	}
+	users, err := identity.ListOrganizationUsers(ctx, strings.TrimSpace(user.OrgSlug))
+	if err != nil {
+		return true, ""
+	}
+	adminCount := 0
+	for _, orgUser := range users {
+		if orgUser.IsOrgAdmin {
+			adminCount++
+		}
+	}
+	if adminCount < 2 {
+		return false, "You're the only Org admin. Add another before leaving."
+	}
+	return true, ""
 }

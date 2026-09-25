@@ -13,13 +13,14 @@ func TestOrgAdminListRowMarkup(t *testing.T) {
 		ActivePanel:  "roles",
 		Organization: Organization{Name: "Acme Org", Slug: "acme-org"},
 		RoleRows: []OrgAdminRoleRow{
-			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", InUse: false},
+			{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", InUse: false, CanDelete: true},
 		},
 		Users: []OrgAdminUserRow{
 			{
 				UserID:    "user-1",
 				Email:     "member@example.com",
 				Activated: true,
+				CanDelete: true,
 				RoleOptions: []OrgAdminRoleOption{
 					{Slug: "qa-reviewer", Name: "QA Reviewer", Palette: "emerald", Selected: true},
 				},
