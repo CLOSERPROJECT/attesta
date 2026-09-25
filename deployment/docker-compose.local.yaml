@@ -59,6 +59,9 @@ services:
       APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}
       APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}
       APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
+      # Cloudflare's always-pass test pair. Environment values may override these defaults.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_FROM: attesta@localhost
