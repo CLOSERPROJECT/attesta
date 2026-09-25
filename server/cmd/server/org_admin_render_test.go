@@ -72,23 +72,6 @@ func TestRenderOrgAdminWithErrorsBranches(t *testing.T) {
 		Status:         "active",
 	}
 
-	t.Run("setup branch redirects without org context", func(t *testing.T) {
-		server := &Server{tmpl: testTemplates(), now: func() time.Time { return now }}
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/my/organization/profile", nil)
-
-		server.renderOrgAdminWithErrors(rec, req, &AccountUser{Email: "owner@example.com", RoleSlugs: []string{"org-admin"}, Status: "active"}, "", "/invite/token", OrgAdminErrors{
-			Invite: " invite failed ",
-		})
-
-		if rec.Code != http.StatusSeeOther {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
-		}
-		if loc := rec.Header().Get("Location"); loc != onboardingPath() {
-			t.Fatalf("location = %q, want %q", loc, onboardingPath())
-		}
-	})
-
 	t.Run("organization not found returns 404", func(t *testing.T) {
 		server := &Server{
 			tmpl: testTemplates(),

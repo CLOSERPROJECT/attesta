@@ -1841,14 +1841,6 @@ func TestEnsurePlatformAdminOwnsOrganizationPromotesMembershipWhenNeeded(t *test
 	}
 }
 
-func TestHandleOrgAdminUsersCreateOrgWithIdentity(t *testing.T) {
-	t.Skip("self-serve org create removed; covered by TestHandleOrgAdminUsersSelfServeCreateOrgGone")
-}
-
-func TestHandleOrgAdminUsersCreateOrgIdentityValidation(t *testing.T) {
-	t.Skip("self-serve org create removed; covered by TestHandleOrgAdminUsersSelfServeCreateOrgGone")
-}
-
 func TestHandleOrgAdminUsersUpdateOrgWithIdentityLogo(t *testing.T) {
 	now := time.Now().UTC()
 	currentUser := IdentityUser{
@@ -3689,15 +3681,6 @@ func TestHandleOrgAdminUsersIdentityAdditionalBranches(t *testing.T) {
 		server.handleOrgAdminUsers(recInvite, reqInvite)
 		if recInvite.Code != http.StatusSeeOther || recInvite.Header().Get("Location") != onboardingPath() {
 			t.Fatalf("invite response = %d %q", recInvite.Code, recInvite.Header().Get("Location"))
-		}
-
-		reqCreate := httptest.NewRequest(http.MethodPost, "/my/organization/users", strings.NewReader("intent=create_org&name=Fresh+Org"))
-		reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		reqCreate.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
-		recCreate := httptest.NewRecorder()
-		server.handleOrgAdminUsers(recCreate, reqCreate)
-		if recCreate.Code != http.StatusSeeOther || recCreate.Header().Get("Location") != onboardingPath() {
-			t.Fatalf("create response = %d %q", recCreate.Code, recCreate.Header().Get("Location"))
 		}
 	})
 

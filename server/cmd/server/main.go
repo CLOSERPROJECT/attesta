@@ -4138,11 +4138,6 @@ func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSl
 }
 
 func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request, user *AccountUser, orgSlug, inviteLink string, errs OrgAdminErrors) {
-	if !userHasOrganizationContext(user) || strings.TrimSpace(orgSlug) == "" {
-		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
-		return
-	}
-
 	errs.Organization = strings.TrimSpace(errs.Organization)
 	errs.Role = strings.TrimSpace(errs.Role)
 	errs.Invite = strings.TrimSpace(errs.Invite)
