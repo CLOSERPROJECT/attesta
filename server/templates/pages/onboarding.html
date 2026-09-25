@@ -120,12 +120,14 @@
   </section>
   {{ else }}
   <div class="onboarding-actions">
-    <a class="btn btn-lg btn-primary" href="{{ .JoinHref }}"
-      >Join an organization</a
-    >
-    <a class="btn btn-lg btn-secondary" href="{{ .RequestOrgHref }}"
-      >Request a new organization</a
-    >
+    <a class="btn btn-lg btn-primary" href="{{ .JoinHref }}">
+      {{ template "icon-users-group" . }}
+      <span>Join an organization</span>
+    </a>
+    <a class="btn btn-lg btn-secondary" href="{{ .RequestOrgHref }}">
+      {{ template "icon-building-grid" . }}
+      <span>Request a new organization</span>
+    </a>
   </div>
   {{ end }}
 </section>
