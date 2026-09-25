@@ -46,6 +46,90 @@ func TestVerifyTurnstilePostsTokenAndClientIP(t *testing.T) {
 	}
 }
 
+func TestVerifyTurnstileRejectsInvalidSiteverifyResponses(t *testing.T) {
+	for name, response := range map[string]struct {
+		status int
+		body   string
+	}{
+		"non-success status": {status: http.StatusBadGateway, body: `upstream unavailable`},
+		"invalid JSON":       {status: http.StatusOK, body: `not JSON`},
+		"rejected token":     {status: http.StatusOK, body: `{"success":false,"error-codes":["invalid-input-response"]}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			verification := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(response.status)
+				_, _ = w.Write([]byte(response.body))
+			}))
+			defer verification.Close()
+
+			server := &Server{
+				turnstileSiteKey:   "site-key",
+				turnstileSecretKey: "secret-key",
+				turnstileVerifyURL: verification.URL,
+			}
+			req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("cf-turnstile-response=response-token"))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			if err := server.verifyTurnstile(req); err == nil {
+				t.Fatal("verifyTurnstile succeeded for an invalid Siteverify response")
+			}
+		})
+	}
+}
+
+func TestVerifyTurnstileSkipsValidationWhenDisabled(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/login", nil)
+	if err := (&Server{}).verifyTurnstile(req); err != nil {
+		t.Fatalf("verifyTurnstile when disabled: %v", err)
+	}
+}
+
+func TestRequestRemoteIP(t *testing.T) {
+	for name, test := range map[string]struct {
+		request *http.Request
+		want    string
+	}{
+		"valid Cloudflare header": {
+			request: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "/", nil)
+				req.Header.Set("CF-Connecting-IP", "203.0.113.10")
+				return req
+			}(),
+			want: "203.0.113.10",
+		},
+		"socket address fallback": {
+			request: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "/", nil)
+				req.Header.Set("CF-Connecting-IP", "not-an-ip")
+				req.RemoteAddr = "198.51.100.20:443"
+				return req
+			}(),
+			want: "198.51.100.20",
+		},
+		"raw address fallback": {
+			request: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "/", nil)
+				req.RemoteAddr = "2001:db8::1"
+				return req
+			}(),
+			want: "2001:db8::1",
+		},
+		"unparseable address": {
+			request: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "/", nil)
+				req.RemoteAddr = "unknown"
+				return req
+			}(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := requestRemoteIP(test.request); got != test.want {
+				t.Errorf("requestRemoteIP() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func TestHandleLoginRejectsInvalidTurnstileBeforeIdentity(t *testing.T) {
 	called := false
 	server := &Server{
