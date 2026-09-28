@@ -43,11 +43,15 @@ list_candidates() {
 
 remove_project() {
   local project="$1"
+  local owner="$2"
   local resources=()
 
   while IFS= read -r resource; do
     [[ -n "${resource}" ]] && resources+=("${resource}")
-  done < <(docker ps -aq --filter "label=com.docker.compose.project=${project}")
+  done < <(docker ps -aq \
+    --filter "label=${MANAGED_LABEL}=true" \
+    --filter "label=${PROJECT_LABEL}=${project}" \
+    --filter "label=${OWNER_LABEL}=${owner}")
   if [[ ${#resources[@]} -gt 0 ]]; then
     docker container rm -f "${resources[@]}"
   fi
@@ -123,7 +127,7 @@ main() {
       echo "would remove Attesta Compose project ${project} (missing worktree ${owner})"
     else
       echo "removing Attesta Compose project ${project} (missing worktree ${owner})"
-      remove_project "${project}"
+      remove_project "${project}" "${owner}"
     fi
   done <<<"${candidates}"
 }

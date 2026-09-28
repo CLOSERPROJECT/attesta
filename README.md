@@ -159,9 +159,17 @@ the checkout's `mise.toml`, initializes submodules, writes `.env.worktree` only
 when it is missing, and captures one coordinated primary-data bundle. After
 bootstrap, `task dev` reruns the same setup idempotently.
 
-Each checkout owns a separate Compose project: containers, networks, MongoDB,
-and Appwrite volumes are isolated. `task start`, `task stop`, `task reset`,
-`task status`, and `task logs` are all scoped to the current worktree.
+Each checkout owns a separate Compose project whose name includes a stable
+canonical-path suffix: containers, networks, MongoDB, and Appwrite volumes are
+isolated even when two checkouts have the same directory name. `task start`,
+`task stop`, `task reset`, `task status`, and `task logs` are all scoped to the
+current worktree.
+
+Older local stacks used only the checkout directory name as their Compose
+project. To keep using those existing volumes after upgrading, run
+`task worktree:bootstrap`, add the old name (for example
+`COMPOSE_PROJECT_NAME=attesta`) to `.env.worktree`, and only then run
+`task start`. An explicit project name is persisted and remains authoritative.
 
 As in Credimi, Worktrunk's `hash_port` derives the initial value for each
 service. Bootstrap checks availability and walks forward on collisions before

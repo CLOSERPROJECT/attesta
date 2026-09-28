@@ -11,6 +11,7 @@ x-logging: &x-logging
     options:
       max-file: '5'
       max-size: '10m'
+  labels: *attesta-resource-labels
 services:
   traefik:
     image: traefik:2.11
@@ -44,6 +45,9 @@ services:
     networks:
       - appwrite
     labels:
+      - eu.forkbomb.attesta.managed=true
+      - eu.forkbomb.attesta.worktree=${ATTESTA_WORKTREE_ROOT:-unknown}
+      - eu.forkbomb.attesta.project=${COMPOSE_PROJECT_NAME:-attesta}
       - traefik.enable=true
       - traefik.constraint-label-stack=${COMPOSE_PROJECT_NAME:-attesta}
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-attesta}_appwrite
@@ -181,6 +185,9 @@ services:
     networks:
       - appwrite
     labels:
+      - "eu.forkbomb.attesta.managed=true"
+      - "eu.forkbomb.attesta.worktree=${ATTESTA_WORKTREE_ROOT:-unknown}"
+      - "eu.forkbomb.attesta.project=${COMPOSE_PROJECT_NAME:-attesta}"
       - "traefik.enable=true"
       - "traefik.constraint-label-stack=${COMPOSE_PROJECT_NAME:-attesta}"
       - "traefik.docker.network=${COMPOSE_PROJECT_NAME:-attesta}_appwrite"
@@ -201,6 +208,9 @@ services:
     <<: *x-logging
     restart: unless-stopped
     labels:
+      - "eu.forkbomb.attesta.managed=true"
+      - "eu.forkbomb.attesta.worktree=${ATTESTA_WORKTREE_ROOT:-unknown}"
+      - "eu.forkbomb.attesta.project=${COMPOSE_PROJECT_NAME:-attesta}"
       - "traefik.enable=true"
       - "traefik.constraint-label-stack=${COMPOSE_PROJECT_NAME:-attesta}"
       - "traefik.docker.network=${COMPOSE_PROJECT_NAME:-attesta}_appwrite"

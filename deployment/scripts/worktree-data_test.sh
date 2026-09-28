@@ -102,15 +102,6 @@ esac
 EOF
 chmod +x "${tmpdir}/bin/git" "${tmpdir}/bin/docker"
 
-durable_volumes=(
-  mongodb_data appwrite-mariadb appwrite-uploads appwrite-imports
-  appwrite-functions appwrite-sites appwrite-builds
-)
-for logical in "${durable_volumes[@]}"; do
-  mkdir -p "${tmpdir}/volumes/primary_${logical}"
-  : >"${tmpdir}/volumes/primary_${logical}/nonempty"
-done
-
 common_env=(
   PATH="${tmpdir}/bin:${PATH}"
   FAKE_PRIMARY="${primary}"
@@ -118,6 +109,24 @@ common_env=(
   FAKE_RESTORE_DIR="${tmpdir}/restored"
   DOCKER_CALLS_FILE="${tmpdir}/docker-calls"
 )
+
+primary_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${primary}" \
+  bash "${primary}/scripts/worktree-env.sh" project-name)"
+target_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${target}" \
+  bash "${target}/scripts/worktree-env.sh" project-name)"
+[[ "${primary_project}" =~ ^primary-[0-9a-f]{8}$ ]] \
+  || fail "primary Compose identity is not path-qualified: ${primary_project}"
+[[ "${target_project}" != "${primary_project}" ]] \
+  || fail "target reused the primary Compose identity"
+
+durable_volumes=(
+  mongodb_data appwrite-mariadb appwrite-uploads appwrite-imports
+  appwrite-functions appwrite-sites appwrite-builds
+)
+for logical in "${durable_volumes[@]}"; do
+  mkdir -p "${tmpdir}/volumes/${primary_project}_${logical}"
+  : >"${tmpdir}/volumes/${primary_project}_${logical}/nonempty"
+done
 
 # A snapshot is an immutable, checksummed bundle of every durable store.
 env "${common_env[@]}" ATTESTA_ROOT_DIR="${target}" bash "${SCRIPT}" snapshot-primary
@@ -133,7 +142,8 @@ grep -qx 'format attesta-worktree-data' "${bundle}/manifest" || fail "manifest f
 grep -qx 'version 1' "${bundle}/manifest" || fail "manifest version missing"
 grep -Eq '^created_at .+Z$' "${bundle}/manifest" || fail "manifest timestamp missing"
 grep -Fqx "source_root ${primary}" "${bundle}/manifest" || fail "manifest source root missing"
-grep -qx 'source_project primary' "${bundle}/manifest" || fail "manifest source project missing"
+grep -Fqx "source_project ${primary_project}" "${bundle}/manifest" \
+  || fail "manifest source project missing"
 
 # Writers are quiesced for the entire raw-volume snapshot, then prior state resumes.
 grep -q ' stop appwrite mongodb mariadb$' "${tmpdir}/docker-calls" \
@@ -195,6 +205,8 @@ mkdir -p "${failure_target}/scripts" "${failure_target}/deployment"
 cp "${ROOT}/scripts/worktree-env.sh" "${failure_target}/scripts/worktree-env.sh"
 cp "${ROOT}/scripts/dev-ports.env" "${failure_target}/scripts/dev-ports.env"
 : >"${failure_target}/deployment/docker-compose.local.yaml"
+failure_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${failure_target}" \
+  bash "${failure_target}/scripts/worktree-env.sh" project-name)"
 : >"${tmpdir}/docker-calls"
 if env "${common_env[@]}" ATTESTA_ROOT_DIR="${failure_target}" \
   FAKE_ARCHIVE_FAILURE=appwrite-functions bash "${SCRIPT}" snapshot-primary >/dev/null 2>&1; then
@@ -214,10 +226,10 @@ if env "${common_env[@]}" ATTESTA_ROOT_DIR="${failure_target}" FAKE_RUNNING_SERV
   FAKE_EXTRACT_FAILURE=appwrite-functions bash "${SCRIPT}" restore >/dev/null 2>&1; then
   fail "partial restore unexpectedly succeeded"
 fi
-if find "${tmpdir}/volumes" -maxdepth 1 -type d -name 'failure-target_*' | grep -q .; then
+if find "${tmpdir}/volumes" -maxdepth 1 -type d -name "${failure_project}_*" | grep -q .; then
   fail "partial restore volumes were not removed"
 fi
-grep -q 'volume rm -f failure-target_' "${tmpdir}/docker-calls" \
+grep -Fq "volume rm -f ${failure_project}_" "${tmpdir}/docker-calls" \
   || fail "failed restore did not clean up target volumes"
 
 # A completely fresh primary has nothing coherent to copy and uses normal seed startup.
@@ -226,7 +238,7 @@ mkdir -p "${fresh_target}/scripts" "${fresh_target}/deployment"
 cp "${ROOT}/scripts/worktree-env.sh" "${fresh_target}/scripts/worktree-env.sh"
 cp "${ROOT}/scripts/dev-ports.env" "${fresh_target}/scripts/dev-ports.env"
 : >"${fresh_target}/deployment/docker-compose.local.yaml"
-rm -rf -- "${tmpdir}/volumes"/primary_*
+rm -rf -- "${tmpdir}/volumes"/"${primary_project}"_*
 env "${common_env[@]}" ATTESTA_ROOT_DIR="${fresh_target}" \
   bash "${SCRIPT}" snapshot-primary >"${tmpdir}/fresh-output"
 grep -qi 'no primary durable data.*fresh seed' "${tmpdir}/fresh-output" \
@@ -235,7 +247,7 @@ grep -qi 'no primary durable data.*fresh seed' "${tmpdir}/fresh-output" \
   || fail "fresh primary produced an empty snapshot"
 
 # Any partial primary volume set is incoherent and must fail closed.
-mkdir -p "${tmpdir}/volumes/primary_mongodb_data"
+mkdir -p "${tmpdir}/volumes/${primary_project}_mongodb_data"
 if env "${common_env[@]}" ATTESTA_ROOT_DIR="${fresh_target}" \
   bash "${SCRIPT}" snapshot-primary >"${tmpdir}/partial-output" 2>"${tmpdir}/partial-error"; then
   fail "partial primary volume set unexpectedly succeeded"

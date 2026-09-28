@@ -23,8 +23,12 @@ case "$*" in
     printf '%s|%s\n' "${ACTIVE_ROOT}" active-stack
     printf '%s|%s\n' "${EXISTING_ROOT}" existing-stack
     ;;
+  'ps -aq --filter label=eu.forkbomb.attesta.managed=true --filter label=eu.forkbomb.attesta.project=orphan-stack --filter label=eu.forkbomb.attesta.worktree='*)
+    echo orphan-container
+    ;;
   'ps -aq --filter label=com.docker.compose.project=orphan-stack')
     echo orphan-container
+    echo unrelated-same-project-container
     ;;
   'network ls -q --filter label=eu.forkbomb.attesta.managed=true --filter label=eu.forkbomb.attesta.project=orphan-stack')
     echo orphan-network
@@ -58,6 +62,14 @@ fi
 env "${common_env[@]}" bash "${ROOT}/scripts/worktree-gc.sh" --apply >"${tmpdir}/apply"
 grep -q '^container rm -f orphan-container$' "${tmpdir}/calls" \
   || fail "apply did not remove the orphaned project's containers"
+grep -Fqx "ps -aq --filter label=eu.forkbomb.attesta.managed=true --filter label=eu.forkbomb.attesta.project=orphan-stack --filter label=eu.forkbomb.attesta.worktree=${tmpdir}/deleted-codex-worktree" "${tmpdir}/calls" \
+  || fail "container selection did not require the exact Attesta ownership labels"
+if grep -q 'label=com.docker.compose.project=orphan-stack' "${tmpdir}/calls"; then
+  fail "container selection still relies on the generic Compose project label"
+fi
+if grep -q 'unrelated-same-project-container' "${tmpdir}/calls"; then
+  fail "apply selected an unrelated container with the same Compose project name"
+fi
 grep -q '^network rm orphan-network$' "${tmpdir}/calls" \
   || fail "apply did not remove the orphaned project's networks"
 grep -q '^volume rm orphan-volume$' "${tmpdir}/calls" \

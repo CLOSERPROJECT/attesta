@@ -39,10 +39,16 @@ task start
 ```
 
 `scripts/worktree-compose.sh` loads the generated or manually edited ports from
-`.env.worktree` and sets a Compose project name derived from the checkout
-directory. Compose therefore scopes container names, networks, and volumes to
-that worktree. `task start` starts infrastructure only; `task dev` runs Attesta
-and Vite on the host.
+`.env.worktree` and sets a Compose project name derived from the checkout's
+canonical path. Compose therefore scopes container names, networks, and
+volumes to that worktree, including checkouts with the same directory name.
+`task start` starts infrastructure only; `task dev` runs Attesta and Vite on
+the host.
+
+Stacks created before canonical-path project names used the directory basename
+as their Compose project. To reattach those existing volumes, run
+`task worktree:bootstrap`, set the legacy name (for example
+`COMPOSE_PROJECT_NAME=attesta`) in `.env.worktree`, and then run `task start`.
 
 For a parallel worktree, bootstrap temporarily quiesces the primary Compose
 project and captures one all-or-nothing bundle containing MongoDB, Appwrite

@@ -15,7 +15,24 @@ sanitize_compose_project_name() {
     | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
 }
 
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(sanitize_compose_project_name "${ROOT_DIR}")}"
+canonical_path() {
+  (cd "$1" && pwd -P)
+}
+
+generated_compose_project_name() {
+  local root slug checksum suffix max_slug_length
+  root="$(canonical_path "${ROOT_DIR}")"
+  slug="$(sanitize_compose_project_name "${root}")"
+  [[ -n "${slug}" ]] || slug="attesta"
+
+  checksum="$(printf '%s' "${root}" | cksum | awk '{print $1}')"
+  printf -v suffix '%08x' "${checksum}"
+  max_slug_length=$((63 - 1 - ${#suffix}))
+  printf '%s-%s\n' "${slug:0:${max_slug_length}}" "${suffix}"
+}
+
+COMPOSE_PROJECT_NAME_OVERRIDE="${COMPOSE_PROJECT_NAME:-}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME_OVERRIDE:-$(generated_compose_project_name)}"
 
 usage() {
   cat <<'USAGE'
@@ -38,6 +55,13 @@ USAGE
 fail() {
   echo "error: $*" >&2
   exit 1
+}
+
+validate_compose_project_name() {
+  [[ "${COMPOSE_PROJECT_NAME}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] \
+    || fail "COMPOSE_PROJECT_NAME must start with a lowercase letter or digit and contain only lowercase letters, digits, hyphens, or underscores"
+  [[ ${#COMPOSE_PROJECT_NAME} -le 63 ]] \
+    || fail "COMPOSE_PROJECT_NAME must be at most 63 characters"
 }
 
 validate_port() {
@@ -157,11 +181,27 @@ load_resolved() {
     source "${WORKTREE_ENV_FILE}"
   fi
   set +a
+  if [[ -n "${COMPOSE_PROJECT_NAME_OVERRIDE}" ]]; then
+    COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME_OVERRIDE}"
+  fi
+  validate_compose_project_name
   validate_ports
+}
+
+load_project_name() {
+  if [[ -z "${COMPOSE_PROJECT_NAME_OVERRIDE}" && -f "${WORKTREE_ENV_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "${WORKTREE_ENV_FILE}"
+  fi
+  if [[ -n "${COMPOSE_PROJECT_NAME_OVERRIDE}" ]]; then
+    COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME_OVERRIDE}"
+  fi
+  validate_compose_project_name
 }
 
 write_ports_file() {
   local header="$1"
+  validate_compose_project_name
   validate_ports
   {
     echo "${header}"
@@ -169,6 +209,7 @@ write_ports_file() {
     for key in "${PORT_KEYS[@]}"; do
       printf '%s=%s\n' "${key}" "${!key}"
     done
+    printf 'COMPOSE_PROJECT_NAME=%s\n' "${COMPOSE_PROJECT_NAME}"
   } >"${WORKTREE_ENV_FILE}"
   echo "wrote ${WORKTREE_ENV_FILE}"
 }
@@ -233,7 +274,7 @@ cmd_export() {
 }
 
 cmd_project_name() {
-  [[ -n "${COMPOSE_PROJECT_NAME}" ]] || fail "checkout name has no Compose-safe characters"
+  load_project_name
   echo "${COMPOSE_PROJECT_NAME}"
 }
 

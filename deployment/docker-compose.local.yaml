@@ -11,6 +11,7 @@ x-attesta-resource-labels: &attesta-resource-labels
 services:
   mongodb:
     image: mongo:7.0
+    labels: *attesta-resource-labels
     ports:
       - "${MONGODB_PORT:-27017}:27017"
     volumes:
@@ -18,6 +19,7 @@ services:
 
   cerbos:
     image: ghcr.io/cerbos/cerbos:0.50.0
+    labels: *attesta-resource-labels
     restart: unless-stopped
     command: ["server", "--config=/config/config.yaml"]
     ports:
@@ -28,6 +30,7 @@ services:
 
   mongo-express:
     image: mongo-express:1.0.2
+    labels: *attesta-resource-labels
     environment:
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: secret
@@ -39,6 +42,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.29.3
+    labels: *attesta-resource-labels
     ports:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
@@ -50,6 +54,7 @@ services:
     build:
       context: ..
       dockerfile: deployment/Dockerfile.local
+    labels: *attesta-resource-labels
     environment:
       MONGODB_URI: mongodb://mongodb:27017
       CERBOS_URL: http://cerbos:3592
