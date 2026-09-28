@@ -1,9 +1,13 @@
-#!/bin/sh
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/deployment/docker-compose.local.yaml"
 SEED_SQL="$ROOT_DIR/deployment/appwrite/appwrite-seed.sql"
+# shellcheck source=scripts/require-compose-version.sh
+source "$ROOT_DIR/scripts/require-compose-version.sh"
+
+require_compose_version
 
 cd "$ROOT_DIR"
 if [ -f "$ROOT_DIR/.env" ]; then
@@ -12,9 +16,13 @@ if [ -f "$ROOT_DIR/.env" ]; then
   . "$ROOT_DIR/.env"
   set +a
 fi
-eval "$(bash "$ROOT_DIR/scripts/worktree-env.sh" export)"
+if ! worktree_exports="$(bash "$ROOT_DIR/scripts/worktree-env.sh" export)"; then
+  exit 1
+fi
+eval "$worktree_exports"
 ATTESTA_WORKTREE_ROOT="$(CDPATH= cd -- "$ROOT_DIR" && pwd -P)"
-export COMPOSE_PROJECT_NAME APPWRITE_RESTORE_SEED_SQL ATTESTA_WORKTREE_ROOT
+ATTESTA_REPOSITORY_ID="$(bash "$ROOT_DIR/scripts/worktree-env.sh" repository-id)"
+export COMPOSE_PROJECT_NAME APPWRITE_RESTORE_SEED_SQL ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
 
 DB_ROOT_PASSWORD="${_APP_DB_ROOT_PASS:-rootsecretpassword}"
 DB_NAME="${_APP_DB_SCHEMA:-appwrite}"
