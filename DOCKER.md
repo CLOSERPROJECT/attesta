@@ -1,6 +1,7 @@
 # Docker Compose Setup
 
-This demo uses Docker Compose to run MongoDB, Cerbos, Appwrite, and Attesta.
+This demo uses one Docker Compose project per checkout to run MongoDB, Cerbos,
+Appwrite, and optionally the containerized Attesta app.
 All Docker-related files live under `deployment/`.
 
 ## Services
@@ -28,21 +29,35 @@ All Docker-related files live under `deployment/`.
 
 ### Attesta app
 - **Image**: Built from local `deployment/Dockerfile.local`
-- **Port**: 3000
+- **Container port**: 3000 (`DOCKER_APP_PORT` on the host when explicitly run)
 - **Mongo**: `mongodb://mongodb:27017`
 - **Cerbos**: `http://cerbos:3592`
 
 ## Quick Start
 ```bash
-docker compose -f deployment/docker-compose.local.yaml up -d
+task start
 ```
 
-Open:
-- Appwrite Console: http://localhost
-- App: http://localhost:3000
-- Mailpit: http://localhost:8025
+`scripts/worktree-compose.sh` loads the generated or manually edited ports from
+`.env.worktree` and sets a Compose project name derived from the checkout
+directory. Compose therefore scopes container names, networks, and volumes to
+that worktree. `task start` starts infrastructure only; `task dev` runs Attesta
+and Vite on the host.
 
-After first boot:
+For a parallel worktree, bootstrap temporarily quiesces the primary Compose
+project and captures one all-or-nothing bundle containing MongoDB, Appwrite
+MariaDB, and Appwrite's durable file volumes. It then restores the primary's
+previous running state. The bundle is restored only before an uninitialized
+worktree stack starts; subsequent starts preserve the worktree's own data.
+Partial or corrupt bundles stop startup instead of mixing databases from
+different points in time. If the primary has no durable volumes yet, bootstrap
+skips the bundle and the new stack initializes from the checked-in seed.
+
+Open:
+- Run `bash scripts/worktree-env.sh print` to see the current checkout's URLs.
+- `task dev` serves the app on `PORT` and Vite on `VITE_PORT`.
+
+After the primary checkout's first boot:
 1. Create the first Appwrite console account.
 2. Create the Attesta Appwrite project.
 3. Create an API key for Attesta.
@@ -50,18 +65,33 @@ After first boot:
 5. Create the `org-assets` bucket.
 6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then restart Attesta.
 
+Fresh stacks without a copied data bundle restore the checked-in local seed on
+first initialization. Copied bundles retain the matching project, users,
+teams, memberships, API keys, and assets while discarding host-specific
+sessions, certificates, caches, and routing state.
+
 ## Verifying the Setup
 ```bash
-curl http://localhost:3592/_cerbos/health
+source <(bash scripts/worktree-env.sh export)
+curl "http://localhost:${CERBOS_PORT}/_cerbos/health"
 ```
 
 ## Stopping the Services
 ```bash
-# Stop services but keep data
-docker compose -f deployment/docker-compose.local.yaml down
+# Remove only this worktree's containers and networks; keep its data
+task stop
 
-# Stop services and remove data
-docker compose -f deployment/docker-compose.local.yaml down -v
+# Remove only this worktree's containers, networks, and data
+task reset
+
+# Also discard the saved coordinated snapshot bundle
+task purge
+
+# Preview orphaned Attesta Docker resources left by deleted worktrees
+task worktree:gc
+
+# Remove only the resources reported as orphaned
+task worktree:gc:apply
 ```
 
 ## Coolify

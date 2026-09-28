@@ -30,5 +30,7 @@ Operator smoke checklist
 7. Confirm invite and recovery URLs resolve back to Attesta before testing signup, invite, or reset flows.
 
 Notes
-- The vendored compose publishes ports `80` and `443` and creates the upstream `gateway` and `runtimes` Docker networks.
+- `APPWRITE_HTTP_PORT` and `APPWRITE_HTTPS_PORT` select the host entrypoints; they default to `80` and `443`.
+- Container names, volumes, Traefik labels, and the `gateway`, `appwrite`, and `runtimes` networks are scoped by `COMPOSE_PROJECT_NAME` so parallel worktrees cannot share Appwrite state.
+- MariaDB mounts the checked-in seed and init hook. It restores only when `APPWRITE_RESTORE_SEED_SQL=true` and the MariaDB volume is initialized for the first time. Parallel worktrees normally restore the coordinated primary MongoDB/Appwrite bundle instead; the SQL seed is the fallback for a genuinely fresh stack.
 - Attesta-specific compose wrappers should add only the minimum wiring needed to connect Attesta to the Appwrite API; they should not fork the Appwrite service graph here.

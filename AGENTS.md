@@ -34,6 +34,11 @@
 - Format and check Go templates with djLint (`task templates:fmt`,
   `task templates:check`, `task templates:lint`); do not use a generic HTML
   formatter on Go templates.
-- Worktrees share one Docker stack. Use the ports in each checkout's
-  `.env.local` or the URL printed by `task dev`; `task stop`, `task reset`, and
-  `task purge` affect every worktree.
+- Every worktree owns a Compose project and generated-once host ports in its
+  ignored `.env.worktree`; later manual edits are preserved. Use
+  `scripts/worktree-compose.sh` (normally through Taskfile tasks);
+  stop/reset/purge must remain scoped to the current checkout.
+- Parallel worktrees keep one point-in-time, all-or-nothing bundle of MongoDB
+  and durable Appwrite state in ignored `.worktree-data/`. Restore it only into
+  an uninitialized worktree stack; preserve developed worktree data and reject
+  partial or corrupt bundles. Worktrunk `pre-remove` deletes Compose volumes.

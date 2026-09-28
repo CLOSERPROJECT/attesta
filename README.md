@@ -132,21 +132,64 @@ PORT=3001 VITE_PORT=5174 task dev
 
 ### Git worktrees
 
-Linked worktrees under `.worktrees/` share one Docker stack (Mongo, Appwrite, Cerbos, Mailpit) and the primary checkout’s `.env` (symlinked). Each worktree gets its own `.env.local` with `PORT` and `VITE_PORT`.
+Attesta follows the same Worktrunk bootstrap shape as Credimi. The primary
+checkout keeps the classic ports from `scripts/dev-ports.env`. Every parallel
+checkout receives deterministic, available application and infrastructure
+ports in a gitignored `.env.worktree`; bootstrap never overwrites that file.
 
 ```bash
-task worktree:add -- my-feature
-task start   # once, from any checkout; no-op if already up
-cd .worktrees/my-feature
-task dev     # prints http://localhost:<PORT>
+mise install
+wt config shell install
+wt config approvals add  # review and approve the shared bootstrap/cleanup hooks once
+wt switch -c my-feature
+task dev
 ```
 
-Notes:
+Codex-managed worktrees use the checked-in local environment to run the same
+bootstrap automatically. Codex also copies the ignored paths allowlisted in
+`.worktreeinclude`. For a plain Git worktree, run bootstrap explicitly:
 
-- `task stop` / `task reset` affect **all** worktrees (shared infra).
-- Cerbos policies mounted into the running stack come from the **primary** checkout.
-- Override ports with `PORT=3001 VITE_PORT=5174 task dev` when needed.
-- Parallel `task dev` in two worktrees works when their `.env.local` ports differ.
+```bash
+bash scripts/worktree-bootstrap.sh
+task dev
+```
+
+Bootstrap copies the allowlisted ignored development files when needed, trusts
+the checkout's `mise.toml`, initializes submodules, writes `.env.worktree` only
+when it is missing, and captures one coordinated primary-data bundle. After
+bootstrap, `task dev` reruns the same setup idempotently.
+
+Each checkout owns a separate Compose project: containers, networks, MongoDB,
+and Appwrite volumes are isolated. `task start`, `task stop`, `task reset`,
+`task status`, and `task logs` are all scoped to the current worktree.
+
+As in Credimi, Worktrunk's `hash_port` derives the initial value for each
+service. Bootstrap checks availability and walks forward on collisions before
+writing `PORT`, `VITE_PORT`, `MONGODB_PORT`, `CERBOS_PORT`,
+`MONGO_EXPRESS_PORT`, `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT`,
+`APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT`, and `DOCKER_APP_PORT`. Edit the
+generated `.env.worktree` for any manual override. Later bootstraps preserve it,
+and duplicate manual values are rejected before Docker starts.
+
+The snapshot bundle is stored with private permissions in ignored
+`.worktree-data/`. It contains MongoDB together with Appwrite MariaDB and its
+durable uploads, imports, functions, sites, and builds. Bootstrap temporarily
+quiesces the primary Compose project while capturing the bundle, then restores
+its prior running state. Restore is all-or-nothing and happens only before an
+uninitialized worktree stack starts; partial or corrupt bundles fail closed.
+If the primary has no durable Docker volumes yet, bootstrap creates no bundle
+and the new worktree initializes from the checked-in seed instead.
+Redis, caches, certificates, sessions, and host routing state are regenerated,
+so sign in again in the new worktree. The bundle is point-in-time: later
+changes in either checkout do not synchronize.
+
+`task stop` preserves the current worktree's volumes. `task reset` deletes the
+volumes, so the next start restores the saved coordinated bundle. `task purge`
+also deletes that bundle. Worktrunk removal runs a non-interactive
+`pre-remove` hook that deletes the worktree's Compose volumes. Codex can remove
+managed worktrees without that hook; use the checked-in purge action before
+archiving, or run `task worktree:gc` from an active checkout to preview orphaned
+Attesta Docker resources, then `task worktree:gc:apply` to remove them.
 
 **[🔝 back to top](#toc)**
 
@@ -157,6 +200,10 @@ Notes:
 Common environment variables:
 
 - `PORT` or `ADDR` - backend listen address, default `:3000`
+- `VITE_PORT` - Vite dev-server port, default `5173`
+- `MONGODB_PORT`, `CERBOS_PORT` - host ports for this checkout's infrastructure
+- `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT` - this checkout's Appwrite entrypoints
+- `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT` - this checkout's local mail service
 - `MONGODB_URI` - default `mongodb://localhost:27017`
 - `CERBOS_URL` - default `http://localhost:3592`
 - `APPWRITE_ENDPOINT` - default `http://appwrite/v1`
