@@ -45,6 +45,15 @@ volumes to that worktree, including checkouts with the same directory name.
 `task start` starts infrastructure only; `task dev` runs Attesta and Vite on
 the host.
 
+The local Compose path applies
+`deployment/appwrite/docker-compose.worktree.yaml` as a local-only override to
+the vendored Appwrite baseline. That override owns the worktree-specific ports,
+resource labels, scoped names, and fresh-stack seed hook. The standalone
+operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the
+Coolify paths in `deployment/docker-compose.coolify.yaml` and
+`deployment/Dockerfile.coolify` remain unchanged and do not consume the local
+override.
+
 Stacks created before canonical-path project names used the directory basename
 as their Compose project. To reattach those existing volumes, run
 `task worktree:bootstrap`, set the legacy name (for example

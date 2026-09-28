@@ -1,5 +1,7 @@
 include:
-  - path: ./appwrite/docker-compose.appwrite.yaml
+  - path:
+      - ./appwrite/docker-compose.appwrite.yaml
+      - ./appwrite/docker-compose.worktree.yaml
     env_file:
       - ./appwrite/.env.appwrite.example
 

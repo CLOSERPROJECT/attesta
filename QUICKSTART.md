@@ -3,7 +3,7 @@
 This demo runs MongoDB + Cerbos + Appwrite with Docker Compose, a Go server, and a Vite-built asset bundle.
 
 ## Prerequisites
-- Docker + Docker Compose
+- Docker + Docker Compose 2.24.4+
 - Go 1.25+
 - Node.js 18+
 - Task

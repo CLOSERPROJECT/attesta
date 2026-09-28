@@ -72,7 +72,7 @@ Use either the manual toolchain:
 - Go 1.25+
 - Node.js 18+ with npm
 - [Task](https://taskfile.dev)
-- Docker and Docker Compose
+- Docker and Docker Compose 2.24.4+
 
 Or use [mise](https://mise.jdx.dev/installing-mise.html) plus Docker:
 
