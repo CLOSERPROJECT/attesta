@@ -43,7 +43,9 @@ task start
 canonical path. Compose therefore scopes container names, networks, and
 volumes to that worktree, including checkouts with the same directory name.
 `task start` starts infrastructure only; `task dev` runs Attesta and Vite on
-the host.
+the host. `task start:docker` starts the full containerized stack and publishes
+Attesta on `DOCKER_APP_PORT`; use `task start:docker:build` to rebuild it first.
+The wrapper checks Docker Compose 2.24.4+ before loading the local override.
 
 The local Compose path applies
 `deployment/appwrite/docker-compose.worktree.yaml` as a local-only override to
@@ -54,23 +56,36 @@ Coolify paths in `deployment/docker-compose.coolify.yaml` and
 `deployment/Dockerfile.coolify` remain unchanged and do not consume the local
 override.
 
-Stacks created before canonical-path project names used the directory basename
-as their Compose project. To reattach those existing volumes, run
-`task worktree:bootstrap`, set the legacy name (for example
-`COMPOSE_PROJECT_NAME=attesta`) in `.env.worktree`, and then run `task start`.
+Stacks created by the old direct command used `deployment` as their implicit
+Compose project. Before the first new start, preserve its volumes and adopt the
+same project name:
+
+```bash
+docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
+COMPOSE_PROJECT_NAME=deployment task worktree:bootstrap
+task start
+```
+
+Never add `-v` to that migration command. If `.env.worktree` already exists,
+edit its `COMPOSE_PROJECT_NAME` to `deployment`; persisted worktree identity
+wins over shell and `.env` values.
 
 For a parallel worktree, bootstrap temporarily quiesces the primary Compose
 project and captures one all-or-nothing bundle containing MongoDB, Appwrite
-MariaDB, and Appwrite's durable file volumes. It then restores the primary's
+MariaDB, and Appwrite's durable file volumes. A repository-wide lock prevents
+parallel bootstraps from overlapping. It then restores the primary's
 previous running state. The bundle is restored only before an uninitialized
 worktree stack starts; subsequent starts preserve the worktree's own data.
 Partial or corrupt bundles stop startup instead of mixing databases from
 different points in time. If the primary has no durable volumes yet, bootstrap
-skips the bundle and the new stack initializes from the checked-in seed.
+skips the bundle and records a persistent fresh-seed choice. `task purge` makes
+the same choice, so its next start uses the checked-in seed instead of copying
+the primary again.
 
 Open:
 - Run `bash scripts/worktree-env.sh print` to see the current checkout's URLs.
 - `task dev` serves the app on `PORT` and Vite on `VITE_PORT`.
+- `task start:docker` serves the containerized app on `DOCKER_APP_PORT`.
 
 After the primary checkout's first boot:
 1. Create the first Appwrite console account.
@@ -78,7 +93,7 @@ After the primary checkout's first boot:
 3. Create an API key for Attesta.
 4. Open Mailpit on `http://localhost:8025` to inspect invite, recovery, and affiliation emails.
 5. Create the `org-assets` bucket.
-6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then restart Attesta.
+6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then run `task start:docker` if using the containerized app.
 
 Fresh stacks without a copied data bundle restore the checked-in local seed on
 first initialization. Copied bundles retain the matching project, users,
@@ -108,6 +123,17 @@ task worktree:gc
 # Remove only the resources reported as orphaned
 task worktree:gc:apply
 ```
+
+Cleanup only considers resources carrying this clone's repository identity and
+the exact worktree owner. Foreign-clone and unlabeled legacy resources are
+skipped. `task reset` and `task purge` inspect every volume in the current
+Compose project and fail closed if any ownership label is missing or different.
+That includes preserved volumes from the legacy `deployment` project because
+Docker cannot add labels to an existing volume. To intentionally discard those
+after migration, inspect them with
+`docker volume ls --filter label=com.docker.compose.project=deployment` and
+remove only the confirmed legacy volume names explicitly; the next start
+creates labeled replacements.
 
 ## Coolify
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in

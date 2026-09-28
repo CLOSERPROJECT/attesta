@@ -117,6 +117,10 @@ Run the app in development mode:
 task dev
 ```
 
+To run the complete stack in Docker instead, use `task start:docker` (or
+`task start:docker:build` after changing the image). The containerized app is
+published on `DOCKER_APP_PORT`; normal `task start` remains infrastructure-only.
+
 Open:
 
 - Attesta: `http://localhost:3000`
@@ -165,14 +169,25 @@ isolated even when two checkouts have the same directory name. `task start`,
 `task stop`, `task reset`, `task status`, and `task logs` are all scoped to the
 current worktree.
 
-Older local stacks used only the checkout directory name as their Compose
-project. To keep using those existing volumes after upgrading, run
-`task worktree:bootstrap`, add the old name (for example
-`COMPOSE_PROJECT_NAME=attesta`) to `.env.worktree`, and only then run
-`task start`. An explicit project name is persisted and remains authoritative.
+Before this worktree setup, `docker compose -f deployment/docker-compose.local.yaml`
+used `deployment` as its implicit project name. To keep its existing data,
+stop those containers without deleting their volumes, persist that exact name,
+and only then start the new wrapper:
+
+```bash
+docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
+COMPOSE_PROJECT_NAME=deployment task worktree:bootstrap
+task start
+```
+
+Do not add `-v` to the migration command. If `.env.worktree` already exists,
+edit its `COMPOSE_PROJECT_NAME` to `deployment` instead: after creation the
+persisted value is authoritative and shell or copied `.env` values cannot
+override it.
 
 As in Credimi, Worktrunk's `hash_port` derives the initial value for each
-service. Bootstrap checks availability and walks forward on collisions before
+service. Bootstrap checks live TCP listeners and the ports reserved in sibling
+worktrees, then walks forward on collisions before
 writing `PORT`, `VITE_PORT`, `MONGODB_PORT`, `CERBOS_PORT`,
 `MONGO_EXPRESS_PORT`, `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT`,
 `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT`, and `DOCKER_APP_PORT`. Edit the
@@ -183,21 +198,37 @@ The snapshot bundle is stored with private permissions in ignored
 `.worktree-data/`. It contains MongoDB together with Appwrite MariaDB and its
 durable uploads, imports, functions, sites, and builds. Bootstrap temporarily
 quiesces the primary Compose project while capturing the bundle, then restores
-its prior running state. Restore is all-or-nothing and happens only before an
-uninitialized worktree stack starts; partial or corrupt bundles fail closed.
+its prior running state. Snapshot creation is serialized across all worktrees
+through the repository's shared Git directory. Restore is all-or-nothing and
+happens only before an uninitialized worktree stack starts; partial or corrupt
+bundles fail closed.
 If the primary has no durable Docker volumes yet, bootstrap creates no bundle
-and the new worktree initializes from the checked-in seed instead.
+and records a `.worktree-data/fresh-seed` choice so later starts do not recopy
+new primary data into that worktree. Existing worktree data also suppresses a
+new primary snapshot.
 Redis, caches, certificates, sessions, and host routing state are regenerated,
 so sign in again in the new worktree. The bundle is point-in-time: later
 changes in either checkout do not synchronize.
 
 `task stop` preserves the current worktree's volumes. `task reset` deletes the
 volumes, so the next start restores the saved coordinated bundle. `task purge`
-also deletes that bundle. Worktrunk removal runs a non-interactive
+deletes the volumes and bundle and records the fresh-seed choice; its next
+start initializes from the checked-in seed. To deliberately copy the primary
+again after a purge, remove `.worktree-data/fresh-seed` before that next start.
+Worktrunk removal runs a non-interactive
 `pre-remove` hook that deletes the worktree's Compose volumes. Codex can remove
 managed worktrees without that hook; use the checked-in purge action before
 archiving, or run `task worktree:gc` from an active checkout to preview orphaned
-Attesta Docker resources, then `task worktree:gc:apply` to remove them.
+Attesta Docker resources, then `task worktree:gc:apply` to remove them. Garbage
+collection is scoped to this repository clone and ignores foreign or unlabeled
+legacy resources. Reset and purge enumerate every volume in the current
+Compose project and refuse deletion unless all ownership labels match the
+current checkout. Volumes preserved from the legacy `deployment` project are
+intentionally unlabeled, so reset and purge refuse them too. To discard those
+after migration, first inspect the exact list with
+`docker volume ls --filter label=com.docker.compose.project=deployment`, then
+remove only the confirmed legacy volume names explicitly; the next start
+creates fully labeled replacements.
 
 **[🔝 back to top](#toc)**
 
@@ -212,9 +243,10 @@ Common environment variables:
 - `MONGODB_PORT`, `CERBOS_PORT` - host ports for this checkout's infrastructure
 - `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT` - this checkout's Appwrite entrypoints
 - `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT` - this checkout's local mail service
-- `MONGODB_URI` - default `mongodb://localhost:27017`
-- `CERBOS_URL` - default `http://localhost:3592`
-- `APPWRITE_ENDPOINT` - default `http://appwrite/v1`
+- `MONGODB_URI`, `CERBOS_URL`, `APPWRITE_ENDPOINT`, `SMTP_HOST`, `SMTP_PORT` -
+  explicit `.env` or shell values are preserved for host development in the
+  primary checkout; linked worktrees always resolve these to their isolated
+  local ports
 - `APPWRITE_PROJECT_ID`
 - `APPWRITE_API_KEY`
 - `APPWRITE_INVITE_REDIRECT_URL`
