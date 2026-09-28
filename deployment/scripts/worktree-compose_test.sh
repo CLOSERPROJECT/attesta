@@ -207,8 +207,8 @@ expected_redirects="http://localhost:${docker_app_port}/invite/accept|http://loc
 if grep -Fvxq "${expected_redirects}" "${tmpdir}/container-redirects"; then
   fail "containerized start passed host-development redirects to Compose"
 fi
-task_list="$(task --list-all)"
-[[ "${task_list}" == *"* start:docker:"* ]] \
+task_list="$(task --list-all --json)"
+grep -Eq '"name"[[:space:]]*:[[:space:]]*"start:docker"' <<<"${task_list}" \
   || fail "Taskfile does not expose the containerized Attesta start path"
 grep -Fq '"github:max-sixty/worktrunk" = { version = "0.77.0", bin = "wt" }' "${ROOT}/mise.toml" \
   || fail "Worktrunk is not pinned to the tested 0.77.0 release"
