@@ -25,6 +25,10 @@ DURABLE_VOLUMES=(
 )
 SNAPSHOT_LOCK_DIR=""
 SNAPSHOT_LOCK_HELD=0
+SNAPSHOT_PRIMARY_ROOT=""
+SNAPSHOT_RUNNING_SERVICES=()
+SNAPSHOT_QUIESCED=0
+SNAPSHOT_TEMP_BUNDLE=""
 RESTORE_CREATED_VOLUMES=()
 RESTORE_TOUCHED_REUSED_VOLUMES=()
 RESTORE_COMPLETE=0
@@ -294,24 +298,27 @@ snapshot_primary() {
     return 0
   fi
 
-  local running_services=()
-  local quiesced=0
-  local temp_bundle=""
+  SNAPSHOT_PRIMARY_ROOT="${primary}"
+  SNAPSHOT_RUNNING_SERVICES=()
+  SNAPSHOT_QUIESCED=0
+  SNAPSHOT_TEMP_BUNDLE=""
 
   resume_primary() {
-    if [[ "${quiesced}" == "1" ]]; then
-      if [[ "${#running_services[@]}" -gt 0 ]]; then
-        compose_for_root "${primary}" start "${running_services[@]}" >/dev/null
+    if [[ "${SNAPSHOT_QUIESCED}" == "1" ]]; then
+      if [[ "${#SNAPSHOT_RUNNING_SERVICES[@]}" -gt 0 ]]; then
+        compose_for_root "${SNAPSHOT_PRIMARY_ROOT}" start "${SNAPSHOT_RUNNING_SERVICES[@]}" >/dev/null
       fi
-      quiesced=0
+      SNAPSHOT_QUIESCED=0
     fi
   }
 
   cleanup_snapshot() {
-    if [[ -n "${temp_bundle}" ]]; then
-      rm -rf -- "${temp_bundle}"
+    # Keep rollback state at script scope because Ubuntu Bash unwinds function
+    # locals before running the EXIT trap after a fatal command.
+    if [[ -n "${SNAPSHOT_TEMP_BUNDLE}" ]]; then
+      rm -rf -- "${SNAPSHOT_TEMP_BUNDLE}"
     fi
-    if [[ "${quiesced}" == "1" ]]; then
+    if [[ "${SNAPSHOT_QUIESCED}" == "1" ]]; then
       resume_primary >/dev/null 2>&1 || \
         echo "error: could not restore the primary Compose state" >&2
     fi
@@ -382,17 +389,17 @@ snapshot_primary() {
     fail "could not determine the primary Compose running services"
   fi
   while IFS= read -r service; do
-    [[ -n "${service}" ]] && running_services+=("${service}")
+    [[ -n "${service}" ]] && SNAPSHOT_RUNNING_SERVICES+=("${service}")
   done <<<"${running_output}"
 
   mkdir -p "${DATA_DIR}"
-  temp_bundle="${DATA_DIR}/.snapshot-v1.tmp.$$"
-  mkdir "${temp_bundle}"
+  SNAPSHOT_TEMP_BUNDLE="${DATA_DIR}/.snapshot-v1.tmp.$$"
+  mkdir "${SNAPSHOT_TEMP_BUNDLE}"
 
-  if [[ "${#running_services[@]}" -gt 0 ]]; then
-    quiesced=1
+  if [[ "${#SNAPSHOT_RUNNING_SERVICES[@]}" -gt 0 ]]; then
+    SNAPSHOT_QUIESCED=1
     echo "quiescing primary Compose services"
-    compose_for_root "${primary}" stop "${running_services[@]}" >/dev/null
+    compose_for_root "${primary}" stop "${SNAPSHOT_RUNNING_SERVICES[@]}" >/dev/null
   fi
 
   assert_runtime_network_quiescent "${project}"
@@ -400,15 +407,15 @@ snapshot_primary() {
   echo "snapshotting primary durable volumes"
   local index=0
   for logical in "${DURABLE_VOLUMES[@]}"; do
-    archive_volume "${source_volumes[$index]}" "${temp_bundle}/${logical}.tar.gz"
+    archive_volume "${source_volumes[$index]}" "${SNAPSHOT_TEMP_BUNDLE}/${logical}.tar.gz"
     index=$((index + 1))
   done
-  write_manifest "${temp_bundle}" "${primary}" "${project}"
+  write_manifest "${SNAPSHOT_TEMP_BUNDLE}" "${primary}" "${project}"
 
   # Restore the exact pre-snapshot running set before publishing the bundle.
   resume_primary
-  mv "${temp_bundle}" "${BUNDLE_DIR}"
-  temp_bundle=""
+  mv "${SNAPSHOT_TEMP_BUNDLE}" "${BUNDLE_DIR}"
+  SNAPSHOT_TEMP_BUNDLE=""
   echo "wrote ${BUNDLE_DIR}"
   finish_snapshot
 }
