@@ -57,36 +57,3 @@ load_env_file() {
     export "$key=$val"
   done <"$path"
 }
-
-stable_port_index() {
-  local root="$1"
-  # cksum first field; map to 0..99
-  local sum
-  sum="$(printf '%s' "$root" | cksum | awk '{print $1}')"
-  echo $((sum % 100))
-}
-
-pick_free_port() {
-  local start="$1"
-  local count="$2"
-  local preferred="$3"
-  local candidates=()
-  local i p
-  if [[ "$preferred" -ge "$start" && "$preferred" -lt $((start + count)) ]]; then
-    candidates+=("$preferred")
-  fi
-  for ((i = 0; i < count; i++)); do
-    p=$((start + i))
-    if [[ "$p" -ne "$preferred" ]]; then
-      candidates+=("$p")
-    fi
-  done
-  for p in "${candidates[@]}"; do
-    if ! tcp_port_listening "$p"; then
-      echo "$p"
-      return 0
-    fi
-  done
-  echo "error: no free port in ${start}-$((start + count - 1))" >&2
-  return 1
-}

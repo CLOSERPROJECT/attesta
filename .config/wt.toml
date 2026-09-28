@@ -1,0 +1,12 @@
+# Required Worktrunk project config for parallel Attesta worktrees.
+# Install: mise install && wt config shell install
+# App and infrastructure ports are derived once through Worktrunk hash_port and
+# stored in ignored .env.worktree. Later manual edits are preserved. Bootstrap
+# also captures one coordinated primary MongoDB/Appwrite bundle for restore
+# before an uninitialized worktree stack starts.
+
+[[pre-start]]
+bootstrap = "bash scripts/worktree-bootstrap.sh"
+
+[pre-remove]
+purge = "bash scripts/worktree-compose.sh down-v"

@@ -1,0 +1,15 @@
+version = 1
+name = "Attesta"
+
+[setup]
+script = "bash scripts/worktree-bootstrap.sh"
+
+[[actions]]
+name = "Dev"
+icon = "run"
+command = "task dev"
+
+[[actions]]
+name = "Purge worktree data"
+icon = "tool"
+command = "task purge"

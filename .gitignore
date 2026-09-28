@@ -5,6 +5,8 @@ server/tmp
 *.log
 .env
 .env.local
+.env.worktree
+.worktree-data/
 *.pid
 
 # OS files
