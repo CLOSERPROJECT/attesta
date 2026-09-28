@@ -8,16 +8,12 @@ This demo runs MongoDB + Cerbos + Appwrite with Docker Compose, a Go server, and
 - Node.js 18+
 - Task
 
-For parallel worktrees, install the repo-pinned Worktrunk tool with
-`mise install`. Worktrunk-created worktrees run `scripts/worktree-bootstrap.sh`
-from `.config/wt.toml`. Codex-managed worktrees run it through the checked-in
-local environment; for a plain Git worktree, run it explicitly. Like Credimi,
-it derives deterministic candidates with Worktrunk's `hash_port`, skips live
-listeners and ports reserved by sibling worktrees, and writes the result once
-in `.env.worktree`. The flat `KEY=value` file can be edited afterward and is
-never overwritten. The same bootstrap saves one coordinated primary MongoDB and
-Appwrite bundle under ignored `.worktree-data/`; `task start` restores it only
-before an uninitialized worktree stack starts.
+For parallel worktrees, install the repo-pinned Worktrunk tool with `mise install`.
+Worktrunk-created worktrees run `scripts/worktree-bootstrap.sh` from `.config/wt.toml`.
+Codex-managed worktrees run it through the checked-in local environment; for a plain Git worktree, run it explicitly.
+Like Credimi, it derives deterministic candidates with Worktrunk's `hash_port`, skips live listeners and ports reserved by sibling worktrees, and writes the result once in `.env.worktree`.
+The flat `KEY=value` file can be edited afterward and is never overwritten.
+The same bootstrap saves one coordinated primary MongoDB and Appwrite bundle under ignored `.worktree-data/`; `task start` restores it only before an uninitialized worktree stack starts.
 
 Before the first unattended Worktrunk operation, review and approve the shared
 hooks with `wt config approvals add`.
@@ -27,17 +23,15 @@ hooks with `wt config approvals add`.
 task start
 ```
 
-This starts a Compose project named after the checkout. Its containers,
-networks, MongoDB volume, and Appwrite volumes are independent of every other
-worktree. Host ports come from `.env.worktree`.
+This starts a Compose project named after the checkout.
+Its containers, networks, MongoDB volume, and Appwrite volumes are independent of every other worktree.
+Host ports come from `.env.worktree`.
 
-Use `task start:docker` for the full containerized stack, or
-`task start:docker:build` to rebuild it. The containerized app is available on
-`DOCKER_APP_PORT`; `task start` remains infrastructure-only for host development.
+Use `task start:docker` for the full containerized stack, or `task start:docker:build` to rebuild it.
+The containerized app is available on `DOCKER_APP_PORT`; `task start` remains infrastructure-only for host development.
 
 ## Bootstrap Appwrite
-The primary checkout may be bootstrapped manually after the compose stack is
-up:
+The primary checkout may be bootstrapped manually after the Compose stack is up:
 1. Open the Appwrite console on `http://localhost`.
 2. Create the first Appwrite console account.
 3. Create the Attesta Appwrite project.
@@ -49,16 +43,11 @@ up:
    - `APPWRITE_API_KEY`
 8. Run `task start:docker` if those values changed and you use the containerized app.
 
-New parallel worktrees normally restore the primary checkout's coordinated
-snapshot, including Appwrite MariaDB and durable file storage. The checked-in
-`deployment/appwrite/appwrite-seed.sql` remains the fallback for a genuinely
-fresh stack with no copied bundle; setup never mixes that seed with a copied
-live MongoDB.
+New parallel worktrees normally restore the primary checkout's coordinated snapshot, including Appwrite MariaDB and durable file storage.
+The checked-in `deployment/appwrite/appwrite-seed.sql` remains the fallback for a genuinely fresh stack with no copied bundle; setup never mixes that seed with a copied live MongoDB.
 
-Snapshot capture is serialized across the repository. If the primary has no
-durable data, or after `task purge`, the worktree records a persistent
-fresh-seed choice instead of reconsidering and copying newer primary data on a
-later start.
+Snapshot capture is serialized across the repository.
+If the primary has no durable data, or after `task purge`, the worktree records a persistent fresh-seed choice instead of reconsidering and copying newer primary data on a later start.
 
 ## Migration Notes
 - Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
