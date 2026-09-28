@@ -25,6 +25,10 @@ DURABLE_VOLUMES=(
 )
 SNAPSHOT_LOCK_DIR=""
 SNAPSHOT_LOCK_HELD=0
+RESTORE_CREATED_VOLUMES=()
+RESTORE_TOUCHED_REUSED_VOLUMES=()
+RESTORE_COMPLETE=0
+RESTORE_MARIADB_MAY_EXIST=0
 
 usage() {
   cat <<'USAGE'
@@ -469,21 +473,23 @@ sanitize_appwrite() {
 restore_snapshot() {
   local target_volumes=()
   local target_volume_reused=()
-  local created_volumes=()
-  local touched_reused_volumes=()
-  local restore_complete=0
-  local mariadb_may_exist=0
+  RESTORE_CREATED_VOLUMES=()
+  RESTORE_TOUCHED_REUSED_VOLUMES=()
+  RESTORE_COMPLETE=0
+  RESTORE_MARIADB_MAY_EXIST=0
   cleanup_restore() {
-    if [[ "${restore_complete}" != "1" ]]; then
-      if [[ "${mariadb_may_exist}" == "1" ]]; then
+    # EXIT traps run after Bash has started unwinding function-local scope on
+    # some platforms, so rollback state intentionally lives at script scope.
+    if [[ "${RESTORE_COMPLETE}" != "1" ]]; then
+      if [[ "${RESTORE_MARIADB_MAY_EXIST}" == "1" ]]; then
         ATTESTA_DATA_DISABLE_SEED=1 compose_for_root "${ROOT_DIR}" stop mariadb >/dev/null 2>&1 || true
         ATTESTA_DATA_DISABLE_SEED=1 compose_for_root "${ROOT_DIR}" rm -f mariadb >/dev/null 2>&1 || true
       fi
-      if [[ "${#created_volumes[@]}" -gt 0 ]]; then
-        docker volume rm -f "${created_volumes[@]}" >/dev/null 2>&1 || true
+      if [[ "${#RESTORE_CREATED_VOLUMES[@]}" -gt 0 ]]; then
+        docker volume rm -f "${RESTORE_CREATED_VOLUMES[@]}" >/dev/null 2>&1 || true
       fi
       local reused
-      for reused in "${touched_reused_volumes[@]:-}"; do
+      for reused in "${RESTORE_TOUCHED_REUSED_VOLUMES[@]:-}"; do
         [[ -n "${reused}" ]] || continue
         if ! empty_volume "${reused}" >/dev/null 2>&1; then
           echo "error: could not clear partially restored pre-existing volume ${reused}" >&2
@@ -559,7 +565,7 @@ restore_snapshot() {
         --label "eu.forkbomb.attesta.project=${project}" \
         --label "eu.forkbomb.attesta.repository=${repository}" \
         "${target_name}")"
-      created_volumes+=("${resolved}")
+      RESTORE_CREATED_VOLUMES+=("${resolved}")
       target_volume_reused+=(0)
     else
       validate_existing_volume_ownership \
@@ -572,21 +578,21 @@ restore_snapshot() {
   local index=0
   for logical in "${DURABLE_VOLUMES[@]}"; do
     if [[ "${target_volume_reused[$index]}" == "1" ]]; then
-      touched_reused_volumes+=("${target_volumes[$index]}")
+      RESTORE_TOUCHED_REUSED_VOLUMES+=("${target_volumes[$index]}")
     fi
     extract_volume "${BUNDLE_DIR}/${logical}.tar.gz" "${target_volumes[$index]}"
     index=$((index + 1))
   done
 
   echo "sanitizing copied Appwrite runtime state"
-  mariadb_may_exist=1
+  RESTORE_MARIADB_MAY_EXIST=1
   ATTESTA_DATA_DISABLE_SEED=1 compose_for_root "${ROOT_DIR}" up -d mariadb >/dev/null
   sanitize_appwrite
   ATTESTA_DATA_DISABLE_SEED=1 compose_for_root "${ROOT_DIR}" stop mariadb >/dev/null
   ATTESTA_DATA_DISABLE_SEED=1 compose_for_root "${ROOT_DIR}" rm -f mariadb >/dev/null
-  mariadb_may_exist=0
+  RESTORE_MARIADB_MAY_EXIST=0
 
-  restore_complete=1
+  RESTORE_COMPLETE=1
   finish_restore
   echo "restored coherent worktree data snapshot"
 }
