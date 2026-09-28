@@ -4,6 +4,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/deployment/docker-compose.local.yaml"
+# shellcheck source=scripts/require-compose-version.sh
+source "${ROOT_DIR}/scripts/require-compose-version.sh"
 
 usage() {
   cat <<'USAGE'
@@ -11,6 +13,8 @@ Usage: scripts/worktree-compose.sh <command>
 
 Commands:
   up [--build]  Start this worktree's infrastructure
+  up-app [--build]
+                Start infrastructure and the containerized Attesta app
   stop          Stop this worktree's infrastructure containers
   down          Remove this worktree's containers and networks; keep volumes
   down-v        Remove this worktree's containers, networks, and volumes
@@ -22,6 +26,7 @@ USAGE
 }
 
 load_env() {
+  local worktree_exports
   cd "${ROOT_DIR}"
   if [[ -f "${ROOT_DIR}/.env" ]]; then
     set -a
@@ -29,9 +34,14 @@ load_env() {
     source "${ROOT_DIR}/.env"
     set +a
   fi
-  eval "$(bash "${ROOT_DIR}/scripts/worktree-env.sh" export)"
+  if ! worktree_exports="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" export)"; then
+    echo "error: could not resolve this worktree's environment" >&2
+    return 1
+  fi
+  eval "${worktree_exports}"
   ATTESTA_WORKTREE_ROOT="$(cd "${ROOT_DIR}" && pwd -P)"
-  export COMPOSE_PROJECT_NAME APPWRITE_RESTORE_SEED_SQL ATTESTA_WORKTREE_ROOT
+  ATTESTA_REPOSITORY_ID="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id)"
+  export COMPOSE_PROJECT_NAME APPWRITE_RESTORE_SEED_SQL ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
 }
 
 compose() {
@@ -45,6 +55,26 @@ infra_services() {
   compose config --services | while IFS= read -r service; do
     [[ "${service}" == "attesta" ]] || echo "${service}"
   done
+}
+
+verify_volume_ownership() {
+  local format volumes name managed project owner repository unsafe=0
+  format="{{.Name}}|{{.Label \"eu.forkbomb.attesta.managed\"}}|{{.Label \"eu.forkbomb.attesta.project\"}}|{{.Label \"eu.forkbomb.attesta.worktree\"}}|{{.Label \"eu.forkbomb.attesta.repository\"}}"
+  if ! volumes="$(docker volume ls \
+    --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
+    --format "${format}")"; then
+    echo "error: refusing to remove volumes because their ownership could not be verified" >&2
+    return 1
+  fi
+  while IFS='|' read -r name managed project owner repository; do
+    [[ -n "${name}" ]] || continue
+    if [[ "${managed}" != "true" || "${project}" != "${COMPOSE_PROJECT_NAME}" || \
+      "${owner}" != "${ATTESTA_WORKTREE_ROOT}" || "${repository}" != "${ATTESTA_REPOSITORY_ID}" ]]; then
+      echo "error: refusing to remove volumes: ${name} has missing or mismatched Attesta ownership labels" >&2
+      unsafe=1
+    fi
+  done <<<"${volumes}"
+  [[ "${unsafe}" -eq 0 ]]
 }
 
 up() {
@@ -75,6 +105,38 @@ up() {
   compose ps
 }
 
+up_app() {
+  local build=0
+  if [[ "${1:-}" == "--build" ]]; then
+    build=1
+    shift
+  fi
+  [[ $# -eq 0 ]] || {
+    echo "error: up-app accepts only --build" >&2
+    exit 1
+  }
+
+  APPWRITE_INVITE_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/invite/accept"
+  APPWRITE_RESET_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/reset/confirm"
+  export APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL
+
+  local services=()
+  while IFS= read -r service; do
+    [[ -n "${service}" ]] && services+=("${service}")
+  done < <(compose config --services)
+  [[ ${#services[@]} -gt 0 ]] || {
+    echo "error: Compose configuration contains no services" >&2
+    exit 1
+  }
+  bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
+  if [[ "${build}" -eq 1 ]]; then
+    compose up -d --build "${services[@]}"
+  else
+    compose up -d "${services[@]}"
+  fi
+  compose ps
+}
+
 main() {
   local command="${1:-}"
   shift || true
@@ -83,11 +145,16 @@ main() {
     return 0
   fi
   load_env
+  require_compose_version
   case "${command}" in
     up) up "$@" ;;
+    up-app) up_app "$@" ;;
     stop) compose stop ;;
     down) compose down --remove-orphans ;;
-    down-v) compose down -v --remove-orphans ;;
+    down-v)
+      verify_volume_ownership
+      compose down -v --remove-orphans
+      ;;
     ps) compose ps ;;
     logs) compose logs -f ;;
     mongo-ping) compose exec -T mongodb mongosh --quiet --eval "db.adminCommand('ping')" ;;

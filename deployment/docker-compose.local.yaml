@@ -9,6 +9,7 @@ x-attesta-resource-labels: &attesta-resource-labels
   eu.forkbomb.attesta.managed: "true"
   eu.forkbomb.attesta.worktree: "${ATTESTA_WORKTREE_ROOT:-unknown}"
   eu.forkbomb.attesta.project: "${COMPOSE_PROJECT_NAME:-attesta}"
+  eu.forkbomb.attesta.repository: "${ATTESTA_REPOSITORY_ID:-unknown}"
 
 services:
   mongodb:
@@ -63,8 +64,8 @@ services:
       APPWRITE_ENDPOINT: http://appwrite/v1
       APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-}
       APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
-      APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}
-      APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}
+      APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:${DOCKER_APP_PORT:-3030}/invite/accept}
+      APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:${DOCKER_APP_PORT:-3030}/reset/confirm}
       APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
       # Cloudflare's always-pass test pair. Environment values may override these defaults.
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}

@@ -6,6 +6,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANAGED_LABEL="eu.forkbomb.attesta.managed"
 OWNER_LABEL="eu.forkbomb.attesta.worktree"
 PROJECT_LABEL="eu.forkbomb.attesta.project"
+REPOSITORY_LABEL="eu.forkbomb.attesta.repository"
+REPOSITORY_ID=""
+REGISTERED_WORKTREES=""
 APPLY=0
 
 usage() {
@@ -25,56 +28,107 @@ fail() {
 
 registered_worktree() {
   local owner="$1"
-  git -C "${ROOT_DIR}" worktree list --porcelain 2>/dev/null \
-    | sed -n 's/^worktree //p' \
-    | grep -Fqx -- "${owner}"
+  local registered
+  while IFS= read -r registered; do
+    [[ "${registered}" == "${owner}" ]] && return 0
+  done <<<"${REGISTERED_WORKTREES}"
+  return 1
+}
+
+load_registered_worktrees() {
+  local worktree_output line
+  if ! worktree_output="$(git -C "${ROOT_DIR}" worktree list --porcelain 2>/dev/null)"; then
+    echo "error: could not enumerate registered Git worktrees" >&2
+    return 1
+  fi
+
+  REGISTERED_WORKTREES=""
+  while IFS= read -r line; do
+    [[ "${line}" == worktree\ * ]] || continue
+    REGISTERED_WORKTREES+="${line#worktree }"$'\n'
+  done <<<"${worktree_output}"
+}
+
+repository_identity() {
+  ATTESTA_ROOT_DIR="${ROOT_DIR}" \
+    bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id
 }
 
 list_candidates() {
-  local format
+  local format volume_candidates network_candidates
   format="{{.Label \"${OWNER_LABEL}\"}}|{{.Label \"${PROJECT_LABEL}\"}}"
-  docker volume ls \
-    --filter "label=${MANAGED_LABEL}=true" \
-    --format "${format}"
-  docker network ls \
-    --filter "label=${MANAGED_LABEL}=true" \
-    --format "${format}"
+  if ! volume_candidates="$(docker volume ls \
+      --filter "label=${MANAGED_LABEL}=true" \
+      --filter "label=${REPOSITORY_LABEL}=${REPOSITORY_ID}" \
+      --format "${format}")"; then
+    echo "error: could not enumerate managed Attesta volumes" >&2
+    return 1
+  fi
+  if ! network_candidates="$(docker network ls \
+      --filter "label=${MANAGED_LABEL}=true" \
+      --filter "label=${REPOSITORY_LABEL}=${REPOSITORY_ID}" \
+      --format "${format}")"; then
+    echo "error: could not enumerate managed Attesta networks" >&2
+    return 1
+  fi
+  printf '%s\n%s\n' "${volume_candidates}" "${network_candidates}"
 }
 
 remove_project() {
   local project="$1"
   local owner="$2"
-  local resources=()
+  local container_output network_output volume_output resource
+  local containers=() networks=() volumes=()
 
-  while IFS= read -r resource; do
-    [[ -n "${resource}" ]] && resources+=("${resource}")
-  done < <(docker ps -aq \
-    --filter "label=${MANAGED_LABEL}=true" \
-    --filter "label=${PROJECT_LABEL}=${project}" \
-    --filter "label=${OWNER_LABEL}=${owner}")
-  if [[ ${#resources[@]} -gt 0 ]]; then
-    docker container rm -f "${resources[@]}"
+  if ! container_output="$(docker ps -aq \
+      --filter "label=${MANAGED_LABEL}=true" \
+      --filter "label=${REPOSITORY_LABEL}=${REPOSITORY_ID}" \
+      --filter "label=${PROJECT_LABEL}=${project}" \
+      --filter "label=${OWNER_LABEL}=${owner}")"; then
+    echo "error: could not enumerate containers for Attesta Compose project ${project}" >&2
+    return 1
+  fi
+  if ! network_output="$(docker network ls -q \
+      --filter "label=${MANAGED_LABEL}=true" \
+      --filter "label=${REPOSITORY_LABEL}=${REPOSITORY_ID}" \
+      --filter "label=${PROJECT_LABEL}=${project}" \
+      --filter "label=${OWNER_LABEL}=${owner}")"; then
+    echo "error: could not enumerate networks for Attesta Compose project ${project}" >&2
+    return 1
+  fi
+  if ! volume_output="$(docker volume ls -q \
+      --filter "label=${MANAGED_LABEL}=true" \
+      --filter "label=${REPOSITORY_LABEL}=${REPOSITORY_ID}" \
+      --filter "label=${PROJECT_LABEL}=${project}" \
+      --filter "label=${OWNER_LABEL}=${owner}")"; then
+    echo "error: could not enumerate volumes for Attesta Compose project ${project}" >&2
+    return 1
   fi
 
-  resources=()
   while IFS= read -r resource; do
-    [[ -n "${resource}" ]] && resources+=("${resource}")
-  done < <(docker network ls -q \
-    --filter "label=${MANAGED_LABEL}=true" \
-    --filter "label=${PROJECT_LABEL}=${project}")
-  if [[ ${#resources[@]} -gt 0 ]]; then
-    docker network rm "${resources[@]}"
-  fi
+    [[ -n "${resource}" ]] && containers+=("${resource}")
+  done <<<"${container_output}"
+  while IFS= read -r resource; do
+    [[ -n "${resource}" ]] && networks+=("${resource}")
+  done <<<"${network_output}"
+  while IFS= read -r resource; do
+    [[ -n "${resource}" ]] && volumes+=("${resource}")
+  done <<<"${volume_output}"
 
-  resources=()
-  while IFS= read -r resource; do
-    [[ -n "${resource}" ]] && resources+=("${resource}")
-  done < <(docker volume ls -q \
-    --filter "label=${MANAGED_LABEL}=true" \
-    --filter "label=${PROJECT_LABEL}=${project}")
-  if [[ ${#resources[@]} -gt 0 ]]; then
-    docker volume rm "${resources[@]}"
+  if [[ ${#containers[@]} -gt 0 ]]; then
+    docker container rm -f "${containers[@]}"
   fi
+  if [[ ${#networks[@]} -gt 0 ]]; then
+    for resource in "${networks[@]}"; do
+      if ! docker network rm "${resource}"; then
+        echo "warning: could not remove network ${resource}; it may still have active endpoints" >&2
+      fi
+    done
+  fi
+  if [[ ${#volumes[@]} -gt 0 ]]; then
+    docker volume rm "${volumes[@]}"
+  fi
+  return 0
 }
 
 main() {
@@ -92,9 +146,16 @@ main() {
   esac
   [[ $# -le 1 ]] || fail "expected at most one argument"
   command -v docker >/dev/null 2>&1 || fail "Docker is required"
+  REPOSITORY_ID="$(repository_identity)"
+  load_registered_worktrees || fail "garbage collection aborted"
 
   local candidates
-  candidates="$(list_candidates | sort -u)"
+  if ! candidates="$(list_candidates)"; then
+    fail "garbage collection aborted"
+  fi
+  if ! candidates="$(sort -u <<<"${candidates}")"; then
+    fail "could not sort managed Attesta resources"
+  fi
   if [[ -z "${candidates}" ]]; then
     echo "no managed Attesta Compose resources found"
     return 0
@@ -127,7 +188,9 @@ main() {
       echo "would remove Attesta Compose project ${project} (missing worktree ${owner})"
     else
       echo "removing Attesta Compose project ${project} (missing worktree ${owner})"
-      remove_project "${project}" "${owner}"
+      if ! remove_project "${project}" "${owner}"; then
+        fail "cleanup aborted for Attesta Compose project ${project}"
+      fi
     fi
   done <<<"${candidates}"
 }

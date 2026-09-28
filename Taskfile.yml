@@ -29,6 +29,19 @@ tasks:
       - task: worktree:bootstrap
       - bash scripts/worktree-compose.sh up --build
 
+  start:docker:
+    desc: Bring up this worktree's full stack, including the containerized Attesta app.
+    cmds:
+      - task: worktree:bootstrap
+      - bash scripts/worktree-compose.sh up-app
+
+  start:docker:build:
+    desc: Rebuild and bring up this worktree's full containerized stack.
+    cmds:
+      - task: submodule:init
+      - task: worktree:bootstrap
+      - bash scripts/worktree-compose.sh up-app --build
+
   stop:
     desc: Remove this worktree's containers and networks (keeps volumes).
     cmds:
@@ -132,7 +145,6 @@ tasks:
           bash -c '
           set -euo pipefail
           source deployment/scripts/dev-env.sh
-          export APPWRITE_ENDPOINT="${APPWRITE_ENDPOINT:-http://localhost/v1}"
           cd server
           GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server
           '
@@ -152,9 +164,22 @@ tasks:
   test:
     desc: Run backend unit tests.
     cmds:
+      - task: test:worktree
       - task: css:lint
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
+
+  test:worktree:
+    desc: Run worktree lifecycle and Compose safety tests.
+    cmds:
+      - bash deployment/scripts/dev-lib_test.sh
+      - bash deployment/scripts/worktree-env_test.sh
+      - bash deployment/scripts/dev-env_test.sh
+      - bash deployment/scripts/worktree-bootstrap_test.sh
+      - bash deployment/scripts/worktree-data_test.sh
+      - bash deployment/scripts/worktree-compose_test.sh
+      - bash deployment/scripts/worktree-gc_test.sh
+      - bash deployment/scripts/restore-appwrite-seed_test.sh
 
   css:lint:
     desc: CSS lint (template inline styles + breakpoint guard + stylelint).
@@ -182,6 +207,7 @@ tasks:
   cover:
     desc: Run backend tests with a 90% coverage gate.
     cmds:
+      - task: test:worktree
       - task: css:lint
       - task: goa:generate
       - |

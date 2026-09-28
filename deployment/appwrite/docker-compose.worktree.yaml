@@ -5,6 +5,7 @@ x-attesta-resource-labels: &attesta-resource-labels
   eu.forkbomb.attesta.managed: "true"
   eu.forkbomb.attesta.worktree: "${ATTESTA_WORKTREE_ROOT:-unknown}"
   eu.forkbomb.attesta.project: "${COMPOSE_PROJECT_NAME:-attesta}"
+  eu.forkbomb.attesta.repository: "${ATTESTA_REPOSITORY_ID:-unknown}"
 
 services:
   traefik:
