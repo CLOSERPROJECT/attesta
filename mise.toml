@@ -5,4 +5,4 @@ npm = "11.6.2"
 ripgrep = "latest"
 task = "latest"
 "pipx:djlint" = "1.46.2"
-"github:max-sixty/worktrunk" = { version = "latest", bin = "wt" }
+"github:max-sixty/worktrunk" = { version = "0.77.0", bin = "wt" }

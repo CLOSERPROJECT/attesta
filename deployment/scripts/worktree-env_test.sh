@@ -19,13 +19,18 @@ cp "${ROOT}/scripts/dev-ports.env" "${tmpdir}/scripts/dev-ports.env"
 cat >"${tmpdir}/bin/wt" <<'EOF'
 #!/usr/bin/env bash
 [[ "$1" == "step" && "$2" == "eval" ]] || exit 1
-echo 11000
+[[ -z "${TEST_WT_SLEEP_SECONDS:-}" ]] || sleep "${TEST_WT_SLEEP_SECONDS}"
+echo "${TEST_WT_PORT:-11000}"
 EOF
 cat >"${tmpdir}/bin/lsof" <<'EOF'
 #!/usr/bin/env bash
 exit 1
 EOF
-chmod +x "${tmpdir}/bin/wt" "${tmpdir}/bin/lsof"
+cat >"${tmpdir}/bin/nc" <<'EOF'
+#!/usr/bin/env bash
+[[ "${*: -1}" == "${TEST_BUSY_PORT:-}" ]]
+EOF
+chmod +x "${tmpdir}/bin/wt" "${tmpdir}/bin/lsof" "${tmpdir}/bin/nc"
 
 PATH="${tmpdir}/bin:${PATH}" ATTESTA_ROOT_DIR="${tmpdir}" bash "${SCRIPT}" write
 cat >"${tmpdir}/expected" <<'EOF'
@@ -115,6 +120,9 @@ git -C "${primary_root}" worktree add -q -b test-one "${same_name_one}"
 git -C "${primary_root}" worktree add -q -b test-two "${same_name_two}"
 project_one="$(ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" project-name)"
 project_two="$(ATTESTA_ROOT_DIR="${same_name_two}" bash "${SCRIPT}" project-name)"
+repository_primary="$(ATTESTA_ROOT_DIR="${primary_root}" bash "${SCRIPT}" repository-id)"
+repository_one="$(ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" repository-id)"
+repository_two="$(ATTESTA_ROOT_DIR="${same_name_two}" bash "${SCRIPT}" repository-id)"
 [[ "${project_one}" != "${project_two}" ]] \
   || fail "same-basename worktrees received the same Compose project name"
 [[ "${project_one}" == "$(ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" project-name)" ]] \
@@ -123,6 +131,10 @@ project_two="$(ATTESTA_ROOT_DIR="${same_name_two}" bash "${SCRIPT}" project-name
   || fail "Compose project name is not Compose-safe: ${project_one}"
 [[ ${#project_one} -le 63 ]] \
   || fail "Compose project name is not reasonably bounded: ${project_one}"
+[[ "${repository_primary}" == "${repository_one}" && "${repository_one}" == "${repository_two}" ]] \
+  || fail "linked worktrees did not share one repository identity"
+[[ "${repository_one}" =~ ^repo-[0-9a-f]{32}$ ]] \
+  || fail "repository identity is not bounded and label-safe: ${repository_one}"
 
 # Independent primary clones with the same basename also remain isolated.
 independent_one="${tmpdir}/independent-one/shared-primary"
@@ -132,12 +144,16 @@ git -C "${independent_one}" init -q
 git -C "${independent_two}" init -q
 independent_project_one="$(ATTESTA_ROOT_DIR="${independent_one}" bash "${SCRIPT}" project-name)"
 independent_project_two="$(ATTESTA_ROOT_DIR="${independent_two}" bash "${SCRIPT}" project-name)"
+independent_repository_one="$(ATTESTA_ROOT_DIR="${independent_one}" bash "${SCRIPT}" repository-id)"
+independent_repository_two="$(ATTESTA_ROOT_DIR="${independent_two}" bash "${SCRIPT}" repository-id)"
 [[ "${independent_project_one}" != "${independent_project_two}" ]] \
   || fail "same-basename primary clones received the same Compose project name"
 [[ "${independent_project_one}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] \
   || fail "primary Compose project name is not safe: ${independent_project_one}"
 [[ ${#independent_project_one} -le 63 ]] \
   || fail "primary Compose project name is not bounded: ${independent_project_one}"
+[[ "${independent_repository_one}" != "${independent_repository_two}" ]] \
+  || fail "independent clones received the same repository identity"
 
 # An explicit legacy identity can be adopted once during bootstrap. The
 # persisted value then drives every read command without another override.
@@ -156,7 +172,142 @@ grep -qx 'COMPOSE_PROJECT_NAME=legacy-name' \
 grep -qx 'export COMPOSE_PROJECT_NAME=legacy-name' \
   <<<"$(ATTESTA_ROOT_DIR="${override_root}" bash "${SCRIPT}" export)" \
   || fail "export ignored the persisted Compose project"
+[[ "$(COMPOSE_PROJECT_NAME=intruder ATTESTA_ROOT_DIR="${override_root}" bash "${SCRIPT}" project-name)" == legacy-name ]] \
+  || fail "environment overrode the persisted Compose project"
+grep -qx 'COMPOSE_PROJECT_NAME=legacy-name' \
+  <<<"$(COMPOSE_PROJECT_NAME=intruder ATTESTA_ROOT_DIR="${override_root}" bash "${SCRIPT}" print)" \
+  || fail "print let the environment override the persisted Compose project"
 [[ "$(COMPOSE_PROJECT_NAME=manual_project ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" project-name)" == "manual_project" ]] \
   || fail "explicit Compose project override was not preserved"
+
+# Older generated files did not persist a project name. They derive the stable
+# canonical identity and still ignore inherited shell/.env values.
+legacy_file_root="${tmpdir}/legacy-file-root"
+mkdir -p "${legacy_file_root}/scripts"
+cp "${ROOT}/scripts/dev-ports.env" "${legacy_file_root}/scripts/dev-ports.env"
+cp "${ROOT}/scripts/dev-ports.env" "${legacy_file_root}/.env.worktree"
+legacy_generated="$(ATTESTA_ROOT_DIR="${legacy_file_root}" bash "${SCRIPT}" project-name)"
+[[ -n "${legacy_generated}" && "${legacy_generated}" != intruder ]] \
+  || fail "legacy env file did not derive a safe project identity"
+[[ "$(COMPOSE_PROJECT_NAME=intruder ATTESTA_ROOT_DIR="${legacy_file_root}" bash "${SCRIPT}" project-name)" == "${legacy_generated}" ]] \
+  || fail "environment overrode a legacy env file's generated identity"
+
+# The exporter is safe to evaluate from checkout paths containing shell syntax,
+# and it does not leak its internal repository path into callers.
+export_root="${tmpdir}/path with spaces/\$(touch should-not-run)"
+mkdir -p "${export_root}/scripts"
+cp "${ROOT}/scripts/dev-ports.env" "${export_root}/scripts/dev-ports.env"
+ATTESTA_ROOT_DIR="${export_root}" bash "${SCRIPT}" write --classic >/dev/null
+export_output="$(ATTESTA_ROOT_DIR="${export_root}" bash "${SCRIPT}" export)"
+if grep -q '^export ROOT_DIR=' <<<"${export_output}"; then
+  fail "export exposed internal ROOT_DIR"
+fi
+(
+  unset ROOT_DIR
+  eval "${export_output}"
+  [[ "${PORT}" == 3000 ]]
+  [[ -z "${ROOT_DIR+x}" ]]
+) || fail "export output was not safe to evaluate"
+[[ ! -e "${ROOT}/should-not-run" && ! -e "${tmpdir}/should-not-run" ]] \
+  || fail "evaluating exports executed checkout-path shell syntax"
+
+# A TCP probe can report a listener even when lsof cannot see it (for example
+# a Docker-published port owned by another user).
+listener_port=13000
+tcp_root="${tmpdir}/tcp-root"
+mkdir -p "${tcp_root}/scripts"
+cp "${ROOT}/scripts/dev-ports.env" "${tcp_root}/scripts/dev-ports.env"
+PATH="${tmpdir}/bin:${PATH}" TEST_WT_PORT="${listener_port}" TEST_BUSY_PORT="${listener_port}" \
+  ATTESTA_ROOT_DIR="${tcp_root}" bash "${SCRIPT}" write >/dev/null
+if grep -qx "PORT=${listener_port}" "${tcp_root}/.env.worktree"; then
+  fail "allocated a port with an active TCP listener"
+fi
+
+# Stopped sibling worktrees still reserve every manually persisted port.
+reservation_repo="${tmpdir}/reservation-repo"
+reservation_sibling="${tmpdir}/reservation-sibling"
+mkdir -p "${reservation_repo}/scripts"
+cp "${ROOT}/scripts/dev-ports.env" "${reservation_repo}/scripts/dev-ports.env"
+git -C "${reservation_repo}" init -q
+git -C "${reservation_repo}" -c user.name=Test -c user.email=test@example.com \
+  commit -q --allow-empty -m initial
+git -C "${reservation_repo}" worktree add -q -b reservation-sibling "${reservation_sibling}"
+cat >"${reservation_sibling}/.env.worktree" <<'EOF'
+PORT=11000
+VITE_PORT=11001
+MONGODB_PORT=11002
+CERBOS_PORT=11003
+MONGO_EXPRESS_PORT=11004
+MAILPIT_SMTP_PORT=11005
+MAILPIT_UI_PORT=11006
+APPWRITE_HTTP_PORT=11007
+APPWRITE_HTTPS_PORT=11008
+DOCKER_APP_PORT=11009
+COMPOSE_PROJECT_NAME=reserved-sibling
+EOF
+PATH="${tmpdir}/bin:${PATH}" ATTESTA_ROOT_DIR="${reservation_repo}" \
+  bash "${SCRIPT}" write >/dev/null
+grep -qx 'PORT=11010' "${reservation_repo}/.env.worktree" \
+  || fail "allocated a port reserved by a stopped sibling worktree"
+
+# Concurrent first bootstraps serialize allocation and atomically publish two
+# complete, disjoint files. Sleeping in the deterministic Worktrunk stub keeps
+# the first allocator inside the critical section while the second starts.
+concurrent_repo="${tmpdir}/concurrent-repo"
+concurrent_sibling="${tmpdir}/concurrent-sibling"
+mkdir -p "${concurrent_repo}/scripts"
+cp "${ROOT}/scripts/dev-ports.env" "${concurrent_repo}/scripts/dev-ports.env"
+git -C "${concurrent_repo}" init -q
+git -C "${concurrent_repo}" add scripts/dev-ports.env
+git -C "${concurrent_repo}" -c user.name=Test -c user.email=test@example.com \
+  commit -qm initial
+git -C "${concurrent_repo}" worktree add -q -b concurrent-sibling "${concurrent_sibling}"
+
+PATH="${tmpdir}/bin:${PATH}" TEST_WT_PORT=14000 TEST_WT_SLEEP_SECONDS=0.02 \
+  ATTESTA_ROOT_DIR="${concurrent_repo}" bash "${SCRIPT}" write \
+  >"${tmpdir}/concurrent-primary.out" 2>"${tmpdir}/concurrent-primary.err" &
+concurrent_primary_pid=$!
+PATH="${tmpdir}/bin:${PATH}" TEST_WT_PORT=14000 TEST_WT_SLEEP_SECONDS=0.02 \
+  ATTESTA_ROOT_DIR="${concurrent_sibling}" bash "${SCRIPT}" write \
+  >"${tmpdir}/concurrent-sibling.out" 2>"${tmpdir}/concurrent-sibling.err" &
+concurrent_sibling_pid=$!
+concurrent_status=0
+wait "${concurrent_primary_pid}" || concurrent_status=1
+wait "${concurrent_sibling_pid}" || concurrent_status=1
+if [[ "${concurrent_status}" != "0" ]]; then
+  cat "${tmpdir}/concurrent-primary.err" "${tmpdir}/concurrent-sibling.err" >&2
+  fail "concurrent port allocation did not complete"
+fi
+
+for env_file in "${concurrent_repo}/.env.worktree" "${concurrent_sibling}/.env.worktree"; do
+  [[ -f "${env_file}" ]] || fail "concurrent allocation did not publish ${env_file}"
+  [[ "$(grep -Ec '^(PORT|[A-Z][A-Z0-9_]*_PORT)=[0-9]+$' "${env_file}")" -eq 10 ]] \
+    || fail "concurrent allocation published an incomplete port file: ${env_file}"
+  [[ "$(grep -c '^COMPOSE_PROJECT_NAME=' "${env_file}")" -eq 1 ]] \
+    || fail "concurrent allocation published an incomplete project identity: ${env_file}"
+done
+concurrent_ports="$(
+  sed -n -E 's/^(PORT|[A-Z][A-Z0-9_]*_PORT)=([0-9]+)$/\2/p' \
+    "${concurrent_repo}/.env.worktree" "${concurrent_sibling}/.env.worktree"
+)"
+[[ "$(wc -l <<<"${concurrent_ports}" | tr -d '[:space:]')" -eq 20 ]] \
+  || fail "concurrent allocation did not publish twenty ports"
+[[ "$(sort -u <<<"${concurrent_ports}" | wc -l | tr -d '[:space:]')" -eq 20 ]] \
+  || fail "concurrent sibling worktrees received overlapping ports"
+if find "${concurrent_repo}" "${concurrent_sibling}" -maxdepth 1 -name '.env.worktree.tmp.*' | grep -q .; then
+  fail "concurrent allocation left a partial publication file"
+fi
+
+# A killed allocator must not leave the repository permanently blocked.
+port_lock_dir="$(git -C "${concurrent_repo}" rev-parse --path-format=absolute --git-common-dir)/attesta-worktree-port-allocation.lock"
+rm "${concurrent_repo}/.env.worktree"
+mkdir "${port_lock_dir}"
+printf '%s\n' 99999999 >"${port_lock_dir}/pid"
+PATH="${tmpdir}/bin:${PATH}" TEST_WT_PORT=14000 \
+  ATTESTA_ROOT_DIR="${concurrent_repo}" bash "${SCRIPT}" write >/dev/null
+[[ -f "${concurrent_repo}/.env.worktree" ]] \
+  || fail "port allocation did not recover from a stale repository lock"
+[[ ! -e "${port_lock_dir}" ]] \
+  || fail "stale repository port-allocation lock was not cleaned up"
 
 echo "ok: worktree-env_test"
