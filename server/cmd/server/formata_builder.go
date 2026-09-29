@@ -255,7 +255,7 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 
 	switch r.Method {
 	case http.MethodGet:
-		user, _, ok := s.requireAuthenticatedPage(w, r)
+		user, _, ok := s.requireVerifiedPage(w, r)
 		if !ok {
 			return
 		}
@@ -279,7 +279,7 @@ func (s *Server) handleOrgAdminFormataBuilder(w http.ResponseWriter, r *http.Req
 			http.NotFound(w, r)
 			return
 		}
-		user, _, ok := s.requireAuthenticatedPost(w, r)
+		user, _, ok := s.requireVerifiedPost(w, r)
 		if !ok {
 			return
 		}
@@ -459,7 +459,7 @@ func (s *Server) handleEmbeddedFormataArch(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+	if _, _, ok := s.requireVerifiedPage(w, r); !ok {
 		return
 	}
 	pathValue := strings.TrimSpace(r.URL.Path)

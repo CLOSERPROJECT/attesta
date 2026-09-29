@@ -191,18 +191,25 @@ func identityUserFromAccountUser(user AccountUser) IdentityUser {
 	if isOrgAdmin {
 		labels = append(labels, identityOrgAdminLabel)
 	}
+	emailVerified := true
+	if user.EmailVerified != nil {
+		emailVerified = *user.EmailVerified
+	}
 	return IdentityUser{
-		ID:         identityUserID,
-		Email:      strings.TrimSpace(user.Email),
-		OrgSlug:    orgSlug,
-		Labels:     labels,
-		IsOrgAdmin: isOrgAdmin,
-		Status:     strings.TrimSpace(user.Status),
+		ID:            identityUserID,
+		Email:         strings.TrimSpace(user.Email),
+		OrgSlug:       orgSlug,
+		Labels:        labels,
+		IsOrgAdmin:    isOrgAdmin,
+		Status:        strings.TrimSpace(user.Status),
+		EmailVerified: emailVerified,
 	}
 }
 
 func testIdentityForSessions(now time.Time, sessions map[string]AccountUser) *fakeIdentityStore {
 	return &fakeIdentityStore{
+		// Honor AccountUser.EmailVerified (including explicit false) via identityUserFromAccountUser.
+		respectEmailVerified: true,
 		getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 			user, ok := sessions[strings.TrimSpace(sessionSecret)]
 			if !ok {

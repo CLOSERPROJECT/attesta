@@ -100,7 +100,7 @@ func TestHandleLoginRedirectsByAffiliation(t *testing.T) {
 					return fakeIdentitySession("login-session", "user-1", now.Add(24*time.Hour)), nil
 				},
 				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: "newbie@example.com", Status: "active"}, nil
+					return IdentityUser{ID: "user-1", Email: "newbie@example.com", Status: "active", EmailVerified: true}, nil
 				},
 			},
 			store: NewMemoryStore(),
@@ -132,7 +132,7 @@ func TestHandleLoginRedirectsByAffiliation(t *testing.T) {
 					return fakeIdentitySession("login-session-next", "user-1", now.Add(24*time.Hour)), nil
 				},
 				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-1", Email: "newbie@example.com", Status: "active"}, nil
+					return IdentityUser{ID: "user-1", Email: "newbie@example.com", Status: "active", EmailVerified: true}, nil
 				},
 			},
 			store: NewMemoryStore(),
@@ -164,7 +164,7 @@ func TestHandleLoginRedirectsByAffiliation(t *testing.T) {
 					return fakeIdentitySession("login-session-affiliated", "user-2", now.Add(24*time.Hour)), nil
 				},
 				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-					return IdentityUser{ID: "user-2", Email: "member@example.com", OrgSlug: "acme", Status: "active"}, nil
+					return IdentityUser{ID: "user-2", Email: "member@example.com", OrgSlug: "acme", Status: "active", EmailVerified: true}, nil
 				},
 			},
 			store: NewMemoryStore(),
@@ -410,7 +410,7 @@ func TestHandleLoginRedirectsAuthenticatedUserToHome(t *testing.T) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(24*time.Hour)), nil
 			},
 			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-				return IdentityUser{ID: "user-1", Email: "u-auth-login@example.com", Status: "active"}, nil
+				return IdentityUser{ID: "user-1", Email: "u-auth-login@example.com", Status: "active", EmailVerified: true}, nil
 			},
 		},
 		tmpl:        testTemplates(),
@@ -634,7 +634,7 @@ func TestHandleSignupRedirectsAuthenticatedUser(t *testing.T) {
 				return fakeIdentitySession(sessionSecret, "user-1", now.Add(time.Hour)), nil
 			},
 			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
-				return IdentityUser{ID: "user-1", Email: "u1@example.com", Status: "active"}, nil
+				return IdentityUser{ID: "user-1", Email: "u1@example.com", Status: "active", EmailVerified: true}, nil
 			},
 		},
 		tmpl:        testTemplates(),
@@ -777,8 +777,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/my/onboarding" {
-			t.Fatalf("location = %q, want /my/onboarding", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/verify" {
+			t.Fatalf("location = %q, want /verify", rec.Header().Get("Location"))
 		}
 		if createdEmail != "new@example.com" || createdPassword != "secure-password" || createdName != "New User" {
 			t.Fatalf("create account args = %q/%q/%q", createdEmail, createdPassword, createdName)
@@ -792,7 +792,7 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		}
 	})
 
-	t.Run("existing org membership redirects home", func(t *testing.T) {
+	t.Run("existing org membership redirects to verification waiting", func(t *testing.T) {
 		server := &Server{
 			identity: &fakeIdentityStore{
 				createAccountFunc: func(ctx context.Context, email, password, name string) (IdentityUser, error) {
@@ -818,8 +818,8 @@ func TestHandleSignupCreatesSessionAndRedirectsByOrgMembership(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/my" {
-			t.Fatalf("location = %q, want /my", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/verify" {
+			t.Fatalf("location = %q, want /verify", rec.Header().Get("Location"))
 		}
 	})
 }

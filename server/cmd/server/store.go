@@ -97,6 +97,10 @@ type AccountUser struct {
 	IsPlatformAdmin bool                `bson:"isPlatformAdmin,omitempty"`
 	CreatedAt       time.Time           `bson:"createdAt"`
 	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
+	// EmailVerified maps Appwrite email verification into AccountUser for the gate.
+	// Nil defaults to verified so existing session tests keep working; accountUserFromIdentity
+	// always sets a non-nil value from IdentityUser.EmailVerified.
+	EmailVerified *bool `bson:"-"`
 }
 
 type FormataBuilderStream struct {

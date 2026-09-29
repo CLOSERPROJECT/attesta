@@ -92,7 +92,7 @@ func (s *Server) handleOnboardingRoutes(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) requireUnaffiliatedOnboarding(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return nil, false
 	}

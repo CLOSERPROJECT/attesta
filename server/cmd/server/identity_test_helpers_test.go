@@ -8,6 +8,11 @@ import (
 )
 
 type fakeIdentityStore struct {
+	// respectEmailVerified keeps GetCurrentUser EmailVerified as the callback
+	// returned it. When false (default), successful GetCurrentUser results are
+	// treated as verified so existing authenticated app-flow fixtures work.
+	respectEmailVerified bool
+
 	createAccountFunc                       func(ctx context.Context, email, password, name string) (IdentityUser, error)
 	createOrganizationFunc                  func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	createOrganizationAsAdminFunc           func(ctx context.Context, name string) (IdentityOrg, error)
@@ -16,6 +21,9 @@ type fakeIdentityStore struct {
 	createEmailPasswordSessionFunc          func(ctx context.Context, email, password string) (IdentitySession, error)
 	createRecoveryFunc                      func(ctx context.Context, email, redirectURL string) error
 	completeRecoveryFunc                    func(ctx context.Context, userID, secret, password string) error
+	createEmailVerificationFunc             func(ctx context.Context, sessionSecret, redirectURL string) error
+	completeEmailVerificationFunc           func(ctx context.Context, userID, secret string) error
+	updateEmailVerificationFunc             func(ctx context.Context, userID string, verified bool) error
 	updateCurrentPasswordFunc               func(ctx context.Context, sessionSecret, password string) error
 	getSessionFunc                          func(ctx context.Context, sessionSecret string) (IdentitySession, error)
 	deleteSessionFunc                       func(ctx context.Context, sessionSecret string) error
@@ -101,6 +109,27 @@ func (f *fakeIdentityStore) CompleteRecovery(ctx context.Context, userID, secret
 	return nil
 }
 
+func (f *fakeIdentityStore) CreateEmailVerification(ctx context.Context, sessionSecret, redirectURL string) error {
+	if f.createEmailVerificationFunc != nil {
+		return f.createEmailVerificationFunc(ctx, sessionSecret, redirectURL)
+	}
+	return nil
+}
+
+func (f *fakeIdentityStore) CompleteEmailVerification(ctx context.Context, userID, secret string) error {
+	if f.completeEmailVerificationFunc != nil {
+		return f.completeEmailVerificationFunc(ctx, userID, secret)
+	}
+	return nil
+}
+
+func (f *fakeIdentityStore) UpdateEmailVerification(ctx context.Context, userID string, verified bool) error {
+	if f.updateEmailVerificationFunc != nil {
+		return f.updateEmailVerificationFunc(ctx, userID, verified)
+	}
+	return nil
+}
+
 func (f *fakeIdentityStore) UpdateCurrentPassword(ctx context.Context, sessionSecret, password string) error {
 	if f.updateCurrentPasswordFunc != nil {
 		return f.updateCurrentPasswordFunc(ctx, sessionSecret, password)
@@ -124,7 +153,14 @@ func (f *fakeIdentityStore) DeleteSession(ctx context.Context, sessionSecret str
 
 func (f *fakeIdentityStore) GetCurrentUser(ctx context.Context, sessionSecret string) (IdentityUser, error) {
 	if f.getCurrentUserFunc != nil {
-		return f.getCurrentUserFunc(ctx, sessionSecret)
+		user, err := f.getCurrentUserFunc(ctx, sessionSecret)
+		if err != nil {
+			return user, err
+		}
+		if !f.respectEmailVerified {
+			user.EmailVerified = true
+		}
+		return user, nil
 	}
 	return IdentityUser{}, ErrIdentityUnauthorized
 }

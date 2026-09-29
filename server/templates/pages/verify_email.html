@@ -1,0 +1,38 @@
+{{/* Used on /verify while waiting for email verification */}}
+
+{{ define "verify_email_body" }}
+  <div class="login-wrapper">
+    <section class="panel login">
+      <div class="panel-heading">
+        <h1>Verify your email</h1>
+        <p>We sent a verification link to your inbox. Open it to continue.</p>
+      </div>
+      <div class="form-field">
+        <label class="muted" for="email">Email</label>
+        <input id="email" type="email" value="{{ .Email }}" readonly />
+      </div>
+      {{ if .Confirmation }}
+        <p class="confirmation">{{ .Confirmation }}</p>
+      {{ end }}
+      {{ if .Error }}
+        <p class="error">{{ .Error }}</p>
+      {{ end }}
+      <form method="post" action="/verify" class="input-form">
+        <div class="form-actions">
+          <button class="btn btn-primary"
+                  type="submit"
+                  {{ if .ResendDisabled }}disabled{{ end }}>Resend verification email</button>
+        </div>
+      </form>
+      <form method="post" action="/logout" class="input-form">
+        <div class="form-actions">
+          <button class="btn btn-outline" type="submit">Log out</button>
+        </div>
+      </form>
+    </section>
+  </div>
+{{ end }}
+
+{{ define "verify_email.html" }}
+  {{ template "layout.html" . }}
+{{ end }}
