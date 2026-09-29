@@ -14,27 +14,13 @@ func NewEmailVerification(identity IdentityStore) *EmailVerification {
 	return &EmailVerification{identity: identity}
 }
 
-// IsVerified reports whether the identity user has proven control of their email.
-// Platform-admin synthetic sessions never appear as IdentityUser; use AllowsAppAccess for that gate.
-func (e *EmailVerification) IsVerified(user IdentityUser) bool {
-	return user.EmailVerified
-}
-
 // AllowsAppAccess reports whether the account may leave the verification waiting path.
-// Platform admins bypass Appwrite EmailVerified; otherwise EmailVerified is required.
-// Nil AccountUser.EmailVerified defaults to verified so existing session tests keep working.
+// Platform admins bypass Appwrite EmailVerified; otherwise EmailVerified must be true.
 func (e *EmailVerification) AllowsAppAccess(user AccountUser) bool {
 	if user.IsPlatformAdmin {
 		return true
 	}
-	return accountUserEmailVerified(user)
-}
-
-func accountUserEmailVerified(user AccountUser) bool {
-	if user.EmailVerified != nil {
-		return *user.EmailVerified
-	}
-	return true
+	return user.EmailVerified != nil && *user.EmailVerified
 }
 
 // Start sends an Appwrite verification email for the current session.

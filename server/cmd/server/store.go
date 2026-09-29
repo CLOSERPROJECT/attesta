@@ -98,8 +98,8 @@ type AccountUser struct {
 	CreatedAt       time.Time           `bson:"createdAt"`
 	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
 	// EmailVerified maps Appwrite email verification into AccountUser for the gate.
-	// Nil defaults to verified so existing session tests keep working; accountUserFromIdentity
-	// always sets a non-nil value from IdentityUser.EmailVerified.
+	// Non-persisted; accountUserFromIdentity always sets a non-nil value from
+	// IdentityUser.EmailVerified. Nil is not treated as verified by AllowsAppAccess.
 	EmailVerified *bool `bson:"-"`
 }
 

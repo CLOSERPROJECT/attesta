@@ -1311,16 +1311,28 @@ func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request
 	return nil, nil, false
 }
 
+// redirectIfUnverifiedPage redirects authenticated users who may not leave the
+// verification waiting path. Returns true if a response was written.
+func (s *Server) redirectIfUnverifiedPage(w http.ResponseWriter, r *http.Request, user AccountUser) bool {
+	if s.emailVerificationService().AllowsAppAccess(user) {
+		return false
+	}
+	http.Redirect(w, r, emailVerificationPath(), http.StatusSeeOther)
+	return true
+}
+
 func (s *Server) requireVerifiedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
 	user, session, ok := s.requireAuthenticatedPage(w, r)
 	if !ok {
 		return nil, nil, false
 	}
-	if s.emailVerificationService().AllowsAppAccess(*user) {
+	if !s.enforceAuth {
 		return user, session, true
 	}
-	http.Redirect(w, r, emailVerificationPath(), http.StatusSeeOther)
-	return nil, nil, false
+	if s.redirectIfUnverifiedPage(w, r, *user) {
+		return nil, nil, false
+	}
+	return user, session, true
 }
 
 func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
@@ -1335,16 +1347,28 @@ func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request
 	return nil, nil, false
 }
 
+// denyIfUnverifiedPost rejects authenticated users who may not leave the
+// verification waiting path. Returns true if a response was written.
+func (s *Server) denyIfUnverifiedPost(w http.ResponseWriter, user AccountUser) bool {
+	if s.emailVerificationService().AllowsAppAccess(user) {
+		return false
+	}
+	http.Error(w, "email verification required", http.StatusForbidden)
+	return true
+}
+
 func (s *Server) requireVerifiedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
 	user, session, ok := s.requireAuthenticatedPost(w, r)
 	if !ok {
 		return nil, nil, false
 	}
-	if s.emailVerificationService().AllowsAppAccess(*user) {
+	if !s.enforceAuth {
 		return user, session, true
 	}
-	http.Error(w, "email verification required", http.StatusForbidden)
-	return nil, nil, false
+	if s.denyIfUnverifiedPost(w, *user) {
+		return nil, nil, false
+	}
+	return user, session, true
 }
 
 func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser IdentityUser) *AccountUser {
@@ -2592,8 +2616,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if s.enforceAuth {
 			if user, _, err := s.currentUser(r); err == nil {
-				if !s.emailVerificationService().AllowsAppAccess(*user) {
-					http.Redirect(w, r, emailVerificationPath(), http.StatusSeeOther)
+				if s.redirectIfUnverifiedPage(w, r, *user) {
 					return
 				}
 				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
@@ -2708,8 +2731,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if s.enforceAuth {
 			if user, _, err := s.currentUser(r); err == nil {
-				if !s.emailVerificationService().AllowsAppAccess(*user) {
-					http.Redirect(w, r, emailVerificationPath(), http.StatusSeeOther)
+				if s.redirectIfUnverifiedPage(w, r, *user) {
 					return
 				}
 				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
