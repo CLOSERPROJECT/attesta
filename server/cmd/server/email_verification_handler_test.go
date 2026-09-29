@@ -1,5 +1,7 @@
 package main
 
+// Email verification HTTP handler tests (waiting path, confirm, gate helpers).
+
 import (
 	"context"
 	"errors"
