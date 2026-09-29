@@ -1062,6 +1062,12 @@ func (s *Server) platformAdminIdentitySession(ctx context.Context) (*IdentitySes
 	return &session, nil
 }
 
+// Overridable in tests so deadline / cancel paths do not sleep for a minute.
+var (
+	platformAdminIdentityBootstrapTimeout = 60 * time.Second
+	platformAdminIdentityBootstrapRetry   = 500 * time.Millisecond
+)
+
 func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 	if s.identity == nil {
 		return nil
@@ -1070,7 +1076,76 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	return s.identity.EnsurePlatformAdminAccount(ctx, email, password)
+	deadline := time.Now().Add(platformAdminIdentityBootstrapTimeout)
+	var err error
+	for {
+		err = s.identity.EnsurePlatformAdminAccount(ctx, email, password)
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		// EnsurePlatformAdminAccount only surfaces ErrIdentityNotFound when
+		// Appwrite answered 404 on create/update (user-missing is handled
+		// inside Ensure). During early Appwrite boot the Users API can still
+		// return 404/5xx even though the container is reachable.
+		if !errors.Is(err, ErrIdentityNotFound) && !isRetriableIdentityBootstrapError(err) {
+			return err
+		}
+		if !time.Now().Before(deadline) {
+			return err
+		}
+		log.Printf("platform admin identity bootstrap: retrying after %v", err)
+		timer := time.NewTimer(platformAdminIdentityBootstrapRetry)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func isRetriableIdentityBootstrapError(err error) bool {
+	if err == nil {
+		return false
+	}
+	type statusCoder interface {
+		GetStatusCode() int
+	}
+	var sc statusCoder
+	if errors.As(err, &sc) {
+		switch sc.GetStatusCode() {
+		case http.StatusInternalServerError, http.StatusBadGateway,
+			http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return true
+		default:
+			return false
+		}
+	}
+	// *url.Error implements net.Error; unwrap so malformed endpoints fail fast.
+	for {
+		var urlErr *url.Error
+		if !errors.As(err, &urlErr) || urlErr.Err == nil || urlErr.Err == err {
+			break
+		}
+		err = urlErr.Err
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "temporary failure")
 }
 
 func (s *Server) ensurePlatformAdminOwnsOrganization(ctx context.Context, orgSlug, redirectURL string) (*IdentitySession, error) {

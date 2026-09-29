@@ -77,6 +77,41 @@ verify_volume_ownership() {
   [[ "${unsafe}" -eq 0 ]]
 }
 
+wait_for_appwrite() {
+  local port="${APPWRITE_HTTP_PORT:-}"
+  local timeout="${ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS:-120}"
+  local deadline code
+  [[ "${port}" =~ ^[0-9]+$ ]] || {
+    echo "error: APPWRITE_HTTP_PORT is required to wait for Appwrite readiness" >&2
+    return 1
+  }
+  [[ "${timeout}" =~ ^[0-9]+$ ]] || {
+    echo "error: ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS must be a non-negative integer" >&2
+    return 1
+  }
+  # Tests set timeout 0 to skip the readiness probe.
+  if [[ "${timeout}" -eq 0 ]]; then
+    return 0
+  fi
+  command -v curl >/dev/null 2>&1 || {
+    echo "error: curl is required to wait for Appwrite readiness" >&2
+    return 1
+  }
+  deadline=$((SECONDS + timeout))
+  echo "waiting for Appwrite on localhost:${port}"
+  while ((SECONDS < deadline)); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
+      "http://127.0.0.1:${port}/v1/health" 2>/dev/null || true)"
+    # Guests get 401 once Appwrite is serving; treat that as ready.
+    if [[ "${code}" == "200" || "${code}" == "401" ]]; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "error: Appwrite did not become ready on localhost:${port} within ${timeout}s" >&2
+  return 1
+}
+
 up() {
   local build=0
   if [[ "${1:-}" == "--build" ]]; then
@@ -102,6 +137,7 @@ up() {
   else
     compose up -d "${services[@]}"
   fi
+  wait_for_appwrite
   compose ps
 }
 
@@ -134,6 +170,7 @@ up_app() {
   else
     compose up -d "${services[@]}"
   fi
+  wait_for_appwrite
   compose ps
 }
 

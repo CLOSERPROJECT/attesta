@@ -184,6 +184,7 @@ grep -q 'Docker Compose 2.24.4 or newer is required' "${tmpdir}/old-compose.err"
 
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_ENV_FILE="${tmpdir}/repository-ids" \
+  ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up
 
 expected_repository_id="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" repository-id)"
@@ -207,6 +208,7 @@ up_line="$(grep -n ' up -d ' "${tmpdir}/calls" | cut -d: -f1)"
 : >"${tmpdir}/calls"
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_REDIRECTS_FILE="${tmpdir}/container-redirects" \
+  ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up-app --build
 grep -q ' up -d --build .*attesta' "${tmpdir}/calls" \
   || fail "containerized start did not build and start the Attesta service"
