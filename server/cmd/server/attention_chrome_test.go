@@ -111,23 +111,28 @@ func TestLayoutAccountMenuShowsAttentionDot(t *testing.T) {
 	}
 }
 
-func TestLayoutAccountMenuJoinRequestSectionDots(t *testing.T) {
+func TestLayoutAccountMenuSectionDotsOnlyOnDashboard(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "layout.html", PageBase{
 		ShowLogout:              true,
+		ShowAdminLink:           true,
 		ShowMyOrgLink:           true,
 		HasAttention:            true,
 		HasJoinRequestAttention: true,
+		HasOrgCreationAttention: true,
 	}); err != nil {
 		t.Fatalf("ExecuteTemplate: %v", err)
 	}
 	body := buf.String()
-	if !strings.Contains(body, `My organization (needs attention)`) {
-		t.Fatalf("expected My organization section Attention chrome, got:\n%s", body)
+	if !strings.Contains(body, `Dashboard (needs attention)`) {
+		t.Fatalf("expected Dashboard section Attention chrome, got:\n%s", body)
 	}
-	if strings.Count(body, `attention-dot`) < 3 {
-		t.Fatalf("expected trigger + Dashboard + My organization dots, got %d:\n%s", strings.Count(body, `attention-dot`), body)
+	if strings.Contains(body, `Admin (needs attention)`) || strings.Contains(body, `My organization (needs attention)`) {
+		t.Fatalf("account-menu Admin/My organization must not carry section Attention dots, got:\n%s", body)
+	}
+	if strings.Count(body, `attention-dot`) != 2 {
+		t.Fatalf("expected trigger + Dashboard dots only, got %d:\n%s", strings.Count(body, `attention-dot`), body)
 	}
 }
 
@@ -316,13 +321,16 @@ func TestOperatorHomeJoinRequestAttentionBandAndResolve(t *testing.T) {
 		"Join requests",
 		"joiner@example.com",
 		`attention-dot`,
-		`My organization (needs attention)`,
+		`Dashboard (needs attention)`,
 		`name="intent" value="approve_join"`,
 		`name="next" value="/my"`,
 	} {
 		if !strings.Contains(homeBody, want) {
 			t.Fatalf("expected %q on Operator home Attention band, got:\n%s", want, homeBody)
 		}
+	}
+	if strings.Contains(homeBody, `My organization (needs attention)`) {
+		t.Fatalf("account-menu My organization must not carry section Attention, got:\n%s", homeBody)
 	}
 	joinIdx := strings.Index(homeBody, "Join requests")
 	chooseIdx := strings.Index(homeBody, "Choose a stream")
@@ -487,6 +495,7 @@ func TestPlatformAdminHomeOrgCreationAttentionBandAndResolve(t *testing.T) {
 		"Fresh Org",
 		"founder@example.com",
 		`attention-dot`,
+		`Dashboard (needs attention)`,
 		`name="intent" value="approve_org_creation"`,
 		`name="next" value="/my"`,
 		`action="/admin/organizations"`,
@@ -494,6 +503,9 @@ func TestPlatformAdminHomeOrgCreationAttentionBandAndResolve(t *testing.T) {
 		if !strings.Contains(homeBody, want) {
 			t.Fatalf("expected %q on platform-admin home Attention band, got:\n%s", want, homeBody)
 		}
+	}
+	if strings.Contains(homeBody, `Admin (needs attention)`) {
+		t.Fatalf("account-menu Admin must not carry section Attention, got:\n%s", homeBody)
 	}
 	orgIdx := strings.Index(homeBody, "Organization requests")
 	chooseIdx := strings.Index(homeBody, "Choose a stream")
