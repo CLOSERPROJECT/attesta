@@ -3,6 +3,12 @@ html:has(.my-home) {
   scroll-behavior: smooth;
 }
 
+.my-home-attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .my-home-catalog {
   display: flex;
   flex-direction: column;

@@ -35,8 +35,20 @@
 }
 
 .sidebar-nav-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-weight: 500;
   color: var(--foreground);
+}
+
+.sidebar-nav-link .attention-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex: 0 0 8px;
+  pointer-events: none;
 }
 
 .sidebar-nav-link .status-tag {

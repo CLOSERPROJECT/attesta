@@ -18,7 +18,20 @@ func (s *Server) populateAttention(base *PageBase, user *AccountUser) {
 	if strings.TrimSpace(user.IdentityUserID) == "" {
 		return
 	}
-	has, err := s.attentionService().HasAttention(context.Background(), identityUserForAffiliation(user))
+	identity := identityUserForAffiliation(user)
+	attention := s.attentionService()
+	if s.affiliationService().IsAffiliated(identity) {
+		joins, err := attention.PendingJoinRequests(context.Background(), identity)
+		if err != nil {
+			log.Printf("join attention check failed for %s: %v", user.Email, err)
+			return
+		}
+		base.HasJoinRequestAttention = len(joins) > 0
+		// Affiliated Attention sources today: Join requests only (stream Attention lands later).
+		base.HasAttention = base.HasJoinRequestAttention
+		return
+	}
+	has, err := attention.HasAttention(context.Background(), identity)
 	if err != nil {
 		log.Printf("attention check failed for %s: %v", user.Email, err)
 		return
