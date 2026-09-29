@@ -14,12 +14,25 @@ func (s *Server) populateAttention(base *PageBase, user *AccountUser) {
 	if base == nil || user == nil || s == nil {
 		return
 	}
+	identity := identityUserForAffiliation(user)
+	attention := s.attentionService()
+
+	// Platform-admin Organization-creation Attention does not require an Appwrite user id.
+	if user.IsPlatformAdmin {
+		items, err := attention.PendingOrganizationCreationRequests(context.Background(), identity)
+		if err != nil {
+			log.Printf("org-creation attention check failed for %s: %v", user.Email, err)
+			return
+		}
+		base.HasOrgCreationAttention = len(items) > 0
+		base.HasAttention = base.HasOrgCreationAttention
+		return
+	}
+
 	// Invitation Attention lookups need an Appwrite user id; email fallback is not a membership key.
 	if strings.TrimSpace(user.IdentityUserID) == "" {
 		return
 	}
-	identity := identityUserForAffiliation(user)
-	attention := s.attentionService()
 	if s.affiliationService().IsAffiliated(identity) {
 		joins, err := attention.PendingJoinRequests(context.Background(), identity)
 		if err != nil {

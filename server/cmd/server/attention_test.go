@@ -121,6 +121,57 @@ func TestAttentionHasAttentionSkipsAffiliatedWithoutInviteLookup(t *testing.T) {
 	}
 }
 
+func TestAttentionHasAttentionPlatformAdminPendingOrgCreation(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		ID:              primitive.NewObjectID(),
+		RequesterUserID: "founder-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Co",
+		ProposedSlug:    "new-co",
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertOrganizationCreationRequest: %v", err)
+	}
+	attention := NewAttention(NewAffiliation(&fakeIdentityStore{}, store, nil, func() time.Time { return now }, nil))
+
+	pa := IdentityUser{Email: "admin@example.com", IsPlatformAdmin: true}
+	has, err := attention.HasAttention(ctx, pa)
+	if err != nil {
+		t.Fatalf("HasAttention: %v", err)
+	}
+	if !has {
+		t.Fatal("platform admin with pending Organization creation must have Attention")
+	}
+	items, err := attention.PendingOrganizationCreationRequests(ctx, pa)
+	if err != nil {
+		t.Fatalf("PendingOrganizationCreationRequests: %v", err)
+	}
+	if len(items) != 1 || items[0].ProposedSlug != "new-co" {
+		t.Fatalf("PendingOrganizationCreationRequests = %+v", items)
+	}
+
+	nonPA := IdentityUser{ID: "user-1", Email: "user@example.com"}
+	has, err = attention.HasAttention(ctx, nonPA)
+	if err != nil {
+		t.Fatalf("HasAttention non-PA: %v", err)
+	}
+	if has {
+		t.Fatal("non-platform-admin must not get Organization-creation Attention")
+	}
+	items, err = attention.PendingOrganizationCreationRequests(ctx, nonPA)
+	if err != nil {
+		t.Fatalf("PendingOrganizationCreationRequests non-PA: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("PendingOrganizationCreationRequests for non-PA = %+v", items)
+	}
+}
+
 func TestAttentionHasAttentionOrgAdminPendingJoin(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)

@@ -180,6 +180,61 @@ func TestPageBaseForUserHasJoinRequestAttention(t *testing.T) {
 	}
 }
 
+func TestPageBaseForUserHasOrgCreationAttention(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertOrganizationCreationRequest(context.Background(), OrganizationCreationRequest{
+		ID:              primitive.NewObjectID(),
+		RequesterUserID: "founder-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Co",
+		ProposedSlug:    "new-co",
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertOrganizationCreationRequest: %v", err)
+	}
+	server := &Server{
+		identity:    &fakeIdentityStore{},
+		store:       store,
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	// Platform admin has no Appwrite IdentityUserID — Attention must still resolve.
+	pa := platformAdminAccountUser()
+	if pa == nil {
+		t.Fatal("expected platformAdminAccountUser")
+	}
+	if strings.TrimSpace(pa.IdentityUserID) != "" {
+		t.Fatalf("platform admin must have empty IdentityUserID for this regression, got %q", pa.IdentityUserID)
+	}
+	base := server.pageBaseForUser(pa, "home_picker_body", "", "")
+	if !base.HasAttention || !base.HasOrgCreationAttention {
+		t.Fatalf("platform admin with pending org creation must light Attention chrome: %+v", base)
+	}
+	if base.HasJoinRequestAttention {
+		t.Fatalf("platform admin must not get Join-request Attention: %+v", base)
+	}
+
+	emptyStore := &Server{
+		identity:    &fakeIdentityStore{},
+		store:       NewMemoryStore(),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+	cleared := emptyStore.pageBaseForUser(pa, "home_picker_body", "", "")
+	if cleared.HasAttention || cleared.HasOrgCreationAttention {
+		t.Fatalf("empty org-creation queue must clear Attention chrome: %+v", cleared)
+	}
+}
+
 func TestOperatorHomeJoinRequestAttentionBandAndResolve(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-join-attention"
@@ -361,6 +416,126 @@ func TestOperatorHomeMemberNeverSeesJoinAttention(t *testing.T) {
 	body := rec.Body.String()
 	if strings.Contains(body, "Join requests") || strings.Contains(body, "joiner@example.com") || strings.Contains(body, `attention-dot`) {
 		t.Fatalf("Member must not see Join-request Attention, got:\n%s", body)
+	}
+}
+
+func TestPlatformAdminHomeOrgCreationAttentionBandAndResolve(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	saved, err := store.InsertOrganizationCreationRequest(context.Background(), OrganizationCreationRequest{
+		RequesterUserID: "founder-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "Fresh Org",
+		ProposedSlug:    "fresh-org",
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	if err != nil {
+		t.Fatalf("InsertOrganizationCreationRequest: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+
+	server := &Server{
+		authorizer: fakeAuthorizer{},
+		store:      store,
+		identity: &fakeIdentityStore{
+			listOrganizationsPageFunc: func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+				return IdentityOrgPage{}, nil
+			},
+			getOrganizationBySlugFunc: func(ctx context.Context, slug string) (*IdentityOrg, error) {
+				return nil, ErrIdentityNotFound
+			},
+			getUserByIDFunc: func(ctx context.Context, userID string) (IdentityUser, error) {
+				if userID != "founder-1" {
+					return IdentityUser{}, ErrIdentityNotFound
+				}
+				return IdentityUser{ID: "founder-1", Email: "founder@example.com", Status: "active"}, nil
+			},
+			createOrganizationAsAdminFunc: func(ctx context.Context, name string) (IdentityOrg, error) {
+				return IdentityOrg{ID: "team-fresh", Slug: "fresh-org", Name: name}, nil
+			},
+			addOrganizationUserByIDAsAdminFunc: func(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+				return IdentityMembership{ID: "membership-" + userID, UserID: userID, IsOrgAdmin: isOrgAdmin}, nil
+			},
+			updateUserLabelsFunc: func(ctx context.Context, userID string, labels []string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Labels: labels, IsOrgAdmin: true}, nil
+			},
+		},
+		tmpl:        parseTestTemplates(t),
+		enforceAuth: true,
+		configDir:   tempDir,
+		now:         func() time.Time { return now },
+	}
+
+	getHome := httptest.NewRequest(http.MethodGet, "/my", nil)
+	getHome.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	homeRec := httptest.NewRecorder()
+	server.handleHome(homeRec, getHome)
+	if homeRec.Code != http.StatusOK {
+		t.Fatalf("home status=%d body=%q", homeRec.Code, homeRec.Body.String())
+	}
+	homeBody := homeRec.Body.String()
+	for _, want := range []string{
+		`aria-label="Attention"`,
+		"Organization requests",
+		"Fresh Org",
+		"founder@example.com",
+		`attention-dot`,
+		`name="intent" value="approve_org_creation"`,
+		`name="next" value="/my"`,
+		`action="/admin/organizations"`,
+	} {
+		if !strings.Contains(homeBody, want) {
+			t.Fatalf("expected %q on platform-admin home Attention band, got:\n%s", want, homeBody)
+		}
+	}
+	orgIdx := strings.Index(homeBody, "Organization requests")
+	chooseIdx := strings.Index(homeBody, "Choose a stream")
+	if orgIdx < 0 || chooseIdx < 0 || orgIdx > chooseIdx {
+		t.Fatalf("expected Organization requests above Choose a stream, org=%d choose=%d body:\n%s", orgIdx, chooseIdx, homeBody)
+	}
+
+	adminReq := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)
+	adminReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	adminRec := httptest.NewRecorder()
+	server.handleAdminOrgs(adminRec, adminReq)
+	if adminRec.Code != http.StatusOK {
+		t.Fatalf("admin orgs status=%d", adminRec.Code)
+	}
+	if !strings.Contains(adminRec.Body.String(), `Organizations (needs attention)`) {
+		t.Fatalf("expected Organizations soft-nav Attention chrome, got:\n%s", adminRec.Body.String())
+	}
+
+	approve := httptest.NewRequest(http.MethodPost, "/admin/organizations", strings.NewReader(
+		"intent=approve_org_creation&request_id="+saved.ID.Hex()+"&next=/my",
+	))
+	approve.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	approve.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	approveRec := httptest.NewRecorder()
+	server.handleAdminOrgs(approveRec, approve)
+	if approveRec.Code != http.StatusSeeOther || approveRec.Header().Get("Location") != "/my" {
+		t.Fatalf("approve redirect status=%d loc=%q", approveRec.Code, approveRec.Header().Get("Location"))
+	}
+
+	afterHome := httptest.NewRequest(http.MethodGet, "/my", nil)
+	afterHome.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	afterRec := httptest.NewRecorder()
+	server.handleHome(afterRec, afterHome)
+	if afterRec.Code != http.StatusOK {
+		t.Fatalf("after home status=%d", afterRec.Code)
+	}
+	afterBody := afterRec.Body.String()
+	if strings.Contains(afterBody, "founder@example.com") || strings.Contains(afterBody, `aria-label="Attention"`) {
+		t.Fatalf("expected org-creation Attention band cleared after approve, got:\n%s", afterBody)
+	}
+	if strings.Contains(afterBody, `attention-dot`) {
+		t.Fatalf("expected Attention dots cleared after approve, got:\n%s", afterBody)
 	}
 }
 

@@ -539,10 +539,11 @@ func identityUserForAffiliation(user *AccountUser) IdentityUser {
 		return IdentityUser{}
 	}
 	return IdentityUser{
-		ID:         firstNonEmpty(strings.TrimSpace(user.IdentityUserID), strings.TrimSpace(user.Email)),
-		Email:      strings.TrimSpace(user.Email),
-		OrgSlug:    strings.TrimSpace(user.OrgSlug),
-		IsOrgAdmin: userIsOrgAdmin(user),
+		ID:              firstNonEmpty(strings.TrimSpace(user.IdentityUserID), strings.TrimSpace(user.Email)),
+		Email:           strings.TrimSpace(user.Email),
+		OrgSlug:         strings.TrimSpace(user.OrgSlug),
+		IsOrgAdmin:      userIsOrgAdmin(user),
+		IsPlatformAdmin: user.IsPlatformAdmin,
 	}
 }
 

@@ -34,10 +34,11 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 		Breadcrumbs: view.Breadcrumbs,
 		NavItems: []AdminConsoleNavItem{
 			{
-				Href:   adminPath("organizations"),
-				Title:  "Organizations",
-				Copy:   "Create and manage organizations",
-				Active: active != "categories",
+				Href:         adminPath("organizations"),
+				Title:        "Organizations",
+				Copy:         "Create and manage organizations",
+				Active:       active != "categories",
+				HasAttention: view.HasOrgCreationAttention,
 			},
 			{
 				Href:   adminPath("categories"),

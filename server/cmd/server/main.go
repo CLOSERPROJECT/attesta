@@ -281,25 +281,26 @@ type RoleMeta struct {
 }
 
 type PageBase struct {
-	Body                   string
-	BuildVersion           string
-	ViteDevServer          string
-	TurnstileSiteKey       string
-	WorkflowKey            string
-	WorkflowName           string
-	WorkflowPath           string
-	UserEmail              string
-	IsPlatformAdmin        bool
-	ShowAdminLink          bool
-	ShowMyOrgLink          bool
-	ShowAccountSettings    bool
-	AccountOrgName         string
-	LeavePath              string
-	CanLeave               bool
-	LeaveReason            string
+	Body                    string
+	BuildVersion            string
+	ViteDevServer           string
+	TurnstileSiteKey        string
+	WorkflowKey             string
+	WorkflowName            string
+	WorkflowPath            string
+	UserEmail               string
+	IsPlatformAdmin         bool
+	ShowAdminLink           bool
+	ShowMyOrgLink           bool
+	ShowAccountSettings     bool
+	AccountOrgName          string
+	LeavePath               string
+	CanLeave                bool
+	LeaveReason             string
 	ShowLogout              bool
 	HasAttention            bool
 	HasJoinRequestAttention bool
+	HasOrgCreationAttention bool
 }
 
 type PublicCatalogResponse struct {
@@ -322,13 +323,14 @@ type PublicCatalogRole struct {
 
 type HomeWorkflowPickerView struct {
 	PageBase
-	Groups              []MyHomeStreamGroupView
-	Sidebar             CategorySidebarView
-	ShowCreateStream    bool
-	Unaffiliated        bool
-	PendingJoinRequests []OrgAdminJoinRequestRow
-	Error               string
-	Confirmation        string
+	Groups                     []MyHomeStreamGroupView
+	Sidebar                    CategorySidebarView
+	ShowCreateStream           bool
+	Unaffiliated               bool
+	PendingJoinRequests        []OrgAdminJoinRequestRow
+	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
+	Error                      string
+	Confirmation               string
 }
 
 type PaginationLink struct {
@@ -427,31 +429,31 @@ type AboutView struct {
 
 type PlatformAdminView struct {
 	PageBase
-	ActivePanel              string
-	Categories               []TaxonomyCategoryNode
-	CategoriesEditor         CategoriesEditorView
-	Breadcrumbs              BreadcrumbsView
-	Console                  AdminConsoleView
-	SearchQuery              string
-	CurrentPage              int
-	TotalPages               int
-	PageNumbers              []int
-	HasPreviousPage          bool
-	HasNextPage              bool
-	PreviousPage             int
-	NextPage                 int
-	MatchedOrganizations     int
-	Organizations            []PlatformAdminOrganizationRow
+	ActivePanel                string
+	Categories                 []TaxonomyCategoryNode
+	CategoriesEditor           CategoriesEditorView
+	Breadcrumbs                BreadcrumbsView
+	Console                    AdminConsoleView
+	SearchQuery                string
+	CurrentPage                int
+	TotalPages                 int
+	PageNumbers                []int
+	HasPreviousPage            bool
+	HasNextPage                bool
+	PreviousPage               int
+	NextPage                   int
+	MatchedOrganizations       int
+	Organizations              []PlatformAdminOrganizationRow
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
-	InviteLink               string
-	Confirmation             string
-	OrganizationError        string
-	OrganizationDialogAction string
-	OrganizationDialogSlug   string
-	OrganizationDialogName   string
-	InviteError              string
-	InviteDialogEmail        string
-	Error                    string
+	InviteLink                 string
+	Confirmation               string
+	OrganizationError          string
+	OrganizationDialogAction   string
+	OrganizationDialogSlug     string
+	OrganizationDialogName     string
+	InviteError                string
+	InviteDialogEmail          string
+	Error                      string
 }
 
 type PlatformAdminOrgCreationRequestRow struct {
@@ -486,26 +488,26 @@ type PlatformAdminErrors struct {
 
 type OrgAdminView struct {
 	PageBase
-	Breadcrumbs            BreadcrumbsView
-	ActivePanel            string
-	Organization           Organization
-	OrganizationLogoURL    string
-	OrganizationError      string
-	RoleError              string
-	RoleDialogAction       string
-	RoleDialogSlug         string
-	RoleDialogName         string
-	RoleDialogPalette      string
-	InviteError            string
-	UsersError             string
-	Roles                  []Role
-	RolePills              []OrgAdminRoleOption
-	RoleRows               []OrgAdminRoleRow
-	Users                  []OrgAdminUserRow
-	Invites                []OrgAdminInviteRow
-	PendingJoinRequests    []OrgAdminJoinRequestRow
-	InviteLink             string
-	Error                  string
+	Breadcrumbs         BreadcrumbsView
+	ActivePanel         string
+	Organization        Organization
+	OrganizationLogoURL string
+	OrganizationError   string
+	RoleError           string
+	RoleDialogAction    string
+	RoleDialogSlug      string
+	RoleDialogName      string
+	RoleDialogPalette   string
+	InviteError         string
+	UsersError          string
+	Roles               []Role
+	RolePills           []OrgAdminRoleOption
+	RoleRows            []OrgAdminRoleRow
+	Users               []OrgAdminUserRow
+	Invites             []OrgAdminInviteRow
+	PendingJoinRequests []OrgAdminJoinRequestRow
+	InviteLink          string
+	Error               string
 }
 
 type OrgAdminJoinRequestRow struct {
@@ -777,20 +779,20 @@ func main() {
 	}
 
 	server := &Server{
-		mongo:          client,
-		store:          &MongoStore{db: db},
-		identity:       NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
-		tmpl:           tmpl,
-		authorizer:     NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
-		sse:            newSSEHub(),
-		now:            time.Now,
-		workflowDefID:  primitive.NewObjectID(),
-		configDir:      configDir,
-		viteDevServer:  strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
-		enforceAuth:    true,
-		formataArchURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
-		buildVersion:   applicationVersion(),
-		mailer:         newMailerFromEnv(),
+		mongo:              client,
+		store:              &MongoStore{db: db},
+		identity:           NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
+		tmpl:               tmpl,
+		authorizer:         NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
+		sse:                newSSEHub(),
+		now:                time.Now,
+		workflowDefID:      primitive.NewObjectID(),
+		configDir:          configDir,
+		viteDevServer:      strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+		enforceAuth:        true,
+		formataArchURL:     strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
+		buildVersion:       applicationVersion(),
+		mailer:             newMailerFromEnv(),
 		turnstileSiteKey:   strings.TrimSpace(os.Getenv("TURNSTILE_SITE_KEY")),
 		turnstileSecretKey: strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY")),
 		turnstileClient:    http.DefaultClient,
@@ -2169,14 +2171,19 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	var pendingOrgCreation []PlatformAdminOrgCreationRequestRow
+	if user.IsPlatformAdmin {
+		pendingOrgCreation = platformAdminOrgCreationRequestRows(r.Context(), s)
+	}
 	view := HomeWorkflowPickerView{
-		PageBase:            s.pageBaseForUser(user, "home_picker_body", "", ""),
-		Groups:              groups,
-		Sidebar:             buildMyHomeCategorySidebar(groups),
-		ShowCreateStream:    showCreateStream && authErr == nil,
-		PendingJoinRequests: pendingJoins,
-		Error:               homePickerMessage(r, "error"),
-		Confirmation:        homePickerMessage(r, "confirmation"),
+		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
+		Groups:                     groups,
+		Sidebar:                    buildMyHomeCategorySidebar(groups),
+		ShowCreateStream:           showCreateStream && authErr == nil,
+		PendingJoinRequests:        pendingJoins,
+		PendingOrgCreationRequests: pendingOrgCreation,
+		Error:                      homePickerMessage(r, "error"),
+		Confirmation:               homePickerMessage(r, "confirmation"),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -3854,6 +3861,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: affiliationOrganizationCreationFormError(err), SearchQuery: searchQuery, Page: page})
 				return
 			}
+			if next := orgAdminPostRedirect(r, ""); next != "" {
+				http.Redirect(w, r, next, http.StatusSeeOther)
+				return
+			}
 			redirectPlatformAdminWithMessage(w, r, searchQuery, page, "organization creation request approved")
 			return
 		case "reject_org_creation":
@@ -3867,6 +3878,10 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			_, err = s.affiliationService().RejectOrganizationCreationRequest(r.Context(), requestID, identityUserForAffiliation(admin), reason)
 			if err != nil {
 				s.renderPlatformAdmin(w, r, admin, "", PlatformAdminErrors{Organization: affiliationOrganizationCreationFormError(err), SearchQuery: searchQuery, Page: page})
+				return
+			}
+			if next := orgAdminPostRedirect(r, ""); next != "" {
+				http.Redirect(w, r, next, http.StatusSeeOther)
 				return
 			}
 			redirectPlatformAdminWithMessage(w, r, searchQuery, page, "organization creation request rejected")
@@ -4384,27 +4399,27 @@ func (s *Server) renderOrgAdminWithErrors(w http.ResponseWriter, r *http.Request
 	}
 
 	view := OrgAdminView{
-		PageBase:               s.pageBaseForUser(user, "org_admin_body", "", ""),
-		Breadcrumbs:            buildOrgAdminBreadcrumbs(activePanel),
-		ActivePanel:            activePanel,
-		Organization:           org,
-		OrganizationLogoURL:    organizationPath("logo/" + strings.TrimSpace(org.LogoAttachmentID)),
-		OrganizationError:      errs.Organization,
-		RoleError:              errs.Role,
-		RoleDialogAction:       strings.TrimSpace(errs.RoleAction),
-		RoleDialogSlug:         strings.TrimSpace(errs.RoleSlug),
-		RoleDialogName:         strings.TrimSpace(errs.RoleName),
-		RoleDialogPalette:      strings.TrimSpace(errs.RolePalette),
-		InviteError:            errs.Invite,
-		UsersError:             errs.Users,
-		Roles:                  roles,
-		RolePills:              rolePills,
-		RoleRows:               roleRows,
-		Users:                  orgUsers,
-		Invites:                pendingInvites,
-		PendingJoinRequests:    pendingJoinRows,
-		InviteLink:             strings.TrimSpace(inviteLink),
-		Error:                  firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
+		PageBase:            s.pageBaseForUser(user, "org_admin_body", "", ""),
+		Breadcrumbs:         buildOrgAdminBreadcrumbs(activePanel),
+		ActivePanel:         activePanel,
+		Organization:        org,
+		OrganizationLogoURL: organizationPath("logo/" + strings.TrimSpace(org.LogoAttachmentID)),
+		OrganizationError:   errs.Organization,
+		RoleError:           errs.Role,
+		RoleDialogAction:    strings.TrimSpace(errs.RoleAction),
+		RoleDialogSlug:      strings.TrimSpace(errs.RoleSlug),
+		RoleDialogName:      strings.TrimSpace(errs.RoleName),
+		RoleDialogPalette:   strings.TrimSpace(errs.RolePalette),
+		InviteError:         errs.Invite,
+		UsersError:          errs.Users,
+		Roles:               roles,
+		RolePills:           rolePills,
+		RoleRows:            roleRows,
+		Users:               orgUsers,
+		Invites:             pendingInvites,
+		PendingJoinRequests: pendingJoinRows,
+		InviteLink:          strings.TrimSpace(inviteLink),
+		Error:               firstNonEmpty(errs.Organization, errs.Role, errs.Invite, errs.Users),
 	}
 	if strings.TrimSpace(org.LogoAttachmentID) == "" {
 		view.OrganizationLogoURL = ""
