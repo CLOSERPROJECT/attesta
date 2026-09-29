@@ -2,6 +2,64 @@
 
 {{ define "home_picker_body" }}
 <section class="stack u-max-w-7xl u-mx-auto my-home">
+  {{ if .PendingJoinRequests }}
+    <section class="my-home-attention" aria-label="Attention">
+      <div class="panel-heading">
+        <h2>Join requests</h2>
+        <p>Review requests from users who asked to join your organization</p>
+      </div>
+      <ul class="list-rows">
+        {{ range .PendingJoinRequests }}
+          <li class="list-row">
+            {{ template "org_pending_row" (orgPendingRowFromJoinRequest .) }}
+            <div class="list-row-actions">
+              <form method="post" action="/my/organization/users" class="panel-actions">
+                <input type="hidden" name="intent" value="approve_join" />
+                <input type="hidden" name="request_id" value="{{ .ID }}" />
+                <input type="hidden" name="next" value="/my" />
+                <button class="btn btn-ghost btn-icon btn-xs"
+                        type="submit"
+                        aria-label="Approve">{{ template "icon-check" . }}</button>
+              </form>
+              <button type="button"
+                      class="btn btn-ghost-danger btn-icon btn-xs"
+                      aria-label="Reject"
+                      onclick="document.getElementById('home-reject-join-{{ .ID }}').showModal()">
+                {{ template "icon-close" . }}
+              </button>
+            </div>
+            <dialog id="home-reject-join-{{ .ID }}" class="dialog">
+              <div class="dialog-card">
+                <header class="dialog-head">
+                  <div>
+                    <h3 class="dialog-title">Reject join request</h3>
+                    <p class="dialog-subtitle">{{ .RequesterEmail }}</p>
+                  </div>
+                  <button type="button"
+                          class="btn btn-ghost btn-icon dialog-close"
+                          onclick="document.getElementById('home-reject-join-{{ .ID }}').close()">
+                    {{ template "icon-close" . }}
+                  </button>
+                </header>
+                <form method="post" action="/my/organization/users" class="input-form">
+                  <input type="hidden" name="intent" value="reject_join" />
+                  <input type="hidden" name="request_id" value="{{ .ID }}" />
+                  <input type="hidden" name="next" value="/my" />
+                  <div class="form-field">
+                    <label for="home-reject-join-reason-{{ .ID }}">Reason (optional)</label>
+                    <input id="home-reject-join-reason-{{ .ID }}" name="reason" type="text" />
+                  </div>
+                  <div class="dialog-actions">
+                    <button class="btn btn-danger" type="submit">Reject request</button>
+                  </div>
+                </form>
+              </div>
+            </dialog>
+          </li>
+        {{ end }}
+      </ul>
+    </section>
+  {{ end }}
   <section class="page-header">
     <div class="page-header-head">
       <div class="page-header-body">

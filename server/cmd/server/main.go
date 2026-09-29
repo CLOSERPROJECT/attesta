@@ -297,8 +297,9 @@ type PageBase struct {
 	LeavePath              string
 	CanLeave               bool
 	LeaveReason            string
-	ShowLogout             bool
-	HasAttention           bool
+	ShowLogout              bool
+	HasAttention            bool
+	HasJoinRequestAttention bool
 }
 
 type PublicCatalogResponse struct {
@@ -321,12 +322,13 @@ type PublicCatalogRole struct {
 
 type HomeWorkflowPickerView struct {
 	PageBase
-	Groups           []MyHomeStreamGroupView
-	Sidebar          CategorySidebarView
-	ShowCreateStream bool
-	Unaffiliated     bool
-	Error            string
-	Confirmation     string
+	Groups              []MyHomeStreamGroupView
+	Sidebar             CategorySidebarView
+	ShowCreateStream    bool
+	Unaffiliated        bool
+	PendingJoinRequests []OrgAdminJoinRequestRow
+	Error               string
+	Confirmation        string
 }
 
 type PaginationLink struct {
@@ -2161,13 +2163,20 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	pendingJoins, joinErr := s.joinAttentionRows(r.Context(), user)
+	if joinErr != nil {
+		logRequestError(r, joinErr, "load join attention for home")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	view := HomeWorkflowPickerView{
-		PageBase:         s.pageBaseForUser(user, "home_picker_body", "", ""),
-		Groups:           groups,
-		Sidebar:          buildMyHomeCategorySidebar(groups),
-		ShowCreateStream: showCreateStream && authErr == nil,
-		Error:            homePickerMessage(r, "error"),
-		Confirmation:     homePickerMessage(r, "confirmation"),
+		PageBase:            s.pageBaseForUser(user, "home_picker_body", "", ""),
+		Groups:              groups,
+		Sidebar:             buildMyHomeCategorySidebar(groups),
+		ShowCreateStream:    showCreateStream && authErr == nil,
+		PendingJoinRequests: pendingJoins,
+		Error:               homePickerMessage(r, "error"),
+		Confirmation:        homePickerMessage(r, "confirmation"),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -4285,6 +4294,44 @@ func orgAdminPendingJoinRequestRows(ctx context.Context, s *Server, orgSlug stri
 	return rows, nil
 }
 
+func (s *Server) joinAttentionRows(ctx context.Context, user *AccountUser) ([]OrgAdminJoinRequestRow, error) {
+	if s == nil || user == nil {
+		return nil, nil
+	}
+	identity := identityUserForAffiliation(user)
+	pending, err := s.attentionService().PendingJoinRequests(ctx, identity)
+	if err != nil {
+		return nil, err
+	}
+	if len(pending) == 0 {
+		return nil, nil
+	}
+	var roles []Role
+	if s.identity != nil {
+		if org, orgErr := s.identity.GetOrganizationBySlug(ctx, identity.OrgSlug); orgErr == nil && org != nil {
+			roles = organizationCatalogRoles(rolesFromIdentityOrg(*org))
+		}
+	}
+	rows := make([]OrgAdminJoinRequestRow, 0, len(pending))
+	for _, req := range pending {
+		rows = append(rows, OrgAdminJoinRequestRow{
+			ID:             req.ID.Hex(),
+			RequesterEmail: strings.TrimSpace(req.RequesterEmail),
+			Roles:          roleOptionsForSlugs(roles, req.RoleSlugs),
+			CreatedAt:      humanReadableTraceabilityTime(req.CreatedAt),
+		})
+	}
+	return rows, nil
+}
+
+func orgAdminPostRedirect(r *http.Request, fallback string) string {
+	next := strings.TrimSpace(r.FormValue("next"))
+	if next == appHomePath || next == appHomePath+"/" {
+		return appHomePath
+	}
+	return fallback
+}
+
 func (s *Server) loadOrgAdminState(ctx context.Context, user *AccountUser, orgSlug string) (Organization, []Role, []OrgAdminUserRow, []OrgAdminInviteRow, error) {
 	if s.identity == nil {
 		return Organization{}, nil, nil, nil, ErrIdentityNotFound
@@ -5078,7 +5125,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: affiliationJoinDecideFormError(err)})
 			return
 		}
-		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+		http.Redirect(w, r, orgAdminPostRedirect(r, organizationPath("members")), http.StatusSeeOther)
 	case "reject_join":
 		requestIDHex := strings.TrimSpace(r.FormValue("request_id"))
 		requestID, err := primitive.ObjectIDFromHex(requestIDHex)
@@ -5091,7 +5138,7 @@ func (s *Server) handleOrgAdminUsers(w http.ResponseWriter, r *http.Request) {
 			s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: affiliationJoinDecideFormError(err)})
 			return
 		}
-		http.Redirect(w, r, organizationPath("members"), http.StatusSeeOther)
+		http.Redirect(w, r, orgAdminPostRedirect(r, organizationPath("members")), http.StatusSeeOther)
 	default:
 		s.renderOrgAdminWithErrors(w, r, admin, admin.OrgSlug, "", OrgAdminErrors{Users: "unsupported action"})
 	}

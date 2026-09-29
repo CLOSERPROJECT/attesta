@@ -426,10 +426,11 @@ type OrgPendingRowView struct {
 
 // AdminConsoleNavItem is one soft-nav link in templates/components/admin_console.html.
 type AdminConsoleNavItem struct {
-	Href   string
-	Title  string
-	Copy   string
-	Active bool
+	Href         string
+	Title        string
+	Copy         string
+	Active       bool
+	HasAttention bool
 }
 
 // AdminConsoleView is the view model for templates/components/admin_console.html.

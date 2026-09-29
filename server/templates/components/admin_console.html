@@ -24,15 +24,21 @@
           {{ range .NavItems }}
             <a
               href="{{ .Href }}"
-              class="sidebar-nav-link{{ if .Active }} is-active{{ end }}"
+              class="sidebar-nav-link{{ if .Active }} is-active{{ end }}{{ if .HasAttention }} has-attention{{ end }}"
               hx-get="{{ .Href }}"
               hx-target="#{{ if $.ID }}{{ $.ID }}{{ else }}admin-console{{ end }}"
               hx-select="#{{ if $.ID }}{{ $.ID }}{{ else }}admin-console{{ end }}"
               hx-swap="outerHTML"
               hx-push-url="true"
               {{ if .Active }}aria-current="page"{{ end }}
+              {{ if .HasAttention }}aria-label="{{ .Title }} (needs attention)"{{ end }}
             >
-              <span class="sidebar-nav-title">{{ .Title }}</span>
+              <span class="sidebar-nav-title">
+                {{ .Title }}
+                {{ if .HasAttention }}
+                  <span class="attention-dot" aria-hidden="true"></span>
+                {{ end }}
+              </span>
               {{ if .Copy }}
                 <span class="sidebar-nav-copy">{{ .Copy }}</span>
               {{ end }}

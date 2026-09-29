@@ -57,4 +57,16 @@ func TestOrgAdminConsoleNav(t *testing.T) {
 	if len(c.NavItems) != 3 || !c.NavItems[1].Active || c.NavItems[1].Href != organizationPath("roles") {
 		t.Fatalf("unexpected nav: %+v", c.NavItems)
 	}
+	if c.NavItems[2].HasAttention {
+		t.Fatal("Members soft-nav must not light Attention without HasJoinRequestAttention")
+	}
+
+	withJoin := OrgAdminView{
+		PageBase:    PageBase{HasJoinRequestAttention: true},
+		ActivePanel: "members",
+	}
+	members := orgAdminConsole(withJoin)
+	if !members.NavItems[2].HasAttention || members.NavItems[2].Title != "Members" {
+		t.Fatalf("Members soft-nav should carry Join-request Attention: %+v", members.NavItems[2])
+	}
 }

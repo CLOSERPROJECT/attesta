@@ -16,9 +16,8 @@ func NewAttention(affiliation *Affiliation) *Attention {
 }
 
 // HasAttention reports whether the user has at least one Attention item.
-// v1 sources: open Invitation for an unaffiliated invitee. Affiliated users
-// return false until later slices add Join-request / org-creation / stream sources.
-// Waiting never contributes.
+// Sources: open Invitation (unaffiliated invitee); pending Join requests (Org admin
+// for their Organization). Waiting never contributes.
 func (a *Attention) HasAttention(ctx context.Context, user IdentityUser) (bool, error) {
 	if a == nil || a.affiliation == nil {
 		return false, nil
@@ -28,11 +27,32 @@ func (a *Attention) HasAttention(ctx context.Context, user IdentityUser) (bool, 
 		return false, nil
 	}
 	if a.affiliation.IsAffiliated(user) {
-		return false, nil
+		items, err := a.PendingJoinRequests(ctx, user)
+		if err != nil {
+			return false, err
+		}
+		return len(items) > 0, nil
 	}
 	invites, err := a.affiliation.ListPendingInvitesForUser(ctx, userID)
 	if err != nil {
 		return false, err
 	}
 	return len(invites) > 0, nil
+}
+
+// PendingJoinRequests returns Join-request Attention items for an Org admin's
+// Organization. Empty when the user lacks Org admin standing, has no OrgSlug,
+// or the queue is empty. Waiting never appears here.
+func (a *Attention) PendingJoinRequests(ctx context.Context, user IdentityUser) ([]JoinRequest, error) {
+	if a == nil || a.affiliation == nil {
+		return nil, nil
+	}
+	if !user.IsOrgAdmin {
+		return nil, nil
+	}
+	orgSlug := strings.TrimSpace(user.OrgSlug)
+	if orgSlug == "" {
+		return nil, nil
+	}
+	return a.affiliation.ListPendingJoinRequests(ctx, orgSlug)
 }
