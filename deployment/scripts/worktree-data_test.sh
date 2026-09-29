@@ -181,7 +181,18 @@ case " $* " in
 mongodb
 mariadb
 }" ;;
-  *" ps --all --services "*) [[ -z "${FAKE_ALL_SERVICES:-}" ]] || printf '%s\n' "${FAKE_ALL_SERVICES}" ;;
+  *" ps --all --services "*)
+    # Real Docker includes running services in --all. Mirror that unless the
+    # test explicitly overrides FAKE_ALL_SERVICES (including to empty).
+    if [[ -n "${FAKE_ALL_SERVICES+x}" ]]; then
+      [[ -z "${FAKE_ALL_SERVICES}" ]] || printf '%s\n' "${FAKE_ALL_SERVICES}"
+    else
+      printf '%s' "${FAKE_RUNNING_SERVICES-appwrite
+mongodb
+mariadb
+}"
+    fi
+    ;;
   *" mariadb-admin ping "*) echo 'mysqld is alive' ;;
   *" exec -T mariadb "*" mariadb --user=root "*)
     mkdir -p "${FAKE_RESTORE_DIR}"
@@ -402,7 +413,7 @@ mkdir -p "${tmpdir}/volumes/${running_keep_project}_mongodb_data"
 : >"${tmpdir}/volumes/${running_keep_project}_mongodb_data/nonempty"
 : >"${tmpdir}/docker-calls"
 env "${common_env[@]}" ATTESTA_ROOT_DIR="${running_keep_target}" \
-  FAKE_RUNNING_SERVICES=mongodb bash "${SCRIPT}" restore \
+  FAKE_RUNNING_SERVICES=mongodb FAKE_ALL_SERVICES=mongodb bash "${SCRIPT}" restore \
   >"${tmpdir}/running-keep.out"
 grep -qi 'already running; skipping data restore' "${tmpdir}/running-keep.out" \
   || fail "live stack with durable data did not skip restore"
@@ -416,7 +427,7 @@ mkdir -p "${running_empty_target}/.worktree-data"
 cp -R "${bundle}" "${running_empty_target}/.worktree-data/snapshot-v1"
 : >"${tmpdir}/docker-calls"
 if env "${common_env[@]}" ATTESTA_ROOT_DIR="${running_empty_target}" \
-  FAKE_RUNNING_SERVICES=mongodb FAKE_ALL_SERVICES= \
+  FAKE_RUNNING_SERVICES=mongodb FAKE_ALL_SERVICES=mongodb \
   bash "${SCRIPT}" restore \
   >"${tmpdir}/running-empty.out" 2>"${tmpdir}/running-empty.err"; then
   fail "live empty stack unexpectedly allowed restore"

@@ -449,6 +449,22 @@ snapshot_primary() {
   finish_snapshot
 }
 
+# True when any durable volume for this project already has data. Empty uploads /
+# functions volumes are normal and must not require every volume to be non-empty.
+target_volumes_have_data() {
+  local project="$1"
+  local logical resolved
+  for logical in "${DURABLE_VOLUMES[@]}"; do
+    if ! resolved="$(volume_name "${project}" "${logical}")"; then
+      fail "could not inspect target durable volume ${logical}"
+    fi
+    if [[ -n "${resolved}" ]] && ! volume_is_empty "${resolved}"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 target_has_state() {
   local project="$1"
   local existing_services=()
@@ -461,16 +477,7 @@ target_has_state() {
   done <<<"${services_output}"
   [[ "${#existing_services[@]}" -eq 0 ]] || return 0
 
-  local logical resolved
-  for logical in "${DURABLE_VOLUMES[@]}"; do
-    if ! resolved="$(volume_name "${project}" "${logical}")"; then
-      fail "could not inspect target durable volume ${logical}"
-    fi
-    if [[ -n "${resolved}" ]] && ! volume_is_empty "${resolved}"; then
-      return 0
-    fi
-  done
-  return 1
+  target_volumes_have_data "${project}"
 }
 
 remove_orphan_target_state() {
@@ -591,7 +598,9 @@ restore_snapshot() {
   if [[ "${#running_services[@]}" -gt 0 ]]; then
     # task start / task:dev re-enter restore on every run. A live stack already
     # owns its volumes; only refuse when restore would still need to mutate them.
-    if target_has_state "${project}"; then
+    # Check volumes directly: target_has_state is true whenever compose ps --all
+    # lists any service, which real Docker always does for a running stack.
+    if target_volumes_have_data "${project}"; then
       echo "Compose stack already running; skipping data restore"
       finish_restore
       return 0

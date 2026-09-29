@@ -1088,14 +1088,15 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 		}
 		// EnsurePlatformAdminAccount only surfaces ErrIdentityNotFound when
 		// Appwrite answered 404 on create/update (user-missing is handled
-		// inside Ensure). During boot Traefik is often up while the API still
-		// returns 404 for those routes.
+		// inside Ensure). During early Appwrite boot the Users API can still
+		// return 404/5xx even though the container is reachable.
 		if !errors.Is(err, ErrIdentityNotFound) && !isRetriableIdentityBootstrapError(err) {
 			return err
 		}
 		if !time.Now().Before(deadline) {
 			return err
 		}
+		log.Printf("platform admin identity bootstrap: retrying after %v", err)
 		timer := time.NewTimer(platformAdminIdentityBootstrapRetry)
 		select {
 		case <-ctx.Done():
@@ -1110,8 +1111,33 @@ func isRetriableIdentityBootstrapError(err error) bool {
 	if err == nil {
 		return false
 	}
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	type statusCoder interface {
+		GetStatusCode() int
+	}
+	var sc statusCoder
+	if errors.As(err, &sc) {
+		switch sc.GetStatusCode() {
+		case http.StatusInternalServerError, http.StatusBadGateway,
+			http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return true
+		default:
+			return false
+		}
+	}
+	// *url.Error implements net.Error; unwrap so malformed endpoints fail fast.
+	for {
+		var urlErr *url.Error
+		if !errors.As(err, &urlErr) || urlErr.Err == nil || urlErr.Err == err {
+			break
+		}
+		err = urlErr.Err
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
 		return true
 	}
 	msg := strings.ToLower(err.Error())

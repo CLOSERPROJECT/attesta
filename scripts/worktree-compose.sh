@@ -93,10 +93,14 @@ wait_for_appwrite() {
   if [[ "${timeout}" -eq 0 ]]; then
     return 0
   fi
+  command -v curl >/dev/null 2>&1 || {
+    echo "error: curl is required to wait for Appwrite readiness" >&2
+    return 1
+  }
   deadline=$((SECONDS + timeout))
   echo "waiting for Appwrite on localhost:${port}"
   while ((SECONDS < deadline)); do
-    code="$(curl -s -o /dev/null -w '%{http_code}' \
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
       "http://127.0.0.1:${port}/v1/health" 2>/dev/null || true)"
     # Guests get 401 once Appwrite is serving; treat that as ready.
     if [[ "${code}" == "200" || "${code}" == "401" ]]; then

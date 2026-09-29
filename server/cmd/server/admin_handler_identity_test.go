@@ -200,26 +200,39 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 		prevTimeout := platformAdminIdentityBootstrapTimeout
 		prevRetry := platformAdminIdentityBootstrapRetry
 		platformAdminIdentityBootstrapTimeout = time.Second
-		platformAdminIdentityBootstrapRetry = 50 * time.Millisecond
+		platformAdminIdentityBootstrapRetry = time.Hour
 		t.Cleanup(func() {
 			platformAdminIdentityBootstrapTimeout = prevTimeout
 			platformAdminIdentityBootstrapRetry = prevRetry
 		})
 		ctx, cancel := context.WithCancel(context.Background())
+		calls := 0
 		server := &Server{
 			authorizer: fakeAuthorizer{},
 			identity: &fakeIdentityStore{
 				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
-					cancel()
+					calls++
 					return ErrIdentityNotFound
 				},
 			},
 		}
+		time.AfterFunc(10*time.Millisecond, cancel)
 		if err := server.bootstrapPlatformAdminIdentity(ctx); !errors.Is(err, context.Canceled) {
 			t.Fatalf("error = %v, want %v", err, context.Canceled)
 		}
+		if calls != 1 {
+			t.Fatalf("calls = %d, want 1", calls)
+		}
 	})
 }
+
+type identityBootstrapStatusError struct {
+	code int
+	msg  string
+}
+
+func (e identityBootstrapStatusError) Error() string     { return e.msg }
+func (e identityBootstrapStatusError) GetStatusCode() int { return e.code }
 
 func TestIsRetriableIdentityBootstrapError(t *testing.T) {
 	if isRetriableIdentityBootstrapError(nil) {
@@ -231,13 +244,40 @@ func TestIsRetriableIdentityBootstrapError(t *testing.T) {
 	if isRetriableIdentityBootstrapError(errors.New("boom")) {
 		t.Fatal("unknown errors should not be retriable")
 	}
-
-	var netErr net.Error = &net.DNSError{Err: "temporary failure", Name: "appwrite", IsTemporary: true}
-	if !isRetriableIdentityBootstrapError(netErr) {
-		t.Fatal("net.Error should be retriable")
+	if isRetriableIdentityBootstrapError(identityBootstrapStatusError{code: http.StatusUnauthorized, msg: "unauthorized"}) {
+		t.Fatal("non-5xx Appwrite errors should not be retriable")
 	}
-	if !isRetriableIdentityBootstrapError(fmt.Errorf("wrap: %w", netErr)) {
-		t.Fatal("wrapped net.Error should be retriable")
+	for _, code := range []int{
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+	} {
+		err := identityBootstrapStatusError{code: code, msg: http.StatusText(code)}
+		if !isRetriableIdentityBootstrapError(err) {
+			t.Fatalf("status %d should be retriable", code)
+		}
+	}
+
+	dnsErr := &net.DNSError{Err: "temporary failure", Name: "appwrite", IsTemporary: true}
+	if !isRetriableIdentityBootstrapError(dnsErr) {
+		t.Fatal("DNSError should be retriable")
+	}
+	if !isRetriableIdentityBootstrapError(fmt.Errorf("wrap: %w", dnsErr)) {
+		t.Fatal("wrapped DNSError should be retriable")
+	}
+
+	opErr := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
+	if !isRetriableIdentityBootstrapError(opErr) {
+		t.Fatal("OpError should be retriable")
+	}
+	urlErr := &url.Error{Op: "Get", URL: "http://appwrite/v1", Err: opErr}
+	if !isRetriableIdentityBootstrapError(urlErr) {
+		t.Fatal("url.Error wrapping OpError should be retriable")
+	}
+	badURL := &url.Error{Op: "Get", URL: "ftp://appwrite/v1", Err: errors.New("unsupported protocol scheme")}
+	if isRetriableIdentityBootstrapError(badURL) {
+		t.Fatal("malformed endpoint url.Error should not be retriable")
 	}
 
 	for _, msg := range []string{
