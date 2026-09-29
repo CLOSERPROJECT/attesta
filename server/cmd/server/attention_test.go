@@ -291,4 +291,91 @@ func TestAttentionHasAttentionNilSafe(t *testing.T) {
 	if err != nil || has {
 		t.Fatalf("empty userID: has=%v err=%v", has, err)
 	}
+
+	orgItems, err := attention.PendingOrganizationCreationRequests(context.Background(), IdentityUser{IsPlatformAdmin: true})
+	if err != nil || orgItems != nil {
+		t.Fatalf("nil Attention org queue: items=%v err=%v", orgItems, err)
+	}
+	orgItems, err = NewAttention(nil).PendingOrganizationCreationRequests(context.Background(), IdentityUser{IsPlatformAdmin: true})
+	if err != nil || orgItems != nil {
+		t.Fatalf("nil affiliation org queue: items=%v err=%v", orgItems, err)
+	}
+	joinItems, err := attention.PendingJoinRequests(context.Background(), IdentityUser{IsOrgAdmin: true, OrgSlug: "acme"})
+	if err != nil || joinItems != nil {
+		t.Fatalf("nil Attention join queue: items=%v err=%v", joinItems, err)
+	}
+	joinItems, err = NewAttention(nil).PendingJoinRequests(context.Background(), IdentityUser{IsOrgAdmin: true, OrgSlug: "acme"})
+	if err != nil || joinItems != nil {
+		t.Fatalf("nil affiliation join queue: items=%v err=%v", joinItems, err)
+	}
+}
+
+func TestAttentionPendingJoinRequestsEmptyOrgSlug(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertJoinRequest(ctx, JoinRequest{
+		ID:              primitive.NewObjectID(),
+		RequesterUserID: "joiner-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertJoinRequest: %v", err)
+	}
+	attention := NewAttention(NewAffiliation(&fakeIdentityStore{}, store, nil, func() time.Time { return now }, nil))
+
+	items, err := attention.PendingJoinRequests(ctx, IdentityUser{ID: "admin-1", IsOrgAdmin: true, OrgSlug: "  "})
+	if err != nil {
+		t.Fatalf("PendingJoinRequests: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("empty OrgSlug must not load Join queue, got %+v", items)
+	}
+	has, err := attention.HasAttention(ctx, IdentityUser{ID: "admin-1", IsOrgAdmin: true, OrgSlug: ""})
+	if err != nil || has {
+		t.Fatalf("empty OrgSlug Org admin: has=%v err=%v", has, err)
+	}
+}
+
+type failingPendingOrgCreationStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingPendingOrgCreationStore) ListPendingOrganizationCreationRequests(context.Context) ([]OrganizationCreationRequest, error) {
+	return nil, s.err
+}
+
+type failingPendingJoinStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingPendingJoinStore) ListPendingJoinRequestsByOrg(context.Context, string) ([]JoinRequest, error) {
+	return nil, s.err
+}
+
+func TestAttentionHasAttentionPropagatesQueueErrors(t *testing.T) {
+	ctx := context.Background()
+	wantErr := errors.New("queue unavailable")
+
+	t.Run("organization creation", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, &failingPendingOrgCreationStore{MemoryStore: NewMemoryStore(), err: wantErr}, nil, time.Now, nil)
+		has, err := NewAttention(aff).HasAttention(ctx, IdentityUser{Email: "admin@example.com", IsPlatformAdmin: true})
+		if !errors.Is(err, wantErr) || has {
+			t.Fatalf("err=%v has=%v", err, has)
+		}
+	})
+
+	t.Run("join requests", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, &failingPendingJoinStore{MemoryStore: NewMemoryStore(), err: wantErr}, nil, time.Now, nil)
+		has, err := NewAttention(aff).HasAttention(ctx, IdentityUser{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true})
+		if !errors.Is(err, wantErr) || has {
+			t.Fatalf("err=%v has=%v", err, has)
+		}
+	})
 }

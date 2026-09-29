@@ -615,3 +615,78 @@ func TestPostVerificationAppPathForUserIDFallback(t *testing.T) {
 		t.Fatalf("nil identity got %q, want %s", got, appHomePath)
 	}
 }
+
+func TestEmailVerificationWaitingUnauthenticatedRedirects(t *testing.T) {
+	server := &Server{
+		identity:    &fakeIdentityStore{},
+		store:       NewMemoryStore(),
+		tmpl:        emailVerificationTemplates(),
+		enforceAuth: true,
+		now:         time.Now,
+	}
+	req := httptest.NewRequest(http.MethodGet, emailVerificationPath(), nil)
+	rec := httptest.NewRecorder()
+	server.handleEmailVerificationWaiting(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "/login") {
+		t.Fatalf("location = %q, want login redirect", loc)
+	}
+}
+
+func TestEmailVerificationWaitingResendUnauthorizedWithoutSession(t *testing.T) {
+	// enforceAuth off returns a nil session from requireAuthenticatedPage.
+	server := &Server{
+		identity:    &fakeIdentityStore{},
+		store:       NewMemoryStore(),
+		tmpl:        emailVerificationTemplates(),
+		enforceAuth: false,
+		now:         time.Now,
+	}
+	req := httptest.NewRequest(http.MethodPost, emailVerificationPath(), strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.handleEmailVerificationWaiting(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestEmailVerificationWaitingResendParseFormError(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-resend-parse"
+	server := &Server{
+		identity: testIdentityForSessions(now, map[string]AccountUser{
+			sessionID: {
+				IdentityUserID: "user-1",
+				Email:          "waiting@example.com",
+				Status:         "active",
+				EmailVerified:  boolPtr(false),
+			},
+		}),
+		store:       NewMemoryStore(),
+		tmpl:        emailVerificationTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodPost, emailVerificationPath(), errReadCloser{})
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleEmailVerificationWaiting(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRenderEmailVerificationWaitingTemplateError(t *testing.T) {
+	server := &Server{tmpl: template.New("empty"), now: time.Now}
+	rec := httptest.NewRecorder()
+	server.renderEmailVerificationWaiting(rec, httptest.NewRequest(http.MethodGet, "/", nil), &AccountUser{
+		Email: "waiting@example.com",
+	}, "", "")
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
