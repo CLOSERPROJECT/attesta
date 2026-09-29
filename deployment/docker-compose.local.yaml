@@ -66,6 +66,7 @@ services:
       APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
       APPWRITE_INVITE_REDIRECT_URL: ${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:${DOCKER_APP_PORT:-3030}/invite/accept}
       APPWRITE_RESET_REDIRECT_URL: ${APPWRITE_RESET_REDIRECT_URL:-http://localhost:${DOCKER_APP_PORT:-3030}/reset/confirm}
+      APPWRITE_VERIFY_REDIRECT_URL: ${APPWRITE_VERIFY_REDIRECT_URL:-http://localhost:${DOCKER_APP_PORT:-3030}/verify/confirm}
       APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
       # Cloudflare's always-pass test pair. Environment values may override these defaults.
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
