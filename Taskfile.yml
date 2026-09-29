@@ -11,96 +11,91 @@ tasks:
     cmds:
       - git submodule update --init --recursive
 
-  worktree:env:
-    desc: Symlink primary .env and ensure .env.local ports. Usage - task worktree:env [-- path]
+  worktree:bootstrap:
+    desc: Copy ignored dev state and initialize this worktree's ports.
     cmds:
-      - bash deployment/scripts/worktree-env.sh {{.CLI_ARGS}}
-
-  worktree:add:
-    desc: Create .worktrees/<branch>, link .env, init submodules, assign ports. Usage - task worktree:add -- <branch>
-    cmds:
-      - |
-          set -euo pipefail
-          branch="{{.CLI_ARGS}}"
-          if [ -z "${branch}" ]; then
-            echo "usage: task worktree:add -- <branch>" >&2
-            exit 1
-          fi
-          path=".worktrees/${branch}"
-          if [ -e "${path}" ]; then
-            echo "error: ${path} already exists" >&2
-            exit 1
-          fi
-          if git show-ref --verify --quiet "refs/heads/${branch}"; then
-            git worktree add "${path}" "${branch}"
-          else
-            git worktree add -b "${branch}" "${path}"
-          fi
-          bash deployment/scripts/worktree-env.sh "${path}"
-          git -C "${path}" submodule update --init --recursive
-          # ports already ensured by worktree-env.sh; print URL from .env.local
-          port="$(awk -F= '/^PORT=/ { print $2; exit }' "${path}/.env.local")"
-          echo "worktree ready: ${path}"
-          echo "  open http://localhost:${port}"
-          echo "  infra is shared — run 'task start' once from primary if needed"
+      - bash scripts/worktree-bootstrap.sh {{.CLI_ARGS}}
 
   start:
-    desc: Bring up shared infra from primary (no-op if already healthy).
+    desc: Bring up this worktree's isolated infrastructure stack.
     cmds:
-      - bash deployment/scripts/infra-up.sh
+      - task: worktree:bootstrap
+      - bash scripts/worktree-compose.sh up
 
   start:build:
-    desc: Bring up shared infra with image rebuild (from primary).
+    desc: Rebuild and bring up this worktree's isolated infrastructure stack.
     cmds:
       - task: submodule:init
-      - bash deployment/scripts/infra-up.sh --build
+      - task: worktree:bootstrap
+      - bash scripts/worktree-compose.sh up --build
+
+  start:docker:
+    desc: Bring up this worktree's full stack, including the containerized Attesta app.
+    cmds:
+      - task: worktree:bootstrap
+      - bash scripts/worktree-compose.sh up-app
+
+  start:docker:build:
+    desc: Rebuild and bring up this worktree's full containerized stack.
+    cmds:
+      - task: submodule:init
+      - task: worktree:bootstrap
+      - bash scripts/worktree-compose.sh up-app --build
 
   stop:
-    desc: Stop shared infra for all worktrees (keeps volumes).
+    desc: Remove this worktree's containers and networks (keeps volumes).
     cmds:
-      - docker compose -f deployment/docker-compose.local.yaml down
+      - bash scripts/worktree-compose.sh down
 
   reset:
-    desc: Stop shared infra and remove volumes (affects all worktrees).
+    desc: Remove this worktree's stack, including its volumes.
     cmds:
-      - docker compose -f deployment/docker-compose.local.yaml down -v
+      - bash scripts/worktree-compose.sh down-v
 
   purge:
-    desc: Purge all database data after confirmation.
+    desc: Purge this worktree's volumes and coordinated data bundle after confirmation.
     cmds:
       - |
-          read -r -p "This will delete all MongoDB data. Type PURGE to continue: " confirm
+          read -r -p "This will delete this worktree's MongoDB and Appwrite data. Type PURGE to continue: " confirm
           if [ "$confirm" = "PURGE" ]; then
-            docker compose -f deployment/docker-compose.local.yaml down -v --remove-orphans
-            docker volume rm -f mongodb_data "${PWD##*/}_mongodb_data" >/dev/null 2>&1 || true
+            bash scripts/worktree-compose.sh down-v
+            bash scripts/worktree-data.sh forget
           else
             echo "Purge cancelled."
           fi
 
-  status:
-    desc: Show service status.
+  worktree:gc:
+    desc: Preview Attesta Docker resources orphaned by removed worktrees.
     cmds:
-      - docker compose -f deployment/docker-compose.local.yaml ps
+      - bash scripts/worktree-gc.sh
+
+  worktree:gc:apply:
+    desc: Remove Attesta Docker resources confirmed orphaned by worktree:gc.
+    cmds:
+      - bash scripts/worktree-gc.sh --apply
+
+  status:
+    desc: Show this worktree's service status.
+    cmds:
+      - bash scripts/worktree-compose.sh ps
 
   logs:
-    desc: Tail Docker logs.
+    desc: Tail this worktree's Docker logs.
     cmds:
-      - docker compose -f deployment/docker-compose.local.yaml logs -f
+      - bash scripts/worktree-compose.sh logs
 
   mongo-ping:
-    desc: Ping MongoDB from the container.
+    desc: Ping this worktree's MongoDB service.
     cmds:
-      - docker exec closer-mongodb mongosh --eval "db.adminCommand('ping')"
+      - bash scripts/worktree-compose.sh mongo-ping
 
   dev:
-    desc: Hot reload backend + frontend (shared infra; per-checkout ports via .env.local).
+    desc: Hot reload backend + frontend with this worktree's isolated stack.
     cmds:
       - task: start
       - |
           bash -c '
           set -euo pipefail
-          primary="$(git worktree list --porcelain | awk "/^worktree / { print substr(\$0, 10); exit }")"
-          docker compose -f "$primary/deployment/docker-compose.local.yaml" stop attesta
           task dev:server &
           server_pid=$!
           task dev:web &
@@ -109,7 +104,7 @@ tasks:
           '
 
   dev:server:
-    desc: Hot reload Go server (ports from .env.local; macOS-safe restart).
+    desc: Hot reload Go server (ports from .env.worktree; macOS-safe restart).
     cmds:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
@@ -128,7 +123,7 @@ tasks:
           '
 
   dev:web:
-    desc: Vite dev server (HMR) on VITE_PORT from .env.local.
+    desc: Vite dev server (HMR) on VITE_PORT from .env.worktree.
     cmds:
       - bash deployment/scripts/dev-stop-local.sh --web-only
       - sh -c 'cd web && npm install'
@@ -141,15 +136,15 @@ tasks:
           '
 
   run:server:
-    desc: Generate Goa artifacts, sync Go deps, and run the backend on localhost:3000.
+    desc: Generate Goa artifacts, sync Go deps, and run the backend on the configured worktree port.
     cmds:
+      - task: worktree:bootstrap
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go mod tidy'
       - |
-          sh -c '
-          export APPWRITE_ENDPOINT="${APPWRITE_ENDPOINT:-http://localhost/v1}"
-          export APPWRITE_INVITE_REDIRECT_URL="${APPWRITE_INVITE_REDIRECT_URL:-http://localhost:3000/invite/accept}"
-          export APPWRITE_RESET_REDIRECT_URL="${APPWRITE_RESET_REDIRECT_URL:-http://localhost:3000/reset/confirm}"
+          bash -c '
+          set -euo pipefail
+          source deployment/scripts/dev-env.sh
           cd server
           GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go run ./cmd/server
           '
@@ -169,9 +164,22 @@ tasks:
   test:
     desc: Run backend unit tests.
     cmds:
+      - task: test:worktree
       - task: css:lint
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
+
+  test:worktree:
+    desc: Run worktree lifecycle and Compose safety tests.
+    cmds:
+      - bash deployment/scripts/dev-lib_test.sh
+      - bash deployment/scripts/worktree-env_test.sh
+      - bash deployment/scripts/dev-env_test.sh
+      - bash deployment/scripts/worktree-bootstrap_test.sh
+      - bash deployment/scripts/worktree-data_test.sh
+      - bash deployment/scripts/worktree-compose_test.sh
+      - bash deployment/scripts/worktree-gc_test.sh
+      - bash deployment/scripts/restore-appwrite-seed_test.sh
 
   css:lint:
     desc: CSS lint (template inline styles + breakpoint guard + stylelint).
@@ -199,6 +207,7 @@ tasks:
   cover:
     desc: Run backend tests with a 90% coverage gate.
     cmds:
+      - task: test:worktree
       - task: css:lint
       - task: goa:generate
       - |

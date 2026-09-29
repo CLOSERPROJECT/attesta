@@ -1,6 +1,6 @@
 # Docker Compose Setup
 
-This demo uses Docker Compose to run MongoDB, Cerbos, Appwrite, and Attesta.
+This demo uses one Docker Compose project per checkout to run MongoDB, Cerbos, Appwrite, and optionally the containerized Attesta app.
 All Docker-related files live under `deployment/`.
 
 ## Services
@@ -28,41 +28,92 @@ All Docker-related files live under `deployment/`.
 
 ### Attesta app
 - **Image**: Built from local `deployment/Dockerfile.local`
-- **Port**: 3000
+- **Container port**: 3000 (`DOCKER_APP_PORT` on the host when explicitly run)
 - **Mongo**: `mongodb://mongodb:27017`
 - **Cerbos**: `http://cerbos:3592`
 
 ## Quick Start
 ```bash
-docker compose -f deployment/docker-compose.local.yaml up -d
+task start
 ```
 
-Open:
-- Appwrite Console: http://localhost
-- App: http://localhost:3000
-- Mailpit: http://localhost:8025
+`scripts/worktree-compose.sh` loads the generated or manually edited ports from `.env.worktree` and sets a Compose project name derived from the checkout's canonical path.
+Compose therefore scopes container names, networks, and volumes to that worktree, including checkouts with the same directory name.
+`task start` starts infrastructure only; `task dev` runs Attesta and Vite on the host.
+`task start:docker` starts the full containerized stack and publishes Attesta on `DOCKER_APP_PORT`; use `task start:docker:build` to rebuild it first.
+The wrapper checks Docker Compose 2.24.4+ before loading the local override.
 
-After first boot:
+The local Compose path applies `deployment/appwrite/docker-compose.worktree.yaml` as a local-only override to the vendored Appwrite baseline.
+That override owns the worktree-specific ports, resource labels, scoped names, and fresh-stack seed hook.
+The standalone operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the Coolify paths in `deployment/docker-compose.coolify.yaml` and `deployment/Dockerfile.coolify` remain unchanged and do not consume the local override.
+
+Stacks created by the old direct command used `deployment` as their implicit Compose project.
+New checkouts get a path-qualified Compose project name automatically.
+To keep pre-worktree `deployment_*` volumes attached, adopt that name once on the primary:
+
+```bash
+docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
+COMPOSE_PROJECT_NAME=deployment task worktree:bootstrap
+task start
+```
+
+Never add `-v` to that migration command.
+If `.env.worktree` already exists, add `COMPOSE_PROJECT_NAME=deployment`; persisted worktree identity wins over shell and `.env` values.
+
+For a parallel worktree, bootstrap temporarily quiesces the primary Compose project and captures one all-or-nothing bundle containing MongoDB, Appwrite MariaDB, and Appwrite's durable file volumes.
+A repository-wide lock prevents parallel bootstraps from overlapping.
+It then restores the primary's previous running state.
+The bundle is restored only before an uninitialized worktree stack starts; subsequent starts preserve the worktree's own data.
+Partial or corrupt bundles stop startup instead of mixing databases from different points in time.
+If the primary has no durable volumes yet, bootstrap skips the bundle and records a persistent fresh-seed choice.
+Bootstrap fails instead when the primary's managed project is empty but legacy `deployment` volumes still exist under a mismatched primary project name; adopt `COMPOSE_PROJECT_NAME=deployment` on the primary once (see README).
+`task purge` makes the same choice, so its next start uses the checked-in seed instead of copying the primary again.
+
+Open:
+- Run `bash scripts/worktree-env.sh print` to see the current checkout's URLs.
+- `task dev` serves the app on `PORT` and Vite on `VITE_PORT`.
+- `task start:docker` serves the containerized app on `DOCKER_APP_PORT`.
+
+After the primary checkout's first boot:
 1. Create the first Appwrite console account.
 2. Create the Attesta Appwrite project.
 3. Create an API key for Attesta.
 4. Open Mailpit on `http://localhost:8025` to inspect invite, recovery, and affiliation emails.
 5. Create the `org-assets` bucket.
-6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then restart Attesta.
+6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then run `task start:docker` if using the containerized app.
+
+Fresh stacks without a copied data bundle restore the checked-in local seed on first initialization.
+Copied bundles retain the matching project, users, teams, memberships, API keys, and assets while discarding host-specific sessions, certificates, caches, and routing state.
 
 ## Verifying the Setup
 ```bash
-curl http://localhost:3592/_cerbos/health
+source <(bash scripts/worktree-env.sh export)
+curl "http://localhost:${CERBOS_PORT}/_cerbos/health"
 ```
 
 ## Stopping the Services
 ```bash
-# Stop services but keep data
-docker compose -f deployment/docker-compose.local.yaml down
+# Remove only this worktree's containers and networks; keep its data
+task stop
 
-# Stop services and remove data
-docker compose -f deployment/docker-compose.local.yaml down -v
+# Remove only this worktree's containers, networks, and data
+task reset
+
+# Also discard the saved coordinated snapshot bundle
+task purge
+
+# Preview orphaned Attesta Docker resources left by deleted worktrees
+task worktree:gc
+
+# Remove only the resources reported as orphaned
+task worktree:gc:apply
 ```
+
+Cleanup only considers resources carrying this clone's repository identity and the exact worktree owner.
+Foreign-clone and unlabeled legacy resources are skipped.
+`task reset` and `task purge` inspect every volume in the current Compose project and fail closed if any ownership label is missing or different.
+That includes preserved volumes from the legacy `deployment` project because Docker cannot add labels to an existing volume.
+To intentionally discard those after migration, inspect them with `docker volume ls --filter label=com.docker.compose.project=deployment` and remove only the confirmed legacy volume names explicitly; the next start creates labeled replacements.
 
 ## Coolify
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in

@@ -1,0 +1,170 @@
+# Local-development adapter for the vendored standalone Appwrite stack.
+# Requires Docker Compose 2.24.4+ for !reset and !override.
+x-reset-container-name: &reset-container-name !reset null
+x-attesta-resource-labels: &attesta-resource-labels
+  eu.forkbomb.attesta.managed: "true"
+  eu.forkbomb.attesta.worktree: "${ATTESTA_WORKTREE_ROOT:-unknown}"
+  eu.forkbomb.attesta.project: "${COMPOSE_PROJECT_NAME:-attesta}"
+  eu.forkbomb.attesta.repository: "${ATTESTA_REPOSITORY_ID:-unknown}"
+
+services:
+  traefik:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+    command: !override
+      - --providers.file.directory=/storage/config
+      - --providers.file.watch=true
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.constraints=Label(`traefik.constraint-label-stack`,`${COMPOSE_PROJECT_NAME:-attesta}`)
+      - --entrypoints.appwrite_web.address=:80
+      - --entrypoints.appwrite_websecure.address=:443
+    ports: !override
+      - ${APPWRITE_HTTP_PORT:-80}:80
+      - ${APPWRITE_HTTPS_PORT:-443}:443
+
+  appwrite:
+    container_name: *reset-container-name
+    labels:
+      <<: *attesta-resource-labels
+      traefik.enable: "true"
+      traefik.constraint-label-stack: "${COMPOSE_PROJECT_NAME:-attesta}"
+      traefik.docker.network: "${COMPOSE_PROJECT_NAME:-attesta}_appwrite"
+
+  appwrite-console:
+    container_name: *reset-container-name
+    labels:
+      <<: *attesta-resource-labels
+      traefik.enable: "true"
+      traefik.constraint-label-stack: "${COMPOSE_PROJECT_NAME:-attesta}"
+      traefik.docker.network: "${COMPOSE_PROJECT_NAME:-attesta}_appwrite"
+
+  appwrite-realtime:
+    container_name: *reset-container-name
+    labels:
+      <<: *attesta-resource-labels
+      traefik.enable: "true"
+      traefik.constraint-label-stack: "${COMPOSE_PROJECT_NAME:-attesta}"
+      traefik.docker.network: "${COMPOSE_PROJECT_NAME:-attesta}_appwrite"
+
+  appwrite-worker-audits:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-webhooks:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-deletes:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-databases:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-builds:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-certificates:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-functions:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-mails:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-messaging:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-migrations:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-task-maintenance:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-task-stats-resources:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-stats-resources:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-worker-stats-usage:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-task-scheduler-functions:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-task-scheduler-executions:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-task-scheduler-messages:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-assistant:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+  appwrite-browser:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+
+  openruntimes-executor:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+    environment:
+      OPR_EXECUTOR_NETWORK: "${COMPOSE_PROJECT_NAME:-attesta}_runtimes"
+
+  mariadb:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+    # Bind-mounted *.sh under initdb.d is often +x on Docker Desktop and then
+    # fails with "bad interpreter: Permission denied" on noexec shares. Keep the
+    # script under /seed and install a non-executable wrapper on the container
+    # filesystem so MariaDB sources it on first init.
+    volumes:
+      - ./appwrite-seed.sql:/seed/appwrite-seed.sql:ro
+      - ./mariadb-init-preview-seed.sh:/seed/mariadb-init-preview-seed.sh:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        printf '%s\n' '. /seed/mariadb-init-preview-seed.sh' > /docker-entrypoint-initdb.d/10-preview-seed.sh
+        chmod a-x /docker-entrypoint-initdb.d/10-preview-seed.sh
+        exec /usr/local/bin/docker-entrypoint.sh mysqld --innodb-flush-method=fsync
+    command: !reset null
+    environment:
+      APPWRITE_RESTORE_SEED_SQL:
+
+  redis:
+    container_name: *reset-container-name
+    labels: *attesta-resource-labels
+
+networks:
+  gateway:
+    name: !reset null
+    labels: *attesta-resource-labels
+  appwrite:
+    name: !reset null
+    labels: *attesta-resource-labels
+  runtimes:
+    name: !reset null
+    labels: *attesta-resource-labels
+
+volumes:
+  appwrite-mariadb:
+    labels: *attesta-resource-labels
+  appwrite-redis:
+    labels: *attesta-resource-labels
+  appwrite-cache:
+    labels: *attesta-resource-labels
+  appwrite-uploads:
+    labels: *attesta-resource-labels
+  appwrite-imports:
+    labels: *attesta-resource-labels
+  appwrite-certificates:
+    labels: *attesta-resource-labels
+  appwrite-functions:
+    labels: *attesta-resource-labels
+  appwrite-sites:
+    labels: *attesta-resource-labels
+  appwrite-builds:
+    labels: *attesta-resource-labels
+  appwrite-config:
+    labels: *attesta-resource-labels

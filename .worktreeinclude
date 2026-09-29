@@ -1,0 +1,3 @@
+# Ignored setup files copied by Codex or Worktrunk into a new worktree.
+.env
+web/node_modules/
