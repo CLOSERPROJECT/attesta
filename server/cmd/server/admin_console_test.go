@@ -45,6 +45,18 @@ func TestPlatformAdminConsoleNav(t *testing.T) {
 	if c.NavItems[1].Copy != "Manage stream discovery taxonomy" {
 		t.Fatalf("Categories nav Copy = %q", c.NavItems[1].Copy)
 	}
+	if c.NavItems[0].HasAttention {
+		t.Fatal("Organizations soft-nav must not light Attention without HasOrgCreationAttention")
+	}
+
+	withOrgCreation := PlatformAdminView{
+		PageBase:    PageBase{HasOrgCreationAttention: true},
+		ActivePanel: "organizations",
+	}
+	orgs := platformAdminConsole(withOrgCreation)
+	if !orgs.NavItems[0].HasAttention || orgs.NavItems[0].Title != "Organizations" {
+		t.Fatalf("Organizations soft-nav should carry org-creation Attention: %+v", orgs.NavItems[0])
+	}
 }
 
 func TestOrgAdminConsoleNav(t *testing.T) {

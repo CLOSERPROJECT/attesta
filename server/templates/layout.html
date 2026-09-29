@@ -186,16 +186,9 @@
                         </a>
                       {{ end }}
                       {{ if .ShowMyOrgLink }}
-                        <a
-                          href="/my/organization/profile"
-                          class="account-menu-item{{ if .HasJoinRequestAttention }} has-attention{{ end }}"
-                          {{ if .HasJoinRequestAttention }}aria-label="My organization (needs attention)"{{ end }}
-                        >
+                        <a href="/my/organization/profile" class="account-menu-item">
                           {{ template "icon-users-group" . }}
                           My organization
-                          {{ if .HasJoinRequestAttention }}
-                            <span class="attention-dot" aria-hidden="true"></span>
-                          {{ end }}
                         </a>
                       {{ end }}
                       {{ if .ShowAccountSettings }}

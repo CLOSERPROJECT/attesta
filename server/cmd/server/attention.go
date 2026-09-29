@@ -17,10 +17,18 @@ func NewAttention(affiliation *Affiliation) *Attention {
 
 // HasAttention reports whether the user has at least one Attention item.
 // Sources: open Invitation (unaffiliated invitee); pending Join requests (Org admin
-// for their Organization). Waiting never contributes.
+// for their Organization); pending Organization creation requests (platform admin).
+// Waiting never contributes.
 func (a *Attention) HasAttention(ctx context.Context, user IdentityUser) (bool, error) {
 	if a == nil || a.affiliation == nil {
 		return false, nil
+	}
+	orgItems, err := a.PendingOrganizationCreationRequests(ctx, user)
+	if err != nil {
+		return false, err
+	}
+	if len(orgItems) > 0 {
+		return true, nil
 	}
 	userID := strings.TrimSpace(user.ID)
 	if userID == "" {
@@ -38,6 +46,19 @@ func (a *Attention) HasAttention(ctx context.Context, user IdentityUser) (bool, 
 		return false, err
 	}
 	return len(invites) > 0, nil
+}
+
+// PendingOrganizationCreationRequests returns Organization-creation Attention
+// items for a platform admin. Empty when the user is not a platform admin or
+// the queue is empty. Waiting never appears here.
+func (a *Attention) PendingOrganizationCreationRequests(ctx context.Context, user IdentityUser) ([]OrganizationCreationRequest, error) {
+	if a == nil || a.affiliation == nil {
+		return nil, nil
+	}
+	if !user.IsPlatformAdmin {
+		return nil, nil
+	}
+	return a.affiliation.ListPendingOrganizationCreationRequests(ctx)
 }
 
 // PendingJoinRequests returns Join-request Attention items for an Org admin's
