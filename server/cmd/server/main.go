@@ -298,6 +298,7 @@ type PageBase struct {
 	CanLeave               bool
 	LeaveReason            string
 	ShowLogout             bool
+	HasAttention           bool
 }
 
 type PublicCatalogResponse struct {
@@ -1502,6 +1503,7 @@ func (s *Server) pageBaseForUser(user *AccountUser, body, workflowKey, workflowN
 	}
 	base.ShowMyOrgLink = showMyOrg
 	s.populateAccountSettings(&base, user)
+	s.populateAttention(&base, user)
 	return base
 }
 

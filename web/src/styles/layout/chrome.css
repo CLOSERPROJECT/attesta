@@ -99,12 +99,36 @@
   text-decoration: none;
 }
 
+.nav .account-trigger {
+  position: relative;
+}
+
 .nav .account-trigger::marker {
   content: "";
 }
 
 .nav .account-trigger::-webkit-details-marker {
   display: none;
+}
+
+.nav .attention-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  pointer-events: none;
+}
+
+.nav .account-trigger .attention-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.nav .account-menu-item .attention-dot {
+  margin-left: auto;
+  flex: 0 0 8px;
 }
 
 .nav .account-dropdown {
