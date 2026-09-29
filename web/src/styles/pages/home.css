@@ -6,7 +6,17 @@ html:has(.my-home) {
 .my-home-attention {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+
+.my-home-attention .panel-heading {
+  margin-bottom: 0;
+}
+
+.my-home-attention .panel-heading p {
+  text-wrap: pretty;
 }
 
 .my-home-catalog {

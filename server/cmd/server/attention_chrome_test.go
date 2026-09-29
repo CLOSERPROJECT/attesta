@@ -269,6 +269,11 @@ func TestOperatorHomeJoinRequestAttentionBandAndResolve(t *testing.T) {
 			t.Fatalf("expected %q on Operator home Attention band, got:\n%s", want, homeBody)
 		}
 	}
+	joinIdx := strings.Index(homeBody, "Join requests")
+	chooseIdx := strings.Index(homeBody, "Choose a stream")
+	if joinIdx < 0 || chooseIdx < 0 || joinIdx > chooseIdx {
+		t.Fatalf("expected Join requests above Choose a stream, join=%d choose=%d body:\n%s", joinIdx, chooseIdx, homeBody)
+	}
 
 	membersReq := httptest.NewRequest(http.MethodGet, "/my/organization/members", nil)
 	membersReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
