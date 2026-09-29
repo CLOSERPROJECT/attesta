@@ -1070,7 +1070,48 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	return s.identity.EnsurePlatformAdminAccount(ctx, email, password)
+	deadline := time.Now().Add(60 * time.Second)
+	var err error
+	for {
+		err = s.identity.EnsurePlatformAdminAccount(ctx, email, password)
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		// Appwrite often returns 404 while Traefik is up but the API is still
+		// booting; that maps to ErrIdentityNotFound and used to fatal startup.
+		if !errors.Is(err, ErrIdentityNotFound) && !isRetriableIdentityBootstrapError(err) {
+			return err
+		}
+		if !time.Now().Before(deadline) {
+			return err
+		}
+		timer := time.NewTimer(500 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func isRetriableIdentityBootstrapError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "temporary failure")
 }
 
 func (s *Server) ensurePlatformAdminOwnsOrganization(ctx context.Context, orgSlug, redirectURL string) (*IdentitySession, error) {

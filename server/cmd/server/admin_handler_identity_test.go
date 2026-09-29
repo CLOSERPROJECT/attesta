@@ -103,6 +103,30 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 			t.Fatalf("error = %v, want boom", err)
 		}
 	})
+
+	t.Run("retries identity-not-found while Appwrite boots", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		calls := 0
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					calls++
+					if calls < 3 {
+						return ErrIdentityNotFound
+					}
+					return nil
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if calls != 3 {
+			t.Fatalf("calls = %d, want 3", calls)
+		}
+	})
 }
 
 func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {

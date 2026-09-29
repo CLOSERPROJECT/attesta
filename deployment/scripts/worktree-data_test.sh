@@ -391,6 +391,41 @@ fi
 ! grep -q ' extract ' "${tmpdir}/docker-calls" \
   || fail "restore extracted data after its running-services query failed"
 
+# Re-running task start against a live stack with durable data skips restore.
+running_keep_target="${tmpdir}/running-keep-target"
+prepare_checkout "${running_keep_target}"
+mkdir -p "${running_keep_target}/.worktree-data"
+cp -R "${bundle}" "${running_keep_target}/.worktree-data/snapshot-v1"
+running_keep_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${running_keep_target}" \
+  bash "${running_keep_target}/scripts/worktree-env.sh" project-name)"
+mkdir -p "${tmpdir}/volumes/${running_keep_project}_mongodb_data"
+: >"${tmpdir}/volumes/${running_keep_project}_mongodb_data/nonempty"
+: >"${tmpdir}/docker-calls"
+env "${common_env[@]}" ATTESTA_ROOT_DIR="${running_keep_target}" \
+  FAKE_RUNNING_SERVICES=mongodb bash "${SCRIPT}" restore \
+  >"${tmpdir}/running-keep.out"
+grep -qi 'already running; skipping data restore' "${tmpdir}/running-keep.out" \
+  || fail "live stack with durable data did not skip restore"
+! grep -q ' extract ' "${tmpdir}/docker-calls" \
+  || fail "live stack with durable data still extracted a snapshot"
+
+# A live stack without durable volumes still cannot restore in place.
+running_empty_target="${tmpdir}/running-empty-target"
+prepare_checkout "${running_empty_target}"
+mkdir -p "${running_empty_target}/.worktree-data"
+cp -R "${bundle}" "${running_empty_target}/.worktree-data/snapshot-v1"
+: >"${tmpdir}/docker-calls"
+if env "${common_env[@]}" ATTESTA_ROOT_DIR="${running_empty_target}" \
+  FAKE_RUNNING_SERVICES=mongodb FAKE_ALL_SERVICES= \
+  bash "${SCRIPT}" restore \
+  >"${tmpdir}/running-empty.out" 2>"${tmpdir}/running-empty.err"; then
+  fail "live empty stack unexpectedly allowed restore"
+fi
+grep -qi 'restore must run before' "${tmpdir}/running-empty.err" \
+  || fail "live empty stack refusal was unclear"
+! grep -q ' extract ' "${tmpdir}/docker-calls" \
+  || fail "live empty stack still extracted a snapshot"
+
 # Worktree environment failures cannot fall back to an inherited project or
 # continue into Docker mutations.
 export_failure_target="${tmpdir}/export-failure-target"

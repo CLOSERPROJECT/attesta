@@ -575,6 +575,11 @@ restore_snapshot() {
   command -v docker >/dev/null 2>&1 \
     || fail "Docker is required to restore worktree data"
 
+  local project
+  if ! project="$(compose_project "${ROOT_DIR}")"; then
+    fail "could not resolve the target Compose project"
+  fi
+
   local running_services=()
   local running_output
   if ! running_output="$(compose_for_root "${ROOT_DIR}" ps --status running --services)"; then
@@ -583,13 +588,17 @@ restore_snapshot() {
   while IFS= read -r service; do
     [[ -n "${service}" ]] && running_services+=("${service}")
   done <<<"${running_output}"
-  [[ "${#running_services[@]}" -eq 0 ]] \
-    || fail "restore must run before this worktree's Compose stack starts"
-
-  local project
-  if ! project="$(compose_project "${ROOT_DIR}")"; then
-    fail "could not resolve the target Compose project"
+  if [[ "${#running_services[@]}" -gt 0 ]]; then
+    # task start / task:dev re-enter restore on every run. A live stack already
+    # owns its volumes; only refuse when restore would still need to mutate them.
+    if target_has_state "${project}"; then
+      echo "Compose stack already running; skipping data restore"
+      finish_restore
+      return 0
+    fi
+    fail "restore must run before this worktree's Compose stack starts (stack is up but durable volumes are empty; run task stop, then task start)"
   fi
+
   local repository
   if ! repository="$(repository_identity "${ROOT_DIR}")"; then
     fail "could not resolve the repository identity for ${ROOT_DIR}"
