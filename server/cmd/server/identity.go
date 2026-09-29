@@ -62,6 +62,7 @@ type IdentityUser struct {
 	OrgName         string
 	Labels          []string
 	IsOrgAdmin      bool
+	IsPlatformAdmin bool
 	MembershipID    string
 	MembershipRoles []string
 	Status          string

@@ -114,10 +114,131 @@ func TestAttentionHasAttentionSkipsAffiliatedWithoutInviteLookup(t *testing.T) {
 		t.Fatalf("HasAttention: %v", err)
 	}
 	if has {
-		t.Fatal("affiliated user must not get Invitation Attention in v1")
+		t.Fatal("affiliated Member must not get Invitation Attention")
 	}
 	if called {
 		t.Fatal("affiliated path must not list memberships for Invitation Attention")
+	}
+}
+
+func TestAttentionHasAttentionPlatformAdminPendingOrgCreation(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertOrganizationCreationRequest(ctx, OrganizationCreationRequest{
+		ID:              primitive.NewObjectID(),
+		RequesterUserID: "founder-1",
+		RequesterEmail:  "founder@example.com",
+		ProposedName:    "New Co",
+		ProposedSlug:    "new-co",
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertOrganizationCreationRequest: %v", err)
+	}
+	attention := NewAttention(NewAffiliation(&fakeIdentityStore{}, store, nil, func() time.Time { return now }, nil))
+
+	pa := IdentityUser{Email: "admin@example.com", IsPlatformAdmin: true}
+	has, err := attention.HasAttention(ctx, pa)
+	if err != nil {
+		t.Fatalf("HasAttention: %v", err)
+	}
+	if !has {
+		t.Fatal("platform admin with pending Organization creation must have Attention")
+	}
+	items, err := attention.PendingOrganizationCreationRequests(ctx, pa)
+	if err != nil {
+		t.Fatalf("PendingOrganizationCreationRequests: %v", err)
+	}
+	if len(items) != 1 || items[0].ProposedSlug != "new-co" {
+		t.Fatalf("PendingOrganizationCreationRequests = %+v", items)
+	}
+
+	nonPA := IdentityUser{ID: "user-1", Email: "user@example.com"}
+	has, err = attention.HasAttention(ctx, nonPA)
+	if err != nil {
+		t.Fatalf("HasAttention non-PA: %v", err)
+	}
+	if has {
+		t.Fatal("non-platform-admin must not get Organization-creation Attention")
+	}
+	items, err = attention.PendingOrganizationCreationRequests(ctx, nonPA)
+	if err != nil {
+		t.Fatalf("PendingOrganizationCreationRequests non-PA: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("PendingOrganizationCreationRequests for non-PA = %+v", items)
+	}
+}
+
+func TestAttentionHasAttentionOrgAdminPendingJoin(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertJoinRequest(ctx, JoinRequest{
+		ID:              primitive.NewObjectID(),
+		RequesterUserID: "joiner-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertJoinRequest: %v", err)
+	}
+	aff := NewAffiliation(&fakeIdentityStore{}, store, nil, func() time.Time { return now }, nil)
+	attention := NewAttention(aff)
+
+	has, err := attention.HasAttention(ctx, IdentityUser{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true})
+	if err != nil {
+		t.Fatalf("HasAttention: %v", err)
+	}
+	if !has {
+		t.Fatal("Org admin with pending Join request must have Attention")
+	}
+
+	items, err := attention.PendingJoinRequests(ctx, IdentityUser{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true})
+	if err != nil {
+		t.Fatalf("PendingJoinRequests: %v", err)
+	}
+	if len(items) != 1 || items[0].RequesterEmail != "joiner@example.com" {
+		t.Fatalf("PendingJoinRequests = %+v", items)
+	}
+}
+
+func TestAttentionHasAttentionMemberNeverSeesJoinQueue(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertJoinRequest(ctx, JoinRequest{
+		ID:              primitive.NewObjectID(),
+		RequesterUserID: "joiner-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertJoinRequest: %v", err)
+	}
+	attention := NewAttention(NewAffiliation(&fakeIdentityStore{}, store, nil, func() time.Time { return now }, nil))
+
+	has, err := attention.HasAttention(ctx, IdentityUser{ID: "member-1", OrgSlug: "acme", IsOrgAdmin: false})
+	if err != nil {
+		t.Fatalf("HasAttention: %v", err)
+	}
+	if has {
+		t.Fatal("Member without Org admin standing must not see Join-request Attention")
+	}
+	items, err := attention.PendingJoinRequests(ctx, IdentityUser{ID: "member-1", OrgSlug: "acme"})
+	if err != nil {
+		t.Fatalf("PendingJoinRequests: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("PendingJoinRequests for Member = %+v", items)
 	}
 }
 

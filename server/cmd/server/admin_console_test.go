@@ -45,6 +45,18 @@ func TestPlatformAdminConsoleNav(t *testing.T) {
 	if c.NavItems[1].Copy != "Manage stream discovery taxonomy" {
 		t.Fatalf("Categories nav Copy = %q", c.NavItems[1].Copy)
 	}
+	if c.NavItems[0].HasAttention {
+		t.Fatal("Organizations soft-nav must not light Attention without HasOrgCreationAttention")
+	}
+
+	withOrgCreation := PlatformAdminView{
+		PageBase:    PageBase{HasOrgCreationAttention: true},
+		ActivePanel: "organizations",
+	}
+	orgs := platformAdminConsole(withOrgCreation)
+	if !orgs.NavItems[0].HasAttention || orgs.NavItems[0].Title != "Organizations" {
+		t.Fatalf("Organizations soft-nav should carry org-creation Attention: %+v", orgs.NavItems[0])
+	}
 }
 
 func TestOrgAdminConsoleNav(t *testing.T) {
@@ -56,5 +68,17 @@ func TestOrgAdminConsoleNav(t *testing.T) {
 	}
 	if len(c.NavItems) != 3 || !c.NavItems[1].Active || c.NavItems[1].Href != organizationPath("roles") {
 		t.Fatalf("unexpected nav: %+v", c.NavItems)
+	}
+	if c.NavItems[2].HasAttention {
+		t.Fatal("Members soft-nav must not light Attention without HasJoinRequestAttention")
+	}
+
+	withJoin := OrgAdminView{
+		PageBase:    PageBase{HasJoinRequestAttention: true},
+		ActivePanel: "members",
+	}
+	members := orgAdminConsole(withJoin)
+	if !members.NavItems[2].HasAttention || members.NavItems[2].Title != "Members" {
+		t.Fatalf("Members soft-nav should carry Join-request Attention: %+v", members.NavItems[2])
 	}
 }

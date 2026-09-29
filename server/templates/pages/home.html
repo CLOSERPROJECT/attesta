@@ -1,72 +1,188 @@
 {{/* Used on /my to render the stream picker (home_picker_body). */}}
 
 {{ define "home_picker_body" }}
-<section class="stack u-max-w-7xl u-mx-auto my-home">
-  {{ if .Confirmation }}
-    <p class="confirmation confirmation-with-icon">
-      {{ template "icon-check-circle" . }}
-      <span>{{ .Confirmation }}</span>
-    </p>
-  {{ end }}
-  <section class="page-header">
-    <div class="page-header-head">
-      <div class="page-header-body">
-        <h1>Choose a stream</h1>
-        <p>Select a stream to start or continue process tracking</p>
-      </div>
-      {{ if .ShowCreateStream }}
-      <div class="page-header-actions">
-        <a class="btn btn-primary" href="/my/organization/formata-builder?new=true">
-          {{ template "icon-plus" . }} Create a stream
-        </a>
-      </div>
-      {{ end }}
-    </div>
-  </section>
-  {{ template "error_banner.html" . }}
-  {{ if .Groups }}
-    <div class="my-home-body">
-      <div
-        id="my-home-category-sidebar"
-        class="nav-drawer-panel my-home-sidebar"
-        popover
-      >
-        {{ template "category_sidebar" .Sidebar }}
-      </div>
-      <div class="my-home-catalog">
-        <div class="my-home-category-menu">
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon nav-drawer-trigger"
-            popovertarget="my-home-category-sidebar"
-            aria-label="Open stream categories"
-            title="Stream categories"
-          >
-            {{ template "icon-menu" . }}
-          </button>
+  <section class="stack u-max-w-7xl u-mx-auto my-home">
+    {{ if .PendingJoinRequests }}
+      <section class="my-home-attention" aria-label="Attention">
+        <div class="panel-heading">
+          <h2>Join requests</h2>
+          <p>Review requests from users who asked to join your organization</p>
         </div>
-        {{ range .Groups }}
-          {{ template "my_home_stream_group" . }}
+        <ul class="list-rows">
+          {{ range .PendingJoinRequests }}
+            <li class="list-row">
+              {{ template "org_pending_row" (orgPendingRowFromJoinRequest .) }}
+              <div class="list-row-actions">
+                <form method="post" action="/my/organization/users" class="panel-actions">
+                  <input type="hidden" name="intent" value="approve_join" />
+                  <input type="hidden" name="request_id" value="{{ .ID }}" />
+                  <input type="hidden" name="next" value="/my" />
+                  <button class="btn btn-ghost btn-icon btn-xs"
+                          type="submit"
+                          aria-label="Approve">{{ template "icon-check" . }}</button>
+                </form>
+                <button type="button"
+                        class="btn btn-ghost-danger btn-icon btn-xs"
+                        aria-label="Reject"
+                        onclick="document.getElementById('home-reject-join-{{ .ID }}').showModal()">
+                  {{ template "icon-close" . }}
+                </button>
+              </div>
+              <dialog id="home-reject-join-{{ .ID }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3 class="dialog-title">Reject join request</h3>
+                      <p class="dialog-subtitle">{{ .RequesterEmail }}</p>
+                    </div>
+                    <button type="button"
+                            class="btn btn-ghost btn-icon dialog-close"
+                            onclick="document.getElementById('home-reject-join-{{ .ID }}').close()">
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <form method="post" action="/my/organization/users" class="input-form">
+                    <input type="hidden" name="intent" value="reject_join" />
+                    <input type="hidden" name="request_id" value="{{ .ID }}" />
+                    <input type="hidden" name="next" value="/my" />
+                    <div class="form-field">
+                      <label for="home-reject-join-reason-{{ .ID }}">Reason (optional)</label>
+                      <input id="home-reject-join-reason-{{ .ID }}" name="reason" type="text" />
+                    </div>
+                    <div class="dialog-actions">
+                      <button class="btn btn-danger" type="submit">Reject request</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            </li>
+          {{ end }}
+        </ul>
+      </section>
+    {{ end }}
+    {{ if .PendingOrgCreationRequests }}
+      <section class="my-home-attention" aria-label="Attention">
+        <div class="panel-heading">
+          <h2>Organization requests</h2>
+          <p>Review organization creation requests from unaffiliated users</p>
+        </div>
+        <ul class="list-rows">
+          {{ range .PendingOrgCreationRequests }}
+            <li class="list-row">
+              <div class="list-row-main list-row-main-stack">
+                <p class="platform-admin-item-name">{{ .ProposedName }}</p>
+                <p class="muted u-text-xs">
+                  {{ .ProposedSlug }}
+                  {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
+                  {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
+                </p>
+              </div>
+              <div class="list-row-actions">
+                <form method="post" action="/admin/organizations" class="panel-actions">
+                  <input type="hidden" name="intent" value="approve_org_creation" />
+                  <input type="hidden" name="request_id" value="{{ .ID }}" />
+                  <input type="hidden" name="next" value="/my" />
+                  <button class="btn btn-ghost btn-icon btn-xs"
+                          type="submit"
+                          aria-label="Approve">{{ template "icon-check" . }}</button>
+                </form>
+                <button type="button"
+                        class="btn btn-ghost-danger btn-icon btn-xs"
+                        aria-label="Reject"
+                        onclick="document.getElementById('home-reject-org-creation-{{ .ID }}').showModal()">
+                  {{ template "icon-close" . }}
+                </button>
+              </div>
+              <dialog id="home-reject-org-creation-{{ .ID }}" class="dialog">
+                <div class="dialog-card">
+                  <header class="dialog-head">
+                    <div>
+                      <h3 class="dialog-title">Reject organization creation request</h3>
+                      <p class="dialog-subtitle">{{ .ProposedName }}</p>
+                    </div>
+                    <button type="button"
+                            class="btn btn-ghost btn-icon dialog-close"
+                            onclick="document.getElementById('home-reject-org-creation-{{ .ID }}').close()">
+                      {{ template "icon-close" . }}
+                    </button>
+                  </header>
+                  <form method="post" action="/admin/organizations" class="input-form">
+                    <input type="hidden" name="intent" value="reject_org_creation" />
+                    <input type="hidden" name="request_id" value="{{ .ID }}" />
+                    <input type="hidden" name="next" value="/my" />
+                    <div class="form-field">
+                      <label for="home-reject-org-creation-reason-{{ .ID }}">Reason (optional)</label>
+                      <input id="home-reject-org-creation-reason-{{ .ID }}"
+                             name="reason"
+                             type="text" />
+                    </div>
+                    <div class="dialog-actions">
+                      <button class="btn btn-danger" type="submit">Reject request</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            </li>
+          {{ end }}
+        </ul>
+      </section>
+    {{ end }}
+    <section class="page-header">
+      <div class="page-header-head">
+        <div class="page-header-body">
+          <h1>Choose a stream</h1>
+          <p>Select a stream to start or continue process tracking</p>
+        </div>
+        {{ if .ShowCreateStream }}
+          <div class="page-header-actions">
+            <a class="btn btn-primary"
+               href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create a stream</a>
+          </div>
         {{ end }}
       </div>
-    </div>
-  {{ else }}
-    <div class="empty-state">
-      {{ template "icon-layers-2" . }}
-      <p class="empty-state-title">No streams available</p>
-      {{ if .Unaffiliated }}
-        <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
-        <p class="empty-state-hint">
-          <a href="/my/onboarding/join">Join an organization</a>
-          ·
-          <a href="/my/onboarding/request-organization">Request a new organization</a>
-        </p>
-      {{ else }}
-        <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
-      {{ end }}
-    </div>
-  {{ end }}
-</section>
+    </section>
+    {{ if .Confirmation }}
+      <p class="confirmation confirmation-with-icon">
+        {{ template "icon-check-circle" . }}
+        <span>{{ .Confirmation }}</span>
+      </p>
+    {{ end }}
+    {{ template "error_banner.html" . }}
+    {{ if .Groups }}
+      <div class="my-home-body">
+        <div id="my-home-category-sidebar"
+             class="nav-drawer-panel my-home-sidebar"
+             popover>{{ template "category_sidebar" .Sidebar }}</div>
+        <div class="my-home-catalog">
+          <div class="my-home-category-menu">
+            <button type="button"
+                    class="btn btn-ghost btn-icon nav-drawer-trigger"
+                    popovertarget="my-home-category-sidebar"
+                    aria-label="Open stream categories"
+                    title="Stream categories">{{ template "icon-menu" . }}</button>
+          </div>
+          {{ range .Groups }}
+            {{ template "my_home_stream_group" . }}
+          {{ end }}
+        </div>
+      </div>
+    {{ else }}
+      <div class="empty-state">
+        {{ template "icon-layers-2" . }}
+        <p class="empty-state-title">No streams available</p>
+        {{ if .Unaffiliated }}
+          <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
+          <p class="empty-state-hint">
+            <a href="/my/onboarding/join">Join an organization</a>
+            ·
+            <a href="/my/onboarding/request-organization">Request a new organization</a>
+          </p>
+        {{ else }}
+          <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
+        {{ end }}
+      </div>
+    {{ end }}
+  </section>
 {{ end }}
 
 {{ define "home.html" }}

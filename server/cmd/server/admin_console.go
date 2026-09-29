@@ -34,10 +34,11 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 		Breadcrumbs: view.Breadcrumbs,
 		NavItems: []AdminConsoleNavItem{
 			{
-				Href:   adminPath("organizations"),
-				Title:  "Organizations",
-				Copy:   "Create and manage organizations",
-				Active: active != "categories",
+				Href:         adminPath("organizations"),
+				Title:        "Organizations",
+				Copy:         "Create and manage organizations",
+				Active:       active != "categories",
+				HasAttention: view.HasOrgCreationAttention,
 			},
 			{
 				Href:   adminPath("categories"),
@@ -76,10 +77,11 @@ func orgAdminConsole(view OrgAdminView) AdminConsoleView {
 				Active: active == "roles",
 			},
 			{
-				Href:   organizationPath("members"),
-				Title:  "Members",
-				Copy:   "Invite people and update member access",
-				Active: active == "members",
+				Href:         organizationPath("members"),
+				Title:        "Members",
+				Copy:         "Invite people and update member access",
+				Active:       active == "members",
+				HasAttention: view.HasJoinRequestAttention,
 			},
 		},
 		MainTemplate: "org_admin_main",
