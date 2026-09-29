@@ -168,9 +168,16 @@
                       </p>
                     </section>
                     <section class="account-menu-section">
-                      <a href="/my" class="account-menu-item">
+                      <a
+                        href="/my"
+                        class="account-menu-item{{ if .HasAttention }} has-attention{{ end }}"
+                        {{ if .HasAttention }}aria-label="Dashboard (needs attention)"{{ end }}
+                      >
                         {{ template "icon-layout-dashboard" . }}
                         Dashboard
+                        {{ if .HasAttention }}
+                          <span class="attention-dot" aria-hidden="true"></span>
+                        {{ end }}
                       </a>
                       {{ if .ShowAdminLink }}
                         <a href="/admin" class="account-menu-item">

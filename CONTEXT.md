@@ -26,17 +26,25 @@ _Avoid_: Action
 The view of one stream instance: its timeline (steps and substeps), completion controls, and post-completion resources (DPP, downloads, termination summary).
 _Avoid_: Process page, action list
 
-**Stream picker**:
-The authenticated screen at `/my` where an affiliated operator chooses which stream (blueprint) to open. Public marketing content lives at `/` and does not redirect logged-in users to `/my`.
-_Avoid_: Home, workflow picker
+**Operator home**:
+The authenticated landing at `/my` for an affiliated user: Attention items (stream work, and Join requests first when Org admin), Upcoming stream instances, then Stream discovery; standing-gated shortcuts under the title (My organization when Org admin). Platform-admin `/my` is a different layout: Organization creation Attention items, then quick actions (Manage streams, Manage orgs, Manage categories, Create stream). Public marketing content lives at `/` and does not redirect logged-in users to `/my`.
+_Avoid_: Home (alone), Dashboard (vague), Stream picker (as the name of `/my`), workflow picker, absorbing Onboarding into `/my`
+
+**Stream discovery**:
+The lower region of affiliated Operator home listing Streams the user’s Organization can take part in, as flat stream cards: startable first (with Start), then the rest. Not Category-grouped when the org’s catalog is small.
+_Avoid_: Stream picker (when meaning the entire `/my` page), Home
+
+**Startable stream**:
+A Stream the current affiliated user may start a new Stream instance for: their Organization owns the first Step, and either they hold at least one Stream role required by that Step’s first Substep (any one role is enough if several are listed) or they have Org admin standing in that Organization. Distinct from merely appearing in Stream discovery as a participant.
+_Avoid_: Accessible stream, visible stream, can open dashboard, requiring every listed first-Substep role
 
 **Onboarding**:
-The unaffiliated-user flow to obtain an Affiliation: join an organization, request a new organization, or wait on / withdraw a pending request. Narrow reading-width layout.
-_Avoid_: Signup (account creation), registration wizard
+The unaffiliated-user surface at `/my/onboarding` to obtain an Affiliation: accept or decline Invitations, join an organization, request a new organization, or wait on / withdraw a pending request. Narrow reading-width layout. Distinct from Operator home; Invitation Attention items surface here.
+_Avoid_: Signup (account creation), registration wizard, folding Onboarding into `/my`
 
 **Public stream card**:
-A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), live stream-instance metrics (total count plus active-or-completed activity, or that none exist yet), and participating **organizations**. Distinct UI from the authenticated stream picker card. Not clickable in v1.
-_Avoid_: Stream card (when meaning the `/my` picker card), process card, landing stream tile, showcase stream
+A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), live stream-instance metrics (total count plus active-or-completed activity, or that none exist yet), and participating **organizations**. Distinct UI from the authenticated stream-discovery card on Operator home. Not clickable in v1.
+_Avoid_: Stream card (when meaning the Operator home discovery card), process card, landing stream tile, showcase stream
 
 ### Stream discovery taxonomy
 
@@ -67,8 +75,12 @@ Open self-serve account creation (email + password). A registered user may have 
 _Avoid_: Closed signup, invite-only registration (as the product default)
 
 **Invitation**:
-An Org-admin-initiated (or platform-admin-initiated) outbound membership offer to an email. The inviter may grant Org admin standing and/or one or more Organization roles — those are separate choices. Distinct from a Join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization.
+An Org-admin-initiated (or platform-admin-initiated) outbound membership offer to an email. The inviter may grant Org admin standing and/or one or more Organization roles — those are separate choices. Distinct from a Join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization. An open Invitation for the invitee is an Attention item until accepted or declined.
 _Avoid_: Join request, membership request (when meaning outbound invite)
+
+**Attention item**:
+Something that requires the current user to act: an actionable Substep on a Stream instance waiting on them, a pending Join request (for an Org admin), a pending Organization creation request (for a platform admin), or an open Invitation (for the invitee). Distinct from waiting on someone else’s decision (e.g. the requester’s own pending Join request or Organization creation request).
+_Avoid_: Notification, alert, badge, task (vague), pending (when meaning “waiting on others”)
 
 **Join request**:
 A registered user’s inbound ask to join an existing organization as a Member, naming one or more Organization roles. Org admins approve or reject; approval grants Member standing with those Organization roles (never Org admin standing). While pending, the requester may withdraw the request (it is removed, as if never submitted).
@@ -79,8 +91,16 @@ A registered user’s ask to create a new organization. Platform admins approve 
 _Avoid_: Org signup, self-serve org (when meaning live create without approval)
 
 **Affiliation**:
-A user’s membership in at most one organization at a time. Unaffiliated means zero organizations. Switching requires leaving (or being removed) before a new join or creation request can complete. The stream picker is for affiliated users only; unaffiliated users (including those with a pending join or creation request) go through onboarding instead. Within an Affiliation, standing (Org admin vs Member) is independent of which Organization roles the user holds.
+A user’s membership in at most one organization at a time. Unaffiliated means zero organizations. Switching requires leaving (or being removed) before a new join or creation request can complete. Operator home is for affiliated users; unaffiliated users (including those with a pending join or creation request) use Onboarding instead. Within an Affiliation, standing (Org admin vs Member) is independent of which Organization roles the user holds.
 _Avoid_: Multi-org membership, active org switcher, workspace
+
+**Waiting**:
+The user’s own pending Join request or Organization creation request while another party decides. Visible to the requester; not an Attention item and does not light attention indicators. The requester may withdraw (the request is removed, as if never submitted).
+_Avoid_: Notification, Attention item, pending (when meaning actionable work for the current user)
+
+**Upcoming stream instance**:
+An active Stream instance that involves the user’s Organization where the next actionable Substep is not theirs (another party or role must act first). A watchlist, not an Attention item.
+_Avoid_: Pending (vague), scheduled, upcoming (when meaning a calendar event)
 
 **Org admin**:
 Privileged standing within an Affiliation: can manage organization profile, Role catalog, and members. Orthogonal to Organization roles — an Org admin may hold zero or more Organization roles. Never an entry in the Role catalog. An Org admin may grant or remove Org admin standing for any affiliated user (including themselves) when at least one other Org admin would remain; the sole Org admin’s standing cannot be removed. An Org admin cannot remove their own Affiliation via member delete — that exit is Leave.
@@ -117,6 +137,10 @@ _Avoid_: Default member, basic role, Org admin, catalog role
 **Stream dashboard**:
 The screen at `/my/streams/:key/` listing stream instances for one stream, with status navigation and a read-only timeline preview.
 _Avoid_: Home, workflow home
+
+**Platform stream catalog**:
+The platform-admin screen at `/admin/streams` for browsing and managing Streams (blueprints) across the platform. Distinct from affiliated Stream discovery on Operator home. Platform-admin `/my` links here via Manage streams; create-stream is a separate quick action on that home (does not require opening the catalog first). Soft-nav: Organizations | Streams | Categories.
+_Avoid_: Operator home, Stream discovery, putting the full PA stream grid on `/my`
 
 **Stream instance detail page**:
 The full page at `/my/streams/:key/instance/:id`. Comprises a stable outer shell (process metadata, SSE hooks) and an inner **content partial** swapped via HTMX/SSE after substep completion or live updates.

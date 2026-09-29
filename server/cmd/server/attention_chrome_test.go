@@ -94,6 +94,12 @@ func TestLayoutAccountMenuShowsAttentionDot(t *testing.T) {
 	if !strings.Contains(body, `has-attention`) {
 		t.Fatalf("expected has-attention class on trigger, got:\n%s", body)
 	}
+	if !strings.Contains(body, `href="/my"`) || !strings.Contains(body, `Dashboard (needs attention)`) {
+		t.Fatalf("expected Dashboard menu item Attention chrome, got:\n%s", body)
+	}
+	if strings.Count(body, `attention-dot`) < 2 {
+		t.Fatalf("expected attention-dot on account trigger and Dashboard item, got %d:\n%s", strings.Count(body, `attention-dot`), body)
+	}
 
 	var withoutDot bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&withoutDot, "layout.html", PageBase{ShowLogout: true}); err != nil {
