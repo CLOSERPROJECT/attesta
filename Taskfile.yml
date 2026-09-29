@@ -192,17 +192,17 @@ tasks:
   templates:fmt:
     desc: Format Go html/template files under server/templates (djLint golang profile).
     cmds:
-      - bash deployment/scripts/djlint.sh server/templates --reformat --quiet
+      - bash scripts/djlint.sh server/templates --reformat --quiet
 
   templates:check:
     desc: Check Go html/template formatting under server/templates (djLint).
     cmds:
-      - bash deployment/scripts/djlint.sh server/templates --check
+      - bash scripts/djlint.sh server/templates --check
 
   templates:lint:
     desc: Lint Go html/template files under server/templates (djLint).
     cmds:
-      - bash deployment/scripts/djlint.sh server/templates --lint
+      - bash scripts/djlint.sh server/templates --lint
 
   cover:
     desc: Run backend tests with a 90% coverage gate.
