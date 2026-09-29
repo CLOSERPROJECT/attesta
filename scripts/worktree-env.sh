@@ -26,6 +26,8 @@ canonical_path() {
   (cd "$1" && pwd -P)
 }
 
+# Every checkout (primary, linked, or independent clone) gets a stable name from
+# its canonical path so Compose volumes never collide across checkouts.
 generated_compose_project_name() {
   local root slug checksum suffix max_slug_length
   root="$(canonical_path "${ROOT_DIR}")"
@@ -36,6 +38,10 @@ generated_compose_project_name() {
   printf -v suffix '%08x' "${checksum}"
   max_slug_length=$((63 - 1 - ${#suffix}))
   printf '%s-%s\n' "${slug:0:${max_slug_length}}" "${suffix}"
+}
+
+default_compose_project_name() {
+  generated_compose_project_name
 }
 
 repository_identity() {
@@ -76,7 +82,7 @@ repository_identity() {
 }
 
 INITIAL_COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
-COMPOSE_PROJECT_NAME="${INITIAL_COMPOSE_PROJECT_NAME:-$(generated_compose_project_name)}"
+COMPOSE_PROJECT_NAME="${INITIAL_COMPOSE_PROJECT_NAME:-$(default_compose_project_name)}"
 
 usage() {
   cat <<'USAGE'
@@ -342,9 +348,9 @@ load_resolved() {
     unset COMPOSE_PROJECT_NAME
     # shellcheck disable=SC1090
     source "${WORKTREE_ENV_FILE}"
-    COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(generated_compose_project_name)}"
+    COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(default_compose_project_name)}"
   else
-    COMPOSE_PROJECT_NAME="${INITIAL_COMPOSE_PROJECT_NAME:-$(generated_compose_project_name)}"
+    COMPOSE_PROJECT_NAME="${INITIAL_COMPOSE_PROJECT_NAME:-$(default_compose_project_name)}"
   fi
   set +a
   validate_compose_project_name
@@ -369,9 +375,9 @@ load_project_name() {
     unset COMPOSE_PROJECT_NAME
     # shellcheck disable=SC1090
     source "${WORKTREE_ENV_FILE}"
-    COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(generated_compose_project_name)}"
+    COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(default_compose_project_name)}"
   else
-    COMPOSE_PROJECT_NAME="${INITIAL_COMPOSE_PROJECT_NAME:-$(generated_compose_project_name)}"
+    COMPOSE_PROJECT_NAME="${INITIAL_COMPOSE_PROJECT_NAME:-$(default_compose_project_name)}"
   fi
   validate_compose_project_name
 }

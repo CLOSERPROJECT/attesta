@@ -184,6 +184,25 @@ volume_name() {
   printf '%s' "${names}"
 }
 
+# Pre-worktree local Compose used the directory name "deployment" as its
+# project. Those volumes are still labeled and must not be ignored as "no data".
+legacy_deployment_volume_count() {
+  local logical names count
+  local found=0
+  for logical in "${DURABLE_VOLUMES[@]}"; do
+    if ! names="$(docker volume ls \
+        --filter "label=com.docker.compose.project=deployment" \
+        --filter "label=com.docker.compose.volume=${logical}" \
+        --format '{{.Name}}')"; then
+      fail "could not enumerate legacy deployment volume ${logical}"
+    fi
+    count="$(printf '%s\n' "${names}" | awk 'NF { count++ } END { print count + 0 }')"
+    [[ "${count}" -le 1 ]] || fail "multiple legacy deployment volumes for ${logical}"
+    [[ "${count}" -eq 0 ]] || found=$((found + 1))
+  done
+  printf '%s\n' "${found}"
+}
+
 archive_volume() {
   local volume="$1"
   local destination="$2"
@@ -355,10 +374,13 @@ snapshot_primary() {
   if ! target_project="$(compose_project "${ROOT_DIR}")"; then
     fail "could not resolve the target Compose project"
   fi
+  # Volumes without a local bundle or fresh-seed marker are leftovers from a
+  # previous checkout at this path (same Compose project name). Keeping them
+  # skips the primary copy and leaves an empty Appwrite that fails identity
+  # bootstrap. Remove them and continue.
   if target_has_state "${target_project}"; then
-    echo "worktree already contains data; keeping it"
-    finish_snapshot
-    return 0
+    echo "removing orphan Compose volumes from a previous checkout at this path"
+    remove_orphan_target_state "${target_project}"
   fi
 
   local project
@@ -376,6 +398,13 @@ snapshot_primary() {
     [[ -z "${resolved}" ]] || found_volumes=$((found_volumes + 1))
   done
   if [[ "${found_volumes}" -eq 0 ]]; then
+    local legacy_found=0
+    if [[ "${project}" != "deployment" ]]; then
+      legacy_found="$(legacy_deployment_volume_count)"
+    fi
+    if [[ "${legacy_found}" -gt 0 ]]; then
+      fail "primary Compose project ${project} has no durable volumes, but legacy project \"deployment\" still has ${legacy_found} Attesta volume(s); add COMPOSE_PROJECT_NAME=deployment to the primary .env.worktree once so bootstrap can copy that data"
+    fi
     write_fresh_seed_choice "primary-had-no-durable-volumes"
     echo "no primary durable data found; worktree will use the fresh seed"
     finish_snapshot
@@ -442,6 +471,22 @@ target_has_state() {
     fi
   done
   return 1
+}
+
+remove_orphan_target_state() {
+  local project="$1"
+  local logical resolved
+  compose_for_root "${ROOT_DIR}" down -v --remove-orphans >/dev/null \
+    || fail "could not tear down orphan Compose project ${project}"
+  for logical in "${DURABLE_VOLUMES[@]}"; do
+    if ! resolved="$(volume_name "${project}" "${logical}")"; then
+      fail "could not inspect orphan durable volume ${logical}"
+    fi
+    if [[ -n "${resolved}" ]]; then
+      docker volume rm -f "${resolved}" >/dev/null \
+        || fail "could not delete orphan volume ${resolved}"
+    fi
+  done
 }
 
 validate_existing_volume_ownership() {

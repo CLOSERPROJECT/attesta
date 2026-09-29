@@ -48,7 +48,8 @@ That override owns the worktree-specific ports, resource labels, scoped names, a
 The standalone operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the Coolify paths in `deployment/docker-compose.coolify.yaml` and `deployment/Dockerfile.coolify` remain unchanged and do not consume the local override.
 
 Stacks created by the old direct command used `deployment` as their implicit Compose project.
-Before the first new start, preserve its volumes and adopt the same project name:
+New checkouts get a path-qualified Compose project name automatically.
+To keep pre-worktree `deployment_*` volumes attached, adopt that name once on the primary:
 
 ```bash
 docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
@@ -57,7 +58,7 @@ task start
 ```
 
 Never add `-v` to that migration command.
-If `.env.worktree` already exists, edit its `COMPOSE_PROJECT_NAME` to `deployment`; persisted worktree identity wins over shell and `.env` values.
+If `.env.worktree` already exists, add `COMPOSE_PROJECT_NAME=deployment`; persisted worktree identity wins over shell and `.env` values.
 
 For a parallel worktree, bootstrap temporarily quiesces the primary Compose project and captures one all-or-nothing bundle containing MongoDB, Appwrite MariaDB, and Appwrite's durable file volumes.
 A repository-wide lock prevents parallel bootstraps from overlapping.
@@ -65,6 +66,7 @@ It then restores the primary's previous running state.
 The bundle is restored only before an uninitialized worktree stack starts; subsequent starts preserve the worktree's own data.
 Partial or corrupt bundles stop startup instead of mixing databases from different points in time.
 If the primary has no durable volumes yet, bootstrap skips the bundle and records a persistent fresh-seed choice.
+Bootstrap fails instead when the primary's managed project is empty but legacy `deployment` volumes still exist under a mismatched primary project name; adopt `COMPOSE_PROJECT_NAME=deployment` on the primary once (see README).
 `task purge` makes the same choice, so its next start uses the checked-in seed instead of copying the primary again.
 
 Open:

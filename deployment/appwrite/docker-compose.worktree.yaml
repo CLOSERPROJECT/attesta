@@ -114,9 +114,21 @@ services:
   mariadb:
     container_name: *reset-container-name
     labels: *attesta-resource-labels
+    # Bind-mounted *.sh under initdb.d is often +x on Docker Desktop and then
+    # fails with "bad interpreter: Permission denied" on noexec shares. Keep the
+    # script under /seed and install a non-executable wrapper on the container
+    # filesystem so MariaDB sources it on first init.
     volumes:
       - ./appwrite-seed.sql:/seed/appwrite-seed.sql:ro
-      - ./mariadb-init-preview-seed.sh:/docker-entrypoint-initdb.d/10-preview-seed.sh:ro
+      - ./mariadb-init-preview-seed.sh:/seed/mariadb-init-preview-seed.sh:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        printf '%s\n' '. /seed/mariadb-init-preview-seed.sh' > /docker-entrypoint-initdb.d/10-preview-seed.sh
+        chmod a-x /docker-entrypoint-initdb.d/10-preview-seed.sh
+        exec /usr/local/bin/docker-entrypoint.sh mysqld --innodb-flush-method=fsync
+    command: !reset null
     environment:
       APPWRITE_RESTORE_SEED_SQL:
 

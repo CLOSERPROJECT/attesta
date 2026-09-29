@@ -120,11 +120,16 @@ git -C "${primary_root}" worktree add -q -b test-one "${same_name_one}"
 git -C "${primary_root}" worktree add -q -b test-two "${same_name_two}"
 project_one="$(ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" project-name)"
 project_two="$(ATTESTA_ROOT_DIR="${same_name_two}" bash "${SCRIPT}" project-name)"
+project_primary="$(ATTESTA_ROOT_DIR="${primary_root}" bash "${SCRIPT}" project-name)"
 repository_primary="$(ATTESTA_ROOT_DIR="${primary_root}" bash "${SCRIPT}" repository-id)"
 repository_one="$(ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" repository-id)"
 repository_two="$(ATTESTA_ROOT_DIR="${same_name_two}" bash "${SCRIPT}" repository-id)"
+[[ -n "${project_primary}" && "${project_primary}" != deployment ]] \
+  || fail "primary Compose project defaulted to ${project_primary}, want path-qualified name"
 [[ "${project_one}" != "${project_two}" ]] \
   || fail "same-basename worktrees received the same Compose project name"
+[[ "${project_one}" != "${project_primary}" && "${project_two}" != "${project_primary}" ]] \
+  || fail "linked worktrees reused the primary Compose project name"
 [[ "${project_one}" == "$(ATTESTA_ROOT_DIR="${same_name_one}" bash "${SCRIPT}" project-name)" ]] \
   || fail "Compose project name is not stable"
 [[ "${project_one}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] \
@@ -136,7 +141,8 @@ repository_two="$(ATTESTA_ROOT_DIR="${same_name_two}" bash "${SCRIPT}" repositor
 [[ "${repository_one}" =~ ^repo-[0-9a-f]{32}$ ]] \
   || fail "repository identity is not bounded and label-safe: ${repository_one}"
 
-# Independent primary clones with the same basename also remain isolated.
+# Independent primary clones each get a path-qualified Compose project so they
+# never share volumes without an explicit persisted override.
 independent_one="${tmpdir}/independent-one/shared-primary"
 independent_two="${tmpdir}/independent-two/shared-primary"
 mkdir -p "${independent_one}" "${independent_two}"
@@ -147,11 +153,9 @@ independent_project_two="$(ATTESTA_ROOT_DIR="${independent_two}" bash "${SCRIPT}
 independent_repository_one="$(ATTESTA_ROOT_DIR="${independent_one}" bash "${SCRIPT}" repository-id)"
 independent_repository_two="$(ATTESTA_ROOT_DIR="${independent_two}" bash "${SCRIPT}" repository-id)"
 [[ "${independent_project_one}" != "${independent_project_two}" ]] \
-  || fail "same-basename primary clones received the same Compose project name"
-[[ "${independent_project_one}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] \
-  || fail "primary Compose project name is not safe: ${independent_project_one}"
-[[ ${#independent_project_one} -le 63 ]] \
-  || fail "primary Compose project name is not bounded: ${independent_project_one}"
+  || fail "independent primaries shared Compose project: ${independent_project_one}"
+[[ "${independent_project_one}" != deployment && "${independent_project_two}" != deployment ]] \
+  || fail "independent primaries reused the legacy deployment name"
 [[ "${independent_repository_one}" != "${independent_repository_two}" ]] \
   || fail "independent clones received the same repository identity"
 

@@ -17,6 +17,10 @@ docker compose \
   -f "${ROOT}/deployment/appwrite/docker-compose.appwrite.yaml" \
   config --format json >"${tmpdir}/standalone.json"
 
+# Host .env / shell may already export Appwrite redirect URLs; clear them so
+# DOCKER_APP_PORT drives the containerized Attesta defaults under test.
+unset APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL COMPOSE_PROJECT_NAME
+
 COMPOSE_PROJECT_NAME=label-test-a \
 ATTESTA_WORKTREE_ROOT="${tmpdir}/owned-worktree-a" \
 ATTESTA_REPOSITORY_ID=repo-test-a \
@@ -72,7 +76,8 @@ node -e '
   assert(Object.values(standalone.networks).every(network => !network.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree network labels");
   assert(Object.values(standalone.volumes).every(volume => !volume.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree volume labels");
   assert(!mounts(standalone).includes("/seed/appwrite-seed.sql"), "standalone acquired the local seed mount");
-  assert(!mounts(standalone).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "standalone acquired the local seed hook");
+  assert(!mounts(standalone).includes("/seed/mariadb-init-preview-seed.sh"), "standalone acquired the local seed hook");
+  assert(!mounts(standalone).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "standalone acquired a direct initdb seed hook");
   assert(!("APPWRITE_RESTORE_SEED_SQL" in standalone.services.mariadb.environment), "standalone acquired the local seed switch");
 
   assert(Object.values(localA.services).every(service => service.container_name == null), "local services retain fixed container names");
@@ -87,7 +92,10 @@ node -e '
   assert(localA.services.attesta.environment.APPWRITE_INVITE_REDIRECT_URL === "http://localhost:19030/invite/accept", "containerized invite redirect did not use DOCKER_APP_PORT");
   assert(localA.services.attesta.environment.APPWRITE_RESET_REDIRECT_URL === "http://localhost:19030/reset/confirm", "containerized reset redirect did not use DOCKER_APP_PORT");
   assert(mounts(localA).includes("/seed/appwrite-seed.sql"), "local seed mount missing");
-  assert(mounts(localA).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "local seed hook missing");
+  assert(mounts(localA).includes("/seed/mariadb-init-preview-seed.sh"), "local seed hook mount missing");
+  assert(!mounts(localA).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "local seed hook must not bind-mount into initdb.d");
+  assert(Array.isArray(localA.services.mariadb.entrypoint), "local MariaDB seed wrapper entrypoint missing");
+  assert(localA.services.mariadb.entrypoint.join(" ").includes("mariadb-init-preview-seed.sh"), "local MariaDB entrypoint does not install the seed wrapper");
   assert(localA.services.mariadb.environment.APPWRITE_RESTORE_SEED_SQL === "true", "local seed switch missing");
 
   const resourcesA = resourceNames(localA);

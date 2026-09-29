@@ -35,10 +35,16 @@
   `task templates:check`, `task templates:lint`); do not use a generic HTML
   formatter on Go templates.
 - Every worktree owns a Compose project and generated-once host ports in its
-  ignored `.env.worktree`; later manual edits are preserved. Use
-  `scripts/worktree-compose.sh` (normally through Taskfile tasks);
-  stop/reset/purge must remain scoped to the current checkout.
+  ignored `.env.worktree`; later manual edits are preserved. Compose project
+  names are path-qualified for every checkout (primary, linked, or independent
+  clone). Pre-worktree `deployment_*` volumes need a one-time
+  `COMPOSE_PROJECT_NAME=deployment` in the primary `.env.worktree`. Use
+  `scripts/worktree-compose.sh` (normally through Taskfile tasks); stop/reset/purge
+  must remain scoped to the current checkout.
 - Parallel worktrees keep one point-in-time, all-or-nothing bundle of MongoDB
-  and durable Appwrite state in ignored `.worktree-data/`. Restore it only into
-  an uninitialized worktree stack; preserve developed worktree data and reject
-  partial or corrupt bundles. Worktrunk `pre-remove` deletes Compose volumes.
+  and durable Appwrite state in ignored `.worktree-data/`. Restore only when the
+  stack is stopped and durable volumes are empty; later starts keep that
+  worktree's data. `task reset` clears volumes so the next start re-applies the
+  saved bundle. Reject partial or corrupt bundles. Bootstrap fails closed if the
+  primary's managed project has no durable volumes while legacy `deployment`
+  volumes still exist. Worktrunk `pre-remove` deletes Compose volumes.

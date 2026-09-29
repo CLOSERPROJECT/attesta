@@ -160,20 +160,15 @@ task dev
 Bootstrap copies the allowlisted ignored development files when needed, trusts the checkout's `mise.toml`, initializes submodules, writes `.env.worktree` only when it is missing, and captures one coordinated primary-data bundle.
 After bootstrap, `task dev` reruns the same setup idempotently.
 
-Each checkout owns a separate Compose project whose name includes a stable canonical-path suffix: containers, networks, MongoDB, and Appwrite volumes are isolated even when two checkouts have the same directory name.
+Each checkout owns a separate Compose project derived from its canonical path, so
+containers, networks, MongoDB, and Appwrite volumes stay isolated across linked
+worktrees and independent clones—even when two checkouts share a directory name.
 `task start`, `task stop`, `task reset`, `task status`, and `task logs` are all scoped to the current worktree.
 
 Before this worktree setup, `docker compose -f deployment/docker-compose.local.yaml` used `deployment` as its implicit project name.
-To keep its existing data, stop those containers without deleting their volumes, persist that exact name, and only then start the new wrapper:
+To keep those existing volumes attached, add `COMPOSE_PROJECT_NAME=deployment` once to the primary `.env.worktree` (or pass it for the first `task worktree:bootstrap` write). New checkouts do not need that.
 
-```bash
-docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
-COMPOSE_PROJECT_NAME=deployment task worktree:bootstrap
-task start
-```
-
-Do not add `-v` to the migration command.
-If `.env.worktree` already exists, edit its `COMPOSE_PROJECT_NAME` to `deployment` instead: after creation the persisted value is authoritative and shell or copied `.env` values cannot override it.
+Bootstrap of a linked worktree fails closed if the primary's managed project has no durable volumes while legacy `deployment_*` volumes still exist under a mismatched primary project name.
 
 As in Credimi, Worktrunk's `hash_port` derives the initial value for each service.
 Bootstrap checks live TCP listeners and the ports reserved in sibling worktrees, then walks forward on collisions before writing `PORT`, `VITE_PORT`, `MONGODB_PORT`, `CERBOS_PORT`, `MONGO_EXPRESS_PORT`, `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT`, `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT`, and `DOCKER_APP_PORT`.

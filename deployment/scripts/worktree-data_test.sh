@@ -192,6 +192,7 @@ EOF
 chmod +x "${tmpdir}/bin/bash" "${tmpdir}/bin/git" "${tmpdir}/bin/docker"
 
 common_env=(
+  -u COMPOSE_PROJECT_NAME
   PATH="${tmpdir}/bin:${PATH}"
   FAKE_PRIMARY="${primary}"
   FAKE_GIT_COMMON_DIR="${tmpdir}/git-common"
@@ -218,8 +219,8 @@ target_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${target}" \
   bash "${target}/scripts/worktree-env.sh" project-name)"
 target_repository="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${target}" \
   bash "${target}/scripts/worktree-env.sh" repository-id)"
-[[ "${primary_project}" =~ ^primary-[0-9a-f]{8}$ ]] \
-  || fail "primary Compose identity is not path-qualified: ${primary_project}"
+[[ -n "${primary_project}" && "${primary_project}" != "${target_project}" ]] \
+  || fail "primary Compose identity is missing or collided with target: ${primary_project}"
 [[ "${target_project}" != "${primary_project}" ]] \
   || fail "target reused the primary Compose identity"
 
@@ -661,6 +662,8 @@ cp "${ROOT}/scripts/worktree-env.sh" "${fresh_target}/scripts/worktree-env.sh"
 cp "${ROOT}/scripts/dev-ports.env" "${fresh_target}/scripts/dev-ports.env"
 : >"${fresh_target}/deployment/docker-compose.local.yaml"
 rm -rf -- "${tmpdir}/volumes"/"${primary_project}"_*
+# Ensure no leftover legacy deployment volumes confuse the empty-primary path.
+rm -rf -- "${tmpdir}/volumes"/deployment_*
 env "${common_env[@]}" ATTESTA_ROOT_DIR="${fresh_target}" \
   bash "${SCRIPT}" snapshot-primary >"${tmpdir}/fresh-output"
 grep -qi 'no primary durable data.*fresh seed' "${tmpdir}/fresh-output" \
@@ -668,6 +671,31 @@ grep -qi 'no primary durable data.*fresh seed' "${tmpdir}/fresh-output" \
 [[ ! -e "${fresh_target}/.worktree-data/snapshot-v1" ]] \
   || fail "fresh primary produced an empty snapshot"
 assert_file "${fresh_target}/.worktree-data/fresh-seed"
+
+# Legacy project "deployment" volumes must not be treated as an empty primary
+# when the primary .env.worktree still points at a different Compose project.
+legacy_target="${tmpdir}/legacy-target"
+mkdir -p "${legacy_target}/scripts" "${legacy_target}/deployment"
+cp "${ROOT}/scripts/worktree-env.sh" "${legacy_target}/scripts/worktree-env.sh"
+cp "${ROOT}/scripts/dev-ports.env" "${legacy_target}/scripts/dev-ports.env"
+: >"${legacy_target}/deployment/docker-compose.local.yaml"
+cp "${ROOT}/scripts/dev-ports.env" "${primary}/.env.worktree"
+printf 'COMPOSE_PROJECT_NAME=wrong-primary\n' >>"${primary}/.env.worktree"
+rm -rf -- "${tmpdir}/volumes"/wrong-primary_* "${tmpdir}/volumes"/deployment_*
+mkdir -p "${tmpdir}/volumes/deployment_mongodb_data"
+: >"${tmpdir}/volumes/deployment_mongodb_data/nonempty"
+if env "${common_env[@]}" ATTESTA_ROOT_DIR="${legacy_target}" \
+  bash "${SCRIPT}" snapshot-primary >"${tmpdir}/legacy-output" 2>"${tmpdir}/legacy-error"; then
+  fail "legacy deployment volumes unexpectedly allowed a fresh-seed fallback"
+fi
+grep -qi 'legacy project "deployment"' "${tmpdir}/legacy-error" \
+  || fail "legacy deployment volume refusal was unclear"
+[[ ! -e "${legacy_target}/.worktree-data/snapshot-v1" ]] \
+  || fail "legacy deployment refusal published a snapshot"
+[[ ! -e "${legacy_target}/.worktree-data/fresh-seed" ]] \
+  || fail "legacy deployment refusal recorded a fresh-seed choice"
+rm -f -- "${primary}/.env.worktree"
+rm -rf -- "${tmpdir}/volumes"/deployment_*
 
 # Once a first bootstrap chooses a fresh seed, later primary data must not be
 # copied into that worktree.
@@ -683,21 +711,30 @@ env "${common_env[@]}" ATTESTA_ROOT_DIR="${fresh_target}" \
 ! grep -q ' archive ' "${tmpdir}/docker-calls" \
   || fail "later bootstrap archived primary data after fresh-seed choice"
 
-# Existing target state wins even when no bundle or choice marker exists.
+# Orphan Compose state at this path (no local bundle/fresh-seed) is removed so
+# a recreated worktree copies primary data instead of keeping a broken stack.
 state_target="${tmpdir}/state-target"
 mkdir -p "${state_target}/scripts" "${state_target}/deployment"
 cp "${ROOT}/scripts/worktree-env.sh" "${state_target}/scripts/worktree-env.sh"
 cp "${ROOT}/scripts/dev-ports.env" "${state_target}/scripts/dev-ports.env"
 : >"${state_target}/deployment/docker-compose.local.yaml"
+state_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${state_target}" \
+  bash "${state_target}/scripts/worktree-env.sh" project-name)"
+mkdir -p "${tmpdir}/volumes/${state_project}_mongodb_data"
+: >"${tmpdir}/volumes/${state_project}_mongodb_data/nonempty"
 : >"${tmpdir}/docker-calls"
 env "${common_env[@]}" ATTESTA_ROOT_DIR="${state_target}" \
   FAKE_ALL_SERVICES=mongodb bash "${SCRIPT}" snapshot-primary >"${tmpdir}/state-output"
-grep -qi 'already contains data' "${tmpdir}/state-output" \
-  || fail "existing target state was not preserved"
-[[ ! -e "${state_target}/.worktree-data/snapshot-v1" ]] \
-  || fail "existing target state triggered a primary snapshot"
-! grep -q ' archive ' "${tmpdir}/docker-calls" \
-  || fail "existing target state still archived primary data"
+grep -qi 'removing orphan Compose volumes' "${tmpdir}/state-output" \
+  || fail "orphan target state was not cleared"
+! grep -qi 'already contains data; keeping it' "${tmpdir}/state-output" \
+  || fail "orphan target state was kept instead of replaced"
+grep -qiE 'wrote .*/snapshot-v1|snapshotting primary' "${tmpdir}/state-output" \
+  || fail "orphan target state did not snapshot primary data: $(cat "${tmpdir}/state-output")"
+[[ -d "${state_target}/.worktree-data/snapshot-v1" ]] \
+  || fail "orphan target state did not publish a snapshot bundle"
+[[ ! -e "${tmpdir}/volumes/${state_project}_mongodb_data/nonempty" ]] \
+  || fail "orphan target volume was not removed"
 
 # Any partial primary volume set is incoherent and must fail closed.
 partial_target="${tmpdir}/partial-target"
