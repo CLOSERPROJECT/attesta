@@ -1,6 +1,12 @@
 {{/* Used on /my/onboarding for unaffiliated account setup. */}} {{ define
   "onboarding_body" }}
   <section class="stack u-max-w-prose u-mx-auto">
+    {{ if .Confirmation }}
+      <p class="confirmation confirmation-with-icon">
+        {{ template "icon-check-circle" . }}
+        <span>{{ .Confirmation }}</span>
+      </p>
+    {{ end }}
     <section class="page-header">
       <div class="page-header-head">
         <div class="page-header-body">

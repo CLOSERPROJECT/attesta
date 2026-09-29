@@ -65,7 +65,7 @@ func (s *Server) handleEmailVerificationConfirm(w http.ResponseWriter, r *http.R
 		s.redirectEmailVerificationFailure(w, r)
 		return
 	}
-	http.Redirect(w, r, s.postVerificationAppPathForUserID(r, userID), http.StatusSeeOther)
+	http.Redirect(w, r, pathWithNotice(s.postVerificationAppPathForUserID(r, userID), noticeEmailVerified), http.StatusSeeOther)
 }
 
 func emailVerificationConfirmParams(r *http.Request) (string, string) {

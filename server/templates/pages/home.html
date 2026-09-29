@@ -2,6 +2,12 @@
 
 {{ define "home_picker_body" }}
 <section class="stack u-max-w-7xl u-mx-auto my-home">
+  {{ if .Confirmation }}
+    <p class="confirmation confirmation-with-icon">
+      {{ template "icon-check-circle" . }}
+      <span>{{ .Confirmation }}</span>
+    </p>
+  {{ end }}
   <section class="page-header">
     <div class="page-header-head">
       <div class="page-header-body">
@@ -17,9 +23,6 @@
       {{ end }}
     </div>
   </section>
-  {{ if .Confirmation }}
-    <p class="confirmation">{{ .Confirmation }}</p>
-  {{ end }}
   {{ template "error_banner.html" . }}
   {{ if .Groups }}
     <div class="my-home-body">

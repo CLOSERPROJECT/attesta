@@ -32,6 +32,7 @@ type OnboardingHubView struct {
 	Invites            []OnboardingInviteView
 	InviteActionHref   string
 	FormError          string
+	Confirmation       string
 }
 
 type OnboardingInviteView struct {
@@ -200,6 +201,7 @@ func (s *Server) renderOnboardingHub(w http.ResponseWriter, r *http.Request, use
 		WithdrawActionHref: onboardingPath(),
 		InviteActionHref:   onboardingPath(),
 		FormError:          strings.TrimSpace(formError),
+		Confirmation:       emailVerifiedSuccessMessage(requestNotice(r)),
 	}
 	identityUser := identityUserForAffiliation(user)
 	aff := s.affiliationService()

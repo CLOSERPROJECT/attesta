@@ -116,11 +116,40 @@ func TestEmailVerificationConfirmSuccess(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
-	if loc := rec.Header().Get("Location"); loc != onboardingPath() {
-		t.Fatalf("location = %q, want %s", loc, onboardingPath())
+	if loc := rec.Header().Get("Location"); loc != pathWithNotice(onboardingPath(), noticeEmailVerified) {
+		t.Fatalf("location = %q, want %s", loc, pathWithNotice(onboardingPath(), noticeEmailVerified))
 	}
 	if !completeCalled {
 		t.Fatal("expected CompleteEmailVerification to be called")
+	}
+}
+
+func TestEmailVerificationConfirmSuccessAffiliatedGoesHome(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "member@example.com", OrgSlug: "acme", EmailVerified: false}, nil
+			},
+			completeEmailVerificationFunc: func(_ context.Context, userID, secret string) error {
+				return nil
+			},
+		},
+		store: NewMemoryStore(),
+		tmpl:  emailVerificationTemplates(),
+		now:   func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, emailVerificationConfirmPath()+"?userId=user-1&secret=secret-1", nil)
+	rec := httptest.NewRecorder()
+	server.handleEmailVerificationConfirm(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	want := pathWithNotice(appHomePath, noticeEmailVerified)
+	if loc := rec.Header().Get("Location"); loc != want {
+		t.Fatalf("location = %q, want %s", loc, want)
 	}
 }
 

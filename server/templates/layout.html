@@ -307,7 +307,7 @@
                     </dialog>
                   {{ end }}
                 {{ end }}
-              {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") }}
+              {{ else if and (ne .Body "login_body") (ne .Body "signup_body") (ne .Body "invite_body") (ne .Body "reset_request_body") (ne .Body "reset_set_body") (ne .Body "verify_email_body") }}
                 <a href="/login" class="btn btn-ghost btn-lg nav-action">
                   {{ template "icon-log-in" . }}
                   Login
@@ -333,6 +333,8 @@
           {{ template "reset_request_body" . }}
         {{ else if eq .Body "reset_set_body" }}
           {{ template "reset_set_body" . }}
+        {{ else if eq .Body "verify_email_body" }}
+          {{ template "verify_email_body" . }}
         {{ else if eq .Body "platform_admin_body" }}
           {{ template "platform_admin_body" . }}
         {{ else if eq .Body "org_admin_body" }}

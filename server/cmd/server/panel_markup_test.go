@@ -532,3 +532,54 @@ func TestLoginPanelMarkup(t *testing.T) {
 		t.Fatalf("heading-only login panel must not use panel-head-actions, got:\n%s", body)
 	}
 }
+
+func TestVerifyEmailPanelMarkup(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "verify_email_body", VerifyEmailView{Email: "waiting@example.com"}); err != nil {
+		t.Fatalf("render verify_email_body: %v", err)
+	}
+	body := out.String()
+
+	for _, want := range []string{
+		`class="login-wrapper"`,
+		`class="panel login"`,
+		"<h1>Verify your email</h1>",
+		`class="input-form"`,
+		`value="waiting@example.com"`,
+		`class="form-actions form-actions-end"`,
+		"Resend verification email",
+		`class="auth-footer"`,
+		`action="/logout"`,
+		`class="auth-footer-action"`,
+		"Log out",
+		`class="icon-svg`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in verify email panel markup, got:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, `class="btn btn-outline"`) {
+		t.Fatalf("verify logout must use auth-footer link styling, got:\n%s", body)
+	}
+}
+
+func TestLayoutRendersVerifyEmailBody(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "layout.html", VerifyEmailView{
+		PageBase: PageBase{Body: "verify_email_body"},
+		Email:    "waiting@example.com",
+	}); err != nil {
+		t.Fatalf("render layout verify_email_body: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, "<h1>Verify your email</h1>") {
+		t.Fatalf("layout must render verify_email_body, got:\n%s", body)
+	}
+	if strings.Contains(body, `href="/login"`) && strings.Contains(body, ">Login</a>") {
+		t.Fatalf("signed-out login CTA must not appear on verify waiting path, got:\n%s", body)
+	}
+}

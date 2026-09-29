@@ -61,6 +61,50 @@ func TestHandleOnboardingUnaffiliatedRendersHub(t *testing.T) {
 	}
 }
 
+func TestHandleOnboardingShowsEmailVerifiedNotice(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-onboarding-verified-notice"
+	user := AccountUser{
+		ID:             primitive.NewObjectID(),
+		IdentityUserID: "user-1",
+		Email:          "newbie@example.com",
+		Status:         "active",
+		CreatedAt:      now,
+	}
+	server := &Server{
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, onboardingPath()+"?notice="+noticeEmailVerified, nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleMyRoutes(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Your email is verified.",
+		"confirmation-with-icon",
+		"Get started",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in onboarding hub, got:\n%s", want, body)
+		}
+	}
+	idxNotice := strings.Index(body, "Your email is verified.")
+	idxHeading := strings.Index(body, "<h1>Get started</h1>")
+	if idxNotice < 0 || idxHeading < 0 || idxNotice > idxHeading {
+		t.Fatalf("verified notice must appear above Get started, notice=%d heading=%d", idxNotice, idxHeading)
+	}
+}
+
 func TestHandleOnboardingAffiliatedRedirectsHome(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-onboarding-affiliated"
@@ -350,15 +394,15 @@ func TestHandleOnboardingHubPendingInviteAcceptAndReject(t *testing.T) {
 		}, nil
 	}
 	pendingMemberships := []IdentityMembership{{
-		ID:         "membership-invite-1",
-		TeamID:     "team-acme",
-		OrgSlug:    "acme",
-		OrgName:    "Acme Org",
-		UserID:     "user-invitee",
-		Email:      "invitee@example.com",
-		RoleSlugs:  []string{"viewer"},
-		Confirmed:  false,
-		InvitedAt:  now,
+		ID:        "membership-invite-1",
+		TeamID:    "team-acme",
+		OrgSlug:   "acme",
+		OrgName:   "Acme Org",
+		UserID:    "user-invitee",
+		Email:     "invitee@example.com",
+		RoleSlugs: []string{"viewer"},
+		Confirmed: false,
+		InvitedAt: now,
 	}}
 	identity.listUserMembershipsFunc = func(ctx context.Context, userID string) ([]IdentityMembership, error) {
 		if userID != "user-invitee" {

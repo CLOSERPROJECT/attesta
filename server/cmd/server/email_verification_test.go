@@ -6,6 +6,15 @@ import (
 	"testing"
 )
 
+func TestEmailVerifiedSuccessMessage(t *testing.T) {
+	if got := emailVerifiedSuccessMessage(noticeEmailVerified); got != "Your email is verified." {
+		t.Fatalf("emailVerifiedSuccessMessage = %q", got)
+	}
+	if got := emailVerifiedSuccessMessage("other"); got != "" {
+		t.Fatalf("unexpected message %q", got)
+	}
+}
+
 func TestEmailVerificationAllowsAppAccess(t *testing.T) {
 	ev := NewEmailVerification(&fakeIdentityStore{})
 	verified := true

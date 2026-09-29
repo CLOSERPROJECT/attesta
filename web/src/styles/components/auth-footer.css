@@ -1,13 +1,33 @@
 /*
- * Auth footer — cross-link under login/signup forms (CSS-only).
+ * Auth footer — cross-link or logout under auth forms (CSS-only).
  *
  * footer.auth-footer
  *   hr
  *   p.auth-footer-switch
  *     a
+ *   — or —
+ *   form > p.auth-footer-switch > button.auth-footer-action
+ *
+ * section.panel.login > hr   (rule above the auth form, e.g. verify)
  *
  * Markup: {{ template "auth_footer" (dict "Prompt" "…" "Href" "…" "LinkLabel" "…") }}
+ * Logout: footer.auth-footer with POST form + .auth-footer-action
  */
+
+.panel.login > .panel-heading:has(+ hr) {
+  margin-bottom: var(--space-10);
+}
+
+.panel.login > hr,
+.auth-footer > hr {
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.panel.login > hr {
+  margin-bottom: var(--space-6);
+}
 
 .auth-footer {
   display: flex;
@@ -16,15 +36,29 @@
   margin-top: var(--space-10);
 }
 
-.auth-footer > hr {
-  margin: 0;
-  border: none;
-  border-top: 1px solid var(--border);
-}
-
 .auth-footer-switch {
   margin: 0;
   text-align: center;
   font-size: var(--text-sm);
   color: var(--muted-foreground);
+}
+
+.auth-footer-action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.auth-footer-action:hover {
+  text-decoration: underline;
 }
