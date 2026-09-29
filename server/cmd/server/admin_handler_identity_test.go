@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -107,6 +109,14 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 	t.Run("retries identity-not-found while Appwrite boots", func(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
+		prevTimeout := platformAdminIdentityBootstrapTimeout
+		prevRetry := platformAdminIdentityBootstrapRetry
+		platformAdminIdentityBootstrapTimeout = time.Second
+		platformAdminIdentityBootstrapRetry = time.Millisecond
+		t.Cleanup(func() {
+			platformAdminIdentityBootstrapTimeout = prevTimeout
+			platformAdminIdentityBootstrapRetry = prevRetry
+		})
 		calls := 0
 		server := &Server{
 			authorizer: fakeAuthorizer{},
@@ -127,6 +137,120 @@ func TestBootstrapPlatformAdminIdentity(t *testing.T) {
 			t.Fatalf("calls = %d, want 3", calls)
 		}
 	})
+
+	t.Run("retries connection refused then succeeds", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		prevTimeout := platformAdminIdentityBootstrapTimeout
+		prevRetry := platformAdminIdentityBootstrapRetry
+		platformAdminIdentityBootstrapTimeout = time.Second
+		platformAdminIdentityBootstrapRetry = time.Millisecond
+		t.Cleanup(func() {
+			platformAdminIdentityBootstrapTimeout = prevTimeout
+			platformAdminIdentityBootstrapRetry = prevRetry
+		})
+		calls := 0
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					calls++
+					if calls == 1 {
+						return errors.New("dial tcp 127.0.0.1:80: connection refused")
+					}
+					return nil
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		if calls != 2 {
+			t.Fatalf("calls = %d, want 2", calls)
+		}
+	})
+
+	t.Run("returns last retriable error after deadline", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		prevTimeout := platformAdminIdentityBootstrapTimeout
+		prevRetry := platformAdminIdentityBootstrapRetry
+		platformAdminIdentityBootstrapTimeout = 0
+		platformAdminIdentityBootstrapRetry = time.Millisecond
+		t.Cleanup(func() {
+			platformAdminIdentityBootstrapTimeout = prevTimeout
+			platformAdminIdentityBootstrapRetry = prevRetry
+		})
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					return ErrIdentityNotFound
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(context.Background()); !errors.Is(err, ErrIdentityNotFound) {
+			t.Fatalf("error = %v, want %v", err, ErrIdentityNotFound)
+		}
+	})
+
+	t.Run("returns context error when canceled during retry wait", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		prevTimeout := platformAdminIdentityBootstrapTimeout
+		prevRetry := platformAdminIdentityBootstrapRetry
+		platformAdminIdentityBootstrapTimeout = time.Second
+		platformAdminIdentityBootstrapRetry = 50 * time.Millisecond
+		t.Cleanup(func() {
+			platformAdminIdentityBootstrapTimeout = prevTimeout
+			platformAdminIdentityBootstrapRetry = prevRetry
+		})
+		ctx, cancel := context.WithCancel(context.Background())
+		server := &Server{
+			authorizer: fakeAuthorizer{},
+			identity: &fakeIdentityStore{
+				ensurePlatformAdminAccountFunc: func(ctx context.Context, email, password string) error {
+					cancel()
+					return ErrIdentityNotFound
+				},
+			},
+		}
+		if err := server.bootstrapPlatformAdminIdentity(ctx); !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want %v", err, context.Canceled)
+		}
+	})
+}
+
+func TestIsRetriableIdentityBootstrapError(t *testing.T) {
+	if isRetriableIdentityBootstrapError(nil) {
+		t.Fatal("nil should not be retriable")
+	}
+	if isRetriableIdentityBootstrapError(ErrIdentityNotFound) {
+		t.Fatal("ErrIdentityNotFound is handled separately, not via isRetriable")
+	}
+	if isRetriableIdentityBootstrapError(errors.New("boom")) {
+		t.Fatal("unknown errors should not be retriable")
+	}
+
+	var netErr net.Error = &net.DNSError{Err: "temporary failure", Name: "appwrite", IsTemporary: true}
+	if !isRetriableIdentityBootstrapError(netErr) {
+		t.Fatal("net.Error should be retriable")
+	}
+	if !isRetriableIdentityBootstrapError(fmt.Errorf("wrap: %w", netErr)) {
+		t.Fatal("wrapped net.Error should be retriable")
+	}
+
+	for _, msg := range []string{
+		"connection refused",
+		"Connection Reset by peer",
+		"i/o timeout",
+		"no such host",
+		"temporary failure in name resolution",
+	} {
+		if !isRetriableIdentityBootstrapError(errors.New(msg)) {
+			t.Fatalf("%q should be retriable", msg)
+		}
+	}
 }
 
 func TestPlatformOrganizationsAndRenderPlatformAdmin(t *testing.T) {

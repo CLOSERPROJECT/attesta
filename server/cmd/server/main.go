@@ -1062,6 +1062,12 @@ func (s *Server) platformAdminIdentitySession(ctx context.Context) (*IdentitySes
 	return &session, nil
 }
 
+// Overridable in tests so deadline / cancel paths do not sleep for a minute.
+var (
+	platformAdminIdentityBootstrapTimeout = 60 * time.Second
+	platformAdminIdentityBootstrapRetry   = 500 * time.Millisecond
+)
+
 func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 	if s.identity == nil {
 		return nil
@@ -1070,7 +1076,7 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	deadline := time.Now().Add(60 * time.Second)
+	deadline := time.Now().Add(platformAdminIdentityBootstrapTimeout)
 	var err error
 	for {
 		err = s.identity.EnsurePlatformAdminAccount(ctx, email, password)
@@ -1080,15 +1086,17 @@ func (s *Server) bootstrapPlatformAdminIdentity(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		// Appwrite often returns 404 while Traefik is up but the API is still
-		// booting; that maps to ErrIdentityNotFound and used to fatal startup.
+		// EnsurePlatformAdminAccount only surfaces ErrIdentityNotFound when
+		// Appwrite answered 404 on create/update (user-missing is handled
+		// inside Ensure). During boot Traefik is often up while the API still
+		// returns 404 for those routes.
 		if !errors.Is(err, ErrIdentityNotFound) && !isRetriableIdentityBootstrapError(err) {
 			return err
 		}
 		if !time.Now().Before(deadline) {
 			return err
 		}
-		timer := time.NewTimer(500 * time.Millisecond)
+		timer := time.NewTimer(platformAdminIdentityBootstrapRetry)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
