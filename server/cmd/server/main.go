@@ -2465,7 +2465,7 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) requireCatalogAccessAPI(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return nil, false
 	}
