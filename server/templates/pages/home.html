@@ -83,6 +83,29 @@
         </ul>
       </section>
     {{ end }}
+    {{ if .UpcomingStreams }}
+      <section class="my-home-upcoming" aria-label="Upcoming">
+        <div class="panel-heading">
+          <h2>Upcoming</h2>
+          <p>Active stream instances waiting on someone else</p>
+        </div>
+        <ul class="list-rows">
+          {{ range .UpcomingStreams }}
+            <li>
+              <a class="list-row" href="{{ .Href }}">
+                <div class="list-row-main list-row-main-stack">
+                  <p>{{ .InstanceName }}</p>
+                  <p class="muted u-text-xs">
+                    {{ .WorkflowName }}
+                    {{ if .WaitingOn }}· {{ .WaitingOn }}{{ end }}
+                  </p>
+                </div>
+              </a>
+            </li>
+          {{ end }}
+        </ul>
+      </section>
+    {{ end }}
     {{ if .PendingOrgCreationRequests }}
       <section class="my-home-attention" aria-label="Attention">
         <div class="panel-heading">

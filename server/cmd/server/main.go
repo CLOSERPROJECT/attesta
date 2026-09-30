@@ -330,6 +330,7 @@ type HomeWorkflowPickerView struct {
 	Unaffiliated               bool
 	PendingJoinRequests        []OrgAdminJoinRequestRow
 	PendingStreamActions       []StreamAttentionItem
+	UpcomingStreams            []StreamUpcomingItem
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
 	Error                      string
 	Confirmation               string
@@ -2280,6 +2281,12 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	upcomingStreams, upcomingErr := s.upcomingStreamRows(r.Context(), user)
+	if upcomingErr != nil {
+		logRequestError(r, upcomingErr, "load upcoming streams for home")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	var pendingOrgCreation []PlatformAdminOrgCreationRequestRow
 	if user.IsPlatformAdmin {
 		pendingOrgCreation = platformAdminOrgCreationRequestRows(r.Context(), s)
@@ -2291,6 +2298,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		ShowCreateStream:           showCreateStream && authErr == nil,
 		PendingJoinRequests:        pendingJoins,
 		PendingStreamActions:       pendingStreams,
+		UpcomingStreams:            upcomingStreams,
 		PendingOrgCreationRequests: pendingOrgCreation,
 		Error:                      homePickerMessage(r, "error"),
 		Confirmation:               homePickerMessage(r, "confirmation"),
@@ -4476,6 +4484,13 @@ func (s *Server) streamAttentionRows(ctx context.Context, user *AccountUser) ([]
 		return nil, nil
 	}
 	return s.attentionService().PendingStreamActions(ctx, identityUserForAffiliation(user))
+}
+
+func (s *Server) upcomingStreamRows(ctx context.Context, user *AccountUser) ([]StreamUpcomingItem, error) {
+	if s == nil || user == nil || user.IsPlatformAdmin {
+		return nil, nil
+	}
+	return s.listUpcomingStreamInstances(ctx, user)
 }
 
 func orgAdminPostRedirect(r *http.Request, fallback string) string {
