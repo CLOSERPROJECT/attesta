@@ -188,6 +188,39 @@ func TestHandleLoginRedirectsByAffiliation(t *testing.T) {
 			t.Fatalf("location = %q, want /my", loc)
 		}
 	})
+
+	t.Run("unverified goes to verification waiting", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				respectEmailVerified: true,
+				createEmailPasswordSessionFunc: func(ctx context.Context, email, password string) (IdentitySession, error) {
+					return fakeIdentitySession("login-session-unverified", "user-3", now.Add(24*time.Hour)), nil
+				},
+				getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+					return IdentityUser{ID: "user-3", Email: "pending@example.com", Status: "active", EmailVerified: false}, nil
+				},
+			},
+			store: NewMemoryStore(),
+			tmpl:  testTemplates(),
+			now:   func() time.Time { return now },
+		}
+		form := url.Values{}
+		form.Set("email", "pending@example.com")
+		form.Set("password", "secure-password")
+		form.Set("next", "/my/streams/workflow/")
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		server.handleLogin(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		}
+		if loc := rec.Header().Get("Location"); loc != emailVerificationPath() {
+			t.Fatalf("location = %q, want %s", loc, emailVerificationPath())
+		}
+	})
 }
 
 func TestHandleLoginCreatesPlatformAdminSessionCookie(t *testing.T) {

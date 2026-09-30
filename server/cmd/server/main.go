@@ -2252,9 +2252,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if s.enforceAuth && !user.IsPlatformAdmin && !s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
-		http.Redirect(w, r, pathWithNotice(onboardingPath(), requestNotice(r)), http.StatusSeeOther)
-		return
+	if s.enforceAuth && !user.IsPlatformAdmin {
+		if landing := s.verifiedLandingPath(user, ""); landing != appHomePath {
+			http.Redirect(w, r, pathWithNotice(landing, requestNotice(r)), http.StatusSeeOther)
+			return
+		}
 	}
 	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), user)
 	if authErr != nil {
@@ -2746,12 +2748,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		redirectTarget := next
 		if identityUser, userErr := s.identity.GetCurrentUser(r.Context(), session.Secret); userErr == nil {
-			accountUser := s.accountUserFromIdentity(r.Context(), identityUser)
-			if !s.emailVerificationService().AllowsAppAccess(*accountUser) {
-				redirectTarget = emailVerificationPath()
-			} else if !s.affiliationService().IsAffiliated(identityUser) && isAppHomePath(next) {
-				redirectTarget = onboardingPath()
-			}
+			redirectTarget = s.verifiedLandingPath(s.accountUserFromIdentity(r.Context(), identityUser), next)
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return

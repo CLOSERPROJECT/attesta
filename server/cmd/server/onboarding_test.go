@@ -293,6 +293,18 @@ func TestHandleHomeRedirectsUnaffiliatedToOnboarding(t *testing.T) {
 	if loc := rec.Header().Get("Location"); loc != "/my/onboarding" {
 		t.Fatalf("location = %q, want /my/onboarding", loc)
 	}
+
+	noticed := httptest.NewRequest(http.MethodGet, "/my?notice="+noticeEmailVerified, nil)
+	noticed.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	noticedRec := httptest.NewRecorder()
+	server.handleHome(noticedRec, noticed)
+	if noticedRec.Code != http.StatusSeeOther {
+		t.Fatalf("noticed status = %d, want %d", noticedRec.Code, http.StatusSeeOther)
+	}
+	wantNoticed := pathWithNotice(onboardingPath(), noticeEmailVerified)
+	if loc := noticedRec.Header().Get("Location"); loc != wantNoticed {
+		t.Fatalf("noticed location = %q, want %s", loc, wantNoticed)
+	}
 }
 
 func TestHandleOnboardingJoinAndRequestPages(t *testing.T) {

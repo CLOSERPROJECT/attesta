@@ -14,7 +14,7 @@ func (s *Server) handleEmailVerificationWaiting(w http.ResponseWriter, r *http.R
 		return
 	}
 	if s.emailVerificationService().AllowsAppAccess(*user) {
-		http.Redirect(w, r, s.postVerificationAppPath(r, user), http.StatusSeeOther)
+		http.Redirect(w, r, s.verifiedLandingPath(user, ""), http.StatusSeeOther)
 		return
 	}
 
@@ -162,11 +162,37 @@ func (s *Server) renderEmailVerificationWaiting(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (s *Server) postVerificationAppPath(r *http.Request, user *AccountUser) string {
-	if user != nil && s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
+// verifiedLandingPath chooses where a signed-in user lands after login, when
+// bouncing off the verification waiting path, or when /my sends unaffiliated
+// users to onboarding. optionalNext may be empty; when set it should be a
+// same-origin path (typically from safeNextPath).
+func (s *Server) verifiedLandingPath(user *AccountUser, optionalNext string) string {
+	if user == nil || !s.emailVerificationService().AllowsAppAccess(*user) {
+		return emailVerificationPath()
+	}
+	return s.appLandingPath(user, optionalNext)
+}
+
+// appLandingPath is affiliation + optional next selection for users who already
+// have app access (or after mailbox confirm/establish succeeded).
+func (s *Server) appLandingPath(user *AccountUser, optionalNext string) string {
+	next := strings.TrimSpace(optionalNext)
+	affiliated := user != nil && s.affiliationService().IsAffiliated(identityUserForAffiliation(user))
+	if !affiliated && (next == "" || isAppHomePath(next)) {
+		return onboardingPath()
+	}
+	if next != "" && strings.HasPrefix(next, "/") {
+		return next
+	}
+	if affiliated {
 		return appHomePath
 	}
 	return onboardingPath()
+}
+
+func (s *Server) postVerificationAppPath(r *http.Request, user *AccountUser) string {
+	_ = r
+	return s.verifiedLandingPath(user, "")
 }
 
 func (s *Server) postVerificationAppPathForUserID(r *http.Request, userID string) string {
@@ -177,10 +203,7 @@ func (s *Server) postVerificationAppPathForUserID(r *http.Request, userID string
 	if err != nil {
 		return appHomePath
 	}
-	if s.affiliationService().IsAffiliated(user) {
-		return appHomePath
-	}
-	return onboardingPath()
+	return s.appLandingPath(s.accountUserFromIdentity(r.Context(), user), "")
 }
 
 type emailVerificationResendState struct {

@@ -697,6 +697,91 @@ func TestEmailVerificationResendTooSoonEdges(t *testing.T) {
 	}
 }
 
+func TestVerifiedLandingPath(t *testing.T) {
+	server := &Server{store: NewMemoryStore()}
+	verified := true
+	unverified := false
+
+	cases := []struct {
+		name string
+		user *AccountUser
+		next string
+		want string
+	}{
+		{name: "nil user", user: nil, want: emailVerificationPath()},
+		{
+			name: "unverified goes verify",
+			user: &AccountUser{Email: "u@example.com", EmailVerified: &unverified},
+			next: appHomePath,
+			want: emailVerificationPath(),
+		},
+		{
+			name: "unaffiliated empty next goes onboarding",
+			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			want: onboardingPath(),
+		},
+		{
+			name: "unaffiliated app home goes onboarding",
+			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			next: appHomePath,
+			want: onboardingPath(),
+		},
+		{
+			name: "unaffiliated app home slash goes onboarding",
+			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			next: appHomePath + "/",
+			want: onboardingPath(),
+		},
+		{
+			name: "unaffiliated explicit next wins",
+			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			next: "/my/streams/workflow/",
+			want: "/my/streams/workflow/",
+		},
+		{
+			name: "affiliated empty next goes home",
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			want: appHomePath,
+		},
+		{
+			name: "affiliated app home stays home",
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			next: appHomePath,
+			want: appHomePath,
+		},
+		{
+			name: "affiliated explicit next wins",
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			next: "/admin/organizations",
+			want: "/admin/organizations",
+		},
+		{
+			name: "unsafe next unaffiliated goes onboarding",
+			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			next: "https://evil.example/",
+			want: onboardingPath(),
+		},
+		{
+			name: "unsafe next affiliated goes home",
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			next: "https://evil.example/",
+			want: appHomePath,
+		},
+		{
+			name: "platform admin unverified unaffiliated goes onboarding",
+			user: &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true, EmailVerified: &unverified},
+			want: onboardingPath(),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := server.verifiedLandingPath(tc.user, tc.next); got != tc.want {
+				t.Fatalf("verifiedLandingPath = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestPostVerificationAppPathForUserIDFallback(t *testing.T) {
 	server := &Server{
 		identity: &fakeIdentityStore{
@@ -721,7 +806,7 @@ func TestMailboxProofSuccessPath(t *testing.T) {
 	server := &Server{
 		identity: &fakeIdentityStore{
 			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
-				return IdentityUser{ID: userID, Email: "user@example.com"}, nil
+				return IdentityUser{ID: userID, Email: "user@example.com", EmailVerified: true}, nil
 			},
 		},
 		store: NewMemoryStore(),
