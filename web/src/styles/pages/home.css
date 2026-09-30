@@ -3,7 +3,8 @@ html:has(.my-home) {
   scroll-behavior: smooth;
 }
 
-.my-home-attention {
+.my-home-attention,
+.my-home-upcoming {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -11,11 +12,13 @@ html:has(.my-home) {
   border-bottom: 1px solid var(--border);
 }
 
-.my-home-attention .panel-heading {
+.my-home-attention .panel-heading,
+.my-home-upcoming .panel-heading {
   margin-bottom: 0;
 }
 
-.my-home-attention .panel-heading p {
+.my-home-attention .panel-heading p,
+.my-home-upcoming .panel-heading p {
   text-wrap: pretty;
 }
 
