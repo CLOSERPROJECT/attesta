@@ -426,10 +426,12 @@ type ResetSetView struct {
 
 type VerifyEmailView struct {
 	PageBase
-	Email          string
-	Error          string
-	Confirmation   string
-	ResendDisabled bool
+	Email                  string
+	Error                  string
+	Confirmation           string
+	ResendDisabled         bool
+	ResendAvailableAt      int64
+	ResendRemainingSeconds int
 }
 
 type AboutView struct {

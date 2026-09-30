@@ -20,7 +20,7 @@ func boolPtr(v bool) *bool { return &v }
 func emailVerificationTemplates() *template.Template {
 	return template.Must(template.New("verify-test").Parse(`
 {{define "layout.html"}}{{if eq .Body "verify_email_body"}}{{template "verify_email_body" .}}{{else if eq .Body "home_picker_body"}}HOME{{end}}{{end}}
-{{define "verify_email_body"}}VERIFY_EMAIL {{.Email}}{{if .Confirmation}} {{.Confirmation}}{{end}}{{if .Error}} {{.Error}}{{end}}{{if .ResendDisabled}} RESEND_DISABLED{{end}}{{end}}
+{{define "verify_email_body"}}VERIFY_EMAIL {{.Email}}{{if .Confirmation}} {{.Confirmation}}{{end}}{{if .Error}} {{.Error}}{{end}}{{if .ResendDisabled}} RESEND_DISABLED{{end}}{{if .ResendAvailableAt}} RESEND_AT={{.ResendAvailableAt}}{{end}}{{if .ResendRemainingSeconds}} RESEND_IN={{.ResendRemainingSeconds}}{{end}}{{end}}
 {{define "verify_email.html"}}{{template "layout.html" .}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 {{define "home_picker_body"}}HOME{{end}}
@@ -90,6 +90,53 @@ func TestEmailVerificationWaitingPathRenders(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, "VERIFY_EMAIL") || !strings.Contains(body, "waiting@example.com") {
 		t.Fatalf("body = %q", body)
+	}
+	if strings.Contains(body, "RESEND_DISABLED") {
+		t.Fatalf("expected resend enabled without cooldown cookie, body = %q", body)
+	}
+}
+
+func TestEmailVerificationWaitingPathRendersResendCooldown(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-waiting-cooldown"
+	identity := testIdentityForSessions(now, map[string]AccountUser{
+		sessionID: {
+			IdentityUserID: "user-1",
+			Email:          "waiting@example.com",
+			Status:         "active",
+			EmailVerified:  boolPtr(false),
+		},
+	})
+	server := &Server{
+		identity:    identity,
+		store:       NewMemoryStore(),
+		tmpl:        emailVerificationTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
+
+	req := httptest.NewRequest(http.MethodGet, emailVerificationPath(), nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	req.AddCookie(&http.Cookie{
+		Name:  emailVerificationResendCookie,
+		Value: strconv.FormatInt(now.Add(-30*time.Second).Unix(), 10),
+	})
+	rec := httptest.NewRecorder()
+	server.handleEmailVerificationWaiting(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	wantAt := now.Add(30 * time.Second).Unix()
+	for _, want := range []string{
+		"RESEND_DISABLED",
+		"RESEND_AT=" + strconv.FormatInt(wantAt, 10),
+		"RESEND_IN=30",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body = %q", want, body)
+		}
 	}
 }
 
@@ -593,6 +640,16 @@ func TestEmailVerificationResendTooSoonEdges(t *testing.T) {
 	})
 	if server.emailVerificationResendTooSoon(expired) {
 		t.Fatal("expired cooldown should allow resend")
+	}
+
+	active := httptest.NewRequest(http.MethodGet, "/", nil)
+	active.AddCookie(&http.Cookie{
+		Name:  emailVerificationResendCookie,
+		Value: strconv.FormatInt(now.Add(-25*time.Second).Unix(), 10),
+	})
+	state := server.emailVerificationResendState(active)
+	if !state.Disabled || state.RemainingSeconds != 35 || state.AvailableAt != now.Add(35*time.Second).Unix() {
+		t.Fatalf("active cooldown state = %+v", state)
 	}
 }
 

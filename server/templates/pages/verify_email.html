@@ -22,8 +22,16 @@
         <div class="form-actions form-actions-end">
           <button class="btn btn-primary"
                   type="submit"
+                  data-resend-cooldown
+                  {{ if .ResendAvailableAt }}data-resend-available-at="{{ .ResendAvailableAt }}"
+                  {{ end }}
                   {{ if .ResendDisabled }}disabled{{ end }}>
-            {{ template "icon-mail" . }} Resend verification email
+            <span data-resend-ready{{ if .ResendDisabled }} hidden{{ end }}>
+              {{ template "icon-mail" . }} Resend verification email
+            </span>
+            <span data-resend-wait{{ if not .ResendDisabled }} hidden{{ end }}>
+              Retry available in <span data-resend-seconds>{{ .ResendRemainingSeconds }}</span>
+            </span>
           </button>
         </div>
       </form>
@@ -31,14 +39,57 @@
         <hr />
         <form method="post" action="/logout">
           <p class="auth-footer-switch">
-            <button type="submit" class="auth-footer-action">
-              {{ template "icon-sign-out" . }} Log out
-            </button>
+            <button type="submit" class="auth-footer-action">{{ template "icon-sign-out" . }} Log out</button>
           </p>
         </form>
       </footer>
     </section>
   </div>
+  <script>
+    (() => {
+      const button = document.querySelector("[data-resend-cooldown]");
+      if (!button) {
+        return;
+      }
+      const availableAtRaw = button.getAttribute("data-resend-available-at");
+      const availableAt = availableAtRaw ? Number.parseInt(availableAtRaw, 10) : 0;
+      const ready = button.querySelector("[data-resend-ready]");
+      const wait = button.querySelector("[data-resend-wait]");
+      const seconds = button.querySelector("[data-resend-seconds]");
+      if (!ready || !wait || !seconds || !Number.isFinite(availableAt) || availableAt <= 0) {
+        return;
+      }
+
+      const showReady = () => {
+        button.removeAttribute("disabled");
+        button.removeAttribute("data-resend-available-at");
+        ready.hidden = false;
+        wait.hidden = true;
+      };
+
+      const tick = () => {
+        const remaining = Math.ceil(availableAt - Date.now() / 1000);
+        if (remaining <= 0) {
+          showReady();
+          return false;
+        }
+        seconds.textContent = String(remaining);
+        ready.hidden = true;
+        wait.hidden = false;
+        button.setAttribute("disabled", "");
+        return true;
+      };
+
+      if (!tick()) {
+        return;
+      }
+      const timer = window.setInterval(() => {
+        if (!tick()) {
+          window.clearInterval(timer);
+        }
+      }, 1000);
+    })();
+  </script>
 {{ end }}
 
 {{ define "verify_email.html" }}

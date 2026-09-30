@@ -85,12 +85,15 @@ func (s *Server) redirectEmailVerificationFailure(w http.ResponseWriter, r *http
 }
 
 func (s *Server) renderEmailVerificationWaiting(w http.ResponseWriter, r *http.Request, user *AccountUser, confirmation, errMsg string) {
+	resend := s.emailVerificationResendState(r)
 	view := VerifyEmailView{
-		PageBase:       s.pageBaseForUser(user, "verify_email_body", "", ""),
-		Email:          strings.TrimSpace(user.Email),
-		Confirmation:   confirmation,
-		Error:          errMsg,
-		ResendDisabled: s.emailVerificationResendTooSoon(r),
+		PageBase:               s.pageBaseForUser(user, "verify_email_body", "", ""),
+		Email:                  strings.TrimSpace(user.Email),
+		Confirmation:           confirmation,
+		Error:                  errMsg,
+		ResendDisabled:         resend.Disabled,
+		ResendAvailableAt:      resend.AvailableAt,
+		ResendRemainingSeconds: resend.RemainingSeconds,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "verify_email.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -118,17 +121,39 @@ func (s *Server) postVerificationAppPathForUserID(r *http.Request, userID string
 	return onboardingPath()
 }
 
+type emailVerificationResendState struct {
+	Disabled         bool
+	AvailableAt      int64
+	RemainingSeconds int
+}
+
 func (s *Server) emailVerificationResendTooSoon(r *http.Request) bool {
+	return s.emailVerificationResendState(r).Disabled
+}
+
+func (s *Server) emailVerificationResendState(r *http.Request) emailVerificationResendState {
 	cookie, err := r.Cookie(emailVerificationResendCookie)
 	if err != nil || cookie == nil {
-		return false
+		return emailVerificationResendState{}
 	}
 	unix, err := strconv.ParseInt(strings.TrimSpace(cookie.Value), 10, 64)
 	if err != nil || unix <= 0 {
-		return false
+		return emailVerificationResendState{}
 	}
-	elapsed := s.nowUTC().Sub(time.Unix(unix, 0))
-	return elapsed >= 0 && elapsed < emailVerificationResendCooldown
+	availableAt := time.Unix(unix, 0).Add(emailVerificationResendCooldown)
+	remaining := availableAt.Sub(s.nowUTC())
+	if remaining <= 0 {
+		return emailVerificationResendState{}
+	}
+	secs := int((remaining + time.Second - 1) / time.Second)
+	if secs < 1 {
+		secs = 1
+	}
+	return emailVerificationResendState{
+		Disabled:         true,
+		AvailableAt:      availableAt.Unix(),
+		RemainingSeconds: secs,
+	}
 }
 
 func (s *Server) setEmailVerificationResendCookie(w http.ResponseWriter, r *http.Request) {
