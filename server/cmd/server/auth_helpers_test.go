@@ -44,7 +44,7 @@ func TestAccountUserFromIdentity(t *testing.T) {
 	if user.IdentityUserID != "user-1" || user.Email != "legacy@example.com" || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
 		t.Fatalf("user = %#v", user)
 	}
-	if user.EmailVerified == nil || !*user.EmailVerified {
+	if !user.EmailVerified {
 		t.Fatalf("EmailVerified = %#v, want true", user.EmailVerified)
 	}
 	if !user.ID.IsZero() {
@@ -56,7 +56,7 @@ func TestAccountUserFromIdentity(t *testing.T) {
 		Email:         "new@example.com",
 		EmailVerified: false,
 	})
-	if unverified.EmailVerified == nil || *unverified.EmailVerified {
+	if unverified.EmailVerified {
 		t.Fatalf("EmailVerified = %#v, want false", unverified.EmailVerified)
 	}
 }

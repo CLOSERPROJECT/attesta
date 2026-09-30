@@ -11,7 +11,7 @@ type fakeIdentityStore struct {
 	// respectEmailVerified keeps GetCurrentUser EmailVerified as the callback
 	// returned it. When false (default), successful GetCurrentUser results are
 	// forced verified so authenticated app-flow fixtures that omit EmailVerified
-	// still pass AllowsAppAccess after accountUserFromIdentity.
+	// still pass AllowsAppAccess. Set true when a fixture must stay unverified.
 	respectEmailVerified bool
 
 	createAccountFunc                       func(ctx context.Context, email, password, name string) (IdentityUser, error)

@@ -17,19 +17,16 @@ func TestEmailVerifiedSuccessMessage(t *testing.T) {
 
 func TestEmailVerificationAllowsAppAccess(t *testing.T) {
 	ev := NewEmailVerification(&fakeIdentityStore{})
-	verified := true
-	unverified := false
 
 	cases := []struct {
 		name string
 		user AccountUser
 		want bool
 	}{
-		{name: "platform admin unverified", user: AccountUser{IsPlatformAdmin: true, EmailVerified: &unverified}, want: true},
-		{name: "platform admin nil email verified", user: AccountUser{IsPlatformAdmin: true}, want: true},
-		{name: "verified", user: AccountUser{EmailVerified: &verified}, want: true},
-		{name: "unverified", user: AccountUser{EmailVerified: &unverified}, want: false},
-		{name: "nil email verified denies access", user: AccountUser{}, want: false},
+		{name: "platform admin unverified", user: AccountUser{IsPlatformAdmin: true, EmailVerified: false}, want: true},
+		{name: "platform admin default", user: AccountUser{IsPlatformAdmin: true}, want: true},
+		{name: "verified", user: AccountUser{EmailVerified: true}, want: true},
+		{name: "unverified", user: AccountUser{EmailVerified: false}, want: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-func boolPtr(v bool) *bool { return &v }
-
 func emailVerificationTemplates() *template.Template {
 	return template.Must(template.New("verify-test").Parse(`
 {{define "layout.html"}}{{if eq .Body "verify_email_body"}}{{template "verify_email_body" .}}{{else if eq .Body "home_picker_body"}}HOME{{end}}{{end}}
@@ -30,12 +28,12 @@ func emailVerificationTemplates() *template.Template {
 func TestEmailVerificationUnverifiedMyRedirectsToWaiting(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-unverified"
-	identity := testIdentityForSessions(now, map[string]AccountUser{
+	identity := testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 		sessionID: {
 			IdentityUserID: "user-1",
 			Email:          "unverified@example.com",
 			Status:         "active",
-			EmailVerified:  boolPtr(false),
+			EmailVerified:  false,
 		},
 	})
 	server := &Server{
@@ -63,12 +61,12 @@ func TestEmailVerificationUnverifiedMyRedirectsToWaiting(t *testing.T) {
 func TestEmailVerificationWaitingPathRenders(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-waiting"
-	identity := testIdentityForSessions(now, map[string]AccountUser{
+	identity := testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 		sessionID: {
 			IdentityUserID: "user-1",
 			Email:          "waiting@example.com",
 			Status:         "active",
-			EmailVerified:  boolPtr(false),
+			EmailVerified:  false,
 		},
 	})
 	server := &Server{
@@ -99,12 +97,12 @@ func TestEmailVerificationWaitingPathRenders(t *testing.T) {
 func TestEmailVerificationWaitingPathRendersResendCooldown(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-waiting-cooldown"
-	identity := testIdentityForSessions(now, map[string]AccountUser{
+	identity := testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 		sessionID: {
 			IdentityUserID: "user-1",
 			Email:          "waiting@example.com",
 			Status:         "active",
-			EmailVerified:  boolPtr(false),
+			EmailVerified:  false,
 		},
 	})
 	server := &Server{
@@ -229,7 +227,7 @@ func TestEmailVerificationWaitingAlreadyVerifiedRedirects(t *testing.T) {
 				IdentityUserID: "user-1",
 				Email:          "verified@example.com",
 				Status:         "active",
-				EmailVerified:  boolPtr(true),
+				EmailVerified:  true,
 			},
 			wantLoc: onboardingPath(),
 		},
@@ -240,7 +238,7 @@ func TestEmailVerificationWaitingAlreadyVerifiedRedirects(t *testing.T) {
 				Email:          "member@example.com",
 				OrgSlug:        "acme",
 				Status:         "active",
-				EmailVerified:  boolPtr(true),
+				EmailVerified:  true,
 			},
 			wantLoc: appHomePath,
 		},
@@ -273,12 +271,12 @@ func TestEmailVerificationWaitingResendSuccess(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-resend-ok"
 	startCalled := false
-	identity := testIdentityForSessions(now, map[string]AccountUser{
+	identity := testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 		sessionID: {
 			IdentityUserID: "user-1",
 			Email:          "waiting@example.com",
 			Status:         "active",
-			EmailVerified:  boolPtr(false),
+			EmailVerified:  false,
 		},
 	})
 	identity.createEmailVerificationFunc = func(_ context.Context, sessionSecret, redirectURL string) error {
@@ -333,12 +331,12 @@ func TestEmailVerificationWaitingResendCooldown(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-resend-wait"
 	startCalled := false
-	identity := testIdentityForSessions(now, map[string]AccountUser{
+	identity := testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 		sessionID: {
 			IdentityUserID: "user-1",
 			Email:          "waiting@example.com",
 			Status:         "active",
-			EmailVerified:  boolPtr(false),
+			EmailVerified:  false,
 		},
 	})
 	identity.createEmailVerificationFunc = func(context.Context, string, string) error {
@@ -378,12 +376,12 @@ func TestEmailVerificationWaitingResendCooldown(t *testing.T) {
 func TestEmailVerificationWaitingResendFailure(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-resend-fail"
-	identity := testIdentityForSessions(now, map[string]AccountUser{
+	identity := testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 		sessionID: {
 			IdentityUserID: "user-1",
 			Email:          "waiting@example.com",
 			Status:         "active",
-			EmailVerified:  boolPtr(false),
+			EmailVerified:  false,
 		},
 	})
 	identity.createEmailVerificationFunc = func(context.Context, string, string) error {
@@ -416,12 +414,12 @@ func TestEmailVerificationWaitingMethodNotAllowed(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-method"
 	server := &Server{
-		identity: testIdentityForSessions(now, map[string]AccountUser{
+		identity: testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 			sessionID: {
 				IdentityUserID: "user-1",
 				Email:          "waiting@example.com",
 				Status:         "active",
-				EmailVerified:  boolPtr(false),
+				EmailVerified:  false,
 			},
 		}),
 		store:       NewMemoryStore(),
@@ -442,12 +440,12 @@ func TestEmailVerificationWaitingGETShowsNoticeAndCooldown(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-notice"
 	server := &Server{
-		identity: testIdentityForSessions(now, map[string]AccountUser{
+		identity: testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 			sessionID: {
 				IdentityUserID: "user-1",
 				Email:          "waiting@example.com",
 				Status:         "active",
-				EmailVerified:  boolPtr(false),
+				EmailVerified:  false,
 			},
 		}),
 		store:       NewMemoryStore(),
@@ -501,12 +499,12 @@ func TestEmailVerificationConfirmFailurePaths(t *testing.T) {
 	t.Run("logged in failure goes to waiting", func(t *testing.T) {
 		sessionID := "session-fail-logged-in"
 		server := &Server{
-			identity: testIdentityForSessions(now, map[string]AccountUser{
+			identity: testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 				sessionID: {
 					IdentityUserID: "user-1",
 					Email:          "waiting@example.com",
 					Status:         "active",
-					EmailVerified:  boolPtr(false),
+					EmailVerified:  false,
 				},
 			}),
 			store:       NewMemoryStore(),
@@ -575,7 +573,7 @@ func TestEmailVerificationConfirmFailurePaths(t *testing.T) {
 
 func TestDenyIfUnverifiedPost(t *testing.T) {
 	server := &Server{identity: &fakeIdentityStore{}, enforceAuth: true}
-	unverified := AccountUser{Email: "u@example.com", EmailVerified: boolPtr(false)}
+	unverified := AccountUser{Email: "u@example.com", EmailVerified: false}
 	rec := httptest.NewRecorder()
 	if !server.denyIfUnverifiedPost(rec, unverified) {
 		t.Fatal("expected deny for unverified user")
@@ -584,7 +582,7 @@ func TestDenyIfUnverifiedPost(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 
-	verified := AccountUser{Email: "v@example.com", EmailVerified: boolPtr(true)}
+	verified := AccountUser{Email: "v@example.com", EmailVerified: true}
 	recOK := httptest.NewRecorder()
 	if server.denyIfUnverifiedPost(recOK, verified) {
 		t.Fatal("did not expect deny for verified user")
@@ -595,12 +593,12 @@ func TestRequireVerifiedPostDeniesUnverified(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-post-deny"
 	server := &Server{
-		identity: testIdentityForSessions(now, map[string]AccountUser{
+		identity: testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 			sessionID: {
 				IdentityUserID: "user-1",
 				Email:          "waiting@example.com",
 				Status:         "active",
-				EmailVerified:  boolPtr(false),
+				EmailVerified:  false,
 			},
 		}),
 		store:       NewMemoryStore(),
@@ -625,10 +623,10 @@ func TestNestedMyHandlersGateUnverifiedInIsolation(t *testing.T) {
 		IdentityUserID: "user-1",
 		Email:          "waiting@example.com",
 		Status:         "active",
-		EmailVerified:  boolPtr(false),
+		EmailVerified:  false,
 	}
 	server := &Server{
-		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: unverified}),
+		identity:    testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{sessionID: unverified}),
 		store:       NewMemoryStore(),
 		tmpl:        emailVerificationTemplates(),
 		enforceAuth: true,
@@ -699,8 +697,6 @@ func TestEmailVerificationResendTooSoonEdges(t *testing.T) {
 
 func TestVerifiedLandingPath(t *testing.T) {
 	server := &Server{store: NewMemoryStore()}
-	verified := true
-	unverified := false
 
 	cases := []struct {
 		name string
@@ -711,65 +707,65 @@ func TestVerifiedLandingPath(t *testing.T) {
 		{name: "nil user", user: nil, want: emailVerificationPath()},
 		{
 			name: "unverified goes verify",
-			user: &AccountUser{Email: "u@example.com", EmailVerified: &unverified},
+			user: &AccountUser{Email: "u@example.com", EmailVerified: false},
 			next: appHomePath,
 			want: emailVerificationPath(),
 		},
 		{
 			name: "unaffiliated empty next goes onboarding",
-			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			user: &AccountUser{Email: "u@example.com", EmailVerified: true},
 			want: onboardingPath(),
 		},
 		{
 			name: "unaffiliated app home goes onboarding",
-			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			user: &AccountUser{Email: "u@example.com", EmailVerified: true},
 			next: appHomePath,
 			want: onboardingPath(),
 		},
 		{
 			name: "unaffiliated app home slash goes onboarding",
-			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			user: &AccountUser{Email: "u@example.com", EmailVerified: true},
 			next: appHomePath + "/",
 			want: onboardingPath(),
 		},
 		{
 			name: "unaffiliated explicit next wins",
-			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			user: &AccountUser{Email: "u@example.com", EmailVerified: true},
 			next: "/my/streams/workflow/",
 			want: "/my/streams/workflow/",
 		},
 		{
 			name: "affiliated empty next goes home",
-			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: true},
 			want: appHomePath,
 		},
 		{
 			name: "affiliated app home stays home",
-			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: true},
 			next: appHomePath,
 			want: appHomePath,
 		},
 		{
 			name: "affiliated explicit next wins",
-			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: true},
 			next: "/admin/organizations",
 			want: "/admin/organizations",
 		},
 		{
 			name: "unsafe next unaffiliated goes onboarding",
-			user: &AccountUser{Email: "u@example.com", EmailVerified: &verified},
+			user: &AccountUser{Email: "u@example.com", EmailVerified: true},
 			next: "https://evil.example/",
 			want: onboardingPath(),
 		},
 		{
 			name: "unsafe next affiliated goes home",
-			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: &verified},
+			user: &AccountUser{Email: "m@example.com", OrgSlug: "acme", EmailVerified: true},
 			next: "https://evil.example/",
 			want: appHomePath,
 		},
 		{
 			name: "platform admin unverified unaffiliated goes onboarding",
-			user: &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true, EmailVerified: &unverified},
+			user: &AccountUser{Email: "admin@example.com", IsPlatformAdmin: true, EmailVerified: false},
 			want: onboardingPath(),
 		},
 	}
@@ -868,12 +864,12 @@ func TestEmailVerificationWaitingResendParseFormError(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	sessionID := "session-resend-parse"
 	server := &Server{
-		identity: testIdentityForSessions(now, map[string]AccountUser{
+		identity: testIdentityForSessionsRespectingEmailVerified(now, map[string]AccountUser{
 			sessionID: {
 				IdentityUserID: "user-1",
 				Email:          "waiting@example.com",
 				Status:         "active",
-				EmailVerified:  boolPtr(false),
+				EmailVerified:  false,
 			},
 		}),
 		store:       NewMemoryStore(),

@@ -98,9 +98,8 @@ type AccountUser struct {
 	CreatedAt       time.Time           `bson:"createdAt"`
 	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
 	// EmailVerified maps Appwrite email verification into AccountUser for the gate.
-	// Non-persisted; accountUserFromIdentity always sets a non-nil value from
-	// IdentityUser.EmailVerified. Nil is not treated as verified by AllowsAppAccess.
-	EmailVerified *bool `bson:"-"`
+	// Non-persisted; set from IdentityUser.EmailVerified by accountUserFromIdentity.
+	EmailVerified bool `bson:"-"`
 }
 
 type FormataBuilderStream struct {

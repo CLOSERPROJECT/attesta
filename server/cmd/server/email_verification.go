@@ -20,7 +20,7 @@ func (e *EmailVerification) AllowsAppAccess(user AccountUser) bool {
 	if user.IsPlatformAdmin {
 		return true
 	}
-	return user.EmailVerified != nil && *user.EmailVerified
+	return user.EmailVerified
 }
 
 // Start sends an Appwrite verification email for the current session.

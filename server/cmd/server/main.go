@@ -1400,14 +1400,13 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 	if identityUser.IsOrgAdmin {
 		roleSlugs = canonifyRoleSlugs(append(roleSlugs, "org-admin"))
 	}
-	emailVerified := identityUser.EmailVerified
 	user := &AccountUser{
 		IdentityUserID: strings.TrimSpace(identityUser.ID),
 		Email:          strings.TrimSpace(identityUser.Email),
 		OrgSlug:        strings.TrimSpace(identityUser.OrgSlug),
 		RoleSlugs:      roleSlugs,
 		Status:         strings.TrimSpace(identityUser.Status),
-		EmailVerified:  &emailVerified,
+		EmailVerified:  identityUser.EmailVerified,
 	}
 	if user.OrgSlug != "" {
 		orgID := stableOrgObjectID(user.OrgSlug)
