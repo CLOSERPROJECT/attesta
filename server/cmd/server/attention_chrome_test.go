@@ -507,7 +507,7 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 			"1.1": {State: "pending"},
 		},
 	})
-	instanceHref := streamInstancePath("workflow", processID.Hex())
+	instanceHref := streamInstanceSubstepPath("workflow", processID.Hex(), "1.1")
 
 	if _, err := store.InsertJoinRequest(context.Background(), JoinRequest{
 		RequesterUserID: "joiner-1",

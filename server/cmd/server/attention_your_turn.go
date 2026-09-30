@@ -56,7 +56,7 @@ func (s *Server) listYourTurnStreamAttention(ctx context.Context, user *AccountU
 				WorkflowName: strings.TrimSpace(cfg.Workflow.Name),
 				InstanceName: instanceName,
 				SubstepTitle: strings.TrimSpace(action.Title),
-				Href:         streamInstancePath(key, process.ID.Hex()),
+				Href:         streamInstanceSubstepPath(key, process.ID.Hex(), action.SubstepID),
 			})
 		}
 	}
