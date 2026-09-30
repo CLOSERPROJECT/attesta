@@ -19,7 +19,7 @@ docker compose \
 
 # Host .env / shell may already export Appwrite redirect URLs; clear them so
 # DOCKER_APP_PORT drives the containerized Attesta defaults under test.
-unset APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL COMPOSE_PROJECT_NAME
+unset APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL APPWRITE_VERIFY_REDIRECT_URL COMPOSE_PROJECT_NAME
 
 COMPOSE_PROJECT_NAME=label-test-a \
 ATTESTA_WORKTREE_ROOT="${tmpdir}/owned-worktree-a" \
@@ -91,6 +91,7 @@ node -e '
   assert(String(localA.services.attesta.ports[0].published) === "19030", "containerized Attesta port did not use DOCKER_APP_PORT");
   assert(localA.services.attesta.environment.APPWRITE_INVITE_REDIRECT_URL === "http://localhost:19030/invite/accept", "containerized invite redirect did not use DOCKER_APP_PORT");
   assert(localA.services.attesta.environment.APPWRITE_RESET_REDIRECT_URL === "http://localhost:19030/reset/confirm", "containerized reset redirect did not use DOCKER_APP_PORT");
+  assert(localA.services.attesta.environment.APPWRITE_VERIFY_REDIRECT_URL === "http://localhost:19030/verify/confirm", "containerized verify redirect did not use DOCKER_APP_PORT");
   assert(mounts(localA).includes("/seed/appwrite-seed.sql"), "local seed mount missing");
   assert(mounts(localA).includes("/seed/mariadb-init-preview-seed.sh"), "local seed hook mount missing");
   assert(!mounts(localA).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "local seed hook must not bind-mount into initdb.d");
@@ -129,8 +130,9 @@ if [[ -n "${DOCKER_ENV_FILE:-}" ]]; then
   printf '%s\n' "${ATTESTA_REPOSITORY_ID:-<unset>}" >>"${DOCKER_ENV_FILE}"
 fi
 if [[ -n "${DOCKER_REDIRECTS_FILE:-}" ]]; then
-  printf '%s|%s\n' "${APPWRITE_INVITE_REDIRECT_URL:-<unset>}" \
-    "${APPWRITE_RESET_REDIRECT_URL:-<unset>}" >>"${DOCKER_REDIRECTS_FILE}"
+  printf '%s|%s|%s\n' "${APPWRITE_INVITE_REDIRECT_URL:-<unset>}" \
+    "${APPWRITE_RESET_REDIRECT_URL:-<unset>}" \
+    "${APPWRITE_VERIFY_REDIRECT_URL:-<unset>}" >>"${DOCKER_REDIRECTS_FILE}"
 fi
 if [[ "$*" == volume\ ls\ --filter\ label=com.docker.compose.project=* ]]; then
   if [[ "${VOLUME_ENUMERATION_FAILURE:-0}" == "1" ]]; then
@@ -213,7 +215,7 @@ PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
 grep -q ' up -d --build .*attesta' "${tmpdir}/calls" \
   || fail "containerized start did not build and start the Attesta service"
 docker_app_port="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" print | awk -F= '$1 == "DOCKER_APP_PORT" { print $2 }')"
-expected_redirects="http://localhost:${docker_app_port}/invite/accept|http://localhost:${docker_app_port}/reset/confirm"
+expected_redirects="http://localhost:${docker_app_port}/invite/accept|http://localhost:${docker_app_port}/reset/confirm|http://localhost:${docker_app_port}/verify/confirm"
 if grep -Fvxq "${expected_redirects}" "${tmpdir}/container-redirects"; then
   fail "containerized start passed host-development redirects to Compose"
 fi

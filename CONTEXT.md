@@ -39,8 +39,8 @@ A Stream the current affiliated user may start a new Stream instance for: their 
 _Avoid_: Accessible stream, visible stream, can open dashboard, requiring every listed first-Substep role
 
 **Onboarding**:
-The unaffiliated-user surface at `/my/onboarding` to obtain an Affiliation: accept or decline Invitations, join an organization, request a new organization, or wait on / withdraw a pending request. Narrow reading-width layout. Distinct from Operator home; Invitation Attention items surface here.
-_Avoid_: Signup (account creation), registration wizard, folding Onboarding into `/my`
+The unaffiliated-user surface at `/my/onboarding` to obtain an Affiliation: accept or decline Invitations, join an organization, request a new organization, or wait on / withdraw a pending request. Only for verified users. Narrow reading-width layout. Distinct from Operator home; Invitation Attention items surface here.
+_Avoid_: Signup (account creation), registration wizard, folding Onboarding into `/my`, Email verification waiting path
 
 **Public stream card**:
 A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), live stream-instance metrics (total count plus active-or-completed activity, or that none exist yet), and participating **organizations**. Distinct UI from the authenticated stream-discovery card on Operator home. Not clickable in v1.
@@ -71,11 +71,19 @@ _Avoid_: Department, company, team (in domain docs — Appwrite may still say te
 ### Auth & affiliation
 
 **Registration**:
-Open self-serve account creation (email + password). A registered user may have zero organizations until a join or creation path completes.
+Open self-serve account creation (email + password). A registered user may have zero organizations until a join or creation path completes. Registration alone does not prove control of the email.
 _Avoid_: Closed signup, invite-only registration (as the product default)
 
+**Email verification**:
+Proof that a registered user controls their account email. A user is verified or unverified. Until verified, authenticated app use is limited to the **verification waiting path** (not Onboarding, Affiliation actions, or the stream picker). Registration starts unverified and needs an explicit verification step. Accepting an Invitation or completing password recovery also establishes verification for that email.
+_Avoid_: Confirmed account, activated, email confirmation (as the glossary name), conflating with Affiliation or Onboarding
+
+**Verification waiting path**:
+The authenticated-only screen for an unverified user after Registration (or login while still unverified). Shows the account email and allows resend of the verification message and logout; it is not Onboarding.
+_Avoid_: Onboarding, signup success page, confirm page (when meaning the email-link landing)
+
 **Invitation**:
-An Org-admin-initiated (or platform-admin-initiated) outbound membership offer to an email. The inviter may grant Org admin standing and/or one or more Organization roles — those are separate choices. Distinct from a Join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization. An open Invitation for the invitee is an Attention item until accepted or declined.
+An Org-admin-initiated (or platform-admin-initiated) outbound membership offer to an email. The inviter may grant Org admin standing and/or one or more Organization roles — those are separate choices. Distinct from a Join request. An invitee who already has an Affiliation may only accept (or be invited into) that same Organization. An open Invitation for the invitee is an Attention item until accepted or declined. Accepting an Invitation also establishes Email verification for that address.
 _Avoid_: Join request, membership request (when meaning outbound invite)
 
 **Attention item**:

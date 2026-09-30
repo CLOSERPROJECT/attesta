@@ -1009,6 +1009,75 @@ func TestAppwriteIdentityCreateAccountAndRecovery(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityCreateAndCompleteEmailVerification(t *testing.T) {
+	var createPath string
+	var createBody map[string]interface{}
+	var createSessionHeader string
+	var completePath string
+	var completeBody map[string]interface{}
+	var updatePath string
+	var updateBody map[string]interface{}
+	var updateKeyHeader string
+
+	appwriteAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/account/verifications/email":
+			createPath = r.URL.Path
+			createSessionHeader = r.Header.Get("X-Appwrite-Session")
+			if err := json.NewDecoder(r.Body).Decode(&createBody); err != nil {
+				t.Fatalf("decode create verification body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"userId":"user-1","secret":"secret-1"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/account/verifications/email":
+			completePath = r.URL.Path
+			if err := json.NewDecoder(r.Body).Decode(&completeBody); err != nil {
+				t.Fatalf("decode complete verification body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"userId":"user-1","secret":"secret-1"}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/users/user-1/verification":
+			updatePath = r.URL.Path
+			updateKeyHeader = r.Header.Get("X-Appwrite-Key")
+			if err := json.NewDecoder(r.Body).Decode(&updateBody); err != nil {
+				t.Fatalf("decode update verification body: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"$id":"user-1","email":"user@example.com","status":true,"emailVerification":true,"labels":[]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer appwriteAPI.Close()
+
+	identity := NewAppwriteIdentity(appwriteAPI.URL+"/v1", "project-1", "api-key-1", appwriteAPI.Client())
+
+	if err := identity.CreateEmailVerification(context.Background(), "session-secret", "http://attesta.local/verify"); err != nil {
+		t.Fatalf("CreateEmailVerification error: %v", err)
+	}
+	if createPath != "/v1/account/verifications/email" || createBody["url"] != "http://attesta.local/verify" {
+		t.Fatalf("create verification request = %q %#v", createPath, createBody)
+	}
+	if createSessionHeader != "session-secret" {
+		t.Fatalf("create verification session header = %q, want session-secret", createSessionHeader)
+	}
+
+	if err := identity.CompleteEmailVerification(context.Background(), "user-1", "secret-1"); err != nil {
+		t.Fatalf("CompleteEmailVerification error: %v", err)
+	}
+	if completePath != "/v1/account/verifications/email" || completeBody["userId"] != "user-1" || completeBody["secret"] != "secret-1" {
+		t.Fatalf("complete verification request = %q %#v", completePath, completeBody)
+	}
+
+	if err := identity.UpdateEmailVerification(context.Background(), "user-1", true); err != nil {
+		t.Fatalf("UpdateEmailVerification error: %v", err)
+	}
+	if updatePath != "/v1/users/user-1/verification" || updateBody["emailVerification"] != true {
+		t.Fatalf("update verification request = %q %#v", updatePath, updateBody)
+	}
+	if updateKeyHeader != "api-key-1" {
+		t.Fatalf("update verification key header = %q, want api-key-1", updateKeyHeader)
+	}
+}
+
 func TestAppwriteIdentityGetCurrentUserHydratesMembership(t *testing.T) {
 	var accountSessionHeader string
 	var membershipsKeyHeader string
@@ -1568,6 +1637,15 @@ func TestAppwriteIdentityMethodsRespectCanceledContext(t *testing.T) {
 	if err := identity.CompleteRecovery(ctx, "user-1", "secret-1", "password"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("CompleteRecovery error = %v, want %v", err, context.Canceled)
 	}
+	if err := identity.CreateEmailVerification(ctx, "session-secret", "http://attesta.local/verify"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateEmailVerification error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.CompleteEmailVerification(ctx, "user-1", "secret-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CompleteEmailVerification error = %v, want %v", err, context.Canceled)
+	}
+	if err := identity.UpdateEmailVerification(ctx, "user-1", true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UpdateEmailVerification error = %v, want %v", err, context.Canceled)
+	}
 	if err := identity.UpdateCurrentPassword(ctx, "session-secret", "password"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("UpdateCurrentPassword error = %v, want %v", err, context.Canceled)
 	}
@@ -1684,10 +1762,21 @@ func TestAppwriteIdentityHelperBranches(t *testing.T) {
 	})
 
 	t.Run("to identity user handles disabled account", func(t *testing.T) {
-		user := &models.User{Id: "user-1", Email: "user@example.com", Status: false}
+		user := &models.User{Id: "user-1", Email: "user@example.com", Status: false, EmailVerification: true}
 		got := toIdentityUser(user, nil)
 		if got.Status != "disabled" {
 			t.Fatalf("status = %q, want disabled", got.Status)
+		}
+		if !got.EmailVerified {
+			t.Fatalf("EmailVerified = false, want true")
+		}
+	})
+
+	t.Run("to identity user maps email verification", func(t *testing.T) {
+		user := &models.User{Id: "user-1", Email: "user@example.com", Status: true, EmailVerification: false}
+		got := toIdentityUser(user, nil)
+		if got.EmailVerified {
+			t.Fatalf("EmailVerified = true, want false")
 		}
 	})
 
@@ -1994,6 +2083,24 @@ func TestAppwriteIdentityCanceledContext(t *testing.T) {
 			},
 		},
 		{
+			name: "create email verification",
+			run: func() error {
+				return identity.CreateEmailVerification(ctx, "session-secret", "http://attesta.local/verify")
+			},
+		},
+		{
+			name: "complete email verification",
+			run: func() error {
+				return identity.CompleteEmailVerification(ctx, "user-1", "secret-1")
+			},
+		},
+		{
+			name: "update email verification",
+			run: func() error {
+				return identity.UpdateEmailVerification(ctx, "user-1", true)
+			},
+		},
+		{
 			name: "update current password",
 			run: func() error {
 				return identity.UpdateCurrentPassword(ctx, "session-secret", "password")
@@ -2177,6 +2284,15 @@ func TestAppwriteIdentityNormalizesUnauthorizedErrors(t *testing.T) {
 	}
 	if err := identity.CompleteRecovery(context.Background(), "user-1", "secret-1", "password"); !errors.Is(err, ErrIdentityUnauthorized) {
 		t.Fatalf("CompleteRecovery error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if err := identity.CreateEmailVerification(context.Background(), "session-secret", "http://attesta.local/verify"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("CreateEmailVerification error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if err := identity.CompleteEmailVerification(context.Background(), "user-1", "secret-1"); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("CompleteEmailVerification error = %v, want %v", err, ErrIdentityUnauthorized)
+	}
+	if err := identity.UpdateEmailVerification(context.Background(), "user-1", true); !errors.Is(err, ErrIdentityUnauthorized) {
+		t.Fatalf("UpdateEmailVerification error = %v, want %v", err, ErrIdentityUnauthorized)
 	}
 }
 

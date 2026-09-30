@@ -192,17 +192,21 @@ func identityUserFromAccountUser(user AccountUser) IdentityUser {
 		labels = append(labels, identityOrgAdminLabel)
 	}
 	return IdentityUser{
-		ID:         identityUserID,
-		Email:      strings.TrimSpace(user.Email),
-		OrgSlug:    orgSlug,
-		Labels:     labels,
-		IsOrgAdmin: isOrgAdmin,
-		Status:     strings.TrimSpace(user.Status),
+		ID:            identityUserID,
+		Email:         strings.TrimSpace(user.Email),
+		OrgSlug:       orgSlug,
+		Labels:        labels,
+		IsOrgAdmin:    isOrgAdmin,
+		Status:        strings.TrimSpace(user.Status),
+		EmailVerified: user.EmailVerified,
 	}
 }
 
 func testIdentityForSessions(now time.Time, sessions map[string]AccountUser) *fakeIdentityStore {
 	return &fakeIdentityStore{
+		// Default respectEmailVerified=false force-verifies GetCurrentUser so app-flow
+		// fixtures need not set AccountUser.EmailVerified. Tests that need unverified
+		// sessions use testIdentityForSessionsRespectingEmailVerified.
 		getSessionFunc: func(ctx context.Context, sessionSecret string) (IdentitySession, error) {
 			user, ok := sessions[strings.TrimSpace(sessionSecret)]
 			if !ok {
@@ -218,4 +222,12 @@ func testIdentityForSessions(now time.Time, sessions map[string]AccountUser) *fa
 			return identityUserFromAccountUser(user), nil
 		},
 	}
+}
+
+// testIdentityForSessionsRespectingEmailVerified honors AccountUser.EmailVerified
+// (including false) instead of force-verifying GetCurrentUser.
+func testIdentityForSessionsRespectingEmailVerified(now time.Time, sessions map[string]AccountUser) *fakeIdentityStore {
+	identity := testIdentityForSessions(now, sessions)
+	identity.respectEmailVerified = true
+	return identity
 }

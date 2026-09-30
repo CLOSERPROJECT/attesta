@@ -11,7 +11,7 @@ func (s *Server) handleLeaveOrganization(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	user, session, ok := s.requireAuthenticatedPost(w, r)
+	user, session, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}

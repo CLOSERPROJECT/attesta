@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -12,6 +13,59 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+func TestPopulateAttentionNilSafe(t *testing.T) {
+	var server *Server
+	server.populateAttention(&PageBase{}, &AccountUser{Email: "a@example.com"})
+	(&Server{}).populateAttention(nil, &AccountUser{Email: "a@example.com"})
+	(&Server{}).populateAttention(&PageBase{}, nil)
+}
+
+func TestPopulateAttentionSwallowsQueueErrors(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+	wantErr := errors.New("attention store down")
+
+	t.Run("platform admin org creation", func(t *testing.T) {
+		server := &Server{
+			identity:    &fakeIdentityStore{},
+			store:       &failingPendingOrgCreationStore{MemoryStore: NewMemoryStore(), err: wantErr},
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         time.Now,
+		}
+		pa := platformAdminAccountUser()
+		if pa == nil {
+			t.Fatal("expected platformAdminAccountUser")
+		}
+		base := &PageBase{}
+		server.populateAttention(base, pa)
+		if base.HasAttention || base.HasOrgCreationAttention {
+			t.Fatalf("error path must leave Attention unset: %+v", base)
+		}
+	})
+
+	t.Run("org admin join requests", func(t *testing.T) {
+		server := &Server{
+			identity:    &fakeIdentityStore{},
+			store:       &failingPendingJoinStore{MemoryStore: NewMemoryStore(), err: wantErr},
+			authorizer:  fakeAuthorizer{},
+			enforceAuth: true,
+			now:         time.Now,
+		}
+		base := &PageBase{}
+		server.populateAttention(base, &AccountUser{
+			IdentityUserID: "admin-1",
+			Email:          "admin@acme.example",
+			OrgSlug:        "acme",
+			RoleSlugs:      []string{"org-admin"},
+			Status:         "active",
+		})
+		if base.HasAttention || base.HasJoinRequestAttention {
+			t.Fatalf("error path must leave Attention unset: %+v", base)
+		}
+	})
+}
 
 func TestPageBaseForUserHasAttentionOpenInvitation(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)

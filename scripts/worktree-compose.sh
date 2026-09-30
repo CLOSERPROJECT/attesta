@@ -154,7 +154,8 @@ up_app() {
 
   APPWRITE_INVITE_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/invite/accept"
   APPWRITE_RESET_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/reset/confirm"
-  export APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL
+  APPWRITE_VERIFY_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/verify/confirm"
+  export APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL APPWRITE_VERIFY_REDIRECT_URL
 
   local services=()
   while IFS= read -r service; do

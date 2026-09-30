@@ -220,6 +220,19 @@ func TestHandlePublicCatalogAuthz(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 	})
+
+	t.Run("forbidden for unverified", func(t *testing.T) {
+		identity := catalogAuthIdentity(now, true)
+		identity.respectEmailVerified = true
+		server := catalogServer(now, identity)
+		req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
+		rec := httptest.NewRecorder()
+		server.handlePublicCatalog(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+		}
+	})
 }
 
 func TestHandlePublicCatalogStoreErrors(t *testing.T) {

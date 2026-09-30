@@ -32,6 +32,7 @@ type OnboardingHubView struct {
 	Invites            []OnboardingInviteView
 	InviteActionHref   string
 	FormError          string
+	Confirmation       string
 }
 
 type OnboardingInviteView struct {
@@ -92,7 +93,7 @@ func (s *Server) handleOnboardingRoutes(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) requireUnaffiliatedOnboarding(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return nil, false
 	}
@@ -200,6 +201,7 @@ func (s *Server) renderOnboardingHub(w http.ResponseWriter, r *http.Request, use
 		WithdrawActionHref: onboardingPath(),
 		InviteActionHref:   onboardingPath(),
 		FormError:          strings.TrimSpace(formError),
+		Confirmation:       emailVerifiedSuccessMessage(requestNotice(r)),
 	}
 	identityUser := identityUserForAffiliation(user)
 	aff := s.affiliationService()

@@ -228,6 +228,34 @@ func (a *appwriteIdentity) CompleteRecovery(ctx context.Context, userID, secret,
 	return normalizeIdentityError(err)
 }
 
+func (a *appwriteIdentity) CreateEmailVerification(ctx context.Context, sessionSecret, redirectURL string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sessionClient, err := cloneAppwriteClient(a.sessionClient, appwrite.WithSession(strings.TrimSpace(sessionSecret)))
+	if err != nil {
+		return err
+	}
+	_, err = account.New(sessionClient).CreateEmailVerification(strings.TrimSpace(redirectURL))
+	return normalizeIdentityError(err)
+}
+
+func (a *appwriteIdentity) CompleteEmailVerification(ctx context.Context, userID, secret string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := account.New(a.sessionClient).UpdateEmailVerification(strings.TrimSpace(userID), strings.TrimSpace(secret))
+	return normalizeIdentityError(err)
+}
+
+func (a *appwriteIdentity) UpdateEmailVerification(ctx context.Context, userID string, verified bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := users.New(a.adminClient).UpdateEmailVerification(strings.TrimSpace(userID), verified)
+	return normalizeIdentityError(err)
+}
+
 func (a *appwriteIdentity) UpdateCurrentPassword(ctx context.Context, sessionSecret, password string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -896,10 +924,11 @@ func toIdentitySession(session *models.Session, fallbackSecret string) (Identity
 func toIdentityUser(user *models.User, memberships []models.Membership) IdentityUser {
 	selected := selectPrimaryMembership(memberships)
 	identity := IdentityUser{
-		ID:     strings.TrimSpace(user.Id),
-		Email:  strings.TrimSpace(user.Email),
-		Labels: append([]string(nil), user.Labels...),
-		Status: "active",
+		ID:            strings.TrimSpace(user.Id),
+		Email:         strings.TrimSpace(user.Email),
+		Labels:        append([]string(nil), user.Labels...),
+		Status:        "active",
+		EmailVerified: user.EmailVerification,
 	}
 	identity.PasswordSet = strings.TrimSpace(user.PasswordUpdate) != ""
 	if !user.Status {

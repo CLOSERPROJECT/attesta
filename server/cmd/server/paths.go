@@ -11,6 +11,14 @@ func onboardingPath() string {
 	return "/my/onboarding"
 }
 
+func emailVerificationPath() string {
+	return "/verify"
+}
+
+func emailVerificationConfirmPath() string {
+	return "/verify/confirm"
+}
+
 func onboardingJoinPath() string {
 	return "/my/onboarding/join"
 }

@@ -97,6 +97,9 @@ type AccountUser struct {
 	IsPlatformAdmin bool                `bson:"isPlatformAdmin,omitempty"`
 	CreatedAt       time.Time           `bson:"createdAt"`
 	LastLoginAt     *time.Time          `bson:"lastLoginAt,omitempty"`
+	// EmailVerified maps Appwrite email verification into AccountUser for the gate.
+	// Non-persisted; set from IdentityUser.EmailVerified by accountUserFromIdentity.
+	EmailVerified bool `bson:"-"`
 }
 
 type FormataBuilderStream struct {

@@ -55,7 +55,7 @@ func (s *Server) handleOrganizationRoot(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}

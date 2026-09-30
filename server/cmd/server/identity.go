@@ -19,6 +19,9 @@ type IdentityStore interface {
 	CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error)
 	CreateRecovery(ctx context.Context, email, redirectURL string) error
 	CompleteRecovery(ctx context.Context, userID, secret, password string) error
+	CreateEmailVerification(ctx context.Context, sessionSecret, redirectURL string) error
+	CompleteEmailVerification(ctx context.Context, userID, secret string) error
+	UpdateEmailVerification(ctx context.Context, userID string, verified bool) error
 	UpdateCurrentPassword(ctx context.Context, sessionSecret, password string) error
 	GetSession(ctx context.Context, sessionSecret string) (IdentitySession, error)
 	DeleteSession(ctx context.Context, sessionSecret string) error
@@ -64,6 +67,7 @@ type IdentityUser struct {
 	MembershipRoles []string
 	Status          string
 	PasswordSet     bool
+	EmailVerified   bool
 }
 
 type IdentityOrg struct {

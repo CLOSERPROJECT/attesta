@@ -183,6 +183,17 @@ svg.bi {
   white-space: pre-line;
 }
 
+.confirmation-with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  white-space: normal;
+}
+
+.confirmation-with-icon .icon-svg {
+  flex-shrink: 0;
+}
+
 .warning {
   background: var(--warning-muted);
   color: var(--warning-muted-foreground);

@@ -61,6 +61,7 @@ fi
 export PORT VITE_PORT
 export APPWRITE_INVITE_REDIRECT_URL="http://localhost:${PORT}/invite/accept"
 export APPWRITE_RESET_REDIRECT_URL="http://localhost:${PORT}/reset/confirm"
+export APPWRITE_VERIFY_REDIRECT_URL="http://localhost:${PORT}/verify/confirm"
 export PUBLIC_BASE_URL="http://localhost:${PORT}"
 export VITE_DEV_SERVER="http://localhost:${VITE_PORT}"
 

@@ -291,6 +291,17 @@ func newLifecycleIdentityStore(founder AccountUser) *lifecycleIdentityStore {
 		}
 		return out, nil
 	}
+	s.updateEmailVerificationFunc = func(_ context.Context, userID string, verified bool) error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		u, ok := s.users[userID]
+		if !ok {
+			return nil
+		}
+		u.EmailVerified = verified
+		s.users[userID] = u
+		return nil
+	}
 	s.listOrganizationMembershipsFunc = func(_ context.Context, orgSlug string) ([]IdentityMembership, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()

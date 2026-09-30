@@ -148,6 +148,7 @@ type Server struct {
 	identity           IdentityStore
 	mailer             Mailer
 	affiliation        *Affiliation
+	emailVerification  *EmailVerification
 	tmpl               *template.Template
 	authorizer         Authorizer
 	sse                *SSEHub
@@ -421,6 +422,16 @@ type ResetSetView struct {
 	ActionPath  string
 	Title       string
 	SubmitLabel string
+}
+
+type VerifyEmailView struct {
+	PageBase
+	Email                  string
+	Error                  string
+	Confirmation           string
+	ResendDisabled         bool
+	ResendAvailableAt      int64
+	ResendRemainingSeconds int
 }
 
 type AboutView struct {
@@ -903,8 +914,15 @@ func shouldSecureCookie(r *http.Request) bool {
 }
 
 const (
-	noticePasswordResetSuccess = "password_reset_success"
-	noticeResetRequestSent     = "reset_request_sent"
+	noticePasswordResetSuccess      = "password_reset_success"
+	noticeResetRequestSent          = "reset_request_sent"
+	noticeVerificationFailed        = "verification_failed"
+	noticeVerificationSent          = "verification_sent"
+	noticeVerificationResendWait    = "verification_resend_wait"
+	noticeVerificationSendFailed    = "verification_send_failed"
+	noticeEmailVerified             = "email_verified"
+	emailVerificationResendCookie   = "attesta_verify_resend"
+	emailVerificationResendCooldown = 60 * time.Second
 )
 
 func clearCookie(w http.ResponseWriter, r *http.Request, name string) {
@@ -931,9 +949,42 @@ func loginNoticeMessage(code string) string {
 	switch strings.TrimSpace(code) {
 	case noticePasswordResetSuccess:
 		return "Password reset successfully. Now you can enter with your new credentials."
+	case noticeVerificationFailed:
+		return "That verification link is invalid or expired. Log in and request a new one."
 	default:
 		return ""
 	}
+}
+
+func emailVerificationNoticeMessage(code string) string {
+	switch strings.TrimSpace(code) {
+	case noticeVerificationSent:
+		return "Verification email sent. Check your inbox."
+	case noticeVerificationResendWait:
+		return "Please wait a minute before requesting another verification email."
+	case noticeVerificationSendFailed:
+		return "Unable to send verification email right now. Please try again."
+	case noticeVerificationFailed:
+		return "That verification link is invalid or expired. Request a new one."
+	default:
+		return ""
+	}
+}
+
+func emailVerifiedSuccessMessage(code string) string {
+	if strings.TrimSpace(code) == noticeEmailVerified {
+		return "Your email is verified."
+	}
+	return ""
+}
+
+func pathWithNotice(path, notice string) string {
+	path = strings.TrimSpace(path)
+	notice = strings.TrimSpace(notice)
+	if path == "" || notice == "" {
+		return path
+	}
+	return path + "?notice=" + url.QueryEscape(notice)
 }
 
 func resetRequestNoticeMessage(code string) string {
@@ -1283,6 +1334,30 @@ func (s *Server) requireAuthenticatedPage(w http.ResponseWriter, r *http.Request
 	return nil, nil, false
 }
 
+// redirectIfUnverifiedPage redirects authenticated users who may not leave the
+// verification waiting path. Returns true if a response was written.
+func (s *Server) redirectIfUnverifiedPage(w http.ResponseWriter, r *http.Request, user AccountUser) bool {
+	if s.emailVerificationService().AllowsAppAccess(user) {
+		return false
+	}
+	http.Redirect(w, r, emailVerificationPath(), http.StatusSeeOther)
+	return true
+}
+
+func (s *Server) requireVerifiedPage(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
+	user, session, ok := s.requireAuthenticatedPage(w, r)
+	if !ok {
+		return nil, nil, false
+	}
+	if !s.enforceAuth {
+		return user, session, true
+	}
+	if s.redirectIfUnverifiedPage(w, r, *user) {
+		return nil, nil, false
+	}
+	return user, session, true
+}
+
 func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
 	if !s.enforceAuth {
 		return &AccountUser{}, nil, true
@@ -1293,6 +1368,30 @@ func (s *Server) requireAuthenticatedPost(w http.ResponseWriter, r *http.Request
 	}
 	http.Error(w, "unauthorized", http.StatusUnauthorized)
 	return nil, nil, false
+}
+
+// denyIfUnverifiedPost rejects authenticated users who may not leave the
+// verification waiting path. Returns true if a response was written.
+func (s *Server) denyIfUnverifiedPost(w http.ResponseWriter, user AccountUser) bool {
+	if s.emailVerificationService().AllowsAppAccess(user) {
+		return false
+	}
+	http.Error(w, "email verification required", http.StatusForbidden)
+	return true
+}
+
+func (s *Server) requireVerifiedPost(w http.ResponseWriter, r *http.Request) (*AccountUser, *IdentitySession, bool) {
+	user, session, ok := s.requireAuthenticatedPost(w, r)
+	if !ok {
+		return nil, nil, false
+	}
+	if !s.enforceAuth {
+		return user, session, true
+	}
+	if s.denyIfUnverifiedPost(w, *user) {
+		return nil, nil, false
+	}
+	return user, session, true
 }
 
 func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser IdentityUser) *AccountUser {
@@ -1307,6 +1406,7 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		OrgSlug:        strings.TrimSpace(identityUser.OrgSlug),
 		RoleSlugs:      roleSlugs,
 		Status:         strings.TrimSpace(identityUser.Status),
+		EmailVerified:  identityUser.EmailVerified,
 	}
 	if user.OrgSlug != "" {
 		orgID := stableOrgObjectID(user.OrgSlug)
@@ -2147,13 +2247,15 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
-	if s.enforceAuth && !user.IsPlatformAdmin && !s.affiliationService().IsAffiliated(identityUserForAffiliation(user)) {
-		http.Redirect(w, r, onboardingPath(), http.StatusSeeOther)
-		return
+	if s.enforceAuth && !user.IsPlatformAdmin {
+		if landing := s.verifiedLandingPath(user, ""); landing != appHomePath {
+			http.Redirect(w, r, pathWithNotice(landing, requestNotice(r)), http.StatusSeeOther)
+			return
+		}
 	}
 	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), user)
 	if authErr != nil {
@@ -2185,13 +2287,16 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		Error:                      homePickerMessage(r, "error"),
 		Confirmation:               homePickerMessage(r, "confirmation"),
 	}
+	if msg := emailVerifiedSuccessMessage(requestNotice(r)); msg != "" {
+		view.Confirmation = msg
+	}
 	if err := s.tmpl.ExecuteTemplate(w, "home.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+	if _, _, ok := s.requireVerifiedPage(w, r); !ok {
 		return
 	}
 	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/my"), "/")
@@ -2360,7 +2465,7 @@ func (s *Server) handlePublicCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) requireCatalogAccessAPI(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return nil, false
 	}
@@ -2387,6 +2492,8 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
 	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/verify", s.handleEmailVerificationWaiting)
+	mux.HandleFunc("/verify/confirm", s.handleEmailVerificationConfirm)
 	mux.HandleFunc("/admin", s.handleAdminRoot)
 	mux.HandleFunc("/admin/{$}", s.handleAdminRoot)
 	mux.HandleFunc("/admin/organizations", s.handleAdminOrgs)
@@ -2547,7 +2654,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if s.enforceAuth {
-			if _, _, err := s.currentUser(r); err == nil {
+			if user, _, err := s.currentUser(r); err == nil {
+				if s.redirectIfUnverifiedPage(w, r, *user) {
+					return
+				}
 				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 				return
 			}
@@ -2637,9 +2747,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		redirectTarget := next
 		if identityUser, userErr := s.identity.GetCurrentUser(r.Context(), session.Secret); userErr == nil {
-			if !s.affiliationService().IsAffiliated(identityUser) && isAppHomePath(next) {
-				redirectTarget = onboardingPath()
-			}
+			redirectTarget = s.verifiedLandingPath(s.accountUserFromIdentity(r.Context(), identityUser), next)
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
@@ -2656,7 +2764,10 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if s.enforceAuth {
-			if _, _, err := s.currentUser(r); err == nil {
+			if user, _, err := s.currentUser(r); err == nil {
+				if s.redirectIfUnverifiedPage(w, r, *user) {
+					return
+				}
 				http.Redirect(w, r, appHomePath, http.StatusSeeOther)
 				return
 			}
@@ -2743,14 +2854,16 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to write signup session cookie for %s", email)
 			return
 		}
-		identityUser, err := s.identity.GetCurrentUser(r.Context(), session.Secret)
-		if err != nil {
+		if _, err := s.identity.GetCurrentUser(r.Context(), session.Secret); err != nil {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "signup failed", err, "failed to load signed up user %s", email)
 			return
 		}
-		redirectTarget := appHomePath
-		if !s.affiliationService().IsAffiliated(identityUser) {
-			redirectTarget = onboardingPath()
+		redirectTarget := emailVerificationPath()
+		if err := s.emailVerificationService().Start(r.Context(), session.Secret, verifyRedirectURL(r)); err != nil {
+			logRequestError(r, err, "failed to start email verification after signup for %s", email)
+			redirectTarget = emailVerificationPath() + "?notice=" + url.QueryEscape(noticeVerificationSendFailed)
+		} else {
+			s.setEmailVerificationResendCookie(w, r)
 		}
 		http.Redirect(w, r, redirectTarget, http.StatusSeeOther)
 		return
@@ -2838,15 +2951,15 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to accept invite", errors.New("missing invite session"), "invite accept missing session team=%s user=%s", teamID, userID)
 		return
 	}
+	established := s.establishMailboxProof(w, r, userID, mailboxProofInviteAccept, result.NeedsPassword)
+	if !established.OK {
+		return
+	}
 	if err := s.writeSessionCookie(w, r, result.Session); err != nil {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to login", err, "failed to write invite session cookie for user %s", userID)
 		return
 	}
-	if result.NeedsPassword {
-		http.Redirect(w, r, "/invite/password", http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
+	http.Redirect(w, r, established.RedirectPath, http.StatusSeeOther)
 }
 
 func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
@@ -2938,6 +3051,13 @@ func resetRedirectURL(r *http.Request) string {
 		return configured
 	}
 	return requestBaseURL(r) + "/reset/confirm"
+}
+
+func verifyRedirectURL(r *http.Request) string {
+	if configured := strings.TrimSpace(os.Getenv("APPWRITE_VERIFY_REDIRECT_URL")); configured != "" {
+		return configured
+	}
+	return requestBaseURL(r) + emailVerificationConfirmPath()
 }
 
 func inviteRedirectURL(r *http.Request) string {
@@ -3056,7 +3176,11 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to reset password", err, "failed to complete password recovery for user %s", userID)
 			return
 		}
-		http.Redirect(w, r, "/login?notice="+url.QueryEscape(noticePasswordResetSuccess), http.StatusSeeOther)
+		established := s.establishMailboxProof(w, r, userID, mailboxProofPasswordRecovery, false)
+		if !established.OK {
+			return
+		}
+		http.Redirect(w, r, established.RedirectPath, http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -3254,7 +3378,7 @@ func ensureOrgAdminRoleOption(roles []Role) []Role {
 }
 
 func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return nil, false
 	}
@@ -3275,7 +3399,7 @@ func (s *Server) requireOrgAdmin(w http.ResponseWriter, r *http.Request) (*Accou
 }
 
 func (s *Server) requirePlatformAdmin(w http.ResponseWriter, r *http.Request) (*AccountUser, bool) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return nil, false
 	}
@@ -4484,7 +4608,7 @@ func (s *Server) handleOrgAdminLogo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOrganizationLogo(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPage(w, r); !ok {
+	if _, _, ok := s.requireVerifiedPage(w, r); !ok {
 		return
 	}
 	if r.Method != http.MethodGet {
@@ -5235,7 +5359,7 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -5402,7 +5526,7 @@ func (s *Server) renderStreamDashboardResults(w http.ResponseWriter, view HomeVi
 }
 
 func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -5569,7 +5693,7 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -5880,7 +6004,7 @@ func dppProcessHasAttachment(def WorkflowDef, process *Process, attachmentID str
 }
 
 func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -6181,7 +6305,7 @@ func (s *Server) authorizeSubstepOverrideRequest(r *http.Request, user *AccountU
 }
 
 func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -6217,7 +6341,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleSaveSubstepOverride(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}
@@ -6296,7 +6420,7 @@ func decodeJSONObject(raw json.RawMessage) (map[string]interface{}, error) {
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}
@@ -6458,7 +6582,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 }
 
 func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}
@@ -6855,7 +6979,7 @@ func sanitizeAttachmentFilename(filename string) string {
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	if _, _, ok := s.requireAuthenticatedPost(w, r); !ok {
+	if _, _, ok := s.requireVerifiedPost(w, r); !ok {
 		return
 	}
 	workflowKey, cfg, err := s.selectedWorkflow(r)
@@ -8236,6 +8360,14 @@ func (s *Server) affiliationService() *Affiliation {
 	}
 	s.affiliation = NewAffiliation(s.identity, affStore, mailer, s.now, notifyEmails)
 	return s.affiliation
+}
+
+func (s *Server) emailVerificationService() *EmailVerification {
+	if s.emailVerification != nil {
+		return s.emailVerification
+	}
+	s.emailVerification = NewEmailVerification(s.identity)
+	return s.emailVerification
 }
 
 func (s *Server) renderActionErrorForRequest(w http.ResponseWriter, r *http.Request, status int, message string, process *Process, actor Actor) {

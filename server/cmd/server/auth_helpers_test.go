@@ -33,18 +33,31 @@ func TestAccountUserFromIdentity(t *testing.T) {
 	server := &Server{
 		authorizer: fakeAuthorizer{}}
 	user := server.accountUserFromIdentity(context.Background(), IdentityUser{
-		ID:         "user-1",
-		Email:      "legacy@example.com",
-		OrgSlug:    "acme",
-		Labels:     []string{encodeIdentityRoleLabel("qa-reviewer")},
-		IsOrgAdmin: false,
-		Status:     "pending",
+		ID:            "user-1",
+		Email:         "legacy@example.com",
+		OrgSlug:       "acme",
+		Labels:        []string{encodeIdentityRoleLabel("qa-reviewer")},
+		IsOrgAdmin:    false,
+		Status:        "pending",
+		EmailVerified: true,
 	})
 	if user.IdentityUserID != "user-1" || user.Email != "legacy@example.com" || user.OrgSlug != "acme" || len(user.RoleSlugs) != 1 || user.RoleSlugs[0] != "qa-reviewer" || user.Status != "pending" {
 		t.Fatalf("user = %#v", user)
 	}
+	if !user.EmailVerified {
+		t.Fatalf("EmailVerified = %#v, want true", user.EmailVerified)
+	}
 	if !user.ID.IsZero() {
 		t.Fatalf("user ID = %s, want zero value for Appwrite-backed account", user.ID.Hex())
+	}
+
+	unverified := server.accountUserFromIdentity(context.Background(), IdentityUser{
+		ID:            "user-2",
+		Email:         "new@example.com",
+		EmailVerified: false,
+	})
+	if unverified.EmailVerified {
+		t.Fatalf("EmailVerified = %#v, want false", unverified.EmailVerified)
 	}
 }
 
@@ -124,6 +137,9 @@ func TestRequestURLsAndCookieHelpers(t *testing.T) {
 	if got := resetRedirectURL(req); got != "http://attesta.local/reset/confirm" {
 		t.Fatalf("resetRedirectURL = %q", got)
 	}
+	if got := verifyRedirectURL(req); got != "http://attesta.local/verify/confirm" {
+		t.Fatalf("verifyRedirectURL = %q", got)
+	}
 	if got := inviteRedirectURL(req); got != "http://attesta.local/invite/accept" {
 		t.Fatalf("inviteRedirectURL = %q", got)
 	}
@@ -131,6 +147,10 @@ func TestRequestURLsAndCookieHelpers(t *testing.T) {
 	t.Setenv("APPWRITE_RESET_REDIRECT_URL", "https://app.example/reset/confirm")
 	if got := resetRedirectURL(req); got != "https://app.example/reset/confirm" {
 		t.Fatalf("configured reset redirect = %q", got)
+	}
+	t.Setenv("APPWRITE_VERIFY_REDIRECT_URL", "https://app.example/verify/confirm")
+	if got := verifyRedirectURL(req); got != "https://app.example/verify/confirm" {
+		t.Fatalf("configured verify redirect = %q", got)
 	}
 	t.Setenv("APPWRITE_INVITE_REDIRECT_URL", "https://app.example/invite/accept")
 	if got := inviteRedirectURL(req); got != "https://app.example/invite/accept" {
