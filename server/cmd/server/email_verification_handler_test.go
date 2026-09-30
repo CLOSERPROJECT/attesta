@@ -618,6 +618,50 @@ func TestRequireVerifiedPostDeniesUnverified(t *testing.T) {
 	}
 }
 
+func TestNestedMyHandlersGateUnverifiedInIsolation(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-nested-gate"
+	unverified := AccountUser{
+		IdentityUserID: "user-1",
+		Email:          "waiting@example.com",
+		Status:         "active",
+		EmailVerified:  boolPtr(false),
+	}
+	server := &Server{
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: unverified}),
+		store:       NewMemoryStore(),
+		tmpl:        emailVerificationTemplates(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+		configProvider: func() (RuntimeConfig, error) {
+			return testRuntimeConfig(), nil
+		},
+	}
+
+	pageReq := httptest.NewRequest(http.MethodGet, "/streams/demo/", nil)
+	pageReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	pageReq = pageReq.WithContext(context.WithValue(pageReq.Context(), workflowContextKey{}, workflowContextValue{
+		Key: "demo",
+		Cfg: testRuntimeConfig(),
+	}))
+	pageRec := httptest.NewRecorder()
+	server.handleWorkflowHome(pageRec, pageReq)
+	if pageRec.Code != http.StatusSeeOther {
+		t.Fatalf("workflow home status = %d, want %d", pageRec.Code, http.StatusSeeOther)
+	}
+	if loc := pageRec.Header().Get("Location"); loc != emailVerificationPath() {
+		t.Fatalf("workflow home location = %q, want %s", loc, emailVerificationPath())
+	}
+
+	postReq := httptest.NewRequest(http.MethodPost, leaveOrganizationPath(), nil)
+	postReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	postRec := httptest.NewRecorder()
+	server.handleLeaveOrganization(postRec, postReq)
+	if postRec.Code != http.StatusForbidden {
+		t.Fatalf("leave org status = %d, want %d", postRec.Code, http.StatusForbidden)
+	}
+}
+
 func TestEmailVerificationResendTooSoonEdges(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	server := &Server{now: func() time.Time { return now }}

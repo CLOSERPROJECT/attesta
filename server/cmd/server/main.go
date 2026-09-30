@@ -5365,7 +5365,7 @@ func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -5532,7 +5532,7 @@ func (s *Server) renderStreamDashboardResults(w http.ResponseWriter, view HomeVi
 }
 
 func (s *Server) handleWorkflowHome(w http.ResponseWriter, r *http.Request) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -5699,7 +5699,7 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -6010,7 +6010,7 @@ func dppProcessHasAttachment(def WorkflowDef, process *Process, attachmentID str
 }
 
 func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -6311,7 +6311,7 @@ func (s *Server) authorizeSubstepOverrideRequest(r *http.Request, user *AccountU
 }
 
 func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPage(w, r)
+	user, _, ok := s.requireVerifiedPage(w, r)
 	if !ok {
 		return
 	}
@@ -6347,7 +6347,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleSaveSubstepOverride(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}
@@ -6426,7 +6426,7 @@ func decodeJSONObject(raw json.RawMessage) (map[string]interface{}, error) {
 }
 
 func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}
@@ -6588,7 +6588,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 }
 
 func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, processID string) {
-	user, _, ok := s.requireAuthenticatedPost(w, r)
+	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
 		return
 	}
