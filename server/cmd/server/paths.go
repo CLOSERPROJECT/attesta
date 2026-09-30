@@ -57,6 +57,23 @@ func streamInstancePath(key, instanceID string) string {
 	return streamPath(key) + "/instance/" + strings.TrimSpace(instanceID)
 }
 
+// substepHeadingID matches templates/components/substep_shell.html
+// (dots in SubstepID become dashes).
+func substepHeadingID(substepID string) string {
+	return "substep-" + strings.ReplaceAll(strings.TrimSpace(substepID), ".", "-") + "-heading"
+}
+
+// streamInstanceSubstepPath deep-links to a Substep: opens it via ?substep=
+// and scrolls via the heading fragment used in substep_shell.
+func streamInstanceSubstepPath(key, instanceID, substepID string) string {
+	base := streamInstancePath(key, instanceID)
+	substepID = strings.TrimSpace(substepID)
+	if substepID == "" {
+		return base
+	}
+	return base + "?substep=" + url.QueryEscape(substepID) + "#" + substepHeadingID(substepID)
+}
+
 // organizationPath joins /my/organization with rest.
 // rest may be "profile", "/roles", or "formata-builder?stream=x".
 func organizationPath(rest string) string {

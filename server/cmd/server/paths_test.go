@@ -14,6 +14,25 @@ func TestStreamInstancePath(t *testing.T) {
 	}
 }
 
+func TestSubstepHeadingID(t *testing.T) {
+	if got := substepHeadingID("1.1"); got != "substep-1-1-heading" {
+		t.Fatalf("substepHeadingID(1.1) = %q", got)
+	}
+	if got := substepHeadingID(" 2.10 "); got != "substep-2-10-heading" {
+		t.Fatalf("substepHeadingID(2.10) = %q", got)
+	}
+}
+
+func TestStreamInstanceSubstepPath(t *testing.T) {
+	want := "/my/streams/wf-a/instance/abc123?substep=1.1#substep-1-1-heading"
+	if got := streamInstanceSubstepPath("wf-a", "abc123", "1.1"); got != want {
+		t.Fatalf("streamInstanceSubstepPath = %q, want %q", got, want)
+	}
+	if got := streamInstanceSubstepPath("wf-a", "abc123", ""); got != "/my/streams/wf-a/instance/abc123" {
+		t.Fatalf("empty substep = %q", got)
+	}
+}
+
 func TestOrganizationPath(t *testing.T) {
 	cases := []struct {
 		rest string

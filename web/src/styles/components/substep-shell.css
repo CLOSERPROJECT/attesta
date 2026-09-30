@@ -101,6 +101,7 @@
 }
 
 .substep-title-heading {
+  scroll-margin-top: var(--space-12);
   font-size: var(--text-base);
   line-height: 1.2;
   font-weight: var(--font-medium);

@@ -430,6 +430,252 @@ func TestOperatorHomeJoinRequestAttentionBandAndResolve(t *testing.T) {
 	}
 }
 
+func TestPageBaseForUserHasAttentionYourTurnStream(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	store := NewMemoryStore()
+	store.SeedProcess(Process{
+		WorkflowKey: "workflow",
+		Name:        "Batch needing action",
+		Status:      processStatusActive,
+		CreatedAt:   now,
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "pending"},
+		},
+	})
+
+	server := &Server{
+		identity:    &fakeIdentityStore{},
+		store:       store,
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		configDir:   tempDir,
+		now:         func() time.Time { return now },
+	}
+
+	memberBase := server.pageBaseForUser(&AccountUser{
+		IdentityUserID: "member-1",
+		Email:          "member@org1.example",
+		OrgSlug:        "org1",
+		RoleSlugs:      []string{"dep1"},
+		Status:         "active",
+	}, "home_picker_body", "", "")
+	if !memberBase.HasAttention {
+		t.Fatal("affiliated Member with your-turn Stream must light HasAttention")
+	}
+
+	// Upcoming: another role's turn — Member with no matching role must not light.
+	otherBase := server.pageBaseForUser(&AccountUser{
+		IdentityUserID: "other-1",
+		Email:          "other@org1.example",
+		OrgSlug:        "org1",
+		RoleSlugs:      []string{"viewer"},
+		Status:         "active",
+	}, "home_picker_body", "", "")
+	if otherBase.HasAttention {
+		t.Fatal("Upcoming (no actionable Substep) must not light HasAttention")
+	}
+
+	pa := platformAdminAccountUser()
+	if pa == nil {
+		t.Fatal("expected platformAdminAccountUser")
+	}
+	paBase := server.pageBaseForUser(pa, "home_picker_body", "", "")
+	if paBase.HasAttention {
+		t.Fatal("platform admin must not get stream Attention on HasAttention")
+	}
+}
+
+func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-your-turn"
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+
+	store := NewMemoryStore()
+	processID := store.SeedProcess(Process{
+		WorkflowKey: "workflow",
+		Name:        "Batch needing action",
+		Status:      processStatusActive,
+		CreatedAt:   now,
+		Progress: map[string]ProcessStep{
+			"1.1": {State: "pending"},
+		},
+	})
+	instanceHref := streamInstanceSubstepPath("workflow", processID.Hex(), "1.1")
+
+	if _, err := store.InsertJoinRequest(context.Background(), JoinRequest{
+		RequesterUserID: "joiner-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "org1",
+		RoleSlugs:       []string{"dep1"},
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertJoinRequest: %v", err)
+	}
+
+	user := AccountUser{
+		IdentityUserID: "admin-1",
+		Email:          "admin@org1.example",
+		OrgSlug:        "org1",
+		RoleSlugs:      []string{"org-admin", "dep1"},
+		Status:         "active",
+	}
+	identity := testIdentityForSessions(now, map[string]AccountUser{sessionID: user})
+	identity.getOrganizationBySlugFunc = func(ctx context.Context, slug string) (*IdentityOrg, error) {
+		return &IdentityOrg{
+			ID: "team-1", Slug: "org1", Name: "Org 1",
+			Roles: []IdentityRole{{Slug: "dep1", Name: "Department 1"}},
+		}, nil
+	}
+
+	server := &Server{
+		identity:    identity,
+		store:       store,
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		configDir:   tempDir,
+		now:         func() time.Time { return now },
+	}
+
+	getHome := httptest.NewRequest(http.MethodGet, "/my", nil)
+	getHome.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	homeRec := httptest.NewRecorder()
+	server.handleHome(homeRec, getHome)
+	if homeRec.Code != http.StatusOK {
+		t.Fatalf("home status=%d body=%q", homeRec.Code, homeRec.Body.String())
+	}
+	homeBody := homeRec.Body.String()
+	for _, want := range []string{
+		`aria-label="Attention"`,
+		"Join requests",
+		"Your turn",
+		"Batch needing action",
+		instanceHref,
+		`attention-dot`,
+		`Dashboard (needs attention)`,
+	} {
+		if !strings.Contains(homeBody, want) {
+			t.Fatalf("expected %q on Operator home, got:\n%s", want, homeBody)
+		}
+	}
+	joinIdx := strings.Index(homeBody, "Join requests")
+	yourTurnIdx := strings.Index(homeBody, "Your turn")
+	chooseIdx := strings.Index(homeBody, "Choose a stream")
+	if joinIdx < 0 || yourTurnIdx < 0 || chooseIdx < 0 || !(joinIdx < yourTurnIdx && yourTurnIdx < chooseIdx) {
+		t.Fatalf("expected Join above Your turn above Choose a stream; join=%d yourTurn=%d choose=%d", joinIdx, yourTurnIdx, chooseIdx)
+	}
+
+	// Resolve your-turn by completing the actionable Substep (process becomes done).
+	doneAt := now
+	if err := store.UpdateProcessProgress(context.Background(), processID, "workflow", "1.1", ProcessStep{
+		State:  "done",
+		DoneAt: &doneAt,
+		Data:   map[string]interface{}{"status": "ok"},
+	}); err != nil {
+		t.Fatalf("UpdateProcessProgress: %v", err)
+	}
+	if err := store.UpdateProcessStatus(context.Background(), processID, "workflow", processStatusDone); err != nil {
+		t.Fatalf("UpdateProcessStatus: %v", err)
+	}
+
+	afterHome := httptest.NewRequest(http.MethodGet, "/my", nil)
+	afterHome.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	afterRec := httptest.NewRecorder()
+	server.handleHome(afterRec, afterHome)
+	if afterRec.Code != http.StatusOK {
+		t.Fatalf("after home status=%d", afterRec.Code)
+	}
+	afterBody := afterRec.Body.String()
+	if strings.Contains(afterBody, "Your turn") || strings.Contains(afterBody, "Batch needing action") {
+		t.Fatalf("expected your-turn band cleared after resolve, got:\n%s", afterBody)
+	}
+	// Join Attention remains — dots stay lit from Join alone.
+	if !strings.Contains(afterBody, "Join requests") || !strings.Contains(afterBody, `attention-dot`) {
+		t.Fatalf("Join Attention should remain after stream resolve, got:\n%s", afterBody)
+	}
+}
+
+func TestOperatorHomeYourTurnStreamAttentionEmptyOmitted(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	sessionID := "session-no-your-turn"
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	user := AccountUser{
+		IdentityUserID: "member-1",
+		Email:          "member@org1.example",
+		OrgSlug:        "org1",
+		RoleSlugs:      []string{"dep1"},
+		Status:         "active",
+	}
+	server := &Server{
+		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
+		store:       NewMemoryStore(),
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		configDir:   tempDir,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "Your turn") || strings.Contains(body, `aria-label="Attention"`) || strings.Contains(body, `attention-dot`) {
+		t.Fatalf("empty your-turn Attention band must be omitted, got:\n%s", body)
+	}
+}
+
+func TestPlatformAdminHomeOmitsStreamAttention(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+	store := NewMemoryStore()
+	store.SeedProcess(Process{
+		WorkflowKey: "workflow",
+		Name:        "Should not appear for PA",
+		Status:      processStatusActive,
+		CreatedAt:   now,
+		Progress:    map[string]ProcessStep{"1.1": {State: "pending"}},
+	})
+
+	server := &Server{
+		identity:    &fakeIdentityStore{},
+		store:       store,
+		tmpl:        parseTestTemplates(t),
+		authorizer:  fakeAuthorizer{},
+		enforceAuth: true,
+		configDir:   tempDir,
+		now:         func() time.Time { return now },
+	}
+	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleHome(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "Your turn") || strings.Contains(body, "Should not appear for PA") {
+		t.Fatalf("platform-admin /my must not show stream Attention, got:\n%s", body)
+	}
+}
+
 func TestOperatorHomeMemberNeverSeesJoinAttention(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	store := NewMemoryStore()
