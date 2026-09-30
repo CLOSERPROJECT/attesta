@@ -540,12 +540,24 @@ func identityUserForAffiliation(user *AccountUser) IdentityUser {
 	if user == nil {
 		return IdentityUser{}
 	}
+	labels := make([]string, 0, len(user.RoleSlugs))
+	for _, slug := range user.RoleSlugs {
+		slug = strings.TrimSpace(slug)
+		if slug == "" || slug == "org-admin" || slug == "org_admin" {
+			continue
+		}
+		if encoded := encodeIdentityRoleLabel(slug); encoded != "" {
+			labels = append(labels, encoded)
+		}
+	}
 	return IdentityUser{
 		ID:              firstNonEmpty(strings.TrimSpace(user.IdentityUserID), strings.TrimSpace(user.Email)),
 		Email:           strings.TrimSpace(user.Email),
 		OrgSlug:         strings.TrimSpace(user.OrgSlug),
+		Labels:          labels,
 		IsOrgAdmin:      userIsOrgAdmin(user),
 		IsPlatformAdmin: user.IsPlatformAdmin,
+		Status:          strings.TrimSpace(user.Status),
 	}
 }
 

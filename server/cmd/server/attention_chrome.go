@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Server) attentionService() *Attention {
-	return NewAttention(s.affiliationService())
+	return NewAttention(s.affiliationService()).WithYourTurnStreams(s)
 }
 
 func (s *Server) populateAttention(base *PageBase, user *AccountUser) {
@@ -18,6 +18,7 @@ func (s *Server) populateAttention(base *PageBase, user *AccountUser) {
 	attention := s.attentionService()
 
 	// Platform-admin Organization-creation Attention does not require an Appwrite user id.
+	// PA sessions stay org-creation-only — no stream Attention.
 	if user.IsPlatformAdmin {
 		items, err := attention.PendingOrganizationCreationRequests(context.Background(), identity)
 		if err != nil {
@@ -40,8 +41,14 @@ func (s *Server) populateAttention(base *PageBase, user *AccountUser) {
 			return
 		}
 		base.HasJoinRequestAttention = len(joins) > 0
-		// Affiliated Attention sources today: Join requests only (stream Attention lands later).
-		base.HasAttention = base.HasJoinRequestAttention
+		streams, streamErr := attention.PendingStreamActions(context.Background(), identity)
+		if streamErr != nil {
+			log.Printf("stream attention check failed for %s: %v", user.Email, streamErr)
+			// Join Attention still applies when the stream catalog is unavailable.
+			base.HasAttention = base.HasJoinRequestAttention
+			return
+		}
+		base.HasAttention = base.HasJoinRequestAttention || len(streams) > 0
 		return
 	}
 	has, err := attention.HasAttention(context.Background(), identity)

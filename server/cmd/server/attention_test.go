@@ -378,4 +378,172 @@ func TestAttentionHasAttentionPropagatesQueueErrors(t *testing.T) {
 			t.Fatalf("err=%v has=%v", err, has)
 		}
 	})
+
+	t.Run("your-turn streams", func(t *testing.T) {
+		aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), nil, time.Now, nil)
+		has, err := NewAttention(aff).WithYourTurnStreams(&stubYourTurnStreams{err: wantErr}).HasAttention(
+			ctx, IdentityUser{ID: "member-1", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("dep1")}},
+		)
+		if !errors.Is(err, wantErr) || has {
+			t.Fatalf("err=%v has=%v", err, has)
+		}
+	})
+}
+
+type stubYourTurnStreams struct {
+	items []StreamAttentionItem
+	err   error
+}
+
+func (s *stubYourTurnStreams) ListYourTurn(_ context.Context, _ *AccountUser) ([]StreamAttentionItem, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	return append([]StreamAttentionItem(nil), s.items...), nil
+}
+
+func TestAttentionPendingStreamActionsYourTurnForAffiliated(t *testing.T) {
+	ctx := context.Background()
+	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), nil, time.Now, nil)
+	item := StreamAttentionItem{
+		ProcessID:    "proc-1",
+		WorkflowKey:  "workflow",
+		WorkflowName: "Main workflow",
+		InstanceName: "Batch A",
+		SubstepTitle: "Input",
+		Href:         "/my/streams/workflow/instance/proc-1",
+	}
+	attention := NewAttention(aff).WithYourTurnStreams(&stubYourTurnStreams{items: []StreamAttentionItem{item}})
+
+	member := IdentityUser{ID: "member-1", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("dep1")}}
+	items, err := attention.PendingStreamActions(ctx, member)
+	if err != nil {
+		t.Fatalf("PendingStreamActions: %v", err)
+	}
+	if len(items) != 1 || items[0].ProcessID != "proc-1" || items[0].Href != item.Href {
+		t.Fatalf("PendingStreamActions = %+v", items)
+	}
+
+	has, err := attention.HasAttention(ctx, member)
+	if err != nil {
+		t.Fatalf("HasAttention: %v", err)
+	}
+	if !has {
+		t.Fatal("your-turn Stream instance must be Attention")
+	}
+}
+
+func TestAttentionPendingStreamActionsORsWithJoin(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore()
+	if _, err := store.InsertJoinRequest(ctx, JoinRequest{
+		RequesterUserID: "joiner-1",
+		RequesterEmail:  "joiner@example.com",
+		OrgSlug:         "acme",
+		RoleSlugs:       []string{"viewer"},
+		Status:          AffiliationStatusPending,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("InsertJoinRequest: %v", err)
+	}
+	attention := NewAttention(NewAffiliation(&fakeIdentityStore{}, store, nil, func() time.Time { return now }, nil)).
+		WithYourTurnStreams(&stubYourTurnStreams{})
+
+	has, err := attention.HasAttention(ctx, IdentityUser{ID: "admin-1", OrgSlug: "acme", IsOrgAdmin: true})
+	if err != nil {
+		t.Fatalf("HasAttention: %v", err)
+	}
+	if !has {
+		t.Fatal("Join Attention alone must still light HasAttention when stream source is empty")
+	}
+
+	attention = NewAttention(NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), nil, time.Now, nil)).
+		WithYourTurnStreams(&stubYourTurnStreams{items: []StreamAttentionItem{{ProcessID: "p1", Href: "/x"}}})
+	has, err = attention.HasAttention(ctx, IdentityUser{ID: "member-1", OrgSlug: "acme", Labels: []string{encodeIdentityRoleLabel("dep1")}})
+	if err != nil || !has {
+		t.Fatalf("stream-only Attention: has=%v err=%v", has, err)
+	}
+}
+
+func TestAttentionPendingStreamActionsExcludedCases(t *testing.T) {
+	ctx := context.Background()
+	item := StreamAttentionItem{ProcessID: "p1", Href: "/x"}
+	source := &stubYourTurnStreams{items: []StreamAttentionItem{item}}
+	aff := NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), nil, time.Now, nil)
+	attention := NewAttention(aff).WithYourTurnStreams(source)
+
+	t.Run("platform admin", func(t *testing.T) {
+		items, err := attention.PendingStreamActions(ctx, IdentityUser{
+			ID: "pa-1", Email: "admin@example.com", IsPlatformAdmin: true, OrgSlug: "acme",
+			Labels: []string{encodeIdentityRoleLabel("dep1")},
+		})
+		if err != nil || len(items) != 0 {
+			t.Fatalf("PA must not get stream Attention: items=%+v err=%v", items, err)
+		}
+		has, err := attention.HasAttention(ctx, IdentityUser{Email: "admin@example.com", IsPlatformAdmin: true})
+		if err != nil || has {
+			t.Fatalf("PA without org-creation queue: has=%v err=%v", has, err)
+		}
+	})
+
+	t.Run("unaffiliated", func(t *testing.T) {
+		items, err := attention.PendingStreamActions(ctx, IdentityUser{ID: "orphan-1", Labels: []string{encodeIdentityRoleLabel("dep1")}})
+		if err != nil || len(items) != 0 {
+			t.Fatalf("unaffiliated must not get stream Attention: items=%+v err=%v", items, err)
+		}
+	})
+
+	t.Run("waiting join does not count as stream", func(t *testing.T) {
+		now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		store := NewMemoryStore()
+		if _, err := store.InsertJoinRequest(ctx, JoinRequest{
+			RequesterUserID: "waiter-1",
+			RequesterEmail:  "waiter@example.com",
+			OrgSlug:         "acme",
+			RoleSlugs:       []string{"viewer"},
+			Status:          AffiliationStatusPending,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		}); err != nil {
+			t.Fatalf("InsertJoinRequest: %v", err)
+		}
+		waitingAttention := NewAttention(NewAffiliation(&fakeIdentityStore{
+			listUserMembershipsFunc: func(_ context.Context, _ string) ([]IdentityMembership, error) {
+				return nil, nil
+			},
+		}, store, nil, func() time.Time { return now }, nil)).WithYourTurnStreams(source)
+		has, err := waitingAttention.HasAttention(ctx, IdentityUser{ID: "waiter-1"})
+		if err != nil {
+			t.Fatalf("HasAttention: %v", err)
+		}
+		if has {
+			t.Fatal("Waiting must not light Attention even when a stream source is wired")
+		}
+		items, err := waitingAttention.PendingStreamActions(ctx, IdentityUser{ID: "waiter-1"})
+		if err != nil || len(items) != 0 {
+			t.Fatalf("Waiting user is unaffiliated: items=%+v err=%v", items, err)
+		}
+	})
+}
+
+func TestAttentionPendingStreamActionsNilSafe(t *testing.T) {
+	var attention *Attention
+	items, err := attention.PendingStreamActions(context.Background(), IdentityUser{ID: "u1", OrgSlug: "acme"})
+	if err != nil || items != nil {
+		t.Fatalf("nil Attention: items=%v err=%v", items, err)
+	}
+	items, err = NewAttention(nil).PendingStreamActions(context.Background(), IdentityUser{ID: "u1", OrgSlug: "acme"})
+	if err != nil || items != nil {
+		t.Fatalf("nil affiliation: items=%v err=%v", items, err)
+	}
+	items, err = NewAttention(NewAffiliation(&fakeIdentityStore{}, NewMemoryStore(), nil, time.Now, nil)).
+		PendingStreamActions(context.Background(), IdentityUser{ID: "u1", OrgSlug: "acme"})
+	if err != nil || items != nil {
+		t.Fatalf("nil stream source: items=%v err=%v", items, err)
+	}
 }
