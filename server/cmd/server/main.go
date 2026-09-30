@@ -2955,18 +2955,15 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to accept invite", errors.New("missing invite session"), "invite accept missing session team=%s user=%s", teamID, userID)
 		return
 	}
-	if err := s.emailVerificationService().EstablishFromMailboxProof(r.Context(), userID); err != nil {
-		logRequestError(r, err, "failed to establish email verification after invite accept for %s", userID)
+	established := s.establishMailboxProof(w, r, userID, mailboxProofInviteAccept, result.NeedsPassword)
+	if !established.OK {
+		return
 	}
 	if err := s.writeSessionCookie(w, r, result.Session); err != nil {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to login", err, "failed to write invite session cookie for user %s", userID)
 		return
 	}
-	if result.NeedsPassword {
-		http.Redirect(w, r, "/invite/password", http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, appHomePath, http.StatusSeeOther)
+	http.Redirect(w, r, established.RedirectPath, http.StatusSeeOther)
 }
 
 func (s *Server) handleInvitePassword(w http.ResponseWriter, r *http.Request) {
@@ -3183,10 +3180,11 @@ func (s *Server) handleResetConfirm(w http.ResponseWriter, r *http.Request) {
 			logAndHTTPError(w, r, http.StatusInternalServerError, "failed to reset password", err, "failed to complete password recovery for user %s", userID)
 			return
 		}
-		if err := s.emailVerificationService().EstablishFromMailboxProof(r.Context(), userID); err != nil {
-			logRequestError(r, err, "failed to establish email verification after password recovery for %s", userID)
+		established := s.establishMailboxProof(w, r, userID, mailboxProofPasswordRecovery, false)
+		if !established.OK {
+			return
 		}
-		http.Redirect(w, r, "/login?notice="+url.QueryEscape(noticePasswordResetSuccess), http.StatusSeeOther)
+		http.Redirect(w, r, established.RedirectPath, http.StatusSeeOther)
 		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

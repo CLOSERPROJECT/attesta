@@ -65,7 +65,69 @@ func (s *Server) handleEmailVerificationConfirm(w http.ResponseWriter, r *http.R
 		s.redirectEmailVerificationFailure(w, r)
 		return
 	}
-	http.Redirect(w, r, pathWithNotice(s.postVerificationAppPathForUserID(r, userID), noticeEmailVerified), http.StatusSeeOther)
+	http.Redirect(w, r, s.mailboxProofSuccessPath(r, mailboxProofConfirm, userID, false), http.StatusSeeOther)
+}
+
+// mailboxProofKind selects the post-establish (or post-complete) success destination.
+// Only confirm attaches noticeEmailVerified; invite accept and recovery do not.
+type mailboxProofKind int
+
+const (
+	mailboxProofConfirm mailboxProofKind = iota
+	mailboxProofInviteAccept
+	mailboxProofPasswordRecovery
+)
+
+// mailboxProofEstablish is the fail-closed HTTP outcome of EstablishFromMailboxProof
+// for invite accept and password recovery. When OK is false, an error response was
+// already written; callers must not continue onto success redirects or session write.
+type mailboxProofEstablish struct {
+	OK           bool
+	RedirectPath string
+}
+
+// establishMailboxProof calls EstablishFromMailboxProof and fail-closes on error
+// (HTTP 500). Soft-log-and-continue onto /my or login-as-verified is intentionally forbidden.
+func (s *Server) establishMailboxProof(w http.ResponseWriter, r *http.Request, userID string, kind mailboxProofKind, inviteNeedsPassword bool) mailboxProofEstablish {
+	action := mailboxProofAction(kind)
+	if err := s.emailVerificationService().EstablishFromMailboxProof(r.Context(), userID); err != nil {
+		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to verify email", err,
+			"failed to establish email verification after %s for %s", action, userID)
+		return mailboxProofEstablish{}
+	}
+	return mailboxProofEstablish{
+		OK:           true,
+		RedirectPath: s.mailboxProofSuccessPath(r, kind, userID, inviteNeedsPassword),
+	}
+}
+
+func mailboxProofAction(kind mailboxProofKind) string {
+	switch kind {
+	case mailboxProofInviteAccept:
+		return "invite accept"
+	case mailboxProofPasswordRecovery:
+		return "password recovery"
+	default:
+		return "mailbox proof"
+	}
+}
+
+// mailboxProofSuccessPath is the shared success destination after mailbox proof
+// establishes verification (invite/recovery) or after confirm Completes.
+func (s *Server) mailboxProofSuccessPath(r *http.Request, kind mailboxProofKind, userID string, inviteNeedsPassword bool) string {
+	switch kind {
+	case mailboxProofConfirm:
+		return pathWithNotice(s.postVerificationAppPathForUserID(r, userID), noticeEmailVerified)
+	case mailboxProofInviteAccept:
+		if inviteNeedsPassword {
+			return "/invite/password"
+		}
+		return appHomePath
+	case mailboxProofPasswordRecovery:
+		return pathWithNotice("/login", noticePasswordResetSuccess)
+	default:
+		return appHomePath
+	}
 }
 
 func emailVerificationConfirmParams(r *http.Request) (string, string) {

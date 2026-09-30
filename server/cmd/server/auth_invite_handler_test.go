@@ -15,6 +15,8 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 	var acceptedMembershipID string
 	var acceptedUserID string
 	var acceptedSecret string
+	var establishedUserID string
+	var establishedVerified bool
 	server := &Server{
 		identity: &fakeIdentityStore{
 			acceptInviteFunc: func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
@@ -26,6 +28,11 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 			},
 			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
 				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: true}, nil
+			},
+			updateEmailVerificationFunc: func(ctx context.Context, userID string, verified bool) error {
+				establishedUserID = userID
+				establishedVerified = verified
+				return nil
 			},
 		},
 		store: NewMemoryStore(),
@@ -49,10 +56,14 @@ func TestHandleInviteAcceptCreatesSessionCookie(t *testing.T) {
 	if acceptedTeamID != "acme" || acceptedMembershipID != "membership-1" || acceptedUserID != "user-1" || acceptedSecret != "secret-1" {
 		t.Fatalf("accepted params = %q/%q/%q/%q", acceptedTeamID, acceptedMembershipID, acceptedUserID, acceptedSecret)
 	}
+	if establishedUserID != "user-1" || !establishedVerified {
+		t.Fatalf("EstablishFromMailboxProof = %q/%v, want user-1/true", establishedUserID, establishedVerified)
+	}
 }
 
 func TestHandleInviteAcceptRedirectsToInvitePasswordWhenUnset(t *testing.T) {
 	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
+	establishCalled := false
 	server := &Server{
 		identity: &fakeIdentityStore{
 			acceptInviteFunc: func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
@@ -60,6 +71,10 @@ func TestHandleInviteAcceptRedirectsToInvitePasswordWhenUnset(t *testing.T) {
 			},
 			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
 				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: false}, nil
+			},
+			updateEmailVerificationFunc: func(ctx context.Context, userID string, verified bool) error {
+				establishCalled = true
+				return nil
 			},
 		},
 		store: NewMemoryStore(),
@@ -75,6 +90,45 @@ func TestHandleInviteAcceptRedirectsToInvitePasswordWhenUnset(t *testing.T) {
 	}
 	if rec.Header().Get("Location") != "/invite/password" {
 		t.Fatalf("location = %q, want /invite/password", rec.Header().Get("Location"))
+	}
+	if !establishCalled {
+		t.Fatal("expected EstablishFromMailboxProof to be called")
+	}
+}
+
+func TestHandleInviteAcceptEstablishFailureDoesNotRedirectHome(t *testing.T) {
+	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
+	server := &Server{
+		identity: &fakeIdentityStore{
+			acceptInviteFunc: func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
+				return fakeIdentitySession("invite-session", userID, now.Add(24*time.Hour)), nil
+			},
+			getCurrentUserFunc: func(ctx context.Context, sessionSecret string) (IdentityUser, error) {
+				return IdentityUser{ID: "user-1", Email: "invitee@example.com", PasswordSet: true}, nil
+			},
+			updateEmailVerificationFunc: func(ctx context.Context, userID string, verified bool) error {
+				return errors.New("establish boom")
+			},
+		},
+		store: NewMemoryStore(),
+		now:   time.Now,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/invite/accept?teamId=acme&membershipId=membership-1&userId=user-1&secret=secret-1", nil)
+	rec := httptest.NewRecorder()
+	server.handleInvite(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("location = %q, want no redirect to %s on establish failure", loc, appHomePath)
+	}
+	cookies := rec.Result().Cookies()
+	for _, c := range cookies {
+		if c.Name == "attesta_session" {
+			t.Fatalf("session cookie written on establish failure: %#v", c)
+		}
 	}
 }
 

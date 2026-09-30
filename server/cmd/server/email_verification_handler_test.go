@@ -717,6 +717,31 @@ func TestPostVerificationAppPathForUserIDFallback(t *testing.T) {
 	}
 }
 
+func TestMailboxProofSuccessPath(t *testing.T) {
+	server := &Server{
+		identity: &fakeIdentityStore{
+			getUserByIDFunc: func(_ context.Context, userID string) (IdentityUser, error) {
+				return IdentityUser{ID: userID, Email: "user@example.com"}, nil
+			},
+		},
+		store: NewMemoryStore(),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	if got := server.mailboxProofSuccessPath(req, mailboxProofConfirm, "user-1", false); got != pathWithNotice(onboardingPath(), noticeEmailVerified) {
+		t.Fatalf("confirm = %q", got)
+	}
+	if got := server.mailboxProofSuccessPath(req, mailboxProofInviteAccept, "user-1", false); got != appHomePath {
+		t.Fatalf("invite home = %q", got)
+	}
+	if got := server.mailboxProofSuccessPath(req, mailboxProofInviteAccept, "user-1", true); got != "/invite/password" {
+		t.Fatalf("invite password = %q", got)
+	}
+	if got := server.mailboxProofSuccessPath(req, mailboxProofPasswordRecovery, "user-1", false); got != pathWithNotice("/login", noticePasswordResetSuccess) {
+		t.Fatalf("recovery = %q", got)
+	}
+}
+
 func TestEmailVerificationWaitingUnauthenticatedRedirects(t *testing.T) {
 	server := &Server{
 		identity:    &fakeIdentityStore{},

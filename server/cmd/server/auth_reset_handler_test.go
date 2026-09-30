@@ -268,12 +268,19 @@ func TestHandleResetConfirmCompletesRecovery(t *testing.T) {
 	var completedUserID string
 	var completedSecret string
 	var completedPassword string
+	var establishedUserID string
+	var establishedVerified bool
 	server := &Server{
 		identity: &fakeIdentityStore{
 			completeRecoveryFunc: func(ctx context.Context, userID, secret, password string) error {
 				completedUserID = userID
 				completedSecret = secret
 				completedPassword = password
+				return nil
+			},
+			updateEmailVerificationFunc: func(ctx context.Context, userID string, verified bool) error {
+				establishedUserID = userID
+				establishedVerified = verified
 				return nil
 			},
 		},
@@ -294,6 +301,9 @@ func TestHandleResetConfirmCompletesRecovery(t *testing.T) {
 	}
 	if completedUserID != "user-1" || completedSecret != "secret-1" || completedPassword != "this-is-strong-enough" {
 		t.Fatalf("completed = %q/%q/%q", completedUserID, completedSecret, completedPassword)
+	}
+	if establishedUserID != "user-1" || !establishedVerified {
+		t.Fatalf("EstablishFromMailboxProof = %q/%v, want user-1/true", establishedUserID, establishedVerified)
 	}
 }
 
@@ -369,6 +379,31 @@ func TestHandleResetSetBranches(t *testing.T) {
 		server.handleResetSet(rec, req)
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("establish failure fails closed", func(t *testing.T) {
+		server := &Server{
+			identity: &fakeIdentityStore{
+				completeRecoveryFunc: func(ctx context.Context, userID, secret, password string) error {
+					return nil
+				},
+				updateEmailVerificationFunc: func(ctx context.Context, userID string, verified bool) error {
+					return errors.New("establish boom")
+				},
+			},
+			tmpl: resetTemplates(),
+			now:  time.Now,
+		}
+		req := httptest.NewRequest(http.MethodPost, "/reset/confirm?userId=user-1&secret=secret-1", strings.NewReader("password=this-is-strong-enough&confirm_password=this-is-strong-enough"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		server.handleResetSet(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+		if loc := rec.Header().Get("Location"); loc != "" {
+			t.Fatalf("location = %q, want no login redirect when Establish fails", loc)
 		}
 	})
 
