@@ -334,8 +334,11 @@ European Union nor the granting authority can be held responsible for them.
 
 ## 📖 More Documentation
 
+- [AGENTS.md](AGENTS.md) - agent behavior, title conventions, and guidance pointers.
+- [CONTEXT.md](CONTEXT.md) - product domain vocabulary.
 - [QUICKSTART.md](QUICKSTART.md) - step-by-step local setup.
 - [DOCKER.md](DOCKER.md) - Docker Compose, Coolify, and preview deployment notes.
-- [docs/architecture.md](docs/architecture.md) - system boundaries and source navigation.
+- [docs/architecture.md](docs/architecture.md) - system boundaries, ADRs, and source navigation.
 - [docs/untp.md](docs/untp.md) - Digital Product Passport and UNTP implementation.
 - [Taskfile.yml](Taskfile.yml) - available local commands.
+- GitHub issues - active and deferred work (see [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)).

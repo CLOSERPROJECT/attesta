@@ -5,7 +5,8 @@ bundle, persists process data in MongoDB/GridFS, uses Appwrite for identity and
 organization state, and asks Cerbos whether an actor may complete a substep.
 
 This is navigation, not a replacement for code, configuration, or active-work
-tracking. Read [`open-work.md`](open-work.md) for deferred changes.
+tracking. Unresolved work lives as GitHub issues (see
+[`agents/issue-tracker.md`](agents/issue-tracker.md)).
 
 ## Boundaries and source locations
 
@@ -27,6 +28,14 @@ The public homepage is `/`; authenticated application entry is `/my`; stream
 instances live under `/my/streams/:key/`. Platform administration begins at
 `/admin`. The handler registrations are authoritative for the complete route
 surface.
+
+## Decisions
+
+| Theme | ADR |
+|---|---|
+| Presentation-only stream edits keep instances | [`adr/0001-stream-presentation-edit-without-purge.md`](adr/0001-stream-presentation-edit-without-purge.md) |
+| Affiliation required before stream authoring | [`adr/0002-affiliation-gated-stream-authoring.md`](adr/0002-affiliation-gated-stream-authoring.md) |
+| Email verification gate after auth | [`adr/0003-email-verification-gate.md`](adr/0003-email-verification-gate.md) |
 
 ## Operational shape
 

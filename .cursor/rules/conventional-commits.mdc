@@ -1,0 +1,19 @@
+---
+description: Enforce Conventional Commits for commits, issues, and PR titles
+alwaysApply: true
+---
+
+# Conventional Commits
+
+Commits, issues, and pull-request titles use Conventional Commits:
+
+```text
+type(optional-scope): imperative summary
+```
+
+- Lowercase `type`. Typical types: `feat`, `fix`, `docs`, `refactor`, `test`,
+  `chore`, `ci`, `build`, `perf`.
+- Scope is optional and should reflect this repository (for example `ui`,
+  `dev`, `untp`), not a fixed global list.
+- Enforce this convention. Do not copy title style from recent `git log`.
+- Future-facing only: never rewrite Git history merely to conform.

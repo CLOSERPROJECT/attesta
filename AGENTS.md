@@ -8,6 +8,11 @@
   persistence.
 - Preserve unrelated work in a dirty tree. Do not commit, push, or change
   external systems unless asked.
+- **Titles:** commits, issues, and pull-request titles use
+  [Conventional Commits](https://www.conventionalcommits.org/):
+  `type(optional-scope): imperative summary` (lowercase type; typical types
+  `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, `build`, `perf`).
+  Enforce this convention; do not infer title style from recent `git log`.
 
 ## Source guidance
 
@@ -18,8 +23,12 @@
   [`DOCKER.md`](DOCKER.md); scripts and configuration remain the source of
   truth.
 - **Domain language:** for product terms, read [`CONTEXT.md`](CONTEXT.md).
-- **Open work:** for deferred design or migration work, read
-  [`docs/open-work.md`](docs/open-work.md).
+- **Active work:** unresolved design and implementable work live as GitHub
+  issues; use [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
+  when creating, updating, triaging, or wayfinding tickets.
+- **Domain exploration:** before codebase exploration that depends on glossary
+  or ADR vocabulary, read
+  [`docs/agents/domain.md`](docs/agents/domain.md).
 - **DPP/UNTP:** for Digital Link or credential behavior, read
   [`docs/untp.md`](docs/untp.md) and the implementation it names.
 - **Templates and CSS:** before changing `server/templates/` or
