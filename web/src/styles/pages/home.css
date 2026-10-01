@@ -9,7 +9,8 @@ html:has(.my-home) {
 
 .my-home-attention,
 .my-home-upcoming,
-.my-home-streams {
+.my-home-streams,
+.my-home-quick-actions {
   display: flex;
   flex-direction: column;
 
@@ -45,8 +46,14 @@ html:has(.my-home) {
 
 .my-home-attention .panel-heading p,
 .my-home-upcoming .panel-heading p,
+.my-home-quick-actions .panel-heading p,
 .my-home-section-heading p {
   text-wrap: pretty;
+}
+
+.my-home-quick-actions-list {
+  flex-wrap: wrap;
+  margin-bottom: 0;
 }
 
 .my-home-catalog-heading {

@@ -7,6 +7,8 @@
 {{ define "platform_admin_main" }}
   {{ if eq .ActivePanel "categories" }}
     {{ template "platform_admin_categories_panel" . }}
+  {{ else if eq .ActivePanel "streams" }}
+    {{ template "platform_admin_streams_panel" . }}
   {{ else }}
     <section class="panel-section">
       {{ if .PendingOrgCreationRequests }}
@@ -181,6 +183,32 @@
       </div>
     </dialog>
   {{ end }}
+{{ end }}
+
+{{ define "platform_admin_streams_panel" }}
+  <div id="platform-admin-streams" class="my-home">
+    <div class="panel-head-actions my-home-catalog-heading">
+      <div class="panel-heading">
+        <h2>Streams</h2>
+        <p>Browse and manage platform streams</p>
+      </div>
+      {{ if .ShowCreateStream }}
+        <div class="panel-actions">
+          <a class="btn btn-primary"
+             href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create a stream</a>
+        </div>
+      {{ end }}
+    </div>
+    {{ if .Groups }}
+      {{ template "my_home_catalog_body" . }}
+    {{ else }}
+      <div class="empty-state">
+        {{ template "icon-layers-2" . }}
+        <p class="empty-state-title">No streams available</p>
+        <p class="empty-state-hint">Create a stream to populate the platform catalog.</p>
+      </div>
+    {{ end }}
+  </div>
 {{ end }}
 
 {{ define "platform_admin_categories_panel" }}
