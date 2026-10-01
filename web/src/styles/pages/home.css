@@ -4,7 +4,7 @@ html:has(.my-home) {
 }
 
 .my-home.stack {
-  gap: var(--space-8);
+  gap: var(--space-12);
 }
 
 .my-home-attention,
@@ -49,6 +49,11 @@ html:has(.my-home) {
 
 .my-home-catalog-heading {
   width: 100%;
+  margin-bottom: 0;
+}
+
+/* panel-head-actions defaults to space-5; streams uses section gap like Upcoming. */
+.my-home-streams .panel-head-actions {
   margin-bottom: 0;
 }
 
