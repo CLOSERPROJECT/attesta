@@ -226,3 +226,69 @@ func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]M
 
 	return buildMyHomeStreamGroups(categories, cardsByKey, catalog, accessibleKeys), nil
 }
+
+// buildDiscoveryManagedCards turns catalog discovery rows into managed card views
+// (metrics + optional clone/edit/delete), preserving discovery order and Startable.
+func (s *Server) buildDiscoveryManagedCards(ctx context.Context, user *AccountUser, items []StreamDiscoveryItem) ([]ManagedPublicStreamCardView, error) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+	catalog, err := s.workflowCatalog()
+	if err != nil {
+		return nil, err
+	}
+	logoURLs := organizationLogoURLMap(ctx, s.identity)
+
+	canEditSavedStreams := false
+	if user != nil {
+		if allowed, err := s.canViewFormataBuilder(ctx, user); err == nil {
+			canEditSavedStreams = allowed
+		}
+	}
+
+	streamsByKey := map[string]FormataBuilderStream{}
+	if s.store != nil {
+		streams, listErr := s.store.ListFormataBuilderStreams(ctx)
+		if listErr != nil {
+			return nil, listErr
+		}
+		for _, stream := range streams {
+			if stream.ID.IsZero() {
+				continue
+			}
+			streamsByKey[stream.ID.Hex()] = stream
+		}
+	}
+
+	cards := make([]ManagedPublicStreamCardView, 0, len(items))
+	for _, item := range items {
+		cfg, ok := catalog[item.WorkflowKey]
+		if !ok {
+			continue
+		}
+		card, buildErr := s.buildPublicStreamCardView(ctx, item.WorkflowKey, cfg, logoURLs)
+		if buildErr != nil {
+			return nil, buildErr
+		}
+		href := strings.TrimSpace(item.Href)
+		if href == "" {
+			href = streamPath(item.WorkflowKey) + "/"
+		}
+		card.Href = href
+
+		managed := ManagedPublicStreamCardView{
+			Key:          item.WorkflowKey,
+			Card:         card,
+			EditAction:   organizationPath("formata-builder?stream=" + item.WorkflowKey),
+			DeleteAction: streamPath(item.WorkflowKey) + "/delete",
+			Startable:    item.Startable,
+			StartAction:  item.StartAction,
+		}
+		if stream, ok := streamsByKey[item.WorkflowKey]; ok {
+			hasProcesses := card.InstanceCount > 0
+			managed.CanClone, managed.CanEdit, managed.EditRequiresPurge, managed.CanDelete, managed.DeleteReason = s.streamManagementFlags(ctx, user, item.WorkflowKey, stream, hasProcesses, canEditSavedStreams)
+		}
+		cards = append(cards, managed)
+	}
+	return cards, nil
+}

@@ -786,6 +786,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 	tempDir := t.TempDir()
 	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "accessible.yaml"), "Accessible Stream", "string", "Visible to org1")
 	writeMyHomeCatalogOtherOrgWorkflow(t, filepath.Join(tempDir, "other-org.yaml"))
+	writeOrg2FirstThenOrg1WorkflowConfig(t, filepath.Join(tempDir, "participant.yaml"))
 
 	now := time.Now().UTC()
 	sessionID := "session-my-home-catalog"
@@ -817,33 +818,37 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `href="#cat-`) {
-		t.Fatalf("expected sidebar anchor hrefs, got %s", body)
-	}
-	if !strings.Contains(body, `id="cat-`) {
-		t.Fatalf("expected catalog section ids, got %s", body)
-	}
 	for _, want := range []string{
-		`nav-drawer-trigger`,
-		`id="my-home-category-sidebar"`,
-		`class="category-sidebar"`,
-		`class="my-home-catalog"`,
+		`class="my-home-discovery"`,
+		`aria-label="Streams"`,
+		`class="public-home-stream-grid"`,
 		"Accessible Stream",
 		`href="/my/streams/accessible/"`,
-		"Supply Chain",
-		"Procurement",
+		"public-stream-card-start",
+		`id="start-instance-accessible"`,
+		`action="/my/streams/accessible/instance/start"`,
+		"Org2-first workflow",
+		`href="/my/streams/participant/"`,
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q in home catalog, got: %s", want, body)
+			t.Fatalf("expected %q in affiliated discovery, got: %s", want, body)
 		}
+	}
+	if strings.Contains(body, `id="start-instance-participant"`) {
+		t.Fatalf("non-startable participant stream must not expose Start, got: %s", body)
 	}
 	for _, gone := range []string{
 		"Other Org Stream",
 		`href="/my/streams/other-org/"`,
 		`href="/streams/accessible"`,
+		`href="#cat-`,
+		`id="my-home-category-sidebar"`,
+		`class="category-sidebar"`,
+		`class="my-home-catalog"`,
+		`nav-drawer-trigger`,
 	} {
 		if strings.Contains(body, gone) {
-			t.Fatalf("did not expect %q in home catalog, got: %s", gone, body)
+			t.Fatalf("did not expect %q in affiliated discovery, got: %s", gone, body)
 		}
 	}
 
@@ -878,9 +883,53 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 			`class="page-header-actions"`,
 			`href="/my/organization/formata-builder?new=true"`,
 			"Create a stream",
+			`class="my-home-discovery"`,
 		} {
 			if !strings.Contains(adminBody, want) {
 				t.Fatalf("expected %q in org admin home, got: %s", want, adminBody)
+			}
+		}
+	})
+
+	t.Run("platform admin keeps category catalog", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		paServer := &Server{
+			authorizer:  fakeAuthorizer{},
+			store:       store,
+			identity:    &fakeIdentityStore{},
+			tmpl:        parseTestTemplates(t),
+			configDir:   tempDir,
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		paReq := httptest.NewRequest(http.MethodGet, "/my", nil)
+		paReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		paRec := httptest.NewRecorder()
+		paServer.handleHome(paRec, paReq)
+		if paRec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", paRec.Code, http.StatusOK)
+		}
+		paBody := paRec.Body.String()
+		for _, want := range []string{
+			`id="my-home-category-sidebar"`,
+			`class="category-sidebar"`,
+			`class="my-home-catalog"`,
+			`href="#cat-`,
+			"Accessible Stream",
+			"Supply Chain",
+			"Procurement",
+		} {
+			if !strings.Contains(paBody, want) {
+				t.Fatalf("expected %q in PA catalog, got: %s", want, paBody)
+			}
+		}
+		for _, gone := range []string{
+			`class="my-home-discovery"`,
+			"public-stream-card-start",
+		} {
+			if strings.Contains(paBody, gone) {
+				t.Fatalf("PA must not use affiliated discovery stack, got %q in: %s", gone, paBody)
 			}
 		}
 	})
@@ -1121,8 +1170,8 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "PICK GROUPS 1") {
-		t.Fatalf("expected uncategorized group marker, got %q", body)
+	if !strings.Contains(body, "PICK DISCOVERY 2") {
+		t.Fatalf("expected discovery stream count, got %q", body)
 	}
 	if !strings.Contains(body, "workflow:Main workflow:Main workflow description:instances=") || !strings.Contains(body, "secondary:Secondary workflow:instances=") {
 		t.Fatalf("expected accessible workflow cards in picker, got %q", body)
@@ -1268,10 +1317,13 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
-	if !strings.Contains(body, `class="my-home-catalog"`) ||
+	if !strings.Contains(body, `class="my-home-discovery"`) ||
 		!strings.Contains(body, `class="public-home-stream-grid"`) ||
 		!strings.Contains(body, `class="public-stream-card"`) {
-		t.Fatalf("expected public stream card grid markup, got %q", body)
+		t.Fatalf("expected discovery stream card grid markup, got %q", body)
+	}
+	if strings.Contains(body, `class="my-home-catalog"`) || strings.Contains(body, `id="my-home-category-sidebar"`) {
+		t.Fatalf("affiliated home must not render category catalog, got %q", body)
 	}
 	if !strings.Contains(body, `href="/my/streams/workflow/"`) {
 		t.Fatalf("expected scoped workflow href for workflow key, got %q", body)
@@ -1970,14 +2022,20 @@ func TestSortHomeProcessListByStatus(t *testing.T) {
 
 func TestHandleHomeErrorPaths(t *testing.T) {
 	t.Run("workflow options error", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
 		server := &Server{
-			authorizer: fakeAuthorizer{},
-			tmpl:       homePickerTemplates(),
-			configDir:  t.TempDir(),
-			store:      NewMemoryStore(),
+			authorizer:  fakeAuthorizer{},
+			tmpl:        homePickerTemplates(),
+			configDir:   t.TempDir(),
+			store:       NewMemoryStore(),
+			identity:    &fakeIdentityStore{},
+			enforceAuth: true,
+			now:         func() time.Time { return time.Now().UTC() },
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/my", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -2354,7 +2412,7 @@ PROCESSES {{range .Processes}}{{.ID}}:{{.Name}}:{{.Status}}:{{.Percent}}|{{end}}
 func homePickerTemplates() *template.Template {
 	return template.Must(template.New("test").Parse(`
 {{define "layout.html"}}{{template "home_picker_body" .}}{{end}}
-{{define "home_picker_body"}}PICK GROUPS {{len .Groups}}{{if .ShowCreateStream}} CREATE{{end}} {{range .Groups}}{{range .Streams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{end}}{{end}}
+{{define "home_picker_body"}}{{if .DiscoveryStreams}}PICK DISCOVERY {{len .DiscoveryStreams}}{{else}}PICK GROUPS {{len .Groups}}{{end}}{{if .ShowCreateStream}} CREATE{{end}} {{range .DiscoveryStreams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{range .Groups}}{{range .Streams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{end}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
 `))
 }

@@ -4,6 +4,7 @@
  * .public-stream-card-shell
  *   details.public-stream-card-menu > summary.public-stream-card-menu-trigger
  *     + .public-stream-card-dropdown > .public-stream-card-menu-item[+modifiers]
+ *   button.public-stream-card-start (optional Startable control)
  *   a.public-stream-card | article.public-stream-card
  *   .public-stream-card-header
  *     h3.public-stream-card-title
@@ -17,10 +18,18 @@
  *     .public-stream-card-orgs
  *       .public-stream-card-orgs-head > strong + span.public-stream-card-orgs-count
  *       .public-stream-card-avatars > img | span.public-stream-card-avatar | span.public-stream-card-avatar-more
+ *   dialog#start-instance-{key} (optional Startable New-instance dialog)
  */
 
 .public-stream-card-shell {
   position: relative;
+}
+
+.public-stream-card-start {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 10;
 }
 
 .public-stream-card-menu {

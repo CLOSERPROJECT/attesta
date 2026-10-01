@@ -194,7 +194,19 @@
       </p>
     {{ end }}
     {{ template "error_banner.html" . }}
-    {{ if .Groups }}
+    {{ if .DiscoveryStreams }}
+      <section class="my-home-discovery" aria-label="Streams">
+        <div class="panel-heading">
+          <h2>Streams</h2>
+          <p>Streams your organization participates in</p>
+        </div>
+        <div class="public-home-stream-grid">
+          {{ range .DiscoveryStreams }}
+            {{ template "managed_public_stream_card" . }}
+          {{ end }}
+        </div>
+      </section>
+    {{ else if .Groups }}
       <div class="my-home-body">
         <div id="my-home-category-sidebar"
              class="nav-drawer-panel my-home-sidebar"

@@ -4,7 +4,8 @@ html:has(.my-home) {
 }
 
 .my-home-attention,
-.my-home-upcoming {
+.my-home-upcoming,
+.my-home-discovery {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -12,13 +13,20 @@ html:has(.my-home) {
   border-bottom: 1px solid var(--border);
 }
 
+.my-home-discovery {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .my-home-attention .panel-heading,
-.my-home-upcoming .panel-heading {
+.my-home-upcoming .panel-heading,
+.my-home-discovery .panel-heading {
   margin-bottom: 0;
 }
 
 .my-home-attention .panel-heading p,
-.my-home-upcoming .panel-heading p {
+.my-home-upcoming .panel-heading p,
+.my-home-discovery .panel-heading p {
   text-wrap: pretty;
 }
 
