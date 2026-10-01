@@ -12,7 +12,8 @@ html:has(.my-home) {
 .my-home-streams {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  /* Match default .panel-heading margin-bottom (title → body). */
+  gap: var(--space-6);
 }
 
 .my-home-rule {
