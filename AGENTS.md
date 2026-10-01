@@ -47,7 +47,9 @@
   ignored `.env.worktree`; later manual edits are preserved. Compose project
   names are path-qualified for every checkout (primary, linked, or independent
   clone). Pre-worktree `deployment_*` volumes need a one-time
-  `COMPOSE_PROJECT_NAME=deployment` in the primary `.env.worktree`. Use
+  `COMPOSE_PROJECT_NAME=deployment` in the primary `.env.worktree`. Unlabeled
+  legacy volumes in that project are copied onto labeled replacements on the
+  next start (Docker cannot retag a volume in place). Use
   `scripts/worktree-compose.sh` (normally through Taskfile tasks); stop/reset/purge
   must remain scoped to the current checkout.
 - Parallel worktrees keep one point-in-time, all-or-nothing bundle of MongoDB

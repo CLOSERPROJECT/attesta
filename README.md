@@ -193,8 +193,10 @@ Worktrunk removal runs a non-interactive `pre-remove` hook that deletes the work
 Codex can remove managed worktrees without that hook; use the checked-in purge action before archiving, or run `task worktree:gc` from an active checkout to preview orphaned Attesta Docker resources, then `task worktree:gc:apply` to remove them.
 Garbage collection is scoped to this repository clone and ignores foreign or unlabeled legacy resources.
 Reset and purge enumerate every volume in the current Compose project and refuse deletion unless all ownership labels match the current checkout.
-Volumes preserved from the legacy `deployment` project are intentionally unlabeled, so reset and purge refuse them too.
-To discard those after migration, first inspect the exact list with `docker volume ls --filter label=com.docker.compose.project=deployment`, then remove only the confirmed legacy volume names explicitly; the next start creates fully labeled replacements.
+Volumes preserved from the legacy `deployment` project start unlabeled because Docker cannot add labels in place.
+The next `task start` / `task dev` copies each unlabeled volume onto a same-named labeled replacement (data preserved) so Compose stops prompting to recreate them.
+After that migration, reset and purge can manage those volumes normally.
+To discard legacy data instead, inspect with `docker volume ls --filter label=com.docker.compose.project=deployment`, remove the confirmed volume names, then start again for fresh labeled volumes.
 
 **[🔝 back to top](#toc)**
 

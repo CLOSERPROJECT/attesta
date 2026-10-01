@@ -18,6 +18,8 @@ Commands:
   stop          Stop this worktree's infrastructure containers
   down          Remove this worktree's containers and networks; keep volumes
   down-v        Remove this worktree's containers, networks, and volumes
+  relabel-volumes
+                Copy legacy unlabeled volumes onto labeled replacements
   ps            Show this worktree's Compose status
   logs          Follow this worktree's Compose logs
   mongo-ping    Ping this worktree's MongoDB service
@@ -131,6 +133,7 @@ up() {
     echo "error: Compose configuration contains no infrastructure services" >&2
     exit 1
   }
+  bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes
   bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
   if [[ "${build}" -eq 1 ]]; then
     compose up -d --build "${services[@]}"
@@ -165,6 +168,7 @@ up_app() {
     echo "error: Compose configuration contains no services" >&2
     exit 1
   }
+  bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes
   bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
   if [[ "${build}" -eq 1 ]]; then
     compose up -d --build "${services[@]}"
@@ -193,6 +197,7 @@ main() {
       verify_volume_ownership
       compose down -v --remove-orphans
       ;;
+    relabel-volumes) bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes ;;
     ps) compose ps ;;
     logs) compose logs -f ;;
     mongo-ping) compose exec -T mongodb mongosh --quiet --eval "db.adminCommand('ping')" ;;

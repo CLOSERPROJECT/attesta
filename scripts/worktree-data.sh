@@ -33,6 +33,9 @@ RESTORE_CREATED_VOLUMES=()
 RESTORE_TOUCHED_REUSED_VOLUMES=()
 RESTORE_COMPLETE=0
 RESTORE_MARIADB_MAY_EXIST=0
+RELABEL_SAFETY_DIR=""
+RELABEL_MIGRATED=0
+RELABEL_TOTAL=0
 
 usage() {
   cat <<'USAGE'
@@ -41,6 +44,7 @@ Usage: scripts/worktree-data.sh <command>
 Commands:
   snapshot-primary  Capture one immutable, coherent snapshot from the primary checkout
   restore           Restore the bundle only into a new, stopped worktree stack
+  relabel-volumes   Copy legacy unlabeled volumes onto replacements owned by this checkout
   sanitize          Remove copied Appwrite sessions, certificates, and routing rules
   forget            Delete this checkout's saved snapshot bundle
 USAGE
@@ -496,20 +500,150 @@ remove_orphan_target_state() {
   done
 }
 
+volume_ownership() {
+  local volume="$1"
+  docker volume inspect \
+    --format '{{ index .Labels "eu.forkbomb.attesta.managed" }}|{{ index .Labels "eu.forkbomb.attesta.project" }}|{{ index .Labels "eu.forkbomb.attesta.worktree" }}|{{ index .Labels "eu.forkbomb.attesta.repository" }}' \
+    "${volume}"
+}
+
+expected_volume_ownership() {
+  local project="$1"
+  local physical_root="$2"
+  local repository="$3"
+  printf 'true|%s|%s|%s' "${project}" "${physical_root}" "${repository}"
+}
+
 validate_existing_volume_ownership() {
   local volume="$1"
   local project="$2"
   local physical_root="$3"
   local repository="$4"
   local ownership
-  if ! ownership="$(docker volume inspect \
-    --format '{{ index .Labels "eu.forkbomb.attesta.managed" }}|{{ index .Labels "eu.forkbomb.attesta.project" }}|{{ index .Labels "eu.forkbomb.attesta.worktree" }}|{{ index .Labels "eu.forkbomb.attesta.repository" }}' \
-    "${volume}")"; then
+  if ! ownership="$(volume_ownership "${volume}")"; then
     fail "could not verify ownership of pre-existing volume ${volume}"
   fi
-  if [[ "${ownership}" != "true|${project}|${physical_root}|${repository}" ]]; then
+  if [[ "${ownership}" != "$(expected_volume_ownership "${project}" "${physical_root}" "${repository}")" ]]; then
     fail "pre-existing volume ${volume} is not owned by this worktree"
   fi
+}
+
+# Docker cannot change labels on an existing local volume. Legacy pre-worktree
+# volumes keep a stale compose config-hash without Attesta ownership labels, so
+# Compose prompts to recreate them (and wipe data) on every up. Copy onto a
+# same-named replacement that carries the ownership labels; Compose accepts an
+# empty config-hash and stops prompting.
+relabel_volumes() {
+  command -v docker >/dev/null 2>&1 \
+    || fail "Docker is required to relabel Compose volumes"
+
+  local project
+  if ! project="$(compose_project "${ROOT_DIR}")"; then
+    fail "could not resolve the target Compose project"
+  fi
+  local repository
+  if ! repository="$(repository_identity "${ROOT_DIR}")"; then
+    fail "could not resolve the repository identity for ${ROOT_DIR}"
+  fi
+  local physical_root
+  physical_root="$(cd "${ROOT_DIR}" && pwd -P)"
+  local expected
+  expected="$(expected_volume_ownership "${project}" "${physical_root}" "${repository}")"
+
+  local running_services=()
+  local running_output
+  if ! running_output="$(compose_for_root "${ROOT_DIR}" ps --status running --services)"; then
+    fail "could not determine the target Compose running services"
+  fi
+  while IFS= read -r service; do
+    [[ -n "${service}" ]] && running_services+=("${service}")
+  done <<<"${running_output}"
+  if [[ "${#running_services[@]}" -gt 0 ]]; then
+    fail "relabel-volumes requires a stopped Compose stack (running: ${running_services[*]})"
+  fi
+
+  local logicals=()
+  local logical_output
+  if ! logical_output="$(compose_for_root "${ROOT_DIR}" config --volumes)"; then
+    fail "could not list Compose volumes for ${project}"
+  fi
+  while IFS= read -r logical; do
+    [[ -n "${logical}" ]] && logicals+=("${logical}")
+  done <<<"${logical_output}"
+  [[ ${#logicals[@]} -gt 0 ]] || return 0
+
+  local logical resolved ownership
+  local to_relabel=()
+  local to_relabel_logicals=()
+  for logical in "${logicals[@]}"; do
+    if ! resolved="$(volume_name "${project}" "${logical}")"; then
+      fail "could not inspect Compose volume ${logical}"
+    fi
+    [[ -n "${resolved}" ]] || continue
+    if ! ownership="$(volume_ownership "${resolved}")"; then
+      fail "could not inspect ownership of volume ${resolved}"
+    fi
+    if [[ "${ownership}" == "${expected}" ]]; then
+      continue
+    fi
+    # Empty ownership is the legacy pre-worktree case. Any other mismatch means
+    # another checkout owns the volume; never steal it.
+    if [[ "${ownership}" != "|||" ]]; then
+      fail "volume ${resolved} has ownership ${ownership}; expected ${expected} or unlabeled legacy volumes"
+    fi
+    to_relabel+=("${resolved}")
+    to_relabel_logicals+=("${logical}")
+  done
+  [[ ${#to_relabel[@]} -gt 0 ]] || return 0
+
+  RELABEL_SAFETY_DIR=""
+  RELABEL_MIGRATED=0
+  RELABEL_TOTAL=${#to_relabel[@]}
+  local index=0
+  cleanup_relabel() {
+    # Keep rollback paths at script scope; Ubuntu Bash can unwind function locals
+    # before EXIT traps after a fatal command.
+    if [[ "${RELABEL_MIGRATED}" -lt "${RELABEL_TOTAL}" && -n "${RELABEL_SAFETY_DIR}" && -d "${RELABEL_SAFETY_DIR}" ]]; then
+      echo "error: volume relabel incomplete; preserved archives in ${RELABEL_SAFETY_DIR}" >&2
+      return 0
+    fi
+    if [[ -n "${RELABEL_SAFETY_DIR}" && -d "${RELABEL_SAFETY_DIR}" ]]; then
+      rm -rf -- "${RELABEL_SAFETY_DIR}"
+    fi
+  }
+  trap cleanup_relabel EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+
+  mkdir -p "${DATA_DIR}"
+  RELABEL_SAFETY_DIR="$(mktemp -d "${DATA_DIR}/relabel-volumes.XXXXXX")"
+
+  echo "relabeling ${#to_relabel[@]} legacy Compose volume(s) for ${project}"
+  for index in "${!to_relabel[@]}"; do
+    resolved="${to_relabel[$index]}"
+    logical="${to_relabel_logicals[$index]}"
+    echo "  ${resolved}"
+    archive_volume "${resolved}" "${RELABEL_SAFETY_DIR}/${logical}.tar.gz"
+    docker volume rm "${resolved}" >/dev/null \
+      || fail "could not remove unlabeled volume ${resolved} (is anything still using it?)"
+    docker volume create \
+      --label "com.docker.compose.project=${project}" \
+      --label "com.docker.compose.volume=${logical}" \
+      --label "eu.forkbomb.attesta.managed=true" \
+      --label "eu.forkbomb.attesta.worktree=${physical_root}" \
+      --label "eu.forkbomb.attesta.project=${project}" \
+      --label "eu.forkbomb.attesta.repository=${repository}" \
+      "${resolved}" >/dev/null \
+      || fail "could not create labeled replacement for ${resolved}; archive is at ${RELABEL_SAFETY_DIR}/${logical}.tar.gz"
+    extract_volume "${RELABEL_SAFETY_DIR}/${logical}.tar.gz" "${resolved}"
+    RELABEL_MIGRATED=$((RELABEL_MIGRATED + 1))
+  done
+
+  rm -rf -- "${RELABEL_SAFETY_DIR}"
+  RELABEL_SAFETY_DIR=""
+  trap - EXIT INT TERM HUP
+  echo "relabeled ${RELABEL_MIGRATED} Compose volume(s)"
 }
 
 wait_for_mariadb() {
@@ -692,6 +826,10 @@ main() {
     restore)
       require_compose_version
       restore_snapshot
+      ;;
+    relabel-volumes)
+      require_compose_version
+      relabel_volumes
       ;;
     sanitize)
       require_compose_version

@@ -112,8 +112,9 @@ task worktree:gc:apply
 Cleanup only considers resources carrying this clone's repository identity and the exact worktree owner.
 Foreign-clone and unlabeled legacy resources are skipped.
 `task reset` and `task purge` inspect every volume in the current Compose project and fail closed if any ownership label is missing or different.
-That includes preserved volumes from the legacy `deployment` project because Docker cannot add labels to an existing volume.
-To intentionally discard those after migration, inspect them with `docker volume ls --filter label=com.docker.compose.project=deployment` and remove only the confirmed legacy volume names explicitly; the next start creates labeled replacements.
+That includes preserved volumes from the legacy `deployment` project until the next start copies them onto labeled replacements (Docker cannot add labels to an existing volume).
+`task start` / `task dev` run that copy automatically for unlabeled legacy volumes in the current Compose project.
+To discard legacy data instead, inspect with `docker volume ls --filter label=com.docker.compose.project=deployment` and remove only the confirmed legacy volume names; the next start creates labeled replacements.
 
 ## Coolify
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in

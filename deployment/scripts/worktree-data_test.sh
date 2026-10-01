@@ -177,6 +177,16 @@ case " $* " in
       rmdir "${FAKE_SNAPSHOT_GUARD_DIR}" 2>/dev/null || true
     fi
     ;;
+  *" config --volumes "*)
+    if [[ -n "${FAKE_COMPOSE_VOLUMES:-}" ]]; then
+      # shellcheck disable=SC2086
+      printf '%s\n' ${FAKE_COMPOSE_VOLUMES}
+    else
+      printf '%s\n' mongodb_data appwrite-mariadb appwrite-uploads \
+        appwrite-imports appwrite-functions appwrite-sites appwrite-builds \
+        appwrite-cache appwrite-certificates appwrite-config appwrite-redis
+    fi
+    ;;
   *" ps --status running --services "*) printf '%s' "${FAKE_RUNNING_SERVICES-appwrite
 mongodb
 mariadb
@@ -798,5 +808,68 @@ grep -qi 'partial.*durable volume' "${tmpdir}/partial-error" \
   || fail "partial primary volume error was unclear"
 [[ ! -e "${partial_target}/.worktree-data/snapshot-v1" ]] \
   || fail "partial primary volume set published a snapshot"
+
+# Legacy unlabeled volumes are copied onto same-named labeled replacements.
+relabel_target="${tmpdir}/relabel-target"
+prepare_checkout "${relabel_target}"
+relabel_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" \
+  bash "${relabel_target}/scripts/worktree-env.sh" project-name)"
+relabel_repository="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" \
+  bash "${relabel_target}/scripts/worktree-env.sh" repository-id)"
+relabel_root="$(cd "${relabel_target}" && pwd -P)"
+mkdir -p "${tmpdir}/volumes/${relabel_project}_mongodb_data" \
+  "${tmpdir}/volumes/${relabel_project}_appwrite-cache"
+printf '|||\n' >"${tmpdir}/volumes/${relabel_project}_mongodb_data/.ownership"
+printf '|||\n' >"${tmpdir}/volumes/${relabel_project}_appwrite-cache/.ownership"
+: >"${tmpdir}/volumes/${relabel_project}_mongodb_data/nonempty"
+: >"${tmpdir}/volumes/${relabel_project}_appwrite-cache/nonempty"
+: >"${tmpdir}/docker-calls"
+env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" FAKE_RUNNING_SERVICES='' \
+  FAKE_COMPOSE_VOLUMES='mongodb_data appwrite-cache' \
+  bash "${SCRIPT}" relabel-volumes >"${tmpdir}/relabel-output"
+grep -qi 'relabeled 2 Compose volume' "${tmpdir}/relabel-output" \
+  || fail "legacy volumes were not relabeled: $(cat "${tmpdir}/relabel-output")"
+grep -Fxq "true|${relabel_project}|${relabel_root}|${relabel_repository}" \
+  "${tmpdir}/volumes/${relabel_project}_mongodb_data/.ownership" \
+  || fail "mongodb volume did not receive Attesta ownership labels"
+grep -Fxq "true|${relabel_project}|${relabel_root}|${relabel_repository}" \
+  "${tmpdir}/volumes/${relabel_project}_appwrite-cache/.ownership" \
+  || fail "cache volume did not receive Attesta ownership labels"
+[[ -f "${tmpdir}/volumes/${relabel_project}_mongodb_data/nonempty" ]] \
+  || fail "relabel lost mongodb data"
+# Already-labeled volumes are left alone.
+: >"${tmpdir}/docker-calls"
+env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" FAKE_RUNNING_SERVICES='' \
+  FAKE_COMPOSE_VOLUMES='mongodb_data appwrite-cache' \
+  bash "${SCRIPT}" relabel-volumes >"${tmpdir}/relabel-skip-output"
+[[ ! -s "${tmpdir}/relabel-skip-output" ]] \
+  || fail "second relabel should be a no-op: $(cat "${tmpdir}/relabel-skip-output")"
+! grep -q ' volume create ' "${tmpdir}/docker-calls" \
+  || fail "already-labeled volumes were recreated"
+
+# Foreign ownership must fail closed instead of being stolen.
+foreign_target="${tmpdir}/foreign-target"
+prepare_checkout "${foreign_target}"
+foreign_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${foreign_target}" \
+  bash "${foreign_target}/scripts/worktree-env.sh" project-name)"
+mkdir -p "${tmpdir}/volumes/${foreign_project}_mongodb_data"
+printf 'true|%s|/other/worktree|repo-other\n' "${foreign_project}" \
+  >"${tmpdir}/volumes/${foreign_project}_mongodb_data/.ownership"
+if env "${common_env[@]}" ATTESTA_ROOT_DIR="${foreign_target}" FAKE_RUNNING_SERVICES='' \
+  FAKE_COMPOSE_VOLUMES='mongodb_data' \
+  bash "${SCRIPT}" relabel-volumes >"${tmpdir}/foreign-output" 2>"${tmpdir}/foreign-error"; then
+  fail "foreign volume ownership was overwritten"
+fi
+grep -qi 'ownership' "${tmpdir}/foreign-error" \
+  || fail "foreign ownership rejection was unclear"
+
+# Relabel refuses to run against a live stack.
+if env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" \
+  FAKE_RUNNING_SERVICES=mongodb FAKE_COMPOSE_VOLUMES='mongodb_data' \
+  bash "${SCRIPT}" relabel-volumes >"${tmpdir}/running-output" 2>"${tmpdir}/running-error"; then
+  fail "relabel ran while Compose services were up"
+fi
+grep -qi 'stopped Compose stack' "${tmpdir}/running-error" \
+  || fail "running-stack rejection was unclear"
 
 echo "ok: worktree-data_test"

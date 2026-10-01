@@ -203,9 +203,11 @@ fi
 grep -q ' ps$' "${tmpdir}/calls" || fail "status call missing"
 
 restore_line="$(grep -n '^data restore$' "${tmpdir}/calls" | cut -d: -f1)"
+relabel_line="$(grep -n '^data relabel-volumes$' "${tmpdir}/calls" | cut -d: -f1)"
 up_line="$(grep -n ' up -d ' "${tmpdir}/calls" | cut -d: -f1)"
-[[ -n "${restore_line}" && -n "${up_line}" && "${restore_line}" -lt "${up_line}" ]] \
-  || fail "data bundle was not restored before writer services started"
+[[ -n "${relabel_line}" && -n "${restore_line}" && -n "${up_line}" \
+  && "${relabel_line}" -lt "${restore_line}" && "${restore_line}" -lt "${up_line}" ]] \
+  || fail "legacy volume relabel and data restore must run before writer services start"
 
 : >"${tmpdir}/calls"
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
