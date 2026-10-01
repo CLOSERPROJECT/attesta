@@ -58,6 +58,12 @@ html:has(.my-home) {
   margin-bottom: 0;
 }
 
+/* list-rows defaults to margin-top space-4; home bands use section gap only. */
+.my-home-attention .list-rows,
+.my-home-upcoming .list-rows {
+  margin-top: 0;
+}
+
 .my-home-catalog {
   display: flex;
   flex-direction: column;
