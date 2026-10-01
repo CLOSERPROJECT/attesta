@@ -4,9 +4,12 @@
   <section class="stack u-max-w-7xl u-mx-auto my-home">
     {{ if .PendingJoinRequests }}
       <section class="my-home-attention" aria-label="Attention">
-        <div class="panel-heading">
-          <h2>Join requests</h2>
-          <p>Review requests from users who asked to join your organization</p>
+        <div class="panel-heading my-home-section-heading">
+          {{ template "icon-users-group" . }}
+          <div class="my-home-section-heading-copy">
+            <h2>Join requests</h2>
+            <p>Review requests from users who asked to join your organization</p>
+          </div>
         </div>
         <ul class="list-rows">
           {{ range .PendingJoinRequests }}
@@ -62,9 +65,12 @@
     {{ end }}
     {{ if .PendingStreamActions }}
       <section class="my-home-attention" aria-label="Attention">
-        <div class="panel-heading">
-          <h2>Your turn</h2>
-          <p>Active stream instances waiting for your action</p>
+        <div class="panel-heading my-home-section-heading">
+          {{ template "icon-bell" . }}
+          <div class="my-home-section-heading-copy">
+            <h2>Your turn</h2>
+            <p>Active stream instances waiting for your action</p>
+          </div>
         </div>
         <ul class="list-rows">
           {{ range .PendingStreamActions }}
@@ -85,9 +91,12 @@
     {{ end }}
     {{ if .UpcomingStreams }}
       <section class="my-home-upcoming" aria-label="Upcoming">
-        <div class="panel-heading">
-          <h2>Upcoming</h2>
-          <p>Active stream instances waiting on someone else</p>
+        <div class="panel-heading my-home-section-heading">
+          {{ template "icon-clock" . }}
+          <div class="my-home-section-heading-copy">
+            <h2>Upcoming</h2>
+            <p>Active stream instances waiting on someone else</p>
+          </div>
         </div>
         <ul class="list-rows">
           {{ range .UpcomingStreams }}
@@ -108,9 +117,12 @@
     {{ end }}
     {{ if .PendingOrgCreationRequests }}
       <section class="my-home-attention" aria-label="Attention">
-        <div class="panel-heading">
-          <h2>Organization requests</h2>
-          <p>Review organization creation requests from unaffiliated users</p>
+        <div class="panel-heading my-home-section-heading">
+          {{ template "icon-building-grid" . }}
+          <div class="my-home-section-heading-copy">
+            <h2>Organization requests</h2>
+            <p>Review organization creation requests from unaffiliated users</p>
+          </div>
         </div>
         <ul class="list-rows">
           {{ range .PendingOrgCreationRequests }}
@@ -173,72 +185,80 @@
         </ul>
       </section>
     {{ end }}
-    {{ if .ShowCreateStream }}
-      <div class="panel-head-actions my-home-catalog-heading">
-        <div class="panel-heading">
-          <h2>Choose a stream</h2>
-          <p>Select a stream to start or continue process tracking</p>
-        </div>
-        <div class="panel-actions">
-          <a class="btn btn-primary"
-             href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create a stream</a>
-        </div>
-      </div>
-    {{ else }}
-      <div class="panel-heading my-home-catalog-heading">
-        <h2>Choose a stream</h2>
-        <p>Select a stream to start or continue process tracking</p>
-      </div>
-    {{ end }}
-    {{ if .Confirmation }}
-      <p class="confirmation confirmation-with-icon">
-        {{ template "icon-check-circle" . }}
-        <span>{{ .Confirmation }}</span>
-      </p>
-    {{ end }}
-    {{ template "error_banner.html" . }}
-    {{ if .DiscoveryStreams }}
-      <section class="my-home-discovery" aria-label="Streams">
-        <div class="public-home-stream-grid">
-          {{ range .DiscoveryStreams }}
-            {{ template "managed_public_stream_card" . }}
-          {{ end }}
-        </div>
-      </section>
-    {{ else if .Groups }}
-      <div class="my-home-body">
-        <div id="my-home-category-sidebar"
-             class="nav-drawer-panel my-home-sidebar"
-             popover>{{ template "category_sidebar" .Sidebar }}</div>
-        <div class="my-home-catalog">
-          <div class="my-home-category-menu">
-            <button type="button"
-                    class="btn btn-ghost btn-icon nav-drawer-trigger"
-                    popovertarget="my-home-category-sidebar"
-                    aria-label="Open stream categories"
-                    title="Stream categories">{{ template "icon-menu" . }}</button>
+    <section class="my-home-streams" aria-label="Streams">
+      {{ if .ShowCreateStream }}
+        <div class="panel-head-actions my-home-catalog-heading">
+          <div class="panel-heading my-home-section-heading">
+            {{ template "icon-layers-2" . }}
+            <div class="my-home-section-heading-copy">
+              <h2>Choose a stream</h2>
+              <p>Select a stream to start or continue process tracking</p>
+            </div>
           </div>
-          {{ range .Groups }}
-            {{ template "my_home_stream_group" . }}
+          <div class="panel-actions">
+            <a class="btn btn-primary"
+               href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create a stream</a>
+          </div>
+        </div>
+      {{ else }}
+        <div class="panel-heading my-home-section-heading my-home-catalog-heading">
+          {{ template "icon-layers-2" . }}
+          <div class="my-home-section-heading-copy">
+            <h2>Choose a stream</h2>
+            <p>Select a stream to start or continue process tracking</p>
+          </div>
+        </div>
+      {{ end }}
+      {{ if .Confirmation }}
+        <p class="confirmation confirmation-with-icon">
+          {{ template "icon-check-circle" . }}
+          <span>{{ .Confirmation }}</span>
+        </p>
+      {{ end }}
+      {{ template "error_banner.html" . }}
+      {{ if .DiscoveryStreams }}
+        <div class="my-home-discovery">
+          <div class="public-home-stream-grid">
+            {{ range .DiscoveryStreams }}
+              {{ template "managed_public_stream_card" . }}
+            {{ end }}
+          </div>
+        </div>
+      {{ else if .Groups }}
+        <div class="my-home-body">
+          <div id="my-home-category-sidebar"
+               class="nav-drawer-panel my-home-sidebar"
+               popover>{{ template "category_sidebar" .Sidebar }}</div>
+          <div class="my-home-catalog">
+            <div class="my-home-category-menu">
+              <button type="button"
+                      class="btn btn-ghost btn-icon nav-drawer-trigger"
+                      popovertarget="my-home-category-sidebar"
+                      aria-label="Open stream categories"
+                      title="Stream categories">{{ template "icon-menu" . }}</button>
+            </div>
+            {{ range .Groups }}
+              {{ template "my_home_stream_group" . }}
+            {{ end }}
+          </div>
+        </div>
+      {{ else }}
+        <div class="empty-state">
+          {{ template "icon-layers-2" . }}
+          <p class="empty-state-title">No streams available</p>
+          {{ if .Unaffiliated }}
+            <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
+            <p class="empty-state-hint">
+              <a href="/my/onboarding/join">Join an organization</a>
+              ·
+              <a href="/my/onboarding/request-organization">Request a new organization</a>
+            </p>
+          {{ else }}
+            <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
           {{ end }}
         </div>
-      </div>
-    {{ else }}
-      <div class="empty-state">
-        {{ template "icon-layers-2" . }}
-        <p class="empty-state-title">No streams available</p>
-        {{ if .Unaffiliated }}
-          <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
-          <p class="empty-state-hint">
-            <a href="/my/onboarding/join">Join an organization</a>
-            ·
-            <a href="/my/onboarding/request-organization">Request a new organization</a>
-          </p>
-        {{ else }}
-          <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
-        {{ end }}
-      </div>
-    {{ end }}
+      {{ end }}
+    </section>
   </section>
 {{ end }}
 
