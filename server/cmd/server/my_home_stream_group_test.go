@@ -146,10 +146,10 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 	if strings.Contains(body, `class="my-home-discovery"`) {
 		t.Fatalf("PA catalog path must not render discovery band, got: %s", body)
 	}
-	headerIdx := strings.Index(body, `class="page-header-head"`)
+	headerIdx := strings.Index(body, `my-home-catalog-heading`)
 	menuIdx := strings.Index(body, `class="my-home-category-menu"`)
 	if headerIdx < 0 || menuIdx < 0 || menuIdx < headerIdx {
-		t.Fatalf("category menu must render below page-header-head; header=%d menu=%d body=%s", headerIdx, menuIdx, body)
+		t.Fatalf("category menu must render below catalog heading; header=%d menu=%d body=%s", headerIdx, menuIdx, body)
 	}
 }
 
@@ -198,6 +198,8 @@ func TestHomePickerBodyRendersDiscoveryStreams(t *testing.T) {
 		`nav-drawer-trigger`,
 		`class="category-sidebar"`,
 		`my_home_stream_group`,
+		"<h2>Streams</h2>",
+		"Streams your organization participates in",
 	} {
 		if strings.Contains(body, gone) {
 			t.Fatalf("discovery must not render %q, got: %s", gone, body)
@@ -285,7 +287,8 @@ func TestHomePickerBodyTemplateRendersCreateStreamAction(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="page-header-actions"`,
+		`class="panel-head-actions my-home-catalog-heading"`,
+		`class="panel-actions"`,
 		`href="/my/organization/formata-builder?new=true"`,
 		"Create a stream",
 	} {

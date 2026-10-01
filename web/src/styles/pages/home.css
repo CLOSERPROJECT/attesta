@@ -20,14 +20,22 @@ html:has(.my-home) {
 
 .my-home-attention .panel-heading,
 .my-home-upcoming .panel-heading,
-.my-home-discovery .panel-heading {
+.my-home-catalog-heading.panel-heading,
+.my-home-catalog-heading > .panel-heading {
   margin-bottom: 0;
 }
 
 .my-home-attention .panel-heading p,
 .my-home-upcoming .panel-heading p,
-.my-home-discovery .panel-heading p {
+.my-home-catalog-heading.panel-heading p,
+.my-home-catalog-heading > .panel-heading p {
   text-wrap: pretty;
+}
+
+.my-home-catalog-heading {
+  width: 100%;
+  margin-bottom: 0;
+  padding-bottom: var(--space-6);
 }
 
 .my-home-catalog {

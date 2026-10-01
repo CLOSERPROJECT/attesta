@@ -880,7 +880,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		}
 		adminBody := adminRec.Body.String()
 		for _, want := range []string{
-			`class="page-header-actions"`,
+			`class="panel-head-actions my-home-catalog-heading"`,
 			`href="/my/organization/formata-builder?new=true"`,
 			"Create a stream",
 			`class="my-home-discovery"`,
@@ -1313,7 +1313,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, `class="stack u-max-w-7xl u-mx-auto my-home"`) ||
-		!strings.Contains(body, `class="page-header"`) ||
+		!strings.Contains(body, `my-home-catalog-heading`) ||
 		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
@@ -1417,7 +1417,7 @@ func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 		}
 		body := rec.Body.String()
 		for _, want := range []string{
-			`class="page-header-actions"`,
+			`class="panel-head-actions my-home-catalog-heading"`,
 			`href="/my/organization/formata-builder?new=true"`,
 			"Create a stream",
 		} {

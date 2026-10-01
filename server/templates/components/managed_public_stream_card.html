@@ -43,7 +43,7 @@
     {{ end }}
     {{ if .Startable }}
       <button type="button"
-              class="btn btn-primary btn-sm public-stream-card-start"
+              class="btn btn-primary public-stream-card-start"
               onclick="document.getElementById('start-instance-{{ .Key }}').showModal()">
         {{ template "icon-play" . }}
         Start
