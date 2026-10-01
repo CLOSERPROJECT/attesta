@@ -40,6 +40,8 @@ func buildPlatformAdminBreadcrumbs(activePanel string) BreadcrumbsView {
 
 func platformAdminSectionLabel(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
+	case "streams":
+		return "Streams"
 	case "categories":
 		return "Categories"
 	default:
@@ -49,6 +51,8 @@ func platformAdminSectionLabel(activePanel string) string {
 
 func platformAdminSectionHref(activePanel string) string {
 	switch strings.TrimSpace(activePanel) {
+	case "streams":
+		return adminPath("streams")
 	case "categories":
 		return adminPath("categories")
 	default:

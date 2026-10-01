@@ -33,6 +33,7 @@ func TestHandleAdminCategoriesHTMXReturnsAdminConsole(t *testing.T) {
 	}
 	for _, want := range []string{
 		`hx-get="/admin/organizations"`,
+		`hx-get="/admin/streams"`,
 		`hx-target="#admin-console"`,
 		"Manage stream discovery taxonomy",
 		"Supply Chain",

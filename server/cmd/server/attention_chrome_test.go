@@ -808,9 +808,12 @@ func TestPlatformAdminHomeOrgCreationAttentionBandAndResolve(t *testing.T) {
 		t.Fatalf("account-menu Admin must not carry section Attention, got:\n%s", homeBody)
 	}
 	orgIdx := strings.Index(homeBody, "Organization requests")
-	chooseIdx := strings.Index(homeBody, "Choose a stream")
-	if orgIdx < 0 || chooseIdx < 0 || orgIdx > chooseIdx {
-		t.Fatalf("expected Organization requests above Choose a stream, org=%d choose=%d body:\n%s", orgIdx, chooseIdx, homeBody)
+	quickIdx := strings.Index(homeBody, "Manage streams")
+	if orgIdx < 0 || quickIdx < 0 || orgIdx > quickIdx {
+		t.Fatalf("expected Organization requests above Manage streams, org=%d quick=%d body:\n%s", orgIdx, quickIdx, homeBody)
+	}
+	if strings.Contains(homeBody, "Choose a stream") {
+		t.Fatalf("platform-admin home must not show Choose a stream catalog, got:\n%s", homeBody)
 	}
 
 	adminReq := httptest.NewRequest(http.MethodGet, "/admin/organizations", nil)

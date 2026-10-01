@@ -23,7 +23,10 @@ func wantsAdminConsolePartial(r *http.Request) bool {
 func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 	active := strings.TrimSpace(view.ActivePanel)
 	subtitle := "Create and manage organizations"
-	if active == "categories" {
+	switch active {
+	case "streams":
+		subtitle = "Browse and manage platform streams"
+	case "categories":
 		subtitle = "Manage stream discovery taxonomy"
 	}
 	return AdminConsoleView{
@@ -37,8 +40,14 @@ func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 				Href:         adminPath("organizations"),
 				Title:        "Organizations",
 				Copy:         "Create and manage organizations",
-				Active:       active != "categories",
+				Active:       active == "organizations" || active == "",
 				HasAttention: view.HasOrgCreationAttention,
+			},
+			{
+				Href:   adminPath("streams"),
+				Title:  "Streams",
+				Copy:   "Browse and manage platform streams",
+				Active: active == "streams",
 			},
 			{
 				Href:   adminPath("categories"),

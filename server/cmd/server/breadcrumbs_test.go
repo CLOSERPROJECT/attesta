@@ -93,6 +93,7 @@ func TestBuildPlatformAdminBreadcrumbs(t *testing.T) {
 		"organizations": {label: "Organizations", href: "/admin/organizations"},
 		"":              {label: "Organizations", href: "/admin/organizations"},
 		"other":         {label: "Organizations", href: "/admin/organizations"},
+		"streams":       {label: "Streams", href: "/admin/streams"},
 		"categories":    {label: "Categories", href: "/admin/categories"},
 	}
 	for panel, want := range cases {
