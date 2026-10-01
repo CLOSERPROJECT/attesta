@@ -4,7 +4,8 @@ html:has(.my-home) {
 }
 
 .my-home.stack {
-  gap: var(--space-12);
+  /* Match section padding-bottom so space above/below the divider is even. */
+  gap: var(--space-8);
 }
 
 .my-home-attention,
@@ -17,7 +18,7 @@ html:has(.my-home) {
 
 .my-home-attention,
 .my-home-upcoming {
-  padding-bottom: var(--space-6);
+  padding-bottom: var(--space-8);
   border-bottom: 1px solid var(--border);
 }
 
