@@ -15,9 +15,11 @@ html:has(.my-home) {
   gap: var(--space-3);
 }
 
-.my-home-attention,
-.my-home-upcoming {
-  border-bottom: 1px solid var(--border);
+.my-home-rule {
+  margin: 0;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
 }
 
 .my-home-section-heading {

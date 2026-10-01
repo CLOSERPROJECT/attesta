@@ -64,6 +64,9 @@
       </section>
     {{ end }}
     {{ if .PendingStreamActions }}
+      {{ if .PendingJoinRequests }}
+        <hr class="my-home-rule" />
+      {{ end }}
       <section class="my-home-attention" aria-label="Attention">
         <div class="panel-heading my-home-section-heading">
           {{ template "icon-bell" . }}
@@ -90,6 +93,9 @@
       </section>
     {{ end }}
     {{ if .UpcomingStreams }}
+      {{ if or .PendingJoinRequests .PendingStreamActions }}
+        <hr class="my-home-rule" />
+      {{ end }}
       <section class="my-home-upcoming" aria-label="Upcoming">
         <div class="panel-heading my-home-section-heading">
           {{ template "icon-clock" . }}
@@ -116,6 +122,9 @@
       </section>
     {{ end }}
     {{ if .PendingOrgCreationRequests }}
+      {{ if or .PendingJoinRequests .PendingStreamActions .UpcomingStreams }}
+        <hr class="my-home-rule" />
+      {{ end }}
       <section class="my-home-attention" aria-label="Attention">
         <div class="panel-heading my-home-section-heading">
           {{ template "icon-building-grid" . }}
@@ -184,6 +193,9 @@
           {{ end }}
         </ul>
       </section>
+    {{ end }}
+    {{ if or .PendingJoinRequests .PendingStreamActions .UpcomingStreams .PendingOrgCreationRequests }}
+      <hr class="my-home-rule" />
     {{ end }}
     <section class="my-home-streams" aria-label="Streams">
       {{ if .ShowCreateStream }}
