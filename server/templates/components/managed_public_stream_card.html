@@ -41,7 +41,48 @@
         </div>
       </details>
     {{ end }}
+    {{ if .Startable }}
+      <button type="button"
+              class="btn btn-primary btn-lg public-stream-card-start"
+              onclick="document.getElementById('start-instance-{{ .Key }}').showModal()">
+        {{ template "icon-play" . }}
+        Start
+      </button>
+    {{ end }}
     {{ template "public_stream_card" .Card }}
+    {{ if .Startable }}
+      <dialog id="start-instance-{{ .Key }}" class="dialog">
+        <div class="dialog-card">
+          <header class="dialog-head">
+            <div>
+              <h3 class="dialog-title">New instance</h3>
+              <p class="dialog-subtitle">Give this stream instance a brief name</p>
+            </div>
+            <button type="button"
+                    class="btn btn-ghost btn-icon dialog-close"
+                    onclick="document.getElementById('start-instance-{{ .Key }}').close()">
+              {{ template "icon-close" . }}
+            </button>
+          </header>
+          <form method="post" action="{{ .StartAction }}" class="input-form">
+            <div class="form-field">
+              <label for="instance-name-{{ .Key }}">Instance name</label>
+              <input id="instance-name-{{ .Key }}"
+                     name="name"
+                     type="text"
+                     maxlength="80"
+                     autocomplete="off" />
+            </div>
+            <div class="dialog-actions">
+              <button class="btn btn-primary" type="submit">
+                {{ template "icon-play" . }}
+                Start instance
+              </button>
+            </div>
+          </form>
+        </div>
+      </dialog>
+    {{ end }}
     {{ if .EditRequiresPurge }}
       <dialog id="edit-workflow-{{ .Key }}" class="dialog">
         <div class="dialog-card">

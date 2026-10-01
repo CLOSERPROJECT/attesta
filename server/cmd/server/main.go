@@ -326,6 +326,7 @@ type HomeWorkflowPickerView struct {
 	PageBase
 	Groups                     []MyHomeStreamGroupView
 	Sidebar                    CategorySidebarView
+	DiscoveryStreams           []ManagedPublicStreamCardView
 	ShowCreateStream           bool
 	Unaffiliated               bool
 	PendingJoinRequests        []OrgAdminJoinRequestRow
@@ -2263,11 +2264,31 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
 	}
-	groups, err := s.buildMyHomeCatalog(r.Context(), user)
-	if err != nil {
-		logRequestError(r, err, "build my home catalog")
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	var groups []MyHomeStreamGroupView
+	var discoveryStreams []ManagedPublicStreamCardView
+	var sidebar CategorySidebarView
+	if user.IsPlatformAdmin {
+		var err error
+		groups, err = s.buildMyHomeCatalog(r.Context(), user)
+		if err != nil {
+			logRequestError(r, err, "build my home catalog")
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		sidebar = buildMyHomeCategorySidebar(groups)
+	} else {
+		items, err := s.listDiscoveryStreams(r.Context(), user)
+		if err != nil {
+			logRequestError(r, err, "list discovery streams")
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		discoveryStreams, err = s.buildDiscoveryManagedCards(r.Context(), user, items)
+		if err != nil {
+			logRequestError(r, err, "build discovery stream cards")
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 	}
 	pendingJoins, joinErr := s.joinAttentionRows(r.Context(), user)
 	if joinErr != nil {
@@ -2294,7 +2315,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	view := HomeWorkflowPickerView{
 		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
 		Groups:                     groups,
-		Sidebar:                    buildMyHomeCategorySidebar(groups),
+		Sidebar:                    sidebar,
+		DiscoveryStreams:           discoveryStreams,
 		ShowCreateStream:           showCreateStream && authErr == nil,
 		PendingJoinRequests:        pendingJoins,
 		PendingStreamActions:       pendingStreams,

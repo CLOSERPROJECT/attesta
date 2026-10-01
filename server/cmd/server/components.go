@@ -39,6 +39,8 @@ type ManagedPublicStreamCardView struct {
 	CanDelete         bool
 	DeleteReason      string
 	DeleteAction      string
+	Startable         bool
+	StartAction       string
 }
 
 // MyHomeStreamGroupView is one taxonomy (or Uncategorized) block on /my.

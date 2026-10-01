@@ -81,10 +81,10 @@ func TestMyHomeStreamGroupTemplateOmitsCategoryHeaderWhenEmpty(t *testing.T) {
 
 	var out bytes.Buffer
 	group := MyHomeStreamGroupView{
-		CategoryName:    "Supply Chain",
-		SubCategoryName: "Order Fulfillment",
+		CategoryName:       "Supply Chain",
+		SubCategoryName:    "Order Fulfillment",
 		ShowCategoryHeader: false,
-		AnchorID:        "cat-supply-chain--order-fulfillment",
+		AnchorID:           "cat-supply-chain--order-fulfillment",
 		Streams: []ManagedPublicStreamCardView{
 			{Card: PublicStreamCardView{Name: "Follow-on Stream"}},
 		},
@@ -143,10 +143,67 @@ func TestHomePickerBodyRendersSidebarAndDrawerTrigger(t *testing.T) {
 	if strings.Contains(body, `class="my-home-category-bar"`) {
 		t.Fatalf("mobile category bar must be removed, got: %s", body)
 	}
-	headerIdx := strings.Index(body, `class="page-header-head"`)
+	if strings.Contains(body, `class="my-home-discovery"`) {
+		t.Fatalf("PA catalog path must not render discovery band, got: %s", body)
+	}
+	headerIdx := strings.Index(body, `my-home-catalog-heading`)
 	menuIdx := strings.Index(body, `class="my-home-category-menu"`)
 	if headerIdx < 0 || menuIdx < 0 || menuIdx < headerIdx {
-		t.Fatalf("category menu must render below page-header-head; header=%d menu=%d body=%s", headerIdx, menuIdx, body)
+		t.Fatalf("category menu must render below catalog heading; header=%d menu=%d body=%s", headerIdx, menuIdx, body)
+	}
+}
+
+func TestHomePickerBodyRendersDiscoveryStreams(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	var out bytes.Buffer
+	view := HomeWorkflowPickerView{
+		PageBase: PageBase{Body: "home_picker_body"},
+		DiscoveryStreams: []ManagedPublicStreamCardView{
+			{
+				Key:         "wf-start",
+				Startable:   true,
+				StartAction: "/my/streams/wf-start/instance/start",
+				Card:        PublicStreamCardView{Name: "Startable Stream", Href: "/my/streams/wf-start/"},
+			},
+			{
+				Key:  "wf-watch",
+				Card: PublicStreamCardView{Name: "Watch Stream", Href: "/my/streams/wf-watch/"},
+			},
+		},
+	}
+	if err := tmpl.ExecuteTemplate(&out, "home_picker_body", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := out.String()
+	for _, want := range []string{
+		`class="my-home-discovery"`,
+		`aria-label="Streams"`,
+		`class="public-home-stream-grid"`,
+		"Startable Stream",
+		"Watch Stream",
+		"public-stream-card-start",
+		`id="start-instance-wf-start"`,
+		`action="/my/streams/wf-start/instance/start"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in %s", want, body)
+		}
+	}
+	if strings.Contains(body, `id="start-instance-wf-watch"`) {
+		t.Fatalf("non-startable card must not expose Start, got: %s", body)
+	}
+	for _, gone := range []string{
+		`class="my-home-catalog"`,
+		`id="my-home-category-sidebar"`,
+		`nav-drawer-trigger`,
+		`class="category-sidebar"`,
+		`my_home_stream_group`,
+		"<h2>Streams</h2>",
+		"Streams your organization participates in",
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("discovery must not render %q, got: %s", gone, body)
+		}
 	}
 }
 
@@ -230,7 +287,8 @@ func TestHomePickerBodyTemplateRendersCreateStreamAction(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="page-header-actions"`,
+		`class="panel-head-actions my-home-catalog-heading"`,
+		`class="panel-actions"`,
 		`href="/my/organization/formata-builder?new=true"`,
 		"Create a stream",
 	} {

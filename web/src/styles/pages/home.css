@@ -3,23 +3,66 @@ html:has(.my-home) {
   scroll-behavior: smooth;
 }
 
-.my-home-attention,
-.my-home-upcoming {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-bottom: var(--space-6);
-  border-bottom: 1px solid var(--border);
+.my-home.stack {
+  gap: var(--space-12);
 }
 
-.my-home-attention .panel-heading,
-.my-home-upcoming .panel-heading {
+.my-home-attention,
+.my-home-upcoming,
+.my-home-streams {
+  display: flex;
+  flex-direction: column;
+
+  /* Match default .panel-heading margin-bottom (title → body). */
+  gap: var(--space-6);
+}
+
+.my-home-rule {
+  margin: 0;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.my-home-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
   margin-bottom: 0;
 }
 
+.my-home-section-heading > .icon-svg {
+  width: 24px;
+  height: 24px;
+  margin-top: 0.2em;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+.my-home-section-heading-copy {
+  min-width: 0;
+}
+
 .my-home-attention .panel-heading p,
-.my-home-upcoming .panel-heading p {
+.my-home-upcoming .panel-heading p,
+.my-home-section-heading p {
   text-wrap: pretty;
+}
+
+.my-home-catalog-heading {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+/* panel-head-actions defaults to space-5; streams uses section gap like Upcoming. */
+.my-home-streams .panel-head-actions {
+  margin-bottom: 0;
+}
+
+/* list-rows defaults to margin-top space-4; home bands use section gap only. */
+.my-home-attention .list-rows,
+.my-home-upcoming .list-rows {
+  margin-top: 0;
 }
 
 .my-home-catalog {
