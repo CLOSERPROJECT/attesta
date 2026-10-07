@@ -19,6 +19,7 @@
 
 .substep:hover {
   opacity: 1;
+  border-color: var(--primary);
 }
 
 .substep-accordion {
