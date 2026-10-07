@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -136,4 +138,105 @@ func TestHandleAdminStreamsHTMXReturnsAdminConsole(t *testing.T) {
 			t.Fatalf("expected %q in streams console, got: %s", want, body)
 		}
 	}
+}
+
+func TestHandleAdminStreamsMethodNotAllowed(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newStreamsAdminServer(t, store)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/streams", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleAdminStreams(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestHandleAdminStreamsCatalogLoadError(t *testing.T) {
+	store := &failingListFormataStore{
+		MemoryStore: NewMemoryStore(),
+		err:         errors.New("list formata streams failed"),
+	}
+	seedPlatformAdminTaxonomy(t, store.MemoryStore)
+	server := newStreamsAdminServer(t, store)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleAdminStreams(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+}
+
+func TestHandleAdminStreamsFormataAuthErrorStillRenders(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newStreamsAdminServer(t, store)
+	server.authorizer = fakeAuthorizer{
+		accessDecide: func(user *AccountUser, resourceKind, resourceID string, resourceAttr map[string]interface{}, action string) (bool, error) {
+			if resourceKind == cerbosResourceFormataBuilder {
+				return false, errors.New("cerbos unavailable")
+			}
+			return fakeCanAccessDecision(user, resourceKind, resourceAttr, action), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+	rec := httptest.NewRecorder()
+	server.handleAdminStreams(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="platform-admin-streams"`) {
+		t.Fatalf("expected streams catalog despite formata auth error, got: %s", body)
+	}
+	if strings.Contains(body, "Create a stream") {
+		t.Fatalf("Create a stream must be hidden when formata auth check errors, got: %s", body)
+	}
+}
+
+func TestHandleAdminStreamsTemplateErrors(t *testing.T) {
+	broken := template.Must(template.New("broken").Parse(`{{define "other"}}x{{end}}`))
+
+	t.Run("full page", func(t *testing.T) {
+		store := NewMemoryStore()
+		seedPlatformAdminTaxonomy(t, store)
+		server := newStreamsAdminServer(t, store)
+		server.tmpl = broken
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleAdminStreams(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("htmx console", func(t *testing.T) {
+		store := NewMemoryStore()
+		seedPlatformAdminTaxonomy(t, store)
+		server := newStreamsAdminServer(t, store)
+		server.tmpl = broken
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
+		req.Header.Set("HX-Request", "true")
+		req.Header.Set("HX-Target", "admin-console")
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleAdminStreams(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
 }

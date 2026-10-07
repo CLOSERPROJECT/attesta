@@ -913,6 +913,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		paBody := paRec.Body.String()
 		for _, want := range []string{
 			`aria-label="Quick actions"`,
+			`class="my-home-quick-actions-list"`,
 			`href="/admin/streams"`,
 			"Manage streams",
 			`href="/admin/organizations"`,
@@ -921,6 +922,8 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 			"Manage categories",
 			`href="/my/organization/formata-builder?new=true"`,
 			"Create stream",
+			`btn-lg btn-secondary`,
+			`btn-lg btn-primary`,
 		} {
 			if !strings.Contains(paBody, want) {
 				t.Fatalf("expected %q in PA home quick actions, got: %s", want, paBody)

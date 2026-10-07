@@ -213,13 +213,25 @@
           </p>
         {{ end }}
         {{ template "error_banner.html" . }}
-        <div class="panel-actions my-home-quick-actions-list">
-          <a class="btn btn-secondary" href="/admin/streams">Manage streams</a>
-          <a class="btn btn-secondary" href="/admin/organizations">Manage orgs</a>
-          <a class="btn btn-secondary" href="/admin/categories">Manage categories</a>
+        <div class="my-home-quick-actions-list">
+          <a class="btn btn-lg btn-secondary" href="/admin/streams">
+            {{ template "icon-layers-2" . }}
+            <span>Manage streams</span>
+          </a>
+          <a class="btn btn-lg btn-secondary" href="/admin/organizations">
+            {{ template "icon-building-grid" . }}
+            <span>Manage orgs</span>
+          </a>
+          <a class="btn btn-lg btn-secondary" href="/admin/categories">
+            {{ template "icon-layout-grid" . }}
+            <span>Manage categories</span>
+          </a>
           {{ if .ShowCreateStream }}
-            <a class="btn btn-primary"
-               href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create stream</a>
+            <a class="btn btn-lg btn-primary"
+               href="/my/organization/formata-builder?new=true">
+              {{ template "icon-plus" . }}
+              <span>Create stream</span>
+            </a>
           {{ end }}
         </div>
       </section>

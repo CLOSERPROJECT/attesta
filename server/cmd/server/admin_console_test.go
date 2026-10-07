@@ -6,6 +6,13 @@ import (
 	"testing"
 )
 
+func TestHTMXTargetIDNilRequest(t *testing.T) {
+	t.Parallel()
+	if got := htmxTargetID(nil); got != "" {
+		t.Fatalf("htmxTargetID(nil) = %q, want empty", got)
+	}
+}
+
 func TestWantsAdminConsolePartial(t *testing.T) {
 	t.Parallel()
 
@@ -96,6 +103,11 @@ func TestOrgAdminConsoleNav(t *testing.T) {
 		t.Fatal("Members soft-nav must not light Attention without HasJoinRequestAttention")
 	}
 
+	defaultPanel := orgAdminConsole(OrgAdminView{})
+	if !defaultPanel.NavItems[0].Active || defaultPanel.NavItems[0].Title != "Organization profile" {
+		t.Fatalf("empty ActivePanel must default to profile: %+v", defaultPanel.NavItems)
+	}
+
 	withJoin := OrgAdminView{
 		PageBase:    PageBase{HasJoinRequestAttention: true},
 		ActivePanel: "members",
@@ -103,5 +115,17 @@ func TestOrgAdminConsoleNav(t *testing.T) {
 	members := orgAdminConsole(withJoin)
 	if !members.NavItems[2].HasAttention || members.NavItems[2].Title != "Members" {
 		t.Fatalf("Members soft-nav should carry Join-request Attention: %+v", members.NavItems[2])
+	}
+}
+
+func TestOrganizationDialogAutoOpenUnknownAction(t *testing.T) {
+	t.Parallel()
+	view := PlatformAdminView{
+		OrganizationDialogAction: "unknown",
+		OrganizationError:        "boom",
+		OrganizationDialogSlug:   "acme",
+	}
+	if view.OrganizationDialogAutoOpen("unknown", "acme") {
+		t.Fatal("unknown dialog action must not auto-open")
 	}
 }
