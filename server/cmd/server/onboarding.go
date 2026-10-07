@@ -69,14 +69,9 @@ type OnboardingJoinView struct {
 	SelectedOrgSlug  string
 	SelectedOrgName  string
 	SelectedOrgRoles []Role
-	CurrentPage      int
-	TotalPages       int
-	PageNumbers      []int
-	HasPreviousPage  bool
-	HasNextPage      bool
-	PreviousPage     int
-	NextPage         int
-	Pagination       PaginationView
+	CurrentPage int
+	TotalPages  int
+	Pagination  PaginationView
 }
 
 func (s *Server) handleOnboardingRoutes(w http.ResponseWriter, r *http.Request) {
@@ -421,8 +416,6 @@ func (s *Server) buildOnboardingJoinView(w http.ResponseWriter, r *http.Request,
 		SelectedOrgSlug: strings.TrimSpace(selectedOrgSlug),
 		CurrentPage:     1,
 		TotalPages:      1,
-		PreviousPage:    1,
-		NextPage:        1,
 	}
 
 	// Empty search browses the full catalog (paginated); non-empty q filters by name/slug.
@@ -462,10 +455,8 @@ func (s *Server) buildOnboardingJoinView(w http.ResponseWriter, r *http.Request,
 		if orgPage.Total > 0 {
 			totalPages = (orgPage.Total + onboardingJoinSearchLimit - 1) / onboardingJoinSearchLimit
 		}
-		pageNumbers := make([]int, 0, totalPages)
 		pageLinks := make([]PaginationLink, 0, totalPages)
 		for page := 1; page <= totalPages; page++ {
-			pageNumbers = append(pageNumbers, page)
 			pageLinks = append(pageLinks, PaginationLink{
 				Page:      page,
 				URL:       onboardingJoinHref(view.SearchQuery, page),
@@ -482,11 +473,6 @@ func (s *Server) buildOnboardingJoinView(w http.ResponseWriter, r *http.Request,
 
 		view.CurrentPage = currentPage
 		view.TotalPages = totalPages
-		view.PageNumbers = pageNumbers
-		view.HasPreviousPage = hasPreviousPage
-		view.HasNextPage = hasNextPage
-		view.PreviousPage = previousPage
-		view.NextPage = nextPage
 		view.Pagination = PaginationView{
 			AriaLabel:       "Organizations pagination",
 			Links:           pageLinks,

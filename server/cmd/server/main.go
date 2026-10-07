@@ -343,29 +343,20 @@ type QueryInput struct {
 }
 
 type ProcessStatusGroup struct {
-	Status              string
-	Label               string
-	NavAriaLabel        string
-	NavTitle            string
-	Heading             string
-	EmptyMessage        string
-	PaginationAriaLabel string
-	PanelID             string
-	Sort                string
-	SortFields          []QueryInput
-	TotalCount          int
-	CurrentPage         int
-	TotalPages          int
-	PageNumbers         []int
-	PageLinks           []PaginationLink
-	HasPreviousPage     bool
-	HasNextPage         bool
-	PreviousPage        int
-	NextPage            int
-	PreviousURL         string
-	NextURL             string
-	Pagination          PaginationView
-	Processes           []StreamInstanceCard
+	Status       string
+	Label        string
+	NavAriaLabel string
+	NavTitle     string
+	Heading      string
+	EmptyMessage string
+	PanelID      string
+	Sort         string
+	SortFields   []QueryInput
+	TotalCount   int
+	CurrentPage  int
+	TotalPages   int
+	Pagination   PaginationView
+	Processes    []StreamInstanceCard
 }
 
 type HomeView struct {
@@ -449,11 +440,6 @@ type PlatformAdminView struct {
 	SearchQuery                string
 	CurrentPage                int
 	TotalPages                 int
-	PageNumbers                []int
-	HasPreviousPage            bool
-	HasNextPage                bool
-	PreviousPage               int
-	NextPage                   int
 	Pagination                 PaginationView
 	MatchedOrganizations       int
 	Organizations              []PlatformAdminOrganizationRow
@@ -2011,11 +1997,9 @@ func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInsta
 	} else if len(items) > 0 {
 		pagedItems = items[:0]
 	}
-	pageNumbers := make([]int, 0, totalPages)
 	pageLinks := make([]PaginationLink, 0, totalPages)
 	panelID := "stream-section-" + status
 	for pageNum := 1; pageNum <= totalPages; pageNum++ {
-		pageNumbers = append(pageNumbers, pageNum)
 		pageLinks = append(pageLinks, PaginationLink{
 			Page:      pageNum,
 			URL:       homePaginationURL(workflowPath, status, sortKey, pageNum),
@@ -2034,27 +2018,18 @@ func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInsta
 	hasPreviousPage := currentPage > 1
 	hasNextPage := currentPage < totalPages
 	return ProcessStatusGroup{
-		Status:              status,
-		Label:               processStatusLabel(status),
-		NavAriaLabel:        navAriaLabel,
-		NavTitle:            navTitle,
-		Heading:             heading,
-		EmptyMessage:        emptyMessage,
-		PaginationAriaLabel: paginationAriaLabel,
-		PanelID:             panelID,
-		Sort:                sortKey,
-		SortFields:          sortFields,
-		TotalCount:          len(items),
-		CurrentPage:         currentPage,
-		TotalPages:          totalPages,
-		PageNumbers:         pageNumbers,
-		PageLinks:           pageLinks,
-		HasPreviousPage:     hasPreviousPage,
-		HasNextPage:         hasNextPage,
-		PreviousPage:        previousPage,
-		NextPage:            nextPage,
-		PreviousURL:         previousURL,
-		NextURL:             nextURL,
+		Status:       status,
+		Label:        processStatusLabel(status),
+		NavAriaLabel: navAriaLabel,
+		NavTitle:     navTitle,
+		Heading:      heading,
+		EmptyMessage: emptyMessage,
+		PanelID:      panelID,
+		Sort:         sortKey,
+		SortFields:   sortFields,
+		TotalCount:   len(items),
+		CurrentPage:  currentPage,
+		TotalPages:   totalPages,
 		Pagination: PaginationView{
 			AriaLabel:       paginationAriaLabel,
 			Inline:          true,
@@ -3848,10 +3823,8 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	if orgPage.Total > 0 {
 		totalPages = (orgPage.Total + limit - 1) / limit
 	}
-	pageNumbers := make([]int, 0, totalPages)
 	pageLinks := make([]PaginationLink, 0, totalPages)
 	for page := 1; page <= totalPages; page++ {
-		pageNumbers = append(pageNumbers, page)
 		pageLinks = append(pageLinks, PaginationLink{
 			Page:      page,
 			URL:       platformAdminPath(errs.SearchQuery, page),
@@ -3865,17 +3838,12 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	pendingRows := platformAdminOrgCreationRequestRows(context.Background(), s)
 	view := PlatformAdminView{
-		PageBase:                   s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		ActivePanel:                "organizations",
-		Breadcrumbs:                buildPlatformAdminBreadcrumbs("organizations"),
-		SearchQuery:                errs.SearchQuery,
-		CurrentPage:                currentPage,
-		TotalPages:                 totalPages,
-		PageNumbers:                pageNumbers,
-		HasPreviousPage:            hasPreviousPage,
-		HasNextPage:                hasNextPage,
-		PreviousPage:               previousPage,
-		NextPage:                   nextPage,
+		PageBase:     s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		ActivePanel:  "organizations",
+		Breadcrumbs:  buildPlatformAdminBreadcrumbs("organizations"),
+		SearchQuery:  errs.SearchQuery,
+		CurrentPage:  currentPage,
+		TotalPages:   totalPages,
 		Pagination: PaginationView{
 			AriaLabel:       "Organizations pagination",
 			Links:           pageLinks,

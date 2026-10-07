@@ -12,9 +12,6 @@ func TestPlatformAdminTemplateOrganizationInviteAndPagination(t *testing.T) {
 	view := PlatformAdminView{
 		CurrentPage: 1,
 		TotalPages:  3,
-		PageNumbers: []int{1, 2, 3},
-		HasNextPage: true,
-		NextPage:    2,
 		Pagination: PaginationView{
 			AriaLabel:       "Organizations pagination",
 			Links:           []PaginationLink{{Page: 1, URL: "/admin/organizations", IsCurrent: true}, {Page: 2, URL: "/admin/organizations?page=2"}, {Page: 3, URL: "/admin/organizations?page=3"}},

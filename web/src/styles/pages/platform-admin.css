@@ -46,8 +46,7 @@
   margin-top: var(--space-5);
 }
 
-.platform-admin-results-footer .pagination,
-.platform-admin-results-footer .platform-admin-pagination {
+.platform-admin-results-footer .pagination {
   margin-top: 0;
 }
 

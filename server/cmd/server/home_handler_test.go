@@ -1992,17 +1992,17 @@ func TestBuildHomeProcessGroupsUsesGlobalSortAndFilterFields(t *testing.T) {
 	if !foundFilter {
 		t.Fatalf("expected filter=done in sort fields, got %#v", done.SortFields)
 	}
-	if !strings.Contains(done.NextURL, "filter=done") {
-		t.Fatalf("expected filter in pagination url, got %q", done.NextURL)
+	if !strings.Contains(done.Pagination.NextURL, "filter=done") {
+		t.Fatalf("expected filter in pagination url, got %q", done.Pagination.NextURL)
 	}
-	if !strings.Contains(done.NextURL, "sort=progress_desc") {
-		t.Fatalf("expected sort=progress_desc in pagination url, got %q", done.NextURL)
+	if !strings.Contains(done.Pagination.NextURL, "sort=progress_desc") {
+		t.Fatalf("expected sort=progress_desc in pagination url, got %q", done.Pagination.NextURL)
 	}
 	if done.Heading != "Done stream instances" || done.EmptyMessage != "No completed instances" {
 		t.Fatalf("expected done status copy on group, got heading=%q empty=%q", done.Heading, done.EmptyMessage)
 	}
-	if done.NavAriaLabel != "Completed streams" || done.PaginationAriaLabel != "Done stream instances pagination" {
-		t.Fatalf("expected done nav/pagination copy, got aria=%q pagination=%q", done.NavAriaLabel, done.PaginationAriaLabel)
+	if done.NavAriaLabel != "Completed streams" || done.Pagination.AriaLabel != "Done stream instances pagination" {
+		t.Fatalf("expected done nav/pagination copy, got aria=%q pagination=%q", done.NavAriaLabel, done.Pagination.AriaLabel)
 	}
 }
 
