@@ -242,6 +242,10 @@
   padding: 0;
 }
 
+body:has(.page-landing) .topbar {
+  border-bottom: none;
+}
+
 .stack {
   display: grid;
   gap: var(--space-6);
