@@ -402,6 +402,28 @@ type BreadcrumbsView struct {
 	Items []BreadcrumbItem
 }
 
+// PaginationLink is one page number control in templates/components/pagination.html.
+type PaginationLink struct {
+	Page      int
+	URL       string
+	IsCurrent bool
+}
+
+// PaginationView is the view model for templates/components/pagination.html.
+// Empty HxTarget means plain links (no HTMX attributes). PushURL emits hx-push-url when HTMX is active.
+type PaginationView struct {
+	AriaLabel       string
+	Inline          bool
+	Links           []PaginationLink
+	HasPreviousPage bool
+	HasNextPage     bool
+	PreviousURL     string
+	NextURL         string
+	HxTarget        string
+	HxSelect        string
+	PushURL         bool
+}
+
 // RolePillView is one palette-colored pill in templates/components/role_pill_row.html.
 type RolePillView struct {
 	Label   string

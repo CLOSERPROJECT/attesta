@@ -337,12 +337,6 @@ type HomeWorkflowPickerView struct {
 	Confirmation               string
 }
 
-type PaginationLink struct {
-	Page      int
-	URL       string
-	IsCurrent bool
-}
-
 type QueryInput struct {
 	Name  string
 	Value string
@@ -370,6 +364,7 @@ type ProcessStatusGroup struct {
 	NextPage            int
 	PreviousURL         string
 	NextURL             string
+	Pagination          PaginationView
 	Processes           []StreamInstanceCard
 }
 
@@ -2033,6 +2028,10 @@ func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInsta
 		sortFields = []QueryInput{{Name: "filter", Value: status}}
 	}
 	navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel := homeProcessStatusCopy(status)
+	previousURL := homePaginationURL(workflowPath, status, sortKey, previousPage)
+	nextURL := homePaginationURL(workflowPath, status, sortKey, nextPage)
+	hasPreviousPage := currentPage > 1
+	hasNextPage := currentPage < totalPages
 	return ProcessStatusGroup{
 		Status:              status,
 		Label:               processStatusLabel(status),
@@ -2049,13 +2048,25 @@ func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInsta
 		TotalPages:          totalPages,
 		PageNumbers:         pageNumbers,
 		PageLinks:           pageLinks,
-		HasPreviousPage:     currentPage > 1,
-		HasNextPage:         currentPage < totalPages,
+		HasPreviousPage:     hasPreviousPage,
+		HasNextPage:         hasNextPage,
 		PreviousPage:        previousPage,
 		NextPage:            nextPage,
-		PreviousURL:         homePaginationURL(workflowPath, status, sortKey, previousPage),
-		NextURL:             homePaginationURL(workflowPath, status, sortKey, nextPage),
-		Processes:           pagedItems,
+		PreviousURL:         previousURL,
+		NextURL:             nextURL,
+		Pagination: PaginationView{
+			AriaLabel:       paginationAriaLabel,
+			Inline:          true,
+			Links:           pageLinks,
+			HasPreviousPage: hasPreviousPage,
+			HasNextPage:     hasNextPage,
+			PreviousURL:     previousURL,
+			NextURL:         nextURL,
+			HxTarget:        "#stream-dashboard-results",
+			HxSelect:        "#stream-dashboard-results",
+			PushURL:         true,
+		},
+		Processes: pagedItems,
 	}
 }
 

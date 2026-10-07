@@ -46,6 +46,7 @@
   margin-top: var(--space-5);
 }
 
+.platform-admin-results-footer .pagination,
 .platform-admin-results-footer .platform-admin-pagination {
   margin-top: 0;
 }
@@ -86,27 +87,6 @@
 .platform-admin-invite-button:hover:not(:disabled, .is-disabled) {
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, var(--card));
-}
-
-.platform-admin-pagination {
-  margin-top: var(--space-5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.platform-admin-pagination--inline {
-  margin: 0;
-}
-
-.platform-admin-pagination-pages {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
 .platform-admin-admin-summary {

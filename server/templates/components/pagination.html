@@ -1,0 +1,16 @@
+{{ define "pagination" }}
+  <nav class="pagination{{ if .Inline }} pagination--inline{{ end }}"
+       aria-label="{{ .AriaLabel }}">
+    <div class="pagination-pages">
+      <a class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}" href="{{ .PreviousURL }}" {{- if .HxTarget }} hx-get="{{ .PreviousURL }}" hx-target="{{ .HxTarget }}" {{- if .HxSelect }} hx-select="{{ .HxSelect }}"{{ end }} hx-swap="outerHTML" {{- if .PushURL }} hx-push-url="true"{{ end }} {{- end }}>
+        {{ template "icon-chevron-left" . }}
+      </a>
+      {{ range .Links }}
+        <a class="{{ if .IsCurrent }}btn btn-primary{{ else }}btn btn-secondary{{ end }}" href="{{ .URL }}" {{- if $.HxTarget }} hx-get="{{ .URL }}" hx-target="{{ $.HxTarget }}" {{- if $.HxSelect }} hx-select="{{ $.HxSelect }}"{{ end }} hx-swap="outerHTML" {{- if $.PushURL }} hx-push-url="true"{{ end }} {{- end }}>{{ .Page }}</a>
+      {{ end }}
+      <a class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}" href="{{ .NextURL }}" {{- if .HxTarget }} hx-get="{{ .NextURL }}" hx-target="{{ .HxTarget }}" {{- if .HxSelect }} hx-select="{{ .HxSelect }}"{{ end }} hx-swap="outerHTML" {{- if .PushURL }} hx-push-url="true"{{ end }} {{- end }}>
+        {{ template "icon-chevron-right" . }}
+      </a>
+    </div>
+  </nav>
+{{ end }}
