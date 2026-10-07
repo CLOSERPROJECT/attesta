@@ -76,6 +76,7 @@ type OnboardingJoinView struct {
 	HasNextPage      bool
 	PreviousPage     int
 	NextPage         int
+	Pagination       PaginationView
 }
 
 func (s *Server) handleOnboardingRoutes(w http.ResponseWriter, r *http.Request) {
@@ -462,17 +463,41 @@ func (s *Server) buildOnboardingJoinView(w http.ResponseWriter, r *http.Request,
 			totalPages = (orgPage.Total + onboardingJoinSearchLimit - 1) / onboardingJoinSearchLimit
 		}
 		pageNumbers := make([]int, 0, totalPages)
+		pageLinks := make([]PaginationLink, 0, totalPages)
 		for page := 1; page <= totalPages; page++ {
 			pageNumbers = append(pageNumbers, page)
+			pageLinks = append(pageLinks, PaginationLink{
+				Page:      page,
+				URL:       onboardingJoinHref(view.SearchQuery, page),
+				IsCurrent: page == currentPage,
+			})
 		}
+
+		previousPage := max(currentPage-1, 1)
+		nextPage := min(currentPage+1, totalPages)
+		hasPreviousPage := currentPage > 1
+		hasNextPage := currentPage < totalPages
+		previousURL := onboardingJoinHref(view.SearchQuery, previousPage)
+		nextURL := onboardingJoinHref(view.SearchQuery, nextPage)
 
 		view.CurrentPage = currentPage
 		view.TotalPages = totalPages
 		view.PageNumbers = pageNumbers
-		view.HasPreviousPage = currentPage > 1
-		view.HasNextPage = currentPage < totalPages
-		view.PreviousPage = max(currentPage-1, 1)
-		view.NextPage = min(currentPage+1, totalPages)
+		view.HasPreviousPage = hasPreviousPage
+		view.HasNextPage = hasNextPage
+		view.PreviousPage = previousPage
+		view.NextPage = nextPage
+		view.Pagination = PaginationView{
+			AriaLabel:       "Organizations pagination",
+			Links:           pageLinks,
+			HasPreviousPage: hasPreviousPage,
+			HasNextPage:     hasNextPage,
+			PreviousURL:     previousURL,
+			NextURL:         nextURL,
+			HxTarget:        "#onboarding-join-results",
+			HxSelect:        "#onboarding-join-results",
+			PushURL:         true,
+		}
 		view.Results = make([]OnboardingJoinOrgResult, 0, len(orgPage.Organizations))
 		for _, org := range orgPage.Organizations {
 			slug := strings.TrimSpace(org.Slug)
@@ -559,6 +584,21 @@ func identityUserForAffiliation(user *AccountUser) IdentityUser {
 		IsPlatformAdmin: user.IsPlatformAdmin,
 		Status:          strings.TrimSpace(user.Status),
 	}
+}
+
+func onboardingJoinHref(searchQuery string, page int) string {
+	values := url.Values{}
+	if q := strings.TrimSpace(searchQuery); q != "" {
+		values.Set("q", q)
+	}
+	if page > 1 {
+		values.Set("page", strconv.Itoa(page))
+	}
+	href := onboardingJoinPath()
+	if encoded := values.Encode(); encoded != "" {
+		href += "?" + encoded
+	}
+	return href
 }
 
 func onboardingJoinDialogHref(searchQuery, orgSlug string, page int) string {

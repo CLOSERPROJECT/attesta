@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -215,5 +218,53 @@ func TestBuildHomeProcessGroupCarriesPaginationView(t *testing.T) {
 	}
 	if len(p.Links) != 2 || !p.Links[0].IsCurrent || p.Links[1].IsCurrent {
 		t.Fatalf("unexpected Links: %#v", p.Links)
+	}
+}
+
+func TestBuildOnboardingJoinViewCarriesPaginationView(t *testing.T) {
+	identity := &fakeIdentityStore{}
+	identity.listOrganizationsPageFunc = func(_ context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+		if opts.Search != "acme" {
+			t.Fatalf("search = %q, want acme", opts.Search)
+		}
+		return IdentityOrgPage{
+			Organizations: []IdentityOrg{{Slug: "acme", Name: "Acme"}},
+			Total:         onboardingJoinSearchLimit + 1,
+		}, nil
+	}
+	server := &Server{identity: identity, tmpl: parseTestTemplates(t)}
+	req := httptest.NewRequest(http.MethodGet, "/my/onboarding/join?q=acme", nil)
+	rec := httptest.NewRecorder()
+	view, ok := server.buildOnboardingJoinView(rec, req, &AccountUser{IdentityUserID: "u"}, "", "acme", "", 1)
+	if !ok {
+		t.Fatal("expected buildOnboardingJoinView ok")
+	}
+	p := view.Pagination
+	if p.AriaLabel != "Organizations pagination" {
+		t.Fatalf("Pagination.AriaLabel = %q", p.AriaLabel)
+	}
+	if p.Inline {
+		t.Fatal("expected onboarding join pagination Inline=false")
+	}
+	if p.HxTarget != "#onboarding-join-results" || p.HxSelect != "#onboarding-join-results" {
+		t.Fatalf("unexpected HTMX targets: %#v", p)
+	}
+	if !p.PushURL {
+		t.Fatal("expected PushURL=true for onboarding join")
+	}
+	if !p.HasNextPage || p.HasPreviousPage {
+		t.Fatalf("page 1 of 2: HasPrevious=%v HasNext=%v", p.HasPreviousPage, p.HasNextPage)
+	}
+	if p.PreviousURL != "/my/onboarding/join?q=acme" {
+		t.Fatalf("PreviousURL = %q", p.PreviousURL)
+	}
+	if p.NextURL != "/my/onboarding/join?page=2&q=acme" {
+		t.Fatalf("NextURL = %q", p.NextURL)
+	}
+	if len(p.Links) != 2 || !p.Links[0].IsCurrent || p.Links[1].IsCurrent {
+		t.Fatalf("unexpected Links: %#v", p.Links)
+	}
+	if p.Links[0].URL != "/my/onboarding/join?q=acme" || p.Links[1].URL != "/my/onboarding/join?page=2&q=acme" {
+		t.Fatalf("unexpected link URLs: %#v", p.Links)
 	}
 }
