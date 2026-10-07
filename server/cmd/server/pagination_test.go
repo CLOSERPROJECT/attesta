@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 )
@@ -215,5 +216,62 @@ func TestBuildHomeProcessGroupCarriesPaginationView(t *testing.T) {
 	}
 	if len(p.Links) != 2 || !p.Links[0].IsCurrent || p.Links[1].IsCurrent {
 		t.Fatalf("unexpected Links: %#v", p.Links)
+	}
+}
+
+func TestPlatformAdminViewCarriesPaginationView(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
+	identity := &fakeIdentityStore{
+		listOrganizationsPageFunc: func(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error) {
+			if opts.Limit != platformAdminOrganizationsPerPage || opts.Offset != platformAdminOrganizationsPerPage || opts.Search != "ac" {
+				t.Fatalf("opts = %#v", opts)
+			}
+			orgs := make([]IdentityOrg, 1)
+			orgs[0] = IdentityOrg{ID: "t13", Slug: "org-13", Name: "Org 13"}
+			return IdentityOrgPage{Total: 25, Organizations: orgs}, nil
+		},
+		listOrganizationMembershipsLiteFunc: func(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
+			return nil, nil
+		},
+	}
+	server := &Server{identity: identity, authorizer: fakeAuthorizer{}}
+	view := server.platformAdminView(
+		&AccountUser{Email: "admin@example.com", IsPlatformAdmin: true},
+		"",
+		PlatformAdminErrors{SearchQuery: "ac", Page: 2},
+	)
+
+	p := view.Pagination
+	if p.AriaLabel != "Organizations pagination" {
+		t.Fatalf("Pagination.AriaLabel = %q", p.AriaLabel)
+	}
+	if p.Inline {
+		t.Fatal("expected platform-admin pagination Inline=false")
+	}
+	if p.HxTarget != "#platform-admin-results" || p.HxSelect != "#platform-admin-results" {
+		t.Fatalf("unexpected HTMX targets: %#v", p)
+	}
+	if !p.PushURL {
+		t.Fatal("expected PushURL=true for platform-admin orgs")
+	}
+	if !p.HasPreviousPage || !p.HasNextPage {
+		t.Fatalf("page 2 of 3: HasPrevious=%v HasNext=%v", p.HasPreviousPage, p.HasNextPage)
+	}
+	if p.PreviousURL != platformAdminPath("ac", 1) || p.NextURL != platformAdminPath("ac", 3) {
+		t.Fatalf("prev/next URLs = %q / %q", p.PreviousURL, p.NextURL)
+	}
+	if len(p.Links) != 3 {
+		t.Fatalf("expected 3 page links, got %#v", p.Links)
+	}
+	for i, link := range p.Links {
+		wantPage := i + 1
+		if link.Page != wantPage || link.URL != platformAdminPath("ac", wantPage) {
+			t.Fatalf("Links[%d] = %#v", i, link)
+		}
+		if link.IsCurrent != (wantPage == 2) {
+			t.Fatalf("Links[%d].IsCurrent = %v", i, link.IsCurrent)
+		}
 	}
 }
