@@ -71,7 +71,7 @@
 
 .category-sidebar-category {
   border-radius: 8px;
-  background: var(--muted);
+  background: var(--background);
   border: 1px solid transparent;
   interpolate-size: allow-keywords;
 }
