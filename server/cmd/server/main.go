@@ -332,6 +332,8 @@ type HomeWorkflowPickerView struct {
 	PendingJoinRequests        []OrgAdminJoinRequestRow
 	PendingStreamActions       []StreamAttentionItem
 	UpcomingStreams            []StreamUpcomingItem
+	YourTurnBand               MyHomeYourTurnBandView
+	UpcomingBand               MyHomeUpcomingBandView
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
 	Error                      string
 	Confirmation               string
@@ -2293,6 +2295,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if user.IsPlatformAdmin {
 		pendingOrgCreation = platformAdminOrgCreationRequestRows(r.Context(), s)
 	}
+	yourTurnBand := buildMyHomeYourTurnBand(pendingStreams, 1)
+	upcomingBand := buildMyHomeUpcomingBand(upcomingStreams, 1)
 	view := HomeWorkflowPickerView{
 		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
 		Groups:                     groups,
@@ -2300,8 +2304,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		DiscoveryStreams:           discoveryStreams,
 		ShowCreateStream:           showCreateStream && authErr == nil,
 		PendingJoinRequests:        pendingJoins,
-		PendingStreamActions:       pendingStreams,
-		UpcomingStreams:            upcomingStreams,
+		PendingStreamActions:       yourTurnBand.PendingStreamActions,
+		UpcomingStreams:            upcomingBand.UpcomingStreams,
+		YourTurnBand:               yourTurnBand,
+		UpcomingBand:               upcomingBand,
 		PendingOrgCreationRequests: pendingOrgCreation,
 		Error:                      homePickerMessage(r, "error"),
 		Confirmation:               homePickerMessage(r, "confirmation"),
@@ -2336,6 +2342,15 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleLeaveOrganization(w, r)
 		return
 	default:
+		if band, ok := myHomeBandRest(rest); ok {
+			switch band {
+			case "your-turn":
+				s.handleMyHomeYourTurn(w, r)
+			case "upcoming":
+				s.handleMyHomeUpcoming(w, r)
+			}
+			return
+		}
 		http.NotFound(w, r)
 	}
 }

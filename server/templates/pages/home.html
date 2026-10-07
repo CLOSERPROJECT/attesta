@@ -1,5 +1,67 @@
 {{/* Used on /my to render the stream picker (home_picker_body). */}}
 
+{{ define "my_home_your_turn" }}
+  <section id="my-home-your-turn"
+           class="my-home-attention"
+           aria-label="Attention">
+    <div class="panel-heading my-home-section-heading">
+      {{ template "icon-bell" . }}
+      <div class="my-home-section-heading-copy">
+        <h2>Your turn</h2>
+        <p>Active stream instances waiting for your action</p>
+      </div>
+    </div>
+    <ul class="list-rows">
+      {{ range .PendingStreamActions }}
+        <li>
+          <a class="list-row" href="{{ .Href }}">
+            <div class="list-row-main list-row-main-stack">
+              <p>{{ .InstanceName }}</p>
+              <p class="muted u-text-xs">
+                {{ .WorkflowName }}
+                {{ if .SubstepTitle }}· {{ .SubstepTitle }}{{ end }}
+              </p>
+            </div>
+          </a>
+        </li>
+      {{ end }}
+    </ul>
+    {{ if gt .TotalPages 1 }}
+      {{ template "pagination" .Pagination }}
+    {{ end }}
+  </section>
+{{ end }}
+
+{{ define "my_home_upcoming" }}
+  <section id="my-home-upcoming" class="my-home-upcoming" aria-label="Upcoming">
+    <div class="panel-heading my-home-section-heading">
+      {{ template "icon-clock" . }}
+      <div class="my-home-section-heading-copy">
+        <h2>Upcoming</h2>
+        <p>Active stream instances waiting on someone else</p>
+      </div>
+    </div>
+    <ul class="list-rows">
+      {{ range .UpcomingStreams }}
+        <li>
+          <a class="list-row" href="{{ .Href }}">
+            <div class="list-row-main list-row-main-stack">
+              <p>{{ .InstanceName }}</p>
+              <p class="muted u-text-xs">
+                {{ .WorkflowName }}
+                {{ if .WaitingOn }}· {{ .WaitingOn }}{{ end }}
+              </p>
+            </div>
+          </a>
+        </li>
+      {{ end }}
+    </ul>
+    {{ if gt .TotalPages 1 }}
+      {{ template "pagination" .Pagination }}
+    {{ end }}
+  </section>
+{{ end }}
+
 {{ define "home_picker_body" }}
   <section class="stack u-max-w-7xl u-mx-auto my-home">
     {{ if .PendingJoinRequests }}
@@ -67,59 +129,13 @@
       {{ if .PendingJoinRequests }}
         <hr class="my-home-rule" />
       {{ end }}
-      <section class="my-home-attention" aria-label="Attention">
-        <div class="panel-heading my-home-section-heading">
-          {{ template "icon-bell" . }}
-          <div class="my-home-section-heading-copy">
-            <h2>Your turn</h2>
-            <p>Active stream instances waiting for your action</p>
-          </div>
-        </div>
-        <ul class="list-rows">
-          {{ range .PendingStreamActions }}
-            <li>
-              <a class="list-row" href="{{ .Href }}">
-                <div class="list-row-main list-row-main-stack">
-                  <p>{{ .InstanceName }}</p>
-                  <p class="muted u-text-xs">
-                    {{ .WorkflowName }}
-                    {{ if .SubstepTitle }}· {{ .SubstepTitle }}{{ end }}
-                  </p>
-                </div>
-              </a>
-            </li>
-          {{ end }}
-        </ul>
-      </section>
+      {{ template "my_home_your_turn" .YourTurnBand }}
     {{ end }}
     {{ if .UpcomingStreams }}
       {{ if or .PendingJoinRequests .PendingStreamActions }}
         <hr class="my-home-rule" />
       {{ end }}
-      <section class="my-home-upcoming" aria-label="Upcoming">
-        <div class="panel-heading my-home-section-heading">
-          {{ template "icon-clock" . }}
-          <div class="my-home-section-heading-copy">
-            <h2>Upcoming</h2>
-            <p>Active stream instances waiting on someone else</p>
-          </div>
-        </div>
-        <ul class="list-rows">
-          {{ range .UpcomingStreams }}
-            <li>
-              <a class="list-row" href="{{ .Href }}">
-                <div class="list-row-main list-row-main-stack">
-                  <p>{{ .InstanceName }}</p>
-                  <p class="muted u-text-xs">
-                    {{ .WorkflowName }}
-                    {{ if .WaitingOn }}· {{ .WaitingOn }}{{ end }}
-                  </p>
-                </div>
-              </a>
-            </li>
-          {{ end }}
-        </ul>
-      </section>
+      {{ template "my_home_upcoming" .UpcomingBand }}
     {{ end }}
     {{ if .PendingOrgCreationRequests }}
       {{ if or .PendingJoinRequests .PendingStreamActions .UpcomingStreams }}
