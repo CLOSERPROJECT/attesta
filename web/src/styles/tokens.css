@@ -56,7 +56,7 @@
   --btn-padding-x-sm: var(--space-2);
 
   /* Surfaces */
-  --background: rgb(248 253 252);
+  --background: #fbfbfb;
   --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
@@ -195,7 +195,7 @@
   color-scheme: dark;
 
   /* Surfaces (Figma CLOSER dark → Attesta names) */
-  --background: linear-gradient(135deg, #0b0f0d 0%, #121915 100%);
+  --background: #1f242e;
   --foreground: #ebf5f4;
   --card: #1d1f2b;
   --muted: color-mix(in srgb, #fff 4%, #1d1f2b);
