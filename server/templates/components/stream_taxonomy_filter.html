@@ -1,0 +1,111 @@
+{{/* Shared select-based taxonomy filter and independently swappable results. */}}
+
+{{ define "stream_taxonomy_filter" }}
+  <form id="{{ .FormID }}"
+        class="stream-taxonomy-filter"
+        method="get"
+        action="{{ .Action }}"
+        onsubmit="return false">
+    <div class="stream-taxonomy-filter-field">
+      <label for="{{ .FormID }}-category">Category</label>
+      <select id="{{ .FormID }}-category"
+              class="stream-taxonomy-filter-select"
+              name="category"
+              aria-controls="{{ .CatalogTargetID }}"
+              hx-get="{{ .Action }}"
+              hx-target="#{{ .CatalogTargetID }}"
+              hx-swap="outerHTML"
+              hx-include="#{{ .FormID }}"
+              hx-trigger="change"
+              hx-push-url="false">
+        <button type="button">
+          <selectedcontent></selectedcontent>
+        </button>
+        <option value="" {{ if .AllCategoriesActive }}selected{{ end }}>
+          <span class="stream-taxonomy-filter-option-label">All categories</span>
+        </option>
+        {{ range .CategoryOptions }}
+          <option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>
+            {{ if .IconURL }}
+              <img class="stream-taxonomy-filter-option-icon"
+                   src="{{ .IconURL }}"
+                   alt=""
+                   width="16"
+                   height="16" />
+            {{ end }}
+            <span class="stream-taxonomy-filter-option-label">{{ .Label }}</span>
+          </option>
+        {{ end }}
+        {{ if .ShowUncategorized }}
+          <option value="uncategorized" {{ if .UncategorizedActive }}selected{{ end }}>
+            <span class="stream-taxonomy-filter-option-label">Uncategorized</span>
+          </option>
+        {{ end }}
+      </select>
+    </div>
+    <div class="stream-taxonomy-filter-field">
+      <label for="{{ .FormID }}-subcategory">Sub-category</label>
+      <select id="{{ .FormID }}-subcategory"
+              class="stream-taxonomy-filter-select"
+              name="subCategory"
+              aria-controls="{{ .ResultsTargetID }}"
+              hx-get="{{ .Action }}"
+              hx-target="#{{ .ResultsTargetID }}"
+              hx-swap="outerHTML"
+              hx-include="#{{ .FormID }}"
+              hx-trigger="change"
+              hx-push-url="false"
+              {{ if .SubCategoryDisabled }}disabled{{ end }}>
+        <button type="button">
+          <selectedcontent></selectedcontent>
+        </button>
+        <option value="">
+          <span class="stream-taxonomy-filter-option-label">All sub-categories</span>
+        </option>
+        {{ range .SubCategoryOptions }}
+          <option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>
+            {{ if .IconURL }}
+              <img class="stream-taxonomy-filter-option-icon"
+                   src="{{ .IconURL }}"
+                   alt=""
+                   width="16"
+                   height="16" />
+            {{ end }}
+            <span class="stream-taxonomy-filter-option-label">{{ .Label }}</span>
+          </option>
+        {{ end }}
+      </select>
+    </div>
+    {{ if not .AllCategoriesActive }}
+      <button type="button"
+              class="btn btn-ghost stream-taxonomy-filter-clear"
+              hx-get="{{ .Action }}"
+              hx-target="#{{ .CatalogTargetID }}"
+              hx-swap="outerHTML"
+              hx-push-url="false">
+        {{ template "icon-close" . }}
+        <span>Clear filters</span>
+      </button>
+    {{ end }}
+  </form>
+{{ end }}
+
+{{ define "stream_taxonomy_results" }}
+  <div id="{{ .ID }}" class="stream-taxonomy-results" aria-live="polite">
+    {{ if .Streams }}
+      <div class="public-home-stream-grid">
+        {{ range .Streams }}
+          {{ template "managed_public_stream_card" . }}
+        {{ end }}
+      </div>
+    {{ else }}
+      <div class="empty-state">
+        {{ template "icon-layers-2" . }}
+        <p class="empty-state-title">No streams available</p>
+        {{ if .EmptyHint }}
+          <p class="empty-state-hint">{{ .EmptyHint }}</p>
+        {{ end }}
+      </div>
+    {{ end }}
+  </div>
+{{ end }}

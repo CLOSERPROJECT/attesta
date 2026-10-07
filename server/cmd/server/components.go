@@ -43,6 +43,43 @@ type ManagedPublicStreamCardView struct {
 	StartAction       string
 }
 
+// StreamTaxonomyOptionView is one option in a taxonomy filter select.
+type StreamTaxonomyOptionView struct {
+	Value    string
+	Label    string
+	IconURL  string
+	Selected bool
+}
+
+// StreamTaxonomyFilterView is the view model for
+// templates/components/stream_taxonomy_filter.html.
+type StreamTaxonomyFilterView struct {
+	FormID              string
+	Action              string
+	CatalogTargetID     string
+	ResultsTargetID     string
+	CategoryOptions     []StreamTaxonomyOptionView
+	SubCategoryOptions  []StreamTaxonomyOptionView
+	ShowUncategorized   bool
+	AllCategoriesActive bool
+	UncategorizedActive bool
+	SubCategoryDisabled bool
+}
+
+// StreamTaxonomyResultsView is the independently swappable card-grid region.
+type StreamTaxonomyResultsView struct {
+	ID        string
+	Streams   []ManagedPublicStreamCardView
+	EmptyHint string
+}
+
+// StreamTaxonomyCatalogView contains the filter and its results region.
+type StreamTaxonomyCatalogView struct {
+	ID      string
+	Filter  StreamTaxonomyFilterView
+	Results StreamTaxonomyResultsView
+}
+
 // MyHomeStreamGroupView is one taxonomy (or Uncategorized) block on /my.
 // CategoryName/CategoryIconURL are always set; ShowCategoryHeader is true only
 // on the first non-empty subcategory under a category so the h2 is not repeated.

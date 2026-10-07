@@ -185,6 +185,13 @@
   {{ end }}
 {{ end }}
 
+{{ define "platform_admin_stream_catalog" }}
+  <div id="{{ .ID }}" class="stream-taxonomy-catalog">
+    {{ template "stream_taxonomy_filter" .Filter }}
+    {{ template "stream_taxonomy_results" .Results }}
+  </div>
+{{ end }}
+
 {{ define "platform_admin_streams_panel" }}
   <div id="platform-admin-streams" class="my-home">
     <div class="panel-head-actions my-home-catalog-heading">
@@ -199,15 +206,7 @@
         </div>
       {{ end }}
     </div>
-    {{ if .Groups }}
-      {{ template "my_home_catalog_body" . }}
-    {{ else }}
-      <div class="empty-state">
-        {{ template "icon-layers-2" . }}
-        <p class="empty-state-title">No streams available</p>
-        <p class="empty-state-hint">Create a stream to populate the platform catalog.</p>
-      </div>
-    {{ end }}
+    {{ template "platform_admin_stream_catalog" .StreamCatalog }}
   </div>
 {{ end }}
 

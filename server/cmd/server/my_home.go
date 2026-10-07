@@ -160,16 +160,16 @@ func (s *Server) streamManagementFlags(ctx context.Context, user *AccountUser, k
 	return canClone, canEdit, editRequiresPurge, canDelete, deleteReason
 }
 
-func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]MyHomeStreamGroupView, error) {
+func (s *Server) buildMyHomeCatalogData(ctx context.Context, user *AccountUser) ([]TaxonomyCategoryNode, []MyHomeStreamGroupView, error) {
 	catalog, err := s.workflowCatalog()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var categories []TaxonomyCategoryNode
 	if s.store != nil {
 		categories, err = loadTaxonomyTree(ctx, s.store)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	logoURLs := organizationLogoURLMap(ctx, s.identity)
@@ -185,7 +185,7 @@ func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]M
 	if s.store != nil {
 		streams, listErr := s.store.ListFormataBuilderStreams(ctx)
 		if listErr != nil {
-			return nil, listErr
+			return nil, nil, listErr
 		}
 		for _, stream := range streams {
 			if stream.ID.IsZero() {
@@ -207,7 +207,7 @@ func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]M
 		cfg := catalog[key]
 		card, buildErr := s.buildPublicStreamCardView(ctx, key, cfg, logoURLs)
 		if buildErr != nil {
-			return nil, buildErr
+			return nil, nil, buildErr
 		}
 		card.Href = streamPath(key) + "/"
 
@@ -224,7 +224,7 @@ func (s *Server) buildMyHomeCatalog(ctx context.Context, user *AccountUser) ([]M
 		cardsByKey[key] = managed
 	}
 
-	return buildMyHomeStreamGroups(categories, cardsByKey, catalog, accessibleKeys), nil
+	return categories, buildMyHomeStreamGroups(categories, cardsByKey, catalog, accessibleKeys), nil
 }
 
 // buildDiscoveryManagedCards turns catalog discovery rows into managed card views

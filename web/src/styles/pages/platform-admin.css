@@ -1,3 +1,12 @@
+#platform-admin-streams .my-home-catalog-heading.panel-head-actions {
+  margin-bottom: 0;
+}
+
+#platform-admin-streams .stream-taxonomy-filter {
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
 .platform-admin-search {
   margin-top: var(--space-1);
 }

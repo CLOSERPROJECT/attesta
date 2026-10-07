@@ -267,7 +267,9 @@
           </p>
         {{ end }}
         {{ template "error_banner.html" . }}
-        {{ if .DiscoveryStreams }}
+        {{ if .DiscoveryCatalog }}
+          {{ template "home_stream_discovery_catalog" .DiscoveryCatalog }}
+        {{ else if .DiscoveryStreams }}
           <div class="my-home-discovery">
             <div class="public-home-stream-grid">
               {{ range .DiscoveryStreams }}
@@ -296,6 +298,13 @@
       </section>
     {{ end }}
   </section>
+{{ end }}
+
+{{ define "home_stream_discovery_catalog" }}
+  <div id="{{ .ID }}" class="my-home-discovery stream-taxonomy-catalog">
+    {{ template "stream_taxonomy_filter" .Filter }}
+    {{ template "stream_taxonomy_results" .Results }}
+  </div>
 {{ end }}
 
 {{ define "home.html" }}
