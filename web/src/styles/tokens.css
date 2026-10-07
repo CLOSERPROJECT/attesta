@@ -60,8 +60,8 @@
   --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
-  --muted: rgb(248 253 252);
-  --muted-foreground: #737973;
+  --muted: #f2f6f5;
+  --muted-foreground: #aeb6ae;
   --secondary: #fff;
   --secondary-foreground: var(--foreground);
 
