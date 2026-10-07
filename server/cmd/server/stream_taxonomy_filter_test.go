@@ -167,6 +167,99 @@ func TestStreamTaxonomySelectionOnlyUsesRecognizedHTMXTargets(t *testing.T) {
 	}
 }
 
+func TestPrepareDiscoveryTaxonomyCandidatesEmpty(t *testing.T) {
+	items := []StreamDiscoveryItem{{WorkflowKey: "procurement", CategorySlug: "supply-chain", SubCategorySlug: "procurement"}}
+	if _, ok := prepareDiscoveryTaxonomyCandidates(items, nil); ok {
+		t.Fatal("empty cards must return ok=false")
+	}
+	if _, ok := prepareDiscoveryTaxonomyCandidates(items, []ManagedPublicStreamCardView{}); ok {
+		t.Fatal("zero-length cards must return ok=false")
+	}
+}
+
+func TestPrepareDiscoveryTaxonomyCandidatesNonEmpty(t *testing.T) {
+	items := []StreamDiscoveryItem{{WorkflowKey: "procurement", CategorySlug: "supply-chain", SubCategorySlug: "procurement"}}
+	cards := []ManagedPublicStreamCardView{{Key: "procurement", Card: PublicStreamCardView{Name: "Procurement Stream"}}}
+	candidates, ok := prepareDiscoveryTaxonomyCandidates(items, cards)
+	if !ok {
+		t.Fatal("expected ok=true for non-empty cards")
+	}
+	if len(candidates) != 1 || candidates[0].CategorySlug != "supply-chain" {
+		t.Fatalf("candidates = %#v", candidates)
+	}
+}
+
+func TestBuildAndWriteStreamTaxonomyCatalogSelectionAndPartial(t *testing.T) {
+	server := &Server{tmpl: parseTestTemplates(t)}
+	spec := streamTaxonomyCatalogSpec{
+		ID:              homeDiscoveryCatalogTargetID,
+		FormID:          "home-stream-discovery-filter",
+		Action:          "/my",
+		ResultsID:       homeDiscoveryResultsTargetID,
+		CatalogTemplate: "home_stream_discovery_catalog",
+		EmptyHint:       "No matching streams.",
+	}
+
+	fullReq := httptest.NewRequest(http.MethodGet, "/my?category=supply-chain&subCategory=procurement", nil)
+	fullRec := httptest.NewRecorder()
+	catalog, wrote := server.buildAndWriteStreamTaxonomyCatalog(
+		fullRec, fullReq, spec, streamTaxonomyTestCategories(), streamTaxonomyTestCandidates(),
+	)
+	if wrote {
+		t.Fatal("full page request must not write a partial")
+	}
+	if got := streamTaxonomyStreamNames(catalog.Results.Streams); got != "Procurement Stream,Fulfillment Stream,Uncategorized Stream" {
+		t.Fatalf("full page streams = %q", got)
+	}
+	if fullRec.Body.Len() != 0 {
+		t.Fatalf("full page must leave response empty, got %s", fullRec.Body.String())
+	}
+
+	filterReq := httptest.NewRequest(http.MethodGet, "/my?category=supply-chain&subCategory=procurement", nil)
+	filterReq.Header.Set("HX-Request", "true")
+	filterReq.Header.Set("HX-Target", homeDiscoveryResultsTargetID)
+	filterRec := httptest.NewRecorder()
+	catalog, wrote = server.buildAndWriteStreamTaxonomyCatalog(
+		filterRec, filterReq, spec, streamTaxonomyTestCategories(), streamTaxonomyTestCandidates(),
+	)
+	if !wrote {
+		t.Fatal("results HTMX target must write a partial")
+	}
+	if got := streamTaxonomyStreamNames(catalog.Results.Streams); got != "Procurement Stream" {
+		t.Fatalf("filtered streams = %q", got)
+	}
+	body := filterRec.Body.String()
+	if !strings.Contains(body, `id="home-stream-discovery-results"`) || !strings.Contains(body, "Procurement Stream") {
+		t.Fatalf("results partial missing expected content: %s", body)
+	}
+	if strings.Contains(body, `id="home-stream-discovery"`) || strings.Contains(body, "home-stream-discovery-filter") {
+		t.Fatalf("results partial must not include catalog chrome: %s", body)
+	}
+
+	catalogReq := httptest.NewRequest(http.MethodGet, "/my?category=supply-chain", nil)
+	catalogReq.Header.Set("HX-Request", "true")
+	catalogReq.Header.Set("HX-Target", homeDiscoveryCatalogTargetID)
+	catalogRec := httptest.NewRecorder()
+	_, wrote = server.buildAndWriteStreamTaxonomyCatalog(
+		catalogRec, catalogReq, spec, streamTaxonomyTestCategories(), streamTaxonomyTestCandidates(),
+	)
+	if !wrote {
+		t.Fatal("catalog HTMX target must write a partial")
+	}
+	catalogBody := catalogRec.Body.String()
+	for _, want := range []string{
+		`id="home-stream-discovery"`,
+		`id="home-stream-discovery-filter"`,
+		`id="home-stream-discovery-results"`,
+		"Procurement Stream",
+		"Fulfillment Stream",
+	} {
+		if !strings.Contains(catalogBody, want) {
+			t.Fatalf("catalog partial missing %q in %s", want, catalogBody)
+		}
+	}
+}
+
 func TestStreamTaxonomyFilterTemplateHTMXWiring(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 

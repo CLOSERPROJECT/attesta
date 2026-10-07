@@ -22,6 +22,7 @@ type streamTaxonomyCatalogSpec struct {
 	FormID                  string
 	Action                  string
 	ResultsID               string
+	CatalogTemplate         string
 	IncludeAllCategories    bool
 	AlwaysShowUncategorized bool
 	EmptyHint               string
@@ -43,6 +44,20 @@ func streamTaxonomySelectionFromRequest(r *http.Request, catalogTargetID, result
 		return "", ""
 	}
 	return strings.TrimSpace(r.URL.Query().Get("category")), strings.TrimSpace(r.URL.Query().Get("subCategory"))
+}
+
+// buildAndWriteStreamTaxonomyCatalog builds the catalog and writes an HTMX
+// partial when HX-Target matches. wrotePartial true means the caller should return.
+func (s *Server) buildAndWriteStreamTaxonomyCatalog(
+	w http.ResponseWriter,
+	r *http.Request,
+	spec streamTaxonomyCatalogSpec,
+	categories []TaxonomyCategoryNode,
+	candidates []streamTaxonomyCandidate,
+) (StreamTaxonomyCatalogView, bool) {
+	categorySlug, subCategorySlug := streamTaxonomySelectionFromRequest(r, spec.ID, spec.ResultsID)
+	catalog := buildStreamTaxonomyCatalogView(spec, categories, candidates, categorySlug, subCategorySlug)
+	return catalog, s.writeStreamTaxonomyHTMXPartial(w, r, spec.CatalogTemplate, catalog)
 }
 
 // writeStreamTaxonomyHTMXPartial writes the catalog or results fragment when
@@ -226,4 +241,12 @@ func streamTaxonomyCandidatesFromDiscovery(items []StreamDiscoveryItem, cards []
 		})
 	}
 	return candidates
+}
+
+// prepareDiscoveryTaxonomyCandidates returns candidates for a non-empty discovery set.
+func prepareDiscoveryTaxonomyCandidates(items []StreamDiscoveryItem, cards []ManagedPublicStreamCardView) (candidates []streamTaxonomyCandidate, ok bool) {
+	if len(cards) == 0 {
+		return nil, false
+	}
+	return streamTaxonomyCandidatesFromDiscovery(items, cards), true
 }

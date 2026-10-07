@@ -25,16 +25,19 @@ func (s *Server) renderStreamsCatalog(w http.ResponseWriter, r *http.Request, ad
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load platform stream catalog", err, "failed to load platform admin streams")
 		return
 	}
-	categorySlug, subCategorySlug := streamTaxonomySelectionFromRequest(r, platformStreamsCatalogTargetID, platformStreamsResultsTargetID)
-	streamCatalog := buildStreamTaxonomyCatalogView(streamTaxonomyCatalogSpec{
+	streamCatalog, wrotePartial := s.buildAndWriteStreamTaxonomyCatalog(w, r, streamTaxonomyCatalogSpec{
 		ID:                      platformStreamsCatalogTargetID,
 		FormID:                  "platform-admin-stream-filter",
 		Action:                  "/admin/streams",
 		ResultsID:               platformStreamsResultsTargetID,
+		CatalogTemplate:         "platform_admin_stream_catalog",
 		IncludeAllCategories:    true,
 		AlwaysShowUncategorized: true,
 		EmptyHint:               "Create a stream to populate the platform catalog.",
-	}, categories, streamTaxonomyCandidatesFromGroups(groups), categorySlug, subCategorySlug)
+	}, categories, streamTaxonomyCandidatesFromGroups(groups))
+	if wrotePartial {
+		return
+	}
 	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), admin)
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
@@ -48,10 +51,6 @@ func (s *Server) renderStreamsCatalog(w http.ResponseWriter, r *http.Request, ad
 		Breadcrumbs:      buildPlatformAdminBreadcrumbs("streams"),
 	}
 	view.Console = platformAdminConsole(view)
-
-	if s.writeStreamTaxonomyHTMXPartial(w, r, "platform_admin_stream_catalog", view.StreamCatalog) {
-		return
-	}
 
 	if wantsAdminConsolePartial(r) {
 		if err := s.tmpl.ExecuteTemplate(w, "admin_console", view.Console); err != nil {

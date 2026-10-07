@@ -2284,7 +2284,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		if len(discoveryStreams) > 0 {
+		if candidates, ok := prepareDiscoveryTaxonomyCandidates(items, discoveryStreams); ok {
 			var categories []TaxonomyCategoryNode
 			if s.store != nil {
 				categories, err = loadTaxonomyTree(r.Context(), s.store)
@@ -2294,19 +2294,19 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-			categorySlug, subCategorySlug := streamTaxonomySelectionFromRequest(r, homeDiscoveryCatalogTargetID, homeDiscoveryResultsTargetID)
-			catalog := buildStreamTaxonomyCatalogView(streamTaxonomyCatalogSpec{
-				ID:        homeDiscoveryCatalogTargetID,
-				FormID:    "home-stream-discovery-filter",
-				Action:    appHomePath,
-				ResultsID: homeDiscoveryResultsTargetID,
-				EmptyHint: "No streams in your organization's discovery set match these filters.",
-			}, categories, streamTaxonomyCandidatesFromDiscovery(items, discoveryStreams), categorySlug, subCategorySlug)
+			catalog, wrotePartial := s.buildAndWriteStreamTaxonomyCatalog(w, r, streamTaxonomyCatalogSpec{
+				ID:              homeDiscoveryCatalogTargetID,
+				FormID:          "home-stream-discovery-filter",
+				Action:          appHomePath,
+				ResultsID:       homeDiscoveryResultsTargetID,
+				CatalogTemplate: "home_stream_discovery_catalog",
+				EmptyHint:       "No streams in your organization's discovery set match these filters.",
+			}, categories, candidates)
+			if wrotePartial {
+				return
+			}
 			discoveryCatalog = &catalog
 		}
-	}
-	if discoveryCatalog != nil && s.writeStreamTaxonomyHTMXPartial(w, r, "home_stream_discovery_catalog", *discoveryCatalog) {
-		return
 	}
 	pendingJoins, joinErr := s.joinAttentionRows(r.Context(), user)
 	if joinErr != nil {
