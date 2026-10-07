@@ -891,7 +891,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		}
 	})
 
-	t.Run("platform admin keeps category catalog", func(t *testing.T) {
+	t.Run("platform admin home uses quick actions without catalog", func(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
 		paServer := &Server{
@@ -912,24 +912,33 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		}
 		paBody := paRec.Body.String()
 		for _, want := range []string{
-			`id="my-home-category-sidebar"`,
-			`class="category-sidebar"`,
-			`class="my-home-catalog"`,
-			`href="#cat-`,
-			"Accessible Stream",
-			"Supply Chain",
-			"Procurement",
+			`aria-label="Quick actions"`,
+			`class="my-home-quick-actions-list"`,
+			`href="/admin/streams"`,
+			"Manage streams",
+			`href="/admin/organizations"`,
+			"Manage orgs",
+			`href="/admin/categories"`,
+			"Manage categories",
+			`href="/my/organization/formata-builder?new=true"`,
+			"Create stream",
+			`btn-lg btn-secondary`,
+			`btn-lg btn-primary`,
 		} {
 			if !strings.Contains(paBody, want) {
-				t.Fatalf("expected %q in PA catalog, got: %s", want, paBody)
+				t.Fatalf("expected %q in PA home quick actions, got: %s", want, paBody)
 			}
 		}
 		for _, gone := range []string{
+			`id="my-home-category-sidebar"`,
+			`class="my-home-catalog"`,
 			`class="my-home-discovery"`,
+			"Choose a stream",
+			"Accessible Stream",
 			"public-stream-card-start",
 		} {
 			if strings.Contains(paBody, gone) {
-				t.Fatalf("PA must not use affiliated discovery stack, got %q in: %s", gone, paBody)
+				t.Fatalf("PA home must not present stream catalog, got %q in: %s", gone, paBody)
 			}
 		}
 	})
@@ -1709,10 +1718,10 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 			now:         func() time.Time { return now },
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/my", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
-		server.handleHome(rec, req)
+		server.handleAdminStreams(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -1798,7 +1807,7 @@ func TestHandleHomePickerDeleteButtonVisibility(t *testing.T) {
 	})
 }
 
-func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
+func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "admin@example.com")
 	t.Setenv("ADMIN_PASSWORD", "secret")
 
@@ -1868,16 +1877,16 @@ func TestHandleHomeRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 
 	server := &Server{
 		authorizer:  fakeAuthorizer{},
-		tmpl:        homePickerTemplates(),
+		tmpl:        adminStreamsCatalogTemplates(),
 		configDir:   tempDir,
 		store:       store,
 		enforceAuth: true,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/my", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	rec := httptest.NewRecorder()
-	server.handleHome(rec, req)
+	server.handleAdminStreams(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -2021,7 +2030,7 @@ func TestSortHomeProcessListByStatus(t *testing.T) {
 }
 
 func TestHandleHomeErrorPaths(t *testing.T) {
-	t.Run("workflow options error", func(t *testing.T) {
+	t.Run("platform admin home skips catalog load", func(t *testing.T) {
 		t.Setenv("ADMIN_EMAIL", "admin@example.com")
 		t.Setenv("ADMIN_PASSWORD", "change-me")
 		server := &Server{
@@ -2038,6 +2047,31 @@ func TestHandleHomeErrorPaths(t *testing.T) {
 		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 		rec := httptest.NewRecorder()
 		server.handleHome(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), "PICK GROUPS 0") {
+			t.Fatalf("expected empty PA home groups, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("admin streams catalog error", func(t *testing.T) {
+		t.Setenv("ADMIN_EMAIL", "admin@example.com")
+		t.Setenv("ADMIN_PASSWORD", "change-me")
+		server := &Server{
+			authorizer:  fakeAuthorizer{},
+			tmpl:        adminStreamsCatalogTemplates(),
+			configDir:   t.TempDir(),
+			store:       NewMemoryStore(),
+			identity:    &fakeIdentityStore{},
+			enforceAuth: true,
+			now:         func() time.Time { return time.Now().UTC() },
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleAdminStreams(rec, req)
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}
@@ -2414,6 +2448,15 @@ func homePickerTemplates() *template.Template {
 {{define "layout.html"}}{{template "home_picker_body" .}}{{end}}
 {{define "home_picker_body"}}{{if .DiscoveryStreams}}PICK DISCOVERY {{len .DiscoveryStreams}}{{else}}PICK GROUPS {{len .Groups}}{{end}}{{if .ShowCreateStream}} CREATE{{end}} {{range .DiscoveryStreams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{range .Groups}}{{range .Streams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{end}}{{end}}
 {{define "home.html"}}{{template "layout.html" .}}{{end}}
+`))
+}
+
+func adminStreamsCatalogTemplates() *template.Template {
+	return template.Must(template.New("test").Parse(`
+{{define "layout.html"}}{{template "platform_admin_body" .}}{{end}}
+{{define "platform_admin_body"}}STREAMS {{range .Groups}}{{range .Streams}}{{.Key}}:{{.Card.Name}}{{if .Card.Description}}:{{.Card.Description}}{{end}}:instances={{.Card.InstanceCount}}:active={{.Card.ActiveCount}}|{{end}}{{end}}{{end}}
+{{define "platform_admin.html"}}{{template "layout.html" .}}{{end}}
+{{define "admin_console"}}ADMIN_CONSOLE{{end}}
 `))
 }
 

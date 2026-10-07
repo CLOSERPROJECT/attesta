@@ -1,0 +1,21 @@
+{{/* Shared category sidebar + stream group catalog body (PA /admin/streams). */}}
+
+{{ define "my_home_catalog_body" }}
+  <div class="my-home-body">
+    <div id="my-home-category-sidebar"
+         class="nav-drawer-panel my-home-sidebar"
+         popover>{{ template "category_sidebar" .Sidebar }}</div>
+    <div class="my-home-catalog">
+      <div class="my-home-category-menu">
+        <button type="button"
+                class="btn btn-ghost btn-icon nav-drawer-trigger"
+                popovertarget="my-home-category-sidebar"
+                aria-label="Open stream categories"
+                title="Stream categories">{{ template "icon-menu" . }}</button>
+      </div>
+      {{ range .Groups }}
+        {{ template "my_home_stream_group" . }}
+      {{ end }}
+    </div>
+  </div>
+{{ end }}

@@ -446,6 +446,9 @@ type PlatformAdminView struct {
 	ActivePanel                string
 	Categories                 []TaxonomyCategoryNode
 	CategoriesEditor           CategoriesEditorView
+	Groups                     []MyHomeStreamGroupView
+	Sidebar                    CategorySidebarView
+	ShowCreateStream           bool
 	Breadcrumbs                BreadcrumbsView
 	Console                    AdminConsoleView
 	SearchQuery                string
@@ -2267,16 +2270,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	var groups []MyHomeStreamGroupView
 	var discoveryStreams []ManagedPublicStreamCardView
 	var sidebar CategorySidebarView
-	if user.IsPlatformAdmin {
-		var err error
-		groups, err = s.buildMyHomeCatalog(r.Context(), user)
-		if err != nil {
-			logRequestError(r, err, "build my home catalog")
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		sidebar = buildMyHomeCategorySidebar(groups)
-	} else {
+	if !user.IsPlatformAdmin {
 		items, err := s.listDiscoveryStreams(r.Context(), user)
 		if err != nil {
 			logRequestError(r, err, "list discovery streams")
@@ -2536,6 +2530,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/admin/{$}", s.handleAdminRoot)
 	mux.HandleFunc("/admin/organizations", s.handleAdminOrgs)
 	mux.HandleFunc("/admin/organizations/", s.handleAdminOrgs)
+	mux.HandleFunc("/admin/streams", s.handleAdminStreams)
 	mux.HandleFunc("/admin/categories", s.handleAdminCategories)
 	mux.HandleFunc("/admin/categories/", s.handleAdminCategoriesPath)
 	mux.HandleFunc("/invite/", s.handleInvite)

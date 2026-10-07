@@ -197,80 +197,104 @@
     {{ if or .PendingJoinRequests .PendingStreamActions .UpcomingStreams .PendingOrgCreationRequests }}
       <hr class="my-home-rule" />
     {{ end }}
-    <section class="my-home-streams" aria-label="Streams">
-      {{ if .ShowCreateStream }}
-        <div class="panel-head-actions my-home-catalog-heading">
-          <div class="panel-heading my-home-section-heading">
+    {{ if .IsPlatformAdmin }}
+      <section class="my-home-quick-actions" aria-label="Quick actions">
+        <div class="panel-heading my-home-section-heading">
+          {{ template "icon-layers-2" . }}
+          <div class="my-home-section-heading-copy">
+            <h2>Quick actions</h2>
+            <p>Manage platform streams, organizations, and categories</p>
+          </div>
+        </div>
+        {{ if .Confirmation }}
+          <p class="confirmation confirmation-with-icon">
+            {{ template "icon-check-circle" . }}
+            <span>{{ .Confirmation }}</span>
+          </p>
+        {{ end }}
+        {{ template "error_banner.html" . }}
+        <div class="my-home-quick-actions-list">
+          <a class="btn btn-lg btn-secondary" href="/admin/streams">
+            {{ template "icon-layers-2" . }}
+            <span>Manage streams</span>
+          </a>
+          <a class="btn btn-lg btn-secondary" href="/admin/organizations">
+            {{ template "icon-building-grid" . }}
+            <span>Manage orgs</span>
+          </a>
+          <a class="btn btn-lg btn-secondary" href="/admin/categories">
+            {{ template "icon-layout-grid" . }}
+            <span>Manage categories</span>
+          </a>
+          {{ if .ShowCreateStream }}
+            <a class="btn btn-lg btn-primary"
+               href="/my/organization/formata-builder?new=true">
+              {{ template "icon-plus" . }}
+              <span>Create stream</span>
+            </a>
+          {{ end }}
+        </div>
+      </section>
+    {{ else }}
+      <section class="my-home-streams" aria-label="Streams">
+        {{ if .ShowCreateStream }}
+          <div class="panel-head-actions my-home-catalog-heading">
+            <div class="panel-heading my-home-section-heading">
+              {{ template "icon-layers-2" . }}
+              <div class="my-home-section-heading-copy">
+                <h2>Choose a stream</h2>
+                <p>Select a stream to start or continue process tracking</p>
+              </div>
+            </div>
+            <div class="panel-actions">
+              <a class="btn btn-primary"
+                 href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create a stream</a>
+            </div>
+          </div>
+        {{ else }}
+          <div class="panel-heading my-home-section-heading my-home-catalog-heading">
             {{ template "icon-layers-2" . }}
             <div class="my-home-section-heading-copy">
               <h2>Choose a stream</h2>
               <p>Select a stream to start or continue process tracking</p>
             </div>
           </div>
-          <div class="panel-actions">
-            <a class="btn btn-primary"
-               href="/my/organization/formata-builder?new=true">{{ template "icon-plus" . }} Create a stream</a>
-          </div>
-        </div>
-      {{ else }}
-        <div class="panel-heading my-home-section-heading my-home-catalog-heading">
-          {{ template "icon-layers-2" . }}
-          <div class="my-home-section-heading-copy">
-            <h2>Choose a stream</h2>
-            <p>Select a stream to start or continue process tracking</p>
-          </div>
-        </div>
-      {{ end }}
-      {{ if .Confirmation }}
-        <p class="confirmation confirmation-with-icon">
-          {{ template "icon-check-circle" . }}
-          <span>{{ .Confirmation }}</span>
-        </p>
-      {{ end }}
-      {{ template "error_banner.html" . }}
-      {{ if .DiscoveryStreams }}
-        <div class="my-home-discovery">
-          <div class="public-home-stream-grid">
-            {{ range .DiscoveryStreams }}
-              {{ template "managed_public_stream_card" . }}
-            {{ end }}
-          </div>
-        </div>
-      {{ else if .Groups }}
-        <div class="my-home-body">
-          <div id="my-home-category-sidebar"
-               class="nav-drawer-panel my-home-sidebar"
-               popover>{{ template "category_sidebar" .Sidebar }}</div>
-          <div class="my-home-catalog">
-            <div class="my-home-category-menu">
-              <button type="button"
-                      class="btn btn-ghost btn-icon nav-drawer-trigger"
-                      popovertarget="my-home-category-sidebar"
-                      aria-label="Open stream categories"
-                      title="Stream categories">{{ template "icon-menu" . }}</button>
+        {{ end }}
+        {{ if .Confirmation }}
+          <p class="confirmation confirmation-with-icon">
+            {{ template "icon-check-circle" . }}
+            <span>{{ .Confirmation }}</span>
+          </p>
+        {{ end }}
+        {{ template "error_banner.html" . }}
+        {{ if .DiscoveryStreams }}
+          <div class="my-home-discovery">
+            <div class="public-home-stream-grid">
+              {{ range .DiscoveryStreams }}
+                {{ template "managed_public_stream_card" . }}
+              {{ end }}
             </div>
-            {{ range .Groups }}
-              {{ template "my_home_stream_group" . }}
+          </div>
+        {{ else if .Groups }}
+          {{ template "my_home_catalog_body" . }}
+        {{ else }}
+          <div class="empty-state">
+            {{ template "icon-layers-2" . }}
+            <p class="empty-state-title">No streams available</p>
+            {{ if .Unaffiliated }}
+              <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
+              <p class="empty-state-hint">
+                <a href="/my/onboarding/join">Join an organization</a>
+                ·
+                <a href="/my/onboarding/request-organization">Request a new organization</a>
+              </p>
+            {{ else }}
+              <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
             {{ end }}
           </div>
-        </div>
-      {{ else }}
-        <div class="empty-state">
-          {{ template "icon-layers-2" . }}
-          <p class="empty-state-title">No streams available</p>
-          {{ if .Unaffiliated }}
-            <p class="empty-state-hint">You are not part of an organization yet. Join an existing organization or request a new one to get started.</p>
-            <p class="empty-state-hint">
-              <a href="/my/onboarding/join">Join an organization</a>
-              ·
-              <a href="/my/onboarding/request-organization">Request a new organization</a>
-            </p>
-          {{ else }}
-            <p class="empty-state-hint">Streams for your organization and roles will appear here.</p>
-          {{ end }}
-        </div>
-      {{ end }}
-    </section>
+        {{ end }}
+      </section>
+    {{ end }}
   </section>
 {{ end }}
 
