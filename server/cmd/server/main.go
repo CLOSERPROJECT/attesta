@@ -454,6 +454,7 @@ type PlatformAdminView struct {
 	HasNextPage                bool
 	PreviousPage               int
 	NextPage                   int
+	Pagination                 PaginationView
 	MatchedOrganizations       int
 	Organizations              []PlatformAdminOrganizationRow
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
@@ -3848,9 +3849,19 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		totalPages = (orgPage.Total + limit - 1) / limit
 	}
 	pageNumbers := make([]int, 0, totalPages)
+	pageLinks := make([]PaginationLink, 0, totalPages)
 	for page := 1; page <= totalPages; page++ {
 		pageNumbers = append(pageNumbers, page)
+		pageLinks = append(pageLinks, PaginationLink{
+			Page:      page,
+			URL:       platformAdminPath(errs.SearchQuery, page),
+			IsCurrent: page == currentPage,
+		})
 	}
+	hasPreviousPage := currentPage > 1
+	hasNextPage := currentPage < totalPages
+	previousPage := max(currentPage-1, 1)
+	nextPage := min(currentPage+1, totalPages)
 	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	pendingRows := platformAdminOrgCreationRequestRows(context.Background(), s)
 	view := PlatformAdminView{
@@ -3861,10 +3872,21 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 		CurrentPage:                currentPage,
 		TotalPages:                 totalPages,
 		PageNumbers:                pageNumbers,
-		HasPreviousPage:            currentPage > 1,
-		HasNextPage:                currentPage < totalPages,
-		PreviousPage:               max(currentPage-1, 1),
-		NextPage:                   min(currentPage+1, totalPages),
+		HasPreviousPage:            hasPreviousPage,
+		HasNextPage:                hasNextPage,
+		PreviousPage:               previousPage,
+		NextPage:                   nextPage,
+		Pagination: PaginationView{
+			AriaLabel:       "Organizations pagination",
+			Links:           pageLinks,
+			HasPreviousPage: hasPreviousPage,
+			HasNextPage:     hasNextPage,
+			PreviousURL:     platformAdminPath(errs.SearchQuery, previousPage),
+			NextURL:         platformAdminPath(errs.SearchQuery, nextPage),
+			HxTarget:        "#platform-admin-results",
+			HxSelect:        "#platform-admin-results",
+			PushURL:         true,
+		},
 		MatchedOrganizations:       orgPage.Total,
 		Organizations:              rows,
 		PendingOrgCreationRequests: pendingRows,
