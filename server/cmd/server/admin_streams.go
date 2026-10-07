@@ -2,6 +2,11 @@ package main
 
 import "net/http"
 
+const (
+	platformStreamsCatalogTargetID = "platform-admin-stream-catalog"
+	platformStreamsResultsTargetID = "platform-admin-stream-results"
+)
+
 func (s *Server) handleAdminStreams(w http.ResponseWriter, r *http.Request) {
 	admin, ok := s.requirePlatformAdmin(w, r)
 	if !ok {
@@ -15,11 +20,21 @@ func (s *Server) handleAdminStreams(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderStreamsCatalog(w http.ResponseWriter, r *http.Request, admin *AccountUser) {
-	groups, err := s.buildMyHomeCatalog(r.Context(), admin)
+	categories, groups, err := s.buildMyHomeCatalogData(r.Context(), admin)
 	if err != nil {
 		logAndHTTPError(w, r, http.StatusInternalServerError, "failed to load platform stream catalog", err, "failed to load platform admin streams")
 		return
 	}
+	categorySlug, subCategorySlug := streamTaxonomySelectionFromRequest(r, platformStreamsCatalogTargetID, platformStreamsResultsTargetID)
+	streamCatalog := buildStreamTaxonomyCatalogView(streamTaxonomyCatalogSpec{
+		ID:                      platformStreamsCatalogTargetID,
+		FormID:                  "platform-admin-stream-filter",
+		Action:                  "/admin/streams",
+		ResultsID:               platformStreamsResultsTargetID,
+		IncludeAllCategories:    true,
+		AlwaysShowUncategorized: true,
+		EmptyHint:               "Create a stream to populate the platform catalog.",
+	}, categories, streamTaxonomyCandidatesFromGroups(groups), categorySlug, subCategorySlug)
 	showCreateStream, authErr := s.canViewFormataBuilder(r.Context(), admin)
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
@@ -28,11 +43,15 @@ func (s *Server) renderStreamsCatalog(w http.ResponseWriter, r *http.Request, ad
 		PageBase:         s.pageBaseForUser(admin, "platform_admin_body", "", ""),
 		ActivePanel:      "streams",
 		Groups:           groups,
-		Sidebar:          buildMyHomeCategorySidebar(groups),
+		StreamCatalog:    streamCatalog,
 		ShowCreateStream: showCreateStream && authErr == nil,
 		Breadcrumbs:      buildPlatformAdminBreadcrumbs("streams"),
 	}
 	view.Console = platformAdminConsole(view)
+
+	if s.writeStreamTaxonomyHTMXPartial(w, r, "platform_admin_stream_catalog", view.StreamCatalog) {
+		return
+	}
 
 	if wantsAdminConsolePartial(r) {
 		if err := s.tmpl.ExecuteTemplate(w, "admin_console", view.Console); err != nil {

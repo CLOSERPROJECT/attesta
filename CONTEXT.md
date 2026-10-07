@@ -31,7 +31,7 @@ The authenticated landing at `/my` for an affiliated user: Attention items (stre
 _Avoid_: Home (alone), Dashboard (vague), Stream picker (as the name of `/my`), workflow picker, absorbing Onboarding into `/my`
 
 **Stream discovery**:
-The lower region of affiliated Operator home listing Streams the user’s Organization can take part in, as flat stream cards: startable first (with Start), then the rest. Not Category-grouped when the org’s catalog is small.
+The lower region of affiliated Operator home listing Streams the user’s Organization can take part in, as flat stream cards: startable first (with Start), then the rest. Browsing uses Category and Sub-category selects above the flat grid, not grouped sections or a Category sidebar.
 _Avoid_: Stream picker (when meaning the entire `/my` page), Home
 
 **Startable stream**:
@@ -147,7 +147,7 @@ The screen at `/my/streams/:key/` listing stream instances for one stream, with 
 _Avoid_: Home, workflow home
 
 **Platform stream catalog**:
-The platform-admin screen at `/admin/streams` for browsing and managing Streams (blueprints) across the platform. Distinct from affiliated Stream discovery on Operator home. Platform-admin `/my` links here via Manage streams; create-stream is a separate quick action on that home (does not require opening the catalog first). Soft-nav: Organizations | Streams | Categories.
+The platform-admin screen at `/admin/streams` for browsing and managing Streams (blueprints) across the platform. It uses Category and Sub-category selects above a flat card grid, not a Category sidebar. Distinct from affiliated Stream discovery on Operator home. Platform-admin `/my` links here via Manage streams; create-stream is a separate quick action on that home (does not require opening the catalog first). Soft-nav: Organizations | Streams | Categories.
 _Avoid_: Operator home, Stream discovery, putting the full PA stream grid on `/my`
 
 **Stream instance detail page**:

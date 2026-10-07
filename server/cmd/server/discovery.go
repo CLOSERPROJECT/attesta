@@ -8,12 +8,14 @@ import (
 // StreamDiscoveryItem is a Stream blueprint the user's Organization can take
 // part in, for the affiliated Operator home discovery list.
 type StreamDiscoveryItem struct {
-	WorkflowKey  string
-	WorkflowName string
-	Description  string
-	Href         string
-	Startable    bool
-	StartAction  string
+	WorkflowKey     string
+	WorkflowName    string
+	Description     string
+	CategorySlug    string
+	SubCategorySlug string
+	Href            string
+	Startable       bool
+	StartAction     string
 }
 
 func streamIsStartable(user *AccountUser, cfg RuntimeConfig) bool {
@@ -65,11 +67,13 @@ func (s *Server) listDiscoveryStreams(ctx context.Context, user *AccountUser) ([
 		}
 		canStart := streamIsStartable(user, cfg)
 		item := StreamDiscoveryItem{
-			WorkflowKey:  key,
-			WorkflowName: strings.TrimSpace(cfg.Workflow.Name),
-			Description:  strings.TrimSpace(cfg.Workflow.Description),
-			Href:         streamPath(key) + "/",
-			Startable:    canStart,
+			WorkflowKey:     key,
+			WorkflowName:    strings.TrimSpace(cfg.Workflow.Name),
+			Description:     strings.TrimSpace(cfg.Workflow.Description),
+			CategorySlug:    strings.TrimSpace(cfg.Workflow.CategorySlug),
+			SubCategorySlug: strings.TrimSpace(cfg.Workflow.SubCategorySlug),
+			Href:            streamPath(key) + "/",
+			Startable:       canStart,
 		}
 		if canStart {
 			item.StartAction = streamPath(key) + "/instance/start"

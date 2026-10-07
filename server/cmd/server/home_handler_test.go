@@ -819,7 +819,16 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		`class="my-home-discovery"`,
+		`class="my-home-discovery stream-taxonomy-catalog"`,
+		`id="home-stream-discovery"`,
+		`id="home-stream-discovery-filter"`,
+		`id="home-stream-discovery-results"`,
+		`name="category"`,
+		`name="subCategory"`,
+		`hx-push-url="false"`,
+		"All categories",
+		"All sub-categories",
+		"Uncategorized",
 		`aria-label="Streams"`,
 		`class="public-home-stream-grid"`,
 		"Accessible Stream",
@@ -834,6 +843,78 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 			t.Fatalf("expected %q in affiliated discovery, got: %s", want, body)
 		}
 	}
+
+	t.Run("full page ignores taxonomy query", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/my?category=uncategorized", nil)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		body := rec.Body.String()
+		for _, want := range []string{"Accessible Stream", "Org2-first workflow"} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("full page query must not filter %q from %s", want, body)
+			}
+		}
+	})
+
+	t.Run("htmx category refreshes filter and results", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/my?category=supply-chain", nil)
+		req.Header.Set("HX-Request", "true")
+		req.Header.Set("HX-Target", homeDiscoveryCatalogTargetID)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		body := rec.Body.String()
+		for _, want := range []string{
+			`id="home-stream-discovery"`,
+			`id="home-stream-discovery-filter"`,
+			`id="home-stream-discovery-results"`,
+			"Accessible Stream",
+			"Procurement",
+			"Order Fulfillment",
+		} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("category partial missing %q in %s", want, body)
+			}
+		}
+		for _, gone := range []string{"Org2-first workflow", "<html", `class="topbar`} {
+			if strings.Contains(body, gone) {
+				t.Fatalf("category partial must not contain %q, got: %s", gone, body)
+			}
+		}
+	})
+
+	t.Run("htmx subcategory refreshes results only", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/my?category=supply-chain&subCategory=procurement", nil)
+		req.Header.Set("HX-Request", "true")
+		req.Header.Set("HX-Target", homeDiscoveryResultsTargetID)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
+		rec := httptest.NewRecorder()
+		server.handleHome(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, `id="home-stream-discovery-results"`) || !strings.Contains(body, "Accessible Stream") {
+			t.Fatalf("subcategory results missing expected stream: %s", body)
+		}
+		for _, gone := range []string{
+			`id="home-stream-discovery"`,
+			`id="home-stream-discovery-filter"`,
+			"Org2-first workflow",
+			"<html",
+		} {
+			if strings.Contains(body, gone) {
+				t.Fatalf("results partial must not contain %q, got: %s", gone, body)
+			}
+		}
+	})
 	if strings.Contains(body, `id="start-instance-participant"`) {
 		t.Fatalf("non-startable participant stream must not expose Start, got: %s", body)
 	}
@@ -883,7 +964,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 			`class="panel-head-actions my-home-catalog-heading"`,
 			`href="/my/organization/formata-builder?new=true"`,
 			"Create a stream",
-			`class="my-home-discovery"`,
+			`class="my-home-discovery stream-taxonomy-catalog"`,
 		} {
 			if !strings.Contains(adminBody, want) {
 				t.Fatalf("expected %q in org admin home, got: %s", want, adminBody)
@@ -939,6 +1020,53 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		} {
 			if strings.Contains(paBody, gone) {
 				t.Fatalf("PA home must not present stream catalog, got %q in: %s", gone, paBody)
+			}
+		}
+	})
+
+	t.Run("empty discovery does not mount taxonomy filter", func(t *testing.T) {
+		emptySession := "session-my-home-empty-discovery"
+		emptyUser := AccountUser{
+			ID:        primitive.NewObjectID(),
+			Email:     "empty@example.com",
+			OrgSlug:   "org1",
+			RoleSlugs: []string{"dep1"},
+			Status:    "active",
+			CreatedAt: now,
+		}
+		emptyServer := &Server{
+			authorizer:  fakeAuthorizer{},
+			store:       store,
+			identity:    testIdentityForSessions(now, map[string]AccountUser{emptySession: emptyUser}),
+			tmpl:        parseTestTemplates(t),
+			configDir:   t.TempDir(),
+			enforceAuth: true,
+			now:         func() time.Time { return now },
+		}
+		emptyReq := httptest.NewRequest(http.MethodGet, "/my", nil)
+		emptyReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: emptySession})
+		emptyRec := httptest.NewRecorder()
+		emptyServer.handleHome(emptyRec, emptyReq)
+		if emptyRec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", emptyRec.Code, http.StatusOK)
+		}
+		emptyBody := emptyRec.Body.String()
+		for _, want := range []string{
+			`class="empty-state-title">No streams available<`,
+			"Streams for your organization and roles will appear here.",
+		} {
+			if !strings.Contains(emptyBody, want) {
+				t.Fatalf("expected %q in empty discovery home, got: %s", want, emptyBody)
+			}
+		}
+		for _, gone := range []string{
+			`id="home-stream-discovery"`,
+			`id="home-stream-discovery-filter"`,
+			"match these filters",
+			`name="category"`,
+		} {
+			if strings.Contains(emptyBody, gone) {
+				t.Fatalf("empty discovery must not mount filter (%q), got: %s", gone, emptyBody)
 			}
 		}
 	})
@@ -1326,7 +1454,7 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 		!strings.Contains(body, "Choose a stream") {
 		t.Fatalf("expected home picker wrapper structure, got %q", body)
 	}
-	if !strings.Contains(body, `class="my-home-discovery"`) ||
+	if !strings.Contains(body, `class="my-home-discovery stream-taxonomy-catalog"`) ||
 		!strings.Contains(body, `class="public-home-stream-grid"`) ||
 		!strings.Contains(body, `class="public-stream-card"`) {
 		t.Fatalf("expected discovery stream card grid markup, got %q", body)

@@ -327,6 +327,7 @@ type HomeWorkflowPickerView struct {
 	Groups                     []MyHomeStreamGroupView
 	Sidebar                    CategorySidebarView
 	DiscoveryStreams           []ManagedPublicStreamCardView
+	DiscoveryCatalog           *StreamTaxonomyCatalogView
 	ShowCreateStream           bool
 	Unaffiliated               bool
 	PendingJoinRequests        []OrgAdminJoinRequestRow
@@ -448,6 +449,7 @@ type PlatformAdminView struct {
 	CategoriesEditor           CategoriesEditorView
 	Groups                     []MyHomeStreamGroupView
 	Sidebar                    CategorySidebarView
+	StreamCatalog              StreamTaxonomyCatalogView
 	ShowCreateStream           bool
 	Breadcrumbs                BreadcrumbsView
 	Console                    AdminConsoleView
@@ -2267,9 +2269,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if authErr != nil {
 		logRequestError(r, authErr, "cerbos check failed for formata builder card")
 	}
-	var groups []MyHomeStreamGroupView
 	var discoveryStreams []ManagedPublicStreamCardView
-	var sidebar CategorySidebarView
+	var discoveryCatalog *StreamTaxonomyCatalogView
 	if !user.IsPlatformAdmin {
 		items, err := s.listDiscoveryStreams(r.Context(), user)
 		if err != nil {
@@ -2283,6 +2284,29 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		if len(discoveryStreams) > 0 {
+			var categories []TaxonomyCategoryNode
+			if s.store != nil {
+				categories, err = loadTaxonomyTree(r.Context(), s.store)
+				if err != nil {
+					logRequestError(r, err, "load discovery taxonomy")
+					http.Error(w, "internal error", http.StatusInternalServerError)
+					return
+				}
+			}
+			categorySlug, subCategorySlug := streamTaxonomySelectionFromRequest(r, homeDiscoveryCatalogTargetID, homeDiscoveryResultsTargetID)
+			catalog := buildStreamTaxonomyCatalogView(streamTaxonomyCatalogSpec{
+				ID:        homeDiscoveryCatalogTargetID,
+				FormID:    "home-stream-discovery-filter",
+				Action:    appHomePath,
+				ResultsID: homeDiscoveryResultsTargetID,
+				EmptyHint: "No streams in your organization's discovery set match these filters.",
+			}, categories, streamTaxonomyCandidatesFromDiscovery(items, discoveryStreams), categorySlug, subCategorySlug)
+			discoveryCatalog = &catalog
+		}
+	}
+	if discoveryCatalog != nil && s.writeStreamTaxonomyHTMXPartial(w, r, "home_stream_discovery_catalog", *discoveryCatalog) {
+		return
 	}
 	pendingJoins, joinErr := s.joinAttentionRows(r.Context(), user)
 	if joinErr != nil {
@@ -2308,9 +2332,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	view := HomeWorkflowPickerView{
 		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
-		Groups:                     groups,
-		Sidebar:                    sidebar,
 		DiscoveryStreams:           discoveryStreams,
+		DiscoveryCatalog:           discoveryCatalog,
 		ShowCreateStream:           showCreateStream && authErr == nil,
 		PendingJoinRequests:        pendingJoins,
 		PendingStreamActions:       pendingStreams,

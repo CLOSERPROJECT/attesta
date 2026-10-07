@@ -1,0 +1,157 @@
+.stream-taxonomy-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.stream-taxonomy-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-3) var(--space-5);
+  min-width: 0;
+}
+
+.stream-taxonomy-filter-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.stream-taxonomy-filter-field label {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+
+.stream-taxonomy-filter-select {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  min-height: calc(var(--btn-height) - 8px);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+}
+
+.stream-taxonomy-filter-clear {
+  flex: 0 0 auto;
+  min-height: calc(var(--btn-height) - 8px);
+  padding-inline: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+}
+
+.stream-taxonomy-filter-clear .icon-svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.stream-taxonomy-filter-select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.stream-taxonomy-filter-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.stream-taxonomy-filter-option-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.stream-taxonomy-filter-option-label {
+  min-width: 0;
+}
+
+@supports (appearance: base-select) {
+  .stream-taxonomy-filter-select,
+  .stream-taxonomy-filter-select::picker(select) {
+    appearance: base-select;
+  }
+
+  .stream-taxonomy-filter-select {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+
+  .stream-taxonomy-filter-select:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 8%, var(--input));
+  }
+
+  .stream-taxonomy-filter-select:open {
+    border-color: var(--primary);
+  }
+
+  .stream-taxonomy-filter-select::picker-icon {
+    color: var(--muted-foreground);
+  }
+
+  .stream-taxonomy-filter-select::picker(select) {
+    margin-top: var(--space-1);
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    color: var(--foreground);
+  }
+
+  .stream-taxonomy-filter-select option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: 4px;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .stream-taxonomy-filter-select option:hover,
+  .stream-taxonomy-filter-select option:focus-visible {
+    background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  }
+
+  .stream-taxonomy-filter-select option:checked {
+    background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  }
+
+  .stream-taxonomy-filter-select option::checkmark {
+    display: none;
+  }
+
+  .stream-taxonomy-filter-select selectedcontent {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    line-height: var(--leading-tight);
+  }
+}
+
+.stream-taxonomy-results {
+  min-width: 0;
+}
+
+.stream-taxonomy-results > .public-home-stream-grid {
+  margin: 0;
+}
+
+.stream-taxonomy-results > .empty-state {
+  margin-top: 0;
+}

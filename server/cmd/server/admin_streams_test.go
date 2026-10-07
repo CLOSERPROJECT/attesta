@@ -88,10 +88,16 @@ func TestHandleAdminStreamsRendersCatalog(t *testing.T) {
 		`aria-current="page"`,
 		"Browse and manage platform streams",
 		`id="platform-admin-streams"`,
-		`id="my-home-category-sidebar"`,
-		`class="my-home-catalog"`,
+		`id="platform-admin-stream-catalog"`,
+		`id="platform-admin-stream-filter"`,
+		`id="platform-admin-stream-results"`,
+		`name="category"`,
+		`name="subCategory"`,
+		`hx-push-url="false"`,
+		"All categories",
+		"All sub-categories",
+		"Uncategorized",
 		"Supply Chain",
-		"Procurement",
 		`href="/my/organization/formata-builder?new=true"`,
 		"Create a stream",
 	} {
@@ -101,6 +107,17 @@ func TestHandleAdminStreamsRendersCatalog(t *testing.T) {
 	}
 	if strings.Contains(body, "Pending organization requests") {
 		t.Fatalf("streams panel must not render organizations pending block, got: %s", body)
+	}
+	for _, gone := range []string{
+		`id="my-home-category-sidebar"`,
+		`class="category-sidebar"`,
+		`class="my-home-catalog"`,
+		`href="#cat-`,
+		`nav-drawer-trigger`,
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("platform catalog must not render %q, got: %s", gone, body)
+		}
 	}
 }
 
@@ -136,6 +153,68 @@ func TestHandleAdminStreamsHTMXReturnsAdminConsole(t *testing.T) {
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in streams console, got: %s", want, body)
+		}
+	}
+}
+
+func TestHandleAdminStreamsHTMXTaxonomyPartials(t *testing.T) {
+	store := NewMemoryStore()
+	seedPlatformAdminTaxonomy(t, store)
+	server := newStreamsAdminServer(t, store)
+	if err := os.WriteFile(
+		filepath.Join(server.configDir, "uncategorized.yaml"),
+		[]byte(strings.Replace(minimalCategorizedWorkflowYAML(""), `name: "Workflow"`, `name: "Uncategorized Workflow"`, 1)),
+		0o644,
+	); err != nil {
+		t.Fatalf("write uncategorized config: %v", err)
+	}
+
+	request := func(target, rawQuery string) string {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/admin/streams?"+rawQuery, nil)
+		req.Header.Set("HX-Request", "true")
+		req.Header.Set("HX-Target", target)
+		req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
+		rec := httptest.NewRecorder()
+		server.handleAdminStreams(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("target %q status = %d; body = %s", target, rec.Code, rec.Body.String())
+		}
+		return rec.Body.String()
+	}
+
+	categoryBody := request(platformStreamsCatalogTargetID, "category=supply-chain")
+	for _, want := range []string{
+		`id="platform-admin-stream-catalog"`,
+		`id="platform-admin-stream-filter"`,
+		`id="platform-admin-stream-results"`,
+		`value="supply-chain"`,
+		"Procurement",
+		"Order Fulfillment",
+	} {
+		if !strings.Contains(categoryBody, want) {
+			t.Fatalf("category partial missing %q in %s", want, categoryBody)
+		}
+	}
+	if strings.Contains(categoryBody, "<html") || strings.Contains(categoryBody, `id="admin-console"`) {
+		t.Fatalf("category partial must only return filter and results, got: %s", categoryBody)
+	}
+	if strings.Contains(categoryBody, "Uncategorized Workflow") {
+		t.Fatalf("category partial must exclude uncategorized stream, got: %s", categoryBody)
+	}
+
+	resultsBody := request(platformStreamsResultsTargetID, "category=uncategorized")
+	if !strings.Contains(resultsBody, `id="platform-admin-stream-results"`) || !strings.Contains(resultsBody, "Uncategorized Workflow") {
+		t.Fatalf("uncategorized results partial missing stream results: %s", resultsBody)
+	}
+	for _, gone := range []string{
+		`id="platform-admin-stream-catalog"`,
+		`id="platform-admin-stream-filter"`,
+		"Accessible workflow",
+		"<html",
+	} {
+		if strings.Contains(resultsBody, gone) {
+			t.Fatalf("results partial must not contain %q, got: %s", gone, resultsBody)
 		}
 	}
 }
