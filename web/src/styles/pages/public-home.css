@@ -5,7 +5,7 @@
  *   section.public-home-hero | .public-home-process | .public-home-features | .public-home-dev
  *   .public-home-streams-split#streams (full-bleed band; content capped at 8xl / 88rem)
  *     aside.category-sidebar  (--card, left bleed via ::before; shared padding like results)
- *     .public-home-stream-results         (--muted, right bleed via ::after; padding on shell)
+ *     .public-home-stream-results         (--background, right bleed via ::after; padding on shell)
  *
  * Shared chrome footer: components/site_footer.html (+ site-footer.css).
  * Phase tiles use CSS-only component .home-phase-card (components/home-phase-card.css).
@@ -137,7 +137,7 @@
   gap: var(--space-6);
   flex: 1;
   min-width: 0;
-  background: var(--muted);
+  background: var(--background);
   padding: var(--space-6);
 }
 
@@ -365,7 +365,7 @@ h2.public-home-results-category-name {
 
   .public-home-streams-split::after {
     grid-column: 4;
-    background: var(--muted);
+    background: var(--background);
   }
 
   .category-sidebar {
