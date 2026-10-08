@@ -56,14 +56,14 @@
   --btn-padding-x-sm: var(--space-2);
 
   /* Surfaces */
-  --background: #fbfbfb;
+  --background: #fafcfb;
   --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
   --muted: #f2f6f5;
   --muted-foreground: #aeb6ae;
   --secondary: #fff;
-  --secondary-foreground: var(--foreground);
+  --secondary-foreground: #7a847c;
 
   /* Accent & semantic */
   --primary: #1e6f5c;
@@ -201,7 +201,7 @@
   --muted: color-mix(in srgb, #fff 4%, #1d1f2b);
   --muted-foreground: #c1cac8;
   --secondary: #0d3235;
-  --secondary-foreground: #d2eaeb;
+  --secondary-foreground: #a8bfc0;
 
   /* Accent & semantic (Figma accent → primary) */
   --primary: #1cc195;
