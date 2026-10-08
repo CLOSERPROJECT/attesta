@@ -5,7 +5,7 @@
     <div class="public-stream-title-wrapper">
       <h1 class="public-stream-title">{{ .Header.Name }}</h1>
       {{ if .Header.PassportEnabled }}
-      <span class="public-stream-dpp public-stream-dpp-beside">
+      <span class="stream-dpp-badge public-stream-dpp-beside">
         DPP {{ template "icon-file-text" . }}
       </span>
       {{ end }}
@@ -14,44 +14,44 @@
     <p class="public-stream-description">{{ .Header.Description }}</p>
     {{ end }}
     {{ if .Header.PassportEnabled }}
-    <span class="public-stream-dpp public-stream-dpp-below">
+    <span class="stream-dpp-badge public-stream-dpp-below">
       DPP {{ template "icon-file-text" . }}
     </span>
     {{ end }}
 
     <div class="public-stream-metrics">
       {{ if eq .Header.InstanceCount 0 }}
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-layers-2" . }} no runs yet
       </span>
       {{ else if .Header.AllCompleted }}
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-layers-2" . }} {{ if eq .Header.InstanceCount 1 }}1
         run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
       </span>
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-check-circle" . }} all completed
       </span>
       {{ else }}
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-layers-2" . }} {{ if eq .Header.InstanceCount 1 }}1
         run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
       </span>
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-activity" . }} {{ if eq .Header.ActiveCount 1 }}1
         active now{{ else }}{{ .Header.ActiveCount }} active now{{ end }}
       </span>
       {{ end }}
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-list" . }} {{ if eq .Header.StepCount 1 }}1 step{{
         else }}{{ .Header.StepCount }} steps{{ end }}
       </span>
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-users-group" . }} {{ if eq .Header.RoleCount 1 }}1
         role{{ else }}{{ .Header.RoleCount }} roles{{ end }}
       </span>
       {{ if gt .Header.OrganizationCount 0 }}
-      <span class="public-stream-metric">
+      <span class="stream-metric">
         {{ template "icon-building-grid" . }}
         {{ if eq .Header.OrganizationCount 1 }}1 organization{{ else
         }}{{ .Header.OrganizationCount }} organizations{{ end }}
