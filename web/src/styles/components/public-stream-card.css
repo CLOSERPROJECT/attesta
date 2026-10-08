@@ -24,6 +24,12 @@
 
 .public-stream-card-shell {
   position: relative;
+  height: 100%;
+}
+
+/* Fill the grid-stretched shell so absolute Start sits on the card, not below it. */
+.public-stream-card-shell .public-stream-card {
+  height: 100%;
 }
 
 .public-stream-card-start {
@@ -31,6 +37,20 @@
   right: var(--space-3);
   bottom: var(--space-3);
   z-index: 10;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .public-stream-card-start {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+  }
+
+  .public-stream-card-shell:hover .public-stream-card-start,
+  .public-stream-card-shell:focus-within .public-stream-card-start {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .public-stream-card-menu {
