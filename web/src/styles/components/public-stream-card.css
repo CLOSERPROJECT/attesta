@@ -168,9 +168,15 @@ a.public-stream-card:hover {
 }
 
 .public-stream-card-title {
+  margin: 0;
   font-size: var(--text-lg);
   line-height: 1.5rem;
   color: var(--foreground);
+}
+
+/* Keep title clear of the absolute menu (menu inset space-3; card pad space-5). */
+.public-stream-card-shell:has(.public-stream-card-menu) .public-stream-card-title {
+  padding-inline-end: calc(var(--btn-height) + var(--space-1));
 }
 
 .public-stream-card-description {
