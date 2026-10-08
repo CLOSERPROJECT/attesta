@@ -43,8 +43,8 @@ func TestPaginationTemplateRendersPrevPagesNext(t *testing.T) {
 			t.Fatalf("expected %q in pagination, got:\n%s", want, body)
 		}
 	}
-	if !strings.Contains(compact, `pagination-btn is-disabled`) {
-		t.Fatalf("expected next link disabled when no next page, got:\n%s", body)
+	if !strings.Contains(compact, `btn-icon pagination-btn is-disabled`) {
+		t.Fatalf("expected square next control disabled when no next page, got:\n%s", body)
 	}
 	if strings.Contains(compact, `pagination--inline`) {
 		t.Fatalf("did not expect inline modifier when Inline=false, got:\n%s", body)

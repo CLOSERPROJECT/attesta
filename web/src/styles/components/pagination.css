@@ -3,8 +3,8 @@
  *
  *   nav.pagination (+ .pagination--inline)
  *     div.pagination-pages
- *       a.btn.pagination-btn (+ .is-disabled)   // prev / next
- *       a.btn.btn-primary | a.btn.btn-secondary // page links
+ *       a.btn.btn-icon.pagination-btn (+ .is-disabled) // prev / next
+ *       a.btn.btn-primary | a.btn.btn-secondary       // page links
  */
 
 .pagination {
@@ -26,4 +26,15 @@
   justify-content: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.pagination .btn {
+  border-color: transparent;
+}
+
+.pagination .pagination-btn {
+  width: var(--btn-height);
+  height: var(--btn-height);
+  min-height: var(--btn-height);
+  padding: 0;
 }
