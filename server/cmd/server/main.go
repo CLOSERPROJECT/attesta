@@ -334,6 +334,8 @@ type HomeWorkflowPickerView struct {
 	UpcomingStreams            []StreamUpcomingItem
 	YourTurnBand               MyHomeYourTurnBandView
 	UpcomingBand               MyHomeUpcomingBandView
+	JoinRequestsBand           MyHomeJoinRequestsBandView
+	OrgCreationBand            MyHomeOrgCreationBandView
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
 	Error                      string
 	Confirmation               string
@@ -2297,18 +2299,22 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	yourTurnBand := buildMyHomeYourTurnBand(pendingStreams, 1)
 	upcomingBand := buildMyHomeUpcomingBand(upcomingStreams, 1)
+	joinRequestsBand := buildMyHomeJoinRequestsBand(pendingJoins, 1)
+	orgCreationBand := buildMyHomeOrgCreationBand(pendingOrgCreation, 1)
 	view := HomeWorkflowPickerView{
 		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
 		Groups:                     groups,
 		Sidebar:                    sidebar,
 		DiscoveryStreams:           discoveryStreams,
 		ShowCreateStream:           showCreateStream && authErr == nil,
-		PendingJoinRequests:        pendingJoins,
+		PendingJoinRequests:        joinRequestsBand.PendingJoinRequests,
 		PendingStreamActions:       yourTurnBand.PendingStreamActions,
 		UpcomingStreams:            upcomingBand.UpcomingStreams,
 		YourTurnBand:               yourTurnBand,
 		UpcomingBand:               upcomingBand,
-		PendingOrgCreationRequests: pendingOrgCreation,
+		JoinRequestsBand:           joinRequestsBand,
+		OrgCreationBand:            orgCreationBand,
+		PendingOrgCreationRequests: orgCreationBand.PendingOrgCreationRequests,
 		Error:                      homePickerMessage(r, "error"),
 		Confirmation:               homePickerMessage(r, "confirmation"),
 	}
@@ -2348,6 +2354,10 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 				s.handleMyHomeYourTurn(w, r)
 			case "upcoming":
 				s.handleMyHomeUpcoming(w, r)
+			case "join-requests":
+				s.handleMyHomeJoinRequests(w, r)
+			case "org-creation":
+				s.handleMyHomeOrgCreation(w, r)
 			}
 			return
 		}

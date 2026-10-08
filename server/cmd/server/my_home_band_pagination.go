@@ -9,10 +9,14 @@ import (
 const myHomeBandPageSize = 5
 
 const (
-	myHomeYourTurnPath = "/my/home/your-turn"
-	myHomeUpcomingPath = "/my/home/upcoming"
-	myHomeYourTurnID   = "my-home-your-turn"
-	myHomeUpcomingID   = "my-home-upcoming"
+	myHomeYourTurnPath     = "/my/home/your-turn"
+	myHomeUpcomingPath     = "/my/home/upcoming"
+	myHomeJoinRequestsPath = "/my/home/join-requests"
+	myHomeOrgCreationPath  = "/my/home/org-creation"
+	myHomeYourTurnID       = "my-home-your-turn"
+	myHomeUpcomingID       = "my-home-upcoming"
+	myHomeJoinRequestsID   = "my-home-join-requests"
+	myHomeOrgCreationID    = "my-home-org-creation"
 )
 
 // MyHomeYourTurnBandView is the HTMX/page partial for the Your turn band.
@@ -27,6 +31,20 @@ type MyHomeUpcomingBandView struct {
 	UpcomingStreams []StreamUpcomingItem
 	Pagination      PaginationView
 	TotalPages      int
+}
+
+// MyHomeJoinRequestsBandView is the HTMX/page partial for Join-request Attention.
+type MyHomeJoinRequestsBandView struct {
+	PendingJoinRequests []OrgAdminJoinRequestRow
+	Pagination          PaginationView
+	TotalPages          int
+}
+
+// MyHomeOrgCreationBandView is the HTMX/page partial for org-creation Attention.
+type MyHomeOrgCreationBandView struct {
+	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
+	Pagination                 PaginationView
+	TotalPages                 int
 }
 
 func normalizeMyHomeBandPage(raw int, totalItems int) int {
@@ -124,6 +142,36 @@ func buildMyHomeUpcomingBand(items []StreamUpcomingItem, page int) MyHomeUpcomin
 	}
 }
 
+func buildMyHomeJoinRequestsBand(items []OrgAdminJoinRequestRow, page int) MyHomeJoinRequestsBandView {
+	paged, currentPage, totalPages := paginateMyHomeBand(items, page)
+	return MyHomeJoinRequestsBandView{
+		PendingJoinRequests: paged,
+		TotalPages:          totalPages,
+		Pagination: buildMyHomeBandPagination(
+			myHomeJoinRequestsPath,
+			myHomeJoinRequestsID,
+			"Join requests pagination",
+			currentPage,
+			totalPages,
+		),
+	}
+}
+
+func buildMyHomeOrgCreationBand(items []PlatformAdminOrgCreationRequestRow, page int) MyHomeOrgCreationBandView {
+	paged, currentPage, totalPages := paginateMyHomeBand(items, page)
+	return MyHomeOrgCreationBandView{
+		PendingOrgCreationRequests: paged,
+		TotalPages:                 totalPages,
+		Pagination: buildMyHomeBandPagination(
+			myHomeOrgCreationPath,
+			myHomeOrgCreationID,
+			"Organization requests pagination",
+			currentPage,
+			totalPages,
+		),
+	}
+}
+
 func (s *Server) handleMyHomeYourTurn(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -176,7 +224,58 @@ func (s *Server) handleMyHomeUpcoming(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// myHomeBandRest matches "home/your-turn" or "home/upcoming" (optional trailing slash).
+func (s *Server) handleMyHomeJoinRequests(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !isHTMXRequest(r) {
+		http.Redirect(w, r, appHomePath, http.StatusFound)
+		return
+	}
+	user, _, ok := s.requireVerifiedPage(w, r)
+	if !ok {
+		return
+	}
+	items, err := s.joinAttentionRows(r.Context(), user)
+	if err != nil {
+		logRequestError(r, err, "load join attention for join-requests band")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
+	view := buildMyHomeJoinRequestsBand(items, page)
+	if err := s.tmpl.ExecuteTemplate(w, "my_home_join_requests", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleMyHomeOrgCreation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !isHTMXRequest(r) {
+		http.Redirect(w, r, appHomePath, http.StatusFound)
+		return
+	}
+	user, _, ok := s.requireVerifiedPage(w, r)
+	if !ok {
+		return
+	}
+	if user == nil || !user.IsPlatformAdmin {
+		http.NotFound(w, r)
+		return
+	}
+	items := platformAdminOrgCreationRequestRows(r.Context(), s)
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
+	view := buildMyHomeOrgCreationBand(items, page)
+	if err := s.tmpl.ExecuteTemplate(w, "my_home_org_creation", view); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// myHomeBandRest matches home band fragment paths (optional trailing slash).
 func myHomeBandRest(rest string) (band string, ok bool) {
 	rest = strings.Trim(rest, "/")
 	switch rest {
@@ -184,6 +283,10 @@ func myHomeBandRest(rest string) (band string, ok bool) {
 		return "your-turn", true
 	case "home/upcoming":
 		return "upcoming", true
+	case "home/join-requests":
+		return "join-requests", true
+	case "home/org-creation":
+		return "org-creation", true
 	default:
 		return "", false
 	}

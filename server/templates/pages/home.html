@@ -62,68 +62,153 @@
   </section>
 {{ end }}
 
+{{ define "my_home_join_requests" }}
+  <section id="my-home-join-requests"
+           class="my-home-attention"
+           aria-label="Attention">
+    <div class="panel-heading my-home-section-heading">
+      {{ template "icon-users-group" . }}
+      <div class="my-home-section-heading-copy">
+        <h2>Join requests</h2>
+        <p>Review requests from users who asked to join your organization</p>
+      </div>
+    </div>
+    <ul class="list-rows">
+      {{ range .PendingJoinRequests }}
+        <li class="list-row">
+          {{ template "org_pending_row" (orgPendingRowFromJoinRequest .) }}
+          <div class="list-row-actions">
+            <form method="post" action="/my/organization/users" class="panel-actions">
+              <input type="hidden" name="intent" value="approve_join" />
+              <input type="hidden" name="request_id" value="{{ .ID }}" />
+              <input type="hidden" name="next" value="/my" />
+              <button class="btn btn-ghost btn-icon btn-xs"
+                      type="submit"
+                      aria-label="Approve">{{ template "icon-check" . }}</button>
+            </form>
+            <button type="button"
+                    class="btn btn-ghost-danger btn-icon btn-xs"
+                    aria-label="Reject"
+                    onclick="document.getElementById('home-reject-join-{{ .ID }}').showModal()">
+              {{ template "icon-close" . }}
+            </button>
+          </div>
+          <dialog id="home-reject-join-{{ .ID }}" class="dialog">
+            <div class="dialog-card">
+              <header class="dialog-head">
+                <div>
+                  <h3 class="dialog-title">Reject join request</h3>
+                  <p class="dialog-subtitle">{{ .RequesterEmail }}</p>
+                </div>
+                <button type="button"
+                        class="btn btn-ghost btn-icon dialog-close"
+                        onclick="document.getElementById('home-reject-join-{{ .ID }}').close()">
+                  {{ template "icon-close" . }}
+                </button>
+              </header>
+              <form method="post" action="/my/organization/users" class="input-form">
+                <input type="hidden" name="intent" value="reject_join" />
+                <input type="hidden" name="request_id" value="{{ .ID }}" />
+                <input type="hidden" name="next" value="/my" />
+                <div class="form-field">
+                  <label for="home-reject-join-reason-{{ .ID }}">Reason (optional)</label>
+                  <input id="home-reject-join-reason-{{ .ID }}" name="reason" type="text" />
+                </div>
+                <div class="dialog-actions">
+                  <button class="btn btn-danger" type="submit">Reject request</button>
+                </div>
+              </form>
+            </div>
+          </dialog>
+        </li>
+      {{ end }}
+    </ul>
+    {{ if gt .TotalPages 1 }}
+      {{ template "pagination" .Pagination }}
+    {{ end }}
+  </section>
+{{ end }}
+
+{{ define "my_home_org_creation" }}
+  <section id="my-home-org-creation"
+           class="my-home-attention"
+           aria-label="Attention">
+    <div class="panel-heading my-home-section-heading">
+      {{ template "icon-building-grid" . }}
+      <div class="my-home-section-heading-copy">
+        <h2>Organization requests</h2>
+        <p>Review organization creation requests from unaffiliated users</p>
+      </div>
+    </div>
+    <ul class="list-rows">
+      {{ range .PendingOrgCreationRequests }}
+        <li class="list-row">
+          <div class="list-row-main list-row-main-stack">
+            <p class="platform-admin-item-name">{{ .ProposedName }}</p>
+            <p class="muted u-text-xs">
+              {{ .ProposedSlug }}
+              {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
+              {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
+            </p>
+          </div>
+          <div class="list-row-actions">
+            <form method="post" action="/admin/organizations" class="panel-actions">
+              <input type="hidden" name="intent" value="approve_org_creation" />
+              <input type="hidden" name="request_id" value="{{ .ID }}" />
+              <input type="hidden" name="next" value="/my" />
+              <button class="btn btn-ghost btn-icon btn-xs"
+                      type="submit"
+                      aria-label="Approve">{{ template "icon-check" . }}</button>
+            </form>
+            <button type="button"
+                    class="btn btn-ghost-danger btn-icon btn-xs"
+                    aria-label="Reject"
+                    onclick="document.getElementById('home-reject-org-creation-{{ .ID }}').showModal()">
+              {{ template "icon-close" . }}
+            </button>
+          </div>
+          <dialog id="home-reject-org-creation-{{ .ID }}" class="dialog">
+            <div class="dialog-card">
+              <header class="dialog-head">
+                <div>
+                  <h3 class="dialog-title">Reject organization creation request</h3>
+                  <p class="dialog-subtitle">{{ .ProposedName }}</p>
+                </div>
+                <button type="button"
+                        class="btn btn-ghost btn-icon dialog-close"
+                        onclick="document.getElementById('home-reject-org-creation-{{ .ID }}').close()">
+                  {{ template "icon-close" . }}
+                </button>
+              </header>
+              <form method="post" action="/admin/organizations" class="input-form">
+                <input type="hidden" name="intent" value="reject_org_creation" />
+                <input type="hidden" name="request_id" value="{{ .ID }}" />
+                <input type="hidden" name="next" value="/my" />
+                <div class="form-field">
+                  <label for="home-reject-org-creation-reason-{{ .ID }}">Reason (optional)</label>
+                  <input id="home-reject-org-creation-reason-{{ .ID }}"
+                         name="reason"
+                         type="text" />
+                </div>
+                <div class="dialog-actions">
+                  <button class="btn btn-danger" type="submit">Reject request</button>
+                </div>
+              </form>
+            </div>
+          </dialog>
+        </li>
+      {{ end }}
+    </ul>
+    {{ if gt .TotalPages 1 }}
+      {{ template "pagination" .Pagination }}
+    {{ end }}
+  </section>
+{{ end }}
+
 {{ define "home_picker_body" }}
   <section class="stack u-max-w-7xl u-mx-auto my-home">
     {{ if .PendingJoinRequests }}
-      <section class="my-home-attention" aria-label="Attention">
-        <div class="panel-heading my-home-section-heading">
-          {{ template "icon-users-group" . }}
-          <div class="my-home-section-heading-copy">
-            <h2>Join requests</h2>
-            <p>Review requests from users who asked to join your organization</p>
-          </div>
-        </div>
-        <ul class="list-rows">
-          {{ range .PendingJoinRequests }}
-            <li class="list-row">
-              {{ template "org_pending_row" (orgPendingRowFromJoinRequest .) }}
-              <div class="list-row-actions">
-                <form method="post" action="/my/organization/users" class="panel-actions">
-                  <input type="hidden" name="intent" value="approve_join" />
-                  <input type="hidden" name="request_id" value="{{ .ID }}" />
-                  <input type="hidden" name="next" value="/my" />
-                  <button class="btn btn-ghost btn-icon btn-xs"
-                          type="submit"
-                          aria-label="Approve">{{ template "icon-check" . }}</button>
-                </form>
-                <button type="button"
-                        class="btn btn-ghost-danger btn-icon btn-xs"
-                        aria-label="Reject"
-                        onclick="document.getElementById('home-reject-join-{{ .ID }}').showModal()">
-                  {{ template "icon-close" . }}
-                </button>
-              </div>
-              <dialog id="home-reject-join-{{ .ID }}" class="dialog">
-                <div class="dialog-card">
-                  <header class="dialog-head">
-                    <div>
-                      <h3 class="dialog-title">Reject join request</h3>
-                      <p class="dialog-subtitle">{{ .RequesterEmail }}</p>
-                    </div>
-                    <button type="button"
-                            class="btn btn-ghost btn-icon dialog-close"
-                            onclick="document.getElementById('home-reject-join-{{ .ID }}').close()">
-                      {{ template "icon-close" . }}
-                    </button>
-                  </header>
-                  <form method="post" action="/my/organization/users" class="input-form">
-                    <input type="hidden" name="intent" value="reject_join" />
-                    <input type="hidden" name="request_id" value="{{ .ID }}" />
-                    <input type="hidden" name="next" value="/my" />
-                    <div class="form-field">
-                      <label for="home-reject-join-reason-{{ .ID }}">Reason (optional)</label>
-                      <input id="home-reject-join-reason-{{ .ID }}" name="reason" type="text" />
-                    </div>
-                    <div class="dialog-actions">
-                      <button class="btn btn-danger" type="submit">Reject request</button>
-                    </div>
-                  </form>
-                </div>
-              </dialog>
-            </li>
-          {{ end }}
-        </ul>
-      </section>
+      {{ template "my_home_join_requests" .JoinRequestsBand }}
     {{ end }}
     {{ if .PendingStreamActions }}
       {{ if .PendingJoinRequests }}
@@ -141,74 +226,7 @@
       {{ if or .PendingJoinRequests .PendingStreamActions .UpcomingStreams }}
         <hr class="my-home-rule" />
       {{ end }}
-      <section class="my-home-attention" aria-label="Attention">
-        <div class="panel-heading my-home-section-heading">
-          {{ template "icon-building-grid" . }}
-          <div class="my-home-section-heading-copy">
-            <h2>Organization requests</h2>
-            <p>Review organization creation requests from unaffiliated users</p>
-          </div>
-        </div>
-        <ul class="list-rows">
-          {{ range .PendingOrgCreationRequests }}
-            <li class="list-row">
-              <div class="list-row-main list-row-main-stack">
-                <p class="platform-admin-item-name">{{ .ProposedName }}</p>
-                <p class="muted u-text-xs">
-                  {{ .ProposedSlug }}
-                  {{ if .RequesterEmail }}· {{ .RequesterEmail }}{{ end }}
-                  {{ if .CreatedAt }}· {{ .CreatedAt }}{{ end }}
-                </p>
-              </div>
-              <div class="list-row-actions">
-                <form method="post" action="/admin/organizations" class="panel-actions">
-                  <input type="hidden" name="intent" value="approve_org_creation" />
-                  <input type="hidden" name="request_id" value="{{ .ID }}" />
-                  <input type="hidden" name="next" value="/my" />
-                  <button class="btn btn-ghost btn-icon btn-xs"
-                          type="submit"
-                          aria-label="Approve">{{ template "icon-check" . }}</button>
-                </form>
-                <button type="button"
-                        class="btn btn-ghost-danger btn-icon btn-xs"
-                        aria-label="Reject"
-                        onclick="document.getElementById('home-reject-org-creation-{{ .ID }}').showModal()">
-                  {{ template "icon-close" . }}
-                </button>
-              </div>
-              <dialog id="home-reject-org-creation-{{ .ID }}" class="dialog">
-                <div class="dialog-card">
-                  <header class="dialog-head">
-                    <div>
-                      <h3 class="dialog-title">Reject organization creation request</h3>
-                      <p class="dialog-subtitle">{{ .ProposedName }}</p>
-                    </div>
-                    <button type="button"
-                            class="btn btn-ghost btn-icon dialog-close"
-                            onclick="document.getElementById('home-reject-org-creation-{{ .ID }}').close()">
-                      {{ template "icon-close" . }}
-                    </button>
-                  </header>
-                  <form method="post" action="/admin/organizations" class="input-form">
-                    <input type="hidden" name="intent" value="reject_org_creation" />
-                    <input type="hidden" name="request_id" value="{{ .ID }}" />
-                    <input type="hidden" name="next" value="/my" />
-                    <div class="form-field">
-                      <label for="home-reject-org-creation-reason-{{ .ID }}">Reason (optional)</label>
-                      <input id="home-reject-org-creation-reason-{{ .ID }}"
-                             name="reason"
-                             type="text" />
-                    </div>
-                    <div class="dialog-actions">
-                      <button class="btn btn-danger" type="submit">Reject request</button>
-                    </div>
-                  </form>
-                </div>
-              </dialog>
-            </li>
-          {{ end }}
-        </ul>
-      </section>
+      {{ template "my_home_org_creation" .OrgCreationBand }}
     {{ end }}
     {{ if or .PendingJoinRequests .PendingStreamActions .UpcomingStreams .PendingOrgCreationRequests }}
       <hr class="my-home-rule" />
