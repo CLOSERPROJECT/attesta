@@ -1,0 +1,38 @@
+/*
+ * Pagination — prev / page numbers / next (full component).
+ *
+ *   nav.pagination (+ .pagination--inline)
+ *     div.pagination-pages
+ *       a.btn.btn-icon.pagination-btn (+ .is-disabled) // prev / next
+ *       a.btn.btn-primary | a.btn.btn-secondary       // page links
+ */
+
+.pagination {
+  margin-top: var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.pagination--inline {
+  margin: 0;
+}
+
+.pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pagination .btn {
+  border-color: transparent;
+  box-sizing: border-box;
+  width: var(--btn-height);
+  height: var(--btn-height);
+  min-width: var(--btn-height);
+  min-height: var(--btn-height);
+  padding: 0;
+}

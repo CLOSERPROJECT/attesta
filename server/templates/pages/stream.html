@@ -272,51 +272,7 @@
               </div>
             {{ end }}
             {{ if gt .TotalPages 1 }}
-              <nav
-                class="platform-admin-pagination platform-admin-pagination--inline"
-                aria-label="{{ .PaginationAriaLabel }}"
-              >
-                <div class="platform-admin-pagination-pages">
-                  <a
-                    class="btn btn-secondary pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
-                    href="{{ .PreviousURL }}"
-                    hx-get="{{ .PreviousURL }}"
-                    hx-target="#stream-dashboard-results"
-                    hx-select="#stream-dashboard-results"
-                    hx-swap="outerHTML"
-                    hx-push-url="true"
-                  >
-                    {{ template "icon-chevron-left" . }}
-                  </a>
-                  {{ range .PageLinks }}
-                    <a
-                      class="{{ if .IsCurrent }}
-                        btn btn-primary
-                      {{ else }}
-                        btn btn-secondary
-                      {{ end }}"
-                      href="{{ .URL }}"
-                      hx-get="{{ .URL }}"
-                      hx-target="#stream-dashboard-results"
-                      hx-select="#stream-dashboard-results"
-                      hx-swap="outerHTML"
-                      hx-push-url="true"
-                      >{{ .Page }}</a
-                    >
-                  {{ end }}
-                  <a
-                    class="btn btn-secondary pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
-                    href="{{ .NextURL }}"
-                    hx-get="{{ .NextURL }}"
-                    hx-target="#stream-dashboard-results"
-                    hx-select="#stream-dashboard-results"
-                    hx-swap="outerHTML"
-                    hx-push-url="true"
-                  >
-                    {{ template "icon-chevron-right" . }}
-                  </a>
-                </div>
-              </nav>
+              {{ template "pagination" .Pagination }}
             {{ end }}
           </section>
       {{ end }}
