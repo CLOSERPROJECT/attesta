@@ -3,6 +3,18 @@ import "./styles.css";
 const themeStorageKey = "attesta_theme";
 const themeToggle = document.getElementById("theme-toggle");
 
+// Nested <dialog> showModal() focuses the in-flow box and can scroll the page;
+// restore scroll so opening a modal never jumps the document.
+const nativeDialogShowModal = HTMLDialogElement.prototype.showModal;
+HTMLDialogElement.prototype.showModal = function showModal(...args) {
+  const { scrollX, scrollY } = window;
+  const result = nativeDialogShowModal.apply(this, args);
+  const restore = () => window.scrollTo(scrollX, scrollY);
+  restore();
+  requestAnimationFrame(restore);
+  return result;
+};
+
 const pad2 = (value) => String(value).padStart(2, "0");
 
 /** Format an ISO datetime as dd/mm/yyyy at HH:mm in the viewer's local timezone. */
