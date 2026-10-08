@@ -131,18 +131,90 @@ func TestPaginationTemplateIncludesHTMXWhenSet(t *testing.T) {
 		t.Fatalf("render pagination: %v", err)
 	}
 	body := out.String()
-	for _, want := range []string{
-		`hx-get="/p1"`,
-		`hx-get="/p2"`,
-		`hx-target="#results"`,
-		`hx-select="#results"`,
-		`hx-swap="outerHTML"`,
-		`hx-push-url="true"`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("expected %q when HTMX set, got:\n%s", want, body)
+	anchors := paginationAnchors(body)
+	if len(anchors) != 4 { // prev + 2 pages + next
+		t.Fatalf("expected 4 pagination anchors, got %d:\n%s", len(anchors), body)
+	}
+	for _, anchor := range anchors {
+		href := paginationAttr(anchor, "href")
+		if href == "" {
+			t.Fatalf("anchor missing href: %s", anchor)
+		}
+		for _, want := range []string{
+			`hx-get="` + href + `"`,
+			`hx-target="#results"`,
+			`hx-select="#results"`,
+			`hx-swap="outerHTML"`,
+			`hx-push-url="true"`,
+		} {
+			if !strings.Contains(anchor, want) {
+				t.Fatalf("expected %q on every link when HTMX set, missing from:\n%s\nfull:\n%s", want, anchor, body)
+			}
 		}
 	}
+}
+
+func TestPaginationTemplateOmitsHxSelectWhenEmpty(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+
+	var out bytes.Buffer
+	view := PaginationView{
+		AriaLabel:       "No select",
+		Links:           []PaginationLink{{Page: 1, URL: "/x", IsCurrent: true}},
+		HasPreviousPage: false,
+		HasNextPage:     false,
+		PreviousURL:     "/x",
+		NextURL:         "/x",
+		HxTarget:        "#frag",
+		PushURL:         true,
+	}
+	if err := tmpl.ExecuteTemplate(&out, "pagination", view); err != nil {
+		t.Fatalf("render pagination: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, `hx-target="#frag"`) {
+		t.Fatalf("expected hx-target when HxTarget set, got:\n%s", body)
+	}
+	if strings.Contains(body, `hx-select`) {
+		t.Fatalf("did not expect hx-select when HxSelect empty, got:\n%s", body)
+	}
+	for _, anchor := range paginationAnchors(body) {
+		if !strings.Contains(anchor, `hx-swap="outerHTML"`) || !strings.Contains(anchor, `hx-push-url="true"`) {
+			t.Fatalf("expected swap/push-url on every link, got:\n%s", anchor)
+		}
+	}
+}
+
+func paginationAnchors(body string) []string {
+	var anchors []string
+	rest := body
+	for {
+		start := strings.Index(rest, "<a")
+		if start == -1 {
+			return anchors
+		}
+		rest = rest[start:]
+		end := strings.Index(rest, ">")
+		if end == -1 {
+			return anchors
+		}
+		anchors = append(anchors, rest[:end+1])
+		rest = rest[end+1:]
+	}
+}
+
+func paginationAttr(anchor, name string) string {
+	prefix := name + `="`
+	i := strings.Index(anchor, prefix)
+	if i == -1 {
+		return ""
+	}
+	rest := anchor[i+len(prefix):]
+	j := strings.Index(rest, `"`)
+	if j == -1 {
+		return ""
+	}
+	return rest[:j]
 }
 
 func TestPaginationTemplateOmitsPushURLWhenFalse(t *testing.T) {
