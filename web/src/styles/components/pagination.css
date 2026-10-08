@@ -24,17 +24,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .pagination .btn {
   border-color: transparent;
-}
-
-.pagination .pagination-btn {
+  box-sizing: border-box;
   width: var(--btn-height);
   height: var(--btn-height);
+  min-width: var(--btn-height);
   min-height: var(--btn-height);
   padding: 0;
 }
