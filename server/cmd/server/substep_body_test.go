@@ -63,7 +63,7 @@ func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 	for _, want := range []string{
 		"Completed by role:",
 		`data-role-palette="red"`,
-		">Submitted<",
+		">Submitted data<",
 		"<dt>notes</dt>",
 		"<dd>All good</dd>",
 		"<dt>photo</dt>",
@@ -100,7 +100,7 @@ func TestSubstepBodyTemplateRendersMessageMode(t *testing.T) {
 	if !strings.Contains(body, "Skipped: not applicable for this batch.") {
 		t.Fatalf("expected detail message in substep body, got: %s", body)
 	}
-	if strings.Contains(body, ">Submitted<") {
+	if strings.Contains(body, ">Submitted data<") {
 		t.Fatalf("expected message mode without submitted block, got: %s", body)
 	}
 	if strings.Contains(body, `class="substep-body-form"`) {
@@ -137,7 +137,7 @@ func TestSubstepBodyTemplateRendersOverrideResultMode(t *testing.T) {
 	for _, want := range []string{
 		"Completed with local form adaptation.",
 		"Reason: local source shape",
-		">Submitted<",
+		">Submitted data<",
 		"<dt>value</dt>",
 		"<dd>override-ok</dd>",
 	} {
