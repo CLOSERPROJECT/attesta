@@ -23,18 +23,19 @@ func templateFuncs() template.FuncMap {
 		"streamTimelineSubstep": func(substep TimelineSubstep, hideStatus bool) StreamTimelineSubstepView {
 			return StreamTimelineSubstepView{Substep: substep, HideStatus: hideStatus}
 		},
-		"substepShellDisplay":      substepShellDisplay,
-		"effectiveSubstepBodyMode": effectiveSubstepBodyMode,
-		"platformAdminConsole":     platformAdminConsole,
-		"orgAdminConsole":          orgAdminConsole,
-		"rolesPickerFromRoles":     rolesPickerFromRoles,
-		"rolesPickerFromOrgAdminOptions": rolesPickerFromOrgAdminOptions,
-		"rolePillRowFromOrgAdminOptions": rolePillRowFromOrgAdminOptions,
+		"substepShellDisplay":                    substepShellDisplay,
+		"effectiveSubstepBodyMode":               effectiveSubstepBodyMode,
+		"platformAdminConsole":                   platformAdminConsole,
+		"orgAdminConsole":                        orgAdminConsole,
+		"rolesPickerFromRoles":                   rolesPickerFromRoles,
+		"rolesPickerFromOrgAdminOptions":         rolesPickerFromOrgAdminOptions,
+		"rolePillRowFromOrgAdminOptions":         rolePillRowFromOrgAdminOptions,
 		"rolePillRowSelectedFromOrgAdminOptions": rolePillRowSelectedFromOrgAdminOptions,
 		"rolePillRowFromSubstepBody":             rolePillRowFromSubstepBody,
 		"orgPendingRowFromJoinRequest":           orgPendingRowFromJoinRequest,
 		"orgPendingRowFromInvite":                orgPendingRowFromInvite,
 		"dataAutoOpen":                           dataAutoOpen,
+		"paginationLinkAttrs":                    paginationLinkAttrs,
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: odd number of arguments")

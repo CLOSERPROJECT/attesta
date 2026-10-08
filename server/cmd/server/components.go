@@ -424,6 +424,17 @@ type PaginationView struct {
 	PushURL         bool
 }
 
+// paginationLinkAttrsView is the data for templates/components/pagination.html
+// define "pagination_link_attrs" (URL + parent PaginationView).
+type paginationLinkAttrsView struct {
+	URL  string
+	View PaginationView
+}
+
+func paginationLinkAttrs(url string, view PaginationView) paginationLinkAttrsView {
+	return paginationLinkAttrsView{URL: url, View: view}
+}
+
 // RolePillView is one palette-colored pill in templates/components/role_pill_row.html.
 type RolePillView struct {
 	Label   string

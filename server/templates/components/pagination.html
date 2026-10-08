@@ -7,17 +7,17 @@
     <div class="pagination-pages">
       <a class="btn btn-secondary btn-icon pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
          href="{{ .PreviousURL }}"
-         {{- template "pagination_link_attrs" (dict "URL" .PreviousURL "View" .) }}>
+         {{- template "pagination_link_attrs" (paginationLinkAttrs .PreviousURL .) }}>
         {{ template "icon-chevron-left" . }}
       </a>
       {{ range .Links }}
         <a class="{{ if .IsCurrent }}btn btn-primary{{ else }}btn btn-secondary{{ end }}"
            href="{{ .URL }}"
-           {{- template "pagination_link_attrs" (dict "URL" .URL "View" $) }}>{{ .Page }}</a>
+           {{- template "pagination_link_attrs" (paginationLinkAttrs .URL $) }}>{{ .Page }}</a>
       {{ end }}
       <a class="btn btn-secondary btn-icon pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
          href="{{ .NextURL }}"
-         {{- template "pagination_link_attrs" (dict "URL" .NextURL "View" .) }}>
+         {{- template "pagination_link_attrs" (paginationLinkAttrs .NextURL .) }}>
         {{ template "icon-chevron-right" . }}
       </a>
     </div>

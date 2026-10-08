@@ -149,8 +149,14 @@ func TestOperatorHomeYourTurnAndUpcomingShowAtMostPageSize(t *testing.T) {
 			t.Fatalf("expected %q on /my page 1, got:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `hx-push-url`) {
-		t.Fatalf("/my band pagers must not push URL, got hx-push-url")
+	// Scope to band sections — the rest of /my may use hx-push-url elsewhere.
+	for name, section := range map[string]string{
+		"Your turn": yourTurnSection,
+		"Upcoming":  upcomingSection,
+	} {
+		if strings.Contains(section, `hx-push-url="true"`) {
+			t.Fatalf("%s band pager must not push URL, got hx-push-url=true in:\n%s", name, section)
+		}
 	}
 	// Chrome Attention still reflects full unpaginated your-turn count.
 	if !strings.Contains(body, `attention-dot`) {
