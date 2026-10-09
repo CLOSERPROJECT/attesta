@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestRunSeedCatalogStreamsCommandWithMemoryStore(t *testing.T) {
@@ -17,8 +19,12 @@ func TestRunSeedCatalogStreamsCommandWithMemoryStore(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
 
-	err := seedCatalogStreamsWithStoreOpener(t.Context(), nil, dir, func(context.Context) (Store, func(), error) {
+	err := withSeedSession(t.Context(), nil, dir, func(context.Context) (Store, func(), error) {
 		return store, func() {}, nil
+	}, nil, func(sess seedSession) error {
+		rng := rand.New(rand.NewSource(1))
+		_, err := seedCatalogStreams(t.Context(), sess.Store, sess.ConfigDir, time.Now().UTC(), rng)
+		return err
 	})
 	if err != nil {
 		t.Fatalf("cmd: %v", err)
@@ -30,9 +36,9 @@ func TestRunSeedCatalogStreamsCommandWithMemoryStore(t *testing.T) {
 }
 
 func TestRunSeedCatalogStreamsCommandRequiresStore(t *testing.T) {
-	err := seedCatalogStreamsWithStoreOpener(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
+	err := withSeedSession(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
 		return nil, nil, fmt.Errorf("boom")
-	})
+	}, nil, func(seedSession) error { return nil })
 	if err == nil {
 		t.Fatal("expected opener error")
 	}
@@ -46,8 +52,8 @@ func TestRunSeedCatalogStreamsCommandUsesOpener(t *testing.T) {
 	}
 }
 
-func TestSeedCatalogStreamsWithStoreOpenerNil(t *testing.T) {
-	if err := seedCatalogStreamsWithStoreOpener(t.Context(), nil, t.TempDir(), nil); err == nil {
+func TestWithSeedSessionCatalogStreamsNilOpener(t *testing.T) {
+	if err := withSeedSession(t.Context(), nil, t.TempDir(), nil, nil, func(seedSession) error { return nil }); err == nil {
 		t.Fatal("expected nil opener error")
 	}
 }

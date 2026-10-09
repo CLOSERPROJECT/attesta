@@ -99,6 +99,25 @@ func openSeedSession(
 	return sess, nil
 }
 
+// withSeedSession opens a seed session, defers cleanup, and runs fn.
+func withSeedSession(
+	ctx context.Context,
+	args []string,
+	configDir string,
+	openStore func(context.Context) (Store, func(), error),
+	openIdentity func() (IdentityStore, error),
+	fn func(seedSession) error,
+) error {
+	sess, err := openSeedSession(ctx, args, configDir, openStore, openIdentity)
+	if err != nil {
+		return err
+	}
+	if sess.Cleanup != nil {
+		defer sess.Cleanup()
+	}
+	return fn(sess)
+}
+
 func openMongoTaxonomyStore(ctx context.Context) (Store, func(), error) {
 	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))

@@ -50,15 +50,29 @@ func writeMinimalWorkflowYAML(t *testing.T, path, name string) {
 	}
 }
 
-func TestSeedInstancesWithStoreOpenerSeedsCatalog(t *testing.T) {
+func seedInstancesViaSession(ctx context.Context, store Store, configDir string) error {
+	return withSeedSession(ctx, nil, configDir, func(context.Context) (Store, func(), error) {
+		return store, func() {}, nil
+	}, nil, func(sess seedSession) error {
+		server := &Server{store: sess.Store, configDir: sess.ConfigDir, now: func() time.Time { return time.Now().UTC() }}
+		catalog, err := server.workflowCatalog()
+		if err != nil {
+			return fmt.Errorf("instance seed: catalog: %w", err)
+		}
+		_, err = seedDemoInstances(ctx, sess.Store, catalog, server.now())
+		if err != nil {
+			return fmt.Errorf("instance seed: %w", err)
+		}
+		return nil
+	})
+}
+
+func TestWithSeedSessionSeedsInstances(t *testing.T) {
 	dir := t.TempDir()
 	writeMinimalWorkflowYAML(t, filepath.Join(dir, "demo.yaml"), "Demo Stream")
 	store := NewMemoryStore()
-	err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
-		return store, func() {}, nil
-	}, dir)
-	if err != nil {
-		t.Fatalf("seedInstancesWithStoreOpener: %v", err)
+	if err := seedInstancesViaSession(t.Context(), store, dir); err != nil {
+		t.Fatalf("withSeedSession: %v", err)
 	}
 	list, err := store.ListRecentProcessesByWorkflow(t.Context(), "demo", 0)
 	if err != nil {
@@ -69,7 +83,7 @@ func TestSeedInstancesWithStoreOpenerSeedsCatalog(t *testing.T) {
 	}
 }
 
-func TestSeedInstancesWithStoreOpenerLeavesEveryFifthStreamEmpty(t *testing.T) {
+func TestWithSeedSessionLeavesEveryFifthStreamEmpty(t *testing.T) {
 	dir := t.TempDir()
 	// Sorted keys: a, b, c, d, e — e is 5th (index 4) and stays empty.
 	for _, name := range []string{"a", "b", "c", "d", "e"} {
@@ -78,11 +92,8 @@ func TestSeedInstancesWithStoreOpenerLeavesEveryFifthStreamEmpty(t *testing.T) {
 	store := NewMemoryStore()
 	// Pre-seed junk on the empty target so replace wipe is visible.
 	store.SeedProcess(Process{WorkflowKey: "e", Status: processStatusActive, CreatedAt: time.Now().UTC()})
-	err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
-		return store, func() {}, nil
-	}, dir)
-	if err != nil {
-		t.Fatalf("seedInstancesWithStoreOpener: %v", err)
+	if err := seedInstancesViaSession(t.Context(), store, dir); err != nil {
+		t.Fatalf("withSeedSession: %v", err)
 	}
 	for _, key := range []string{"a", "b", "c", "d"} {
 		list, listErr := store.ListRecentProcessesByWorkflow(t.Context(), key, 0)
@@ -102,25 +113,22 @@ func TestSeedInstancesWithStoreOpenerLeavesEveryFifthStreamEmpty(t *testing.T) {
 	}
 }
 
-func TestSeedInstancesWithStoreOpenerEmptyCatalog(t *testing.T) {
+func TestWithSeedSessionInstancesEmptyCatalog(t *testing.T) {
 	dir := t.TempDir()
 	store := NewMemoryStore()
-	err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
-		return store, func() {}, nil
-	}, dir)
-	if err == nil {
+	if err := seedInstancesViaSession(t.Context(), store, dir); err == nil {
 		t.Fatal("expected empty catalog error")
 	}
 }
 
-func TestSeedInstancesWithStoreOpenerErrors(t *testing.T) {
-	if err := seedInstancesWithStoreOpener(t.Context(), nil, nil, t.TempDir()); err == nil {
+func TestWithSeedSessionInstancesErrors(t *testing.T) {
+	if err := withSeedSession(t.Context(), nil, t.TempDir(), nil, nil, func(seedSession) error { return nil }); err == nil {
 		t.Fatal("expected nil opener error")
 	}
 	openErr := errors.New("open failed")
-	if err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
+	if err := withSeedSession(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
 		return nil, nil, openErr
-	}, t.TempDir()); !errors.Is(err, openErr) {
+	}, nil, func(seedSession) error { return nil }); !errors.Is(err, openErr) {
 		t.Fatalf("err = %v, want openErr", err)
 	}
 }

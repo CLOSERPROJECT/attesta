@@ -35,7 +35,7 @@ func TestCategoriesSeedPathFromArgsResolved(t *testing.T) {
 	}
 }
 
-func TestSeedCategoriesWithStoreOpener(t *testing.T) {
+func TestWithSeedSessionSeedsCategories(t *testing.T) {
 	store := NewMemoryStore()
 	path := writeTempTaxonomySeed(t, `
 categories:
@@ -44,11 +44,14 @@ categories:
     icon: batch-traceability
     sortOrder: 1
 `)
-	err := seedCategoriesWithStoreOpener(t.Context(), []string{"--file", path}, func(context.Context) (Store, func(), error) {
+	err := withSeedSession(t.Context(), []string{"--file", path}, "", func(context.Context) (Store, func(), error) {
 		return store, func() {}, nil
+	}, nil, func(sess seedSession) error {
+		seedPath := resolveCategoriesSeedPath(sess.CategoriesPath, sess.ConfigDir)
+		return seedTaxonomyFromFile(t.Context(), sess.Store, seedPath)
 	})
 	if err != nil {
-		t.Fatalf("seedCategoriesWithStoreOpener: %v", err)
+		t.Fatalf("withSeedSession: %v", err)
 	}
 	cats, err := store.ListCategories(t.Context())
 	if err != nil {
@@ -59,20 +62,23 @@ categories:
 	}
 }
 
-func TestSeedCategoriesWithStoreOpenerErrors(t *testing.T) {
-	if err := seedCategoriesWithStoreOpener(t.Context(), nil, nil); err == nil {
+func TestWithSeedSessionCategoriesErrors(t *testing.T) {
+	if err := withSeedSession(t.Context(), nil, "", nil, nil, func(seedSession) error { return nil }); err == nil {
 		t.Fatal("expected nil opener error")
 	}
 	openErr := errors.New("open failed")
-	if err := seedCategoriesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
+	if err := withSeedSession(t.Context(), nil, "", func(context.Context) (Store, func(), error) {
 		return nil, nil, openErr
-	}); !errors.Is(err, openErr) {
+	}, nil, func(seedSession) error { return nil }); !errors.Is(err, openErr) {
 		t.Fatalf("err = %v, want openErr", err)
 	}
 
 	store := NewMemoryStore()
-	if err := seedCategoriesWithStoreOpener(t.Context(), []string{"--file", filepath.Join(t.TempDir(), "missing.yaml")}, func(context.Context) (Store, func(), error) {
+	if err := withSeedSession(t.Context(), []string{"--file", filepath.Join(t.TempDir(), "missing.yaml")}, "", func(context.Context) (Store, func(), error) {
 		return store, nil, nil
+	}, nil, func(sess seedSession) error {
+		seedPath := resolveCategoriesSeedPath(sess.CategoriesPath, sess.ConfigDir)
+		return seedTaxonomyFromFile(t.Context(), sess.Store, seedPath)
 	}); err == nil {
 		t.Fatal("expected seed file error")
 	}

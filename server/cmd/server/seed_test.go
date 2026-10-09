@@ -137,7 +137,7 @@ func TestSeedPopulatesTaxonomyCatalogAndInstances(t *testing.T) {
 	}
 }
 
-func TestSeedWithOpenersAppliesFixture(t *testing.T) {
+func TestWithSeedSessionAppliesFixture(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "platform_admin@example.org")
 	t.Setenv("ADMIN_PASSWORD", "change-me")
 	t.Setenv("CATEGORIES_SEED", "")
@@ -146,12 +146,20 @@ func TestSeedWithOpenersAppliesFixture(t *testing.T) {
 	identity := newSeedFakeIdentity()
 	dir := writeSeedTestConfigDir(t)
 
-	err := seedWithOpeners(t.Context(), nil, dir,
+	err := withSeedSession(t.Context(), nil, dir,
 		func(context.Context) (Store, func(), error) { return store, func() {}, nil },
 		func() (IdentityStore, error) { return identity, nil },
+		func(sess seedSession) error {
+			return Seed(t.Context(), SeedDeps{
+				Identity:       sess.Identity,
+				Store:          sess.Store,
+				ConfigDir:      sess.ConfigDir,
+				CategoriesPath: sess.CategoriesPath,
+			})
+		},
 	)
 	if err != nil {
-		t.Fatalf("seedWithOpeners: %v", err)
+		t.Fatalf("withSeedSession: %v", err)
 	}
 	if _, err := identity.GetOrganizationBySlug(t.Context(), demoFixtureMarkerOrgSlug); err != nil {
 		t.Fatalf("marker org: %v", err)
@@ -162,7 +170,7 @@ func TestSeedWithOpenersAppliesFixture(t *testing.T) {
 	}
 }
 
-func TestSeedWithOpenersReplaceFlag(t *testing.T) {
+func TestSeedReplaceFromArgs(t *testing.T) {
 	if !seedReplaceFromArgs([]string{"--replace"}) {
 		t.Fatal("expected --replace")
 	}
@@ -171,14 +179,22 @@ func TestSeedWithOpenersReplaceFlag(t *testing.T) {
 	}
 }
 
-func TestSeedWithOpenersRequiresOpeners(t *testing.T) {
-	if err := seedWithOpeners(t.Context(), nil, t.TempDir(), nil, func() (IdentityStore, error) { return newSeedFakeIdentity(), nil }); err == nil {
+func TestWithSeedSessionRequiresOpeners(t *testing.T) {
+	if err := withSeedSession(t.Context(), nil, t.TempDir(), nil, func() (IdentityStore, error) { return newSeedFakeIdentity(), nil }, func(seedSession) error {
+		return nil
+	}); err == nil {
 		t.Fatal("expected nil store opener error")
 	}
-	if err := seedWithOpeners(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
+	if err := withSeedSession(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
 		return NewMemoryStore(), nil, nil
-	}, nil); err == nil {
-		t.Fatal("expected nil identity opener error")
+	}, nil, func(sess seedSession) error {
+		return Seed(t.Context(), SeedDeps{
+			Identity:  sess.Identity,
+			Store:     sess.Store,
+			ConfigDir: sess.ConfigDir,
+		})
+	}); err == nil {
+		t.Fatal("expected nil identity error")
 	}
 }
 
