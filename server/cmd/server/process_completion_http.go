@@ -135,29 +135,16 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	if workflowCompletionStrategy(cfg.Workflow) == CompletionStrategyDraftAndSeal {
-		process, err = s.processService().SaveDraft(ctx, SaveDraftCmd{
-			Process:     process,
-			WorkflowKey: workflowKey,
-			SubstepID:   substepID,
-			Substep:     substep,
-			Actor:       actor,
-			Payload:     payload,
-			Config:      cfg,
-			Now:         now,
-		})
-	} else {
-		process, err = s.processService().CompleteSubstep(ctx, CompleteSubstepCmd{
-			Process:     process,
-			WorkflowKey: workflowKey,
-			SubstepID:   substepID,
-			Substep:     substep,
-			Actor:       actor,
-			Payload:     payload,
-			Config:      cfg,
-			Now:         now,
-		})
-	}
+	result, err := s.processService().SubmitSubstepForm(ctx, CompleteSubstepCmd{
+		Process:     process,
+		WorkflowKey: workflowKey,
+		SubstepID:   substepID,
+		Substep:     substep,
+		Actor:       actor,
+		Payload:     payload,
+		Config:      cfg,
+		Now:         now,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrDraftValidation):
@@ -176,30 +163,22 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		}
 		return
 	}
+	process = result.Process
 
 	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
 	for _, role := range s.roles(cfg) {
 		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
 	}
-	// Classic Complete clears selection so the next available Substep opens.
-	// Draft-and-seal keeps both peers available; clearing would always fall
-	// back to the first peer and close the Substep the operator just saved.
-	selectedAfter := ""
-	confirmation := ""
-	if workflowCompletionStrategy(cfg.Workflow) == CompletionStrategyDraftAndSeal {
-		selectedAfter = substepID
-		confirmation = "Draft saved."
-	}
-	nextReq := cloneRequestWithSelectedSubstep(r, selectedAfter)
+	nextReq := cloneRequestWithSelectedSubstep(r, result.SelectedSubstepID)
 	if isProcessContentTargetRequest(r) {
-		s.renderProcessContentNotice(w, nextReq, process, actor, "", confirmation)
+		s.renderProcessContentNotice(w, nextReq, process, actor, "", result.Confirmation)
 		return
 	}
 	if isHTMXRequest(r) {
-		s.renderProcessContentNotice(w, nextReq, process, actor, "", confirmation)
+		s.renderProcessContentNotice(w, nextReq, process, actor, "", result.Confirmation)
 		return
 	}
-	s.renderDepartmentProcessPageNotice(w, nextReq, process, actor, "", confirmation)
+	s.renderDepartmentProcessPageNotice(w, nextReq, process, actor, "", result.Confirmation)
 }
 
 func formConfirmTrue(value string) bool {

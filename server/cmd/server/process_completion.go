@@ -33,6 +33,13 @@ type CompleteSubstepCmd struct {
 	Now         time.Time
 }
 
+// SubstepSubmitResult is the post-write UX for a Substep form submit.
+type SubstepSubmitResult struct {
+	Process           *Process
+	SelectedSubstepID string
+	Confirmation      string
+}
+
 func (p *ProcessService) serviceNow(fallback time.Time) time.Time {
 	if p != nil && p.now != nil {
 		return p.now().UTC()
@@ -41,6 +48,41 @@ func (p *ProcessService) serviceNow(fallback time.Time) time.Time {
 		return fallback.UTC()
 	}
 	return time.Now().UTC()
+}
+
+// SubmitSubstepForm is the ProcessService edge for Substep form POST.
+// It selects the Stream blueprint completion strategy, then calls SaveDraft
+// (draft-and-seal) or CompleteSubstep (classic) and owns post-write UX.
+func (p *ProcessService) SubmitSubstepForm(ctx context.Context, cmd CompleteSubstepCmd) (SubstepSubmitResult, error) {
+	switch workflowCompletionStrategy(cmd.Config.Workflow) {
+	case CompletionStrategyDraftAndSeal:
+		process, err := p.SaveDraft(ctx, SaveDraftCmd{
+			Process:     cmd.Process,
+			WorkflowKey: cmd.WorkflowKey,
+			SubstepID:   cmd.SubstepID,
+			Substep:     cmd.Substep,
+			Actor:       cmd.Actor,
+			Payload:     cmd.Payload,
+			Config:      cmd.Config,
+			Now:         cmd.Now,
+		})
+		if err != nil {
+			return SubstepSubmitResult{}, err
+		}
+		return SubstepSubmitResult{
+			Process:           process,
+			SelectedSubstepID: cmd.SubstepID,
+			Confirmation:      "Draft saved.",
+		}, nil
+	default:
+		process, err := p.CompleteSubstep(ctx, cmd)
+		if err != nil {
+			return SubstepSubmitResult{}, err
+		}
+		return SubstepSubmitResult{
+			Process: process,
+		}, nil
+	}
 }
 
 // CompleteSubstep selects the Stream blueprint completion strategy, then delegates.

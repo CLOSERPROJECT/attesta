@@ -78,6 +78,90 @@ func TestWorkflowCompletionStrategySelection(t *testing.T) {
 	}
 }
 
+func TestSubmitSubstepFormOwnsPostWriteUX(t *testing.T) {
+	fixedNow := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
+
+	t.Run("classic clears selection", func(t *testing.T) {
+		def := WorkflowDef{
+			CompletionStrategy: CompletionStrategyClassic,
+			Steps: []WorkflowStep{{
+				StepID: "1",
+				Substep: []WorkflowSub{
+					{SubstepID: "1.1", Order: 1, Role: "dep1", InputKey: "value", InputType: "formata"},
+				},
+			}},
+		}
+		cfg := RuntimeConfig{Workflow: def}
+		store := NewMemoryStore()
+		svc := &ProcessService{store: store, now: func() time.Time { return fixedNow }}
+		processID := primitive.NewObjectID()
+		store.SeedProcess(Process{
+			ID:       processID,
+			Status:   "active",
+			Progress: map[string]ProcessStep{"1_1": {State: "pending"}},
+		})
+		process, err := store.LoadProcessByID(context.Background(), processID)
+		if err != nil {
+			t.Fatalf("LoadProcessByID: %v", err)
+		}
+		process.Progress = normalizeProgressKeys(process.Progress)
+
+		result, err := svc.SubmitSubstepForm(context.Background(), CompleteSubstepCmd{
+			Process:     process,
+			WorkflowKey: "workflow",
+			SubstepID:   "1.1",
+			Substep:     def.Steps[0].Substep[0],
+			Actor:       Actor{ID: "user-1", Role: "dep1", RoleSlugs: []string{"dep1"}},
+			Payload:     map[string]interface{}{"status": "ok"},
+			Config:      cfg,
+			Now:         fixedNow,
+		})
+		if err != nil {
+			t.Fatalf("SubmitSubstepForm: %v", err)
+		}
+		if result.SelectedSubstepID != "" {
+			t.Fatalf("SelectedSubstepID = %q, want empty", result.SelectedSubstepID)
+		}
+		if result.Confirmation != "" {
+			t.Fatalf("Confirmation = %q, want empty", result.Confirmation)
+		}
+		if result.Process == nil || result.Process.Progress["1.1"].State != "done" {
+			t.Fatalf("expected classic complete via SubmitSubstepForm, got %#v", result.Process)
+		}
+	})
+
+	t.Run("draft-and-seal keeps selection and toast", func(t *testing.T) {
+		def := feragameDraftAndSealDef()
+		cfg := RuntimeConfig{Workflow: def}
+		store := NewMemoryStore()
+		svc := &ProcessService{store: store, now: func() time.Time { return fixedNow }}
+		process := seedFeragameProcess(t, store, def)
+
+		result, err := svc.SubmitSubstepForm(context.Background(), CompleteSubstepCmd{
+			Process:     process,
+			WorkflowKey: "feragame",
+			SubstepID:   "1.2",
+			Substep:     def.Steps[0].Substep[1],
+			Actor:       Actor{ID: "user-1", Role: "dep1", RoleSlugs: []string{"dep1"}},
+			Payload:     map[string]interface{}{"udc": []interface{}{}},
+			Config:      cfg,
+			Now:         fixedNow,
+		})
+		if err != nil {
+			t.Fatalf("SubmitSubstepForm: %v", err)
+		}
+		if result.SelectedSubstepID != "1.2" {
+			t.Fatalf("SelectedSubstepID = %q, want 1.2", result.SelectedSubstepID)
+		}
+		if result.Confirmation != "Draft saved." {
+			t.Fatalf("Confirmation = %q, want %q", result.Confirmation, "Draft saved.")
+		}
+		if result.Process == nil || result.Process.Progress["1.2"].State != progressStateDraft {
+			t.Fatalf("expected draft save via SubmitSubstepForm, got %#v", result.Process)
+		}
+	})
+}
+
 func TestClassicStrategyCompleteUnchanged(t *testing.T) {
 	fixedNow := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
 	def := WorkflowDef{
