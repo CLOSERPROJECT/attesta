@@ -1,0 +1,46 @@
+{{/* Approve/reject + reject dialog for home Join / org-creation request rows. */}}
+{{ define "my_home_request_actions" }}
+  <div class="list-row-actions">
+    <form method="post" action="{{ .Action }}" class="panel-actions">
+      <input type="hidden" name="intent" value="{{ .ApproveIntent }}" />
+      <input type="hidden" name="request_id" value="{{ .ID }}" />
+      <input type="hidden" name="next" value="/my" />
+      <button class="btn btn-ghost btn-icon btn-xs"
+              type="submit"
+              aria-label="Approve">{{ template "icon-check" . }}</button>
+    </form>
+    <button type="button"
+            class="btn btn-ghost-danger btn-icon btn-xs"
+            aria-label="Reject"
+            onclick="document.getElementById('{{ .DialogIDPrefix }}-{{ .ID }}').showModal()">
+      {{ template "icon-close" . }}
+    </button>
+  </div>
+  <dialog id="{{ .DialogIDPrefix }}-{{ .ID }}" class="dialog">
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <div>
+          <h3 class="dialog-title">{{ .DialogTitle }}</h3>
+          <p class="dialog-subtitle">{{ .DialogSubtitle }}</p>
+        </div>
+        <button type="button"
+                class="btn btn-ghost btn-icon dialog-close"
+                onclick="document.getElementById('{{ .DialogIDPrefix }}-{{ .ID }}').close()">
+          {{ template "icon-close" . }}
+        </button>
+      </header>
+      <form method="post" action="{{ .Action }}" class="input-form">
+        <input type="hidden" name="intent" value="{{ .RejectIntent }}" />
+        <input type="hidden" name="request_id" value="{{ .ID }}" />
+        <input type="hidden" name="next" value="/my" />
+        <div class="form-field">
+          <label for="{{ .DialogIDPrefix }}-reason-{{ .ID }}">Reason (optional)</label>
+          <input id="{{ .DialogIDPrefix }}-reason-{{ .ID }}" name="reason" type="text" />
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-danger" type="submit">Reject request</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+{{ end }}

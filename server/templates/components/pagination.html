@@ -1,0 +1,25 @@
+{{ define "pagination_link_attrs" }}
+  {{- if .View.HxTarget }} hx-get="{{ .URL }}" hx-target="{{ .View.HxTarget }}" {{- if .View.HxSelect }} hx-select="{{ .View.HxSelect }}"{{ end }} hx-swap="outerHTML" {{- if .View.PushURL }} hx-push-url="true"{{ end }} {{- end -}}
+{{ end }}
+{{ define "pagination" }}
+  <nav class="pagination{{ if .Inline }} pagination--inline{{ end }}"
+       aria-label="{{ .AriaLabel }}">
+    <div class="pagination-pages">
+      <a class="btn btn-secondary btn-icon pagination-btn{{ if not .HasPreviousPage }} is-disabled{{ end }}"
+         href="{{ .PreviousURL }}"
+         {{- template "pagination_link_attrs" (paginationLinkAttrs .PreviousURL .) }}>
+        {{ template "icon-chevron-left" . }}
+      </a>
+      {{ range .Links }}
+        <a class="{{ if .IsCurrent }}btn btn-primary{{ else }}btn btn-secondary{{ end }}"
+           href="{{ .URL }}"
+           {{- template "pagination_link_attrs" (paginationLinkAttrs .URL $) }}>{{ .Page }}</a>
+      {{ end }}
+      <a class="btn btn-secondary btn-icon pagination-btn{{ if not .HasNextPage }} is-disabled{{ end }}"
+         href="{{ .NextURL }}"
+         {{- template "pagination_link_attrs" (paginationLinkAttrs .NextURL .) }}>
+        {{ template "icon-chevron-right" . }}
+      </a>
+    </div>
+  </nav>
+{{ end }}

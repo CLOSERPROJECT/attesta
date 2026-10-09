@@ -242,10 +242,6 @@ a img {
   white-space: pre-line;
 }
 
-.pagination-btn {
-  padding: var(--space-3) var(--space-2);
-}
-
 .is-disabled {
   opacity: 0.5;
   pointer-events: none;

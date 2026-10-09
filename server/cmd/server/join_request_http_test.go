@@ -309,9 +309,13 @@ func TestHandleOnboardingJoinSearchPagination(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
+		`class="pagination"`,
 		`aria-label="Organizations pagination"`,
 		`href="/my/onboarding/join?q=org"`,
-		`href="/my/onboarding/join?q=org&amp;page=3"`,
+		`href="/my/onboarding/join?page=3&amp;q=org"`,
+		`hx-target="#onboarding-join-results"`,
+		`hx-select="#onboarding-join-results"`,
+		`hx-push-url="true"`,
 		"Org 13",
 		`hx-get="/my/onboarding/join?org=org-13&amp;page=2&amp;q=org"`,
 		`hx-target="#join-org-dialog-body"`,
@@ -326,6 +330,9 @@ func TestHandleOnboardingJoinSearchPagination(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in paginated join page, got:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, "platform-admin-pagination") {
+		t.Fatalf("expected shared pagination component, not platform-admin-pagination, got:\n%s", body)
 	}
 	if strings.Contains(body, `>Select</a>`) {
 		t.Fatalf("expected whole-row links, not Select buttons, got:\n%s", body)
@@ -381,9 +388,13 @@ func TestHandleOnboardingJoinBrowseAllPagination(t *testing.T) {
 	for _, want := range []string{
 		"Get started",
 		`href="/my/onboarding"`,
+		`class="pagination"`,
 		`aria-label="Organizations pagination"`,
 		`href="/my/onboarding/join"`,
 		`href="/my/onboarding/join?page=3"`,
+		`hx-target="#onboarding-join-results"`,
+		`hx-select="#onboarding-join-results"`,
+		`hx-push-url="true"`,
 		"Org 13",
 		`hx-get="/my/onboarding/join?org=org-13&amp;page=2"`,
 		`hx-target="#join-org-dialog-body"`,
@@ -393,6 +404,9 @@ func TestHandleOnboardingJoinBrowseAllPagination(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in browse-all join page, got:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, "platform-admin-pagination") {
+		t.Fatalf("expected shared pagination component, not platform-admin-pagination, got:\n%s", body)
 	}
 }
 

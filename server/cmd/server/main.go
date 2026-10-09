@@ -333,15 +333,13 @@ type HomeWorkflowPickerView struct {
 	PendingJoinRequests        []OrgAdminJoinRequestRow
 	PendingStreamActions       []StreamAttentionItem
 	UpcomingStreams            []StreamUpcomingItem
+	YourTurnBand               MyHomeYourTurnBandView
+	UpcomingBand               MyHomeUpcomingBandView
+	JoinRequestsBand           MyHomeJoinRequestsBandView
+	OrgCreationBand            MyHomeOrgCreationBandView
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
 	Error                      string
 	Confirmation               string
-}
-
-type PaginationLink struct {
-	Page      int
-	URL       string
-	IsCurrent bool
 }
 
 type QueryInput struct {
@@ -350,28 +348,20 @@ type QueryInput struct {
 }
 
 type ProcessStatusGroup struct {
-	Status              string
-	Label               string
-	NavAriaLabel        string
-	NavTitle            string
-	Heading             string
-	EmptyMessage        string
-	PaginationAriaLabel string
-	PanelID             string
-	Sort                string
-	SortFields          []QueryInput
-	TotalCount          int
-	CurrentPage         int
-	TotalPages          int
-	PageNumbers         []int
-	PageLinks           []PaginationLink
-	HasPreviousPage     bool
-	HasNextPage         bool
-	PreviousPage        int
-	NextPage            int
-	PreviousURL         string
-	NextURL             string
-	Processes           []StreamInstanceCard
+	Status       string
+	Label        string
+	NavAriaLabel string
+	NavTitle     string
+	Heading      string
+	EmptyMessage string
+	PanelID      string
+	Sort         string
+	SortFields   []QueryInput
+	TotalCount   int
+	CurrentPage  int
+	TotalPages   int
+	Pagination   PaginationView
+	Processes    []StreamInstanceCard
 }
 
 type HomeView struct {
@@ -456,11 +446,7 @@ type PlatformAdminView struct {
 	SearchQuery                string
 	CurrentPage                int
 	TotalPages                 int
-	PageNumbers                []int
-	HasPreviousPage            bool
-	HasNextPage                bool
-	PreviousPage               int
-	NextPage                   int
+	Pagination                 PaginationView
 	MatchedOrganizations       int
 	Organizations              []PlatformAdminOrganizationRow
 	PendingOrgCreationRequests []PlatformAdminOrgCreationRequestRow
@@ -2017,11 +2003,9 @@ func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInsta
 	} else if len(items) > 0 {
 		pagedItems = items[:0]
 	}
-	pageNumbers := make([]int, 0, totalPages)
 	pageLinks := make([]PaginationLink, 0, totalPages)
 	panelID := "stream-section-" + status
 	for pageNum := 1; pageNum <= totalPages; pageNum++ {
-		pageNumbers = append(pageNumbers, pageNum)
 		pageLinks = append(pageLinks, PaginationLink{
 			Page:      pageNum,
 			URL:       homePaginationURL(workflowPath, status, sortKey, pageNum),
@@ -2035,29 +2019,36 @@ func buildHomeProcessGroupForStatus(workflowPath string, processes []StreamInsta
 		sortFields = []QueryInput{{Name: "filter", Value: status}}
 	}
 	navAriaLabel, navTitle, heading, emptyMessage, paginationAriaLabel := homeProcessStatusCopy(status)
+	previousURL := homePaginationURL(workflowPath, status, sortKey, previousPage)
+	nextURL := homePaginationURL(workflowPath, status, sortKey, nextPage)
+	hasPreviousPage := currentPage > 1
+	hasNextPage := currentPage < totalPages
 	return ProcessStatusGroup{
-		Status:              status,
-		Label:               processStatusLabel(status),
-		NavAriaLabel:        navAriaLabel,
-		NavTitle:            navTitle,
-		Heading:             heading,
-		EmptyMessage:        emptyMessage,
-		PaginationAriaLabel: paginationAriaLabel,
-		PanelID:             panelID,
-		Sort:                sortKey,
-		SortFields:          sortFields,
-		TotalCount:          len(items),
-		CurrentPage:         currentPage,
-		TotalPages:          totalPages,
-		PageNumbers:         pageNumbers,
-		PageLinks:           pageLinks,
-		HasPreviousPage:     currentPage > 1,
-		HasNextPage:         currentPage < totalPages,
-		PreviousPage:        previousPage,
-		NextPage:            nextPage,
-		PreviousURL:         homePaginationURL(workflowPath, status, sortKey, previousPage),
-		NextURL:             homePaginationURL(workflowPath, status, sortKey, nextPage),
-		Processes:           pagedItems,
+		Status:       status,
+		Label:        processStatusLabel(status),
+		NavAriaLabel: navAriaLabel,
+		NavTitle:     navTitle,
+		Heading:      heading,
+		EmptyMessage: emptyMessage,
+		PanelID:      panelID,
+		Sort:         sortKey,
+		SortFields:   sortFields,
+		TotalCount:   len(items),
+		CurrentPage:  currentPage,
+		TotalPages:   totalPages,
+		Pagination: PaginationView{
+			AriaLabel:       paginationAriaLabel,
+			Inline:          true,
+			Links:           pageLinks,
+			HasPreviousPage: hasPreviousPage,
+			HasNextPage:     hasNextPage,
+			PreviousURL:     previousURL,
+			NextURL:         nextURL,
+			HxTarget:        "#stream-dashboard-results",
+			HxSelect:        "#stream-dashboard-results",
+			PushURL:         true,
+		},
+		Processes: pagedItems,
 	}
 }
 
@@ -2330,15 +2321,23 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if user.IsPlatformAdmin {
 		pendingOrgCreation = platformAdminOrgCreationRequestRows(r.Context(), s)
 	}
+	yourTurnBand := buildMyHomeYourTurnBand(pendingStreams, 1)
+	upcomingBand := buildMyHomeUpcomingBand(upcomingStreams, 1)
+	joinRequestsBand := buildMyHomeJoinRequestsBand(pendingJoins, 1)
+	orgCreationBand := buildMyHomeOrgCreationBand(pendingOrgCreation, 1)
 	view := HomeWorkflowPickerView{
 		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
 		DiscoveryStreams:           discoveryStreams,
 		DiscoveryCatalog:           discoveryCatalog,
 		ShowCreateStream:           showCreateStream && authErr == nil,
-		PendingJoinRequests:        pendingJoins,
-		PendingStreamActions:       pendingStreams,
-		UpcomingStreams:            upcomingStreams,
-		PendingOrgCreationRequests: pendingOrgCreation,
+		PendingJoinRequests:        joinRequestsBand.PendingJoinRequests,
+		PendingStreamActions:       yourTurnBand.PendingStreamActions,
+		UpcomingStreams:            upcomingBand.UpcomingStreams,
+		YourTurnBand:               yourTurnBand,
+		UpcomingBand:               upcomingBand,
+		JoinRequestsBand:           joinRequestsBand,
+		OrgCreationBand:            orgCreationBand,
+		PendingOrgCreationRequests: orgCreationBand.PendingOrgCreationRequests,
 		Error:                      homePickerMessage(r, "error"),
 		Confirmation:               homePickerMessage(r, "confirmation"),
 	}
@@ -2372,6 +2371,19 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleLeaveOrganization(w, r)
 		return
 	default:
+		if band, ok := myHomeBandRest(rest); ok {
+			switch band {
+			case "your-turn":
+				s.handleMyHomeYourTurn(w, r)
+			case "upcoming":
+				s.handleMyHomeUpcoming(w, r)
+			case "join-requests":
+				s.handleMyHomeJoinRequests(w, r)
+			case "org-creation":
+				s.handleMyHomeOrgCreation(w, r)
+			}
+			return
+		}
 		http.NotFound(w, r)
 	}
 }
@@ -3859,24 +3871,38 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	if orgPage.Total > 0 {
 		totalPages = (orgPage.Total + limit - 1) / limit
 	}
-	pageNumbers := make([]int, 0, totalPages)
+	pageLinks := make([]PaginationLink, 0, totalPages)
 	for page := 1; page <= totalPages; page++ {
-		pageNumbers = append(pageNumbers, page)
+		pageLinks = append(pageLinks, PaginationLink{
+			Page:      page,
+			URL:       platformAdminPath(errs.SearchQuery, page),
+			IsCurrent: page == currentPage,
+		})
 	}
+	hasPreviousPage := currentPage > 1
+	hasNextPage := currentPage < totalPages
+	previousPage := max(currentPage-1, 1)
+	nextPage := min(currentPage+1, totalPages)
 	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	pendingRows := platformAdminOrgCreationRequestRows(context.Background(), s)
 	view := PlatformAdminView{
-		PageBase:                   s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		ActivePanel:                "organizations",
-		Breadcrumbs:                buildPlatformAdminBreadcrumbs("organizations"),
-		SearchQuery:                errs.SearchQuery,
-		CurrentPage:                currentPage,
-		TotalPages:                 totalPages,
-		PageNumbers:                pageNumbers,
-		HasPreviousPage:            currentPage > 1,
-		HasNextPage:                currentPage < totalPages,
-		PreviousPage:               max(currentPage-1, 1),
-		NextPage:                   min(currentPage+1, totalPages),
+		PageBase:     s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		ActivePanel:  "organizations",
+		Breadcrumbs:  buildPlatformAdminBreadcrumbs("organizations"),
+		SearchQuery:  errs.SearchQuery,
+		CurrentPage:  currentPage,
+		TotalPages:   totalPages,
+		Pagination: PaginationView{
+			AriaLabel:       "Organizations pagination",
+			Links:           pageLinks,
+			HasPreviousPage: hasPreviousPage,
+			HasNextPage:     hasNextPage,
+			PreviousURL:     platformAdminPath(errs.SearchQuery, previousPage),
+			NextURL:         platformAdminPath(errs.SearchQuery, nextPage),
+			HxTarget:        "#platform-admin-results",
+			HxSelect:        "#platform-admin-results",
+			PushURL:         true,
+		},
 		MatchedOrganizations:       orgPage.Total,
 		Organizations:              rows,
 		PendingOrgCreationRequests: pendingRows,
