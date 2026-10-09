@@ -6,7 +6,9 @@ import (
 )
 
 func runSeedCommand(ctx context.Context, args []string) error {
-	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, openAppwriteIdentity, func(sess seedSession) error {
+	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
+		return appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true})
+	}, func(sess seedSession) error {
 		replace := seedReplaceFromArgs(args)
 		if err := Seed(ctx, SeedDeps{
 			Identity:       sess.Identity,
@@ -24,10 +26,6 @@ func runSeedCommand(ctx context.Context, args []string) error {
 		}
 		return nil
 	})
-}
-
-func openAppwriteIdentity() (IdentityStore, error) {
-	return appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true})
 }
 
 func seedReplaceFromArgs(args []string) bool {

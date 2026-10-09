@@ -198,11 +198,11 @@ func TestWithSeedSessionRequiresOpeners(t *testing.T) {
 	}
 }
 
-func TestOpenAppwriteIdentityRequiresEnv(t *testing.T) {
+func TestAppwriteIdentityFromEnvRequiresEnv(t *testing.T) {
 	t.Setenv("APPWRITE_ENDPOINT", "")
 	t.Setenv("APPWRITE_PROJECT_ID", "")
 	t.Setenv("APPWRITE_API_KEY", "")
-	if _, err := openAppwriteIdentity(); err == nil {
+	if _, err := appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true}); err == nil {
 		t.Fatal("expected missing env error")
 	}
 }
