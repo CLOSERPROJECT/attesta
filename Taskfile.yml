@@ -53,13 +53,12 @@ tasks:
       - bash scripts/worktree-compose.sh down-v
 
   purge:
-    desc: Purge this worktree's volumes and coordinated data bundle after confirmation.
+    desc: Purge this worktree's volumes after confirmation (next start can re-seed).
     cmds:
       - |
           read -r -p "This will delete this worktree's MongoDB and Appwrite data. Type PURGE to continue: " confirm
           if [ "$confirm" = "PURGE" ]; then
             bash scripts/worktree-compose.sh down-v
-            bash scripts/worktree-data.sh forget
           else
             echo "Purge cancelled."
           fi
@@ -176,10 +175,9 @@ tasks:
       - bash deployment/scripts/worktree-env_test.sh
       - bash deployment/scripts/dev-env_test.sh
       - bash deployment/scripts/worktree-bootstrap_test.sh
-      - bash deployment/scripts/worktree-data_test.sh
+      - bash deployment/scripts/worktree-relabel-volumes_test.sh
       - bash deployment/scripts/worktree-compose_test.sh
       - bash deployment/scripts/worktree-gc_test.sh
-      - bash deployment/scripts/restore-appwrite-seed_test.sh
 
   css:lint:
     desc: CSS lint (template inline styles + breakpoint guard + stylelint).
@@ -220,6 +218,12 @@ tasks:
           echo "total coverage: ${total}%"
           awk -v total="$total" -v min="$min" "BEGIN { if ((total+0) < (min+0)) { printf(\"coverage gate failed (< %.1f%%)\\n\", min); exit 1 } }"
           '
+
+  seed:
+    desc: Apply integrated demo fixture (identity + taxonomy + catalog + instances). Empty-only by default; pass --replace to rewrite.
+    dir: server
+    cmds:
+      - go run ./cmd/server seed {{.CLI_ARGS}}
 
   seed:categories:
     desc: Full-replace Mongo taxonomy from server/config/categories.yaml.

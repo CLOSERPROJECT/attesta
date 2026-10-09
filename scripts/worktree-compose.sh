@@ -43,7 +43,7 @@ load_env() {
   eval "${worktree_exports}"
   ATTESTA_WORKTREE_ROOT="$(cd "${ROOT_DIR}" && pwd -P)"
   ATTESTA_REPOSITORY_ID="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id)"
-  export COMPOSE_PROJECT_NAME APPWRITE_RESTORE_SEED_SQL ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
+  export COMPOSE_PROJECT_NAME ATTESTA_SEED ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
 }
 
 compose() {
@@ -114,6 +114,31 @@ wait_for_appwrite() {
   return 1
 }
 
+attesta_seed_enabled() {
+  case "${ATTESTA_SEED:-false}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+maybe_run_attesta_seed() {
+  attesta_seed_enabled || return 0
+
+  if [[ -n "${ATTESTA_SEED_COMMAND:-}" ]]; then
+    echo "running attesta seed via ATTESTA_SEED_COMMAND"
+    bash -c "${ATTESTA_SEED_COMMAND}"
+    return
+  fi
+
+  if [[ -z "${APPWRITE_ENDPOINT:-}" || -z "${APPWRITE_PROJECT_ID:-}" || -z "${APPWRITE_API_KEY:-}" ]]; then
+    echo "skipping attesta seed: set APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY (or run task seed later)" >&2
+    return 0
+  fi
+
+  echo "running attesta seed (empty-only; ATTESTA_SEED=${ATTESTA_SEED})"
+  (cd "${ROOT_DIR}/server" && go run ./cmd/server seed)
+}
+
 up() {
   local build=0
   if [[ "${1:-}" == "--build" ]]; then
@@ -133,14 +158,14 @@ up() {
     echo "error: Compose configuration contains no infrastructure services" >&2
     exit 1
   }
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
+  bash "${ROOT_DIR}/scripts/worktree-relabel-volumes.sh"
   if [[ "${build}" -eq 1 ]]; then
     compose up -d --build "${services[@]}"
   else
     compose up -d "${services[@]}"
   fi
   wait_for_appwrite
+  maybe_run_attesta_seed
   compose ps
 }
 
@@ -168,14 +193,14 @@ up_app() {
     echo "error: Compose configuration contains no services" >&2
     exit 1
   }
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
+  bash "${ROOT_DIR}/scripts/worktree-relabel-volumes.sh"
   if [[ "${build}" -eq 1 ]]; then
     compose up -d --build "${services[@]}"
   else
     compose up -d "${services[@]}"
   fi
   wait_for_appwrite
+  maybe_run_attesta_seed
   compose ps
 }
 
@@ -197,7 +222,7 @@ main() {
       verify_volume_ownership
       compose down -v --remove-orphans
       ;;
-    relabel-volumes) bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes ;;
+    relabel-volumes) bash "${ROOT_DIR}/scripts/worktree-relabel-volumes.sh" ;;
     ps) compose ps ;;
     logs) compose logs -f ;;
     mongo-ping) compose exec -T mongodb mongosh --quiet --eval "db.adminCommand('ping')" ;;

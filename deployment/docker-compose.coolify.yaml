@@ -208,9 +208,7 @@ services:
       retries: 3
 
   appwrite-mariadb:
-    build:
-      context: .
-      dockerfile: deployment/Dockerfile.appwrite-mariadb
+    image: mariadb:10.11
     container_name: appwrite-mariadb
     networks:
       default:
@@ -225,8 +223,6 @@ services:
       - MYSQL_USER=$SERVICE_USER_MARIADB
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
       - MARIADB_AUTO_UPGRADE=1
-      # Set this only in Coolify preview deployment env vars.
-      - APPWRITE_RESTORE_SEED_SQL=${APPWRITE_RESTORE_SEED_SQL:-false}
     command: 'mysqld --innodb-flush-method=fsync'
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -293,6 +289,8 @@ services:
       SMTP_PASSWORD: ${SERVICE_PASSWORD_SMTP:-}
       SMTP_FROM: ${ATTESTA_SMTP_FROM:-attesta@apps.forkbomb.eu}
       SMTP_SECURE: ${SERVICE_SECURE_SMTP:-}
+      # Set only in Coolify Preview env; production must leave unset/false.
+      ATTESTA_SEED: ${ATTESTA_SEED:-false}
       SERVICE_FQDN_ATTESTA_3000:
     depends_on:
       - mongodb

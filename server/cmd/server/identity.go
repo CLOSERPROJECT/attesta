@@ -15,6 +15,9 @@ type IdentityStore interface {
 	CreateOrganization(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	CreateOrganizationAsAdmin(ctx context.Context, name string) (IdentityOrg, error)
 	EnsurePlatformAdminAccount(ctx context.Context, email, password string) error
+	// EnsureUserAccount creates the user via the admin API when missing, or updates
+	// the password when present. Used by demo seed (public signup may be disabled).
+	EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error)
 	AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error)
 	CreateRecovery(ctx context.Context, email, redirectURL string) error

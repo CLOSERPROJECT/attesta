@@ -743,6 +743,12 @@ type workflowContextValue struct {
 
 func main() {
 	ctx := context.Background()
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed" {
+		if err := runSeedCommand(ctx, os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-categories" {
 		if err := runSeedCategoriesCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)

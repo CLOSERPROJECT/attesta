@@ -1,0 +1,250 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/rand"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+// demoFixtureMarkerOrgSlug is the empty-only presence marker for Seed.
+// When this organization already exists and Replace is false, Seed is a no-op.
+const demoFixtureMarkerOrgSlug = "organization-1"
+
+// SeedDeps is the injectable seam for the unified demo fixture seeder.
+type SeedDeps struct {
+	Identity IdentityStore
+	Store    Store
+	// ConfigDir holds workflow YAMLs and categories.yaml (default: WORKFLOW_CONFIG_DIR).
+	ConfigDir string
+	// CategoriesPath overrides the taxonomy seed file; empty uses ConfigDir/categories.yaml.
+	CategoriesPath string
+	// Replace rewrites the fixture even when the marker org already exists (local only).
+	Replace bool
+	// RNG drives catalog stream variety; nil picks a time-based source in Seed.
+	RNG catalogStreamRNG
+	// Fixture overrides the built-in demo dataset; nil uses defaultDemoFixture().
+	Fixture *demoFixture
+	// Now overrides wall clock for instance timestamps; nil uses time.Now.
+	Now func() time.Time
+}
+
+// Seed applies the integrated synthetic demo fixture.
+//
+// Empty-only (default): if GetOrganizationBySlug(demoFixtureMarkerOrgSlug) succeeds,
+// Seed returns nil without writing identity or Mongo. Pass Replace to rewrite.
+//
+// Order when applying: identity (orgs/users/memberships, email verified) →
+// taxonomy → catalog streams → instances.
+//
+// Preconditions (CLI): Mongo reachable; Appwrite project exists; APPWRITE_* set.
+// Seed does not create the Appwrite project or API key.
+// Optional Coolify gate (later wiring): ATTESTA_SEED=true — not read here yet.
+func Seed(ctx context.Context, deps SeedDeps) error {
+	if deps.Identity == nil {
+		return fmt.Errorf("seed: identity is required")
+	}
+	if deps.Store == nil {
+		return fmt.Errorf("seed: store is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if !deps.Replace {
+		_, err := deps.Identity.GetOrganizationBySlug(ctx, demoFixtureMarkerOrgSlug)
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, ErrIdentityNotFound):
+			// Fixture absent — continue to apply.
+		default:
+			return fmt.Errorf("seed: marker org lookup: %w", err)
+		}
+	}
+
+	fixture := defaultDemoFixture()
+	if deps.Fixture != nil {
+		fixture = *deps.Fixture
+	}
+	fixture = demoFixtureWithPlatformAdminFromEnv(fixture)
+
+	if err := seedDemoIdentity(ctx, deps.Identity, fixture, deps.Replace); err != nil {
+		return err
+	}
+
+	configDir := strings.TrimSpace(deps.ConfigDir)
+	if configDir == "" {
+		configDir = "config"
+	}
+	categoriesPath := strings.TrimSpace(deps.CategoriesPath)
+	if categoriesPath == "" {
+		categoriesPath = filepath.Join(configDir, "categories.yaml")
+	}
+	if err := seedTaxonomyFromFile(ctx, deps.Store, categoriesPath); err != nil {
+		return fmt.Errorf("seed: taxonomy: %w", err)
+	}
+
+	rng := deps.RNG
+	if rng == nil {
+		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	server := &Server{store: deps.Store, configDir: configDir, now: deps.Now}
+	if server.now == nil {
+		server.now = func() time.Time { return time.Now().UTC() }
+	}
+	if _, err := seedCatalogStreams(ctx, server, rng); err != nil {
+		return fmt.Errorf("seed: catalog streams: %w", err)
+	}
+	if err := seedDemoInstances(ctx, server); err != nil {
+		return fmt.Errorf("seed: instances: %w", err)
+	}
+	return nil
+}
+
+func seedDemoIdentity(ctx context.Context, identity IdentityStore, fixture demoFixture, replace bool) error {
+	if replace {
+		for _, org := range fixture.Orgs {
+			slug := demoOrgSlug(org.Name)
+			if err := identity.DeleteOrganizationAsAdmin(ctx, slug); err != nil && !errors.Is(err, ErrIdentityNotFound) {
+				return fmt.Errorf("seed identity: delete org %s: %w", slug, err)
+			}
+		}
+	}
+
+	orgBySlug := make(map[string]IdentityOrg, len(fixture.Orgs))
+	for _, orgDef := range fixture.Orgs {
+		slug := demoOrgSlug(orgDef.Name)
+		existing, err := identity.GetOrganizationBySlug(ctx, slug)
+		switch {
+		case err == nil:
+			updated, updErr := identity.UpdateOrganizationAsAdmin(ctx, existing.Slug, orgDef.Name, existing.LogoFileID, append([]IdentityRole(nil), orgDef.Roles...))
+			if updErr != nil {
+				return fmt.Errorf("seed identity: update org %s: %w", slug, updErr)
+			}
+			orgBySlug[updated.Slug] = updated
+		case errors.Is(err, ErrIdentityNotFound):
+			created, createErr := identity.CreateOrganizationAsAdmin(ctx, orgDef.Name)
+			if createErr != nil {
+				return fmt.Errorf("seed identity: create org %s: %w", orgDef.Name, createErr)
+			}
+			updated, updErr := identity.UpdateOrganizationAsAdmin(ctx, created.Slug, orgDef.Name, created.LogoFileID, append([]IdentityRole(nil), orgDef.Roles...))
+			if updErr != nil {
+				return fmt.Errorf("seed identity: set roles %s: %w", created.Slug, updErr)
+			}
+			orgBySlug[updated.Slug] = updated
+		default:
+			return fmt.Errorf("seed identity: lookup org %s: %w", slug, err)
+		}
+	}
+
+	for _, userDef := range fixture.Users {
+		user, err := ensureDemoFixtureUser(ctx, identity, userDef)
+		if err != nil {
+			return err
+		}
+		if err := identity.UpdateEmailVerification(ctx, user.ID, true); err != nil {
+			return fmt.Errorf("seed identity: verify %s: %w", userDef.Email, err)
+		}
+		user.EmailVerified = true
+
+		labels := make([]string, 0, 8)
+		if len(userDef.OrgAdminSlugs) > 0 {
+			labels = append(labels, identityOrgAdminLabel)
+		}
+		for _, orgSlug := range userDef.OrgAdminSlugs {
+			if _, ok := orgBySlug[orgSlug]; !ok {
+				return fmt.Errorf("seed identity: unknown org slug %q for %s", orgSlug, userDef.Email)
+			}
+			roleSlugs := append([]string(nil), userDef.MembershipRoles[orgSlug]...)
+			if err := ensureDemoOrgMembership(ctx, identity, orgSlug, user, roleSlugs, true); err != nil {
+				return err
+			}
+			for _, roleSlug := range roleSlugs {
+				if encoded := encodeIdentityRoleLabel(roleSlug); encoded != "" {
+					labels = append(labels, encoded)
+				}
+			}
+		}
+		if len(labels) > 0 {
+			if _, err := identity.UpdateUserLabels(ctx, user.ID, uniqueIdentityStrings(labels)); err != nil {
+				return fmt.Errorf("seed identity: labels %s: %w", userDef.Email, err)
+			}
+		}
+	}
+	return nil
+}
+
+func ensureDemoFixtureUser(ctx context.Context, identity IdentityStore, userDef demoFixtureUser) (IdentityUser, error) {
+	email := strings.ToLower(strings.TrimSpace(userDef.Email))
+	password := strings.TrimSpace(userDef.Password)
+	if email == "" || password == "" {
+		return IdentityUser{}, fmt.Errorf("seed identity: user email and password are required")
+	}
+	user, err := identity.EnsureUserAccount(ctx, email, password, userDef.Name)
+	if err != nil {
+		return IdentityUser{}, fmt.Errorf("seed identity: ensure user %s: %w", email, err)
+	}
+	if strings.TrimSpace(user.ID) == "" {
+		loaded, loadErr := identity.GetUserByEmail(ctx, email)
+		if loadErr != nil {
+			return IdentityUser{}, fmt.Errorf("seed identity: load user %s: %w", email, loadErr)
+		}
+		return loaded, nil
+	}
+	return user, nil
+}
+
+func ensureDemoOrgMembership(ctx context.Context, identity IdentityStore, orgSlug string, user IdentityUser, roleSlugs []string, isOrgAdmin bool) error {
+	memberships, err := identity.ListOrganizationMemberships(ctx, orgSlug)
+	if err != nil {
+		return fmt.Errorf("seed identity: list memberships %s: %w", orgSlug, err)
+	}
+	for _, m := range memberships {
+		if strings.TrimSpace(m.UserID) == strings.TrimSpace(user.ID) || strings.EqualFold(m.Email, user.Email) {
+			return nil
+		}
+	}
+	if _, err := identity.AddOrganizationUserByIDAsAdmin(ctx, orgSlug, user.ID, roleSlugs, isOrgAdmin); err != nil {
+		return fmt.Errorf("seed identity: add %s to %s: %w", user.Email, orgSlug, err)
+	}
+	return nil
+}
+
+func seedDemoInstances(ctx context.Context, server *Server) error {
+	if server == nil || server.store == nil {
+		return fmt.Errorf("server store is required")
+	}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		return fmt.Errorf("catalog: %w", err)
+	}
+	if len(catalog) == 0 {
+		return fmt.Errorf("workflow catalog is empty")
+	}
+	keys := make([]string, 0, len(catalog))
+	for k := range catalog {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	now := time.Now().UTC()
+	if server.now != nil {
+		now = server.now()
+	}
+	for i, key := range keys {
+		if seedStreamLeftEmpty(i) {
+			if err := server.store.DeleteWorkflowData(ctx, key); err != nil {
+				return fmt.Errorf("%s: delete: %w", key, err)
+			}
+			continue
+		}
+		if _, err := seedWorkflowInstances(ctx, server.store, key, catalog[key], now); err != nil {
+			return err
+		}
+	}
+	return nil
+}

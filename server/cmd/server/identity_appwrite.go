@@ -138,33 +138,39 @@ func (a *appwriteIdentity) CreateOrganizationAsAdmin(ctx context.Context, name s
 }
 
 func (a *appwriteIdentity) EnsurePlatformAdminAccount(ctx context.Context, email, password string) error {
+	_, err := a.EnsureUserAccount(ctx, email, password, "Platform Admin")
+	return err
+}
+
+func (a *appwriteIdentity) EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return IdentityUser{}, err
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	password = strings.TrimSpace(password)
 	if email == "" || password == "" {
-		return nil
+		return IdentityUser{}, nil
 	}
 	user, err := a.GetUserByEmail(ctx, email)
 	switch {
 	case err == nil:
 		if _, err := users.New(a.adminClient).UpdatePassword(strings.TrimSpace(user.ID), password); err != nil {
-			return normalizeIdentityError(err)
+			return IdentityUser{}, normalizeIdentityError(err)
 		}
-		return nil
+		return user, nil
 	case err != nil && !errors.Is(err, ErrIdentityNotFound):
-		return err
+		return IdentityUser{}, err
 	}
-	if _, err := users.New(a.adminClient).Create(
+	created, err := users.New(a.adminClient).Create(
 		id.Unique(),
 		users.New(a.adminClient).WithCreateEmail(email),
 		users.New(a.adminClient).WithCreatePassword(password),
-		users.New(a.adminClient).WithCreateName("Platform Admin"),
-	); err != nil {
-		return normalizeIdentityError(err)
+		users.New(a.adminClient).WithCreateName(identityAccountDisplayName(email, name)),
+	)
+	if err != nil {
+		return IdentityUser{}, normalizeIdentityError(err)
 	}
-	return nil
+	return toIdentityUser(created, nil), nil
 }
 
 func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {

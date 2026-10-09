@@ -13,7 +13,7 @@ Worktrunk-created worktrees run `scripts/worktree-bootstrap.sh` from `.config/wt
 Codex-managed worktrees run it through the checked-in local environment; for a plain Git worktree, run it explicitly.
 Like Credimi, it derives deterministic candidates with Worktrunk's `hash_port`, skips live listeners and ports reserved by sibling worktrees, and writes the result once in `.env.worktree`.
 The flat `KEY=value` file can be edited afterward and is never overwritten.
-The same bootstrap saves one coordinated primary MongoDB and Appwrite bundle under ignored `.worktree-data/`; `task start` restores it only before an uninitialized worktree stack starts.
+Each worktree starts with its own empty Compose volumes; demo data comes from the Go seed after Appwrite credentials exist (`ATTESTA_SEED=true` / `task seed`).
 
 Before the first unattended Worktrunk operation, review and approve the shared
 hooks with `wt config approvals add`.
@@ -41,13 +41,13 @@ The primary checkout may be bootstrapped manually after the Compose stack is up:
 7. Export or set:
    - `APPWRITE_PROJECT_ID`
    - `APPWRITE_API_KEY`
-8. Run `task start:docker` if those values changed and you use the containerized app.
+8. Re-run `task start` (or `task start:docker`) so the empty-only Go seed can apply, or run `task seed` once.
 
-New parallel worktrees normally restore the primary checkout's coordinated snapshot, including Appwrite MariaDB and durable file storage.
-The checked-in `deployment/appwrite/appwrite-seed.sql` remains the fallback for a genuinely fresh stack with no copied bundle; setup never mixes that seed with a copied live MongoDB.
+New parallel worktrees start empty. After Appwrite credentials are set, the Go demo seed (`ATTESTA_SEED=true`) is the only demo-data path. There is no SQL MariaDB seed fallback and no primary volume-copy.
 
-Snapshot capture is serialized across the repository.
-If the primary has no durable data, or after `task purge`, the worktree records a persistent fresh-seed choice instead of reconsidering and copying newer primary data on a later start.
+After Appwrite credentials are set, `task start` / `task start:docker` run the Go demo seed automatically (`ATTESTA_SEED=true` from worktree-env; empty-only). Run `task seed` manually anytime, or `task seed -- --replace` to rewrite.
+
+After `task reset` or `task purge`, the next start re-applies the Go demo seed when credentials exist.
 
 ## Migration Notes
 - Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.

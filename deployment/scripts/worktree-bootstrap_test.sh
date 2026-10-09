@@ -29,11 +29,6 @@ elif [[ "${1:-}" == "print" ]]; then
   echo "PORT=3000"
 fi
 EOF
-cat >"${test_root}/scripts/worktree-data.sh" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-echo "data $*" >>"${TEST_LOG}"
-EOF
 cat >"${test_root}/bin/mise" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -80,7 +75,6 @@ mise trust --yes ${test_root}/mise.toml
 mise ls --missing --no-header
 mise install
 env write
-data snapshot-primary
 git submodule update --init --recursive
 env print
 EOF
@@ -121,13 +115,11 @@ PATH="${test_root}/bin:/usr/bin:/bin" \
 grep -q '^SECRET=primary$' "${test_root}/.env" \
   || fail "plain worktree did not receive primary .env"
 
-# Primary setup uses classic ports and does not snapshot itself.
+# Primary setup uses classic ports and does not call snapshot helpers.
 rm "${test_root}/.env"
-cp "${test_root}/scripts/worktree-bootstrap.sh" "${primary_root}/scripts-worktree-bootstrap.sh"
 mkdir -p "${primary_root}/scripts" "${primary_root}/bin"
 cp "${test_root}/scripts/worktree-bootstrap.sh" "${primary_root}/scripts/worktree-bootstrap.sh"
 cp "${test_root}/scripts/worktree-env.sh" "${primary_root}/scripts/worktree-env.sh"
-cp "${test_root}/scripts/worktree-data.sh" "${primary_root}/scripts/worktree-data.sh"
 cp "${test_root}/bin/mise" "${primary_root}/bin/mise"
 cp "${test_root}/bin/git" "${primary_root}/bin/git"
 touch "${primary_root}/mise.toml"
@@ -138,8 +130,8 @@ PATH="${primary_root}/bin:/usr/bin:/bin" \
   ATTESTA_TEST_PRIMARY="${primary_root}" \
   bash "${primary_root}/scripts/worktree-bootstrap.sh" >"${primary_root}/output"
 grep -q '^env write --classic$' "${log_file}" || fail "primary did not use classic ports"
-if grep -q '^data ' "${log_file}"; then
-  fail "primary bootstrap unexpectedly captured a data snapshot"
+if grep -q 'snapshot\|worktree-data\|relabel' "${log_file}"; then
+  fail "primary bootstrap unexpectedly touched data/volume helpers"
 fi
 
 echo "ok: worktree-bootstrap_test"
