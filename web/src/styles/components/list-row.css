@@ -40,7 +40,7 @@
   padding: var(--space-3);
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--secondary);
+  background: var(--card);
 }
 
 a.list-row,
