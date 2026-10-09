@@ -2,8 +2,6 @@ package main
 
 import "strings"
 
-const demoFixtureDefaultPassword = "change-me"
-
 type demoFixtureOrg struct {
 	Name  string
 	Roles []IdentityRole
@@ -49,15 +47,15 @@ func defaultDemoFixture() demoFixture {
 		},
 		Users: []demoFixtureUser{
 			{
-				Email:         "platform_admin@example.org",
-				Password:      demoFixtureDefaultPassword,
+				Email:         "admin@attesta.com",
+				Password:      "admin@attesta.com",
 				Name:          "Platform Admin",
 				PlatformAdmin: true,
 				OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3"},
 			},
 			{
-				Email:         "org1@admin.org",
-				Password:      demoFixtureDefaultPassword,
+				Email:         "admin@org1.com",
+				Password:      "admin@org1.com",
 				Name:          "Org 1 Admin",
 				OrgAdminSlugs: []string{"organization-1"},
 				MembershipRoles: map[string][]string{
@@ -65,8 +63,8 @@ func defaultDemoFixture() demoFixture {
 				},
 			},
 			{
-				Email:         "org2@admin.org",
-				Password:      demoFixtureDefaultPassword,
+				Email:         "admin@org2.com",
+				Password:      "admin@org2.com",
 				Name:          "Org 2 Admin",
 				OrgAdminSlugs: []string{"organization-2"},
 				MembershipRoles: map[string][]string{
@@ -74,8 +72,8 @@ func defaultDemoFixture() demoFixture {
 				},
 			},
 			{
-				Email:         "org3@admin.org",
-				Password:      demoFixtureDefaultPassword,
+				Email:         "admin@org3.com",
+				Password:      "admin@org3.com",
 				Name:          "Org 3 Admin",
 				OrgAdminSlugs: []string{"organization-3"},
 				MembershipRoles: map[string][]string{

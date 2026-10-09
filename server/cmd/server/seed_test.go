@@ -49,8 +49,8 @@ func TestSeedEmptyOnlyNoopsWhenMarkerOrgExists(t *testing.T) {
 }
 
 func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
-	t.Setenv("ADMIN_EMAIL", "platform_admin@example.org")
-	t.Setenv("ADMIN_PASSWORD", "change-me")
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
 
 	store := NewMemoryStore()
 	identity := newSeedFakeIdentity()
@@ -77,7 +77,7 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		t.Fatal("expected org roles on fixture organization")
 	}
 
-	for _, email := range []string{"platform_admin@example.org", "org1@admin.org", "org2@admin.org", "org3@admin.org"} {
+	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com"} {
 		user, err := identity.GetUserByEmail(t.Context(), email)
 		if err != nil {
 			t.Fatalf("user %s: %v", email, err)
@@ -97,8 +97,8 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 }
 
 func TestSeedPopulatesTaxonomyCatalogAndInstances(t *testing.T) {
-	t.Setenv("ADMIN_EMAIL", "platform_admin@example.org")
-	t.Setenv("ADMIN_PASSWORD", "change-me")
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
 
 	store := NewMemoryStore()
 	dir := writeSeedTestConfigDir(t)
@@ -138,8 +138,8 @@ func TestSeedPopulatesTaxonomyCatalogAndInstances(t *testing.T) {
 }
 
 func TestWithSeedSessionAppliesFixture(t *testing.T) {
-	t.Setenv("ADMIN_EMAIL", "platform_admin@example.org")
-	t.Setenv("ADMIN_PASSWORD", "change-me")
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
 	t.Setenv("CATEGORIES_SEED", "")
 
 	store := NewMemoryStore()
@@ -208,8 +208,8 @@ func TestAppwriteIdentityFromEnvRequiresEnv(t *testing.T) {
 }
 
 func TestSeedReplaceRewritesWhenMarkerPresent(t *testing.T) {
-	t.Setenv("ADMIN_EMAIL", "platform_admin@example.org")
-	t.Setenv("ADMIN_PASSWORD", "change-me")
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
 
 	store := NewMemoryStore()
 	identity := newSeedFakeIdentity()
