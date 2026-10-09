@@ -115,9 +115,10 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 		Progress:    map[string]ProcessStep{},
 	})
 
-	server := &Server{store: store, configDir: t.TempDir()}
+	configDir := t.TempDir()
+	now := time.Now().UTC()
 	rng := rand.New(rand.NewSource(1))
-	res, err := seedCatalogStreams(t.Context(), server, rng)
+	res, err := seedCatalogStreams(t.Context(), store, configDir, now, rng)
 	if err != nil {
 		t.Fatalf("seedCatalogStreams: %v", err)
 	}
@@ -170,7 +171,7 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 		}
 	}
 
-	res2, err := seedCatalogStreams(t.Context(), server, rand.New(rand.NewSource(2)))
+	res2, err := seedCatalogStreams(t.Context(), store, configDir, now, rand.New(rand.NewSource(2)))
 	if err != nil {
 		t.Fatalf("second seed: %v", err)
 	}
@@ -199,8 +200,7 @@ func TestSeedCatalogStreamsUsesConfigDirWhenFormataEmpty(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	server := &Server{store: store, configDir: dir}
-	res, err := seedCatalogStreams(t.Context(), server, rand.New(rand.NewSource(3)))
+	res, err := seedCatalogStreams(t.Context(), store, dir, time.Now().UTC(), rand.New(rand.NewSource(3)))
 	if err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -213,8 +213,7 @@ func TestSeedCatalogStreamsErrorsWithoutTaxonomy(t *testing.T) {
 	store := NewMemoryStore()
 	dir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
-	server := &Server{store: store, configDir: dir}
-	if _, err := seedCatalogStreams(t.Context(), server, rand.New(rand.NewSource(1))); err == nil {
+	if _, err := seedCatalogStreams(t.Context(), store, dir, time.Now().UTC(), rand.New(rand.NewSource(1))); err == nil {
 		t.Fatal("expected error for empty taxonomy")
 	}
 }

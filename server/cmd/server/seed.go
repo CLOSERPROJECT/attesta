@@ -92,18 +92,18 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if rng == nil {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
-	server := &Server{store: deps.Store, configDir: configDir, now: deps.Now}
-	if server.now == nil {
-		server.now = func() time.Time { return time.Now().UTC() }
+	now := time.Now().UTC()
+	if deps.Now != nil {
+		now = deps.Now().UTC()
 	}
-	if _, err := seedCatalogStreams(ctx, server, rng); err != nil {
+	if _, err := seedCatalogStreams(ctx, deps.Store, configDir, now, rng); err != nil {
 		return fmt.Errorf("seed: catalog streams: %w", err)
 	}
-	catalog, err := server.workflowCatalog()
+	catalog, err := (&Server{store: deps.Store, configDir: configDir, now: func() time.Time { return now }}).workflowCatalog()
 	if err != nil {
 		return fmt.Errorf("seed: instances: catalog: %w", err)
 	}
-	if _, err := seedDemoInstances(ctx, server.store, catalog, server.now()); err != nil {
+	if _, err := seedDemoInstances(ctx, deps.Store, catalog, now); err != nil {
 		return fmt.Errorf("seed: instances: %w", err)
 	}
 	return nil
