@@ -92,17 +92,28 @@ Pilot blueprint: one Organization (Feragame), one Step for the day’s line work
 
 Grounded in current server behavior: Substeps are ordered flat; `computeAvailability` exposes only the first incomplete Substep; completion writes `done` and notarizes together; there is no Step-level approve/close.
 
-### Must change
+### Strategy split (classic untouched)
+
+Ship **two strategies**, selected once from a Stream (blueprint) opt-in — default remains today’s behavior:
+
+| Strategy | Who uses it | Behavior |
+|----------|-------------|----------|
+| **Classic** | Existing Streams (default) | Flat sequential unlock; Complete Substep → `done` + notarize; instance done when all Substeps are done. **Current functions stay as the classic implementation** — do not sprinkle mode `if`s through them. |
+| **Draft-and-seal** | Feragame (and A/B) Streams that opt in | Parallel in-Step availability; draft progress; no mid-day Complete on kind Substeps; Seal Step freezes + notarizes + completes the pilot instance. |
+
+Select the strategy at the edge (handler / view model / process service entry). Shared pieces underneath: progress map + store, Formata payloads, role/org gates, notarization insert/export shape, Stream instance create, display flattening, progress-key encoding.
+
+### Draft-and-seal must add (classic path unchanged)
 
 | Area | Change |
 |------|--------|
-| **In-Step availability** | For Substeps that share an open (unsealed) Step, mark all incomplete Substeps available—or scope the flat predecessor rule so it does not lock siblings inside the same Step. Preserve predecessor locking **across** Steps (`steps-only`). Touches availability helpers (`computeAvailability`, `isSequenceOK`), timeline/status (“Locked by sequence”), and complete-path sequence checks (today: completing out of order → conflict). |
-| **Draft progress** | Allow persisting Substep payload while `state` is not `done` (draft / in-progress). Today, durable answers arrive with completion. Need save (and load) of draft Formata values, authorization, and UI that does not imply “Completed.” |
-| **Step seal** | New explicit action at Step scope: authorize, confirm, freeze all Substep payloads in the Step, transition progress to sealed/done, notarize sealed evidence, reject further edits. This is the close half of `open_close: mixed`. |
-| **Completion semantics for event Substeps** | Ordinary mid-day “Complete Substep” must not be the path that freezes the day’s event log. Either hide/disable complete on draftable kind Substeps until seal owns the terminal transition, or redefine complete so it is not used for these Substeps. Seal is the commit. |
-| **Pilot workflow config** | One-org, one-Step blueprint; per-kind Formata Substeps with array item schemas; no open/close Substeps. |
+| **In-Step availability** | Draft-and-seal strategy: all incomplete Substeps in an unsealed Step available together; predecessor lock only across Steps. Classic availability/sequence helpers remain the sequential implementation. |
+| **Draft progress** | Draft-and-seal only: persist Substep payload while `state` is not `done`. Classic still arrives answers with completion. |
+| **Step seal** | Draft-and-seal only: Step-scoped seal (auth, confirm, freeze, notarize leaves, reject further edits). Close half of `open_close: mixed`. |
+| **Completion semantics for event Substeps** | Draft-and-seal only: no ordinary Complete on kind Substeps; seal owns terminal + notarization. Classic Complete untouched. |
+| **Pilot workflow config** | Opt-in Stream: one-org, one-Step; per-kind Formata array Substeps; no open/close Substeps; strategy = draft-and-seal. |
 
-### Should stay
+### Shared (maximize reuse)
 
 | Area | Why |
 |------|-----|
@@ -112,6 +123,7 @@ Grounded in current server behavior: Substeps are ordered flat; `computeAvailabi
 | **Instance = process** | One instance per production day; create remains the open. |
 | **Notarized export shape** | Sealed Substep payloads still export under Steps → Substeps; merkle/notarization can stay Substep-leaf oriented if seal finalizes those leaves together. |
 | **Inter-Step sequence** | Future multi-org Streams still order Organizations by Step. |
+| **Classic completion + availability** | Left as the classic strategy implementation; not rewritten for Feragame. |
 
 ### Deliberately deferred (vs architectural)
 
@@ -154,23 +166,43 @@ Supported directly: accumulate on arrays, one whole-Step seal.
 
 ---
 
-## 5. Open questions
+## 5. Grill outcomes (2026-10-09)
 
-1. **Draft persistence API** — Reuse `UpdateProcessProgress` with a non-`done` state, or a dedicated draft endpoint? How do HTMX Formata saves map onto append-row vs replace-whole-array?
-2. **Concurrent editors** — Two stations appending UdC rows at once: last-write-wins on the whole array is unsafe. Need row-level append, ETags/versions, or short-term “one writer per kind Substep” operational rule for the pilot.
-3. **Notarization at seal** — One notarization per Substep leaf at seal time, one Step-level notarization, or both? Must remain compatible with existing notarized JSON / merkle export expectations.
-4. **Empty kinds** — May the day seal with zero batch loads or zero UdC rows? Probably yes (line stopped early), but confirm with Feragame.
-5. **Seal authorization** — Same roles as Substep edit, a narrower “supervisor” role, or Organization admin only?
-6. **Post-seal Stream instance** — Is the process “done” when the single Feragame Step seals, or only when all Steps (future multi-org) are sealed? Pilot likely: seal ⇒ instance complete.
-7. **Shift representation** — Field on every row, day-level metadata, or both? Brief says shifts are data inside the day; pick a schema convention before build.
-8. **UI for parallel Substeps** — Timeline today centers “the” available Substep. Drafting two open kind Substeps needs navigation that does not look like a broken sequence.
-9. **Migration of `complete` button** — For draftable kind Substeps, remove complete entirely vs keep it disabled with explanation until seal exists in UI.
-10. **Validation at seal** — Required fields per row, minimum row counts, or “seal whatever is there”? Affects whether seal can fail after confirm.
-11. **Station as data vs Substep** — This cell keeps `per-kind`. If Feragame later wants station-scoped queues, that is a different matrix cell (`per-station`), not a silent tweak here.
-12. **Partial seal / reopen** — Out of scope for C3’s irreversible seal; confirm no pilot need to unseal or seal per kind.
+Stress-tested on branch `docs/feragame-grill-compromise`. **This cell is an A/B candidate**, not the locked pilot winner. Further explorations / spikes will be compared internally before choosing one pilot version.
+
+### Settled for this candidate (if built)
+
+| Topic | Decision |
+|-------|----------|
+| Cell axes | Keep as written: `array-fields` × `per-kind` × `steps-only` × `mixed` × `whole-step` |
+| vs minimal | Real Step seal + drafts required; no last-Substep-as-seal theatre |
+| vs architectural | Formata arrays remain the store of record; no child-event log in this spike |
+| Open | Stream instance create only; no open-day Substep |
+| In-Step sequence | All kind Substeps available together; sequence only between Steps |
+| Seal | One irreversible whole-Step seal; empty kinds allowed; no reopen / per-kind seal |
+| Kind Substeps mid-day | Draft saves only; no ordinary Complete (seal owns terminal + notarization) |
+| Concurrency | Feragame pilot has a single registrar → defer concurrent-append design; last-write-wins acceptable for now |
+| Seal auth | Elevated (supervisor / Org admin–class); row draft uses ordinary Substep roles |
+| After seal | Pilot has one Step → seal completes the Stream instance |
+| Validation | Row/field validation on draft save; seal freezes whatever is there (no min-count gate) |
+| Notarization | At seal, notarize each kind Substep’s sealed payload (Substep-leaf export shape). Notary `CreatedAt` = seal time. Event times are optional row fields, **not** required for integrity |
+| Row schema | No mandatory `registered_at` or `shift` for the spike |
+| Draft persistence | Progress payload with non-`done` state; same Formata document shape |
+| UX | Timeline shows parallel drafting kind Substeps; explicit Seal Step control (not a fake last Substep) |
+| Strategies | **Classic** (default, untouched) vs **draft-and-seal** (opt-in). Select once at the edge; maximize shared store/Formata/auth/notarization/instance create. No mode `if`s inside classic completion/availability. |
+| Product status | Remains `proposed` / candidate until A/B picks a winner; ADR only if Step seal becomes general Attesta law |
+
+### Still open (implementation detail, not product forks)
+
+1. Exact HTTP/HTMX mapping for draft save (append-row UX vs replace-whole-array under single-writer assumption).
+2. Exact elevated role string / Cerbos rule for Seal Step.
+3. Whether draft state is named `draft`, `in_progress`, or another non-`done` token in progress maps.
+4. Failure/retry semantics if seal notarizes one Substep leaf and fails on the next (transactional seal vs compensating retry).
+5. Station remains a field on rows (`per-kind`); `per-station` is a different matrix cell if needed later.
+6. Where the strategy flag lives on the Stream blueprint (top-level vs Step-scoped) — prefer Stream-level opt-in for the pilot.
 
 ---
 
 ## Bottom line
 
-Use **per-kind Formata array Substeps** as the repeating event log, **drop in-Step sequential unlock**, **open the day by creating the instance**, and **close by sealing the Step**—so Feragame gets interleaved draft capture without a new event store, and Attesta gains an honest Step seal instead of a last-Substep workaround.
+Use **per-kind Formata array Substeps** as the repeating event log, **drop in-Step sequential unlock**, **open the day by creating the instance**, and **close by sealing the Step**—so Feragame gets interleaved draft capture without a new event store, and Attesta gains an honest Step seal instead of a last-Substep workaround. Treat this as one internal A/B candidate alongside at least the minimal exploration.
