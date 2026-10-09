@@ -263,7 +263,9 @@ When a new matrix axis is added later, update the table in this README and add t
 
 | File | Title | Cost posture | Status |
 |------|-------|--------------|--------|
-| — | _None yet_ | — | — |
+| [01-minimal-array-substeps.md](explorations/01-minimal-array-substeps.md) | Minimal: array Substeps, last-Substep seal | minimal | proposed |
+| [02-architectural-event-log.md](explorations/02-architectural-event-log.md) | Architectural: child event log + Step seal | architectural | proposed |
+| [03-compromise-draft-and-seal.md](explorations/03-compromise-draft-and-seal.md) | Compromise: draftable array Substeps + Step seal | compromise | proposed |
 
 Add a row when you add `explorations/NN-slug.md`.
 
