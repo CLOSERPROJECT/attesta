@@ -10,12 +10,11 @@ import (
 func runSeedInstancesCommand(ctx context.Context, args []string) error {
 	_ = args
 	return withSeedSession(ctx, nil, workflowConfigDir(), openMongoTaxonomyStore, nil, func(sess seedSession) error {
-		server := &Server{store: sess.Store, configDir: sess.ConfigDir, now: func() time.Time { return time.Now().UTC() }}
-		catalog, err := server.workflowCatalog()
+		catalog, err := loadWorkflowCatalog(ctx, sess.Store, sess.ConfigDir)
 		if err != nil {
 			return fmt.Errorf("instance seed: catalog: %w", err)
 		}
-		now := server.now()
+		now := time.Now().UTC()
 		result, err := seedDemoInstances(ctx, sess.Store, catalog, now)
 		if err != nil {
 			return fmt.Errorf("instance seed: %w", err)

@@ -54,12 +54,11 @@ func seedInstancesViaSession(ctx context.Context, store Store, configDir string)
 	return withSeedSession(ctx, nil, configDir, func(context.Context) (Store, func(), error) {
 		return store, func() {}, nil
 	}, nil, func(sess seedSession) error {
-		server := &Server{store: sess.Store, configDir: sess.ConfigDir, now: func() time.Time { return time.Now().UTC() }}
-		catalog, err := server.workflowCatalog()
+		catalog, err := loadWorkflowCatalog(ctx, sess.Store, sess.ConfigDir)
 		if err != nil {
 			return fmt.Errorf("instance seed: catalog: %w", err)
 		}
-		_, err = seedDemoInstances(ctx, sess.Store, catalog, server.now())
+		_, err = seedDemoInstances(ctx, sess.Store, catalog, time.Now().UTC())
 		if err != nil {
 			return fmt.Errorf("instance seed: %w", err)
 		}

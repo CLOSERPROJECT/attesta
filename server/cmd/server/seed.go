@@ -95,7 +95,7 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if _, err := seedCatalogStreams(ctx, deps.Store, configDir, now, rng); err != nil {
 		return fmt.Errorf("seed: catalog streams: %w", err)
 	}
-	catalog, err := (&Server{store: deps.Store, configDir: configDir, now: func() time.Time { return now }}).workflowCatalog()
+	catalog, err := loadWorkflowCatalog(ctx, deps.Store, configDir)
 	if err != nil {
 		return fmt.Errorf("seed: instances: catalog: %w", err)
 	}

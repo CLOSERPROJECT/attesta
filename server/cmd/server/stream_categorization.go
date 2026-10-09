@@ -79,11 +79,11 @@ func applyEffectiveStreamCategorization(ctx context.Context, workflow *WorkflowD
 	return nil
 }
 
-func (s *Server) storeSubCategoryPathExists(ctx context.Context, categorySlug, subCategorySlug string) (bool, error) {
-	if s == nil || s.store == nil {
+func storeSubCategoryPathExists(ctx context.Context, store Store, categorySlug, subCategorySlug string) (bool, error) {
+	if store == nil {
 		return false, nil
 	}
-	_, err := s.store.GetSubCategoryBySlug(ctx, categorySlug, subCategorySlug)
+	_, err := store.GetSubCategoryBySlug(ctx, categorySlug, subCategorySlug)
 	if err == nil {
 		return true, nil
 	}
@@ -93,13 +93,30 @@ func (s *Server) storeSubCategoryPathExists(ctx context.Context, categorySlug, s
 	return false, err
 }
 
-func (s *Server) resolveCatalogStreamCategorization(cfg *RuntimeConfig) error {
+func (s *Server) storeSubCategoryPathExists(ctx context.Context, categorySlug, subCategorySlug string) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
+	return storeSubCategoryPathExists(ctx, s.store, categorySlug, subCategorySlug)
+}
+
+func resolveCatalogStreamCategorization(ctx context.Context, store Store, cfg *RuntimeConfig) error {
 	if cfg == nil {
 		return nil
 	}
 	var pathExists subCategoryPathExists
-	if s != nil {
-		pathExists = s.storeSubCategoryPathExists
+	if store != nil {
+		pathExists = func(ctx context.Context, categorySlug, subCategorySlug string) (bool, error) {
+			return storeSubCategoryPathExists(ctx, store, categorySlug, subCategorySlug)
+		}
 	}
-	return applyEffectiveStreamCategorization(context.Background(), &cfg.Workflow, pathExists)
+	return applyEffectiveStreamCategorization(ctx, &cfg.Workflow, pathExists)
+}
+
+func (s *Server) resolveCatalogStreamCategorization(cfg *RuntimeConfig) error {
+	var store Store
+	if s != nil {
+		store = s.store
+	}
+	return resolveCatalogStreamCategorization(context.Background(), store, cfg)
 }
