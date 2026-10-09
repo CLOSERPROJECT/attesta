@@ -43,7 +43,7 @@ The primary checkout may be bootstrapped manually after the Compose stack is up:
    - `APPWRITE_API_KEY`
 8. Re-run `task start` (or `task start:docker`) so the empty-only Go seed can apply, or run `task seed` once.
 
-New parallel worktrees start empty. After Appwrite credentials are set, the Go demo seed (`ATTESTA_SEED=true`) is the only demo-data path. There is no SQL MariaDB seed fallback and no primary volume-copy.
+New parallel worktrees start empty. After Appwrite credentials are set, the Go demo seed (`ATTESTA_SEED=true`) is the only demo-data path.
 
 After Appwrite credentials are set, `task start` / `task start:docker` run the Go demo seed automatically (`ATTESTA_SEED=true` from worktree-env; empty-only). Run `task seed` manually anytime, or `task seed -- --replace` to rewrite.
 

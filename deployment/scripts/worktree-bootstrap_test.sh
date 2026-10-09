@@ -115,7 +115,7 @@ PATH="${test_root}/bin:/usr/bin:/bin" \
 grep -q '^SECRET=primary$' "${test_root}/.env" \
   || fail "plain worktree did not receive primary .env"
 
-# Primary setup uses classic ports and does not call snapshot helpers.
+# Primary setup uses classic ports and does not call volume-copy helpers.
 rm "${test_root}/.env"
 mkdir -p "${primary_root}/scripts" "${primary_root}/bin"
 cp "${test_root}/scripts/worktree-bootstrap.sh" "${primary_root}/scripts/worktree-bootstrap.sh"

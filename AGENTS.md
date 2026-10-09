@@ -53,7 +53,7 @@
   volume in place). Use `scripts/worktree-compose.sh` (normally through
   Taskfile tasks); stop/reset/purge must remain scoped to the current checkout.
 - Demo data for empty stacks comes only from the Go seed (`attesta seed` /
-  `ATTESTA_SEED`). There is no coordinated `.worktree-data` volume-copy between
-  worktrees. `task reset` / `task purge` clear this checkout's volumes; the next
-  start can re-apply the Go demo seed when credentials exist. Worktrunk
-  `pre-remove` deletes Compose volumes.
+  `ATTESTA_SEED`). There is no worktree volume-copy of MongoDB or Appwrite data.
+  `task reset` / `task purge` clear this checkout's volumes; the next start can
+  re-apply the Go demo seed when credentials exist. Worktrunk `pre-remove`
+  deletes Compose volumes.

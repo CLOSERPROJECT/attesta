@@ -41,7 +41,8 @@ type SeedDeps struct {
 //
 // Preconditions (CLI): Mongo reachable; Appwrite project exists; APPWRITE_* set.
 // Seed does not create the Appwrite project or API key.
-// Optional Coolify gate (later wiring): ATTESTA_SEED=true — not read here yet.
+// Hosts may gate with ATTESTA_SEED outside this function (see ADR-0004); Seed
+// does not read that env var.
 func Seed(ctx context.Context, deps SeedDeps) error {
 	if deps.Identity == nil {
 		return fmt.Errorf("seed: identity is required")

@@ -79,7 +79,7 @@ After the primary checkout's first boot:
 
 Fresh stacks start with empty Appwrite MariaDB; demo data comes from the Go seed after credentials exist.
 
-`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and, after Appwrite is ready, run the Go demo fixture via `go run ./cmd/server seed` (empty-only; skip if Appwrite credentials are not set yet). Use `task seed` (optionally with `--replace`) for a manual run. There is no SQL MariaDB seed fallback.
+`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and, after Appwrite is ready, run the Go demo fixture via `go run ./cmd/server seed` (empty-only; skip if Appwrite credentials are not set yet). Use `task seed` (optionally with `--replace`) for a manual run.
 
 ## Verifying the Setup
 ```bash
@@ -122,7 +122,7 @@ Coolify-specific notes:
 - Set `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`, `APPWRITE_INVITE_REDIRECT_URL`, and `APPWRITE_RESET_REDIRECT_URL` on the `attesta` service before testing auth flows.
 - Attesta's compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
 - The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
-- For the Go demo fixture on Coolify Preview, set `ATTESTA_SEED=true` (leave unset/false in production). Unset `APPWRITE_RESTORE_SEED_SQL` if it is still present; it is no longer used. Coolify uses stock `mariadb:10.11`. When `ATTESTA_SEED` is truthy, the Coolify entrypoint waits until Appwrite HTTP is ready (`/v1/health` guest 401 or 200), then runs `./attesta seed` (empty-only) before serving.
+- For the Go demo fixture on Coolify Preview, set `ATTESTA_SEED=true` (leave unset/false in production). Coolify uses stock `mariadb:10.11`. When `ATTESTA_SEED` is truthy, the Coolify entrypoint waits until Appwrite HTTP is ready (`/v1/health` guest 401 or 200), then runs `./attesta seed` (empty-only) before serving.
 
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed
