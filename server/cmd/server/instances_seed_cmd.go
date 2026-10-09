@@ -4,38 +4,28 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 )
 
 func runSeedInstancesCommand(ctx context.Context, args []string) error {
-	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
-	if configDir == "" {
-		configDir = filepath.Dir(envOr("WORKFLOW_CONFIG", "config/workflow.yaml"))
-	}
-	return seedInstancesWithStoreOpener(ctx, args, openMongoTaxonomyStore, configDir)
+	return seedInstancesWithStoreOpener(ctx, args, openMongoTaxonomyStore, workflowConfigDir())
 }
 
 func seedInstancesWithStoreOpener(ctx context.Context, _ []string, open func(context.Context) (Store, func(), error), configDir string) error {
-	if open == nil {
-		return fmt.Errorf("instance seed: store opener is required")
-	}
-	store, cleanup, err := open(ctx)
+	sess, err := openSeedSession(ctx, nil, configDir, open, nil)
 	if err != nil {
 		return err
 	}
-	if cleanup != nil {
-		defer cleanup()
+	if sess.Cleanup != nil {
+		defer sess.Cleanup()
 	}
-	server := &Server{store: store, configDir: configDir, now: func() time.Time { return time.Now().UTC() }}
+	server := &Server{store: sess.Store, configDir: sess.ConfigDir, now: func() time.Time { return time.Now().UTC() }}
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		return fmt.Errorf("instance seed: catalog: %w", err)
 	}
 	now := server.now()
-	result, err := seedDemoInstances(ctx, store, catalog, now)
+	result, err := seedDemoInstances(ctx, sess.Store, catalog, now)
 	if err != nil {
 		return fmt.Errorf("instance seed: %w", err)
 	}

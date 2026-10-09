@@ -5,16 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
 func runSeedCommand(ctx context.Context, args []string) error {
-	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
-	if configDir == "" {
-		configDir = filepath.Dir(envOr("WORKFLOW_CONFIG", "config/workflow.yaml"))
-	}
-	return seedWithOpeners(ctx, args, configDir, openMongoTaxonomyStore, openAppwriteIdentity)
+	return seedWithOpeners(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, openAppwriteIdentity)
 }
 
 func seedWithOpeners(
@@ -24,29 +19,22 @@ func seedWithOpeners(
 	openStore func(context.Context) (Store, func(), error),
 	openIdentity func() (IdentityStore, error),
 ) error {
-	if openStore == nil {
-		return fmt.Errorf("seed: store opener is required")
-	}
 	if openIdentity == nil {
 		return fmt.Errorf("seed: identity opener is required")
 	}
-	store, cleanup, err := openStore(ctx)
+	sess, err := openSeedSession(ctx, args, configDir, openStore, openIdentity)
 	if err != nil {
 		return err
 	}
-	if cleanup != nil {
-		defer cleanup()
-	}
-	identity, err := openIdentity()
-	if err != nil {
-		return err
+	if sess.Cleanup != nil {
+		defer sess.Cleanup()
 	}
 	replace := seedReplaceFromArgs(args)
 	if err := Seed(ctx, SeedDeps{
-		Identity:       identity,
-		Store:          store,
-		ConfigDir:      configDir,
-		CategoriesPath: seedCategoriesPathFromArgs(args),
+		Identity:       sess.Identity,
+		Store:          sess.Store,
+		ConfigDir:      sess.ConfigDir,
+		CategoriesPath: sess.CategoriesPath,
 		Replace:        replace,
 	}); err != nil {
 		return err
@@ -76,19 +64,4 @@ func seedReplaceFromArgs(args []string) bool {
 		}
 	}
 	return false
-}
-
-// seedCategoriesPathFromArgs returns an explicit taxonomy path from --file or
-// CATEGORIES_SEED. Empty means Seed should use ConfigDir/categories.yaml.
-func seedCategoriesPathFromArgs(args []string) string {
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "--file" && i+1 < len(args) {
-			return strings.TrimSpace(args[i+1])
-		}
-		if strings.HasPrefix(arg, "--file=") {
-			return strings.TrimSpace(strings.TrimPrefix(arg, "--file="))
-		}
-	}
-	return strings.TrimSpace(os.Getenv("CATEGORIES_SEED"))
 }
