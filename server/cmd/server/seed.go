@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -100,7 +99,11 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if _, err := seedCatalogStreams(ctx, server, rng); err != nil {
 		return fmt.Errorf("seed: catalog streams: %w", err)
 	}
-	if err := seedDemoInstances(ctx, server); err != nil {
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		return fmt.Errorf("seed: instances: catalog: %w", err)
+	}
+	if _, err := seedDemoInstances(ctx, server.store, catalog, server.now()); err != nil {
 		return fmt.Errorf("seed: instances: %w", err)
 	}
 	return nil
@@ -211,40 +214,6 @@ func ensureDemoOrgMembership(ctx context.Context, identity IdentityStore, orgSlu
 	}
 	if _, err := identity.AddOrganizationUserByIDAsAdmin(ctx, orgSlug, user.ID, roleSlugs, isOrgAdmin); err != nil {
 		return fmt.Errorf("seed identity: add %s to %s: %w", user.Email, orgSlug, err)
-	}
-	return nil
-}
-
-func seedDemoInstances(ctx context.Context, server *Server) error {
-	if server == nil || server.store == nil {
-		return fmt.Errorf("server store is required")
-	}
-	catalog, err := server.workflowCatalog()
-	if err != nil {
-		return fmt.Errorf("catalog: %w", err)
-	}
-	if len(catalog) == 0 {
-		return fmt.Errorf("workflow catalog is empty")
-	}
-	keys := make([]string, 0, len(catalog))
-	for k := range catalog {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	now := time.Now().UTC()
-	if server.now != nil {
-		now = server.now()
-	}
-	for i, key := range keys {
-		if seedStreamLeftEmpty(i) {
-			if err := server.store.DeleteWorkflowData(ctx, key); err != nil {
-				return fmt.Errorf("%s: delete: %w", key, err)
-			}
-			continue
-		}
-		if _, err := seedWorkflowInstances(ctx, server.store, key, catalog[key], now); err != nil {
-			return err
-		}
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -179,6 +180,46 @@ func seedSubstepSuppliesLot(sub WorkflowSub, lotKey string) bool {
 
 func seedActor() Actor {
 	return Actor{ID: "seed-user", Role: "seed", OrgSlug: "seed"}
+}
+
+// seedDemoInstancesResult summarizes one catalog walk for CLI logging.
+type seedDemoInstancesResult struct {
+	Instances     int
+	SeededStreams int
+	EmptyStreams  int
+}
+
+// seedDemoInstances walks a sorted workflow catalog: every Nth stream is wiped
+// and left empty; the rest get synthetic instances via seedWorkflowInstances.
+func seedDemoInstances(ctx context.Context, store Store, catalog map[string]RuntimeConfig, now time.Time) (seedDemoInstancesResult, error) {
+	if store == nil {
+		return seedDemoInstancesResult{}, fmt.Errorf("store is required")
+	}
+	if len(catalog) == 0 {
+		return seedDemoInstancesResult{}, fmt.Errorf("workflow catalog is empty")
+	}
+	keys := make([]string, 0, len(catalog))
+	for k := range catalog {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var result seedDemoInstancesResult
+	for i, key := range keys {
+		if seedStreamLeftEmpty(i) {
+			if err := store.DeleteWorkflowData(ctx, key); err != nil {
+				return seedDemoInstancesResult{}, fmt.Errorf("%s: delete: %w", key, err)
+			}
+			result.EmptyStreams++
+			continue
+		}
+		n, err := seedWorkflowInstances(ctx, store, key, catalog[key], now)
+		if err != nil {
+			return seedDemoInstancesResult{}, err
+		}
+		result.Instances += n
+	}
+	result.SeededStreams = len(keys) - result.EmptyStreams
+	return result, nil
 }
 
 func seedWorkflowInstances(ctx context.Context, store Store, workflowKey string, cfg RuntimeConfig, now time.Time) (int, error) {
