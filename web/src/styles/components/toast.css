@@ -2,17 +2,21 @@
  * Toast — fixed success notices (CSS-only component).
  *
  * div#toast-host.toast-host[aria-live=polite]
- *   p.confirmation.toast[data-toast]   (promoted by main.js)
+ *   p.confirmation.confirmation-with-icon.toast[data-toast]   (promoted by main.js)
+ *     icon-check-circle + span (message)
  *
  * Opt-in source (still in page HTML until promoted; must not shift layout):
- *   p.confirmation[data-toast]
+ *   p.confirmation.confirmation-with-icon[data-toast]
  *
- * Unmarked .confirmation banners stay in shared.css / document flow.
+ * Stacking: z-index 60 — above tip (30–31), stream-card / account menu (40),
+ * home sticky (45–47), and chrome topbar (50). Native <dialog> stays above via
+ * the top layer (not z-index). Unmarked .confirmation banners stay in
+ * shared.css / document flow; .confirmation-with-icon flex/gap/icon rules live there.
  */
 
 .toast-host {
   position: fixed;
-  z-index: 50;
+  z-index: 60;
   inset: auto var(--space-4) var(--space-4) auto;
   display: flex;
   flex-direction: column-reverse;
@@ -28,10 +32,16 @@
 /* Out of flow from first paint — no panel jump before JS promote */
 .confirmation[data-toast] {
   position: fixed;
-  z-index: 50;
+  z-index: 60;
   inset: auto var(--space-4) var(--space-4) auto;
   width: min(22rem, calc(100vw - 2 * var(--space-4)));
   margin: 0;
+  /* Opaque over the page: dark --success-muted is 12% alpha and reads as glass. */
+  background: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 16%,
+    var(--background)
+  );
   box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
   transition:
     opacity 220ms ease,
@@ -49,4 +59,13 @@
   position: relative;
   inset: auto;
   width: 100%;
+}
+
+/* Keep icon+copy row readable in the narrow floating slot */
+.confirmation.confirmation-with-icon[data-toast] {
+  gap: var(--space-2);
+}
+
+.confirmation.confirmation-with-icon[data-toast] .icon-svg {
+  flex-shrink: 0;
 }
