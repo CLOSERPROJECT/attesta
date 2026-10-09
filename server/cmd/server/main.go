@@ -789,10 +789,15 @@ func main() {
 		configDir = filepath.Dir(defaultConfigPath)
 	}
 
+	identity, err := appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{HTTPClient: http.DefaultClient})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	server := &Server{
 		mongo:              client,
 		store:              &MongoStore{db: db},
-		identity:           NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
+		identity:           identity,
 		tmpl:               tmpl,
 		authorizer:         NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:                newSSEHub(),

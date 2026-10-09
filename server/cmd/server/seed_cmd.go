@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"strings"
 )
 
 func runSeedCommand(ctx context.Context, args []string) error {
@@ -48,13 +46,7 @@ func seedWithOpeners(
 }
 
 func openAppwriteIdentity() (IdentityStore, error) {
-	endpoint := strings.TrimSpace(os.Getenv("APPWRITE_ENDPOINT"))
-	projectID := strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID"))
-	apiKey := strings.TrimSpace(os.Getenv("APPWRITE_API_KEY"))
-	if endpoint == "" || projectID == "" || apiKey == "" {
-		return nil, fmt.Errorf("seed: APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY are required")
-	}
-	return NewAppwriteIdentity(endpoint, projectID, apiKey, nil), nil
+	return appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true})
 }
 
 func seedReplaceFromArgs(args []string) bool {

@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -59,6 +60,35 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 		sessionClient:   sessionClient,
 		orgAssetsBucket: appwriteOrgAssetsBucket(),
 	}
+}
+
+// appwriteIdentityFromEnvOptions controls how appwriteIdentityFromEnv reads APPWRITE_*.
+//
+// RequireAll (seed): trimmed APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY
+// are all required; returns an error if any is empty.
+//
+// Lax / default (main): APPWRITE_ENDPOINT defaults to http://appwrite/v1 when unset
+// (same as envOr); project ID and API key are trimmed and may be empty.
+//
+// HTTPClient is passed through to NewAppwriteIdentity; the helper never chooses a client.
+type appwriteIdentityFromEnvOptions struct {
+	RequireAll bool
+	HTTPClient *http.Client
+}
+
+func appwriteIdentityFromEnv(opts appwriteIdentityFromEnvOptions) (IdentityStore, error) {
+	projectID := strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID"))
+	apiKey := strings.TrimSpace(os.Getenv("APPWRITE_API_KEY"))
+	var endpoint string
+	if opts.RequireAll {
+		endpoint = strings.TrimSpace(os.Getenv("APPWRITE_ENDPOINT"))
+		if endpoint == "" || projectID == "" || apiKey == "" {
+			return nil, fmt.Errorf("APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY are required")
+		}
+	} else {
+		endpoint = envOr("APPWRITE_ENDPOINT", "http://appwrite/v1")
+	}
+	return NewAppwriteIdentity(endpoint, projectID, apiKey, opts.HTTPClient), nil
 }
 
 func appwriteOrgAssetsBucket() string {
