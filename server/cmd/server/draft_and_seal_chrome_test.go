@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestBuildSubstepViewsDraftAndSealParallelDraftingChrome(t *testing.T) {
+func TestApplyDraftAndSealChromeParallelDrafting(t *testing.T) {
 	def := feragameDraftAndSealDef()
 	process := &Process{
 		ID:     primitive.NewObjectID(),
@@ -25,6 +25,7 @@ func TestBuildSubstepViewsDraftAndSealParallelDraftingChrome(t *testing.T) {
 	actor := Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}
 
 	actions := buildSubstepViews(def, process, "feragame", actor, false, map[roleMetaKey]RoleMeta{}, nil)
+	_, actions = applyDraftAndSealChrome(nil, actions, def, process, actor, "feragame")
 	if len(actions) != 2 {
 		t.Fatalf("actions = %d, want 2", len(actions))
 	}
@@ -54,7 +55,7 @@ func TestBuildSubstepViewsDraftAndSealParallelDraftingChrome(t *testing.T) {
 	}
 }
 
-func TestBuildSubstepViewsDraftAndSealSealedCopy(t *testing.T) {
+func TestApplyDraftAndSealChromeSealedCopy(t *testing.T) {
 	def := feragameDraftAndSealDef()
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	process := &Process{
@@ -65,8 +66,10 @@ func TestBuildSubstepViewsDraftAndSealSealedCopy(t *testing.T) {
 			"1.2": {State: "done", Data: map[string]interface{}{"udc": []interface{}{}}, DoneAt: &now},
 		},
 	}
+	actor := Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}
 
-	actions := buildSubstepViews(def, process, "feragame", Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "feragame", actor, false, map[roleMetaKey]RoleMeta{}, nil)
+	_, actions = applyDraftAndSealChrome(nil, actions, def, process, actor, "feragame")
 	for _, action := range actions {
 		if action.Status != "done" {
 			t.Fatalf("%s status = %q, want done", action.SubstepID, action.Status)
@@ -82,6 +85,24 @@ func TestBuildSubstepViewsDraftAndSealSealedCopy(t *testing.T) {
 		}
 		if action.Reason != draftAndSealSealedReason {
 			t.Fatalf("%s reason = %q", action.SubstepID, action.Reason)
+		}
+	}
+}
+
+func TestBuildSubstepViewsStrategyBlindForDraftAndSealChrome(t *testing.T) {
+	def := feragameDraftAndSealDef()
+	process := &Process{
+		ID:     primitive.NewObjectID(),
+		Status: processStatusActive,
+		Progress: map[string]ProcessStep{
+			"1.1": {State: progressStateDraft, Data: map[string]interface{}{"batches": []interface{}{}}},
+			"1.2": {State: "pending"},
+		},
+	}
+	actions := buildSubstepViews(def, process, "feragame", Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}, false, map[roleMetaKey]RoleMeta{}, nil)
+	for _, action := range actions {
+		if action.SaveDraft || action.Sealed || action.Hint != "" || action.StatusLabel != "" || action.FormValue != "" {
+			t.Fatalf("%s still carries draft-and-seal chrome before apply: %#v", action.SubstepID, action)
 		}
 	}
 }
@@ -333,8 +354,8 @@ func TestHandleSealStepRequiresConfirmAndOrgAdmin(t *testing.T) {
 		configProvider: func() (RuntimeConfig, error) {
 			return RuntimeConfig{Workflow: def}, nil
 		},
-		now:          func() time.Time { return fixedNow },
-		enforceAuth:  true,
+		now:         func() time.Time { return fixedNow },
+		enforceAuth: true,
 		identity: testIdentityForSessions(fixedNow, map[string]AccountUser{
 			"admin": {
 				IdentityUserID: "admin-1",

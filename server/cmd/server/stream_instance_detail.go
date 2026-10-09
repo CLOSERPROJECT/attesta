@@ -14,7 +14,7 @@ func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeC
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
 	actions = s.applyDoneByEmailToSubstepViews(ctx, cfg.Workflow, actor, actions)
 	timeline = decorateTimelineSubstepBodies(timeline, actions)
-	timeline = decorateTimelineDraftAndSealChrome(timeline, cfg.Workflow, process, workflowKey, actor)
+	timeline, actions = applyDraftAndSealChrome(timeline, actions, cfg.Workflow, process, actor, workflowKey)
 
 	view := StreamInstanceDetailView{
 		WorkflowKey:       workflowKey,
@@ -101,14 +101,26 @@ func (s *Server) applyDoneByEmailToTermination(ctx context.Context, def Workflow
 }
 
 const (
+	draftAndSealSubstepHint    = "Save a draft. This does not freeze or notarize. Seal the Step when the day is closed."
+	draftAndSealSealedReason   = "Sealed. This Substep is frozen evidence."
+	draftAndSealLockedReason   = "Locked by a prior Step"
+	draftAndSealDraftingLabel  = "drafting"
+	draftAndSealSealedLabel    = "sealed"
 	draftAndSealDraftingNotice = "Kind Substeps can be drafted in parallel. Saves do not freeze or notarize. Seal this Step to close the production day."
 	draftAndSealSealedNotice   = "This Step is sealed. Kind Substeps are frozen evidence."
 )
 
-func decorateTimelineDraftAndSealChrome(timeline []TimelineStep, def WorkflowDef, process *Process, workflowKey string, actor Actor) []TimelineStep {
+// applyDraftAndSealChrome owns draft-and-seal view chrome for Stream instance detail:
+// Substep body flags (SaveDraft/Sealed/Hint/StatusLabel/FormValue/reason copy) and
+// timeline Seal controls. buildSubstepViews stays strategy-blind for this chrome.
+func applyDraftAndSealChrome(timeline []TimelineStep, actions []SubstepBodyView, def WorkflowDef, process *Process, actor Actor, workflowKey string) ([]TimelineStep, []SubstepBodyView) {
 	if workflowCompletionStrategy(def) != CompletionStrategyDraftAndSeal {
-		return timeline
+		return timeline, actions
 	}
+	for i := range actions {
+		actions[i] = applyDraftAndSealBodyChrome(actions[i], process)
+	}
+	timeline = decorateTimelineSubstepBodies(timeline, actions)
 	closed := isProcessClosed(def, process)
 	for i := range timeline {
 		step, err := findWorkflowStep(def, timeline[i].Summary.StepID)
@@ -127,7 +139,34 @@ func decorateTimelineDraftAndSealChrome(timeline []TimelineStep, def WorkflowDef
 			timeline[i].SealAction = streamInstancePath(workflowKey, processIDString(process)) + "/step/" + step.StepID + "/seal"
 		}
 	}
-	return timeline
+	return timeline, actions
+}
+
+func applyDraftAndSealBodyChrome(action SubstepBodyView, process *Process) SubstepBodyView {
+	switch action.Status {
+	case "locked":
+		if action.Reason == "Locked by sequence" {
+			action.Reason = draftAndSealLockedReason
+		}
+	case "done":
+		action.Sealed = true
+		action.StatusLabel = draftAndSealSealedLabel
+		if action.Reason == "Already completed" {
+			action.Reason = draftAndSealSealedReason
+		}
+	case "available":
+		action.StatusLabel = draftAndSealDraftingLabel
+		if !action.Disabled {
+			action.SaveDraft = true
+			action.Hint = draftAndSealSubstepHint
+		}
+		if process != nil {
+			if progress, ok := process.Progress[action.SubstepID]; ok && progress.Data != nil {
+				action.FormValue = marshalJSONCompact(progress.Data)
+			}
+		}
+	}
+	return action
 }
 
 func terminationEndedByDisplay(endedBy string) string {
