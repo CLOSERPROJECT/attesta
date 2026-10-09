@@ -51,18 +51,17 @@ svg.bi {
 }
 
 .attention-dot {
-  width: 8px;
-  height: 8px;
+  --attention-dot-size: 8px;
+  width: var(--attention-dot-size);
+  height: var(--attention-dot-size);
   border-radius: 50%;
   background: var(--primary);
-  flex: 0 0 8px;
+  flex: 0 0 var(--attention-dot-size);
   pointer-events: none;
 }
 
 .attention-dot-sm {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
+  --attention-dot-size: 6px;
 }
 
 .field-label {
