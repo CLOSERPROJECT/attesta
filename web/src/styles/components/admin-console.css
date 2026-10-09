@@ -31,8 +31,7 @@
 
 /* Horizontal + wrap while stacked; column once the md rail is two-col. */
 .admin-console .sidebar-nav {
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-flow: row wrap;
   width: 100%;
 }
 

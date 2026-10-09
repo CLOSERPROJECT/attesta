@@ -4,6 +4,7 @@ svg.bi {
   display: inline-block;
   flex: 0 0 auto;
   vertical-align: -0.125em;
+
   /* Chrome: icons inside links/buttons fight hit-testing and flicker the cursor. */
   pointer-events: none;
 }
@@ -59,6 +60,7 @@ a img {
 
 .attention-dot {
   --attention-dot-size: 8px;
+
   width: var(--attention-dot-size);
   height: var(--attention-dot-size);
   border-radius: 50%;
