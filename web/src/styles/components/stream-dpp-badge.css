@@ -1,0 +1,29 @@
+/*
+ * Stream DPP badge — passport-enabled chip (CSS-only).
+ *
+ * span.stream-dpp-badge
+ *   text "DPP" + icon-file-text
+ *
+ * Page placement modifiers (public-stream.css):
+ *   .public-stream-dpp-beside | .public-stream-dpp-below
+ */
+
+.stream-dpp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--secondary-foreground);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}
+
+.stream-dpp-badge .icon-svg {
+  width: 13px;
+  height: 16px;
+  flex-shrink: 0;
+}

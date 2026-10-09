@@ -1,22 +1,15 @@
-{{/* Shared admin soft-nav shell: page-header + sidebar + main (HTMX swap root). */}}
+{{/* Shared admin soft-nav shell: nav heading + sidebar + main (HTMX swap root). */}}
 
 {{ define "admin_console" }}
   <div
     id="{{ if .ID }}{{ .ID }}{{ else }}admin-console{{ end }}"
     class="admin-console"
   >
-    <section class="page-header">
-      {{ template "breadcrumbs" .Breadcrumbs }}
-      <div class="page-header-body">
-        <h1>{{ .Title }}</h1>
-        {{ if .Subtitle }}
-          <p>{{ .Subtitle }}</p>
-        {{ end }}
-      </div>
-    </section>
-
     <div class="rail-layout rail-layout-ready">
       <section class="panel panel-sticky">
+        {{ if .NavHeading }}
+          <h2 class="admin-console-nav-heading">{{ .NavHeading }}</h2>
+        {{ end }}
         <nav
           class="sidebar-nav"
           aria-label="{{ .NavLabel }}"
@@ -33,15 +26,13 @@
               {{ if .Active }}aria-current="page"{{ end }}
               {{ if .HasAttention }}aria-label="{{ .Title }} (needs attention)"{{ end }}
             >
+              {{ if .Icon }}{{ template "sidebar_nav_icon" .Icon }}{{ end }}
               <span class="sidebar-nav-title">
                 {{ .Title }}
                 {{ if .HasAttention }}
-                  <span class="attention-dot" aria-hidden="true"></span>
+                  <span class="attention-dot attention-dot-sm" aria-hidden="true"></span>
                 {{ end }}
               </span>
-              {{ if .Copy }}
-                <span class="sidebar-nav-copy">{{ .Copy }}</span>
-              {{ end }}
             </a>
           {{ end }}
         </nav>

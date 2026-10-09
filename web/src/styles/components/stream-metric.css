@@ -1,0 +1,29 @@
+/*
+ * Stream metric — icon + label stat (CSS-only).
+ *
+ * span.stream-metric[.stream-metric-active]
+ *   .icon-svg + text
+ *
+ * Layout wrappers stay local:
+ *   .public-stream-card-metrics / -row (card)
+ *   .public-stream-metrics (page header)
+ */
+
+.stream-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--secondary-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+}
+
+.stream-metric .icon-svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.stream-metric-active .icon-svg {
+  color: var(--primary);
+}

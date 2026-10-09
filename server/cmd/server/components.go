@@ -500,7 +500,7 @@ type OrgPendingRowView struct {
 type AdminConsoleNavItem struct {
 	Href         string
 	Title        string
-	Copy         string
+	Icon         string // template name, e.g. "icon-building-grid"
 	Active       bool
 	HasAttention bool
 }
@@ -510,9 +510,7 @@ type AdminConsoleNavItem struct {
 type AdminConsoleView struct {
 	ID           string // default "admin-console" when empty
 	NavLabel     string
-	Title        string
-	Subtitle     string
-	Breadcrumbs  BreadcrumbsView
+	NavHeading   string // label above the soft-nav (e.g. "Organization settings")
 	NavItems     []AdminConsoleNavItem
 	MainTemplate string
 	MainData     any

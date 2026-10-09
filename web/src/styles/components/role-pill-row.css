@@ -18,4 +18,5 @@
 .role-pill-label {
   margin-right: var(--space-1);
   font-size: var(--text-xs);
+  color: var(--secondary-foreground);
 }

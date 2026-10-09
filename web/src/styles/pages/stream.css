@@ -88,7 +88,7 @@
   align-items: center;
   gap: var(--space-1);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
 }
 
 .stream-status-sort {

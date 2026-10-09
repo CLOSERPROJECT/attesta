@@ -69,7 +69,7 @@ func (s *Server) listDiscoveryStreams(ctx context.Context, user *AccountUser) ([
 		item := StreamDiscoveryItem{
 			WorkflowKey:     key,
 			WorkflowName:    strings.TrimSpace(cfg.Workflow.Name),
-			Description:     strings.TrimSpace(cfg.Workflow.Description),
+			Description:     normalizeOptionalText(cfg.Workflow.Description),
 			CategorySlug:    strings.TrimSpace(cfg.Workflow.CategorySlug),
 			SubCategorySlug: strings.TrimSpace(cfg.Workflow.SubCategorySlug),
 			Href:            streamPath(key) + "/",

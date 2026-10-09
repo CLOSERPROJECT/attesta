@@ -5599,7 +5599,7 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 	return HomeView{
 		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
 		Breadcrumbs:         buildStreamBreadcrumbs(workflowKey, cfg.Workflow.Name),
-		WorkflowDescription: strings.TrimSpace(cfg.Workflow.Description),
+		WorkflowDescription: normalizeOptionalText(cfg.Workflow.Description),
 		Error:               workflowError,
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
@@ -7366,10 +7366,22 @@ func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {
 	return cfg, nil
 }
 
+// normalizeOptionalText clears blank and common sentinel placeholders (e.g. YAML/Python "None").
+func normalizeOptionalText(s string) string {
+	s = strings.TrimSpace(s)
+	switch strings.ToLower(s) {
+	case "", "none", "null", "nil", "undefined":
+		return ""
+	default:
+		return s
+	}
+}
+
 func normalizeWorkflowConfig(cfg *RuntimeConfig) {
 	if cfg == nil {
 		return
 	}
+	cfg.Workflow.Description = normalizeOptionalText(cfg.Workflow.Description)
 	defaultOrg := ""
 	if len(cfg.Organizations) > 0 {
 		defaultOrg = strings.TrimSpace(cfg.Organizations[0].Slug)

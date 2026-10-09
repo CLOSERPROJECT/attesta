@@ -1,0 +1,10 @@
+{{/* Dispatches AdminConsoleNavItem.Icon (or any icon template name string) to icons.html. */}}
+
+{{ define "sidebar_nav_icon" }}
+  {{ if eq . "icon-building-grid" }}{{ template "icon-building-grid" . }}
+  {{ else if eq . "icon-layers-2" }}{{ template "icon-layers-2" . }}
+  {{ else if eq . "icon-layout-grid" }}{{ template "icon-layout-grid" . }}
+  {{ else if eq . "icon-settings" }}{{ template "icon-settings" . }}
+  {{ else if eq . "icon-users-group" }}{{ template "icon-users-group" . }}
+  {{ end }}
+{{ end }}

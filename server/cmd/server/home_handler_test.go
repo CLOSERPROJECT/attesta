@@ -342,12 +342,12 @@ func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
 		alphaCardEnd = len(body)
 	}
 	alphaCard := body[alphaIdx:alphaCardEnd]
-	if strings.Contains(alphaCard, "public-stream-card-dpp") || strings.Contains(alphaCard, ">DPP<") {
+	if strings.Contains(alphaCard, "stream-dpp-badge") || strings.Contains(alphaCard, ">DPP<") {
 		t.Fatalf("plain stream must not show DPP chip, got %q", alphaCard)
 	}
 
 	betaCard := body[betaIdx:]
-	if !strings.Contains(betaCard, `class="public-stream-card-dpp"`) {
+	if !strings.Contains(betaCard, `class="stream-dpp-badge"`) {
 		t.Fatalf("DPP-enabled stream must show DPP chip, got %q", betaCard)
 	}
 	if !strings.Contains(betaCard, "DPP") {

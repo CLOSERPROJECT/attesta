@@ -22,37 +22,28 @@ func wantsAdminConsolePartial(r *http.Request) bool {
 
 func platformAdminConsole(view PlatformAdminView) AdminConsoleView {
 	active := strings.TrimSpace(view.ActivePanel)
-	subtitle := "Create and manage organizations"
-	switch active {
-	case "streams":
-		subtitle = "Browse and manage platform streams"
-	case "categories":
-		subtitle = "Manage stream discovery taxonomy"
-	}
 	return AdminConsoleView{
-		ID:          "admin-console",
-		NavLabel:    "Platform admin sections",
-		Title:       "Platform admin dashboard",
-		Subtitle:    subtitle,
-		Breadcrumbs: view.Breadcrumbs,
+		ID:         "admin-console",
+		NavLabel:   "Platform admin sections",
+		NavHeading: "Platform settings",
 		NavItems: []AdminConsoleNavItem{
 			{
 				Href:         adminPath("organizations"),
 				Title:        "Organizations",
-				Copy:         "Create and manage organizations",
+				Icon:         "icon-building-grid",
 				Active:       active == "organizations" || active == "",
 				HasAttention: view.HasOrgCreationAttention,
 			},
 			{
 				Href:   adminPath("streams"),
 				Title:  "Streams",
-				Copy:   "Browse and manage platform streams",
+				Icon:   "icon-layers-2",
 				Active: active == "streams",
 			},
 			{
 				Href:   adminPath("categories"),
 				Title:  "Categories",
-				Copy:   "Manage stream discovery taxonomy",
+				Icon:   "icon-layout-grid",
 				Active: active == "categories",
 			},
 		},
@@ -67,28 +58,26 @@ func orgAdminConsole(view OrgAdminView) AdminConsoleView {
 		active = "profile"
 	}
 	return AdminConsoleView{
-		ID:          "admin-console",
-		NavLabel:    "Organization admin sections",
-		Title:       "Organization admin dashboard",
-		Subtitle:    "Manage organization settings, roles, and members",
-		Breadcrumbs: view.Breadcrumbs,
+		ID:         "admin-console",
+		NavLabel:   "Organization admin sections",
+		NavHeading: "Organization settings",
 		NavItems: []AdminConsoleNavItem{
 			{
 				Href:   organizationPath("profile"),
-				Title:  "Organization profile",
-				Copy:   "Update your organization name and logo",
+				Title:  "Profile",
+				Icon:   "icon-building-grid",
 				Active: active == "profile",
 			},
 			{
 				Href:   organizationPath("roles"),
 				Title:  "Roles",
-				Copy:   "Manage the role catalog for your organization",
+				Icon:   "icon-settings",
 				Active: active == "roles",
 			},
 			{
 				Href:         organizationPath("members"),
 				Title:        "Members",
-				Copy:         "Invite people and update member access",
+				Icon:         "icon-users-group",
 				Active:       active == "members",
 				HasAttention: view.HasJoinRequestAttention,
 			},

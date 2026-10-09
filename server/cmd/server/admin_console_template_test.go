@@ -13,17 +13,12 @@ func TestAdminConsoleTemplateSoftNavContract(t *testing.T) {
 		{Label: "MainSlot", Href: "/main-slot", Current: true},
 	}}
 	view := AdminConsoleView{
-		ID:       "admin-console",
-		NavLabel: "Test sections",
-		Title:    "Test dashboard",
-		Subtitle: "Test subtitle",
-		Breadcrumbs: BreadcrumbsView{Items: []BreadcrumbItem{
-			{Label: "Dashboard", Href: "/my"},
-			{Label: "Test", Href: "/test", Current: true},
-		}},
+		ID:         "admin-console",
+		NavLabel:   "Test sections",
+		NavHeading: "Platform settings",
 		NavItems: []AdminConsoleNavItem{
-			{Href: "/test/a", Title: "Alpha", Copy: "First", Active: true},
-			{Href: "/test/b", Title: "Beta", Copy: "Second", Active: false},
+			{Href: "/test/a", Title: "Alpha", Icon: "icon-building-grid", Active: true},
+			{Href: "/test/b", Title: "Beta", Icon: "icon-layers-2", Active: false},
 		},
 		MainTemplate: "breadcrumbs",
 		MainData:     mainCrumbs,
@@ -36,10 +31,9 @@ func TestAdminConsoleTemplateSoftNavContract(t *testing.T) {
 	body := out.String()
 	for _, want := range []string{
 		`id="admin-console"`,
-		`class="page-header"`,
-		`class="breadcrumbs"`,
-		"<h1>Test dashboard</h1>",
-		"Test subtitle",
+		`class="admin-console"`,
+		`class="admin-console-nav-heading"`,
+		">Platform settings<",
 		`aria-label="Test sections"`,
 		`class="sidebar-nav"`,
 		`hx-get="/test/a"`,
@@ -50,11 +44,23 @@ func TestAdminConsoleTemplateSoftNavContract(t *testing.T) {
 		`hx-push-url="true"`,
 		`class="sidebar-nav-link is-active"`,
 		`aria-current="page"`,
+		`class="icon-svg`,
+		"Alpha",
+		"Beta",
 		"MainSlot",
 		`href="/main-slot"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in admin_console, got:\n%s", want, body)
+		}
+	}
+	for _, banned := range []string{
+		`class="page-header"`,
+		"sidebar-nav-copy",
+		"admin-console-compact",
+	} {
+		if strings.Contains(body, banned) {
+			t.Fatalf("did not expect %q in admin_console, got:\n%s", banned, body)
 		}
 	}
 }

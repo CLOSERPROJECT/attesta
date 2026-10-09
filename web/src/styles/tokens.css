@@ -56,14 +56,14 @@
   --btn-padding-x-sm: var(--space-2);
 
   /* Surfaces */
-  --background: rgb(248 253 252);
+  --background: #fafcfb;
   --foreground: #12210c;
   --card: #fff;
   --card-foreground: var(--foreground);
-  --muted: #f8f9f4;
-  --muted-foreground: #737973;
+  --muted: #f2f6f5;
+  --muted-foreground: #aeb6ae;
   --secondary: #fff;
-  --secondary-foreground: var(--foreground);
+  --secondary-foreground: #7a847c;
 
   /* Accent & semantic */
   --primary: #1e6f5c;
@@ -82,7 +82,7 @@
   --warning-muted-foreground: #a67f05;
 
   /* Borders, inputs & chips */
-  --border: #c5d0b5;
+  --border: #dde2e0;
   --input: #fff;
   --pill: #eff4e9;
   --tag: #eef2e6;
@@ -195,13 +195,13 @@
   color-scheme: dark;
 
   /* Surfaces (Figma CLOSER dark → Attesta names) */
-  --background: linear-gradient(135deg, #0b0f0d 0%, #121915 100%);
+  --background: #1f242e;
   --foreground: #ebf5f4;
   --card: #1d1f2b;
-  --muted: rgb(255 255 255 / 4%);
+  --muted: color-mix(in srgb, #fff 4%, #1d1f2b);
   --muted-foreground: #c1cac8;
   --secondary: #0d3235;
-  --secondary-foreground: #d2eaeb;
+  --secondary-foreground: #a8bfc0;
 
   /* Accent & semantic (Figma accent → primary) */
   --primary: #1cc195;

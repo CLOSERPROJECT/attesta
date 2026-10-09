@@ -587,7 +587,7 @@ func TestHandleOrgAdminMembersPendingJoinRequests(t *testing.T) {
 		saved.ID.Hex(),
 		`name="intent" value="approve_join"`,
 		`name="intent" value="reject_join"`,
-		"<h2>Users</h2>",
+		"<h2>Members</h2>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in members page, got:\n%s", want, body)

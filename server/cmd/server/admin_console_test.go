@@ -55,25 +55,22 @@ func TestPlatformAdminConsoleNav(t *testing.T) {
 	if c.NavItems[2].Title != "Categories" || c.NavItems[2].Href != "/admin/categories" || !c.NavItems[2].Active {
 		t.Fatalf("unexpected Categories nav: %+v", c.NavItems[2])
 	}
-	if c.Subtitle != "Manage stream discovery taxonomy" {
-		t.Fatalf("Subtitle = %q", c.Subtitle)
+	if c.NavHeading != "Platform settings" {
+		t.Fatalf("NavHeading = %q", c.NavHeading)
 	}
-	if c.NavItems[2].Copy != "Manage stream discovery taxonomy" {
-		t.Fatalf("Categories nav Copy = %q", c.NavItems[2].Copy)
+	if c.NavItems[2].Icon != "icon-layout-grid" {
+		t.Fatalf("Categories nav Icon = %q", c.NavItems[2].Icon)
 	}
 	if c.NavItems[0].HasAttention {
 		t.Fatal("Organizations soft-nav must not light Attention without HasOrgCreationAttention")
 	}
 
 	streams := platformAdminConsole(PlatformAdminView{ActivePanel: "streams"})
-	if streams.Subtitle != "Browse and manage platform streams" {
-		t.Fatalf("streams Subtitle = %q", streams.Subtitle)
-	}
 	if !streams.NavItems[1].Active || streams.NavItems[0].Active || streams.NavItems[2].Active {
 		t.Fatalf("streams panel must mark only Streams active: %+v", streams.NavItems)
 	}
-	if streams.NavItems[1].Copy != "Browse and manage platform streams" {
-		t.Fatalf("Streams nav Copy = %q", streams.NavItems[1].Copy)
+	if streams.NavItems[1].Icon != "icon-layers-2" {
+		t.Fatalf("Streams nav Icon = %q", streams.NavItems[1].Icon)
 	}
 
 	withOrgCreation := PlatformAdminView{
@@ -96,6 +93,9 @@ func TestOrgAdminConsoleNav(t *testing.T) {
 	if c.MainTemplate != "org_admin_main" {
 		t.Fatalf("MainTemplate = %q", c.MainTemplate)
 	}
+	if c.NavHeading != "Organization settings" {
+		t.Fatalf("org admin NavHeading = %q", c.NavHeading)
+	}
 	if len(c.NavItems) != 3 || !c.NavItems[1].Active || c.NavItems[1].Href != organizationPath("roles") {
 		t.Fatalf("unexpected nav: %+v", c.NavItems)
 	}
@@ -104,7 +104,7 @@ func TestOrgAdminConsoleNav(t *testing.T) {
 	}
 
 	defaultPanel := orgAdminConsole(OrgAdminView{})
-	if !defaultPanel.NavItems[0].Active || defaultPanel.NavItems[0].Title != "Organization profile" {
+	if !defaultPanel.NavItems[0].Active || defaultPanel.NavItems[0].Title != "Profile" {
 		t.Fatalf("empty ActivePanel must default to profile: %+v", defaultPanel.NavItems)
 	}
 

@@ -19,6 +19,7 @@
 
 .substep:hover {
   opacity: 1;
+  border-color: var(--primary);
 }
 
 .substep-accordion {
@@ -166,7 +167,7 @@
   gap: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
   line-height: var(--leading-tight);
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
   min-width: 0;
 }
 
@@ -184,7 +185,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
 }
 
 .substep-meta-icon .icon-svg {

@@ -1,16 +1,65 @@
 /*
- * Admin console — soft-nav shell (header + rail).
+ * Admin console — soft-nav shell (nav heading + rail).
  *
  *   div.admin-console[#…]
- *     section.page-header
  *     div.rail-layout.rail-layout-ready
  *       section.panel.panel-sticky
+ *         h2.admin-console-nav-heading?
  *         nav.sidebar-nav
  *       section.panel.rail-layout-main
  */
 
-.admin-console > .page-header {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: var(--space-10);
-  margin-bottom: var(--space-10);
+.admin-console-nav-heading {
+  margin: 0 0 var(--space-3);
+  padding-inline: var(--space-2);
+  font-size: 10px;
+  font-weight: var(--font-medium);
+  line-height: var(--leading-tight);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--secondary-foreground);
+  white-space: nowrap;
+}
+
+.admin-console .panel-heading h2 {
+  font-size: var(--text-lg);
+}
+
+.admin-console .panel-heading p {
+  font-size: var(--text-sm);
+}
+
+/* Horizontal + wrap while stacked; column once the md rail is two-col. */
+.admin-console .sidebar-nav {
+  flex-flow: row wrap;
+  width: 100%;
+}
+
+@media (--md-down) {
+  body:has(.admin-console) .page {
+    padding-top: var(--space-10);
+    padding-bottom: var(--space-6);
+  }
+
+  .admin-console .rail-layout {
+    gap: var(--space-10);
+  }
+
+  .admin-console .rail-layout-ready > .panel-sticky {
+    width: 100%;
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (--md-up) {
+  /* Rail width comes from .rail-layout-ready > .panel-sticky (grids.css). */
+  .admin-console .rail-layout-ready > .panel-sticky {
+    display: grid;
+  }
+
+  .admin-console .sidebar-nav {
+    display: grid;
+    width: 100%;
+  }
 }
