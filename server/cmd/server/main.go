@@ -8325,53 +8325,6 @@ func cssValue(value, fallback string) template.CSS {
 	return template.CSS(trimmed)
 }
 
-func computeAvailability(def WorkflowDef, process *Process) map[string]bool {
-	available := map[string]bool{}
-	if isProcessClosed(def, process) {
-		for _, sub := range orderedSubsteps(def) {
-			available[sub.SubstepID] = false
-		}
-		return available
-	}
-	ordered := orderedSubsteps(def)
-	allPrevDone := true
-	for _, sub := range ordered {
-		done := false
-		if process != nil {
-			if entry, ok := process.Progress[sub.SubstepID]; ok && entry.State == "done" {
-				done = true
-			}
-		}
-		if done {
-			available[sub.SubstepID] = false
-			continue
-		}
-		if allPrevDone {
-			available[sub.SubstepID] = true
-			allPrevDone = false
-		} else {
-			available[sub.SubstepID] = false
-		}
-	}
-	return available
-}
-
-func isSequenceOK(def WorkflowDef, process *Process, substepID string) bool {
-	ordered := orderedSubsteps(def)
-	for _, sub := range ordered {
-		if sub.SubstepID == substepID {
-			return true
-		}
-		if process == nil {
-			return false
-		}
-		if entry, ok := process.Progress[sub.SubstepID]; !ok || entry.State != "done" {
-			return false
-		}
-	}
-	return false
-}
-
 func isProcessDone(def WorkflowDef, process *Process) bool {
 	for _, sub := range orderedSubsteps(def) {
 		entry, ok := process.Progress[sub.SubstepID]

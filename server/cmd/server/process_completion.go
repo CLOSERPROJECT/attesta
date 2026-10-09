@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -57,54 +56,6 @@ func (p *ProcessService) SaveDraft(ctx context.Context, cmd SaveDraftCmd) (*Proc
 // SealStep selects the Stream blueprint completion strategy, then delegates.
 func (p *ProcessService) SealStep(ctx context.Context, cmd SealStepCmd) (*Process, error) {
 	return p.completionStrategy(cmd.Config.Workflow).SealStep(ctx, cmd)
-}
-
-// classicCompleteSubstep is the classic strategy body: mark done, notarize, maybe finalize.
-func (p *ProcessService) classicCompleteSubstep(ctx context.Context, cmd CompleteSubstepCmd) (*Process, error) {
-	if cmd.Process == nil {
-		return nil, fmt.Errorf("missing process")
-	}
-	now := cmd.Now
-	if now.IsZero() {
-		now = p.serviceNow(time.Time{})
-	}
-
-	description := cmd.Substep.InputKey
-	progressUpdate := ProcessStep{
-		State:       "done",
-		Description: &description,
-		DoneAt:      &now,
-		DoneBy:      &cmd.Actor,
-		Data:        cmd.Payload,
-	}
-	if err := p.store.UpdateProcessProgress(ctx, cmd.Process.ID, cmd.WorkflowKey, cmd.SubstepID, progressUpdate); err != nil {
-		return cmd.Process, fmt.Errorf("%w: %v", ErrProgressUpdate, err)
-	}
-
-	notary := Notarization{
-		ProcessID: cmd.Process.ID,
-		SubstepID: cmd.SubstepID,
-		Payload:   cmd.Payload,
-		Actor:     cmd.Actor,
-		CreatedAt: now,
-		FakeNotary: FakeNotary{
-			Method: "sha256",
-			Digest: digestPayload(cmd.Payload),
-		},
-	}
-	if err := p.store.InsertNotarization(ctx, notary); err != nil {
-		return cmd.Process, fmt.Errorf("%w: %v", ErrNotarization, err)
-	}
-
-	reloaded, err := p.reloadProcess(ctx, cmd.Process.ID)
-	if err != nil {
-		return cmd.Process, err
-	}
-
-	if isProcessDone(cmd.Config.Workflow, reloaded) {
-		return p.finalizeProcessIfDone(ctx, cmd.Config, cmd.WorkflowKey, reloaded, now), nil
-	}
-	return reloaded, nil
 }
 
 func (p *ProcessService) EnsureCompletionArtifacts(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process) *Process {
