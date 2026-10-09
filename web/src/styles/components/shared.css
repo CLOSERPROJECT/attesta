@@ -50,6 +50,21 @@ svg.bi {
   color: var(--secondary-foreground);
 }
 
+.attention-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex: 0 0 8px;
+  pointer-events: none;
+}
+
+.attention-dot-sm {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+}
+
 .field-label {
   display: block;
   margin: 0;
