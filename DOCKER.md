@@ -122,10 +122,10 @@ Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
 vendored Appwrite module instead of assuming an external identity deployment.
 
 Coolify-specific notes:
-- `traefik` from the vendored Appwrite stack is still included, but only as an internal router for `/`, `/console`, and `/v1/realtime`.
-- Set `SERVICE_FQDN_APPWRITE_80` on the `traefik` service if you want a public Appwrite hostname in Coolify.
+- Coolify owns public routing (no Traefik in this compose). Expose Appwrite with Coolify `SERVICE_FQDN_APPWRITE` / `SERVICE_URL_*` on the Appwrite services.
 - Set `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`, `APPWRITE_INVITE_REDIRECT_URL`, and `APPWRITE_RESET_REDIRECT_URL` on the `attesta` service before testing auth flows.
-- Attesta reaches Appwrite internally through `http://${SERVICE_NAME_APPWRITE:-appwrite}:80/v1`.
+- Attesta's compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
+- The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
 - To restore `deployment/appwrite/appwrite-seed.sql` only in preview deployments, set `APPWRITE_RESTORE_SEED_SQL=true` in Coolify's Preview Deployment environment variables and leave it unset in production. The SQL and init hook are baked into the custom MariaDB image, the import runs only on first MariaDB initialization, and the init hook clears Appwrite runtime tables such as sessions, certificates, and domain rules so each preview can recreate host-specific state cleanly.
 
 ## Ephemeral previews (PRs)
