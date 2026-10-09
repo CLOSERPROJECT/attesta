@@ -46,6 +46,19 @@ func categoriesSeedPathFromArgs(args []string) string {
 	return strings.TrimSpace(os.Getenv("CATEGORIES_SEED"))
 }
 
+// resolveCategoriesSeedPath returns explicit when set, otherwise
+// configDir/categories.yaml (empty configDir defaults to "config").
+func resolveCategoriesSeedPath(explicit, configDir string) string {
+	if path := strings.TrimSpace(explicit); path != "" {
+		return path
+	}
+	dir := strings.TrimSpace(configDir)
+	if dir == "" {
+		dir = "config"
+	}
+	return filepath.Join(dir, "categories.yaml")
+}
+
 // openSeedSession opens the Mongo store (required) and optional identity, and
 // resolves ConfigDir / CategoriesPath. When openIdentity is nil, Identity is
 // left unset. On identity open failure, the store cleanup runs before return.

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -80,10 +79,7 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if configDir == "" {
 		configDir = "config"
 	}
-	categoriesPath := strings.TrimSpace(deps.CategoriesPath)
-	if categoriesPath == "" {
-		categoriesPath = filepath.Join(configDir, "categories.yaml")
-	}
+	categoriesPath := resolveCategoriesSeedPath(deps.CategoriesPath, configDir)
 	if err := seedTaxonomyFromFile(ctx, deps.Store, categoriesPath); err != nil {
 		return fmt.Errorf("seed: taxonomy: %w", err)
 	}

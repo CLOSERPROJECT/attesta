@@ -7,29 +7,29 @@ import (
 	"testing"
 )
 
-func TestTaxonomySeedPathFromArgs(t *testing.T) {
+func TestCategoriesSeedPathFromArgsResolved(t *testing.T) {
 	t.Setenv("CATEGORIES_SEED", "")
 	t.Setenv("WORKFLOW_CONFIG", "config/workflow.yaml")
 	t.Setenv("WORKFLOW_CONFIG_DIR", "")
 
-	got := taxonomySeedPathFromArgs(nil)
+	got := resolveCategoriesSeedPath(categoriesSeedPathFromArgs(nil), workflowConfigDir())
 	want := filepath.Join("config", "categories.yaml")
 	if got != want {
 		t.Fatalf("default path = %q, want %q", got, want)
 	}
 
-	got = taxonomySeedPathFromArgs([]string{"--file", "/tmp/custom.yaml"})
+	got = resolveCategoriesSeedPath(categoriesSeedPathFromArgs([]string{"--file", "/tmp/custom.yaml"}), workflowConfigDir())
 	if got != "/tmp/custom.yaml" {
 		t.Fatalf("--file path = %q", got)
 	}
 
-	got = taxonomySeedPathFromArgs([]string{"--file=/tmp/eq.yaml"})
+	got = resolveCategoriesSeedPath(categoriesSeedPathFromArgs([]string{"--file=/tmp/eq.yaml"}), workflowConfigDir())
 	if got != "/tmp/eq.yaml" {
 		t.Fatalf("--file= path = %q", got)
 	}
 
 	t.Setenv("CATEGORIES_SEED", "/env/categories.yaml")
-	got = taxonomySeedPathFromArgs(nil)
+	got = resolveCategoriesSeedPath(categoriesSeedPathFromArgs(nil), workflowConfigDir())
 	if got != "/env/categories.yaml" {
 		t.Fatalf("env path = %q", got)
 	}
