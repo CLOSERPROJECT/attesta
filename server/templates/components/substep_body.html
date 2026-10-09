@@ -2,9 +2,7 @@
 
 {{ define "substep_body" }}
   {{ if .InputKey }}
-    <p class="muted u-m-0 u-pre-line u-text-xs">
-      {{- .InputKey -}}
-    </p>
+    <p class="muted u-m-0 u-pre-line u-text-xs">{{- .InputKey -}}</p>
   {{ end }}
   {{ template "role_pill_row" (rolePillRowFromSubstepBody .) }}
   <hr class="u-divider-flush" />
@@ -20,14 +18,15 @@
 
 {{ define "substep_body_message" }}
   <div class="substep-body-submitted">
-    <p class="muted u-m-0 u-pre-line">
-      {{- .DetailMessage -}}
-    </p>
+    <p class="muted u-m-0 u-pre-line">{{- .DetailMessage -}}</p>
   </div>
 {{ end }}
 
 {{ define "substep_body_form" }}
   {{ $formataDisabled := or .ReadOnly .Disabled }}
+  {{ if .Hint }}
+    <p class="muted u-m-0 u-pre-line u-text-xs">{{- .Hint -}}</p>
+  {{ end }}
   {{ if not $formataDisabled }}
     <div class="local-adaptation-tools">
       {{ if .HasOverride }}
@@ -41,67 +40,44 @@
       {{ if .CanAdaptForm }}
         <div class="local-adaptation-actions">
           {{ if not .HasOverride }}
-            <span class="muted">
-              Need to edit the form? Adapt it locally for this substep.
-            </span>
+            <span class="muted">Need to edit the form? Adapt it locally for this substep.</span>
           {{ end }}
-          <button
-            type="button"
-            class="js-open-substep-override"
-            data-override-url="{{ .AdaptURL }}"
-          >
-            {{ template "icon-pencil-small" . }} Edit substep
-          </button>
+          <button type="button"
+                  class="js-open-substep-override"
+                  data-override-url="{{ .AdaptURL }}">{{ template "icon-pencil-small" . }} Edit substep</button>
         </div>
       {{ end }}
     </div>
   {{ end }}
-  <form
-    id="substep-body-form-{{ .ProcessID }}-{{ .SubstepID }}"
-    class="substep-body-form"
-    {{ if not .ReadOnly }}
-      method="post"
-      action="/my/streams/{{ .WorkflowKey }}/instance/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
-      data-formata-substep="true"
-      data-formata-post="/my/streams/{{ .WorkflowKey }}/instance/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}"
-      {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }}
-        data-active-role-dialog="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
-      {{ end }}
-    {{ end }}
-  >
+  <form id="substep-body-form-{{ .ProcessID }}-{{ .SubstepID }}" class="substep-body-form" {{ if not .ReadOnly }} method="post" action="/my/streams/{{ .WorkflowKey }}/instance/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}" data-formata-substep="true" data-formata-post="/my/streams/{{ .WorkflowKey }}/instance/{{ .ProcessID }}/substep/{{ .SubstepID }}/complete?substep={{ .SubstepID }}" {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }} data-active-role-dialog="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}" {{ end }} {{ end }}>
     {{ if .MatchingRoles }}
       {{ if eq (len .MatchingRoles) 1 }}
-        <input
-          type="hidden"
-          name="activeRole"
-          value="{{ (index .MatchingRoles 0).Slug }}"
-          {{ if .ReadOnly }}disabled{{ end }}
-        />
+        <input type="hidden"
+               name="activeRole"
+               value="{{ (index .MatchingRoles 0).Slug }}"
+               {{ if .ReadOnly }}disabled{{ end }} />
       {{ else }}
-        <input
-          type="hidden"
-          name="activeRole"
-          value=""
-          data-active-role-input="true"
-          {{ if $formataDisabled }}disabled{{ end }}
-        />
+        <input type="hidden"
+               name="activeRole"
+               value=""
+               data-active-role-input="true"
+               {{ if $formataDisabled }}disabled{{ end }} />
       {{ end }}
     {{ end }}
     <label class="substep-body-field-formata">
-      <div
-        class="js-formata-host"
-        data-formata-schema="{{ .FormSchema }}"
-        {{ if .FormUISchema }}
-          data-formata-uischema='{{ .FormUISchema }}'
-        {{ end }}
-        {{ if $formataDisabled }}data-formata-disabled="true"{{ end }}
-      ></div>
-      <input
-        class="js-formata-value"
-        type="hidden"
-        name="value"
-        {{ if $formataDisabled }}disabled{{ end }}
-      />
+      <div class="js-formata-host"
+           data-formata-schema="{{ .FormSchema }}"
+           {{ if .FormUISchema }}
+           data-formata-uischema='{{ .FormUISchema }}'
+           {{ end }}
+           {{ if $formataDisabled }}data-formata-disabled="true"
+           {{ end }}></div>
+      <input class="js-formata-value"
+             type="hidden"
+             name="value"
+             {{ if .FormValue }}value="{{ .FormValue }}"
+             {{ end }}
+             {{ if $formataDisabled }}disabled{{ end }} />
     </label>
     {{ if .ReadOnly }}
       {{ if .Reason }}
@@ -110,49 +86,39 @@
     {{ end }}
   </form>
   {{ if and .MatchingRoles (gt (len .MatchingRoles) 1) }}
-    <dialog
-      id="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
-      class="dialog js-active-role-dialog"
-      data-active-role-form="substep-body-form-{{ .ProcessID }}-{{ .SubstepID }}"
-    >
+    <dialog id="active-role-dialog-{{ .ProcessID }}-{{ .SubstepID }}"
+            class="dialog js-active-role-dialog"
+            data-active-role-form="substep-body-form-{{ .ProcessID }}-{{ .SubstepID }}">
       <div class="dialog-card">
         <header class="dialog-head">
           <div>
-            <h3 class="dialog-title">Complete as</h3>
+            <h3 class="dialog-title">{{ if .SaveDraft }}Save draft as{{ else }}Complete as{{ end }}</h3>
             <p class="dialog-subtitle">
-              Choose the role to use for this submission
+              {{ if .SaveDraft }}
+                Choose the role to use for this draft save
+              {{ else }}
+                Choose the role to use for this submission
+              {{ end }}
             </p>
           </div>
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon dialog-close js-cancel-active-role"
-            aria-label="Close role selection"
-          >
-            {{ template "icon-close" . }}
-          </button>
+          <button type="button"
+                  class="btn btn-ghost btn-icon dialog-close js-cancel-active-role"
+                  aria-label="Close role selection">{{ template "icon-close" . }}</button>
         </header>
         <div class="active-role-options" role="radiogroup">
           {{ range .MatchingRoles }}
             <label class="active-role-option">
-              <input
-                type="radio"
-                name="roleChoice-{{ $.ProcessID }}-{{ $.SubstepID }}"
-                value="{{ .Slug }}"
-                data-active-role-option="true"
-              />
+              <input type="radio"
+                     name="roleChoice-{{ $.ProcessID }}-{{ $.SubstepID }}"
+                     value="{{ .Slug }}"
+                     data-active-role-option="true" />
               <span>{{ .Label }}</span>
             </label>
           {{ end }}
         </div>
-        <p class="active-role-error" data-active-role-error hidden>
-          Select a role to continue.
-        </p>
-        <div
-          class="dialog-actions"
-        >
-          <button type="button" class="btn btn-primary js-confirm-active-role">
-            Confirm
-          </button>
+        <p class="active-role-error" data-active-role-error hidden>Select a role to continue.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary js-confirm-active-role">Confirm</button>
         </div>
       </div>
     </dialog>
@@ -171,13 +137,15 @@
     </div>
   {{ end }}
   <div class="substep-body-submitted">
-    <span class="muted substep-body-submitted-label">Submitted data</span>
+    <span class="muted substep-body-submitted-label">{{ if .Sealed }}Sealed data{{ else }}Submitted data{{ end }}</span>
     <div class="substep-body-submitted">
       <dl class="substep-body-submitted-values">
         {{ if .Values }}
           {{ range .Values }}
             <dt>{{ .Key }}</dt>
-            <dd>{{ .Value }}</dd>
+            <dd>
+              {{ .Value }}
+            </dd>
           {{ end }}
         {{ end }}
         {{ if .Attachments }}
@@ -199,24 +167,21 @@
   {{ end }}
   {{ if .Digest }}
     <div class="substep-meta">
-      <span class="data"
-        >digest
+      <span class="data">digest
         <code class="substep-body-digest-hash">{{ .Digest }}</code>
-        <button
-          type="button"
-          class="substep-body-digest-button js-copy-text"
-          data-copy-text="{{ .Digest }}"
-          data-copy-label="digest"
-          aria-label="Copy full digest for substep {{ .SubstepID }}"
-          title="{{ .Digest }}"
-        >
+        <button type="button"
+                class="substep-body-digest-button js-copy-text"
+                data-copy-text="{{ .Digest }}"
+                data-copy-label="digest"
+                aria-label="Copy full digest for substep {{ .SubstepID }}"
+                title="{{ .Digest }}">
           {{ if gt (len .Digest) 7 }}
             {{ slice .Digest 0 7 }}
           {{ else }}
             {{ .Digest }}
           {{ end }}
-        </button></span
-      >
+        </button>
+      </span>
     </div>
   {{ end }}
 {{ end }}

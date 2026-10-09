@@ -59,17 +59,18 @@ func TestSubstepBodyTemplateRendersResultMode(t *testing.T) {
 		t.Fatalf("render substep_body template: %v", err)
 	}
 	body := out.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, want := range []string{
 		"Completed by role:",
 		`data-role-palette="red"`,
 		">Submitted data<",
 		"<dt>notes</dt>",
-		"<dd>All good</dd>",
+		"<dd> All good </dd>",
 		"<dt>photo</dt>",
 		">Attachments<",
 	} {
-		if !strings.Contains(body, want) {
+		if !strings.Contains(body, want) && !strings.Contains(compactBody, strings.Join(strings.Fields(want), " ")) {
 			t.Fatalf("expected %q in rendered substep body, got: %s", want, body)
 		}
 	}
@@ -133,15 +134,16 @@ func TestSubstepBodyTemplateRendersOverrideResultMode(t *testing.T) {
 		t.Fatalf("render substep_body template: %v", err)
 	}
 	body := out.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 
 	for _, want := range []string{
 		"Completed with local form adaptation.",
 		"Reason: local source shape",
 		">Submitted data<",
 		"<dt>value</dt>",
-		"<dd>override-ok</dd>",
+		"<dd> override-ok </dd>",
 	} {
-		if !strings.Contains(body, want) {
+		if !strings.Contains(body, want) && !strings.Contains(compactBody, strings.Join(strings.Fields(want), " ")) {
 			t.Fatalf("expected %q in rendered override substep body, got: %s", want, body)
 		}
 	}

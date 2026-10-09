@@ -13,10 +13,18 @@ func nextAuthorizedSubstepBody(def WorkflowDef, process *Process, workflowKey st
 	return SubstepBodyView{}, false
 }
 
+const (
+	draftAndSealSubstepHint   = "Save a draft. This does not freeze or notarize. Seal the Step when the day is closed."
+	draftAndSealSealedReason  = "Sealed. This Substep is frozen evidence."
+	draftAndSealDraftingLabel = "drafting"
+	draftAndSealSealedLabel   = "sealed"
+)
+
 func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
 	var actions []SubstepBodyView
 	ordered := orderedSubsteps(def)
-	availMap := computeAvailability(def, process)
+	availMap := substepAvailability(def, process)
+	draftAndSeal := workflowCompletionStrategy(def) == CompletionStrategyDraftAndSeal
 	substepOrgs := substepOrganizationMap(def)
 	terminated := process != nil && process.Termination != nil
 	terminationSubstepID := ""
@@ -91,9 +99,17 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 		reason := ""
 		detailMessage := ""
 		if status == "locked" {
-			reason = "Locked by sequence"
+			if draftAndSeal {
+				reason = "Locked by a prior Step"
+			} else {
+				reason = "Locked by sequence"
+			}
 		} else if status == "done" {
-			reason = "Already completed"
+			if draftAndSeal {
+				reason = draftAndSealSealedReason
+			} else {
+				reason = "Already completed"
+			}
 		} else if status == processStatusTerminated {
 			reason = "Stream ended early"
 			detailMessage = terminationReason
@@ -166,6 +182,26 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 		if canAdaptForm {
 			adaptURL = streamInstancePath(workflowKey, processIDString(process)) + "/substep/" + sub.SubstepID + "/override"
 		}
+		statusLabel := ""
+		saveDraft := false
+		sealed := draftAndSeal && status == "done"
+		hint := ""
+		formValue := ""
+		if draftAndSeal && status == "available" {
+			statusLabel = draftAndSealDraftingLabel
+			if !disabled {
+				saveDraft = true
+				hint = draftAndSealSubstepHint
+			}
+			if process != nil {
+				if progress, ok := process.Progress[sub.SubstepID]; ok && progress.Data != nil {
+					formValue = marshalJSONCompact(progress.Data)
+				}
+			}
+		}
+		if sealed {
+			statusLabel = draftAndSealSealedLabel
+		}
 		actions = append(actions, withSubstepBodyMode(SubstepBodyView{
 			WorkflowKey:    workflowKey,
 			ProcessID:      processIDString(process),
@@ -181,7 +217,12 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 			InputType:      sub.InputType,
 			FormSchema:     formSchema,
 			FormUISchema:   formUISchema,
+			FormValue:      formValue,
 			Status:         status,
+			StatusLabel:    statusLabel,
+			SaveDraft:      saveDraft,
+			Sealed:         sealed,
+			Hint:           hint,
 			DoneAt:         doneAt,
 			DoneAtISO:      doneAtISO,
 			DoneBy:         doneBy,

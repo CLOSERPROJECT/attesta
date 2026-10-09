@@ -824,19 +824,55 @@ const serializeFormataValue = async (value) => {
   return value;
 };
 
+// Nest PHP-style Formata keys (batches[][loadId]) into JSON Formata can reload.
+// A new row starts when the current row already has the field.
+const assignNestedFormDataValue = (result, key, value) => {
+  const appendMatch = /^([^[\]]+)\[\]\[([^\]]+)\]$/.exec(key);
+  if (appendMatch) {
+    const [, arrayName, field] = appendMatch;
+    if (!Array.isArray(result[arrayName])) {
+      result[arrayName] = [];
+    }
+    const rows = result[arrayName];
+    let row = rows[rows.length - 1];
+    if (!row || Object.prototype.hasOwnProperty.call(row, field)) {
+      row = {};
+      rows.push(row);
+    }
+    row[field] = value;
+    return;
+  }
+
+  const indexedMatch = /^([^[\]]+)\[(\d+)\]\[([^\]]+)\]$/.exec(key);
+  if (indexedMatch) {
+    const [, arrayName, indexText, field] = indexedMatch;
+    const index = Number(indexText);
+    if (!Array.isArray(result[arrayName])) {
+      result[arrayName] = [];
+    }
+    while (result[arrayName].length <= index) {
+      result[arrayName].push({});
+    }
+    result[arrayName][index][field] = value;
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(result, key)) {
+    if (Array.isArray(result[key])) {
+      result[key].push(value);
+    } else {
+      result[key] = [result[key], value];
+    }
+  } else {
+    result[key] = value;
+  }
+};
+
 const formDataToObject = async (formData) => {
   const result = {};
   for (const [key, value] of formData.entries()) {
     const normalizedValue = await serializeFormataValue(value);
-    if (Object.prototype.hasOwnProperty.call(result, key)) {
-      if (Array.isArray(result[key])) {
-        result[key].push(normalizedValue);
-      } else {
-        result[key] = [result[key], normalizedValue];
-      }
-    } else {
-      result[key] = normalizedValue;
-    }
+    assignNestedFormDataValue(result, key, normalizedValue);
   }
   return result;
 };
@@ -852,7 +888,32 @@ const readFormataComponentValue = (component) => {
   return {};
 };
 
+const isSparseFormataValue = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return true;
+  }
+  const keys = Object.keys(value);
+  if (keys.length === 0) {
+    return true;
+  }
+  // Treat {batches: []} as empty so FormData fallback can supply rows.
+  return keys.every((key) => {
+    const entry = value[key];
+    return Array.isArray(entry) && entry.length === 0;
+  });
+};
+
 const extractFormataSubmitPayload = async (componentEvent, component) => {
+  // Prefer the component's structured value when it has rows. Formata submit
+  // details are often FormData with PHP-style keys (batches[][loadId]); those
+  // are nested in formDataToObject so drafts reload via setValue.
+  const fromComponent = await serializeFormataValue(
+    readFormataComponentValue(component),
+  );
+  if (!isSparseFormataValue(fromComponent)) {
+    return fromComponent;
+  }
+
   const detail =
     componentEvent instanceof CustomEvent ? componentEvent.detail : undefined;
   if (detail instanceof FormData) {
@@ -868,12 +929,14 @@ const extractFormataSubmitPayload = async (componentEvent, component) => {
   if (detail && typeof detail === "object" && !Array.isArray(detail)) {
     return await serializeFormataValue(detail);
   }
-  return await serializeFormataValue(readFormataComponentValue(component));
+  return fromComponent;
 };
 
 let formataReadyPromise;
+// Pin to formata#6 (value/setValue/getValue) until that lands on main.
+// https://github.com/CLOSERPROJECT/formata/pull/6
 const formataScriptURLs = [
-  "https://cdn.jsdelivr.net/gh/CLOSERPROJECT/formata@main/dist/formata-web-component.umd.js",
+  "https://cdn.jsdelivr.net/gh/CLOSERPROJECT/formata@6adfbf040b24b496d521db47382c27232d914b27/dist/formata-web-component.umd.js",
   "https://closerproject.github.io/formata-arch/formata-web-component.umd.js",
 ];
 
@@ -1099,6 +1162,15 @@ const initializeFormataForms = async (container = document) => {
     const hiddenInput = form.querySelector(".js-formata-value");
     if (!(hiddenInput instanceof HTMLInputElement)) {
       continue;
+    }
+
+    const initial = parseJsonAttribute(hiddenInput.value);
+    if (initial && typeof initial === "object" && !Array.isArray(initial)) {
+      if (typeof component.setValue === "function") {
+        component.setValue(initial);
+      } else {
+        component.value = initial;
+      }
     }
 
     const sync = () => syncFormataValue(component, hiddenInput);

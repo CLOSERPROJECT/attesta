@@ -1,0 +1,75 @@
+# Draft-and-seal browser smoke Stream (Feragame compromise pilot).
+# Catalog key when file-backed: feragame-pilot
+# Org/roles match Appwrite local seed (organization-1 / chemist; org1@admin.org is Org admin).
+workflow:
+  categorySlug: recycling-and-recovery
+  subCategorySlug: flat-screen-displays
+  name: Feragame production day (pilot)
+  description: Single-Step draft-and-seal day with parallel Batch loads and UdC registrations
+  completionStrategy: draft-and-seal
+  steps:
+    - id: "1"
+      title: Production day
+      order: 1
+      organization: organization-1
+      substeps:
+        - id: "1.1"
+          order: 1
+          title: Batch loads
+          inputKey: batches
+          roles:
+            - chemist
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              batches:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    loadId:
+                      type: string
+                      title: loadId
+                    weightKg:
+                      type: string
+                      title: weightKg
+                  required:
+                    - loadId
+                    - weightKg
+            title: Batch loads
+        - id: "1.2"
+          order: 2
+          title: UdC registrations
+          inputKey: udc
+          roles:
+            - chemist
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              udc:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    station:
+                      type: string
+                      title: station
+                    weightKg:
+                      type: string
+                      title: weightKg
+                  required:
+                    - station
+                    - weightKg
+            title: UdC registrations
+
+organizations:
+  - slug: organization-1
+    name: Organization 1
+
+roles:
+  - orgSlug: organization-1
+    slug: chemist
+    name: Chemist
+    color: var(--role-blue)

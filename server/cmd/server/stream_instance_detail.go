@@ -14,6 +14,7 @@ func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeC
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
 	actions = s.applyDoneByEmailToSubstepViews(ctx, cfg.Workflow, actor, actions)
 	timeline = decorateTimelineSubstepBodies(timeline, actions)
+	timeline = decorateTimelineDraftAndSealChrome(timeline, cfg.Workflow, process, workflowKey, actor)
 
 	view := StreamInstanceDetailView{
 		WorkflowKey:       workflowKey,
@@ -97,6 +98,36 @@ func (s *Server) applyDoneByEmailToTermination(ctx context.Context, def Workflow
 		mapped.EndedBy = identity.fallbackID
 	}
 	return &mapped
+}
+
+const (
+	draftAndSealDraftingNotice = "Kind Substeps can be drafted in parallel. Saves do not freeze or notarize. Seal this Step to close the production day."
+	draftAndSealSealedNotice   = "This Step is sealed. Kind Substeps are frozen evidence."
+)
+
+func decorateTimelineDraftAndSealChrome(timeline []TimelineStep, def WorkflowDef, process *Process, workflowKey string, actor Actor) []TimelineStep {
+	if workflowCompletionStrategy(def) != CompletionStrategyDraftAndSeal {
+		return timeline
+	}
+	closed := isProcessClosed(def, process)
+	for i := range timeline {
+		step, err := findWorkflowStep(def, timeline[i].Summary.StepID)
+		if err != nil {
+			continue
+		}
+		timeline[i].DraftAndSeal = true
+		if stepAllSubstepsDone(step, process) {
+			timeline[i].Sealed = true
+			timeline[i].SealNotice = draftAndSealSealedNotice
+			continue
+		}
+		timeline[i].SealNotice = draftAndSealDraftingNotice
+		if process != nil && !closed && actorCanSealStep(actor, step) {
+			timeline[i].CanSeal = true
+			timeline[i].SealAction = streamInstancePath(workflowKey, processIDString(process)) + "/step/" + step.StepID + "/seal"
+		}
+	}
+	return timeline
 }
 
 func terminationEndedByDisplay(endedBy string) string {

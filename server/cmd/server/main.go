@@ -42,12 +42,13 @@ const (
 )
 
 type WorkflowDef struct {
-	ID              primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
-	Name            string             `bson:"name" yaml:"name"`
-	Description     string             `bson:"description,omitempty" yaml:"description,omitempty"`
-	CategorySlug    string             `bson:"categorySlug,omitempty" yaml:"categorySlug,omitempty"`
-	SubCategorySlug string             `bson:"subCategorySlug,omitempty" yaml:"subCategorySlug,omitempty"`
-	Steps           []WorkflowStep     `bson:"steps" yaml:"steps"`
+	ID                 primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
+	Name               string             `bson:"name" yaml:"name"`
+	Description        string             `bson:"description,omitempty" yaml:"description,omitempty"`
+	CategorySlug       string             `bson:"categorySlug,omitempty" yaml:"categorySlug,omitempty"`
+	SubCategorySlug    string             `bson:"subCategorySlug,omitempty" yaml:"subCategorySlug,omitempty"`
+	CompletionStrategy string             `bson:"completionStrategy,omitempty" yaml:"completionStrategy,omitempty"`
+	Steps              []WorkflowStep     `bson:"steps" yaml:"steps"`
 }
 
 type WorkflowStep struct {
@@ -5770,6 +5771,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
 	}
+	if len(parts) == 4 && parts[1] == "step" && parts[3] == "seal" && r.Method == http.MethodPost {
+		s.handleSealStep(w, r, processID, parts[2])
+		return
+	}
 	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "override" {
 		switch r.Method {
 		case http.MethodGet:
@@ -6368,7 +6373,7 @@ func (s *Server) authorizeSubstepOverrideRequest(r *http.Request, user *AccountU
 	if progress, ok := process.Progress[substepID]; ok && progress.State == "done" {
 		return process, canonical, step, actor, http.StatusConflict, "Completed substeps cannot be adapted.", false
 	}
-	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
+	sequenceOK := substepSequenceOK(cfg.Workflow, process, substepID)
 	if !sequenceOK {
 		return process, canonical, step, actor, http.StatusConflict, "Step is locked: complete previous steps first.", false
 	}
@@ -6584,7 +6589,7 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 	}
 	actor.Role = activeRole
 
-	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
+	sequenceOK := substepSequenceOK(cfg.Workflow, process, substepID)
 	if s.authorizer == nil {
 		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
 		return
@@ -6636,27 +6641,138 @@ func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	process, err = s.processService().CompleteSubstep(ctx, CompleteSubstepCmd{
-		Process:     process,
-		WorkflowKey: workflowKey,
-		SubstepID:   substepID,
-		Substep:     substep,
-		Actor:       actor,
-		Payload:     payload,
-		Config:      cfg,
-		Now:         now,
-	})
+	if workflowCompletionStrategy(cfg.Workflow) == CompletionStrategyDraftAndSeal {
+		process, err = s.processService().SaveDraft(ctx, SaveDraftCmd{
+			Process:     process,
+			WorkflowKey: workflowKey,
+			SubstepID:   substepID,
+			Substep:     substep,
+			Actor:       actor,
+			Payload:     payload,
+			Config:      cfg,
+			Now:         now,
+		})
+	} else {
+		process, err = s.processService().CompleteSubstep(ctx, CompleteSubstepCmd{
+			Process:     process,
+			WorkflowKey: workflowKey,
+			SubstepID:   substepID,
+			Substep:     substep,
+			Actor:       actor,
+			Payload:     payload,
+			Config:      cfg,
+			Now:         now,
+		})
+	}
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrDraftValidation):
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
 		case errors.Is(err, ErrProgressUpdate):
 			logRequestError(r, err, "failed to update process %s substep %s", process.ID.Hex(), substepID)
 			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
 		case errors.Is(err, ErrNotarization):
 			logRequestError(r, err, "failed to notarize process %s substep %s", process.ID.Hex(), substepID)
 			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
+		case errors.Is(err, ErrCompletionUnsupported):
+			s.renderActionErrorForRequest(w, r, http.StatusConflict, "Complete is not available for this stream.", process, actor)
 		default:
 			logRequestError(r, err, "failed to complete process %s substep %s", process.ID.Hex(), substepID)
 			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
+		}
+		return
+	}
+
+	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
+	for _, role := range s.roles(cfg) {
+		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
+	}
+	// Classic Complete clears selection so the next available Substep opens.
+	// Draft-and-seal keeps both peers available; clearing would always fall
+	// back to the first peer and close the Substep the operator just saved.
+	selectedAfter := ""
+	confirmation := ""
+	if workflowCompletionStrategy(cfg.Workflow) == CompletionStrategyDraftAndSeal {
+		selectedAfter = substepID
+		confirmation = "Draft saved."
+	}
+	nextReq := cloneRequestWithSelectedSubstep(r, selectedAfter)
+	if isProcessContentTargetRequest(r) {
+		s.renderProcessContentNotice(w, nextReq, process, actor, "", confirmation)
+		return
+	}
+	if isHTMXRequest(r) {
+		s.renderProcessContentNotice(w, nextReq, process, actor, "", confirmation)
+		return
+	}
+	s.renderDepartmentProcessPageNotice(w, nextReq, process, actor, "", confirmation)
+}
+
+func formConfirmTrue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) handleSealStep(w http.ResponseWriter, r *http.Request, processID, stepID string) {
+	user, _, ok := s.requireVerifiedPost(w, r)
+	if !ok {
+		return
+	}
+	workflowKey, cfg, selected := s.selectedWorkflowOrRedirectHome(w, r)
+	if !selected {
+		return
+	}
+	actor := actorFromAccountUser(user, workflowKey)
+
+	ctx := r.Context()
+	process, err := s.loadProcess(ctx, processID)
+	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			logRequestError(r, err, "failed to load process %s for step %s seal", processID, stepID)
+		}
+		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
+		return
+	}
+	if !s.processBelongsToWorkflow(process, workflowKey) {
+		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
+		return
+	}
+
+	_ = r.ParseForm()
+	confirm := formConfirmTrue(r.FormValue("confirm"))
+	now := s.nowUTC()
+	process, err = s.processService().SealStep(ctx, SealStepCmd{
+		Process:     process,
+		WorkflowKey: workflowKey,
+		StepID:      stepID,
+		Actor:       actor,
+		Config:      cfg,
+		Now:         now,
+		Confirm:     confirm,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrSealNotConfirmed):
+			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Seal requires confirmation.", process, actor)
+		case errors.Is(err, ErrSealUnauthorized):
+			s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized to seal this Step.", process, actor)
+		case errors.Is(err, ErrSealAlreadySealed):
+			s.renderActionErrorForRequest(w, r, http.StatusConflict, "This Step is already sealed.", process, actor)
+		case errors.Is(err, ErrCompletionUnsupported):
+			s.renderActionErrorForRequest(w, r, http.StatusConflict, "Seal Step is not available for this stream.", process, actor)
+		case errors.Is(err, ErrProgressUpdate):
+			logRequestError(r, err, "failed to update process %s during seal of step %s", processID, stepID)
+			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
+		case errors.Is(err, ErrNotarization):
+			logRequestError(r, err, "failed to notarize process %s during seal of step %s", processID, stepID)
+			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
+		default:
+			logRequestError(r, err, "failed to seal process %s step %s", processID, stepID)
+			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to seal Step.", process, actor)
 		}
 		return
 	}
@@ -7199,6 +7315,9 @@ func parseRuntimeConfigData(source string, data []byte) (RuntimeConfig, error) {
 	if err := validateWorkflowCategoryPair(cfg.Workflow); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
+	if err := normalizeCompletionStrategy(&cfg.Workflow); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
+	}
 	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
@@ -7382,6 +7501,9 @@ func normalizeWorkflowConfig(cfg *RuntimeConfig) {
 		return
 	}
 	cfg.Workflow.Description = normalizeOptionalText(cfg.Workflow.Description)
+	if strings.TrimSpace(cfg.Workflow.CompletionStrategy) == "" {
+		cfg.Workflow.CompletionStrategy = CompletionStrategyClassic
+	}
 	defaultOrg := ""
 	if len(cfg.Organizations) > 0 {
 		defaultOrg = strings.TrimSpace(cfg.Organizations[0].Slug)
@@ -7766,7 +7888,7 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 		export.Termination = notarizedProcessTermination(process.Termination)
 	}
 
-	availableMap := computeAvailability(def, process)
+	availableMap := substepAvailability(def, process)
 	var leaves []MerkleLeaf
 	for _, step := range sortedSteps(def) {
 		stepEntry := NotarizedStep{StepID: step.StepID, Title: step.Title}
@@ -7923,7 +8045,7 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 	if process == nil {
 		return WorkflowSub{}, false
 	}
-	availMap := computeAvailability(def, process)
+	availMap := substepAvailability(def, process)
 	for _, sub := range orderedSubsteps(def) {
 		if availMap[sub.SubstepID] {
 			return sub, true
@@ -8499,6 +8621,10 @@ func isProcessContentTargetRequest(r *http.Request) bool {
 }
 
 func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	s.renderDepartmentProcessPageNotice(w, r, process, actor, message, "")
+}
+
+func (s *Server) renderDepartmentProcessPageNotice(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message, confirmation string) {
 	workflowKey := s.defaultWorkflowKey()
 	cfg := RuntimeConfig{}
 	var err error
@@ -8528,12 +8654,17 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		message,
 		false,
 	)
+	view.Detail.Confirmation = strings.TrimSpace(confirmation)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	s.renderProcessContentNotice(w, r, process, actor, message, "")
+}
+
+func (s *Server) renderProcessContentNotice(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message, confirmation string) {
 	workflowKey := s.defaultWorkflowKey()
 	cfg := RuntimeConfig{}
 	var err error
@@ -8563,6 +8694,7 @@ func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, pr
 		message,
 		false,
 	)
+	view.Detail.Confirmation = strings.TrimSpace(confirmation)
 	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

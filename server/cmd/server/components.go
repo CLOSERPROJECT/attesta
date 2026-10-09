@@ -261,8 +261,13 @@ type SubstepBodyView struct {
 	InputType      string
 	FormSchema     string
 	FormUISchema   string
+	FormValue      string
 	Status         string
+	StatusLabel    string
 	Mode           SubstepBodyMode
+	SaveDraft      bool
+	Sealed         bool
+	Hint           string
 	DoneAt         string
 	DoneAtISO      string
 	DoneBy         string
@@ -317,9 +322,13 @@ func substepShellDisplay(sub TimelineSubstep) SubstepShellDisplay {
 		if status == "available" && sub.Body.Disabled {
 			status = "active"
 		}
+		label := strings.TrimSpace(sub.Body.StatusLabel)
+		if label == "" {
+			label = processStatusLabel(status)
+		}
 		return SubstepShellDisplay{
 			Status:      status,
-			StatusLabel: processStatusLabel(status),
+			StatusLabel: label,
 			Palette:     sub.Body.Palette,
 			DoneAt:      sub.Body.DoneAt,
 			DoneAtISO:   sub.Body.DoneAtISO,
@@ -359,10 +368,15 @@ type TimelineSubstep struct {
 
 // TimelineStep groups substeps under a blueprint step in the stream timeline.
 type TimelineStep struct {
-	Summary  StepSummaryView
-	OrgSlug  string
-	Expanded bool
-	Substeps []TimelineSubstep
+	Summary      StepSummaryView
+	OrgSlug      string
+	Expanded     bool
+	Substeps     []TimelineSubstep
+	DraftAndSeal bool
+	CanSeal      bool
+	Sealed       bool
+	SealAction   string
+	SealNotice   string
 }
 
 // StreamTimelineView is the view model for templates/components/stream_timeline.html.
@@ -402,6 +416,7 @@ type StreamInstanceDetailView struct {
 	ProcessDone       bool
 	SelectedBody      *SubstepBodyView
 	Error             string
+	Confirmation      string // opt-in floating toast via data-toast
 	Timeline          []TimelineStep
 	HideStatus        bool
 	DPPURL            string

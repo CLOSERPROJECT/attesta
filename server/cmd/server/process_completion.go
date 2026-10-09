@@ -43,7 +43,24 @@ func (p *ProcessService) serviceNow(fallback time.Time) time.Time {
 	return time.Now().UTC()
 }
 
+// CompleteSubstep selects the Stream blueprint completion strategy, then delegates.
+// Classic Streams keep today's Complete→done+notarize body via classicCompleteSubstep.
 func (p *ProcessService) CompleteSubstep(ctx context.Context, cmd CompleteSubstepCmd) (*Process, error) {
+	return p.completionStrategy(cmd.Config.Workflow).CompleteSubstep(ctx, cmd)
+}
+
+// SaveDraft selects the Stream blueprint completion strategy, then delegates.
+func (p *ProcessService) SaveDraft(ctx context.Context, cmd SaveDraftCmd) (*Process, error) {
+	return p.completionStrategy(cmd.Config.Workflow).SaveDraft(ctx, cmd)
+}
+
+// SealStep selects the Stream blueprint completion strategy, then delegates.
+func (p *ProcessService) SealStep(ctx context.Context, cmd SealStepCmd) (*Process, error) {
+	return p.completionStrategy(cmd.Config.Workflow).SealStep(ctx, cmd)
+}
+
+// classicCompleteSubstep is the classic strategy body: mark done, notarize, maybe finalize.
+func (p *ProcessService) classicCompleteSubstep(ctx context.Context, cmd CompleteSubstepCmd) (*Process, error) {
 	if cmd.Process == nil {
 		return nil, fmt.Errorf("missing process")
 	}

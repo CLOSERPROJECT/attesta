@@ -67,12 +67,15 @@ func TestStreamTimelineTemplateRendersStepsAndSubsteps(t *testing.T) {
 		`data-tooltip="Steps"`,
 		"Capture batch data",
 	} {
-		if !strings.Contains(body, want) {
+		if !strings.Contains(body, want) && !strings.Contains(compactBody, want) {
 			t.Fatalf("expected %q in rendered timeline, got: %s", want, body)
 		}
 	}
 	if !strings.Contains(compactBody, `class="substep-accordion js-process-substep-panel" data-substep-id="1.1" aria-labelledby="substep-1-1-heading" open`) {
 		t.Fatalf("expected selected substep accordion open, got: %s", body)
+	}
+	if strings.Contains(body, "Seal Step") {
+		t.Fatalf("classic timeline must not render Seal Step, got: %s", body)
 	}
 }
 

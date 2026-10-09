@@ -9,8 +9,14 @@
 >
   <div id="process-page-content">{{ template "process_content.html" . }}</div>
 </div>
-{{ end }} {{ define "process_content.html" }} {{ template "error_banner.html"
-.Detail }}
+{{ end }} {{ define "process_content.html" }}
+{{ if .Detail.Confirmation }}
+  <p class="confirmation confirmation-with-icon" data-toast>
+    {{ template "icon-check-circle" . }}
+    <span>{{ .Detail.Confirmation }}</span>
+  </p>
+{{ end }}
+{{ template "error_banner.html" .Detail }}
 <div class="stack">
   <section class="page-header">
     {{ template "breadcrumbs" .Breadcrumbs }}
