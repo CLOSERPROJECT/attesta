@@ -155,6 +155,17 @@ chmod +x "${tmpdir}/bin/bash" "${tmpdir}/bin/docker"
 
 expected_project="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" project-name)"
 
+grep -Fq 'deployment/attesta-appwrite-ready.sh' "${ROOT}/scripts/worktree-compose.sh" \
+  || fail "worktree-compose does not source shared Appwrite readiness helpers"
+[[ -f "${ROOT}/deployment/attesta-appwrite-ready.sh" ]] \
+  || fail "shared Appwrite readiness helpers missing"
+# shellcheck source=deployment/attesta-appwrite-ready.sh
+source "${ROOT}/deployment/attesta-appwrite-ready.sh"
+ATTESTA_SEED=true attesta_seed_enabled || fail "attesta_seed_enabled rejected truthy ATTESTA_SEED"
+ATTESTA_SEED=false attesta_seed_enabled && fail "attesta_seed_enabled accepted false ATTESTA_SEED"
+ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 wait_for_appwrite "http://127.0.0.1:9/v1/health" \
+  || fail "wait_for_appwrite timeout 0 should skip the probe"
+
 if PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   FAIL_WORKTREE_ENV=1 COMPOSE_PROJECT_NAME=stale-project \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" ps \
