@@ -1,10 +1,10 @@
 /*
- * Sidebar nav — section switcher tiles (CSS-only component).
+ * Sidebar nav — section switcher (CSS-only component).
  *
  * nav.sidebar-nav
  *   a.sidebar-nav-link[.is-active]   (or button, on pages that still use buttons)
+ *     .icon-svg?
  *     span.sidebar-nav-title | status_tag micro-partial
- *     span.sidebar-nav-copy?   (optional subtitle)
  */
 
 .sidebar-nav {
@@ -17,16 +17,19 @@
 
 .sidebar-nav-link {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: var(--space-2) var(--space-3);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
   text-align: left;
   text-decoration: none;
   border-radius: 4px;
   border: 1px solid transparent;
   background: transparent;
-  color: inherit;
+  color: var(--secondary-foreground);
   font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
   cursor: pointer;
   transition:
     border-color 0.18s ease,
@@ -38,17 +41,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-weight: 500;
-  color: var(--foreground);
+  font-weight: inherit;
+  color: inherit;
 }
 
-.sidebar-nav-link .attention-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary);
-  flex: 0 0 8px;
-  pointer-events: none;
+.sidebar-nav-link .icon-svg {
+  flex: 0 0 auto;
+  color: inherit;
 }
 
 .sidebar-nav-link .status-tag {
@@ -64,10 +63,5 @@
 
 .sidebar-nav-link.is-active {
   border-color: var(--primary);
-}
-
-.sidebar-nav-copy {
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
+  color: var(--primary);
 }

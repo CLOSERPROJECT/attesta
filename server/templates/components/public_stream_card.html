@@ -12,7 +12,7 @@
         <p class="public-stream-card-description">{{ .Description }}</p>
       {{ end }}
       {{ if .PassportEnabled }}
-        <span class="public-stream-card-dpp">
+        <span class="stream-dpp-badge">
           DPP
           {{ template "icon-file-text" . }}
         </span>
@@ -22,36 +22,36 @@
       <div class="public-stream-card-metrics">
         <div class="public-stream-card-metrics-row">
           {{ if eq .InstanceCount 0 }}
-            <span class="public-stream-card-metric">
+            <span class="stream-metric">
               {{ template "icon-layers-2" . }}
               no runs yet
             </span>
           {{ else if .AllCompleted }}
-            <span class="public-stream-card-metric">
+            <span class="stream-metric">
               {{ template "icon-layers-2" . }}
               {{ if eq .InstanceCount 1 }}1 run{{ else }}{{ .InstanceCount }} runs{{ end }}
             </span>
-            <span class="public-stream-card-metric">
+            <span class="stream-metric">
               {{ template "icon-check-circle" . }}
               all completed
             </span>
           {{ else }}
-            <span class="public-stream-card-metric">
+            <span class="stream-metric">
               {{ template "icon-layers-2" . }}
               {{ if eq .InstanceCount 1 }}1 run{{ else }}{{ .InstanceCount }} runs{{ end }}
             </span>
-            <span class="public-stream-card-metric public-stream-card-metric-active">
+            <span class="stream-metric stream-metric-active">
               {{ template "icon-activity" . }}
               {{ if eq .ActiveCount 1 }}1 active now{{ else }}{{ .ActiveCount }} active now{{ end }}
             </span>
           {{ end }}
         </div>
         <div class="public-stream-card-metrics-row">
-          <span class="public-stream-card-metric">
+          <span class="stream-metric">
             {{ template "icon-list" . }}
             {{ if eq .StepCount 1 }}1 step{{ else }}{{ .StepCount }} steps{{ end }}
           </span>
-          <span class="public-stream-card-metric">
+          <span class="stream-metric">
             {{ template "icon-users-group" . }}
             {{ if eq .RoleCount 1 }}1 role{{ else }}{{ .RoleCount }} roles{{ end }}
           </span>

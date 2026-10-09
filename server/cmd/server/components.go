@@ -439,6 +439,39 @@ type BreadcrumbsView struct {
 	Items []BreadcrumbItem
 }
 
+// PaginationLink is one page number control in templates/components/pagination.html.
+type PaginationLink struct {
+	Page      int
+	URL       string
+	IsCurrent bool
+}
+
+// PaginationView is the view model for templates/components/pagination.html.
+// Empty HxTarget means plain links (no HTMX attributes). PushURL emits hx-push-url when HTMX is active.
+type PaginationView struct {
+	AriaLabel       string
+	Inline          bool
+	Links           []PaginationLink
+	HasPreviousPage bool
+	HasNextPage     bool
+	PreviousURL     string
+	NextURL         string
+	HxTarget        string
+	HxSelect        string
+	PushURL         bool
+}
+
+// paginationLinkAttrsView is the data for templates/components/pagination.html
+// define "pagination_link_attrs" (URL + parent PaginationView).
+type paginationLinkAttrsView struct {
+	URL  string
+	View PaginationView
+}
+
+func paginationLinkAttrs(url string, view PaginationView) paginationLinkAttrsView {
+	return paginationLinkAttrsView{URL: url, View: view}
+}
+
 // RolePillView is one palette-colored pill in templates/components/role_pill_row.html.
 type RolePillView struct {
 	Label   string
@@ -467,7 +500,7 @@ type OrgPendingRowView struct {
 type AdminConsoleNavItem struct {
 	Href         string
 	Title        string
-	Copy         string
+	Icon         string // template name, e.g. "icon-building-grid"
 	Active       bool
 	HasAttention bool
 }
@@ -477,9 +510,7 @@ type AdminConsoleNavItem struct {
 type AdminConsoleView struct {
 	ID           string // default "admin-console" when empty
 	NavLabel     string
-	Title        string
-	Subtitle     string
-	Breadcrumbs  BreadcrumbsView
+	NavHeading   string // label above the soft-nav (e.g. "Organization settings")
 	NavItems     []AdminConsoleNavItem
 	MainTemplate string
 	MainData     any

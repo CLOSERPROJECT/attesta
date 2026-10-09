@@ -14,7 +14,7 @@
 
 .process-header-meta-id {
   font-family: var(--font-mono);
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
   overflow-wrap: anywhere;
 }
 

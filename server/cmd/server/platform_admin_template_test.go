@@ -12,9 +12,17 @@ func TestPlatformAdminTemplateOrganizationInviteAndPagination(t *testing.T) {
 	view := PlatformAdminView{
 		CurrentPage: 1,
 		TotalPages:  3,
-		PageNumbers: []int{1, 2, 3},
-		HasNextPage: true,
-		NextPage:    2,
+		Pagination: PaginationView{
+			AriaLabel:       "Organizations pagination",
+			Links:           []PaginationLink{{Page: 1, URL: "/admin/organizations", IsCurrent: true}, {Page: 2, URL: "/admin/organizations?page=2"}, {Page: 3, URL: "/admin/organizations?page=3"}},
+			HasPreviousPage: false,
+			HasNextPage:     true,
+			PreviousURL:     "/admin/organizations",
+			NextURL:         "/admin/organizations?page=2",
+			HxTarget:        "#platform-admin-results",
+			HxSelect:        "#platform-admin-results",
+			PushURL:         true,
+		},
 		Organizations: []PlatformAdminOrganizationRow{
 			{
 				Name:                    "Accepted Org",
@@ -56,11 +64,17 @@ func TestPlatformAdminTemplateOrganizationInviteAndPagination(t *testing.T) {
 		t.Fatalf("expected org admin list in invite dialog, got: %s", body)
 	}
 	if !strings.Contains(compactBody, `aria-label="Organizations pagination"`) ||
+		!strings.Contains(compactBody, `class="pagination"`) ||
+		!strings.Contains(compactBody, `class="pagination-pages"`) ||
 		!strings.Contains(compactBody, `m15 18-6-6 6-6`) ||
 		!strings.Contains(compactBody, `m9 18 6-6-6-6`) ||
 		!strings.Contains(compactBody, `?page=2`) ||
-		!strings.Contains(compactBody, `?page=3`) {
-		t.Fatalf("expected pagination controls and pages, got: %s", body)
+		!strings.Contains(compactBody, `?page=3`) ||
+		!strings.Contains(compactBody, `hx-target="#platform-admin-results"`) {
+		t.Fatalf("expected shared pagination controls and pages, got: %s", body)
+	}
+	if strings.Contains(compactBody, `platform-admin-pagination`) {
+		t.Fatalf("did not expect page-local platform-admin-pagination markup, got: %s", body)
 	}
 }
 

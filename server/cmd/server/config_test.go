@@ -422,6 +422,35 @@ func TestWorkflowCatalogModTimeFallbacks(t *testing.T) {
 	}
 }
 
+func TestNormalizeOptionalText(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"":          "",
+		"  ":        "",
+		"None":      "",
+		"none":      "",
+		" null ":    "",
+		"nil":       "",
+		"undefined": "",
+		"Real copy": "Real copy",
+		" None yet": "None yet",
+	}
+	for in, want := range cases {
+		if got := normalizeOptionalText(in); got != want {
+			t.Fatalf("normalizeOptionalText(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestNormalizeWorkflowConfigClearsNoneDescription(t *testing.T) {
+	t.Parallel()
+	cfg := RuntimeConfig{Workflow: WorkflowDef{Description: "None"}}
+	normalizeWorkflowConfig(&cfg)
+	if cfg.Workflow.Description != "" {
+		t.Fatalf("description = %q, want empty", cfg.Workflow.Description)
+	}
+}
+
 func TestParseRuntimeConfigDataErrors(t *testing.T) {
 	invalidYAML := []byte("workflow: [")
 	if _, err := parseRuntimeConfigData("invalid.yaml", invalidYAML); err == nil {

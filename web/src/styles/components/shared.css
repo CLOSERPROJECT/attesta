@@ -4,6 +4,14 @@ svg.bi {
   display: inline-block;
   flex: 0 0 auto;
   vertical-align: -0.125em;
+
+  /* Chrome: icons inside links/buttons fight hit-testing and flicker the cursor. */
+  pointer-events: none;
+}
+
+/* Same hit-testing issue for images nested in anchors. */
+a img {
+  pointer-events: none;
 }
 
 .icon-svg-sm {
@@ -47,7 +55,22 @@ svg.bi {
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
+}
+
+.attention-dot {
+  --attention-dot-size: 8px;
+
+  width: var(--attention-dot-size);
+  height: var(--attention-dot-size);
+  border-radius: 50%;
+  background: var(--primary);
+  flex: 0 0 var(--attention-dot-size);
+  pointer-events: none;
+}
+
+.attention-dot-sm {
+  --attention-dot-size: 6px;
 }
 
 .field-label {
@@ -219,10 +242,6 @@ svg.bi {
 .warning--rich > .warning-detail {
   margin-top: var(--space-2);
   white-space: pre-line;
-}
-
-.pagination-btn {
-  padding: var(--space-3) var(--space-2);
 }
 
 .is-disabled {

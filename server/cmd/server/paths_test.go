@@ -63,6 +63,15 @@ func TestOnboardingPaths(t *testing.T) {
 	if got := onboardingJoinPath(); got != "/my/onboarding/join" {
 		t.Fatalf("onboardingJoinPath = %q", got)
 	}
+	if got := onboardingJoinHref("acme", 1); got != "/my/onboarding/join?q=acme" {
+		t.Fatalf("onboardingJoinHref page1 = %q", got)
+	}
+	if got := onboardingJoinHref("acme", 2); got != "/my/onboarding/join?page=2&q=acme" {
+		t.Fatalf("onboardingJoinHref page2 = %q", got)
+	}
+	if got := onboardingJoinHref("", 3); got != "/my/onboarding/join?page=3" {
+		t.Fatalf("onboardingJoinHref browse = %q", got)
+	}
 	if got := onboardingRequestOrganizationPath(); got != "/my/onboarding/request-organization" {
 		t.Fatalf("onboardingRequestOrganizationPath = %q", got)
 	}

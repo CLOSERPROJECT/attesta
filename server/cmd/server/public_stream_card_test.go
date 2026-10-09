@@ -112,7 +112,7 @@ func TestPublicStreamCardTemplateOmitsPassportBadgeWhenDisabled(t *testing.T) {
 	}
 	body := out.String()
 
-	if strings.Contains(body, "public-stream-card-dpp") {
+	if strings.Contains(body, "stream-dpp-badge") {
 		t.Fatalf("did not expect DPP chip when disabled, got: %s", body)
 	}
 	if strings.Contains(body, ">DPP<") {
@@ -133,7 +133,7 @@ func TestPublicStreamCardTemplateRendersPassportBadgeWhenEnabled(t *testing.T) {
 	}
 	body := out.String()
 
-	if !strings.Contains(body, "public-stream-card-dpp") {
+	if !strings.Contains(body, "stream-dpp-badge") {
 		t.Fatalf("expected DPP chip class, got: %s", body)
 	}
 	if !strings.Contains(body, "DPP") {
@@ -246,7 +246,7 @@ func TestPublicStreamCardTemplateRendersEmptyMetricsAsSingleLayersChip(t *testin
 
 	for _, want := range []string{
 		`class="public-stream-card-metrics"`,
-		`class="public-stream-card-metric"`,
+		`class="stream-metric"`,
 		"no runs yet",
 		// icon-layers-2 path
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
@@ -281,7 +281,7 @@ func TestPublicStreamCardTemplateRendersOneInstanceAllCompletedMetrics(t *testin
 	body := out.String()
 
 	for _, want := range []string{
-		`class="public-stream-card-metric"`,
+		`class="stream-metric"`,
 		"1 run",
 		"all completed",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
@@ -346,8 +346,8 @@ func TestPublicStreamCardTemplateRendersOneActiveNowMetrics(t *testing.T) {
 	body := out.String()
 
 	for _, want := range []string{
-		`class="public-stream-card-metric"`,
-		`class="public-stream-card-metric public-stream-card-metric-active"`,
+		`class="stream-metric"`,
+		`class="stream-metric stream-metric-active"`,
 		"1 run",
 		"1 active now",
 		`M13 13.74a2 2 0 0 1-2 0L2.5 8.87`,
@@ -398,7 +398,7 @@ func TestPublicStreamCardTemplateRendersPluralActiveNowMetrics(t *testing.T) {
 	if strings.Contains(body, "1 active now") {
 		t.Fatalf("plural active count must not use singular label, got: %s", body)
 	}
-	if !strings.Contains(body, `class="public-stream-card-metric public-stream-card-metric-active"`) {
+	if !strings.Contains(body, `class="stream-metric stream-metric-active"`) {
 		t.Fatalf("expected active metric chip class, got: %s", body)
 	}
 }

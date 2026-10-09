@@ -468,7 +468,7 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 		`name="intent" value="delete_invite"`,
 		`name="membership_id" value="membership-pending"`,
 		`aria-label="Delete invite"`,
-		"<h2>Users</h2>",
+		"<h2>Members</h2>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in members panel markup, got:\n%s", want, body)
@@ -480,7 +480,7 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 
 	pendingIdx := strings.Index(body, "Pending join requests")
 	invitesIdx := strings.Index(body, "Pending invites")
-	usersIdx := strings.Index(body, "<h2>Users</h2>")
+	usersIdx := strings.Index(body, "<h2>Members</h2>")
 	if pendingIdx == -1 || invitesIdx == -1 || usersIdx == -1 || !(pendingIdx < invitesIdx && invitesIdx < usersIdx) {
 		t.Fatalf("expected Pending join requests, then Pending invites, then Users heading")
 	}
@@ -505,7 +505,7 @@ func TestOrgAdminMembersPanelAddUserDialogMarkup(t *testing.T) {
 			t.Fatalf("empty members panel must not contain %q, got:\n%s", gone, emptyBody)
 		}
 	}
-	if !strings.Contains(emptyBody, "<h2>Users</h2>") {
+	if !strings.Contains(emptyBody, "<h2>Members</h2>") {
 		t.Fatalf("expected Users heading in empty members panel, got:\n%s", emptyBody)
 	}
 }

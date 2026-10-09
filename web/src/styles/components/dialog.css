@@ -20,6 +20,11 @@
  * Page-specific: stream preview sizing → pages/stream.css (#stream-preview-dialog)
  */
 
+/* Nested dialogs still live in-flow; lock the document while any is open. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
 .dialog {
   border: none;
   background: transparent;
