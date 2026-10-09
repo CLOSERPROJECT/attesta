@@ -170,12 +170,6 @@ a.public-stream-card {
   cursor: pointer;
 }
 
-/* Chrome: SVGs/imgs inside <a> can fight the link for hit-testing and flicker the cursor. */
-a.public-stream-card img,
-a.public-stream-card .icon-svg {
-  pointer-events: none;
-}
-
 a.public-stream-card:hover {
   border-color: var(--primary);
 }

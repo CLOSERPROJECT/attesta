@@ -4,6 +4,13 @@ svg.bi {
   display: inline-block;
   flex: 0 0 auto;
   vertical-align: -0.125em;
+  /* Chrome: icons inside links/buttons fight hit-testing and flicker the cursor. */
+  pointer-events: none;
+}
+
+/* Same hit-testing issue for images nested in anchors. */
+a img {
+  pointer-events: none;
 }
 
 .icon-svg-sm {
