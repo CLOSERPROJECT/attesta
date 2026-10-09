@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -56,6 +57,45 @@ func (p *ProcessService) SaveDraft(ctx context.Context, cmd SaveDraftCmd) (*Proc
 // SealStep selects the Stream blueprint completion strategy, then delegates.
 func (p *ProcessService) SealStep(ctx context.Context, cmd SealStepCmd) (*Process, error) {
 	return p.completionStrategy(cmd.Config.Workflow).SealStep(ctx, cmd)
+}
+
+// persistDoneSubstep marks a Substep done and inserts its notarization record.
+// Callers prepare the actor (classic DoneBy vs sealActor) and keep finalize/reload.
+func (p *ProcessService) persistDoneSubstep(
+	ctx context.Context,
+	processID primitive.ObjectID,
+	workflowKey string,
+	substepID string,
+	description string,
+	actor Actor,
+	payload map[string]interface{},
+	now time.Time,
+) error {
+	progressUpdate := ProcessStep{
+		State:       "done",
+		Description: &description,
+		DoneAt:      &now,
+		DoneBy:      &actor,
+		Data:        payload,
+	}
+	if err := p.store.UpdateProcessProgress(ctx, processID, workflowKey, substepID, progressUpdate); err != nil {
+		return fmt.Errorf("%w: %v", ErrProgressUpdate, err)
+	}
+	notary := Notarization{
+		ProcessID: processID,
+		SubstepID: substepID,
+		Payload:   payload,
+		Actor:     actor,
+		CreatedAt: now,
+		FakeNotary: FakeNotary{
+			Method: "sha256",
+			Digest: digestPayload(payload),
+		},
+	}
+	if err := p.store.InsertNotarization(ctx, notary); err != nil {
+		return fmt.Errorf("%w: %v", ErrNotarization, err)
+	}
+	return nil
 }
 
 func (p *ProcessService) EnsureCompletionArtifacts(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process) *Process {

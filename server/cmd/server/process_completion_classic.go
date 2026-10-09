@@ -48,31 +48,8 @@ func (p *ProcessService) classicCompleteSubstep(ctx context.Context, cmd Complet
 		now = p.serviceNow(time.Time{})
 	}
 
-	description := cmd.Substep.InputKey
-	progressUpdate := ProcessStep{
-		State:       "done",
-		Description: &description,
-		DoneAt:      &now,
-		DoneBy:      &cmd.Actor,
-		Data:        cmd.Payload,
-	}
-	if err := p.store.UpdateProcessProgress(ctx, cmd.Process.ID, cmd.WorkflowKey, cmd.SubstepID, progressUpdate); err != nil {
-		return cmd.Process, fmt.Errorf("%w: %v", ErrProgressUpdate, err)
-	}
-
-	notary := Notarization{
-		ProcessID: cmd.Process.ID,
-		SubstepID: cmd.SubstepID,
-		Payload:   cmd.Payload,
-		Actor:     cmd.Actor,
-		CreatedAt: now,
-		FakeNotary: FakeNotary{
-			Method: "sha256",
-			Digest: digestPayload(cmd.Payload),
-		},
-	}
-	if err := p.store.InsertNotarization(ctx, notary); err != nil {
-		return cmd.Process, fmt.Errorf("%w: %v", ErrNotarization, err)
+	if err := p.persistDoneSubstep(ctx, cmd.Process.ID, cmd.WorkflowKey, cmd.SubstepID, cmd.Substep.InputKey, cmd.Actor, cmd.Payload, now); err != nil {
+		return cmd.Process, err
 	}
 
 	reloaded, err := p.reloadProcess(ctx, cmd.Process.ID)

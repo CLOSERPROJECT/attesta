@@ -134,30 +134,8 @@ func (s draftAndSealCompletionStrategy) SealStep(ctx context.Context, cmd SealSt
 			continue
 		}
 		payload := sealedSubstepPayload(cmd.Process, sub.SubstepID)
-		description := sub.InputKey
-		progressUpdate := ProcessStep{
-			State:       "done",
-			Description: &description,
-			DoneAt:      &now,
-			DoneBy:      &sealer,
-			Data:        payload,
-		}
-		if err := s.svc.store.UpdateProcessProgress(ctx, cmd.Process.ID, cmd.WorkflowKey, sub.SubstepID, progressUpdate); err != nil {
-			return cmd.Process, fmt.Errorf("%w: %v", ErrProgressUpdate, err)
-		}
-		notary := Notarization{
-			ProcessID: cmd.Process.ID,
-			SubstepID: sub.SubstepID,
-			Payload:   payload,
-			Actor:     sealer,
-			CreatedAt: now,
-			FakeNotary: FakeNotary{
-				Method: "sha256",
-				Digest: digestPayload(payload),
-			},
-		}
-		if err := s.svc.store.InsertNotarization(ctx, notary); err != nil {
-			return cmd.Process, fmt.Errorf("%w: %v", ErrNotarization, err)
+		if err := s.svc.persistDoneSubstep(ctx, cmd.Process.ID, cmd.WorkflowKey, sub.SubstepID, sub.InputKey, sealer, payload, now); err != nil {
+			return cmd.Process, err
 		}
 	}
 
