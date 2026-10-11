@@ -23,12 +23,12 @@ const (
 )
 
 // appwriteBootstrapKeyScopes covers identity_appwrite admin + org-assets storage.
+// Names must match Appwrite's project-key allowlist (no sessions.read in 1.8.x).
 var appwriteBootstrapKeyScopes = []string{
 	"users.read",
 	"users.write",
 	"teams.read",
 	"teams.write",
-	"sessions.read",
 	"sessions.write",
 	"files.read",
 	"files.write",
@@ -219,6 +219,12 @@ func ensureConsoleAccount(ctx context.Context, client *http.Client, endpoint, em
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
 		return nil
 	case resp.StatusCode == http.StatusConflict:
+		// Email already registered.
+		return nil
+	case resp.StatusCode == http.StatusNotImplemented:
+		// Appwrite disables further console signups after the first root
+		// (user_console_count_exceeded / _APP_CONSOLE_WHITELIST_ROOT). Continue
+		// and let createConsoleSession validate the existing account.
 		return nil
 	default:
 		return fmt.Errorf("appwrite bootstrap create console account: HTTP %d", resp.StatusCode)

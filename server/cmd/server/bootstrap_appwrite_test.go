@@ -189,6 +189,9 @@ func TestBootstrapAppwriteProjectCreatesProjectKeyAndBucketWhenProbeFails(t *tes
 			t.Fatalf("scopes missing %q in %#v", want, scopes)
 		}
 	}
+	if scopeListContains(scopes, "sessions.read") {
+		t.Fatalf("scopes must not include invalid sessions.read: %#v", scopes)
+	}
 	if bucketBody["bucketId"] != "org-assets" {
 		t.Fatalf("bucket body = %#v", bucketBody)
 	}
@@ -196,6 +199,17 @@ func TestBootstrapAppwriteProjectCreatesProjectKeyAndBucketWhenProbeFails(t *tes
 }
 
 func TestBootstrapAppwriteProjectIgnoresExistingConsoleAccount(t *testing.T) {
+	t.Run("conflict", func(t *testing.T) {
+		testBootstrapIgnoresConsoleSignupStatus(t, http.StatusConflict, `{"message":"user already exists","code":409}`)
+	})
+	t.Run("console_signup_restricted", func(t *testing.T) {
+		// Appwrite 1.8 returns 501 user_console_count_exceeded after the first root.
+		testBootstrapIgnoresConsoleSignupStatus(t, http.StatusNotImplemented, `{"message":"Sign up to the console is restricted.","code":501,"type":"user_console_count_exceeded"}`)
+	})
+}
+
+func testBootstrapIgnoresConsoleSignupStatus(t *testing.T, signupStatus int, signupBody string) {
+	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		project := r.Header.Get("X-Appwrite-Project")
 		w.Header().Set("Content-Type", "application/json")
@@ -204,8 +218,8 @@ func TestBootstrapAppwriteProjectIgnoresExistingConsoleAccount(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"code":401}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/account" && project == "console":
-			w.WriteHeader(http.StatusConflict)
-			_, _ = w.Write([]byte(`{"message":"user already exists","code":409}`))
+			w.WriteHeader(signupStatus)
+			_, _ = w.Write([]byte(signupBody))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/account/sessions/email":
 			http.SetCookie(w, &http.Cookie{Name: "a_session_console", Value: "sess", Path: "/"})
 			w.WriteHeader(http.StatusCreated)
