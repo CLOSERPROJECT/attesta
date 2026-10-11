@@ -90,6 +90,35 @@ wait_for_local_appwrite() {
   wait_for_appwrite "http://127.0.0.1:${port}/v1/health"
 }
 
+load_appwrite_runtime_env() {
+  local env_file="${ATTESTA_APPWRITE_ENV_FILE:-/tmp/attesta-appwrite.env}"
+  if [[ -f "${env_file}" ]]; then
+    # Runtime file wins over a stale shell/Coolify APPWRITE_API_KEY.
+    set -a
+    # shellcheck disable=SC1090
+    source "${env_file}"
+    set +a
+  fi
+}
+
+maybe_bootstrap_appwrite() {
+  attesta_seed_enabled || return 0
+
+  if [[ -z "${APPWRITE_ENDPOINT:-}" || -z "${APPWRITE_PROJECT_ID:-}" ]]; then
+    echo "skipping attesta bootstrap-appwrite: set APPWRITE_ENDPOINT and APPWRITE_PROJECT_ID" >&2
+    return 0
+  fi
+
+  echo "running attesta bootstrap-appwrite (ATTESTA_SEED=${ATTESTA_SEED})"
+  if ! (cd "${ROOT_DIR}/server" && go run ./cmd/server bootstrap-appwrite); then
+    # Soft-skip: local stacks may lack console access while an existing project already works,
+    # or console defaults may not match a manually created console account.
+    echo "warning: attesta bootstrap-appwrite failed; continuing with existing APPWRITE_* credentials" >&2
+    return 0
+  fi
+  load_appwrite_runtime_env
+}
+
 maybe_run_attesta_seed() {
   attesta_seed_enabled || return 0
 
@@ -98,6 +127,9 @@ maybe_run_attesta_seed() {
     bash -c "${ATTESTA_SEED_COMMAND}"
     return
   fi
+
+  maybe_bootstrap_appwrite
+  load_appwrite_runtime_env
 
   if [[ -z "${APPWRITE_ENDPOINT:-}" || -z "${APPWRITE_PROJECT_ID:-}" || -z "${APPWRITE_API_KEY:-}" ]]; then
     echo "skipping attesta seed: set APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY (or run task seed later)" >&2

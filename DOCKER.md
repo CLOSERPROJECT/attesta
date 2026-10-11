@@ -79,7 +79,7 @@ After the primary checkout's first boot:
 
 Fresh stacks start with empty Appwrite MariaDB; demo data comes from the Go seed after credentials exist.
 
-`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and, after Appwrite is ready, run the Go demo fixture via `go run ./cmd/server seed` (empty-only; skip if Appwrite credentials are not set yet). Use `task seed` (optionally with `--replace`) for a manual run.
+`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and, after Appwrite is ready, run `go run ./cmd/server bootstrap-appwrite` (soft-skips on failure) then `go run ./cmd/server seed` (empty-only; skip if Appwrite credentials are not set yet). Bootstrap defaults console credentials to `console@attesta.local` / `password` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
 
 ## Verifying the Setup
 ```bash
@@ -119,10 +119,26 @@ vendored Appwrite module instead of assuming an external identity deployment.
 
 Coolify-specific notes:
 - Coolify owns public routing (no Traefik in this compose). Expose Appwrite with Coolify `SERVICE_FQDN_APPWRITE` / `SERVICE_URL_*` on the Appwrite services.
-- Set `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`, `APPWRITE_INVITE_REDIRECT_URL`, and `APPWRITE_RESET_REDIRECT_URL` on the `attesta` service before testing auth flows.
 - Attesta's compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
 - The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
-- For the Go demo fixture on Coolify Preview, set `ATTESTA_SEED=true` (leave unset/false in production). MariaDB is stock `mariadb:10.11` via a passthrough `deployment/Dockerfile.appwrite-mariadb` (Coolify preview build compatibility; no SQL seed). When `ATTESTA_SEED` is truthy, the Coolify entrypoint waits until Appwrite HTTP is ready (`/v1/health` guest 401 or 200), then runs `./attesta seed` (empty-only) before serving.
+- MariaDB is stock `mariadb:10.11` via a passthrough `deployment/Dockerfile.appwrite-mariadb` (Coolify preview build compatibility; no SQL seed). Demo identity data comes from the Go seed after console bootstrap.
+
+### Coolify Preview env checklist
+Set these on the `attesta` service for automatic Appwrite project + demo fixture:
+
+| Variable | Preview | Notes |
+|---|---|---|
+| `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
+| `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
+| `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `bootstrap-appwrite` probes, regenerates when needed, and writes `/tmp/attesta-appwrite.env` which the entrypoint sources before seed **and** before `exec` of the server |
+| `APPWRITE_CONSOLE_EMAIL` | default `console@attesta.local` | First console signup (conflict ignored if it already exists) |
+| `APPWRITE_CONSOLE_PASSWORD` | default `password` | Demo-only; change if you share console access |
+| `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
+| `APPWRITE_INVITE_REDIRECT_URL` | preview app URL + `/invite/accept` | Required for invite emails |
+| `APPWRITE_RESET_REDIRECT_URL` | preview app URL + `/reset/confirm` | Required for recovery emails |
+| `APPWRITE_VERIFY_REDIRECT_URL` | preview app URL + `/verify/confirm` | Required for verification emails |
+
+When `ATTESTA_SEED` is truthy, the Coolify entrypoint waits until Appwrite HTTP is ready (`/v1/health` guest 401 or 200), runs `./attesta bootstrap-appwrite`, sources the runtime env file, then runs `./attesta seed` (empty-only) before serving.
 
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed
