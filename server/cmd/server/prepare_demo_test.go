@@ -1,0 +1,271 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestAttestaSeedEnabledTruthy(t *testing.T) {
+	t.Parallel()
+	for _, v := range []string{"1", "true", "TRUE", "yes", "YES", "on", "ON"} {
+		if !attestaSeedEnabled(v) {
+			t.Fatalf("attestaSeedEnabled(%q) = false, want true", v)
+		}
+	}
+	for _, v := range []string{"", "0", "false", "no", "off", "maybe"} {
+		if attestaSeedEnabled(v) {
+			t.Fatalf("attestaSeedEnabled(%q) = true, want false", v)
+		}
+	}
+}
+
+func TestPrepareDemoStackSeedDisabledNoop(t *testing.T) {
+	var calls []string
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled: boolPtr(false),
+		WaitAppwriteReady: func(context.Context, string, int) error {
+			calls = append(calls, "wait")
+			return nil
+		},
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			calls = append(calls, "bootstrap")
+			return BootstrapResult{}, nil
+		},
+		Seed: func(context.Context) error {
+			calls = append(calls, "seed")
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+	if len(calls) != 0 {
+		t.Fatalf("calls = %#v, want no-op", calls)
+	}
+}
+
+func TestPrepareDemoStackOrderWaitBootstrapSeed(t *testing.T) {
+	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
+
+	var mu sync.Mutex
+	var calls []string
+	envPath := filepath.Join(t.TempDir(), "attesta-appwrite.env")
+
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		Endpoint:            "http://appwrite/v1",
+		ReadyTimeoutSeconds: intPtr(30),
+		EnvFilePath:         envPath,
+		WaitAppwriteReady: func(_ context.Context, healthURL string, timeoutSec int) error {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, "wait")
+			if healthURL != "http://appwrite/v1/health" {
+				t.Fatalf("healthURL = %q", healthURL)
+			}
+			if timeoutSec != 30 {
+				t.Fatalf("timeoutSec = %d", timeoutSec)
+			}
+			return nil
+		},
+		Bootstrap: func(_ context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, "bootstrap")
+			if deps.EnvFilePath != envPath {
+				t.Fatalf("EnvFilePath = %q", deps.EnvFilePath)
+			}
+			if err := os.WriteFile(envPath, []byte("APPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=from-bootstrap\n"), 0o600); err != nil {
+				t.Fatalf("write env: %v", err)
+			}
+			return BootstrapResult{ProjectID: "attesta", APIKey: "from-bootstrap", Created: true}, nil
+		},
+		Seed: func(context.Context) error {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, "seed")
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+	if got := strings.Join(calls, ","); got != "wait,bootstrap,seed" {
+		t.Fatalf("order = %q, want wait,bootstrap,seed", got)
+	}
+}
+
+func TestPrepareDemoStackSoftBootstrapContinues(t *testing.T) {
+	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
+	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
+	t.Setenv("APPWRITE_API_KEY", "existing-key")
+
+	var calls []string
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		ReadyTimeoutSeconds: intPtr(30),
+		SoftBootstrap:       true,
+		SoftCredentialSkip:  true,
+		Endpoint:            "http://appwrite/v1",
+		WaitAppwriteReady: func(context.Context, string, int) error {
+			calls = append(calls, "wait")
+			return nil
+		},
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			calls = append(calls, "bootstrap")
+			return BootstrapResult{}, errors.New("console unavailable")
+		},
+		Seed: func(context.Context) error {
+			calls = append(calls, "seed")
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+	if got := strings.Join(calls, ","); got != "wait,bootstrap,seed" {
+		t.Fatalf("order = %q, want wait,bootstrap,seed after soft bootstrap", got)
+	}
+}
+
+func TestPrepareDemoStackHardBootstrapFails(t *testing.T) {
+	var calls []string
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		ReadyTimeoutSeconds: intPtr(30),
+		SoftBootstrap:       false,
+		WaitAppwriteReady: func(context.Context, string, int) error {
+			calls = append(calls, "wait")
+			return nil
+		},
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			calls = append(calls, "bootstrap")
+			return BootstrapResult{}, errors.New("console unavailable")
+		},
+		Seed: func(context.Context) error {
+			calls = append(calls, "seed")
+			return nil
+		},
+	})
+	if err == nil {
+		t.Fatal("PrepareDemoStack: expected error")
+	}
+	if !strings.Contains(err.Error(), "console unavailable") {
+		t.Fatalf("error = %v", err)
+	}
+	if got := strings.Join(calls, ","); got != "wait,bootstrap" {
+		t.Fatalf("calls = %q, want wait,bootstrap without seed", got)
+	}
+}
+
+func TestPrepareDemoStackTimeoutZeroSkipsWait(t *testing.T) {
+	t.Setenv("APPWRITE_ENDPOINT", "http://127.0.0.1:9/v1")
+
+	var waited bool
+	var seeded bool
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		ReadyTimeoutSeconds: intPtr(0),
+		Endpoint:            "http://127.0.0.1:9/v1",
+		WaitAppwriteReady: func(context.Context, string, int) error {
+			waited = true
+			return errors.New("wait should not run when timeout is 0")
+		},
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			return BootstrapResult{ProjectID: "attesta", APIKey: "k"}, nil
+		},
+		Seed: func(context.Context) error {
+			seeded = true
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+	if waited {
+		t.Fatal("WaitAppwriteReady was called despite timeout 0")
+	}
+	if !seeded {
+		t.Fatal("seed did not run")
+	}
+}
+
+func TestPrepareDemoStackAppliesEnvFileBeforeSeed(t *testing.T) {
+	envPath := filepath.Join(t.TempDir(), "attesta-appwrite.env")
+	t.Setenv("APPWRITE_API_KEY", "stale-key")
+	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
+	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
+
+	var seedSawKey string
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		ReadyTimeoutSeconds: intPtr(0),
+		EnvFilePath:         envPath,
+		Endpoint:            "http://appwrite/v1",
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			if err := os.WriteFile(envPath, []byte("APPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=fresh-key\n"), 0o600); err != nil {
+				return BootstrapResult{}, err
+			}
+			return BootstrapResult{ProjectID: "attesta", APIKey: "fresh-key", Created: true}, nil
+		},
+		Seed: func(context.Context) error {
+			seedSawKey = os.Getenv("APPWRITE_API_KEY")
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+	if seedSawKey != "fresh-key" {
+		t.Fatalf("seed saw APPWRITE_API_KEY=%q, want fresh-key", seedSawKey)
+	}
+	if os.Getenv("APPWRITE_API_KEY") != "fresh-key" {
+		t.Fatalf("process env APPWRITE_API_KEY=%q after prepare", os.Getenv("APPWRITE_API_KEY"))
+	}
+}
+
+func TestWaitAppwriteReadyAccepts200And401(t *testing.T) {
+	t.Parallel()
+	for _, code := range []int{http.StatusOK, http.StatusUnauthorized} {
+		code := code
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/health" {
+					t.Fatalf("path = %q", r.URL.Path)
+				}
+				w.WriteHeader(code)
+			}))
+			t.Cleanup(srv.Close)
+			err := waitAppwriteReady(t.Context(), srv.Client(), srv.URL+"/v1/health", 5)
+			if err != nil {
+				t.Fatalf("waitAppwriteReady: %v", err)
+			}
+		})
+	}
+}
+
+func TestWaitAppwriteReadyTimesOut(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	err := waitAppwriteReady(ctx, srv.Client(), srv.URL+"/v1/health", 1)
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }
+func intPtr(v int) *int    { return &v }

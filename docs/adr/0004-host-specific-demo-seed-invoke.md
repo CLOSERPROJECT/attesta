@@ -1,7 +1,12 @@
 # Demo fixture seed invoke stays host-specific
 
-Coolify Preview and local worktree Compose both gate on `ATTESTA_SEED` and wait for Appwrite `/v1/health` via shared `deployment/attesta-appwrite-ready.sh`, then run `bootstrap-appwrite` (shared Go seam `BootstrapAppwriteProject`) before the Go demo fixture seed (`attesta seed` / `Seed`). The *invocation* still differs: the Coolify image runs `./attesta bootstrap-appwrite` then `./attesta seed` and hard-fails on bootstrap errors; worktree runs `go run ./cmd/server bootstrap-appwrite` (soft-skips on failure), may soft-skip seed when Appwrite credentials are unset, and may override seed via `ATTESTA_SEED_COMMAND`.
+Coolify Preview and local worktree Compose both gate on `ATTESTA_SEED` and prepare an empty Appwrite + demo fixture before serving (or after local infra is up). Shared orchestration now lives in the Go seam `PrepareDemoStack` / CLI `attesta prepare`: enable-gate → wait for Appwrite `/v1/health` → `BootstrapAppwriteProject` → apply runtime env file in-process → `Seed` (empty-only).
 
-**Decision:** Keep seed *invocation* as host-specific adapters. Do not fold those policies into a shared runner in the ready script (or similar). Shared glue stops at enable-gate + readiness wait; the Go seams remain `BootstrapAppwriteProject` and `Seed(ctx, SeedDeps)`.
+**Decision:** Keep *host invocation policy* in thin adapters. Do not fold Coolify hard-fail vs worktree soft-skip (or `ATTESTA_SEED_COMMAND`) into one shared shell runner. Adapters only choose soft vs hard flags and the worktree escape hatch:
 
-**Rejected:** A parameterized shared `run_attesta_seed` that encodes command, credential skip, and `ATTESTA_SEED_COMMAND` — that mostly relocates host divergence into flags and fails the deletion test for a deep module.
+| Host | Adapter | Policy |
+|---|---|---|
+| Coolify Preview | `deployment/coolify-entrypoint.sh` → `./attesta prepare` | Hard-fail on bootstrap/seed; sources env file once before `exec` so the server inherits keys |
+| Worktree Compose | `scripts/worktree-compose.sh` → `go run ./cmd/server prepare --soft-bootstrap --soft-credential-skip` | Soft-skip bootstrap failure; soft-skip seed when credentials missing; `ATTESTA_SEED_COMMAND` override stays shell-only |
+
+**Rejected:** A parameterized shared `run_attesta_seed` shell helper that encodes command, credential skip, and `ATTESTA_SEED_COMMAND` — that mostly relocates host divergence into flags and fails the deletion test for a deep module. Deepen the Go prepare seam instead.

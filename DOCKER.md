@@ -79,7 +79,7 @@ After the primary checkout's first boot:
 
 Fresh stacks start with empty Appwrite MariaDB; demo data comes from the Go seed after credentials exist.
 
-`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and, after Appwrite is ready, run `go run ./cmd/server bootstrap-appwrite` (soft-skips on failure) then `go run ./cmd/server seed` (empty-only; skip if Appwrite credentials are not set yet). Bootstrap defaults console credentials to `console@attesta.local` / `password` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
+`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and run `go run ./cmd/server prepare --soft-bootstrap --soft-credential-skip` (wait → bootstrap → apply env → empty-only seed; soft-skips bootstrap failure and missing credentials). Bootstrap defaults console credentials to `console@attesta.local` / `password` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
 
 ## Verifying the Setup
 ```bash
@@ -130,7 +130,7 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 |---|---|---|
 | `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
 | `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
-| `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `bootstrap-appwrite` probes, regenerates when needed, and writes `/tmp/attesta-appwrite.env` which the entrypoint sources before seed **and** before `exec` of the server |
+| `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed), applies `/tmp/attesta-appwrite.env` in-process for seed, and the entrypoint sources that file again before `exec` of the server |
 | `APPWRITE_CONSOLE_EMAIL` | default `console@attesta.local` | First console signup (conflict ignored if it already exists) |
 | `APPWRITE_CONSOLE_PASSWORD` | default `password` | Demo-only; change if you share console access |
 | `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
@@ -138,7 +138,7 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | `APPWRITE_RESET_REDIRECT_URL` | preview app URL + `/reset/confirm` | Required for recovery emails |
 | `APPWRITE_VERIFY_REDIRECT_URL` | preview app URL + `/verify/confirm` | Required for verification emails |
 
-When `ATTESTA_SEED` is truthy, the Coolify entrypoint waits until Appwrite HTTP is ready (`/v1/health` guest 401 or 200), runs `./attesta bootstrap-appwrite`, sources the runtime env file, then runs `./attesta seed` (empty-only) before serving.
+When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (hard-fail: wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → apply runtime env → empty-only seed), sources the runtime env file once more so the server inherits keys, then `exec`s the server. When `ATTESTA_SEED` is unset/false, prepare is a no-op.
 
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed

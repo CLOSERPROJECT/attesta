@@ -159,6 +159,15 @@ grep -Fq 'deployment/attesta-appwrite-ready.sh' "${ROOT}/scripts/worktree-compos
   || fail "worktree-compose does not source shared Appwrite readiness helpers"
 [[ -f "${ROOT}/deployment/attesta-appwrite-ready.sh" ]] \
   || fail "shared Appwrite readiness helpers missing"
+grep -Fq 'go run ./cmd/server prepare --soft-bootstrap --soft-credential-skip' \
+  "${ROOT}/scripts/worktree-compose.sh" \
+  || fail "worktree-compose does not invoke attesta prepare with soft policy flags"
+grep -Fq './attesta prepare' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  || fail "Coolify entrypoint does not invoke attesta prepare"
+grep -Fq 'bootstrap-appwrite' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  && fail "Coolify entrypoint still runs bootstrap-appwrite in shell"
+grep -Eq '(^|[[:space:]])(\./)?attesta seed([[:space:]]|$)' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  && fail "Coolify entrypoint still runs attesta seed in shell"
 # shellcheck source=deployment/attesta-appwrite-ready.sh
 source "${ROOT}/deployment/attesta-appwrite-ready.sh"
 ATTESTA_SEED=true attesta_seed_enabled || fail "attesta_seed_enabled rejected truthy ATTESTA_SEED"

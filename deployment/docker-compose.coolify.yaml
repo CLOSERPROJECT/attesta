@@ -280,7 +280,7 @@ services:
       CERBOS_URL: http://${SERVICE_NAME_CERBOS:-cerbos}:3592
       APPWRITE_ENDPOINT: https://${SERVICE_FQDN_APPWRITE:-appwrite}/v1
       APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-attesta}
-      # Optional on Preview: bootstrap-appwrite regenerates when missing/stale.
+      # Optional on Preview: attesta prepare regenerates when missing/stale.
       APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
       APPWRITE_CONSOLE_EMAIL: ${APPWRITE_CONSOLE_EMAIL:-console@attesta.local}
       APPWRITE_CONSOLE_PASSWORD: ${APPWRITE_CONSOLE_PASSWORD:-password}
