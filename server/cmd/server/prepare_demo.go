@@ -15,8 +15,14 @@ import (
 
 const defaultAppwriteReadyTimeoutSeconds = 120
 
+// Prepare host policies (ADR-0004). Empty Policy means coolify.
+const (
+	PreparePolicyCoolify  = "coolify"
+	PreparePolicyWorktree = "worktree"
+)
+
 // PrepareDeps is the injectable seam for demo-stack prepare orchestration.
-// Host adapters choose SoftBootstrap / SoftCredentialSkip; shared glue lives here.
+// Host adapters set Policy; shared glue lives here.
 type PrepareDeps struct {
 	// SeedEnabled overrides ATTESTA_SEED when non-nil.
 	SeedEnabled *bool
@@ -31,12 +37,9 @@ type PrepareDeps struct {
 
 	EnvFilePath string
 
-	// SoftBootstrap continues with a warning when bootstrap fails (worktree).
-	// Coolify leaves this false so prepare hard-fails.
-	SoftBootstrap bool
-	// SoftCredentialSkip skips seed with a warning when APPWRITE_* credentials
-	// are missing after bootstrap (worktree). Coolify leaves this false.
-	SoftCredentialSkip bool
+	// Policy selects soft vs hard failure. Empty or "coolify" hard-fails bootstrap
+	// and missing credentials. "worktree" soft-skips both with warnings.
+	Policy string
 
 	HTTPClient *http.Client
 
@@ -83,6 +86,11 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 		}
 	}
 
+	soft, err := preparePolicyIsSoft(deps.Policy)
+	if err != nil {
+		return err
+	}
+
 	bootstrapFn := deps.Bootstrap
 	if bootstrapFn == nil {
 		bootstrapFn = BootstrapAppwriteProject
@@ -90,10 +98,10 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	bootstrapDeps := mergeBootstrapDeps(deps.BootstrapDeps, deps.EnvFilePath)
 	result, err := bootstrapFn(ctx, bootstrapDeps)
 	if err != nil {
-		if deps.SoftBootstrap {
-			log.Printf("warning: attesta bootstrap-appwrite failed; continuing with existing APPWRITE_* credentials: %v", err)
+		if soft {
+			log.Printf("warning: attesta bootstrap failed; continuing with existing APPWRITE_* credentials: %v", err)
 		} else {
-			return fmt.Errorf("prepare: bootstrap-appwrite: %w", err)
+			return fmt.Errorf("prepare: bootstrap: %w", err)
 		}
 	} else {
 		_ = os.Setenv("APPWRITE_PROJECT_ID", result.ProjectID)
@@ -106,7 +114,7 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 
 	if missing := missingAppwriteCredentials(); len(missing) > 0 {
 		msg := "prepare: missing " + strings.Join(missing, ", ")
-		if deps.SoftCredentialSkip {
+		if soft {
 			log.Printf("skipping attesta seed: %s (or run task seed later)", msg)
 			return nil
 		}
@@ -127,6 +135,25 @@ func prepareSeedEnabled(deps PrepareDeps) bool {
 		return *deps.SeedEnabled
 	}
 	return attestaSeedEnabled(os.Getenv("ATTESTA_SEED"))
+}
+
+func normalizePreparePolicy(policy string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(policy)) {
+	case "", PreparePolicyCoolify:
+		return PreparePolicyCoolify, nil
+	case PreparePolicyWorktree:
+		return PreparePolicyWorktree, nil
+	default:
+		return "", fmt.Errorf("prepare: unknown policy %q (want coolify or worktree)", policy)
+	}
+}
+
+func preparePolicyIsSoft(policy string) (bool, error) {
+	normalized, err := normalizePreparePolicy(policy)
+	if err != nil {
+		return false, err
+	}
+	return normalized == PreparePolicyWorktree, nil
 }
 
 func attestaSeedEnabled(value string) bool {

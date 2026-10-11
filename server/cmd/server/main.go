@@ -743,12 +743,6 @@ type workflowContextValue struct {
 
 func main() {
 	ctx := context.Background()
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "bootstrap-appwrite" {
-		if err := runBootstrapAppwriteCommand(ctx, os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
 	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "prepare" {
 		if err := runPrepareCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)
@@ -757,24 +751,6 @@ func main() {
 	}
 	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed" {
 		if err := runSeedCommand(ctx, os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-categories" {
-		if err := runSeedCategoriesCommand(ctx, os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-instances" {
-		if err := runSeedInstancesCommand(ctx, os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-catalog-streams" {
-		if err := runSeedCatalogStreamsCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -799,6 +775,11 @@ func main() {
 	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
 	if configDir == "" {
 		configDir = filepath.Dir(defaultConfigPath)
+	}
+
+	// Coolify prepare writes APPWRITE_* here; file wins over stale injected keys.
+	if err := applyAppwriteRuntimeEnvFile(envOr("ATTESTA_APPWRITE_ENV_FILE", defaultAppwriteBootstrapEnvFile)); err != nil {
+		log.Fatal(err)
 	}
 
 	identity, err := appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{HTTPClient: http.DefaultClient})

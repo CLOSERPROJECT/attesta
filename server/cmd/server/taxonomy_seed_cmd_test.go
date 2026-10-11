@@ -84,15 +84,6 @@ func TestWithSeedSessionCategoriesErrors(t *testing.T) {
 	}
 }
 
-func TestRunSeedCategoriesCommandUsesOpener(t *testing.T) {
-	// Bad URI should fail during mongo connect without needing a live server.
-	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1/?connectTimeoutMS=1&serverSelectionTimeoutMS=1")
-	err := runSeedCategoriesCommand(t.Context(), []string{"--file", writeTempTaxonomySeed(t, "categories: []\n")})
-	if err == nil {
-		t.Fatal("expected mongo connect/ping failure")
-	}
-}
-
 func TestOpenMongoTaxonomyStoreConnectError(t *testing.T) {
 	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1/?connectTimeoutMS=1&serverSelectionTimeoutMS=1")
 	_, _, err := openMongoTaxonomyStore(t.Context())

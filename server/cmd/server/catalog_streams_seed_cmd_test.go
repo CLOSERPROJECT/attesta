@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestRunSeedCatalogStreamsCommandWithMemoryStore(t *testing.T) {
+func TestWithSeedSessionSeedsCatalogStreams(t *testing.T) {
 	store := NewMemoryStore()
 	_ = store.ReplaceTaxonomy(t.Context(),
 		[]Category{{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1}},
@@ -27,7 +27,7 @@ func TestRunSeedCatalogStreamsCommandWithMemoryStore(t *testing.T) {
 		return err
 	})
 	if err != nil {
-		t.Fatalf("cmd: %v", err)
+		t.Fatalf("withSeedSession: %v", err)
 	}
 	streams, _ := store.ListFormataBuilderStreams(t.Context())
 	if len(streams) < 1 || len(streams) > 3 {
@@ -35,20 +35,12 @@ func TestRunSeedCatalogStreamsCommandWithMemoryStore(t *testing.T) {
 	}
 }
 
-func TestRunSeedCatalogStreamsCommandRequiresStore(t *testing.T) {
+func TestWithSeedSessionCatalogStreamsRequiresStore(t *testing.T) {
 	err := withSeedSession(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
 		return nil, nil, fmt.Errorf("boom")
 	}, nil, func(seedSession) error { return nil })
 	if err == nil {
 		t.Fatal("expected opener error")
-	}
-}
-
-func TestRunSeedCatalogStreamsCommandUsesOpener(t *testing.T) {
-	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1/?connectTimeoutMS=1&serverSelectionTimeoutMS=1")
-	err := runSeedCatalogStreamsCommand(t.Context(), nil)
-	if err == nil {
-		t.Fatal("expected mongo connect/ping failure")
 	}
 }
 

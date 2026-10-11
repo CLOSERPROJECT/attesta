@@ -52,7 +52,7 @@ func (s *Server) catalogTaxonomyRevision() (int64, error) {
 
 // loadWorkflowCatalog loads workflow runtime configs from Formata builder streams
 // when present, otherwise from configDir YAML files. It applies Store-backed
-// stream categorization. Seed and seed-instances call this directly.
+// stream categorization. Seed calls this directly.
 func loadWorkflowCatalog(ctx context.Context, store Store, configDir string) (map[string]RuntimeConfig, error) {
 	loaded, err := loadWorkflowCatalogResult(ctx, store, configDir)
 	if err != nil {

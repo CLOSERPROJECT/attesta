@@ -103,7 +103,49 @@ func TestPrepareDemoStackOrderWaitBootstrapSeed(t *testing.T) {
 	}
 }
 
-func TestPrepareDemoStackSoftBootstrapContinues(t *testing.T) {
+func TestParsePrepareArgsPolicy(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		args    []string
+		policy  string
+		rest    []string
+		wantErr string
+	}{
+		{name: "default coolify", args: nil, policy: PreparePolicyCoolify},
+		{name: "equals coolify", args: []string{"--policy=coolify"}, policy: PreparePolicyCoolify},
+		{name: "equals worktree", args: []string{"--policy=worktree"}, policy: PreparePolicyWorktree},
+		{name: "space worktree", args: []string{"--policy", "worktree"}, policy: PreparePolicyWorktree},
+		{name: "unknown policy", args: []string{"--policy=staging"}, wantErr: "unknown policy"},
+		{name: "missing value", args: []string{"--policy"}, wantErr: "--policy requires"},
+		{name: "retired soft flag", args: []string{"--soft-bootstrap"}, wantErr: "unknown flag"},
+		{name: "help", args: []string{"--help"}, wantErr: "usage:"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			policy, rest, err := parsePrepareArgs(tc.args)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("err = %v, want containing %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parsePrepareArgs: %v", err)
+			}
+			if policy != tc.policy {
+				t.Fatalf("policy = %q, want %q", policy, tc.policy)
+			}
+			if len(rest) != len(tc.rest) {
+				t.Fatalf("rest = %#v, want %#v", rest, tc.rest)
+			}
+		})
+	}
+}
+
+func TestPrepareDemoStackWorktreePolicySoftBootstrapContinues(t *testing.T) {
 	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
 	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
 	t.Setenv("APPWRITE_API_KEY", "existing-key")
@@ -112,8 +154,7 @@ func TestPrepareDemoStackSoftBootstrapContinues(t *testing.T) {
 	err := PrepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(30),
-		SoftBootstrap:       true,
-		SoftCredentialSkip:  true,
+		Policy:              PreparePolicyWorktree,
 		Endpoint:            "http://appwrite/v1",
 		WaitAppwriteReady: func(context.Context, string, int) error {
 			calls = append(calls, "wait")
@@ -136,12 +177,12 @@ func TestPrepareDemoStackSoftBootstrapContinues(t *testing.T) {
 	}
 }
 
-func TestPrepareDemoStackHardBootstrapFails(t *testing.T) {
+func TestPrepareDemoStackCoolifyPolicyHardBootstrapFails(t *testing.T) {
 	var calls []string
 	err := PrepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(30),
-		SoftBootstrap:       false,
+		Policy:              PreparePolicyCoolify,
 		WaitAppwriteReady: func(context.Context, string, int) error {
 			calls = append(calls, "wait")
 			return nil
@@ -163,6 +204,33 @@ func TestPrepareDemoStackHardBootstrapFails(t *testing.T) {
 	}
 	if got := strings.Join(calls, ","); got != "wait,bootstrap" {
 		t.Fatalf("calls = %q, want wait,bootstrap without seed", got)
+	}
+}
+
+func TestPrepareDemoStackWorktreePolicySkipsMissingCredentials(t *testing.T) {
+	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
+	t.Setenv("APPWRITE_PROJECT_ID", "")
+	t.Setenv("APPWRITE_API_KEY", "")
+
+	var seeded bool
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		ReadyTimeoutSeconds: intPtr(0),
+		Policy:              PreparePolicyWorktree,
+		Endpoint:            "http://appwrite/v1",
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			return BootstrapResult{}, errors.New("console unavailable")
+		},
+		Seed: func(context.Context) error {
+			seeded = true
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+	if seeded {
+		t.Fatal("seed ran despite missing credentials under worktree policy")
 	}
 }
 
@@ -264,6 +332,33 @@ func TestWaitAppwriteReadyTimesOut(t *testing.T) {
 	err := waitAppwriteReady(ctx, srv.Client(), srv.URL+"/v1/health", 1)
 	if err == nil {
 		t.Fatal("expected timeout error")
+	}
+}
+
+func TestApplyAppwriteRuntimeEnvFile(t *testing.T) {
+	t.Setenv("APPWRITE_API_KEY", "stale")
+	t.Setenv("APPWRITE_PROJECT_ID", "stale-project")
+
+	if err := applyAppwriteRuntimeEnvFile(filepath.Join(t.TempDir(), "missing.env")); err != nil {
+		t.Fatalf("missing file: %v", err)
+	}
+	if got := os.Getenv("APPWRITE_API_KEY"); got != "stale" {
+		t.Fatalf("missing file mutated APPWRITE_API_KEY=%q", got)
+	}
+
+	path := filepath.Join(t.TempDir(), "attesta-appwrite.env")
+	content := "# comment\n\nAPPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=fresh\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyAppwriteRuntimeEnvFile(path); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if got := os.Getenv("APPWRITE_API_KEY"); got != "fresh" {
+		t.Fatalf("APPWRITE_API_KEY=%q, want fresh", got)
+	}
+	if got := os.Getenv("APPWRITE_PROJECT_ID"); got != "attesta" {
+		t.Fatalf("APPWRITE_PROJECT_ID=%q, want attesta", got)
 	}
 }
 

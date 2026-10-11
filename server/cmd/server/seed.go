@@ -41,9 +41,9 @@ type SeedDeps struct {
 //
 // Preconditions (CLI): Mongo reachable; Appwrite project + API key usable;
 // APPWRITE_* set. Hosts that need an empty Appwrite first run
-// `attesta prepare` (or `bootstrap-appwrite`) so the project/key/bucket exist
-// and runtime env is applied before seed. Seed itself does not create the
-// Appwrite project or API key.
+// `attesta prepare` so the project/key/bucket exist and runtime env is
+// applied before seed. Seed itself does not create the Appwrite project
+// or API key.
 // Hosts gate with ATTESTA_SEED via PrepareDemoStack (see ADR-0004); Seed
 // does not read that env var.
 func Seed(ctx context.Context, deps SeedDeps) error {

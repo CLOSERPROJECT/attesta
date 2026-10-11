@@ -151,29 +151,36 @@ if [[ " $* " == *" config --services "* ]]; then
 fi
 printf '%s\n' "$*" >>"${DOCKER_CALLS_FILE}"
 EOF
-chmod +x "${tmpdir}/bin/bash" "${tmpdir}/bin/docker"
+cat >"${tmpdir}/bin/go" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+# Stub prepare so compose up tests do not need a live Appwrite stack.
+if [[ " $* " == *" prepare "* ]]; then
+  printf 'attesta-prepare\n' >>"${DOCKER_CALLS_FILE}"
+  exit 0
+fi
+echo "unexpected go invocation: $*" >&2
+exit 1
+EOF
+chmod +x "${tmpdir}/bin/bash" "${tmpdir}/bin/docker" "${tmpdir}/bin/go"
 
 expected_project="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" project-name)"
 
-grep -Fq 'deployment/attesta-appwrite-ready.sh' "${ROOT}/scripts/worktree-compose.sh" \
-  || fail "worktree-compose does not source shared Appwrite readiness helpers"
-[[ -f "${ROOT}/deployment/attesta-appwrite-ready.sh" ]] \
-  || fail "shared Appwrite readiness helpers missing"
-grep -Fq 'go run ./cmd/server prepare --soft-bootstrap --soft-credential-skip' \
+grep -Fq 'go run ./cmd/server prepare --policy=worktree' \
   "${ROOT}/scripts/worktree-compose.sh" \
-  || fail "worktree-compose does not invoke attesta prepare with soft policy flags"
+  || fail "worktree-compose does not invoke attesta prepare with worktree policy"
+grep -Fq 'ATTESTA_SEED_COMMAND' "${ROOT}/scripts/worktree-compose.sh" \
+  && fail "worktree-compose still exposes retired ATTESTA_SEED_COMMAND hatch"
+[[ ! -e "${ROOT}/deployment/attesta-appwrite-ready.sh" ]] \
+  || fail "retired attesta-appwrite-ready.sh still present"
 grep -Fq './attesta prepare' "${ROOT}/deployment/coolify-entrypoint.sh" \
   || fail "Coolify entrypoint does not invoke attesta prepare"
 grep -Fq 'bootstrap-appwrite' "${ROOT}/deployment/coolify-entrypoint.sh" \
   && fail "Coolify entrypoint still runs bootstrap-appwrite in shell"
 grep -Eq '(^|[[:space:]])(\./)?attesta seed([[:space:]]|$)' "${ROOT}/deployment/coolify-entrypoint.sh" \
   && fail "Coolify entrypoint still runs attesta seed in shell"
-# shellcheck source=deployment/attesta-appwrite-ready.sh
-source "${ROOT}/deployment/attesta-appwrite-ready.sh"
-ATTESTA_SEED=true attesta_seed_enabled || fail "attesta_seed_enabled rejected truthy ATTESTA_SEED"
-ATTESTA_SEED=false attesta_seed_enabled && fail "attesta_seed_enabled accepted false ATTESTA_SEED"
-ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 wait_for_appwrite "http://127.0.0.1:9/v1/health" \
-  || fail "wait_for_appwrite timeout 0 should skip the probe"
+grep -Eq 'load_appwrite_runtime_env|^[[:space:]]*\.[[:space:]]' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  && fail "Coolify entrypoint still sources runtime Appwrite env in shell"
 
 if PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   FAIL_WORKTREE_ENV=1 COMPOSE_PROJECT_NAME=stale-project \
@@ -199,8 +206,6 @@ grep -q 'Docker Compose 2.24.4 or newer is required' "${tmpdir}/old-compose.err"
 
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_ENV_FILE="${tmpdir}/repository-ids" \
-  ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 \
-  ATTESTA_SEED_COMMAND="printf 'attesta-seed\n' >>'${tmpdir}/calls'" \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up
 
 expected_repository_id="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" repository-id)"
@@ -214,7 +219,7 @@ grep -q ' up -d .*mongodb.*appwrite.*traefik' "${tmpdir}/calls" || fail "infra s
 if grep ' up -d ' "${tmpdir}/calls" | sed 's/.* up -d //' | grep -q '\(^\| \)attesta\($\| \)'; then
   fail "host-dev up unexpectedly starts the attesta container"
 fi
-grep -q '^attesta-seed$' "${tmpdir}/calls" || fail "attesta seed did not run after Appwrite readiness"
+grep -q '^attesta-prepare$' "${tmpdir}/calls" || fail "attesta prepare did not run after infra up"
 grep -q ' ps$' "${tmpdir}/calls" || fail "status call missing"
 
 relabel_line="$(grep -n '^relabel-volumes$' "${tmpdir}/calls" | cut -d: -f1)"
@@ -227,13 +232,11 @@ up_line="$(grep -n ' up -d ' "${tmpdir}/calls" | cut -d: -f1)"
 : >"${tmpdir}/calls"
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_REDIRECTS_FILE="${tmpdir}/container-redirects" \
-  ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 \
-  ATTESTA_SEED_COMMAND="printf 'attesta-seed\n' >>'${tmpdir}/calls'" \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up-app --build
 grep -q ' up -d --build .*attesta' "${tmpdir}/calls" \
   || fail "containerized start did not build and start the Attesta service"
-grep -q '^attesta-seed$' "${tmpdir}/calls" \
-  || fail "containerized start did not run attesta seed after Appwrite readiness"
+grep -q '^attesta-prepare$' "${tmpdir}/calls" \
+  || fail "containerized start did not run attesta prepare after infra up"
 docker_app_port="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" print | awk -F= '$1 == "DOCKER_APP_PORT" { print $2 }')"
 expected_redirects="http://localhost:${docker_app_port}/invite/accept|http://localhost:${docker_app_port}/reset/confirm|http://localhost:${docker_app_port}/verify/confirm"
 if grep -Fvxq "${expected_redirects}" "${tmpdir}/container-redirects"; then

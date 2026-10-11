@@ -148,7 +148,7 @@ func seedCatalogStreams(ctx context.Context, store Store, configDir string, now 
 	}
 	leaves := taxonomyLeavesFromTree(tree)
 	if len(leaves) == 0 {
-		return zero, fmt.Errorf("catalog stream seed: taxonomy is empty (run seed-categories first)")
+		return zero, fmt.Errorf("catalog stream seed: taxonomy is empty (run attesta seed first)")
 	}
 
 	templates, err := loadCatalogStreamTemplateBodies(ctx, store, configDir)

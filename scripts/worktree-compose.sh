@@ -6,8 +6,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/deployment/docker-compose.local.yaml"
 # shellcheck source=scripts/require-compose-version.sh
 source "${ROOT_DIR}/scripts/require-compose-version.sh"
-# shellcheck source=deployment/attesta-appwrite-ready.sh
-source "${ROOT_DIR}/deployment/attesta-appwrite-ready.sh"
 
 usage() {
   cat <<'USAGE'
@@ -81,30 +79,10 @@ verify_volume_ownership() {
   [[ "${unsafe}" -eq 0 ]]
 }
 
-wait_for_local_appwrite() {
-  local port="${APPWRITE_HTTP_PORT:-}"
-  [[ "${port}" =~ ^[0-9]+$ ]] || {
-    echo "error: APPWRITE_HTTP_PORT is required to wait for Appwrite readiness" >&2
-    return 1
-  }
-  wait_for_appwrite "http://127.0.0.1:${port}/v1/health"
-}
-
-# Soft-policy prepare (ADR-0004): Go owns wait/bootstrap/env/seed; shell keeps
-# ATTESTA_SEED_COMMAND override and soft-bootstrap / soft-credential-skip flags.
-maybe_run_attesta_seed() {
-  attesta_seed_enabled || return 0
-
-  if [[ -n "${ATTESTA_SEED_COMMAND:-}" ]]; then
-    # Escape hatch stays host-specific; wait here since prepare is not invoked.
-    wait_for_local_appwrite
-    echo "running attesta seed via ATTESTA_SEED_COMMAND"
-    bash -c "${ATTESTA_SEED_COMMAND}"
-    return
-  fi
-
-  echo "running attesta prepare (ATTESTA_SEED=${ATTESTA_SEED})"
-  (cd "${ROOT_DIR}/server" && go run ./cmd/server prepare --soft-bootstrap --soft-credential-skip)
+# Worktree-policy prepare (ADR-0004): Go owns gate/wait/bootstrap/env/seed.
+maybe_run_attesta_prepare() {
+  echo "running attesta prepare (ATTESTA_SEED=${ATTESTA_SEED:-false})"
+  (cd "${ROOT_DIR}/server" && go run ./cmd/server prepare --policy=worktree)
 }
 
 up() {
@@ -132,7 +110,7 @@ up() {
   else
     compose up -d "${services[@]}"
   fi
-  maybe_run_attesta_seed
+  maybe_run_attesta_prepare
   compose ps
 }
 
@@ -166,7 +144,7 @@ up_app() {
   else
     compose up -d "${services[@]}"
   fi
-  maybe_run_attesta_seed
+  maybe_run_attesta_prepare
   compose ps
 }
 

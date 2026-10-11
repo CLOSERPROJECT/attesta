@@ -22,7 +22,6 @@ COPY --from=go-build /app/server/templates /app/server/templates
 COPY --from=go-build /app/server/config /app/server/config
 COPY --from=go-build /app/server/gen/http /app/server/gen/http
 COPY --from=web-build /app/web/dist /app/web/dist
-COPY deployment/attesta-appwrite-ready.sh /attesta-appwrite-ready.sh
 COPY deployment/coolify-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 WORKDIR /app/server

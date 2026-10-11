@@ -112,7 +112,7 @@ func seedTaxonomyFromFile(ctx context.Context, store Store, path string) error {
 
 // bootstrapTaxonomy seeds taxonomy from categories.yaml when the store is empty.
 // Existing taxonomy is left untouched (same empty-only pattern as Formata stream
-// bootstrap). Missing seed file is a no-op. Full replace remains seed-categories.
+// bootstrap). Missing seed file is a no-op. Full replace uses Seed with Replace.
 func bootstrapTaxonomy(ctx context.Context, store Store, configDir string) error {
 	if store == nil {
 		return nil

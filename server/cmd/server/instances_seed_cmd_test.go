@@ -131,11 +131,3 @@ func TestWithSeedSessionInstancesErrors(t *testing.T) {
 		t.Fatalf("err = %v, want openErr", err)
 	}
 }
-
-func TestRunSeedInstancesCommandUsesOpener(t *testing.T) {
-	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1/?connectTimeoutMS=1&serverSelectionTimeoutMS=1")
-	err := runSeedInstancesCommand(t.Context(), nil)
-	if err == nil {
-		t.Fatal("expected mongo connect/ping failure")
-	}
-}

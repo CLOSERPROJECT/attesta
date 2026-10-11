@@ -63,7 +63,7 @@ type Store interface {
 	ReplaceTaxonomy(ctx context.Context, categories []Category, subCategories []SubCategory) error
 	// TaxonomyRevision is a monotonically increasing counter bumped when taxonomy
 	// contents change. Used to invalidate the workflow catalog cache across processes
-	// (e.g. seed-categories CLI while the server keeps running).
+	// (e.g. attesta seed --replace while the server keeps running).
 	TaxonomyRevision(ctx context.Context) (int64, error)
 }
 
