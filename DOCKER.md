@@ -131,7 +131,7 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
 | `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
 | `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed), applies `/tmp/attesta-appwrite.env` in-process for seed, and the entrypoint sources that file again before `exec` of the server |
-| `APPWRITE_CONSOLE_EMAIL` | default `console@attesta.local` | First console signup (conflict ignored if it already exists) |
+| `APPWRITE_CONSOLE_EMAIL` | default `console@attesta.local` | Console login-first; signup only if login fails (409/501 treated as account may exist) |
 | `APPWRITE_CONSOLE_PASSWORD` | default `password` | Demo-only; change if you share console access |
 | `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
 | `APPWRITE_INVITE_REDIRECT_URL` | preview app URL + `/invite/accept` | Required for invite emails |
