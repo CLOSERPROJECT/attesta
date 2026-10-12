@@ -212,6 +212,9 @@ const syncSelectedSubstepURL = (substepId = "") => {
   } catch (_err) {}
 };
 
+const isDraftAndSealProcess = () =>
+  (root?.dataset?.completionStrategy || "").trim() === "draft-and-seal";
+
 const openProcessSubstepId = () => {
   const selectedPanel = document.querySelector(
     ".js-process-substep-panel[open]",
@@ -227,6 +230,23 @@ const retainedSelectedSubstep = () =>
 
 const currentSelectedSubstep = () =>
   openProcessSubstepId() || retainedSelectedSubstep();
+
+const collectOpenProcessSubstepIds = () => {
+  const openIds = [];
+  for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
+    if (!(panel instanceof HTMLDetailsElement) || !panel.open) {
+      continue;
+    }
+    const id = (panel.dataset.substepId || "").trim();
+    if (id) {
+      openIds.push(id);
+    }
+  }
+  return openIds;
+};
+
+let retainedOpenProcessSubstepIds = [];
+let suppressProcessSubstepToggle = false;
 
 const markSelectedSubstep = (substepId = "") => {
   const selected = substepId.trim();
@@ -253,21 +273,49 @@ const markSelectedSubstep = (substepId = "") => {
 
 // Prefer the panel the server marked open (classic Complete may advance), then
 // fall back to retained data-selected-substep when a swap cleared [open].
+// Draft-and-seal also restores peer panels that were open before the HTMX swap —
+// capture selection from the fresh HTML before reopening peers.
 const syncProcessSubstepSelectionAfterSwap = () => {
-  const selected = openProcessSubstepId() || retainedSelectedSubstep();
+  const selectionHost = processPageContent?.querySelector("#process-selection");
+  const fromServer = (
+    selectionHost instanceof HTMLElement
+      ? selectionHost.dataset.selectedSubstep
+      : ""
+  )
+    .trim();
+  // Prefer server selection from the swapped fragment (authoritative after
+  // Save draft / Complete). Fall back to [open] / retained dataset.
+  const selected =
+    fromServer || openProcessSubstepId() || retainedSelectedSubstep();
+  const restoreOpen = new Set(retainedOpenProcessSubstepIds);
   if (selected) {
+    restoreOpen.add(selected);
+  }
+  retainedOpenProcessSubstepIds = [];
+
+  suppressProcessSubstepToggle = true;
+  try {
     for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
       if (!(panel instanceof HTMLDetailsElement)) {
         continue;
       }
-      if ((panel.dataset.substepId || "").trim() !== selected) {
+      const id = (panel.dataset.substepId || "").trim();
+      if (!id) {
         continue;
       }
-      if (!panel.open) {
+      if (isDraftAndSealProcess()) {
+        const shouldOpen = restoreOpen.has(id);
+        if (panel.open !== shouldOpen) {
+          panel.open = shouldOpen;
+        }
+        continue;
+      }
+      if (id === selected && !panel.open) {
         panel.open = true;
       }
-      break;
     }
+  } finally {
+    suppressProcessSubstepToggle = false;
   }
   markSelectedSubstep(selected);
 };
@@ -299,6 +347,11 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
       return;
     }
     const html = await response.text();
+    if (isDraftAndSealProcess()) {
+      retainedOpenProcessSubstepIds = collectOpenProcessSubstepIds();
+    } else {
+      retainedOpenProcessSubstepIds = [];
+    }
     processPageContent.innerHTML = html;
     formatLocalDateTimes(processPageContent);
     await initializeFormataForms(processPageContent);
@@ -1490,6 +1543,17 @@ document.addEventListener("click", (event) => {
   }
 });
 
+document.body.addEventListener("htmx:beforeSwap", (event) => {
+  if (event.target?.id !== "process-page-content") {
+    return;
+  }
+  if (!isDraftAndSealProcess()) {
+    retainedOpenProcessSubstepIds = [];
+    return;
+  }
+  retainedOpenProcessSubstepIds = collectOpenProcessSubstepIds();
+});
+
 document.body.addEventListener("htmx:afterSwap", (event) => {
   if (event.target instanceof Element) {
     formatLocalDateTimes(event.target);
@@ -1565,6 +1629,9 @@ document.body.addEventListener("toggle", (event) => {
   if (!target.classList.contains("js-process-substep-panel")) {
     return;
   }
+  if (suppressProcessSubstepToggle) {
+    return;
+  }
   // HTMX innerHTML swaps can fire toggle while disconnecting the old panel;
   // clearing selection here drops ?substep= before afterSwap can re-sync.
   if (!target.isConnected) {
@@ -1575,13 +1642,17 @@ document.body.addEventListener("toggle", (event) => {
     return;
   }
   if (target.open) {
-    for (const panel of document.querySelectorAll(
-      ".js-process-substep-panel",
-    )) {
-      if (!(panel instanceof HTMLDetailsElement) || panel === target) {
-        continue;
+    // Classic: one open Substep at a time. Draft-and-seal drafts in parallel —
+    // keep peer panels open across submit/HTMX remount.
+    if (!isDraftAndSealProcess()) {
+      for (const panel of document.querySelectorAll(
+        ".js-process-substep-panel",
+      )) {
+        if (!(panel instanceof HTMLDetailsElement) || panel === target) {
+          continue;
+        }
+        panel.open = false;
       }
-      panel.open = false;
     }
     markSelectedSubstep(substepID);
     const summary = target.querySelector(".substep-accordion-summary");

@@ -602,15 +602,16 @@ func (e *WorkflowRefValidationError) Error() string {
 
 type ProcessPageView struct {
 	PageBase
-	Breadcrumbs  BreadcrumbsView
-	ProcessID    string
-	InstanceName string
-	Status       string
-	StatusLabel  string
-	Detail       StreamInstanceDetailView
-	DPPURL       string
-	DPPGS1       string
-	Attachments  []ProcessDownloadAttachment
+	Breadcrumbs        BreadcrumbsView
+	ProcessID          string
+	InstanceName       string
+	Status             string
+	StatusLabel        string
+	CompletionStrategy string
+	Detail             StreamInstanceDetailView
+	DPPURL             string
+	DPPGS1             string
+	Attachments        []ProcessDownloadAttachment
 }
 
 type ProcessDownloadAttachment struct {
@@ -5853,16 +5854,17 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		status = deriveProcessStatus(cfg.Workflow, process)
 	}
 	return ProcessPageView{
-		PageBase:     pageBase,
-		Breadcrumbs:  buildProcessBreadcrumbs(workflowKey, pageBase.WorkflowName, instanceName, processID),
-		ProcessID:    processID,
-		InstanceName: instanceName,
-		Status:       status,
-		StatusLabel:  processStatusLabel(status),
-		Detail:       detail,
-		DPPURL:       detail.DPPURL,
-		DPPGS1:       detail.DPPGS1,
-		Attachments:  detail.Attachments,
+		PageBase:           pageBase,
+		Breadcrumbs:        buildProcessBreadcrumbs(workflowKey, pageBase.WorkflowName, instanceName, processID),
+		ProcessID:          processID,
+		InstanceName:       instanceName,
+		Status:             status,
+		StatusLabel:        processStatusLabel(status),
+		CompletionStrategy: workflowCompletionStrategy(cfg.Workflow),
+		Detail:             detail,
+		DPPURL:             detail.DPPURL,
+		DPPGS1:             detail.DPPGS1,
+		Attachments:        detail.Attachments,
 	}
 }
 

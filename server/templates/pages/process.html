@@ -6,10 +6,16 @@
   data-process-id="{{ .ProcessID }}"
   data-workflow-key="{{ .WorkflowKey }}"
   data-selected-substep="{{ .Detail.SelectedSubstepID }}"
+  data-completion-strategy="{{ .CompletionStrategy }}"
 >
   <div id="process-page-content">{{ template "process_content.html" . }}</div>
 </div>
 {{ end }} {{ define "process_content.html" }}
+<div
+  id="process-selection"
+  hidden
+  data-selected-substep="{{ .Detail.SelectedSubstepID }}"
+></div>
 {{ if .Detail.Confirmation }}
   <p class="confirmation confirmation-with-icon" data-toast>
     {{ template "icon-check-circle" . }}
