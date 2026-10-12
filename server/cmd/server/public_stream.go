@@ -89,7 +89,7 @@ func (s *Server) buildPublicStreamBlueprint(ctx context.Context, cfg RuntimeConf
 			Actor{},
 			"",
 			"",
-			false,
+			streamInstanceDetailOptions{},
 		),
 		"Public preview.",
 	)

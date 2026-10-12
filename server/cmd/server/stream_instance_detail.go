@@ -5,12 +5,23 @@ import (
 	"strings"
 )
 
-func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) StreamInstanceDetailView {
+func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, opts streamInstanceDetailOptions) StreamInstanceDetailView {
 	roleMeta := s.roleMetaIndex(ctx)
-	actions := buildSubstepViews(cfg.Workflow, process, workflowKey, actor, onlyRole, roleMeta, cfg.Roles)
+	actions := buildSubstepViews(cfg.Workflow, process, workflowKey, actor, roleMeta, cfg.Roles)
 	processDone := process != nil && isProcessClosed(cfg.Workflow, process)
 	selected := resolveSelectedSubstepID(actions, selectedSubstepID, processDone)
-	timeline := decorateTimelineSelection(buildTimeline(cfg.Workflow, process, workflowKey, roleMeta, cfg.Roles, organizationNameMap(cfg)), selected)
+
+	mineFilterOn := opts.ShowMineFilter && opts.MineFilterOn
+	carveOutSubstepID := strings.TrimSpace(selectedSubstepID)
+	if mineFilterOn {
+		selected = reconcileSelectedSubstepForMineFilter(selected, selectedSubstepID, actions, cfg.Workflow, actor, processDone, true)
+	}
+
+	timeline := buildTimeline(cfg.Workflow, process, workflowKey, roleMeta, cfg.Roles, organizationNameMap(cfg))
+	if mineFilterOn {
+		timeline = filterTimelineForMineFilter(timeline, cfg.Workflow, actor, carveOutSubstepID, true)
+	}
+	timeline = decorateTimelineSelection(timeline, selected)
 	timeline = decorateTimelineOrganizationLogos(timeline, organizationLogoURLMap(ctx, s.identity))
 	actions = s.applyDoneByEmailToSubstepViews(ctx, cfg.Workflow, actor, actions)
 	timeline = decorateTimelineSubstepBodies(timeline, actions)
@@ -24,6 +35,8 @@ func (s *Server) buildStreamInstanceDetailView(ctx context.Context, cfg RuntimeC
 		ProcessDone:       processDone,
 		Error:             message,
 		Timeline:          timeline,
+		ShowMineFilter:    opts.ShowMineFilter,
+		MineFilterOn:      mineFilterOn,
 	}
 	if process != nil && !processDone {
 		if action, ok := nextAuthorizedSubstepBody(cfg.Workflow, process, workflowKey, actor, roleMeta, cfg.Roles); ok {

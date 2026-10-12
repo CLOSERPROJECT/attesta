@@ -392,6 +392,11 @@ type StreamTerminationDetailsView struct {
 	Reason       string
 }
 
+type streamInstanceDetailOptions struct {
+	MineFilterOn   bool
+	ShowMineFilter bool
+}
+
 // StreamInstanceDetailView is the HTMX/SSE partial payload for stream instance detail content.
 type StreamInstanceDetailView struct {
 	WorkflowKey       string
@@ -403,6 +408,8 @@ type StreamInstanceDetailView struct {
 	SelectedBody      *SubstepBodyView
 	Error             string
 	Timeline          []TimelineStep
+	ShowMineFilter    bool
+	MineFilterOn      bool
 	HideStatus        bool
 	DPPURL            string
 	DPPGS1            string

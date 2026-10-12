@@ -46,6 +46,14 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	}
 }
 
+func TestCloneRequestWithSelectedSubstepPreservesMine(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/instance/123/content?substep=1.1&mine=0", nil)
+	clone := cloneRequestWithSelectedSubstep(req, "2.1")
+	if got := clone.URL.Query().Get("mine"); got != "0" {
+		t.Fatalf("mine query = %q, want %q", got, "0")
+	}
+}
+
 func TestCloneRequestWithSelectedSubstepUpdatesQuery(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/instance/123/content?substep=1.1&filter=active", nil)
 

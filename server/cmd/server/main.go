@@ -5516,7 +5516,7 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 	activeGroup := buildHomeActiveProcessGroup(path, processes, statusFilter, sortKey, page)
 
 	preview := makeStreamInstanceDetailReadOnly(
-		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
+		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", streamInstanceDetailOptions{}),
 		"Preview only. Start an instance to submit data.",
 	)
 	preview.HideStatus = true
@@ -5746,6 +5746,7 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		actor.Role = actor.RoleSlugs[0]
 	}
 	selectedSubstepID := strings.TrimSpace(r.URL.Query().Get("substep"))
+	mineFilterOn := parseMineFilterEnabled(r.URL.Query().Get("mine"))
 	view := s.buildProcessPageView(
 		ctx,
 		s.pageBaseForUser(user, "process_body", workflowKey, cfg.Workflow.Name),
@@ -5755,15 +5756,18 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		actor,
 		selectedSubstepID,
 		"",
-		false,
+		mineFilterOn,
 	)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
-	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
+func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, mineFilterOn bool) ProcessPageView {
+	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, streamInstanceDetailOptions{
+		MineFilterOn:   mineFilterOn,
+		ShowMineFilter: true,
+	})
 	processID := ""
 	instanceName := ""
 	status := processStatusActive
@@ -6065,7 +6069,7 @@ func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Requ
 		actor,
 		strings.TrimSpace(r.URL.Query().Get("substep")),
 		"",
-		false,
+		parseMineFilterEnabled(r.URL.Query().Get("mine")),
 	)
 	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -8282,9 +8286,11 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 	cfg := RuntimeConfig{}
 	var err error
 	selectedSubstepID := ""
+	mineFilterOn := true
 	if r != nil {
 		workflowKey, cfg, err = s.selectedWorkflow(r)
 		selectedSubstepID = strings.TrimSpace(r.URL.Query().Get("substep"))
+		mineFilterOn = parseMineFilterEnabled(r.URL.Query().Get("mine"))
 	} else {
 		cfg, err = s.runtimeConfig()
 	}
@@ -8305,7 +8311,7 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		actor,
 		selectedSubstepID,
 		message,
-		false,
+		mineFilterOn,
 	)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -8317,9 +8323,11 @@ func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, pr
 	cfg := RuntimeConfig{}
 	var err error
 	selectedSubstepID := ""
+	mineFilterOn := true
 	if r != nil {
 		workflowKey, cfg, err = s.selectedWorkflow(r)
 		selectedSubstepID = strings.TrimSpace(r.URL.Query().Get("substep"))
+		mineFilterOn = parseMineFilterEnabled(r.URL.Query().Get("mine"))
 	} else {
 		cfg, err = s.runtimeConfig()
 	}
@@ -8340,7 +8348,7 @@ func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, pr
 		actor,
 		selectedSubstepID,
 		message,
-		false,
+		mineFilterOn,
 	)
 	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

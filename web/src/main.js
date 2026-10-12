@@ -196,7 +196,19 @@ const focusNextActionInput = () => {
   }
 };
 
-const syncSelectedSubstepURL = (substepId = "") => {
+const mineFilterEnabled = () => {
+  const toggle = document.querySelector(".js-mine-filter");
+  if (toggle instanceof HTMLInputElement) {
+    return toggle.checked;
+  }
+  try {
+    return new URL(window.location.href).searchParams.get("mine") !== "0";
+  } catch (_err) {
+    return true;
+  }
+};
+
+const syncProcessPageURL = (substepId = "") => {
   // Process-page only: do not leak ?substep= onto stream dashboard URLs.
   if (!processId) {
     return;
@@ -208,8 +220,17 @@ const syncSelectedSubstepURL = (substepId = "") => {
     } else {
       url.searchParams.delete("substep");
     }
+    if (mineFilterEnabled()) {
+      url.searchParams.delete("mine");
+    } else {
+      url.searchParams.set("mine", "0");
+    }
     window.history.replaceState({}, "", url);
   } catch (_err) {}
+};
+
+const syncSelectedSubstepURL = (substepId = "") => {
+  syncProcessPageURL(substepId);
 };
 
 const currentSelectedSubstep = () => {
@@ -261,7 +282,14 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
   if (!processId || !workflowKey || !processPageContent) {
     return;
   }
-  const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
+  const params = new URLSearchParams();
+  if (substepId) {
+    params.set("substep", substepId);
+  }
+  if (!mineFilterEnabled()) {
+    params.set("mine", "0");
+  }
+  const query = params.toString() ? `?${params.toString()}` : "";
   const url = `/my/streams/${workflowKey}/instance/${processId}/content${query}`;
   if (window.htmx?.ajax) {
     window.htmx.ajax("GET", url, {
@@ -1153,6 +1181,18 @@ const initializeFormataForms = async (container = document) => {
     });
   }
 };
+
+document.body.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  if (!target.classList.contains("js-mine-filter") || !processId) {
+    return;
+  }
+  syncProcessPageURL(currentSelectedSubstep());
+  void loadProcessContent(currentSelectedSubstep());
+});
 
 if (processId && workflowKey && processPageContent) {
   const source = new EventSource(

@@ -2,6 +2,23 @@
   min-width: 0;
 }
 
+.stream-mine-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: var(--space-3);
+}
+
+.stream-mine-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--secondary-foreground);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* Process ID under page-header title (process page only) */
 .process-header-meta {
   display: inline-flex;

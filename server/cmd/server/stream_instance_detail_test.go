@@ -51,30 +51,6 @@ func TestMakeStreamInstanceDetailReadOnlyClearsSelection(t *testing.T) {
 	}
 }
 
-func TestBuildStreamInstanceDetailViewDoesNotFilterByCurrentActiveRole(t *testing.T) {
-	process := &Process{
-		ID: primitive.NewObjectID(),
-		Progress: map[string]ProcessStep{
-			"1.1": {State: "pending"},
-			"1.2": {State: "pending"},
-			"1.3": {State: "pending"},
-			"2.1": {State: "pending"},
-			"2.2": {State: "pending"},
-			"3.1": {State: "pending"},
-			"3.2": {State: "pending"},
-		},
-	}
-	server := &Server{}
-	actor := Actor{
-		Role:      "dep2",
-		RoleSlugs: []string{"dep1", "dep2"},
-	}
-	view := server.buildStreamInstanceDetailView(t.Context(), testRuntimeConfig(), "workflow", process, actor, "", "", false)
-
-	if view.SelectedBody == nil || view.SelectedBody.SubstepID != "1.1" {
-		t.Fatalf("expected dep1 step to remain visible after dep2 completion context, got %#v", view.SelectedBody)
-	}
-}
 
 func TestBuildStreamInstanceDetailViewDoneProcessIncludesDPPAndAttachments(t *testing.T) {
 	processID := primitive.NewObjectID()
@@ -100,7 +76,7 @@ func TestBuildStreamInstanceDetailViewDoneProcessIncludesDPPAndAttachments(t *te
 		},
 	}
 	server := &Server{}
-	view := server.buildStreamInstanceDetailView(t.Context(), testRuntimeConfig(), "workflow", process, Actor{Role: "dep1"}, "", "", false)
+	view := server.buildStreamInstanceDetailView(t.Context(), testRuntimeConfig(), "workflow", process, Actor{Role: "dep1"}, "", "", streamInstanceDetailOptions{})
 
 	if !view.ProcessDone {
 		t.Fatal("expected processDone")

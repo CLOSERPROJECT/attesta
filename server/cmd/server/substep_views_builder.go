@@ -5,7 +5,7 @@ import (
 )
 
 func nextAuthorizedSubstepBody(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) (SubstepBodyView, bool) {
-	for _, action := range buildSubstepViews(def, process, workflowKey, actor, false, roleIndex, cfgRoles) {
+	for _, action := range buildSubstepViews(def, process, workflowKey, actor, roleIndex, cfgRoles) {
 		if action.Status == "available" && !action.Disabled {
 			return action, true
 		}
@@ -13,7 +13,7 @@ func nextAuthorizedSubstepBody(def WorkflowDef, process *Process, workflowKey st
 	return SubstepBodyView{}, false
 }
 
-func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, actor Actor, onlyRole bool, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
+func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
 	var actions []SubstepBodyView
 	ordered := orderedSubsteps(def)
 	availMap := computeAvailability(def, process)
@@ -65,9 +65,6 @@ func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, ac
 				Label:   meta.Label,
 				Palette: meta.Palette,
 			})
-		}
-		if onlyRole && strings.TrimSpace(actor.Role) != "" && !containsRole(allowedRoles, actor.Role) {
-			continue
 		}
 		meta := roleMetaForOrg(substepOrgs[sub.SubstepID], primaryRole, roleIndex, cfgRoles)
 		role := primaryRole
