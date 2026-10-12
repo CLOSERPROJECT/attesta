@@ -33,10 +33,10 @@ func TestCategoriesSeedPathFromArgsResolved(t *testing.T) {
 	}
 }
 
-func TestOpenMongoTaxonomyStoreConnectError(t *testing.T) {
+func TestOpenMongoStoreConnectError(t *testing.T) {
 	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1/?connectTimeoutMS=1&serverSelectionTimeoutMS=1")
-	_, _, err := openMongoTaxonomyStore(t.Context())
+	_, _, _, err := openMongoStore(t.Context())
 	if err == nil {
-		t.Fatal("expected openMongoTaxonomyStore error")
+		t.Fatal("expected openMongoStore error")
 	}
 }

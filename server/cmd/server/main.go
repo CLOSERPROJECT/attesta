@@ -31,7 +31,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/yaml.v3"
 )
 
@@ -142,7 +141,6 @@ type FakeNotary struct {
 }
 
 type Server struct {
-	mongo              *mongo.Client
 	store              Store
 	process            *ProcessService
 	identity           IdentityStore
@@ -756,25 +754,14 @@ func main() {
 		return
 	}
 
-	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	store, configDir, _, err := openMongoStore(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := client.Ping(ctx, nil); err != nil {
-		log.Fatal(err)
-	}
 
-	db := client.Database("closer_demo")
 	tmpl, err := parseTemplates()
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	defaultConfigPath := envOr("WORKFLOW_CONFIG", "config/workflow.yaml")
-	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
-	if configDir == "" {
-		configDir = filepath.Dir(defaultConfigPath)
 	}
 
 	// Coolify prepare writes APPWRITE_* here; file wins over stale injected keys.
@@ -788,8 +775,7 @@ func main() {
 	}
 
 	server := &Server{
-		mongo:              client,
-		store:              &MongoStore{db: db},
+		store:              store,
 		identity:           identity,
 		tmpl:               tmpl,
 		authorizer:         NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),

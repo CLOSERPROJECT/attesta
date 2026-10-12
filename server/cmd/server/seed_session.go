@@ -151,18 +151,28 @@ func runSeedSession(ctx context.Context, args []string, replace bool, creds *app
 	})
 }
 
-func openMongoTaxonomyStore(ctx context.Context) (Store, func(), error) {
+// openMongoStore connects with MONGODB_URI (default mongodb://localhost:27017),
+// selects MONGODB_DATABASE (default closer_demo), and resolves ConfigDir via
+// workflowConfigDir(). Cleanup disconnects the client.
+func openMongoStore(ctx context.Context) (Store, string, func(), error) {
 	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		return nil, nil, fmt.Errorf("mongo connect: %w", err)
+		return nil, "", nil, fmt.Errorf("mongo connect: %w", err)
 	}
 	if err := client.Ping(ctx, nil); err != nil {
 		_ = client.Disconnect(ctx)
-		return nil, nil, fmt.Errorf("mongo ping: %w", err)
+		return nil, "", nil, fmt.Errorf("mongo ping: %w", err)
 	}
 	dbName := envOr("MONGODB_DATABASE", "closer_demo")
 	store := NewMongoStore(client.Database(dbName))
 	cleanup := func() { _ = client.Disconnect(ctx) }
-	return store, cleanup, nil
+	return store, workflowConfigDir(), cleanup, nil
+}
+
+// openMongoTaxonomyStore is a thin wrapper for seed-session openers that only
+// need Store + cleanup (ConfigDir is resolved separately via workflowConfigDir).
+func openMongoTaxonomyStore(ctx context.Context) (Store, func(), error) {
+	store, _, cleanup, err := openMongoStore(ctx)
+	return store, cleanup, err
 }
