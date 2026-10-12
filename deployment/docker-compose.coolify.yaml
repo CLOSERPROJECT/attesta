@@ -284,9 +284,6 @@ services:
       APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
       APPWRITE_CONSOLE_EMAIL: ${APPWRITE_CONSOLE_EMAIL:-console@attesta.local}
       APPWRITE_CONSOLE_PASSWORD: ${APPWRITE_CONSOLE_PASSWORD:-password}
-      APPWRITE_INVITE_REDIRECT_URL:
-      APPWRITE_RESET_REDIRECT_URL:
-      APPWRITE_VERIFY_REDIRECT_URL:
       APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?}
@@ -298,7 +295,11 @@ services:
       SMTP_SECURE: ${SERVICE_SECURE_SMTP:-}
       # Set only in Coolify Preview env; production must leave unset/false.
       ATTESTA_SEED: ${ATTESTA_SEED:-false}
+      ATTESTA_ROOT_DIR: /app
       SERVICE_FQDN_ATTESTA_3000:
+      # Invite/reset/verify links derive from this origin + fixed paths.
+      PUBLIC_BASE_URL: https://${SERVICE_FQDN_ATTESTA_3000}
+
     depends_on:
       - mongodb
       - cerbos

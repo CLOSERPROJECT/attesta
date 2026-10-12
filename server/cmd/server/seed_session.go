@@ -111,6 +111,10 @@ func withSeedSession(
 
 // creds nil → identity from process env (standalone seed); non-nil → prepare→seed by value.
 func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
+	// Parity with main: apply checkout-scoped runtime file before identity.
+	if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
+		return err
+	}
 	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
 		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
 		if creds == nil {

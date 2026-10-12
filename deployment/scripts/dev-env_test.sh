@@ -44,6 +44,10 @@ sed -i.bak \
   "${linked}/.env.worktree"
 rm "${linked}/.env.worktree.bak"
 
+# mktemp may yield /var/... while git/worktree-env resolve /private/var/... on macOS.
+primary_root="$(git -C "${primary}" rev-parse --show-toplevel)"
+linked_root="$(git -C "${linked}" rev-parse --show-toplevel)"
+
 primary_output="$({
   cd "${primary}"
   APPWRITE_ENDPOINT=https://shell.primary.example/v1 bash -c '
@@ -55,9 +59,12 @@ primary_output="$({
       "APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}" \
       "SMTP_HOST=${SMTP_HOST}" \
       "SMTP_PORT=${SMTP_PORT}" \
-      "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+      "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" \
+      "ATTESTA_ROOT_DIR=${ATTESTA_ROOT_DIR}"
   '
 })"
+grep -qx "ATTESTA_ROOT_DIR=${primary_root}" <<<"${primary_output}" \
+  || fail "primary ATTESTA_ROOT_DIR is not the checkout root"
 grep -qx 'MONGODB_URI=mongodb://primary.example:27099/attesta' <<<"${primary_output}" \
   || fail "primary MongoDB endpoint was clobbered"
 grep -qx 'CERBOS_URL=https://cerbos.primary.example' <<<"${primary_output}" \
@@ -84,9 +91,12 @@ linked_output="$({
       "APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}" \
       "SMTP_HOST=${SMTP_HOST}" \
       "SMTP_PORT=${SMTP_PORT}" \
-      "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+      "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" \
+      "ATTESTA_ROOT_DIR=${ATTESTA_ROOT_DIR}"
   '
 })"
+grep -qx "ATTESTA_ROOT_DIR=${linked_root}" <<<"${linked_output}" \
+  || fail "linked ATTESTA_ROOT_DIR is not the checkout root"
 grep -qx 'PORT=13000' <<<"${linked_output}" || fail "linked worktree ignored its persisted port"
 grep -qx 'MONGODB_URI=mongodb://localhost:13002' <<<"${linked_output}" \
   || fail "linked worktree retained the primary MongoDB endpoint"

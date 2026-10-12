@@ -17,6 +17,7 @@ RUN go build -trimpath -o /app/bin/attesta ./cmd/server
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
+ENV ATTESTA_ROOT_DIR=/app
 COPY --from=go-build /app/bin/attesta /app/server/attesta
 COPY --from=go-build /app/server/templates /app/server/templates
 COPY --from=go-build /app/server/config /app/server/config

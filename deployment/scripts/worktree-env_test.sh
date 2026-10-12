@@ -68,6 +68,8 @@ grep -q '^APPWRITE_ENDPOINT=http://localhost:11007/v1$' <<<"${resolved}" || fail
 grep -q '^MAILPIT_UI_URL=http://localhost:11006$' <<<"${resolved}" || fail "Mailpit URL missing"
 grep -q '^COMPOSE_PROJECT_NAME=' <<<"${resolved}" || fail "Compose project missing"
 grep -q '^ATTESTA_SEED=true$' <<<"${resolved}" || fail "ATTESTA_SEED flag missing"
+grep -qx "ATTESTA_ROOT_DIR=${tmpdir}" <<<"${resolved}" \
+  || fail "ATTESTA_ROOT_DIR missing from print"
 if grep -q '^APPWRITE_RESTORE_SEED_SQL=' <<<"${resolved}"; then
   fail "retired APPWRITE_RESTORE_SEED_SQL still exported"
 fi
@@ -210,10 +212,11 @@ if grep -q '^export ROOT_DIR=' <<<"${export_output}"; then
   fail "export exposed internal ROOT_DIR"
 fi
 (
-  unset ROOT_DIR
+  unset ROOT_DIR ATTESTA_ROOT_DIR
   eval "${export_output}"
   [[ "${PORT}" == 3000 ]]
   [[ -z "${ROOT_DIR+x}" ]]
+  [[ "${ATTESTA_ROOT_DIR}" == "${export_root}" ]]
 ) || fail "export output was not safe to evaluate"
 [[ ! -e "${ROOT}/should-not-run" && ! -e "${tmpdir}/should-not-run" ]] \
   || fail "evaluating exports executed checkout-path shell syntax"

@@ -566,13 +566,14 @@ func TestBootstrapAppwriteProjectRequiresProjectID(t *testing.T) {
 }
 
 func TestBootstrapDepsFromEnvDefaults(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("ATTESTA_ROOT_DIR", root)
 	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
 	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
 	t.Setenv("APPWRITE_API_KEY", "")
 	t.Setenv("APPWRITE_CONSOLE_EMAIL", "")
 	t.Setenv("APPWRITE_CONSOLE_PASSWORD", "")
 	t.Setenv("APPWRITE_ORG_ASSETS_BUCKET", "")
-	t.Setenv("ATTESTA_APPWRITE_ENV_FILE", "")
 
 	deps := bootstrapAppwriteDepsFromEnv()
 	if deps.ConsoleEmail != defaultAppwriteConsoleEmail {
@@ -584,8 +585,9 @@ func TestBootstrapDepsFromEnvDefaults(t *testing.T) {
 	if deps.OrgAssetsBucket != "org-assets" {
 		t.Fatalf("bucket = %q", deps.OrgAssetsBucket)
 	}
-	if deps.EnvFilePath != defaultAppwriteBootstrapEnvFile {
-		t.Fatalf("env file = %q", deps.EnvFilePath)
+	wantEnv := filepath.Join(root, ".env.appwrite")
+	if deps.EnvFilePath != wantEnv {
+		t.Fatalf("env file = %q, want %q", deps.EnvFilePath, wantEnv)
 	}
 }
 

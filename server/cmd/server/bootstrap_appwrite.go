@@ -16,11 +16,10 @@ import (
 )
 
 const (
-	defaultAppwriteConsoleEmail     = "console@attesta.local"
-	defaultAppwriteConsolePassword  = "password"
-	defaultAppwriteBootstrapEnvFile = "/tmp/attesta-appwrite.env"
-	defaultAppwriteConsoleTeamID    = "attesta"
-	appwriteBootstrapKeyName        = "attesta-bootstrap"
+	defaultAppwriteConsoleEmail    = "console@attesta.local"
+	defaultAppwriteConsolePassword = "password"
+	defaultAppwriteConsoleTeamID   = "attesta"
+	appwriteBootstrapKeyName       = "attesta-bootstrap"
 
 	// Bound 429 retries to a few attempts / ~30–60s total wait.
 	appwriteBootstrap429MaxAttempts = 6
@@ -145,9 +144,14 @@ func normalizeBootstrapAppwriteDeps(deps BootstrapAppwriteDeps) BootstrapAppwrit
 		deps.ProjectName = deps.ProjectID
 	}
 	if deps.EnvFilePath == "" {
-		deps.EnvFilePath = defaultAppwriteBootstrapEnvFile
+		deps.EnvFilePath = resolveAppwriteRuntimeEnvFile()
 	}
 	return deps
+}
+
+// Coolify/local must set ATTESTA_ROOT_DIR (e.g. /app). Empty root → cwd-relative .env.appwrite.
+func resolveAppwriteRuntimeEnvFile() string {
+	return filepath.Join(strings.TrimSpace(os.Getenv("ATTESTA_ROOT_DIR")), ".env.appwrite")
 }
 
 func resolveBootstrapSleep(sleep func(context.Context, time.Duration) error) func(context.Context, time.Duration) error {
@@ -178,7 +182,7 @@ func bootstrapAppwriteDepsFromEnv() BootstrapAppwriteDeps {
 		ConsolePassword: envOr("APPWRITE_CONSOLE_PASSWORD", defaultAppwriteConsolePassword),
 		OrgAssetsBucket: envOr("APPWRITE_ORG_ASSETS_BUCKET", "org-assets"),
 		ConsoleTeamID:   envOr("APPWRITE_CONSOLE_TEAM_ID", defaultAppwriteConsoleTeamID),
-		EnvFilePath:     envOr("ATTESTA_APPWRITE_ENV_FILE", defaultAppwriteBootstrapEnvFile),
+		EnvFilePath:     resolveAppwriteRuntimeEnvFile(),
 	}
 }
 

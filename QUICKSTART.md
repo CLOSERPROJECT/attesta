@@ -31,21 +31,23 @@ Use `task start:docker` for the full containerized stack, or `task start:docker:
 The containerized app is available on `DOCKER_APP_PORT`; `task start` remains infrastructure-only for host development.
 
 ## Bootstrap Appwrite
-The primary checkout may be bootstrapped manually after the Compose stack is up:
+Preferred path: with `ATTESTA_SEED=true` (worktree-env default), `task start` / `task start:docker` run `attesta prepare`, which bootstraps Appwrite when needed, writes checkout-scoped `.env.appwrite` (gitignored; `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY`), and applies the empty-only Go demo seed. The server and `task seed` load the same file.
+
+Manual console bootstrap is still possible after the Compose stack is up:
 1. Open the Appwrite console on `http://localhost`.
 2. Create the first Appwrite console account.
 3. Create the Attesta Appwrite project.
 4. Create an API key for Attesta.
 5. Open Mailpit on `http://localhost:8025` if you want to inspect invite and recovery emails locally.
 6. Create the `org-assets` storage bucket.
-7. Export or set:
-   - `APPWRITE_PROJECT_ID`
-   - `APPWRITE_API_KEY`
+7. Put `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` in `.env` or let prepare write `.env.appwrite`.
 8. Re-run `task start` (or `task start:docker`) so the empty-only Go seed can apply, or run `task seed` once.
 
-New parallel worktrees start empty. After Appwrite credentials are set, the Go demo seed (`ATTESTA_SEED=true`) is the only demo-data path.
+Invite, reset, and verify links use `PUBLIC_BASE_URL` (from worktree-env / compose) plus fixed paths; if unset, they use the request host.
 
-After Appwrite credentials are set, `task start` / `task start:docker` run the Go demo seed automatically (`ATTESTA_SEED=true` from worktree-env; empty-only). Run `task seed` manually anytime, or `task seed -- --replace` to rewrite.
+New parallel worktrees start empty. After Appwrite credentials exist (`.env.appwrite` or ambient env), the Go demo seed (`ATTESTA_SEED=true`) is the only demo-data path.
+
+After credentials exist, `task start` / `task start:docker` run the Go demo seed automatically (`ATTESTA_SEED=true` from worktree-env; empty-only). Run `task seed` manually anytime, or `task seed -- --replace` to rewrite.
 
 After `task reset` or `task purge`, the next start re-applies the Go demo seed when credentials exist.
 

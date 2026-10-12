@@ -764,8 +764,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Coolify prepare writes APPWRITE_* here; file wins over stale injected keys.
-	if err := applyAppwriteRuntimeEnvFile(envOr("ATTESTA_APPWRITE_ENV_FILE", defaultAppwriteBootstrapEnvFile)); err != nil {
+	// Prepare writes APPWRITE_* under ATTESTA_ROOT_DIR; file wins over stale injected keys.
+	if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
 		log.Fatal(err)
 	}
 
@@ -3043,25 +3043,23 @@ func requestBaseURL(r *http.Request) string {
 	return scheme + "://" + host
 }
 
-func resetRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_RESET_REDIRECT_URL")); configured != "" {
-		return configured
+func redirectBaseURL(r *http.Request) string {
+	if base := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")); base != "" {
+		return strings.TrimRight(base, "/")
 	}
-	return requestBaseURL(r) + "/reset/confirm"
+	return requestBaseURL(r)
+}
+
+func resetRedirectURL(r *http.Request) string {
+	return redirectBaseURL(r) + "/reset/confirm"
 }
 
 func verifyRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_VERIFY_REDIRECT_URL")); configured != "" {
-		return configured
-	}
-	return requestBaseURL(r) + emailVerificationConfirmPath()
+	return redirectBaseURL(r) + emailVerificationConfirmPath()
 }
 
 func inviteRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_INVITE_REDIRECT_URL")); configured != "" {
-		return configured
-	}
-	return requestBaseURL(r) + "/invite/accept"
+	return redirectBaseURL(r) + "/invite/accept"
 }
 
 func resetConfirmParams(r *http.Request) (string, string) {

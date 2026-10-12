@@ -129,16 +129,15 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | Variable | Preview | Notes |
 |---|---|---|
 | `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
+| `ATTESTA_ROOT_DIR` | `/app` | App root for `.env.appwrite` (Dockerfile/entrypoint set this; matches image app root, not `WORKDIR /app/server`) |
 | `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
-| `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed) and writes `/tmp/attesta-appwrite.env`; prepare applies it for seed, and the server loads the same file at startup |
+| `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed) and writes `$ATTESTA_ROOT_DIR/.env.appwrite`; prepare applies it for seed, and the server loads the same file at startup |
 | `APPWRITE_CONSOLE_EMAIL` | default `console@attesta.local` | Console login-first; signup only if login fails (409/501 treated as account may exist) |
 | `APPWRITE_CONSOLE_PASSWORD` | default `password` | Demo-only; change if you share console access |
 | `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
-| `APPWRITE_INVITE_REDIRECT_URL` | preview app URL + `/invite/accept` | Required for invite emails |
-| `APPWRITE_RESET_REDIRECT_URL` | preview app URL + `/reset/confirm` | Required for recovery emails |
-| `APPWRITE_VERIFY_REDIRECT_URL` | preview app URL + `/verify/confirm` | Required for verification emails |
+| `PUBLIC_BASE_URL` | `https://${SERVICE_FQDN_ATTESTA_3000}` | Compose default; invite/reset/verify links derive from this origin + fixed paths |
 
-When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → apply runtime env → empty-only seed) then `exec`s the server. The server loads `/tmp/attesta-appwrite.env` at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`).
+When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → apply runtime env → empty-only seed) then `exec`s the server. The server loads `$ATTESTA_ROOT_DIR/.env.appwrite` at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`).
 
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed

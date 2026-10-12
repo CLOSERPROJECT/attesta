@@ -201,9 +201,8 @@ Common environment variables:
 - `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT` - this checkout's local mail service
 - `MONGODB_URI`, `CERBOS_URL`, `APPWRITE_ENDPOINT`, `SMTP_HOST`, `SMTP_PORT` - explicit `.env` or shell values are preserved for host development in the primary checkout; linked worktrees always resolve these to their isolated local ports
 - `APPWRITE_PROJECT_ID`
-- `APPWRITE_API_KEY`
-- `APPWRITE_INVITE_REDIRECT_URL`
-- `APPWRITE_RESET_REDIRECT_URL`
+- `APPWRITE_API_KEY` - leave empty for prepare; runtime creds live in checkout-scoped `.env.appwrite`
+- `PUBLIC_BASE_URL` - public origin for invite/reset/verify and notification links (no trailing slash)
 - `APPWRITE_ORG_ASSETS_BUCKET` - default `org-assets`
 - `WORKFLOW_CONFIG` - default `config/workflow.yaml`
 - `ATTACHMENT_MAX_BYTES` - default 25 MiB
