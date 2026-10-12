@@ -36,6 +36,7 @@
   inset: auto var(--space-4) var(--space-4) auto;
   width: min(22rem, calc(100vw - 2 * var(--space-4)));
   margin: 0;
+
   /* Opaque over the page: dark --success-muted is 12% alpha and reads as glass. */
   background: color-mix(
     in srgb,
