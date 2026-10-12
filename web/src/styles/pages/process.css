@@ -26,7 +26,7 @@
 }
 
 .stream-mine-filter-root.is-mine-filter
-  .substep:not([data-viewer-owned="true"]):not(.substep-selected) {
+  .substep:not([data-viewer-owned="true"], .substep-selected) {
   display: none;
 }
 
