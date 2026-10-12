@@ -181,6 +181,10 @@ grep -Fq 'ATTESTA_SEED_COMMAND' "${ROOT}/scripts/worktree-compose.sh" \
   || fail "retired attesta-appwrite-ready.sh still present"
 grep -Fq './attesta prepare' "${ROOT}/deployment/coolify-entrypoint.sh" \
   || fail "Coolify entrypoint does not invoke attesta prepare"
+grep -Fq 'ATTESTA_SEED: ${ATTESTA_SEED}' "${ROOT}/deployment/docker-compose.coolify.yaml" \
+  || fail "Coolify compose must use \${ATTESTA_SEED} without :-default (Coolify bakes defaults)"
+grep -Eq 'ATTESTA_SEED: \$\{ATTESTA_SEED:-[^}]+\}' "${ROOT}/deployment/docker-compose.coolify.yaml" \
+  && fail "Coolify compose must not use ATTESTA_SEED:-default (bakes Production into deployable)"
 grep -Fq 'bootstrap-appwrite' "${ROOT}/deployment/coolify-entrypoint.sh" \
   && fail "Coolify entrypoint still runs bootstrap-appwrite in shell"
 grep -Eq '(^|[[:space:]])(\./)?attesta seed([[:space:]]|$)' "${ROOT}/deployment/coolify-entrypoint.sh" \
