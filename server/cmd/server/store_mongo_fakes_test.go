@@ -281,6 +281,16 @@ func (c *fakeAnyCursor) Decode(val interface{}) error {
 			*target = v
 			return nil
 		}
+	case *JoinRequest:
+		if v, ok := item.(JoinRequest); ok {
+			*target = v
+			return nil
+		}
+	case *OrganizationCreationRequest:
+		if v, ok := item.(OrganizationCreationRequest); ok {
+			*target = v
+			return nil
+		}
 	case *bson.M:
 		if v, ok := item.(bson.M); ok {
 			*target = v

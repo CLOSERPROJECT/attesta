@@ -52,6 +52,14 @@ func TestOpenCatalogTemplatePackErrors(t *testing.T) {
 			t.Fatalf("err = %v", err)
 		}
 	})
+	t.Run("empty configDir defaults missing", func(t *testing.T) {
+		cwd := t.TempDir()
+		t.Chdir(cwd)
+		_, err := openCatalogTemplatePack("")
+		if err == nil || !strings.Contains(err.Error(), "config dir not found") {
+			t.Fatalf("err = %v, want default config missing", err)
+		}
+	})
 	t.Run("empty pack", func(t *testing.T) {
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, "categories.yaml"), []byte("categories: []\n"), 0o644); err != nil {

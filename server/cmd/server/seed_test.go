@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSeedEmptyOnlyNoopsWhenMarkerOrgExists(t *testing.T) {
@@ -238,6 +240,267 @@ func TestAppwriteIdentityFromCredentialsRequiresAll(t *testing.T) {
 	}
 }
 
+func TestSeedRequiresIdentityAndStore(t *testing.T) {
+	t.Parallel()
+	if err := Seed(t.Context(), SeedDeps{Store: NewMemoryStore()}); err == nil || !strings.Contains(err.Error(), "identity is required") {
+		t.Fatalf("err = %v, want identity required", err)
+	}
+	if err := Seed(t.Context(), SeedDeps{Identity: newSeedFakeIdentity()}); err == nil || !strings.Contains(err.Error(), "store is required") {
+		t.Fatalf("err = %v, want store required", err)
+	}
+}
+
+func TestSeedCanceledContext(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err := Seed(ctx, SeedDeps{Identity: newSeedFakeIdentity(), Store: NewMemoryStore()})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+}
+
+func TestSeedMarkerLookupGenericError(t *testing.T) {
+	t.Parallel()
+	want := errors.New("appwrite timeout")
+	identity := &fakeIdentityStore{
+		getOrganizationBySlugFunc: func(context.Context, string) (*IdentityOrg, error) {
+			return nil, want
+		},
+	}
+	err := Seed(t.Context(), SeedDeps{Identity: identity, Store: NewMemoryStore()})
+	if err == nil || !strings.Contains(err.Error(), "marker org lookup") {
+		t.Fatalf("err = %v, want marker org lookup wrap", err)
+	}
+	if !errors.Is(err, want) {
+		t.Fatalf("err = %v, want wrap of %v", err, want)
+	}
+}
+
+func TestSeedFixtureEmptyConfigDirNilRNGAndNow(t *testing.T) {
+	dir := writeSeedTestConfigDir(t)
+	fixed := time.Date(2026, 3, 1, 15, 30, 0, 0, time.UTC)
+	err := Seed(t.Context(), SeedDeps{
+		Identity:       newSeedFakeIdentity(),
+		Store:          NewMemoryStore(),
+		ConfigDir:      "",
+		CategoriesPath: filepath.Join(dir, "categories.yaml"),
+		Fixture:        &demoFixture{},
+		RNG:            nil,
+		Now:            func() time.Time { return fixed },
+	})
+	// Empty ConfigDir becomes "config"; taxonomy uses CategoriesPath, then catalog fails.
+	if err == nil || !strings.Contains(err.Error(), "catalog streams") {
+		t.Fatalf("err = %v, want catalog streams failure after empty ConfigDir", err)
+	}
+}
+
+func TestSeedCustomFixtureNowAndNilRNGSucceeds(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	store := NewMemoryStore()
+	dir := writeSeedTestConfigDir(t)
+	fixed := time.Date(2026, 4, 2, 10, 0, 0, 0, time.UTC)
+	fixture := demoFixture{
+		Orgs: []demoFixtureOrg{{
+			Name:  "Organization 1",
+			Roles: []IdentityRole{{Slug: "chemist", Name: "Chemist", Palette: "blue"}},
+		}},
+		Users: []demoFixtureUser{{
+			Email:         "admin@org1.com",
+			Password:      "admin@org1.com",
+			Name:          "Org Admin",
+			OrgAdminSlugs: []string{"organization-1"},
+			MembershipRoles: map[string][]string{
+				"organization-1": {"chemist"},
+			},
+		}},
+	}
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:  newSeedFakeIdentity(),
+		Store:     store,
+		ConfigDir: dir,
+		Fixture:   &fixture,
+		RNG:       nil,
+		Now:       func() time.Time { return fixed },
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	cats, err := store.ListCategories(t.Context())
+	if err != nil || len(cats) == 0 {
+		t.Fatalf("categories=%v err=%v", cats, err)
+	}
+}
+
+func TestEnsureDemoFixtureUserErrors(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	t.Run("empty credentials", func(t *testing.T) {
+		t.Parallel()
+		_, err := ensureDemoFixtureUser(ctx, newSeedFakeIdentity(), demoFixtureUser{Email: " ", Password: ""})
+		if err == nil || !strings.Contains(err.Error(), "email and password are required") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("ensure error", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("ensure failed")
+		identity := newSeedFakeIdentity()
+		identity.ensureUserAccountFn = func(context.Context, string, string, string) (IdentityUser, error) {
+			return IdentityUser{}, want
+		}
+		_, err := ensureDemoFixtureUser(ctx, identity, demoFixtureUser{Email: "a@b.com", Password: "pw"})
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+
+	t.Run("empty id loads by email", func(t *testing.T) {
+		t.Parallel()
+		identity := newSeedFakeIdentity()
+		identity.ensureUserAccountFn = func(context.Context, string, string, string) (IdentityUser, error) {
+			return IdentityUser{Email: "a@b.com"}, nil
+		}
+		identity.getUserByEmailFn = func(_ context.Context, email string) (IdentityUser, error) {
+			return IdentityUser{ID: "loaded-id", Email: email}, nil
+		}
+		user, err := ensureDemoFixtureUser(ctx, identity, demoFixtureUser{Email: "a@b.com", Password: "pw", Name: "A"})
+		if err != nil {
+			t.Fatalf("ensureDemoFixtureUser: %v", err)
+		}
+		if user.ID != "loaded-id" {
+			t.Fatalf("user.ID = %q, want loaded-id", user.ID)
+		}
+	})
+
+	t.Run("empty id load error", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("not found")
+		identity := newSeedFakeIdentity()
+		identity.ensureUserAccountFn = func(context.Context, string, string, string) (IdentityUser, error) {
+			return IdentityUser{}, nil
+		}
+		identity.getUserByEmailFn = func(context.Context, string) (IdentityUser, error) {
+			return IdentityUser{}, want
+		}
+		_, err := ensureDemoFixtureUser(ctx, identity, demoFixtureUser{Email: "a@b.com", Password: "pw"})
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+}
+
+func TestEnsureDemoOrgMembership(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	user := IdentityUser{ID: "u1", Email: "a@b.com"}
+
+	t.Run("already member by user id", func(t *testing.T) {
+		t.Parallel()
+		identity := newSeedFakeIdentity()
+		identity.listMembershipsFn = func(context.Context, string) ([]IdentityMembership, error) {
+			return []IdentityMembership{{UserID: "u1", Email: "other@x.com"}}, nil
+		}
+		identity.addMemberFn = func(context.Context, string, string, []string, bool) (IdentityMembership, error) {
+			t.Fatal("AddOrganizationUserByIDAsAdmin must not run for existing member")
+			return IdentityMembership{}, nil
+		}
+		if err := ensureDemoOrgMembership(ctx, identity, "organization-1", user, nil, true); err != nil {
+			t.Fatalf("ensureDemoOrgMembership: %v", err)
+		}
+	})
+
+	t.Run("already member by email", func(t *testing.T) {
+		t.Parallel()
+		identity := newSeedFakeIdentity()
+		identity.listMembershipsFn = func(context.Context, string) ([]IdentityMembership, error) {
+			return []IdentityMembership{{UserID: "other", Email: "A@B.com"}}, nil
+		}
+		if err := ensureDemoOrgMembership(ctx, identity, "organization-1", user, nil, true); err != nil {
+			t.Fatalf("ensureDemoOrgMembership: %v", err)
+		}
+	})
+
+	t.Run("list error", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("list failed")
+		identity := newSeedFakeIdentity()
+		identity.listMembershipsFn = func(context.Context, string) ([]IdentityMembership, error) {
+			return nil, want
+		}
+		err := ensureDemoOrgMembership(ctx, identity, "organization-1", user, nil, true)
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+
+	t.Run("add error", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("add failed")
+		identity := newSeedFakeIdentity()
+		identity.listMembershipsFn = func(context.Context, string) ([]IdentityMembership, error) {
+			return nil, nil
+		}
+		identity.addMemberFn = func(context.Context, string, string, []string, bool) (IdentityMembership, error) {
+			return IdentityMembership{}, want
+		}
+		err := ensureDemoOrgMembership(ctx, identity, "organization-1", user, []string{"chemist"}, true)
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+}
+
+func TestSeedDemoIdentityFailureStubs(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	fixture := demoFixture{
+		Orgs: []demoFixtureOrg{{Name: "Organization 1", Roles: []IdentityRole{{Slug: "op", Name: "Op"}}}},
+	}
+
+	t.Run("lookup org generic error", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("lookup boom")
+		identity := newSeedFakeIdentity()
+		identity.getOrgBySlugFn = func(context.Context, string) (*IdentityOrg, error) {
+			return nil, want
+		}
+		err := seedDemoIdentity(ctx, identity, fixture, false)
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+
+	t.Run("create org error", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("create boom")
+		identity := newSeedFakeIdentity()
+		identity.createOrgFn = func(context.Context, string) (IdentityOrg, error) {
+			return IdentityOrg{}, want
+		}
+		err := seedDemoIdentity(ctx, identity, fixture, false)
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+
+	t.Run("delete org error on replace", func(t *testing.T) {
+		t.Parallel()
+		want := errors.New("delete boom")
+		identity := newSeedFakeIdentity()
+		identity.deleteOrgFn = func(context.Context, string) error {
+			return want
+		}
+		err := seedDemoIdentity(ctx, identity, fixture, true)
+		if err == nil || !errors.Is(err, want) {
+			t.Fatalf("err = %v, want wrap of %v", err, want)
+		}
+	})
+}
+
 func TestSeedReplaceRewritesWhenMarkerPresent(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
 	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
@@ -289,6 +552,14 @@ type seedFakeIdentity struct {
 	usersByID    map[string]IdentityUser
 	memberships  map[string][]IdentityMembership
 	nextUser     int
+
+	getOrgBySlugFn      func(ctx context.Context, slug string) (*IdentityOrg, error)
+	createOrgFn         func(ctx context.Context, name string) (IdentityOrg, error)
+	deleteOrgFn         func(ctx context.Context, orgSlug string) error
+	ensureUserAccountFn func(ctx context.Context, email, password, name string) (IdentityUser, error)
+	getUserByEmailFn    func(ctx context.Context, email string) (IdentityUser, error)
+	listMembershipsFn   func(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	addMemberFn         func(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
 }
 
 var _ seedIdentity = (*seedFakeIdentity)(nil)
@@ -302,7 +573,10 @@ func newSeedFakeIdentity() *seedFakeIdentity {
 	}
 }
 
-func (s *seedFakeIdentity) GetOrganizationBySlug(_ context.Context, slug string) (*IdentityOrg, error) {
+func (s *seedFakeIdentity) GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error) {
+	if s.getOrgBySlugFn != nil {
+		return s.getOrgBySlugFn(ctx, slug)
+	}
 	org, ok := s.orgs[slug]
 	if !ok {
 		return nil, ErrIdentityNotFound
@@ -311,7 +585,10 @@ func (s *seedFakeIdentity) GetOrganizationBySlug(_ context.Context, slug string)
 	return &cp, nil
 }
 
-func (s *seedFakeIdentity) CreateOrganizationAsAdmin(_ context.Context, name string) (IdentityOrg, error) {
+func (s *seedFakeIdentity) CreateOrganizationAsAdmin(ctx context.Context, name string) (IdentityOrg, error) {
+	if s.createOrgFn != nil {
+		return s.createOrgFn(ctx, name)
+	}
 	slug := canonifySlug(name)
 	id := appwriteTeamIDFromSlug(slug)
 	org := IdentityOrg{ID: id, Slug: slug, Name: strings.TrimSpace(name), Roles: []IdentityRole{defaultOperatorCatalogRole()}}
@@ -332,13 +609,19 @@ func (s *seedFakeIdentity) UpdateOrganizationAsAdmin(_ context.Context, currentS
 	return org, nil
 }
 
-func (s *seedFakeIdentity) DeleteOrganizationAsAdmin(_ context.Context, orgSlug string) error {
+func (s *seedFakeIdentity) DeleteOrganizationAsAdmin(ctx context.Context, orgSlug string) error {
+	if s.deleteOrgFn != nil {
+		return s.deleteOrgFn(ctx, orgSlug)
+	}
 	delete(s.orgs, orgSlug)
 	delete(s.memberships, orgSlug)
 	return nil
 }
 
-func (s *seedFakeIdentity) EnsureUserAccount(_ context.Context, email, password, name string) (IdentityUser, error) {
+func (s *seedFakeIdentity) EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
+	if s.ensureUserAccountFn != nil {
+		return s.ensureUserAccountFn(ctx, email, password, name)
+	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" || strings.TrimSpace(password) == "" {
 		return IdentityUser{}, nil
@@ -357,7 +640,10 @@ func (s *seedFakeIdentity) EnsureUserAccount(_ context.Context, email, password,
 	return user, nil
 }
 
-func (s *seedFakeIdentity) GetUserByEmail(_ context.Context, email string) (IdentityUser, error) {
+func (s *seedFakeIdentity) GetUserByEmail(ctx context.Context, email string) (IdentityUser, error) {
+	if s.getUserByEmailFn != nil {
+		return s.getUserByEmailFn(ctx, email)
+	}
 	user, ok := s.usersByEmail[strings.ToLower(strings.TrimSpace(email))]
 	if !ok {
 		return IdentityUser{}, ErrIdentityNotFound
@@ -375,7 +661,10 @@ func (s *seedFakeIdentity) UpdateEmailVerification(_ context.Context, userID str
 	return nil
 }
 
-func (s *seedFakeIdentity) AddOrganizationUserByIDAsAdmin(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+func (s *seedFakeIdentity) AddOrganizationUserByIDAsAdmin(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+	if s.addMemberFn != nil {
+		return s.addMemberFn(ctx, orgSlug, userID, roleSlugs, isOrgAdmin)
+	}
 	if _, ok := s.orgs[orgSlug]; !ok {
 		return IdentityMembership{}, ErrIdentityNotFound
 	}
@@ -397,7 +686,10 @@ func (s *seedFakeIdentity) AddOrganizationUserByIDAsAdmin(_ context.Context, org
 	return m, nil
 }
 
-func (s *seedFakeIdentity) ListOrganizationMemberships(_ context.Context, orgSlug string) ([]IdentityMembership, error) {
+func (s *seedFakeIdentity) ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error) {
+	if s.listMembershipsFn != nil {
+		return s.listMembershipsFn(ctx, orgSlug)
+	}
 	return append([]IdentityMembership(nil), s.memberships[orgSlug]...), nil
 }
 

@@ -13,6 +13,103 @@ import (
 	"time"
 )
 
+func TestPrepareDemoStackPublicEntrySeedDisabled(t *testing.T) {
+	// Covers PrepareDemoStack + defaultPrepareHooks (nil client → DefaultClient).
+	err := PrepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled: boolPtr(false),
+		HTTPClient:  nil,
+	})
+	if err != nil {
+		t.Fatalf("PrepareDemoStack: %v", err)
+	}
+}
+
+func TestPrepareReadyTimeoutEnv(t *testing.T) {
+	cases := []struct {
+		name string
+		env  string
+		want int
+	}{
+		{name: "empty default", env: "", want: defaultAppwriteReadyTimeoutSeconds},
+		{name: "invalid", env: "abc", want: defaultAppwriteReadyTimeoutSeconds},
+		{name: "negative", env: "-3", want: defaultAppwriteReadyTimeoutSeconds},
+		{name: "parsed", env: "45", want: 45},
+		{name: "zero", env: "0", want: 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS", tc.env)
+			got := prepareReadyTimeout(PrepareDeps{})
+			if got != tc.want {
+				t.Fatalf("prepareReadyTimeout = %d, want %d", got, tc.want)
+			}
+		})
+	}
+	t.Run("explicit override", func(t *testing.T) {
+		t.Setenv("ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS", "45")
+		got := prepareReadyTimeout(PrepareDeps{ReadyTimeoutSeconds: intPtr(7)})
+		if got != 7 {
+			t.Fatalf("got %d, want 7", got)
+		}
+	})
+}
+
+func TestPrepareSeedEnabledNilReadsEnv(t *testing.T) {
+	t.Setenv("ATTESTA_SEED", "true")
+	if !prepareSeedEnabled(PrepareDeps{}) {
+		t.Fatal("expected ATTESTA_SEED=true to enable")
+	}
+	t.Setenv("ATTESTA_SEED", "0")
+	if prepareSeedEnabled(PrepareDeps{}) {
+		t.Fatal("expected ATTESTA_SEED=0 to disable")
+	}
+	if !prepareSeedEnabled(PrepareDeps{SeedEnabled: boolPtr(true)}) {
+		t.Fatal("explicit true should win")
+	}
+}
+
+func TestPreparePolicyIsSoftUnknown(t *testing.T) {
+	t.Parallel()
+	_, err := preparePolicyIsSoft("staging")
+	if err == nil || !strings.Contains(err.Error(), "unknown policy") {
+		t.Fatalf("err = %v, want unknown policy", err)
+	}
+	soft, err := preparePolicyIsSoft(PreparePolicyWorktree)
+	if err != nil || !soft {
+		t.Fatalf("worktree soft=%v err=%v", soft, err)
+	}
+	soft, err = preparePolicyIsSoft(PreparePolicyCoolify)
+	if err != nil || soft {
+		t.Fatalf("coolify soft=%v err=%v", soft, err)
+	}
+}
+
+func TestPrepareDemoStackNilWaitSeedError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	err := prepareDemoStack(t.Context(), PrepareDeps{
+		SeedEnabled:         boolPtr(true),
+		ReadyTimeoutSeconds: intPtr(5),
+		Endpoint:            srv.URL + "/v1",
+		HealthURL:           srv.URL + "/v1/health",
+		HTTPClient:          srv.Client(),
+		Seed: func(context.Context, appwriteRuntimeCredentials) error {
+			return errors.New("seed boom")
+		},
+	}, prepareHooks{
+		Wait: nil, // falls back to defaultPrepareHooks.Wait
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			return BootstrapResult{ProjectID: "attesta", APIKey: "k"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "seed boom") {
+		t.Fatalf("err = %v, want prepare: seed wrap", err)
+	}
+}
+
 func TestAttestaSeedEnabledTruthy(t *testing.T) {
 	t.Parallel()
 	for _, v := range []string{"1", "true", "TRUE", "yes", "YES", "on", "ON"} {

@@ -650,6 +650,24 @@ func newBootstrapConsoleStub(t *testing.T, opts bootstrapConsoleStubOpts) *httpt
 	}))
 }
 
+func TestTruncateForErr(t *testing.T) {
+	t.Parallel()
+	if got := truncateForErr(nil); got != "" {
+		t.Fatalf("nil = %q", got)
+	}
+	if got := truncateForErr([]byte("  hi  ")); got != "hi" {
+		t.Fatalf("trim = %q", got)
+	}
+	long := strings.Repeat("a", 300)
+	got := truncateForErr([]byte(long))
+	if !strings.HasSuffix(got, "…") || !strings.HasPrefix(got, long[:240]) {
+		t.Fatalf("truncated = %q", got)
+	}
+	if len(got) != 240+len("…") {
+		t.Fatalf("truncated byte len=%d, want %d", len(got), 240+len("…"))
+	}
+}
+
 func assertEnvFile(t *testing.T, path, projectID, apiKey string) {
 	t.Helper()
 	data, err := os.ReadFile(path)
