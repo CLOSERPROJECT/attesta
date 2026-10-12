@@ -175,7 +175,6 @@ tasks:
       - bash deployment/scripts/worktree-env_test.sh
       - bash deployment/scripts/dev-env_test.sh
       - bash deployment/scripts/worktree-bootstrap_test.sh
-      - bash deployment/scripts/worktree-relabel-volumes_test.sh
       - bash deployment/scripts/worktree-compose_test.sh
       - bash deployment/scripts/worktree-gc_test.sh
 

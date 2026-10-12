@@ -165,9 +165,6 @@ containers, networks, MongoDB, and Appwrite volumes stay isolated across linked
 worktrees and independent clones—even when two checkouts share a directory name.
 `task start`, `task stop`, `task reset`, `task status`, and `task logs` are all scoped to the current worktree.
 
-Before this worktree setup, `docker compose -f deployment/docker-compose.local.yaml` used `deployment` as its implicit project name.
-To keep those existing volumes attached, add `COMPOSE_PROJECT_NAME=deployment` once to the primary `.env.worktree` (or pass it for the first `task worktree:bootstrap` write). New checkouts do not need that.
-
 As in Credimi, Worktrunk's `hash_port` derives the initial value for each service.
 Bootstrap checks live TCP listeners and the ports reserved in sibling worktrees, then walks forward on collisions before writing `PORT`, `VITE_PORT`, `MONGODB_PORT`, `CERBOS_PORT`, `MONGO_EXPRESS_PORT`, `MAILPIT_SMTP_PORT`, `MAILPIT_UI_PORT`, `APPWRITE_HTTP_PORT`, `APPWRITE_HTTPS_PORT`, and `DOCKER_APP_PORT`.
 Edit the generated `.env.worktree` for any manual override.
@@ -179,12 +176,8 @@ Parallel worktrees start with empty durable volumes. Demo data comes only from t
 `task reset` and `task purge` delete the volumes; the next start initializes empty Appwrite MariaDB, then applies the Go demo seed when `ATTESTA_SEED=true` and credentials exist.
 Worktrunk removal runs a non-interactive `pre-remove` hook that deletes the worktree's Compose volumes.
 Codex can remove managed worktrees without that hook; use the checked-in purge action before archiving, or run `task worktree:gc` from an active checkout to preview orphaned Attesta Docker resources, then `task worktree:gc:apply` to remove them.
-Garbage collection is scoped to this repository clone and ignores foreign or unlabeled legacy resources.
+Garbage collection is scoped to this repository clone and ignores foreign or unlabeled resources.
 Reset and purge enumerate every volume in the current Compose project and refuse deletion unless all ownership labels match the current checkout.
-Volumes preserved from the legacy `deployment` project start unlabeled because Docker cannot add labels in place.
-The next `task start` / `task dev` copies each unlabeled volume onto a same-named labeled replacement (data preserved) so Compose stops prompting to recreate them.
-After that migration, reset and purge can manage those volumes normally.
-To discard legacy data instead, inspect with `docker volume ls --filter label=com.docker.compose.project=deployment`, remove the confirmed volume names, then start again for fresh labeled volumes.
 
 **[🔝 back to top](#toc)**
 
