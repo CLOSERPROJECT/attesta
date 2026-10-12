@@ -62,12 +62,20 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 	}
 }
 
-// appwriteIdentityFromEnvOptions controls how appwriteIdentityFromEnv reads APPWRITE_*.
+// appwriteRuntimeCredentials is the value form of Appwrite identity open params.
+// PrepareDemoStack passes this into Seed; standalone seed opens from process env.
+type appwriteRuntimeCredentials struct {
+	Endpoint  string
+	ProjectID string
+	APIKey    string
+}
+
+// appwriteIdentityFromEnvOptions controls RequireAll / HTTPClient for identity open.
 //
-// RequireAll (seed): trimmed APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY
-// are all required; returns an error if any is empty.
+// RequireAll (seed): trimmed Endpoint, ProjectID, and APIKey are all required;
+// returns an error if any is empty.
 //
-// Lax / default (main): APPWRITE_ENDPOINT defaults to http://appwrite/v1 when unset
+// Lax / default (main): Endpoint defaults to http://appwrite/v1 when unset
 // (same as envOr); project ID and API key are trimmed and may be empty.
 //
 // HTTPClient is passed through to NewAppwriteIdentity; the helper never chooses a client.
@@ -76,19 +84,30 @@ type appwriteIdentityFromEnvOptions struct {
 	HTTPClient *http.Client
 }
 
-func appwriteIdentityFromEnv(opts appwriteIdentityFromEnvOptions) (IdentityStore, error) {
-	projectID := strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID"))
-	apiKey := strings.TrimSpace(os.Getenv("APPWRITE_API_KEY"))
+func appwriteIdentityFromCredentials(creds appwriteRuntimeCredentials, opts appwriteIdentityFromEnvOptions) (IdentityStore, error) {
+	projectID := strings.TrimSpace(creds.ProjectID)
+	apiKey := strings.TrimSpace(creds.APIKey)
 	var endpoint string
 	if opts.RequireAll {
-		endpoint = strings.TrimSpace(os.Getenv("APPWRITE_ENDPOINT"))
+		endpoint = strings.TrimSpace(creds.Endpoint)
 		if endpoint == "" || projectID == "" || apiKey == "" {
 			return nil, fmt.Errorf("APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY are required")
 		}
 	} else {
-		endpoint = envOr("APPWRITE_ENDPOINT", "http://appwrite/v1")
+		endpoint = strings.TrimSpace(creds.Endpoint)
+		if endpoint == "" {
+			endpoint = "http://appwrite/v1"
+		}
 	}
 	return NewAppwriteIdentity(endpoint, projectID, apiKey, opts.HTTPClient), nil
+}
+
+func appwriteIdentityFromEnv(opts appwriteIdentityFromEnvOptions) (IdentityStore, error) {
+	return appwriteIdentityFromCredentials(appwriteRuntimeCredentials{
+		Endpoint:  os.Getenv("APPWRITE_ENDPOINT"),
+		ProjectID: os.Getenv("APPWRITE_PROJECT_ID"),
+		APIKey:    os.Getenv("APPWRITE_API_KEY"),
+	}, opts)
 }
 
 func appwriteOrgAssetsBucket() string {

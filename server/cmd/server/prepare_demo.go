@@ -49,15 +49,17 @@ type PrepareDeps struct {
 	// Bootstrap overrides BootstrapAppwriteProject (tests).
 	Bootstrap func(ctx context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error)
 
-	// Seed runs after env is applied. When nil, PrepareDemoStack returns
-	// after bootstrap/env so the CLI can open a seed session with fresh env.
-	Seed func(ctx context.Context) error
+	// Seed receives Appwrite open params by value. When nil, PrepareDemoStack
+	// returns after bootstrap (env file may still be written for Server restart).
+	Seed func(ctx context.Context, creds appwriteRuntimeCredentials) error
 
 	// BootstrapDeps supplies bootstrap inputs; empty fields filled from env.
 	BootstrapDeps BootstrapAppwriteDeps
 }
 
-// PrepareDemoStack gates on ATTESTA_SEED, then wait → bootstrap → apply env → seed.
+// PrepareDemoStack gates on ATTESTA_SEED, then wait → bootstrap → seed.
+// Bootstrap may still write the on-disk runtime env file for Server startup;
+// prepare→seed does not mutate process env or apply that file in-process.
 // When seed is disabled it is a no-op success.
 func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	if err := ctx.Err(); err != nil {
@@ -97,22 +99,27 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	}
 	bootstrapDeps := mergeBootstrapDeps(deps.BootstrapDeps, deps.EnvFilePath)
 	result, err := bootstrapFn(ctx, bootstrapDeps)
+	var creds appwriteRuntimeCredentials
 	if err != nil {
 		if soft {
 			log.Printf("warning: attesta bootstrap failed; continuing with existing APPWRITE_* credentials: %v", err)
+			creds = appwriteRuntimeCredentials{
+				Endpoint:  os.Getenv("APPWRITE_ENDPOINT"),
+				ProjectID: os.Getenv("APPWRITE_PROJECT_ID"),
+				APIKey:    os.Getenv("APPWRITE_API_KEY"),
+			}
 		} else {
 			return fmt.Errorf("prepare: bootstrap: %w", err)
 		}
 	} else {
-		_ = os.Setenv("APPWRITE_PROJECT_ID", result.ProjectID)
-		_ = os.Setenv("APPWRITE_API_KEY", result.APIKey)
+		creds = appwriteRuntimeCredentials{
+			Endpoint:  deps.Endpoint,
+			ProjectID: result.ProjectID,
+			APIKey:    result.APIKey,
+		}
 	}
 
-	if err := applyAppwriteRuntimeEnvFile(deps.EnvFilePath); err != nil {
-		return fmt.Errorf("prepare: apply env file: %w", err)
-	}
-
-	if missing := missingAppwriteCredentials(); len(missing) > 0 {
+	if missing := missingAppwriteCredentials(creds); len(missing) > 0 {
 		msg := "prepare: missing " + strings.Join(missing, ", ")
 		if soft {
 			log.Printf("skipping attesta seed: %s (or run task seed later)", msg)
@@ -124,7 +131,7 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	if deps.Seed == nil {
 		return nil
 	}
-	if err := deps.Seed(ctx); err != nil {
+	if err := deps.Seed(ctx, creds); err != nil {
 		return fmt.Errorf("prepare: seed: %w", err)
 	}
 	return nil
@@ -228,15 +235,15 @@ func mergeBootstrapDeps(deps BootstrapAppwriteDeps, envFilePath string) Bootstra
 	return deps
 }
 
-func missingAppwriteCredentials() []string {
+func missingAppwriteCredentials(creds appwriteRuntimeCredentials) []string {
 	var missing []string
-	if strings.TrimSpace(os.Getenv("APPWRITE_ENDPOINT")) == "" {
+	if strings.TrimSpace(creds.Endpoint) == "" {
 		missing = append(missing, "APPWRITE_ENDPOINT")
 	}
-	if strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")) == "" {
+	if strings.TrimSpace(creds.ProjectID) == "" {
 		missing = append(missing, "APPWRITE_PROJECT_ID")
 	}
-	if strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")) == "" {
+	if strings.TrimSpace(creds.APIKey) == "" {
 		missing = append(missing, "APPWRITE_API_KEY")
 	}
 	return missing

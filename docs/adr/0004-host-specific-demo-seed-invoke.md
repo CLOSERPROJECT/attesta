@@ -1,6 +1,6 @@
 # Demo fixture seed invoke stays host-specific
 
-Coolify Preview and local worktree Compose both gate on `ATTESTA_SEED` and prepare an empty Appwrite + demo fixture before serving (or after local infra is up). Shared orchestration lives in the Go seam `PrepareDemoStack` / CLI `attesta prepare`: enable-gate → wait for Appwrite `/v1/health` → `BootstrapAppwriteProject` → apply runtime env file in-process → `Seed` (empty-only).
+Coolify Preview and local worktree Compose both gate on `ATTESTA_SEED` and prepare an empty Appwrite + demo fixture before serving (or after local infra is up). Shared orchestration lives in the Go seam `PrepareDemoStack` / CLI `attesta prepare`: enable-gate → wait for Appwrite `/v1/health` → `BootstrapAppwriteProject` → `Seed` (empty-only) with Appwrite open params passed by value. Bootstrap may still write the on-disk runtime env file; that file is only the Server restart adapter (main applies it after Coolify prepare), not an in-process prepare→seed channel.
 
 **Decision:** Keep *host invocation policy* in thin adapters via `--policy`. Adapters do not reimplement wait/bootstrap/seed in shell.
 

@@ -5,7 +5,7 @@ import (
 )
 
 func runSeedCommand(ctx context.Context, args []string) error {
-	return runSeedSession(ctx, args, seedReplaceFromArgs(args))
+	return runSeedSession(ctx, args, seedReplaceFromArgs(args), nil)
 }
 
 func seedReplaceFromArgs(args []string) bool {

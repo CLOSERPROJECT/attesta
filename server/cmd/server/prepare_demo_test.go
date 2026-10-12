@@ -39,7 +39,7 @@ func TestPrepareDemoStackSeedDisabledNoop(t *testing.T) {
 			calls = append(calls, "bootstrap")
 			return BootstrapResult{}, nil
 		},
-		Seed: func(context.Context) error {
+		Seed: func(context.Context, appwriteRuntimeCredentials) error {
 			calls = append(calls, "seed")
 			return nil
 		},
@@ -88,10 +88,13 @@ func TestPrepareDemoStackOrderWaitBootstrapSeed(t *testing.T) {
 			}
 			return BootstrapResult{ProjectID: "attesta", APIKey: "from-bootstrap", Created: true}, nil
 		},
-		Seed: func(context.Context) error {
+		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
 			mu.Lock()
 			defer mu.Unlock()
 			calls = append(calls, "seed")
+			if creds.Endpoint != "http://appwrite/v1" || creds.ProjectID != "attesta" || creds.APIKey != "from-bootstrap" {
+				t.Fatalf("seed creds = %#v", creds)
+			}
 			return nil
 		},
 	})
@@ -164,8 +167,11 @@ func TestPrepareDemoStackWorktreePolicySoftBootstrapContinues(t *testing.T) {
 			calls = append(calls, "bootstrap")
 			return BootstrapResult{}, errors.New("console unavailable")
 		},
-		Seed: func(context.Context) error {
+		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
 			calls = append(calls, "seed")
+			if creds.Endpoint != "http://appwrite/v1" || creds.ProjectID != "attesta" || creds.APIKey != "existing-key" {
+				t.Fatalf("seed creds after soft bootstrap = %#v", creds)
+			}
 			return nil
 		},
 	})
@@ -191,7 +197,7 @@ func TestPrepareDemoStackCoolifyPolicyHardBootstrapFails(t *testing.T) {
 			calls = append(calls, "bootstrap")
 			return BootstrapResult{}, errors.New("console unavailable")
 		},
-		Seed: func(context.Context) error {
+		Seed: func(context.Context, appwriteRuntimeCredentials) error {
 			calls = append(calls, "seed")
 			return nil
 		},
@@ -221,7 +227,7 @@ func TestPrepareDemoStackWorktreePolicySkipsMissingCredentials(t *testing.T) {
 		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
 			return BootstrapResult{}, errors.New("console unavailable")
 		},
-		Seed: func(context.Context) error {
+		Seed: func(context.Context, appwriteRuntimeCredentials) error {
 			seeded = true
 			return nil
 		},
@@ -250,7 +256,10 @@ func TestPrepareDemoStackTimeoutZeroSkipsWait(t *testing.T) {
 		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
 			return BootstrapResult{ProjectID: "attesta", APIKey: "k"}, nil
 		},
-		Seed: func(context.Context) error {
+		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
+			if creds.ProjectID != "attesta" || creds.APIKey != "k" {
+				t.Fatalf("seed creds = %#v", creds)
+			}
 			seeded = true
 			return nil
 		},
@@ -266,13 +275,13 @@ func TestPrepareDemoStackTimeoutZeroSkipsWait(t *testing.T) {
 	}
 }
 
-func TestPrepareDemoStackAppliesEnvFileBeforeSeed(t *testing.T) {
+func TestPrepareDemoStackPassesBootstrapCredsWithoutMutatingEnv(t *testing.T) {
 	envPath := filepath.Join(t.TempDir(), "attesta-appwrite.env")
 	t.Setenv("APPWRITE_API_KEY", "stale-key")
 	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
 	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
 
-	var seedSawKey string
+	var seedCreds appwriteRuntimeCredentials
 	err := PrepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(0),
@@ -284,19 +293,19 @@ func TestPrepareDemoStackAppliesEnvFileBeforeSeed(t *testing.T) {
 			}
 			return BootstrapResult{ProjectID: "attesta", APIKey: "fresh-key", Created: true}, nil
 		},
-		Seed: func(context.Context) error {
-			seedSawKey = os.Getenv("APPWRITE_API_KEY")
+		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
+			seedCreds = creds
 			return nil
 		},
 	})
 	if err != nil {
 		t.Fatalf("PrepareDemoStack: %v", err)
 	}
-	if seedSawKey != "fresh-key" {
-		t.Fatalf("seed saw APPWRITE_API_KEY=%q, want fresh-key", seedSawKey)
+	if seedCreds.Endpoint != "http://appwrite/v1" || seedCreds.ProjectID != "attesta" || seedCreds.APIKey != "fresh-key" {
+		t.Fatalf("seed creds = %#v", seedCreds)
 	}
-	if os.Getenv("APPWRITE_API_KEY") != "fresh-key" {
-		t.Fatalf("process env APPWRITE_API_KEY=%q after prepare", os.Getenv("APPWRITE_API_KEY"))
+	if got := os.Getenv("APPWRITE_API_KEY"); got != "stale-key" {
+		t.Fatalf("process env APPWRITE_API_KEY=%q after prepare, want stale-key (unmutated)", got)
 	}
 }
 

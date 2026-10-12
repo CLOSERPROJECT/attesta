@@ -17,12 +17,12 @@ func runPrepareCommand(ctx context.Context, args []string) error {
 
 	deps := PrepareDeps{Policy: policy}
 
-	return PrepareDemoStack(ctx, deps.withSeedRunner(func(ctx context.Context) error {
-		return runSeedSession(ctx, nil, false)
+	return PrepareDemoStack(ctx, deps.withSeedRunner(func(ctx context.Context, creds appwriteRuntimeCredentials) error {
+		return runSeedSession(ctx, nil, false, &creds)
 	}))
 }
 
-func (d PrepareDeps) withSeedRunner(seed func(context.Context) error) PrepareDeps {
+func (d PrepareDeps) withSeedRunner(seed func(context.Context, appwriteRuntimeCredentials) error) PrepareDeps {
 	d.Seed = seed
 	return d
 }

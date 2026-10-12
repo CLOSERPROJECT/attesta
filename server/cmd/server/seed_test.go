@@ -220,6 +220,24 @@ func TestAppwriteIdentityFromEnvRequiresEnv(t *testing.T) {
 	}
 }
 
+func TestAppwriteIdentityFromCredentialsRequiresAll(t *testing.T) {
+	t.Parallel()
+	if _, err := appwriteIdentityFromCredentials(appwriteRuntimeCredentials{}, appwriteIdentityFromEnvOptions{RequireAll: true}); err == nil {
+		t.Fatal("expected missing credentials error")
+	}
+	identity, err := appwriteIdentityFromCredentials(appwriteRuntimeCredentials{
+		Endpoint:  "http://appwrite/v1",
+		ProjectID: "attesta",
+		APIKey:    "key",
+	}, appwriteIdentityFromEnvOptions{RequireAll: true})
+	if err != nil {
+		t.Fatalf("appwriteIdentityFromCredentials: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("expected identity")
+	}
+}
+
 func TestSeedReplaceRewritesWhenMarkerPresent(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
 	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")

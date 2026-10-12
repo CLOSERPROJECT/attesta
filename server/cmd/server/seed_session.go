@@ -122,9 +122,16 @@ func withSeedSession(
 // runSeedSession opens the default demo-seed session (Mongo + required Appwrite
 // identity) and runs Seed. Flag parsing stays in each CLI; replace only changes
 // SeedDeps and the success log line.
-func runSeedSession(ctx context.Context, args []string, replace bool) error {
+//
+// When creds is nil, identity opens from process environment (standalone
+// `attesta seed`). When non-nil, identity opens from those values (prepare→seed).
+func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
 	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
-		return appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true})
+		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
+		if creds == nil {
+			return appwriteIdentityFromEnv(opts)
+		}
+		return appwriteIdentityFromCredentials(*creds, opts)
 	}, func(sess seedSession) error {
 		if err := Seed(ctx, SeedDeps{
 			Identity:       sess.Identity,
