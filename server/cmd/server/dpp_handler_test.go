@@ -171,7 +171,8 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	if !strings.Contains(body, `class="dpp-history-item"`) {
 		t.Fatalf("expected dpp history rail wrapper in body, got %q", body)
 	}
-	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(body, "<dd>1</dd>") {
+	compactBody := strings.Join(strings.Fields(body), " ")
+	if !strings.Contains(body, "<dt>value</dt>") || !strings.Contains(compactBody, "<dd> 1 </dd>") {
 		t.Fatalf("expected inline traceability value in body, got %q", body)
 	}
 	if strings.Contains(body, ">Documents<") {
@@ -575,13 +576,14 @@ func TestHandleDigitalLinkDPPHTMLRendersOverrideSubstepValues(t *testing.T) {
 		t.Fatalf("expected status %d, got %d body=%q", http.StatusOK, rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
+	compactBody := strings.Join(strings.Fields(body), " ")
 	for _, want := range []string{
 		"Completed with local form adaptation.",
 		"Reason: local source shape",
 		"<dt>value</dt>",
-		"<dd>override-ok</dd>",
+		"<dd> override-ok </dd>",
 	} {
-		if !strings.Contains(body, want) {
+		if !strings.Contains(body, want) && !strings.Contains(compactBody, strings.Join(strings.Fields(want), " ")) {
 			t.Fatalf("expected %q in DPP override body, got: %s", want, body)
 		}
 	}
