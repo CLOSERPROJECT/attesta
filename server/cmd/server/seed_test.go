@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -137,36 +138,67 @@ func TestSeedPopulatesTaxonomyCatalogAndInstances(t *testing.T) {
 	}
 }
 
-func TestWithSeedSessionAppliesFixture(t *testing.T) {
+func TestSeedLeavesEveryFifthStreamEmpty(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
 	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
-	t.Setenv("CATEGORIES_SEED", "")
 
 	store := NewMemoryStore()
-	identity := newSeedFakeIdentity()
-	dir := writeSeedTestConfigDir(t)
+	dir := writeSeedTestConfigDirWithLeaves(t, 5)
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:  newSeedFakeIdentity(),
+		Store:     store,
+		ConfigDir: dir,
+		RNG:       &fixedCatalogRNG{n: 0}, // 1 stream per leaf → 5 sorted keys
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
 
-	err := withSeedSession(t.Context(), nil, dir,
-		func(context.Context) (Store, func(), error) { return store, func() {}, nil },
-		func() (IdentityStore, error) { return identity, nil },
-		func(sess seedSession) error {
-			return Seed(t.Context(), SeedDeps{
-				Identity:       sess.Identity,
-				Store:          sess.Store,
-				ConfigDir:      sess.ConfigDir,
-				CategoriesPath: sess.CategoriesPath,
-			})
-		},
-	)
+	server := &Server{store: store, configDir: dir}
+	catalog, err := server.workflowCatalog()
 	if err != nil {
-		t.Fatalf("withSeedSession: %v", err)
+		t.Fatalf("workflowCatalog: %v", err)
 	}
-	if _, err := identity.GetOrganizationBySlug(t.Context(), demoFixtureMarkerOrgSlug); err != nil {
-		t.Fatalf("marker org: %v", err)
+	if len(catalog) != 5 {
+		t.Fatalf("catalog size = %d, want 5", len(catalog))
 	}
-	cats, err := store.ListCategories(t.Context())
-	if err != nil || len(cats) == 0 {
-		t.Fatalf("categories=%v err=%v", cats, err)
+
+	var empty, seeded int
+	for key := range catalog {
+		procs, listErr := store.ListRecentProcessesByWorkflow(t.Context(), key, 0)
+		if listErr != nil {
+			t.Fatalf("ListRecentProcessesByWorkflow %s: %v", key, listErr)
+		}
+		switch len(procs) {
+		case 0:
+			empty++
+		case 8:
+			seeded++
+		default:
+			t.Fatalf("%s instances = %d, want 0 or 8", key, len(procs))
+		}
+	}
+	if empty != 1 || seeded != 4 {
+		t.Fatalf("empty=%d seeded=%d, want empty=1 seeded=4", empty, seeded)
+	}
+}
+
+func TestSeedErrorsOnMissingTaxonomyFile(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
+
+	dir := writeSeedTestConfigDir(t)
+	err := Seed(t.Context(), SeedDeps{
+		Identity:       newSeedFakeIdentity(),
+		Store:          NewMemoryStore(),
+		ConfigDir:      dir,
+		CategoriesPath: filepath.Join(t.TempDir(), "missing.yaml"),
+		RNG:            &fixedCatalogRNG{n: 1},
+	})
+	if err == nil {
+		t.Fatal("expected missing taxonomy file error")
+	}
+	if !strings.Contains(err.Error(), "taxonomy") {
+		t.Fatalf("err = %v, want taxonomy wrap", err)
 	}
 }
 
@@ -176,25 +208,6 @@ func TestSeedReplaceFromArgs(t *testing.T) {
 	}
 	if seedReplaceFromArgs(nil) {
 		t.Fatal("expected no replace")
-	}
-}
-
-func TestWithSeedSessionRequiresOpeners(t *testing.T) {
-	if err := withSeedSession(t.Context(), nil, t.TempDir(), nil, func() (IdentityStore, error) { return newSeedFakeIdentity(), nil }, func(seedSession) error {
-		return nil
-	}); err == nil {
-		t.Fatal("expected nil store opener error")
-	}
-	if err := withSeedSession(t.Context(), nil, t.TempDir(), func(context.Context) (Store, func(), error) {
-		return NewMemoryStore(), nil, nil
-	}, nil, func(sess seedSession) error {
-		return Seed(t.Context(), SeedDeps{
-			Identity:  sess.Identity,
-			Store:     sess.Store,
-			ConfigDir: sess.ConfigDir,
-		})
-	}); err == nil {
-		t.Fatal("expected nil identity error")
 	}
 }
 
@@ -384,20 +397,30 @@ func (s *seedFakeIdentity) putUser(user IdentityUser) {
 
 func writeSeedTestConfigDir(t *testing.T) string {
 	t.Helper()
+	return writeSeedTestConfigDirWithLeaves(t, 1)
+}
+
+func writeSeedTestConfigDirWithLeaves(t *testing.T, leafCount int) string {
+	t.Helper()
+	if leafCount < 1 {
+		t.Fatalf("leafCount = %d, want >= 1", leafCount)
+	}
 	dir := t.TempDir()
-	taxonomy := `
-categories:
-  - slug: supply-chain
-    name: Supply Chain
-    icon: batch-traceability
-    sortOrder: 1
-    subCategories:
-      - slug: procurement
-        name: Procurement
-        icon: procurement-workflow
-        sortOrder: 1
-`
-	if err := os.WriteFile(filepath.Join(dir, "categories.yaml"), []byte(taxonomy), 0o644); err != nil {
+	var taxonomy strings.Builder
+	taxonomy.WriteString("categories:\n  - slug: supply-chain\n    name: Supply Chain\n    icon: batch-traceability\n    sortOrder: 1\n    subCategories:\n")
+	for i := 0; i < leafCount; i++ {
+		slug := "leaf-" + string(rune('a'+i))
+		name := "Leaf " + string(rune('A'+i))
+		if leafCount == 1 {
+			slug = "procurement"
+			name = "Procurement"
+		}
+		taxonomy.WriteString("      - slug: " + slug + "\n")
+		taxonomy.WriteString("        name: " + name + "\n")
+		taxonomy.WriteString("        icon: procurement-workflow\n")
+		taxonomy.WriteString("        sortOrder: " + strconv.Itoa(i+1) + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "categories.yaml"), []byte(taxonomy.String()), 0o644); err != nil {
 		t.Fatalf("write categories: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte(minimalCategorizedWorkflowYAML(

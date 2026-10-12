@@ -27,6 +27,13 @@ func TestSeedStreamLeftEmptyEveryFifth(t *testing.T) {
 	}
 }
 
+func TestSeedDemoInstancesEmptyCatalog(t *testing.T) {
+	_, err := seedDemoInstances(t.Context(), NewMemoryStore(), map[string]RuntimeConfig{}, time.Now().UTC())
+	if err == nil {
+		t.Fatal("expected empty catalog error")
+	}
+}
+
 func TestBuildSeedInstancePlansMix(t *testing.T) {
 	cfg := RuntimeConfig{
 		Workflow: WorkflowDef{
