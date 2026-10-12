@@ -31,7 +31,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/yaml.v3"
 )
 
@@ -142,7 +141,6 @@ type FakeNotary struct {
 }
 
 type Server struct {
-	mongo              *mongo.Client
 	store              Store
 	process            *ProcessService
 	identity           IdentityStore
@@ -743,50 +741,42 @@ type workflowContextValue struct {
 
 func main() {
 	ctx := context.Background()
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-categories" {
-		if err := runSeedCategoriesCommand(ctx, os.Args[2:]); err != nil {
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "prepare" {
+		if err := runPrepareCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-instances" {
-		if err := runSeedInstancesCommand(ctx, os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-catalog-streams" {
-		if err := runSeedCatalogStreamsCommand(ctx, os.Args[2:]); err != nil {
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed" {
+		if err := runSeedCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
 
-	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	store, configDir, _, err := openMongoStore(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := client.Ping(ctx, nil); err != nil {
-		log.Fatal(err)
-	}
 
-	db := client.Database("closer_demo")
 	tmpl, err := parseTemplates()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defaultConfigPath := envOr("WORKFLOW_CONFIG", "config/workflow.yaml")
-	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
-	if configDir == "" {
-		configDir = filepath.Dir(defaultConfigPath)
+	// Coolify prepare writes APPWRITE_* here; file wins over stale injected keys.
+	if err := applyAppwriteRuntimeEnvFile(envOr("ATTESTA_APPWRITE_ENV_FILE", defaultAppwriteBootstrapEnvFile)); err != nil {
+		log.Fatal(err)
+	}
+
+	identity, err := appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{HTTPClient: http.DefaultClient})
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	server := &Server{
-		mongo:              client,
-		store:              &MongoStore{db: db},
-		identity:           NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
+		store:              store,
+		identity:           identity,
 		tmpl:               tmpl,
 		authorizer:         NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:                newSSEHub(),
@@ -803,10 +793,7 @@ func main() {
 		turnstileClient:    http.DefaultClient,
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
-	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
-		log.Fatal(err)
-	}
-	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
+	if err := ensureEmptyConfigFoundation(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
 	if err := server.bootstrapPlatformAdminIdentity(ctx); err != nil {
@@ -1410,64 +1397,6 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		user.Status = "active"
 	}
 	return user
-}
-
-func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
-	if store == nil {
-		return nil
-	}
-	existing, err := store.ListFormataBuilderStreams(ctx)
-	if err != nil {
-		return err
-	}
-	if len(existing) > 0 {
-		return nil
-	}
-
-	dir := strings.TrimSpace(configDir)
-	if dir == "" {
-		dir = "config"
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("config dir not found: %w", err)
-	}
-	paths := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !isWorkflowCatalogConfigFile(name) {
-			continue
-		}
-		paths = append(paths, filepath.Join(dir, name))
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return errors.New("workflow config catalog is empty")
-	}
-
-	updatedAt := time.Now().UTC()
-	if now != nil {
-		updatedAt = now().UTC()
-	}
-	for _, path := range paths {
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return fmt.Errorf("read config %s: %w", path, readErr)
-		}
-		creatorID := platformAdminStreamUserID()
-		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
-			Stream:          string(data),
-			UpdatedAt:       updatedAt,
-			CreatedByUserID: creatorID,
-			UpdatedByUserID: creatorID,
-		}); saveErr != nil {
-			return fmt.Errorf("seed formata stream %s: %w", filepath.Base(path), saveErr)
-		}
-	}
-	return nil
 }
 
 func attachmentMaxBytes() int64 {

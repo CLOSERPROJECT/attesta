@@ -43,7 +43,7 @@ load_env() {
   eval "${worktree_exports}"
   ATTESTA_WORKTREE_ROOT="$(cd "${ROOT_DIR}" && pwd -P)"
   ATTESTA_REPOSITORY_ID="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id)"
-  export COMPOSE_PROJECT_NAME APPWRITE_RESTORE_SEED_SQL ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
+  export COMPOSE_PROJECT_NAME ATTESTA_SEED ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
 }
 
 compose() {
@@ -79,39 +79,10 @@ verify_volume_ownership() {
   [[ "${unsafe}" -eq 0 ]]
 }
 
-wait_for_appwrite() {
-  local port="${APPWRITE_HTTP_PORT:-}"
-  local timeout="${ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS:-120}"
-  local deadline code
-  [[ "${port}" =~ ^[0-9]+$ ]] || {
-    echo "error: APPWRITE_HTTP_PORT is required to wait for Appwrite readiness" >&2
-    return 1
-  }
-  [[ "${timeout}" =~ ^[0-9]+$ ]] || {
-    echo "error: ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS must be a non-negative integer" >&2
-    return 1
-  }
-  # Tests set timeout 0 to skip the readiness probe.
-  if [[ "${timeout}" -eq 0 ]]; then
-    return 0
-  fi
-  command -v curl >/dev/null 2>&1 || {
-    echo "error: curl is required to wait for Appwrite readiness" >&2
-    return 1
-  }
-  deadline=$((SECONDS + timeout))
-  echo "waiting for Appwrite on localhost:${port}"
-  while ((SECONDS < deadline)); do
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
-      "http://127.0.0.1:${port}/v1/health" 2>/dev/null || true)"
-    # Guests get 401 once Appwrite is serving; treat that as ready.
-    if [[ "${code}" == "200" || "${code}" == "401" ]]; then
-      return 0
-    fi
-    sleep 0.5
-  done
-  echo "error: Appwrite did not become ready on localhost:${port} within ${timeout}s" >&2
-  return 1
+# Worktree-policy prepare (ADR-0004): Go owns gate/wait/bootstrap/env/seed.
+maybe_run_attesta_prepare() {
+  echo "running attesta prepare (ATTESTA_SEED=${ATTESTA_SEED:-false})"
+  (cd "${ROOT_DIR}/server" && go run ./cmd/server prepare --policy=worktree)
 }
 
 up() {
@@ -133,14 +104,13 @@ up() {
     echo "error: Compose configuration contains no infrastructure services" >&2
     exit 1
   }
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
+  bash "${ROOT_DIR}/scripts/worktree-relabel-volumes.sh"
   if [[ "${build}" -eq 1 ]]; then
     compose up -d --build "${services[@]}"
   else
     compose up -d "${services[@]}"
   fi
-  wait_for_appwrite
+  maybe_run_attesta_prepare
   compose ps
 }
 
@@ -168,14 +138,13 @@ up_app() {
     echo "error: Compose configuration contains no services" >&2
     exit 1
   }
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes
-  bash "${ROOT_DIR}/scripts/worktree-data.sh" restore
+  bash "${ROOT_DIR}/scripts/worktree-relabel-volumes.sh"
   if [[ "${build}" -eq 1 ]]; then
     compose up -d --build "${services[@]}"
   else
     compose up -d "${services[@]}"
   fi
-  wait_for_appwrite
+  maybe_run_attesta_prepare
   compose ps
 }
 
@@ -197,7 +166,7 @@ main() {
       verify_volume_ownership
       compose down -v --remove-orphans
       ;;
-    relabel-volumes) bash "${ROOT_DIR}/scripts/worktree-data.sh" relabel-volumes ;;
+    relabel-volumes) bash "${ROOT_DIR}/scripts/worktree-relabel-volumes.sh" ;;
     ps) compose ps ;;
     logs) compose logs -f ;;
     mongo-ping) compose exec -T mongodb mongosh --quiet --eval "db.adminCommand('ping')" ;;
