@@ -124,7 +124,7 @@ func bootstrapTaxonomy(ctx context.Context, store Store, configDir string) error
 		return nil
 	}
 
-	path := resolveCategoriesSeedPath(os.Getenv("CATEGORIES_SEED"), configDir)
+	path := resolveCategoriesSeedPath("", configDir)
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return nil

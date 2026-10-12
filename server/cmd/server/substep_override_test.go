@@ -190,10 +190,9 @@ func TestCompletedSubstepBodyViewExposesLocalAdaptationReason(t *testing.T) {
 	}
 }
 
-func TestGetSubstepOverrideRendersFormataURLAndTargetData(t *testing.T) {
+func TestGetSubstepOverrideRendersEmptyFormataArchURLAndSaveRoute(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-	server.formataArchURL = "https://forms.example.test"
 	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID+"/substep/1.1/override", nil)
 	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
 	rr := httptest.NewRecorder()
@@ -202,23 +201,12 @@ func TestGetSubstepOverrideRendersFormataURLAndTargetData(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "https://forms.example.test") || !strings.Contains(body, "/instance/"+processID+"/substep/1.1/override") {
-		t.Fatalf("editor body missing formata url/save route: %s", body)
+	// Stub template: OVERRIDE_EDITOR {{.SubstepID}} {{.FormataArchURL}} {{.SaveURL}}
+	if !strings.Contains(body, "OVERRIDE_EDITOR 1.1  ") {
+		t.Fatalf("editor body missing empty FormataArchURL: %s", body)
 	}
-}
-
-func TestGetSubstepOverrideAllowsSameOriginBuilderWhenFormataURLMissing(t *testing.T) {
-	store := NewMemoryStore()
-	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
-	req := httptest.NewRequest(http.MethodGet, "/instance/"+processID+"/substep/1.1/override", nil)
-	req.AddCookie(&http.Cookie{Name: "demo_user", Value: "u1|dep1"})
-	rr := httptest.NewRecorder()
-	server.handleGetSubstepOverride(rr, req, processID, "1.1")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
-	if strings.Contains(rr.Body.String(), "FORMATA_ARCH_URL is not configured") {
-		t.Fatalf("did not expect configuration error: %s", rr.Body.String())
+	if !strings.Contains(body, "/substep/1.1/override") {
+		t.Fatalf("editor body missing save route: %s", body)
 	}
 }
 

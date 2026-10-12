@@ -58,7 +58,6 @@ func TestOpenSeedSessionSuccessWithoutIdentity(t *testing.T) {
 }
 
 func TestOpenSeedSessionEmptyConfigDirUsesWorkflowConfigDir(t *testing.T) {
-	t.Setenv("WORKFLOW_CONFIG_DIR", "/from/env/workflows")
 	store := NewMemoryStore()
 	sess, err := openSeedSession(t.Context(), nil, "  ", func(context.Context) (Store, func(), error) {
 		return store, func() {}, nil
@@ -66,8 +65,8 @@ func TestOpenSeedSessionEmptyConfigDirUsesWorkflowConfigDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("openSeedSession: %v", err)
 	}
-	if sess.ConfigDir != "/from/env/workflows" {
-		t.Fatalf("ConfigDir = %q, want workflowConfigDir()", sess.ConfigDir)
+	if sess.ConfigDir != "config" {
+		t.Fatalf("ConfigDir = %q, want %q", sess.ConfigDir, "config")
 	}
 }
 

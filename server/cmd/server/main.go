@@ -160,7 +160,6 @@ type Server struct {
 	catalog            map[string]RuntimeConfig
 	viteDevServer      string
 	enforceAuth        bool
-	formataArchURL     string
 	buildVersion       string
 	turnstileSiteKey   string
 	turnstileSecretKey string
@@ -764,8 +763,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Coolify prepare writes APPWRITE_* here; file wins over stale injected keys.
-	if err := applyAppwriteRuntimeEnvFile(envOr("ATTESTA_APPWRITE_ENV_FILE", defaultAppwriteBootstrapEnvFile)); err != nil {
+	// Prepare writes APPWRITE_* under ATTESTA_ROOT_DIR; file wins over stale injected keys.
+	if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
 		log.Fatal(err)
 	}
 
@@ -785,7 +784,6 @@ func main() {
 		configDir:          configDir,
 		viteDevServer:      strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 		enforceAuth:        true,
-		formataArchURL:     strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 		buildVersion:       applicationVersion(),
 		mailer:             newMailerFromEnv(),
 		turnstileSiteKey:   strings.TrimSpace(os.Getenv("TURNSTILE_SITE_KEY")),
@@ -3043,25 +3041,23 @@ func requestBaseURL(r *http.Request) string {
 	return scheme + "://" + host
 }
 
-func resetRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_RESET_REDIRECT_URL")); configured != "" {
-		return configured
+func redirectBaseURL(r *http.Request) string {
+	if base := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")); base != "" {
+		return strings.TrimRight(base, "/")
 	}
-	return requestBaseURL(r) + "/reset/confirm"
+	return requestBaseURL(r)
+}
+
+func resetRedirectURL(r *http.Request) string {
+	return redirectBaseURL(r) + "/reset/confirm"
 }
 
 func verifyRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_VERIFY_REDIRECT_URL")); configured != "" {
-		return configured
-	}
-	return requestBaseURL(r) + emailVerificationConfirmPath()
+	return redirectBaseURL(r) + emailVerificationConfirmPath()
 }
 
 func inviteRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_INVITE_REDIRECT_URL")); configured != "" {
-		return configured
-	}
-	return requestBaseURL(r) + "/invite/accept"
+	return redirectBaseURL(r) + "/invite/accept"
 }
 
 func resetConfirmParams(r *http.Request) (string, string) {
@@ -6356,7 +6352,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 		Schema:         marshalJSONCompact(effective.Schema),
 		UISchema:       marshalJSONCompact(effective.UISchema),
 		Reason:         strings.TrimSpace(override.Reason),
-		FormataArchURL: strings.TrimRight(strings.TrimSpace(s.formataArchURL), "/"),
+		FormataArchURL: "",
 		SaveURL:        streamInstancePath(workflowKey, process.ID.Hex()) + "/substep/" + canonical.SubstepID + "/override",
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

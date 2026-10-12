@@ -179,7 +179,7 @@ func normalizePrepareDeps(deps PrepareDeps) PrepareDeps {
 		deps.HealthURL = deps.Endpoint + "/health"
 	}
 	if deps.EnvFilePath == "" {
-		deps.EnvFilePath = envOr("ATTESTA_APPWRITE_ENV_FILE", defaultAppwriteBootstrapEnvFile)
+		deps.EnvFilePath = resolveAppwriteRuntimeEnvFile()
 	}
 	return deps
 }

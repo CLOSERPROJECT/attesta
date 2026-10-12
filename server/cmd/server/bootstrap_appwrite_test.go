@@ -84,7 +84,7 @@ func TestBootstrapAppwriteProjectCreatesProjectKeyAndBucketWhenProbeFails(t *tes
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/account" && project == "console":
 			accountCreates++
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"$id":"console-user","email":"console@attesta.local"}`))
+			_, _ = w.Write([]byte(`{"$id":"console-user","email":"admin@appwrite.local"}`))
 
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/account/sessions/email" && project == "console":
 			loginAttempts++
@@ -161,8 +161,8 @@ func TestBootstrapAppwriteProjectCreatesProjectKeyAndBucketWhenProbeFails(t *tes
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
 		APIKey:          "stale-coolify-key",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -229,8 +229,8 @@ func TestBootstrapAppwriteProjectLoginFirstSkipsSignup(t *testing.T) {
 	result, err := BootstrapAppwriteProject(t.Context(), BootstrapAppwriteDeps{
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -285,8 +285,8 @@ func TestBootstrapAppwriteProjectLogin401Signup501ThenLoginSucceeds(t *testing.T
 	result, err := BootstrapAppwriteProject(t.Context(), BootstrapAppwriteDeps{
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -348,8 +348,8 @@ func testBootstrapIgnoresConsoleSignupStatus(t *testing.T, signupStatus int, sig
 	result, err := BootstrapAppwriteProject(t.Context(), BootstrapAppwriteDeps{
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -391,8 +391,8 @@ func TestBootstrapAppwriteProjectReusesExistingBootstrapKeySecret(t *testing.T) 
 	result, err := BootstrapAppwriteProject(t.Context(), BootstrapAppwriteDeps{
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -447,8 +447,8 @@ func TestBootstrapAppwriteProjectRotatesBootstrapKeyWhenSecretMissing(t *testing
 	result, err := BootstrapAppwriteProject(t.Context(), BootstrapAppwriteDeps{
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -523,8 +523,8 @@ func TestBootstrapAppwriteProjectRetries429OnLoginAndKey(t *testing.T) {
 	result, err := BootstrapAppwriteProject(t.Context(), BootstrapAppwriteDeps{
 		Endpoint:        srv.URL + "/v1",
 		ProjectID:       "attesta",
-		ConsoleEmail:    "console@attesta.local",
-		ConsolePassword: "password",
+		ConsoleEmail:    "admin@appwrite.local",
+		ConsolePassword: "admin@appwrite.local",
 		OrgAssetsBucket: "org-assets",
 		ConsoleTeamID:   "attesta",
 		EnvFilePath:     envPath,
@@ -566,13 +566,14 @@ func TestBootstrapAppwriteProjectRequiresProjectID(t *testing.T) {
 }
 
 func TestBootstrapDepsFromEnvDefaults(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("ATTESTA_ROOT_DIR", root)
 	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
 	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
 	t.Setenv("APPWRITE_API_KEY", "")
 	t.Setenv("APPWRITE_CONSOLE_EMAIL", "")
 	t.Setenv("APPWRITE_CONSOLE_PASSWORD", "")
 	t.Setenv("APPWRITE_ORG_ASSETS_BUCKET", "")
-	t.Setenv("ATTESTA_APPWRITE_ENV_FILE", "")
 
 	deps := bootstrapAppwriteDepsFromEnv()
 	if deps.ConsoleEmail != defaultAppwriteConsoleEmail {
@@ -584,8 +585,9 @@ func TestBootstrapDepsFromEnvDefaults(t *testing.T) {
 	if deps.OrgAssetsBucket != "org-assets" {
 		t.Fatalf("bucket = %q", deps.OrgAssetsBucket)
 	}
-	if deps.EnvFilePath != defaultAppwriteBootstrapEnvFile {
-		t.Fatalf("env file = %q", deps.EnvFilePath)
+	wantEnv := filepath.Join(root, ".env.appwrite")
+	if deps.EnvFilePath != wantEnv {
+		t.Fatalf("env file = %q, want %q", deps.EnvFilePath, wantEnv)
 	}
 }
 

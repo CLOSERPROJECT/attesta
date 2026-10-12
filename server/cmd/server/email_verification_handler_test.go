@@ -204,11 +204,12 @@ func TestEmailVerificationConfirmSuccessAffiliatedGoesHome(t *testing.T) {
 }
 
 func TestVerifyRedirectURL(t *testing.T) {
+	t.Setenv("PUBLIC_BASE_URL", "")
 	req := httptest.NewRequest(http.MethodGet, "http://attesta.local/", nil)
 	if got := verifyRedirectURL(req); got != "http://attesta.local/verify/confirm" {
 		t.Fatalf("verifyRedirectURL = %q", got)
 	}
-	t.Setenv("APPWRITE_VERIFY_REDIRECT_URL", "https://app.example/verify/confirm")
+	t.Setenv("PUBLIC_BASE_URL", "https://app.example")
 	if got := verifyRedirectURL(req); got != "https://app.example/verify/confirm" {
 		t.Fatalf("configured verify redirect = %q", got)
 	}

@@ -580,6 +580,19 @@ func TestWaitAppwriteReadyTimesOut(t *testing.T) {
 	}
 }
 
+func TestResolveAppwriteRuntimeEnvFile(t *testing.T) {
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+	t.Setenv("ATTESTA_ROOT_DIR", rootA)
+	if got := resolveAppwriteRuntimeEnvFile(); got != filepath.Join(rootA, ".env.appwrite") {
+		t.Fatalf("root A path = %q", got)
+	}
+	t.Setenv("ATTESTA_ROOT_DIR", rootB)
+	if got := resolveAppwriteRuntimeEnvFile(); got != filepath.Join(rootB, ".env.appwrite") {
+		t.Fatalf("root B path = %q", got)
+	}
+}
+
 func TestApplyAppwriteRuntimeEnvFile(t *testing.T) {
 	t.Setenv("APPWRITE_API_KEY", "stale")
 	t.Setenv("APPWRITE_PROJECT_ID", "stale-project")
@@ -591,7 +604,9 @@ func TestApplyAppwriteRuntimeEnvFile(t *testing.T) {
 		t.Fatalf("missing file mutated APPWRITE_API_KEY=%q", got)
 	}
 
-	path := filepath.Join(t.TempDir(), "attesta-appwrite.env")
+	root := t.TempDir()
+	t.Setenv("ATTESTA_ROOT_DIR", root)
+	path := resolveAppwriteRuntimeEnvFile()
 	content := "# comment\n\nAPPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=fresh\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -604,6 +619,24 @@ func TestApplyAppwriteRuntimeEnvFile(t *testing.T) {
 	}
 	if got := os.Getenv("APPWRITE_PROJECT_ID"); got != "attesta" {
 		t.Fatalf("APPWRITE_PROJECT_ID=%q, want attesta", got)
+	}
+}
+
+func TestRunSeedSessionAppliesRuntimeEnvFile(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("ATTESTA_ROOT_DIR", root)
+	t.Setenv("APPWRITE_API_KEY", "stale")
+	t.Setenv("APPWRITE_PROJECT_ID", "stale-project")
+	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1")
+	path := resolveAppwriteRuntimeEnvFile()
+	if err := os.WriteFile(path, []byte("APPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	_ = runSeedSession(ctx, nil, false, nil)
+	if got := os.Getenv("APPWRITE_API_KEY"); got != "from-file" {
+		t.Fatalf("APPWRITE_API_KEY=%q after seed entry, want from-file", got)
 	}
 }
 

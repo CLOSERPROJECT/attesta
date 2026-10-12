@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,11 +20,7 @@ type seedSession struct {
 }
 
 func workflowConfigDir() string {
-	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
-	if configDir == "" {
-		configDir = filepath.Dir(envOr("WORKFLOW_CONFIG", "config/workflow.yaml"))
-	}
-	return configDir
+	return "config"
 }
 
 // Empty means Seed should default to ConfigDir/categories.yaml.
@@ -39,7 +34,7 @@ func categoriesSeedPathFromArgs(args []string) string {
 			return strings.TrimSpace(strings.TrimPrefix(arg, "--file="))
 		}
 	}
-	return strings.TrimSpace(os.Getenv("CATEGORIES_SEED"))
+	return ""
 }
 
 func resolveCategoriesSeedPath(explicit, configDir string) string {
@@ -111,6 +106,10 @@ func withSeedSession(
 
 // creds nil → identity from process env (standalone seed); non-nil → prepare→seed by value.
 func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
+	// Parity with main: apply checkout-scoped runtime file before identity.
+	if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
+		return err
+	}
 	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
 		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
 		if creds == nil {

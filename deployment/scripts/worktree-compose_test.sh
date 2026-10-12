@@ -17,9 +17,9 @@ docker compose \
   -f "${ROOT}/deployment/appwrite/docker-compose.appwrite.yaml" \
   config --format json >"${tmpdir}/standalone.json"
 
-# Host .env / shell may already export Appwrite redirect URLs; clear them so
-# DOCKER_APP_PORT drives the containerized Attesta defaults under test.
-unset APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL APPWRITE_VERIFY_REDIRECT_URL COMPOSE_PROJECT_NAME
+# Host .env / shell may already export PUBLIC_BASE_URL; clear it so
+# DOCKER_APP_PORT drives the containerized Attesta default under test.
+unset PUBLIC_BASE_URL COMPOSE_PROJECT_NAME
 
 COMPOSE_PROJECT_NAME=label-test-a \
 ATTESTA_WORKTREE_ROOT="${tmpdir}/owned-worktree-a" \
@@ -85,9 +85,8 @@ node -e '
   assert(localA.networks.runtimes.name === "label-test-a_runtimes", "local runtimes network is not project-scoped");
   assert(localA.services["openruntimes-executor"].environment.OPR_EXECUTOR_NETWORK === "label-test-a_runtimes", "executor uses the wrong runtimes network");
   assert(String(localA.services.attesta.ports[0].published) === "19030", "containerized Attesta port did not use DOCKER_APP_PORT");
-  assert(localA.services.attesta.environment.APPWRITE_INVITE_REDIRECT_URL === "http://localhost:19030/invite/accept", "containerized invite redirect did not use DOCKER_APP_PORT");
-  assert(localA.services.attesta.environment.APPWRITE_RESET_REDIRECT_URL === "http://localhost:19030/reset/confirm", "containerized reset redirect did not use DOCKER_APP_PORT");
-  assert(localA.services.attesta.environment.APPWRITE_VERIFY_REDIRECT_URL === "http://localhost:19030/verify/confirm", "containerized verify redirect did not use DOCKER_APP_PORT");
+  assert(localA.services.attesta.environment.PUBLIC_BASE_URL === "http://localhost:19030", "containerized PUBLIC_BASE_URL did not use DOCKER_APP_PORT");
+  assert(localA.services.attesta.environment.ATTESTA_ROOT_DIR === "/app", "containerized ATTESTA_ROOT_DIR is not /app");
   assert(!mounts(localA).some(target => target.startsWith("/seed/")), "local MariaDB still mounts retired SQL seed artifacts");
   assert(localA.services.mariadb.entrypoint == null, "local MariaDB still uses a seed wrapper entrypoint");
   assert(!("APPWRITE_RESTORE_SEED_SQL" in (localA.services.mariadb.environment || {})), "local MariaDB still exposes retired APPWRITE_RESTORE_SEED_SQL");
@@ -122,10 +121,8 @@ fi
 if [[ -n "${DOCKER_ENV_FILE:-}" ]]; then
   printf '%s\n' "${ATTESTA_REPOSITORY_ID:-<unset>}" >>"${DOCKER_ENV_FILE}"
 fi
-if [[ -n "${DOCKER_REDIRECTS_FILE:-}" ]]; then
-  printf '%s|%s|%s\n' "${APPWRITE_INVITE_REDIRECT_URL:-<unset>}" \
-    "${APPWRITE_RESET_REDIRECT_URL:-<unset>}" \
-    "${APPWRITE_VERIFY_REDIRECT_URL:-<unset>}" >>"${DOCKER_REDIRECTS_FILE}"
+if [[ -n "${DOCKER_PUBLIC_BASE_URL_FILE:-}" ]]; then
+  printf '%s\n' "${PUBLIC_BASE_URL:-<unset>}" >>"${DOCKER_PUBLIC_BASE_URL_FILE}"
 fi
 if [[ "$*" == volume\ ls\ --filter\ label=com.docker.compose.project=* ]]; then
   if [[ "${VOLUME_ENUMERATION_FAILURE:-0}" == "1" ]]; then
@@ -169,6 +166,9 @@ expected_project="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" project-name)"
 grep -Fq 'go run ./cmd/server prepare --policy=worktree' \
   "${ROOT}/scripts/worktree-compose.sh" \
   || fail "worktree-compose does not invoke attesta prepare with worktree policy"
+grep -Fq 'ATTESTA_ROOT_DIR="${ROOT_DIR}"' \
+  "${ROOT}/scripts/worktree-compose.sh" \
+  || fail "worktree-compose does not export ATTESTA_ROOT_DIR for prepare"
 grep -Fq 'ATTESTA_SEED_COMMAND' "${ROOT}/scripts/worktree-compose.sh" \
   && fail "worktree-compose still exposes retired ATTESTA_SEED_COMMAND hatch"
 [[ ! -e "${ROOT}/deployment/attesta-appwrite-ready.sh" ]] \
@@ -231,16 +231,16 @@ up_line="$(grep -n ' up -d ' "${tmpdir}/calls" | cut -d: -f1)"
 
 : >"${tmpdir}/calls"
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
-  DOCKER_REDIRECTS_FILE="${tmpdir}/container-redirects" \
+  DOCKER_PUBLIC_BASE_URL_FILE="${tmpdir}/container-public-base-url" \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up-app --build
 grep -q ' up -d --build .*attesta' "${tmpdir}/calls" \
   || fail "containerized start did not build and start the Attesta service"
 grep -q '^attesta-prepare$' "${tmpdir}/calls" \
   || fail "containerized start did not run attesta prepare after infra up"
 docker_app_port="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" print | awk -F= '$1 == "DOCKER_APP_PORT" { print $2 }')"
-expected_redirects="http://localhost:${docker_app_port}/invite/accept|http://localhost:${docker_app_port}/reset/confirm|http://localhost:${docker_app_port}/verify/confirm"
-if grep -Fvxq "${expected_redirects}" "${tmpdir}/container-redirects"; then
-  fail "containerized start passed host-development redirects to Compose"
+expected_public_base_url="http://localhost:${docker_app_port}"
+if grep -Fvxq "${expected_public_base_url}" "${tmpdir}/container-public-base-url"; then
+  fail "containerized start did not pass DOCKER_APP_PORT PUBLIC_BASE_URL to Compose"
 fi
 task_list="$(task --list-all --json)"
 grep -Eq '"name"[[:space:]]*:[[:space:]]*"start:docker"' <<<"${task_list}" \

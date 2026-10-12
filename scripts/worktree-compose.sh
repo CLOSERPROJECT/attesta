@@ -41,9 +41,10 @@ load_env() {
     return 1
   fi
   eval "${worktree_exports}"
+  ATTESTA_ROOT_DIR="${ROOT_DIR}"
   ATTESTA_WORKTREE_ROOT="$(cd "${ROOT_DIR}" && pwd -P)"
   ATTESTA_REPOSITORY_ID="$(bash "${ROOT_DIR}/scripts/worktree-env.sh" repository-id)"
-  export COMPOSE_PROJECT_NAME ATTESTA_SEED ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
+  export COMPOSE_PROJECT_NAME ATTESTA_SEED ATTESTA_ROOT_DIR ATTESTA_WORKTREE_ROOT ATTESTA_REPOSITORY_ID
 }
 
 compose() {
@@ -125,10 +126,9 @@ up_app() {
     exit 1
   }
 
-  APPWRITE_INVITE_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/invite/accept"
-  APPWRITE_RESET_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/reset/confirm"
-  APPWRITE_VERIFY_REDIRECT_URL="http://localhost:${DOCKER_APP_PORT}/verify/confirm"
-  export APPWRITE_INVITE_REDIRECT_URL APPWRITE_RESET_REDIRECT_URL APPWRITE_VERIFY_REDIRECT_URL
+  # Override host-dev PUBLIC_BASE_URL (from PORT) with the containerized publish port.
+  PUBLIC_BASE_URL="http://localhost:${DOCKER_APP_PORT}"
+  export PUBLIC_BASE_URL
 
   local services=()
   while IFS= read -r service; do

@@ -6,7 +6,7 @@ Coolify Preview and local worktree Compose both gate on `ATTESTA_SEED` and prepa
 
 | Host | Adapter | Policy |
 |---|---|---|
-| Coolify Preview | `deployment/coolify-entrypoint.sh` → `./attesta prepare` then `exec` | Default `--policy=coolify`: hard-fail on bootstrap/seed; server loads `/tmp/attesta-appwrite.env` at startup (overrides stale Coolify-injected keys) |
+| Coolify Preview | `deployment/coolify-entrypoint.sh` → `./attesta prepare` then `exec` | Default `--policy=coolify`: hard-fail on bootstrap/seed; server loads `$ATTESTA_ROOT_DIR/.env.appwrite` at startup (overrides stale Coolify-injected keys) |
 | Worktree Compose | `scripts/worktree-compose.sh` → `go run ./cmd/server prepare --policy=worktree` | Soft-skip bootstrap failure; soft-skip seed when credentials missing |
 
 Manual/operator re-seed uses `attesta seed` / `task seed` (optionally `--replace`). Partial seed CLIs (`seed-categories`, `seed-instances`, `seed-catalog-streams`, `bootstrap-appwrite`) are not public entrypoints; their Go helpers remain for `Seed` / `PrepareDemoStack`.

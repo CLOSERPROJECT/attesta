@@ -6,10 +6,6 @@ import (
 )
 
 func TestCategoriesSeedPathFromArgsResolved(t *testing.T) {
-	t.Setenv("CATEGORIES_SEED", "")
-	t.Setenv("WORKFLOW_CONFIG", "config/workflow.yaml")
-	t.Setenv("WORKFLOW_CONFIG_DIR", "")
-
 	got := resolveCategoriesSeedPath(categoriesSeedPathFromArgs(nil), workflowConfigDir())
 	want := filepath.Join("config", "categories.yaml")
 	if got != want {
@@ -24,12 +20,6 @@ func TestCategoriesSeedPathFromArgsResolved(t *testing.T) {
 	got = resolveCategoriesSeedPath(categoriesSeedPathFromArgs([]string{"--file=/tmp/eq.yaml"}), workflowConfigDir())
 	if got != "/tmp/eq.yaml" {
 		t.Fatalf("--file= path = %q", got)
-	}
-
-	t.Setenv("CATEGORIES_SEED", "/env/categories.yaml")
-	got = resolveCategoriesSeedPath(categoriesSeedPathFromArgs(nil), workflowConfigDir())
-	if got != "/env/categories.yaml" {
-		t.Fatalf("env path = %q", got)
 	}
 }
 

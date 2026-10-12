@@ -324,10 +324,6 @@ func TestResolveCategoriesSeedPath(t *testing.T) {
 	if got := resolveCategoriesSeedPath("/custom/categories.yaml", "ignored"); got != "/custom/categories.yaml" {
 		t.Fatalf("explicit = %q", got)
 	}
-	t.Setenv("CATEGORIES_SEED", "/custom/categories.yaml")
-	if got := resolveCategoriesSeedPath(os.Getenv("CATEGORIES_SEED"), "ignored"); got != "/custom/categories.yaml" {
-		t.Fatalf("CATEGORIES_SEED = %q", got)
-	}
 }
 
 func TestBootstrapTaxonomyPropagatesListError(t *testing.T) {
