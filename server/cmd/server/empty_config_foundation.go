@@ -7,12 +7,9 @@ import (
 	"time"
 )
 
-// ensureEmptyConfigFoundation installs empty-only Mongo foundations for taxonomy
-// and Formata builder Streams. Taxonomy uses bootstrapTaxonomy (categories.yaml
-// when Categories are empty). Formata Streams are copied from the on-disk
-// catalog template pack when Mongo Formata is empty. Seed's demo overlay
-// (wipe + leaf-multiplied Streams) is a separate path and must not be folded
-// in here.
+// Empty-only Mongo foundations for taxonomy and Formata builder Streams.
+// Seed's demo overlay (wipe + leaf-multiplied Streams) is a separate path and
+// must not be folded in here.
 func ensureEmptyConfigFoundation(ctx context.Context, store Store, configDir string, now func() time.Time) error {
 	if store == nil {
 		return nil
@@ -23,9 +20,7 @@ func ensureEmptyConfigFoundation(ctx context.Context, store Store, configDir str
 	return ensureEmptyFormataBuilderStreams(ctx, store, configDir, now)
 }
 
-// ensureEmptyFormataBuilderStreams copies catalog template pack YAML into
-// Formata builder Streams when Mongo Formata is empty. If Formata already has
-// Streams, this is a no-op.
+// No-op when Formata already has Streams.
 func ensureEmptyFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
 	if store == nil {
 		return nil

@@ -8,24 +8,18 @@ import (
 	"strings"
 )
 
-// catalogTemplatePack is the on-disk install/seed template pack under a
-// workflow config directory: Stream YAML files plus the resolved categories
-// seed path. It is not the runtime Stream catalog (Formata is).
+// On-disk install/seed pack (Stream YAML + categories path), not the runtime Formata catalog.
 type catalogTemplatePack struct {
 	Dir            string
 	CategoriesPath string
 	Streams        []catalogTemplateStream
 }
 
-// catalogTemplateStream is one Stream blueprint YAML from the template pack.
 type catalogTemplateStream struct {
 	Path string
 	Body []byte
 }
 
-// openCatalogTemplatePack opens configDir (default "config") and loads every
-// Stream blueprint YAML (same inclusion rules as isWorkflowCatalogConfigFile).
-// CategoriesPath uses the same resolution as resolveCategoriesSeedPath("", dir).
 func openCatalogTemplatePack(configDir string) (catalogTemplatePack, error) {
 	dir := strings.TrimSpace(configDir)
 	if dir == "" {

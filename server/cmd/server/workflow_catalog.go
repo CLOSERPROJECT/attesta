@@ -7,12 +7,9 @@ import (
 	"time"
 )
 
-// errFormataWorkflowCatalogEmpty is returned when the runtime Stream catalog has
-// no Formata builder Streams. Callers may treat this as an empty catalog.
+// Callers may treat this as an empty catalog rather than a hard failure.
 var errFormataWorkflowCatalogEmpty = errors.New("formata workflow catalog is empty")
 
-// workflowCatalogLoad is the full catalog load result, including cache metadata
-// used by Server.workflowCatalog.
 type workflowCatalogLoad struct {
 	catalog   map[string]RuntimeConfig
 	modTimes  map[string]time.Time
@@ -49,8 +46,7 @@ func (s *Server) catalogTaxonomyRevision() (int64, error) {
 	return catalogTaxonomyRevision(context.Background(), s.store)
 }
 
-// loadWorkflowCatalog loads workflow runtime configs from Formata builder
-// Streams only. An empty Formata catalog fails closed.
+// Formata builder Streams only; empty catalog fails closed.
 func loadWorkflowCatalog(ctx context.Context, store Store) (map[string]RuntimeConfig, error) {
 	loaded, err := loadWorkflowCatalogResult(ctx, store)
 	if err != nil {
@@ -80,7 +76,6 @@ func loadWorkflowCatalogResult(ctx context.Context, store Store) (workflowCatalo
 	}, nil
 }
 
-// workflowCatalog is a mutex/cache adapter over loadWorkflowCatalogResult.
 func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
@@ -113,8 +108,7 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	return cloneWorkflowCatalog(loaded.catalog), nil
 }
 
-// inspectWorkflowCatalogSources lists Formata builder Streams for the runtime
-// catalog. Disk YAML is never a runtime fallback; empty Formata fails closed.
+// Disk YAML is never a runtime fallback; empty Formata fails closed.
 func inspectWorkflowCatalogSources(ctx context.Context, store Store) (workflowCatalogSources, error) {
 	if store == nil {
 		return workflowCatalogSources{}, errFormataWorkflowCatalogEmpty

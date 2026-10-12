@@ -78,8 +78,7 @@ func applyCatalogStreamCategoryAndName(yamlText, categorySlug, subCategorySlug, 
 	return out, nil
 }
 
-// loadCatalogStreamTemplateBodies reads Stream YAML bodies from the on-disk
-// catalog template pack only — never from live Formata Streams.
+// Disk template pack only — never live Formata Streams.
 func loadCatalogStreamTemplateBodies(configDir string) ([]string, error) {
 	pack, err := openCatalogTemplatePack(configDir)
 	if err != nil {

@@ -8,6 +8,11 @@
   persistence.
 - Preserve unrelated work in a dirty tree. Do not commit, push, or change
   external systems unless asked.
+- **Comments are *why*, never *what*.** Keep a comment only when deleting it
+  would lose non-obvious intent, a constraint, or a gotcha the code cannot
+  express. In every region you touch, delete comments that restate identifiers,
+  types, or control flow. Prefer renaming or restructuring over explaining the
+  obvious. Narration, section banners, and commented-out code are out.
 - **Titles:** commits, issues, and pull-request titles use
   [Conventional Commits](https://www.conventionalcommits.org/):
   `type(optional-scope): imperative summary` (lowercase type; typical types

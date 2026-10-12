@@ -40,7 +40,6 @@ type appwriteIdentity struct {
 	orgAssetsBucket string
 }
 
-// NewAppwriteIdentity builds the Appwrite-backed identity adapter used by later auth work.
 func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Client) IdentityStore {
 	adminClient := appwrite.NewClient(
 		appwrite.WithEndpoint(strings.TrimRight(strings.TrimSpace(endpoint), "/")),
@@ -62,7 +61,6 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 	}
 }
 
-// appwriteRuntimeCredentials is the value form of Appwrite identity open params.
 // PrepareDemoStack passes this into Seed; standalone seed opens from process env.
 type appwriteRuntimeCredentials struct {
 	Endpoint  string
@@ -70,15 +68,9 @@ type appwriteRuntimeCredentials struct {
 	APIKey    string
 }
 
-// appwriteIdentityFromEnvOptions controls RequireAll / HTTPClient for identity open.
-//
-// RequireAll (seed): trimmed Endpoint, ProjectID, and APIKey are all required;
-// returns an error if any is empty.
-//
-// Lax / default (main): Endpoint defaults to http://appwrite/v1 when unset
-// (same as envOr); project ID and API key are trimmed and may be empty.
-//
-// HTTPClient is passed through to NewAppwriteIdentity; the helper never chooses a client.
+// RequireAll (seed): Endpoint, ProjectID, and APIKey are all required.
+// Lax / default (main): Endpoint defaults to http://appwrite/v1 when unset;
+// project ID and API key may be empty. HTTPClient is never chosen by the helper.
 type appwriteIdentityFromEnvOptions struct {
 	RequireAll bool
 	HTTPClient *http.Client
@@ -597,12 +589,9 @@ func (a *appwriteIdentity) ListOrganizationMemberships(ctx context.Context, orgS
 	return memberships, nil
 }
 
-// ListOrganizationMembershipsLite returns memberships decoded from the team membership
-// list only. IsOrgAdmin is derived from membership roles (owner / invite encoding), not
-// user labels. Callers that need label-accurate roles must use ListOrganizationMemberships.
-//
-// When org.ID is set it is used as the Appwrite team ID directly (no slug lookup). That
-// matters for paged platform-admin catalogs where slug may differ from team ID and
+// IsOrgAdmin comes from membership roles (owner / invite encoding), not user labels —
+// use ListOrganizationMemberships for label-accurate roles. When org.ID is set it is
+// the Appwrite team ID (no slug lookup); needed when slug≠team-ID and
 // GetOrganizationBySlug's ListOrganizations fallback is not exhaustive.
 func (a *appwriteIdentity) ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
 	if err := ctx.Err(); err != nil {

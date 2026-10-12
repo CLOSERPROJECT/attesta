@@ -49,7 +49,7 @@ workflow:
 organizations:
   - slug: org1
     name: Organization 1
-  subCategorySlug: supplier-onboarding`, "\n") // no trailing newline on last key
+  subCategorySlug: supplier-onboarding`, "\n")
 
 	out, err := applyCatalogStreamCategoryAndName(in, "recycling-and-recovery", "photovoltaic-panels", "Photovoltaic Panels — Pilot")
 	if err != nil {
@@ -78,7 +78,7 @@ func TestTaxonomyLeavesFromTree(t *testing.T) {
 			{Slug: "a1", Name: "A1"},
 			{Slug: "a2", Name: "A2"},
 		}},
-		{Slug: "b", Name: "B"}, // no subs
+		{Slug: "b", Name: "B"},
 	})
 	if len(leaves) != 2 {
 		t.Fatalf("len=%d want 2", len(leaves))

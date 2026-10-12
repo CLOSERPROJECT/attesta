@@ -20,13 +20,11 @@ const (
 	seedKindDoneNoDPP   seedInstanceKind = "done_no_dpp"
 	seedKindTerminated  seedInstanceKind = "terminated"
 	seedLotValue                         = "SEED-LOT-001"
-	// Every Nth catalog stream (1-based position among sorted keys) stays
-	// empty after delete so empty-state UI is easy to check in dev.
+	// Every Nth sorted catalog stream (1-based) stays empty after wipe so empty-state UI is testable in dev.
 	seedEmptyStreamPeriod = 5
 )
 
-// seedStreamLeftEmpty reports whether the stream at sorted catalog index
-// should get zero instances (still wiped via DeleteWorkflowData).
+// Empty streams are still wiped via DeleteWorkflowData.
 func seedStreamLeftEmpty(sortedIndex int) bool {
 	if seedEmptyStreamPeriod <= 0 || sortedIndex < 0 {
 		return false
@@ -182,15 +180,12 @@ func seedActor() Actor {
 	return Actor{ID: "seed-user", Role: "seed", OrgSlug: "seed"}
 }
 
-// seedDemoInstancesResult summarizes one catalog walk for CLI logging.
 type seedDemoInstancesResult struct {
 	Instances     int
 	SeededStreams int
 	EmptyStreams  int
 }
 
-// seedDemoInstances walks a sorted workflow catalog: every Nth stream is wiped
-// and left empty; the rest get synthetic instances via seedWorkflowInstances.
 func seedDemoInstances(ctx context.Context, store Store, catalog map[string]RuntimeConfig, now time.Time) (seedDemoInstancesResult, error) {
 	if store == nil {
 		return seedDemoInstancesResult{}, fmt.Errorf("store is required")

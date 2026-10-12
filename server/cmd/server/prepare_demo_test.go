@@ -14,7 +14,7 @@ import (
 )
 
 func TestPrepareDemoStackPublicEntrySeedDisabled(t *testing.T) {
-	// Covers PrepareDemoStack + defaultPrepareHooks (nil client → DefaultClient).
+	// nil HTTPClient → DefaultClient via defaultPrepareHooks.
 	err := PrepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled: boolPtr(false),
 		HTTPClient:  nil,

@@ -21,38 +21,32 @@ const (
 	PreparePolicyWorktree = "worktree"
 )
 
-// PrepareDeps is the injectable seam for demo-stack prepare orchestration.
-// Host adapters set Policy; shared glue lives here.
 type PrepareDeps struct {
-	// SeedEnabled overrides ATTESTA_SEED when non-nil.
+	// Non-nil overrides ATTESTA_SEED.
 	SeedEnabled *bool
 
-	// Endpoint is the Appwrite API base (…/v1). HealthURL defaults to Endpoint+"/health".
+	// Appwrite API base (…/v1). HealthURL defaults to Endpoint+"/health".
 	Endpoint  string
 	HealthURL string
 
-	// ReadyTimeoutSeconds polls /health; nil reads ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS
-	// (default 120). Zero skips the readiness probe.
+	// Nil reads ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS (default 120). Zero skips the probe.
 	ReadyTimeoutSeconds *int
 
 	EnvFilePath string
 
-	// Policy selects soft vs hard failure. Empty or "coolify" hard-fails bootstrap
-	// and missing credentials. "worktree" soft-skips both with warnings.
+	// Empty or "coolify" hard-fails; "worktree" soft-skips with warnings.
 	Policy string
 
 	HTTPClient *http.Client
 
-	// Seed receives Appwrite open params by value. When nil, PrepareDemoStack
-	// returns after bootstrap (env file may still be written for Server restart).
+	// Nil → return after bootstrap (env file may still be written for Server restart).
 	Seed func(ctx context.Context, creds appwriteRuntimeCredentials) error
 
-	// BootstrapDeps supplies bootstrap inputs; empty fields filled from env.
+	// Empty fields filled from env.
 	BootstrapDeps BootstrapAppwriteDeps
 }
 
-// prepareHooks are unexported wait/bootstrap doubles for same-package tests.
-// Production uses defaultPrepareHooks; Seed stays on PrepareDeps.
+// Unexported wait/bootstrap doubles for same-package tests; Seed stays on PrepareDeps.
 type prepareHooks struct {
 	Wait      func(ctx context.Context, healthURL string, timeoutSec int) error
 	Bootstrap func(ctx context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error)
@@ -70,10 +64,9 @@ func defaultPrepareHooks(client *http.Client) prepareHooks {
 	}
 }
 
-// PrepareDemoStack gates on ATTESTA_SEED, then wait → bootstrap → seed.
-// Bootstrap may still write the on-disk runtime env file for Server startup;
-// prepare→seed does not mutate process env or apply that file in-process.
-// When seed is disabled it is a no-op success.
+// Gates on ATTESTA_SEED, then wait → bootstrap → seed.
+// prepare→seed does not mutate process env or apply the on-disk env file in-process
+// (bootstrap may still write it for Server startup). Disabled seed is a no-op success.
 func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	return prepareDemoStack(ctx, deps, defaultPrepareHooks(deps.HTTPClient))
 }
@@ -238,8 +231,7 @@ func mergeBootstrapDeps(deps BootstrapAppwriteDeps, envFilePath string) Bootstra
 	return deps
 }
 
-// runtimeCredsFromBootstrap maps a successful BootstrapResult onto open params.
-// Endpoint comes from prepare (bootstrap does not return it).
+// Endpoint comes from prepare; bootstrap does not return it.
 func runtimeCredsFromBootstrap(endpoint string, result BootstrapResult) appwriteRuntimeCredentials {
 	return appwriteRuntimeCredentials{
 		Endpoint:  endpoint,
@@ -248,7 +240,6 @@ func runtimeCredsFromBootstrap(endpoint string, result BootstrapResult) appwrite
 	}
 }
 
-// ambientAppwriteRuntimeCredentials reads current APPWRITE_* process env.
 func ambientAppwriteRuntimeCredentials() appwriteRuntimeCredentials {
 	return appwriteRuntimeCredentials{
 		Endpoint:  os.Getenv("APPWRITE_ENDPOINT"),
@@ -257,8 +248,7 @@ func ambientAppwriteRuntimeCredentials() appwriteRuntimeCredentials {
 	}
 }
 
-// prepareCredentialsAfterBootstrap picks runtime creds after a bootstrap attempt.
-// Soft policy falls back to ambient on bootstrap error; hard policy returns the error.
+// Soft policy falls back to ambient on bootstrap error; hard returns the error.
 // usedAmbient is true when soft fallback was taken (caller may log).
 func prepareCredentialsAfterBootstrap(
 	soft bool,
@@ -274,7 +264,6 @@ func prepareCredentialsAfterBootstrap(
 	return fromBootstrap, false, nil
 }
 
-// prepareSeedCredentialGate checks required open params under soft vs hard policy.
 // Soft + missing → skip seed (no error). Hard + missing → error.
 func prepareSeedCredentialGate(soft bool, creds appwriteRuntimeCredentials) (skip bool, err error) {
 	missing := missingAppwriteCredentials(creds)
@@ -302,7 +291,6 @@ func missingAppwriteCredentials(creds appwriteRuntimeCredentials) []string {
 	return missing
 }
 
-// applyAppwriteRuntimeEnvFile loads KEY=VALUE pairs from path into the process env.
 // Missing files are ignored (bootstrap soft-skip may leave no file).
 func applyAppwriteRuntimeEnvFile(path string) error {
 	path = strings.TrimSpace(path)
@@ -339,8 +327,8 @@ func applyAppwriteRuntimeEnvFile(path string) error {
 	return scanner.Err()
 }
 
-// waitAppwriteReady polls healthURL until HTTP 200 or 401, or timeoutSec elapses.
-// timeoutSec 0 is a no-op success (callers should skip invoking this).
+// Treats HTTP 200 or 401 as ready (Appwrite may answer 401 before auth is configured).
+// timeoutSec 0 is a no-op success.
 func waitAppwriteReady(ctx context.Context, client *http.Client, healthURL string, timeoutSec int) error {
 	healthURL = strings.TrimSpace(healthURL)
 	if healthURL == "" {

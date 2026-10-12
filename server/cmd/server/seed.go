@@ -9,13 +9,10 @@ import (
 	"time"
 )
 
-// demoFixtureMarkerOrgSlug is the empty-only presence marker for Seed.
-// When this organization already exists and Replace is false, Seed is a no-op.
+// Empty-only presence marker: when this org exists and Replace is false, Seed is a no-op.
 const demoFixtureMarkerOrgSlug = "organization-1"
 
-// seedIdentity is the Seed-facing slice of IdentityStore: only methods
-// Seed / seedDemoIdentity / ensureDemo* call. Full IdentityStore remains the
-// HTTP and session surface; IdentityStore values assign into SeedDeps.
+// Narrow IdentityStore surface for Seed; full IdentityStore remains the HTTP/session type.
 type seedIdentity interface {
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
 	DeleteOrganizationAsAdmin(ctx context.Context, orgSlug string) error
@@ -31,39 +28,32 @@ type seedIdentity interface {
 
 var _ seedIdentity = (*appwriteIdentity)(nil)
 
-// SeedDeps is the injectable seam for the unified demo fixture seeder.
 type SeedDeps struct {
 	Identity seedIdentity
 	Store    Store
-	// ConfigDir holds workflow YAMLs and categories.yaml (default: WORKFLOW_CONFIG_DIR).
+	// Workflow YAMLs and categories.yaml; empty defaults to WORKFLOW_CONFIG_DIR / "config".
 	ConfigDir string
-	// CategoriesPath overrides the taxonomy seed file; empty uses ConfigDir/categories.yaml.
+	// Empty uses ConfigDir/categories.yaml.
 	CategoriesPath string
-	// Replace rewrites the fixture even when the marker org already exists (local only).
+	// Rewrite even when the marker org exists (local only).
 	Replace bool
-	// RNG drives catalog stream variety; nil picks a time-based source in Seed.
+	// Nil picks a time-based source in Seed.
 	RNG catalogStreamRNG
-	// Fixture overrides the built-in demo dataset; nil uses defaultDemoFixture().
+	// Nil uses defaultDemoFixture().
 	Fixture *demoFixture
-	// Now overrides wall clock for instance timestamps; nil uses time.Now.
+	// Nil uses time.Now.
 	Now func() time.Time
 }
 
 // Seed applies the integrated synthetic demo fixture.
 //
-// Empty-only (default): if GetOrganizationBySlug(demoFixtureMarkerOrgSlug) succeeds,
-// Seed returns nil without writing identity or Mongo. Pass Replace to rewrite.
+// Empty-only (default): if the marker org already exists, returns nil without writing.
+// Pass Replace to rewrite.
 //
-// Order when applying: identity (orgs/users/memberships, email verified) →
-// taxonomy → catalog streams → instances.
+// Apply order is intentional: identity → taxonomy → catalog streams → instances.
 //
-// Preconditions (CLI): Mongo reachable; Appwrite project + API key usable.
-// Standalone `attesta seed` opens identity from APPWRITE_* in process env.
-// Hosts that need an empty Appwrite first run `attesta prepare`, which
-// bootstraps the project/key/bucket and passes open params by value into
-// Seed. Seed itself does not create the Appwrite project or API key.
-// Hosts gate with ATTESTA_SEED via PrepareDemoStack (see ADR-0004); Seed
-// does not read that env var.
+// Seed does not create the Appwrite project or API key (use prepare for that) and
+// does not read ATTESTA_SEED (hosts gate via PrepareDemoStack / ADR-0004).
 func Seed(ctx context.Context, deps SeedDeps) error {
 	if deps.Identity == nil {
 		return fmt.Errorf("seed: identity is required")

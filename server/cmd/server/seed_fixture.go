@@ -13,7 +13,7 @@ type demoFixtureUser struct {
 	Name            string
 	PlatformAdmin   bool
 	OrgAdminSlugs   []string
-	MembershipRoles map[string][]string // orgSlug → business role slugs
+	MembershipRoles map[string][]string
 }
 
 type demoFixture struct {

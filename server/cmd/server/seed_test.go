@@ -545,7 +545,6 @@ func TestSeedReplaceRewritesWhenMarkerPresent(t *testing.T) {
 	}
 }
 
-// seedFakeIdentity implements only seedIdentity for Seed tests.
 type seedFakeIdentity struct {
 	orgs         map[string]IdentityOrg
 	usersByEmail map[string]IdentityUser

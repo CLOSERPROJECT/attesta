@@ -177,7 +177,6 @@ func TestBootstrapAppwriteProjectCreatesProjectKeyAndBucketWhenProbeFails(t *tes
 	if result.APIKey != "standard_bootstrapped_key" || result.ProjectID != "attesta" {
 		t.Fatalf("result = %#v", result)
 	}
-	// Login-first: existing console credentials succeed without signup.
 	if accountCreates != 0 || loginAttempts != 1 || consoleTeamCreates != 1 || keyCreates != 1 {
 		t.Fatalf("accountCreates=%d loginAttempts=%d teamCreates=%d keyCreates=%d", accountCreates, loginAttempts, consoleTeamCreates, keyCreates)
 	}

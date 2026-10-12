@@ -12,9 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// seedSession is the shared runtime handle for demo-seed CLIs: Mongo store,
-// optional Appwrite identity, workflow config dir, and an explicit categories
-// path from --file / CATEGORIES_SEED (empty means unset).
 type seedSession struct {
 	Store          Store
 	Identity       IdentityStore
@@ -31,9 +28,7 @@ func workflowConfigDir() string {
 	return configDir
 }
 
-// categoriesSeedPathFromArgs returns an explicit taxonomy path from --file or
-// CATEGORIES_SEED. Empty means the caller (or Seed) should default to
-// ConfigDir/categories.yaml.
+// Empty means Seed should default to ConfigDir/categories.yaml.
 func categoriesSeedPathFromArgs(args []string) string {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -47,8 +42,6 @@ func categoriesSeedPathFromArgs(args []string) string {
 	return strings.TrimSpace(os.Getenv("CATEGORIES_SEED"))
 }
 
-// resolveCategoriesSeedPath returns explicit when set, otherwise
-// configDir/categories.yaml (empty configDir defaults to "config").
 func resolveCategoriesSeedPath(explicit, configDir string) string {
 	if path := strings.TrimSpace(explicit); path != "" {
 		return path
@@ -60,9 +53,7 @@ func resolveCategoriesSeedPath(explicit, configDir string) string {
 	return filepath.Join(dir, "categories.yaml")
 }
 
-// openSeedSession opens the Mongo store (required) and optional identity, and
-// resolves ConfigDir / CategoriesPath. When openIdentity is nil, Identity is
-// left unset. On identity open failure, the store cleanup runs before return.
+// On identity open failure, store cleanup runs before return.
 func openSeedSession(
 	ctx context.Context,
 	args []string,
@@ -100,7 +91,6 @@ func openSeedSession(
 	return sess, nil
 }
 
-// withSeedSession opens a seed session, defers cleanup, and runs fn.
 func withSeedSession(
 	ctx context.Context,
 	args []string,
@@ -119,12 +109,7 @@ func withSeedSession(
 	return fn(sess)
 }
 
-// runSeedSession opens the default demo-seed session (Mongo + required Appwrite
-// identity) and runs Seed. Flag parsing stays in each CLI; replace only changes
-// SeedDeps and the success log line.
-//
-// When creds is nil, identity opens from process environment (standalone
-// `attesta seed`). When non-nil, identity opens from those values (prepare→seed).
+// creds nil → identity from process env (standalone seed); non-nil → prepare→seed by value.
 func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
 	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
 		opts := appwriteIdentityFromEnvOptions{RequireAll: true}
@@ -151,9 +136,6 @@ func runSeedSession(ctx context.Context, args []string, replace bool, creds *app
 	})
 }
 
-// openMongoStore connects with MONGODB_URI (default mongodb://localhost:27017),
-// selects MONGODB_DATABASE (default closer_demo), and resolves ConfigDir via
-// workflowConfigDir(). Cleanup disconnects the client.
 func openMongoStore(ctx context.Context) (Store, string, func(), error) {
 	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
@@ -170,8 +152,7 @@ func openMongoStore(ctx context.Context) (Store, string, func(), error) {
 	return store, workflowConfigDir(), cleanup, nil
 }
 
-// openMongoTaxonomyStore is a thin wrapper for seed-session openers that only
-// need Store + cleanup (ConfigDir is resolved separately via workflowConfigDir).
+// ConfigDir is resolved separately via workflowConfigDir; openers only need Store + cleanup.
 func openMongoTaxonomyStore(ctx context.Context) (Store, func(), error) {
 	store, _, cleanup, err := openMongoStore(ctx)
 	return store, cleanup, err

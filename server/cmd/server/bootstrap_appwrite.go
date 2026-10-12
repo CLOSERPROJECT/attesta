@@ -28,8 +28,7 @@ const (
 	appwriteBootstrap429MaxDelay    = 16 * time.Second
 )
 
-// appwriteBootstrapKeyScopes covers identity_appwrite admin + org-assets storage.
-// Names must match Appwrite's project-key allowlist (no sessions.read in 1.8.x).
+// Must match Appwrite's project-key allowlist (no sessions.read in 1.8.x).
 var appwriteBootstrapKeyScopes = []string{
 	"users.read",
 	"users.write",
@@ -42,7 +41,6 @@ var appwriteBootstrapKeyScopes = []string{
 	"buckets.write",
 }
 
-// BootstrapAppwriteDeps is the injectable seam for console project bootstrap.
 type BootstrapAppwriteDeps struct {
 	Endpoint        string
 	ProjectID       string
@@ -54,11 +52,10 @@ type BootstrapAppwriteDeps struct {
 	ProjectName     string
 	EnvFilePath     string
 	HTTPClient      *http.Client
-	// Sleep backs off on HTTP 429. Nil uses a context-aware time.Timer sleep.
+	// Nil uses a context-aware time.Timer sleep (429 backoff).
 	Sleep func(ctx context.Context, d time.Duration) error
 }
 
-// BootstrapResult reports credentials after probe or console bootstrap.
 type BootstrapResult struct {
 	ProjectID string
 	APIKey    string
@@ -66,14 +63,10 @@ type BootstrapResult struct {
 	Created   bool
 }
 
-// BootstrapAppwriteProject ensures the Attesta Appwrite project, API key, and
-// org-assets bucket exist. When the current APPWRITE_API_KEY can list users,
-// bootstrap is a no-op (aside from ensuring the bucket and writing EnvFilePath).
-// Otherwise it uses the console project (X-Appwrite-Project: console) to create
-// the console account/session/team/project/key, then the storage bucket.
-//
-// EnvFilePath (default /tmp/attesta-appwrite.env) always receives the runtime
-// credentials so Coolify Preview can overwrite a stale injected API key.
+// Ensures project, API key, and org-assets bucket. Usable APPWRITE_API_KEY →
+// skip console bootstrap (still ensure bucket + write EnvFilePath).
+// EnvFilePath always receives runtime credentials so Coolify Preview can
+// overwrite a stale injected API key.
 func BootstrapAppwriteProject(ctx context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error) {
 	if err := ctx.Err(); err != nil {
 		return BootstrapResult{}, err
@@ -221,9 +214,8 @@ func bootstrapAppwriteViaConsole(ctx context.Context, client *http.Client, sleep
 	return secret, nil
 }
 
-// ensureConsoleLoggedIn prefers an existing console session (login-first) so
-// restart loops do not hammer POST /account once the first root exists
-// (Appwrite 501 user_console_count_exceeded / 429 storms on Coolify previews).
+// Login-first so restart loops do not hammer POST /account once the first root
+// exists (Appwrite 501 user_console_count_exceeded / 429 storms on Coolify previews).
 func ensureConsoleLoggedIn(ctx context.Context, client *http.Client, sleep func(context.Context, time.Duration) error, endpoint, email, password string) error {
 	loggedIn, err := tryConsoleSession(ctx, client, sleep, endpoint, email, password)
 	if err != nil {
@@ -266,17 +258,14 @@ func ensureConsoleAccount(ctx context.Context, client *http.Client, sleep func(c
 		return nil
 	case resp.StatusCode == http.StatusNotImplemented:
 		// Appwrite disables further console signups after the first root
-		// (user_console_count_exceeded / _APP_CONSOLE_WHITELIST_ROOT). Continue
-		// and let login validate the existing account.
+		// (user_console_count_exceeded / _APP_CONSOLE_WHITELIST_ROOT).
 		return nil
 	default:
 		return fmt.Errorf("appwrite bootstrap create console account: HTTP %d", resp.StatusCode)
 	}
 }
 
-// tryConsoleSession posts email login. On success returns true. On 401 (or other
-// auth-style failure) returns false so callers may attempt signup. Other errors
-// fail closed.
+// 401/403 → false so callers may attempt signup; other errors fail closed.
 func tryConsoleSession(ctx context.Context, client *http.Client, sleep func(context.Context, time.Duration) error, endpoint, email, password string) (bool, error) {
 	body := map[string]any{
 		"email":    email,
@@ -384,9 +373,8 @@ func ensureConsoleProject(ctx context.Context, client *http.Client, sleep func(c
 	return nil
 }
 
-// ensureConsoleProjectKey reuses or rotates the single named bootstrap key.
-// Appwrite list/get responses usually omit secrets for existing keys, so when
-// attesta-bootstrap exists without a secret we delete it and create once —
+// Appwrite list/get usually omit secrets for existing keys, so when
+// attesta-bootstrap exists without a secret we delete and recreate once —
 // avoiding unbounded key accumulation on long-lived preview volumes.
 func ensureConsoleProjectKey(ctx context.Context, client *http.Client, sleep func(context.Context, time.Duration) error, endpoint, projectID string) (string, error) {
 	keysURL := endpoint + "/projects/" + url.PathEscape(projectID) + "/keys"

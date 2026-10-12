@@ -10,12 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// subCategoryPathExists reports whether a Sub-category path exists in taxonomy.
-// A nil checker means taxonomy is unavailable (treat as uncategorized).
+// Nil checker means taxonomy is unavailable (treat as uncategorized).
 type subCategoryPathExists func(ctx context.Context, categorySlug, subCategorySlug string) (bool, error)
 
-// isWorkflowCatalogConfigFile reports whether a config-dir entry should be loaded
-// as a Stream blueprint. Taxonomy seed files share the directory but are not workflows.
+// Taxonomy seed files share the config directory but are not Stream blueprints.
 func isWorkflowCatalogConfigFile(name string) bool {
 	base := strings.ToLower(filepath.Base(strings.TrimSpace(name)))
 	switch base {
@@ -25,14 +23,11 @@ func isWorkflowCatalogConfigFile(name string) bool {
 	return strings.HasSuffix(base, ".yaml") || strings.HasSuffix(base, ".yml")
 }
 
-// IsCategorized reports whether the Stream blueprint currently references a
-// Sub-category path (both slugs set after effective categorization).
 func (w WorkflowDef) IsCategorized() bool {
 	return strings.TrimSpace(w.CategorySlug) != "" && strings.TrimSpace(w.SubCategorySlug) != ""
 }
 
-// validateWorkflowCategoryPair requires categorySlug and subCategorySlug together
-// (both set or both omitted). A Stream never attaches to a Category alone.
+// Both set or both omitted — a Stream never attaches to a Category alone.
 func validateWorkflowCategoryPair(workflow WorkflowDef) error {
 	categorySlug := strings.TrimSpace(workflow.CategorySlug)
 	subCategorySlug := strings.TrimSpace(workflow.SubCategorySlug)
@@ -42,11 +37,10 @@ func validateWorkflowCategoryPair(workflow WorkflowDef) error {
 	return fmt.Errorf("categorySlug and subCategorySlug must both be set or both omitted")
 }
 
-// applyEffectiveStreamCategorization keeps a declared Sub-category path only when
-// it exists in taxonomy. Unknown paths (or a nil checker) become uncategorized
-// without failing blueprint load. Lookup errors leave the declared pair unchanged
-// and are returned so callers can avoid caching a transient resolution.
-// Pair completeness is validated separately by validateWorkflowCategoryPair.
+// Unknown paths (or nil checker) become uncategorized without failing load.
+// Lookup errors leave the declared pair unchanged and are returned so callers
+// can avoid caching a transient resolution. Pair completeness is
+// validateWorkflowCategoryPair.
 func applyEffectiveStreamCategorization(ctx context.Context, workflow *WorkflowDef, pathExists subCategoryPathExists) error {
 	if workflow == nil {
 		return nil
