@@ -39,8 +39,8 @@ func seedCatalogStreamsWithStoreOpener(
 	if rng == nil {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
-	server := &Server{store: store, configDir: configDir}
-	res, err := seedCatalogStreams(ctx, server, rng)
+	now := time.Now().UTC()
+	res, err := seedCatalogStreams(ctx, store, configDir, now, rng)
 	if err != nil {
 		return err
 	}

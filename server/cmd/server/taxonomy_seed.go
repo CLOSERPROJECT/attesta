@@ -111,9 +111,8 @@ func seedTaxonomyFromFile(ctx context.Context, store Store, path string) error {
 	return nil
 }
 
-// bootstrapTaxonomy seeds taxonomy from categories.yaml when the store is empty.
-// Existing taxonomy is left untouched (same empty-only pattern as Formata stream
-// bootstrap). Missing seed file is a no-op. Full replace remains seed-categories.
+// Empty-store only (same pattern as Formata stream bootstrap). Missing seed file is a
+// no-op; full replace is Seed with Replace.
 func bootstrapTaxonomy(ctx context.Context, store Store, configDir string) error {
 	if store == nil {
 		return nil
@@ -126,7 +125,7 @@ func bootstrapTaxonomy(ctx context.Context, store Store, configDir string) error
 		return nil
 	}
 
-	path := taxonomyBootstrapSeedPath(configDir)
+	path := resolveCategoriesSeedPath(os.Getenv("CATEGORIES_SEED"), configDir)
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -136,8 +135,8 @@ func bootstrapTaxonomy(ctx context.Context, store Store, configDir string) error
 	return seedTaxonomyFromFile(ctx, store, path)
 }
 
-func taxonomyBootstrapSeedPath(configDir string) string {
-	if path := strings.TrimSpace(os.Getenv("CATEGORIES_SEED")); path != "" {
+func resolveCategoriesSeedPath(explicit, configDir string) string {
+	if path := strings.TrimSpace(explicit); path != "" {
 		return path
 	}
 	dir := strings.TrimSpace(configDir)

@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 )
 
-func writeMinimalWorkflowYAML(t *testing.T, path, name string) {
-	t.Helper()
+func minimalWorkflowYAML(name string) string {
 	substepLines := ""
 	for i := 1; i <= 5; i++ {
 		id := "1." + string(rune('0'+i))
@@ -25,7 +23,7 @@ func writeMinimalWorkflowYAML(t *testing.T, path, name string) {
 			"          schema:\n" +
 			"            type: object\n"
 	}
-	content := "workflow:\n" +
+	return "workflow:\n" +
 		"  name: \"" + name + "\"\n" +
 		"  steps:\n" +
 		"    - id: \"1\"\n" +
@@ -45,22 +43,30 @@ func writeMinimalWorkflowYAML(t *testing.T, path, name string) {
 		"  - id: \"u1\"\n" +
 		"    name: \"User 1\"\n" +
 		"    departmentId: \"dep1\"\n"
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write temp config %s: %v", path, err)
+}
+
+func saveFormataStream(t *testing.T, store Store, name string) string {
+	t.Helper()
+	saved, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{
+		Stream: minimalWorkflowYAML(name),
+	})
+	if err != nil {
+		t.Fatalf("SaveFormataBuilderStream %s: %v", name, err)
 	}
+	return saved.ID.Hex()
 }
 
 func TestSeedInstancesWithStoreOpenerSeedsCatalog(t *testing.T) {
 	dir := t.TempDir()
-	writeMinimalWorkflowYAML(t, filepath.Join(dir, "demo.yaml"), "Demo Stream")
 	store := NewMemoryStore()
+	key := saveFormataStream(t, store, "Demo Stream")
 	err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
 		return store, func() {}, nil
 	}, dir)
 	if err != nil {
 		t.Fatalf("seedInstancesWithStoreOpener: %v", err)
 	}
-	list, err := store.ListRecentProcessesByWorkflow(t.Context(), "demo", 0)
+	list, err := store.ListRecentProcessesByWorkflow(t.Context(), key, 0)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -71,20 +77,21 @@ func TestSeedInstancesWithStoreOpenerSeedsCatalog(t *testing.T) {
 
 func TestSeedInstancesWithStoreOpenerLeavesEveryFifthStreamEmpty(t *testing.T) {
 	dir := t.TempDir()
-	// Sorted keys: a, b, c, d, e — e is 5th (index 4) and stays empty.
-	for _, name := range []string{"a", "b", "c", "d", "e"} {
-		writeMinimalWorkflowYAML(t, filepath.Join(dir, name+".yaml"), "Stream "+name)
-	}
 	store := NewMemoryStore()
-	// Pre-seed junk on the empty target so replace wipe is visible.
-	store.SeedProcess(Process{WorkflowKey: "e", Status: processStatusActive, CreatedAt: time.Now().UTC()})
+	keys := make([]string, 0, 5)
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		keys = append(keys, saveFormataStream(t, store, "Stream "+name))
+	}
+	sort.Strings(keys)
+	emptyKey := keys[4]
+	store.SeedProcess(Process{WorkflowKey: emptyKey, Status: processStatusActive, CreatedAt: time.Now().UTC()})
 	err := seedInstancesWithStoreOpener(t.Context(), nil, func(context.Context) (Store, func(), error) {
 		return store, func() {}, nil
 	}, dir)
 	if err != nil {
 		t.Fatalf("seedInstancesWithStoreOpener: %v", err)
 	}
-	for _, key := range []string{"a", "b", "c", "d"} {
+	for _, key := range keys[:4] {
 		list, listErr := store.ListRecentProcessesByWorkflow(t.Context(), key, 0)
 		if listErr != nil {
 			t.Fatalf("list %s: %v", key, listErr)
@@ -93,12 +100,12 @@ func TestSeedInstancesWithStoreOpenerLeavesEveryFifthStreamEmpty(t *testing.T) {
 			t.Fatalf("%s instances = %d, want 8", key, len(list))
 		}
 	}
-	emptyList, err := store.ListRecentProcessesByWorkflow(t.Context(), "e", 0)
+	emptyList, err := store.ListRecentProcessesByWorkflow(t.Context(), emptyKey, 0)
 	if err != nil {
-		t.Fatalf("list e: %v", err)
+		t.Fatalf("list empty: %v", err)
 	}
 	if len(emptyList) != 0 {
-		t.Fatalf("e instances = %d, want 0 (empty-state stream)", len(emptyList))
+		t.Fatalf("empty-key instances = %d, want 0 (empty-state stream)", len(emptyList))
 	}
 }
 

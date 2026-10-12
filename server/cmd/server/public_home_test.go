@@ -89,6 +89,7 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 
 	cards, err := server.publicStreamCardsForPath(t.Context(), "supply-chain", "procurement")
@@ -98,8 +99,16 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 	if len(cards) != 1 || cards[0].Name != "Match Stream" {
 		t.Fatalf("cards = %#v, want only Match Stream", cards)
 	}
-	if cards[0].Href != "/streams/match" {
-		t.Fatalf("Href = %q, want /streams/match", cards[0].Href)
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	matchKey, _, ok := catalogKeyByWorkflowName(catalog, "Match Stream")
+	if !ok {
+		t.Fatal("missing Match Stream")
+	}
+	if cards[0].Href != "/streams/"+matchKey {
+		t.Fatalf("Href = %q, want /streams/%s", cards[0].Href, matchKey)
 	}
 
 	empty, err := server.publicStreamCardsForPath(t.Context(), "", "")
@@ -193,6 +202,7 @@ func TestHandlePublicStreamsPartialFilters(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 
 	req := httptest.NewRequest(http.MethodGet, "/streams/public?category=supply-chain&subCategory=procurement", nil)
