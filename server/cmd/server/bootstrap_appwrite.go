@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	defaultAppwriteConsoleEmail    = "console@attesta.local"
-	defaultAppwriteConsolePassword = "password"
+	defaultAppwriteConsoleEmail    = "admin@appwrite.local"
+	defaultAppwriteConsolePassword = "admin@appwrite.local"
 	defaultAppwriteConsoleTeamID   = "attesta"
 	appwriteBootstrapKeyName       = "attesta-bootstrap"
 

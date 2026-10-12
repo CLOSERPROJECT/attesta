@@ -79,7 +79,7 @@ After the primary checkout's first boot:
 
 Fresh stacks start with empty Appwrite MariaDB; demo data comes from the Go seed after credentials exist.
 
-`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and run `go run ./cmd/server prepare --policy=worktree` (wait → bootstrap → apply env → empty-only seed; soft-skips bootstrap failure and missing credentials). Bootstrap defaults console credentials to `console@attesta.local` / `password` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
+`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and run `go run ./cmd/server prepare --policy=worktree` (wait → bootstrap → apply env → empty-only seed; soft-skips bootstrap failure and missing credentials). Bootstrap defaults console credentials to `admin@appwrite.local` / `admin@appwrite.local` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
 
 ## Verifying the Setup
 ```bash
@@ -132,8 +132,8 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | `ATTESTA_ROOT_DIR` | `/app` | App root for `.env.appwrite` (Dockerfile/entrypoint set this; matches image app root, not `WORKDIR /app/server`) |
 | `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
 | `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed) and writes `$ATTESTA_ROOT_DIR/.env.appwrite`; prepare applies it for seed, and the server loads the same file at startup |
-| `APPWRITE_CONSOLE_EMAIL` | default `console@attesta.local` | Console login-first; signup only if login fails (409/501 treated as account may exist) |
-| `APPWRITE_CONSOLE_PASSWORD` | default `password` | Demo-only; change if you share console access |
+| `APPWRITE_CONSOLE_EMAIL` | default `admin@appwrite.local` | Console login-first; signup only if login fails (409/501 treated as account may exist) |
+| `APPWRITE_CONSOLE_PASSWORD` | default `admin@appwrite.local` | Demo-only; change if you share console access |
 | `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
 | `PUBLIC_BASE_URL` | `https://${SERVICE_FQDN_ATTESTA_3000}` | Compose default; invite/reset/verify links derive from this origin + fixed paths |
 
