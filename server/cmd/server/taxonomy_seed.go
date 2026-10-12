@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -133,15 +132,4 @@ func bootstrapTaxonomy(ctx context.Context, store Store, configDir string) error
 		return fmt.Errorf("taxonomy bootstrap stat %s: %w", path, err)
 	}
 	return seedTaxonomyFromFile(ctx, store, path)
-}
-
-func resolveCategoriesSeedPath(explicit, configDir string) string {
-	if path := strings.TrimSpace(explicit); path != "" {
-		return path
-	}
-	dir := strings.TrimSpace(configDir)
-	if dir == "" {
-		dir = "config"
-	}
-	return filepath.Join(dir, "categories.yaml")
 }

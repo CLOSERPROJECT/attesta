@@ -75,10 +75,8 @@ node -e '
   assert(Object.values(standalone.services).every(service => !service.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree service labels");
   assert(Object.values(standalone.networks).every(network => !network.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree network labels");
   assert(Object.values(standalone.volumes).every(volume => !volume.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree volume labels");
-  assert(!mounts(standalone).includes("/seed/appwrite-seed.sql"), "standalone acquired the local seed mount");
-  assert(!mounts(standalone).includes("/seed/mariadb-init-preview-seed.sh"), "standalone acquired the local seed hook");
-  assert(!mounts(standalone).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "standalone acquired a direct initdb seed hook");
-  assert(!("APPWRITE_RESTORE_SEED_SQL" in standalone.services.mariadb.environment), "standalone acquired the local seed switch");
+  assert(!mounts(standalone).some(target => target.startsWith("/seed/")), "standalone acquired a local seed mount");
+  assert(!("APPWRITE_RESTORE_SEED_SQL" in (standalone.services.mariadb.environment || {})), "standalone acquired a retired seed switch");
 
   assert(Object.values(localA.services).every(service => service.container_name == null), "local services retain fixed container names");
   assert(Object.values(localA.services).every(resource => isOwnedBy(resource, "label-test-a", ownerA, "repo-test-a")), "local services lack exact ownership labels");
@@ -112,8 +110,8 @@ if [[ "${1:-}" == */scripts/worktree-env.sh && "${FAIL_WORKTREE_ENV:-0}" == "1" 
   echo "simulated invalid worktree environment" >&2
   exit 23
 fi
-if [[ "${1:-}" == */scripts/worktree-data.sh ]]; then
-  printf 'data %s\n' "${2:-}" >>"${DOCKER_CALLS_FILE}"
+if [[ "${1:-}" == */scripts/worktree-relabel-volumes.sh ]]; then
+  printf 'relabel-volumes\n' >>"${DOCKER_CALLS_FILE}"
   exit 0
 fi
 exec /bin/bash "$@"
@@ -158,9 +156,36 @@ if [[ " $* " == *" config --services "* ]]; then
 fi
 printf '%s\n' "$*" >>"${DOCKER_CALLS_FILE}"
 EOF
-chmod +x "${tmpdir}/bin/bash" "${tmpdir}/bin/docker"
+cat >"${tmpdir}/bin/go" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+# Stub prepare so compose up tests do not need a live Appwrite stack.
+if [[ " $* " == *" prepare "* ]]; then
+  printf 'attesta-prepare\n' >>"${DOCKER_CALLS_FILE}"
+  exit 0
+fi
+echo "unexpected go invocation: $*" >&2
+exit 1
+EOF
+chmod +x "${tmpdir}/bin/bash" "${tmpdir}/bin/docker" "${tmpdir}/bin/go"
 
 expected_project="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" project-name)"
+
+grep -Fq 'go run ./cmd/server prepare --policy=worktree' \
+  "${ROOT}/scripts/worktree-compose.sh" \
+  || fail "worktree-compose does not invoke attesta prepare with worktree policy"
+grep -Fq 'ATTESTA_SEED_COMMAND' "${ROOT}/scripts/worktree-compose.sh" \
+  && fail "worktree-compose still exposes retired ATTESTA_SEED_COMMAND hatch"
+[[ ! -e "${ROOT}/deployment/attesta-appwrite-ready.sh" ]] \
+  || fail "retired attesta-appwrite-ready.sh still present"
+grep -Fq './attesta prepare' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  || fail "Coolify entrypoint does not invoke attesta prepare"
+grep -Fq 'bootstrap-appwrite' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  && fail "Coolify entrypoint still runs bootstrap-appwrite in shell"
+grep -Eq '(^|[[:space:]])(\./)?attesta seed([[:space:]]|$)' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  && fail "Coolify entrypoint still runs attesta seed in shell"
+grep -Eq 'load_appwrite_runtime_env|^[[:space:]]*\.[[:space:]]' "${ROOT}/deployment/coolify-entrypoint.sh" \
+  && fail "Coolify entrypoint still sources runtime Appwrite env in shell"
 
 if PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   FAIL_WORKTREE_ENV=1 COMPOSE_PROJECT_NAME=stale-project \
@@ -186,7 +211,6 @@ grep -q 'Docker Compose 2.24.4 or newer is required' "${tmpdir}/old-compose.err"
 
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_ENV_FILE="${tmpdir}/repository-ids" \
-  ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up
 
 expected_repository_id="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" repository-id)"
@@ -200,22 +224,24 @@ grep -q ' up -d .*mongodb.*appwrite.*traefik' "${tmpdir}/calls" || fail "infra s
 if grep ' up -d ' "${tmpdir}/calls" | sed 's/.* up -d //' | grep -q '\(^\| \)attesta\($\| \)'; then
   fail "host-dev up unexpectedly starts the attesta container"
 fi
+grep -q '^attesta-prepare$' "${tmpdir}/calls" || fail "attesta prepare did not run after infra up"
 grep -q ' ps$' "${tmpdir}/calls" || fail "status call missing"
 
-restore_line="$(grep -n '^data restore$' "${tmpdir}/calls" | cut -d: -f1)"
-relabel_line="$(grep -n '^data relabel-volumes$' "${tmpdir}/calls" | cut -d: -f1)"
+relabel_line="$(grep -n '^relabel-volumes$' "${tmpdir}/calls" | cut -d: -f1)"
 up_line="$(grep -n ' up -d ' "${tmpdir}/calls" | cut -d: -f1)"
-[[ -n "${relabel_line}" && -n "${restore_line}" && -n "${up_line}" \
-  && "${relabel_line}" -lt "${restore_line}" && "${restore_line}" -lt "${up_line}" ]] \
-  || fail "legacy volume relabel and data restore must run before writer services start"
+[[ -n "${relabel_line}" && -n "${up_line}" && "${relabel_line}" -lt "${up_line}" ]] \
+  || fail "legacy volume relabel must run before writer services start"
+! grep -q '^data ' "${tmpdir}/calls" \
+  || fail "compose up still invoked retired worktree-data snapshot/restore"
 
 : >"${tmpdir}/calls"
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_REDIRECTS_FILE="${tmpdir}/container-redirects" \
-  ATTESTA_APPWRITE_READY_TIMEOUT_SECONDS=0 \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up-app --build
 grep -q ' up -d --build .*attesta' "${tmpdir}/calls" \
   || fail "containerized start did not build and start the Attesta service"
+grep -q '^attesta-prepare$' "${tmpdir}/calls" \
+  || fail "containerized start did not run attesta prepare after infra up"
 docker_app_port="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" print | awk -F= '$1 == "DOCKER_APP_PORT" { print $2 }')"
 expected_redirects="http://localhost:${docker_app_port}/invite/accept|http://localhost:${docker_app_port}/reset/confirm|http://localhost:${docker_app_port}/verify/confirm"
 if grep -Fvxq "${expected_redirects}" "${tmpdir}/container-redirects"; then
