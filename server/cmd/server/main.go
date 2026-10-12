@@ -160,7 +160,6 @@ type Server struct {
 	catalog            map[string]RuntimeConfig
 	viteDevServer      string
 	enforceAuth        bool
-	formataArchURL     string
 	buildVersion       string
 	turnstileSiteKey   string
 	turnstileSecretKey string
@@ -785,7 +784,6 @@ func main() {
 		configDir:          configDir,
 		viteDevServer:      strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 		enforceAuth:        true,
-		formataArchURL:     strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 		buildVersion:       applicationVersion(),
 		mailer:             newMailerFromEnv(),
 		turnstileSiteKey:   strings.TrimSpace(os.Getenv("TURNSTILE_SITE_KEY")),
@@ -6354,7 +6352,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 		Schema:         marshalJSONCompact(effective.Schema),
 		UISchema:       marshalJSONCompact(effective.UISchema),
 		Reason:         strings.TrimSpace(override.Reason),
-		FormataArchURL: strings.TrimRight(strings.TrimSpace(s.formataArchURL), "/"),
+		FormataArchURL: "",
 		SaveURL:        streamInstancePath(workflowKey, process.ID.Hex()) + "/substep/" + canonical.SubstepID + "/override",
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

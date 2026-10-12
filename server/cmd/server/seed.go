@@ -31,7 +31,7 @@ var _ seedIdentity = (*appwriteIdentity)(nil)
 type SeedDeps struct {
 	Identity seedIdentity
 	Store    Store
-	// Workflow YAMLs and categories.yaml; empty defaults to WORKFLOW_CONFIG_DIR / "config".
+	// Workflow YAMLs and categories.yaml; empty defaults to "config".
 	ConfigDir string
 	// Empty uses ConfigDir/categories.yaml.
 	CategoriesPath string

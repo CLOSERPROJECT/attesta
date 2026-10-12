@@ -204,7 +204,6 @@ Common environment variables:
 - `APPWRITE_API_KEY` - leave empty for prepare; runtime creds live in checkout-scoped `.env.appwrite`
 - `PUBLIC_BASE_URL` - public origin for invite/reset/verify and notification links (no trailing slash)
 - `APPWRITE_ORG_ASSETS_BUCKET` - default `org-assets`
-- `WORKFLOW_CONFIG` - default `config/workflow.yaml`
 - `ATTACHMENT_MAX_BYTES` - default 25 MiB
 - `ANYONE_CAN_CREATE_ACCOUNT` - default `true` (open registration); set `false` as an emergency kill switch for signup
 - `SESSION_TTL_DAYS`
