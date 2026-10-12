@@ -43,12 +43,6 @@ type PrepareDeps struct {
 
 	HTTPClient *http.Client
 
-	// WaitAppwriteReady overrides the default health wait (tests).
-	WaitAppwriteReady func(ctx context.Context, healthURL string, timeoutSec int) error
-
-	// Bootstrap overrides BootstrapAppwriteProject (tests).
-	Bootstrap func(ctx context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error)
-
 	// Seed receives Appwrite open params by value. When nil, PrepareDemoStack
 	// returns after bootstrap (env file may still be written for Server restart).
 	Seed func(ctx context.Context, creds appwriteRuntimeCredentials) error
@@ -57,11 +51,34 @@ type PrepareDeps struct {
 	BootstrapDeps BootstrapAppwriteDeps
 }
 
+// prepareHooks are unexported wait/bootstrap doubles for same-package tests.
+// Production uses defaultPrepareHooks; Seed stays on PrepareDeps.
+type prepareHooks struct {
+	Wait      func(ctx context.Context, healthURL string, timeoutSec int) error
+	Bootstrap func(ctx context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error)
+}
+
+func defaultPrepareHooks(client *http.Client) prepareHooks {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return prepareHooks{
+		Wait: func(ctx context.Context, healthURL string, timeoutSec int) error {
+			return waitAppwriteReady(ctx, client, healthURL, timeoutSec)
+		},
+		Bootstrap: BootstrapAppwriteProject,
+	}
+}
+
 // PrepareDemoStack gates on ATTESTA_SEED, then wait → bootstrap → seed.
 // Bootstrap may still write the on-disk runtime env file for Server startup;
 // prepare→seed does not mutate process env or apply that file in-process.
 // When seed is disabled it is a no-op success.
 func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
+	return prepareDemoStack(ctx, deps, defaultPrepareHooks(deps.HTTPClient))
+}
+
+func prepareDemoStack(ctx context.Context, deps PrepareDeps, hooks prepareHooks) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -73,15 +90,9 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	timeoutSec := prepareReadyTimeout(deps)
 
 	if timeoutSec != 0 {
-		waitFn := deps.WaitAppwriteReady
+		waitFn := hooks.Wait
 		if waitFn == nil {
-			client := deps.HTTPClient
-			if client == nil {
-				client = http.DefaultClient
-			}
-			waitFn = func(ctx context.Context, healthURL string, timeoutSec int) error {
-				return waitAppwriteReady(ctx, client, healthURL, timeoutSec)
-			}
+			waitFn = defaultPrepareHooks(deps.HTTPClient).Wait
 		}
 		if err := waitFn(ctx, deps.HealthURL, timeoutSec); err != nil {
 			return err
@@ -93,39 +104,31 @@ func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 		return err
 	}
 
-	bootstrapFn := deps.Bootstrap
+	bootstrapFn := hooks.Bootstrap
 	if bootstrapFn == nil {
 		bootstrapFn = BootstrapAppwriteProject
 	}
 	bootstrapDeps := mergeBootstrapDeps(deps.BootstrapDeps, deps.EnvFilePath)
-	result, err := bootstrapFn(ctx, bootstrapDeps)
-	var creds appwriteRuntimeCredentials
+	result, bootstrapErr := bootstrapFn(ctx, bootstrapDeps)
+
+	fromBootstrap := runtimeCredsFromBootstrap(deps.Endpoint, result)
+	ambient := ambientAppwriteRuntimeCredentials()
+	creds, usedAmbient, err := prepareCredentialsAfterBootstrap(soft, bootstrapErr, fromBootstrap, ambient)
 	if err != nil {
-		if soft {
-			log.Printf("warning: attesta bootstrap failed; continuing with existing APPWRITE_* credentials: %v", err)
-			creds = appwriteRuntimeCredentials{
-				Endpoint:  os.Getenv("APPWRITE_ENDPOINT"),
-				ProjectID: os.Getenv("APPWRITE_PROJECT_ID"),
-				APIKey:    os.Getenv("APPWRITE_API_KEY"),
-			}
-		} else {
-			return fmt.Errorf("prepare: bootstrap: %w", err)
-		}
-	} else {
-		creds = appwriteRuntimeCredentials{
-			Endpoint:  deps.Endpoint,
-			ProjectID: result.ProjectID,
-			APIKey:    result.APIKey,
-		}
+		return err
+	}
+	if usedAmbient {
+		log.Printf("warning: attesta bootstrap failed; continuing with existing APPWRITE_* credentials: %v", bootstrapErr)
 	}
 
-	if missing := missingAppwriteCredentials(creds); len(missing) > 0 {
-		msg := "prepare: missing " + strings.Join(missing, ", ")
-		if soft {
-			log.Printf("skipping attesta seed: %s (or run task seed later)", msg)
-			return nil
-		}
-		return fmt.Errorf("%s", msg)
+	skip, err := prepareSeedCredentialGate(soft, creds)
+	if err != nil {
+		return err
+	}
+	if skip {
+		missing := missingAppwriteCredentials(creds)
+		log.Printf("skipping attesta seed: prepare: missing %s (or run task seed later)", strings.Join(missing, ", "))
+		return nil
 	}
 
 	if deps.Seed == nil {
@@ -233,6 +236,56 @@ func mergeBootstrapDeps(deps BootstrapAppwriteDeps, envFilePath string) Bootstra
 		deps.EnvFilePath = fromEnv.EnvFilePath
 	}
 	return deps
+}
+
+// runtimeCredsFromBootstrap maps a successful BootstrapResult onto open params.
+// Endpoint comes from prepare (bootstrap does not return it).
+func runtimeCredsFromBootstrap(endpoint string, result BootstrapResult) appwriteRuntimeCredentials {
+	return appwriteRuntimeCredentials{
+		Endpoint:  endpoint,
+		ProjectID: result.ProjectID,
+		APIKey:    result.APIKey,
+	}
+}
+
+// ambientAppwriteRuntimeCredentials reads current APPWRITE_* process env.
+func ambientAppwriteRuntimeCredentials() appwriteRuntimeCredentials {
+	return appwriteRuntimeCredentials{
+		Endpoint:  os.Getenv("APPWRITE_ENDPOINT"),
+		ProjectID: os.Getenv("APPWRITE_PROJECT_ID"),
+		APIKey:    os.Getenv("APPWRITE_API_KEY"),
+	}
+}
+
+// prepareCredentialsAfterBootstrap picks runtime creds after a bootstrap attempt.
+// Soft policy falls back to ambient on bootstrap error; hard policy returns the error.
+// usedAmbient is true when soft fallback was taken (caller may log).
+func prepareCredentialsAfterBootstrap(
+	soft bool,
+	bootstrapErr error,
+	fromBootstrap, ambient appwriteRuntimeCredentials,
+) (creds appwriteRuntimeCredentials, usedAmbient bool, err error) {
+	if bootstrapErr != nil {
+		if !soft {
+			return appwriteRuntimeCredentials{}, false, fmt.Errorf("prepare: bootstrap: %w", bootstrapErr)
+		}
+		return ambient, true, nil
+	}
+	return fromBootstrap, false, nil
+}
+
+// prepareSeedCredentialGate checks required open params under soft vs hard policy.
+// Soft + missing → skip seed (no error). Hard + missing → error.
+func prepareSeedCredentialGate(soft bool, creds appwriteRuntimeCredentials) (skip bool, err error) {
+	missing := missingAppwriteCredentials(creds)
+	if len(missing) == 0 {
+		return false, nil
+	}
+	msg := "prepare: missing " + strings.Join(missing, ", ")
+	if soft {
+		return true, nil
+	}
+	return false, fmt.Errorf("%s", msg)
 }
 
 func missingAppwriteCredentials(creds appwriteRuntimeCredentials) []string {

@@ -29,9 +29,14 @@ func TestAttestaSeedEnabledTruthy(t *testing.T) {
 
 func TestPrepareDemoStackSeedDisabledNoop(t *testing.T) {
 	var calls []string
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled: boolPtr(false),
-		WaitAppwriteReady: func(context.Context, string, int) error {
+		Seed: func(context.Context, appwriteRuntimeCredentials) error {
+			calls = append(calls, "seed")
+			return nil
+		},
+	}, prepareHooks{
+		Wait: func(context.Context, string, int) error {
 			calls = append(calls, "wait")
 			return nil
 		},
@@ -39,13 +44,9 @@ func TestPrepareDemoStackSeedDisabledNoop(t *testing.T) {
 			calls = append(calls, "bootstrap")
 			return BootstrapResult{}, nil
 		},
-		Seed: func(context.Context, appwriteRuntimeCredentials) error {
-			calls = append(calls, "seed")
-			return nil
-		},
 	})
 	if err != nil {
-		t.Fatalf("PrepareDemoStack: %v", err)
+		t.Fatalf("prepareDemoStack: %v", err)
 	}
 	if len(calls) != 0 {
 		t.Fatalf("calls = %#v, want no-op", calls)
@@ -59,12 +60,22 @@ func TestPrepareDemoStackOrderWaitBootstrapSeed(t *testing.T) {
 	var calls []string
 	envPath := filepath.Join(t.TempDir(), "attesta-appwrite.env")
 
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		Endpoint:            "http://appwrite/v1",
 		ReadyTimeoutSeconds: intPtr(30),
 		EnvFilePath:         envPath,
-		WaitAppwriteReady: func(_ context.Context, healthURL string, timeoutSec int) error {
+		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, "seed")
+			if creds.Endpoint != "http://appwrite/v1" || creds.ProjectID != "attesta" || creds.APIKey != "from-bootstrap" {
+				t.Fatalf("seed creds = %#v", creds)
+			}
+			return nil
+		},
+	}, prepareHooks{
+		Wait: func(_ context.Context, healthURL string, timeoutSec int) error {
 			mu.Lock()
 			defer mu.Unlock()
 			calls = append(calls, "wait")
@@ -88,18 +99,9 @@ func TestPrepareDemoStackOrderWaitBootstrapSeed(t *testing.T) {
 			}
 			return BootstrapResult{ProjectID: "attesta", APIKey: "from-bootstrap", Created: true}, nil
 		},
-		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
-			mu.Lock()
-			defer mu.Unlock()
-			calls = append(calls, "seed")
-			if creds.Endpoint != "http://appwrite/v1" || creds.ProjectID != "attesta" || creds.APIKey != "from-bootstrap" {
-				t.Fatalf("seed creds = %#v", creds)
-			}
-			return nil
-		},
 	})
 	if err != nil {
-		t.Fatalf("PrepareDemoStack: %v", err)
+		t.Fatalf("prepareDemoStack: %v", err)
 	}
 	if got := strings.Join(calls, ","); got != "wait,bootstrap,seed" {
 		t.Fatalf("order = %q, want wait,bootstrap,seed", got)
@@ -148,25 +150,149 @@ func TestParsePrepareArgsPolicy(t *testing.T) {
 	}
 }
 
+func TestPrepareCredentialsAfterBootstrap(t *testing.T) {
+	t.Parallel()
+	fromBootstrap := appwriteRuntimeCredentials{
+		Endpoint:  "http://appwrite/v1",
+		ProjectID: "attesta",
+		APIKey:    "fresh",
+	}
+	ambient := appwriteRuntimeCredentials{
+		Endpoint:  "http://appwrite/v1",
+		ProjectID: "attesta",
+		APIKey:    "existing",
+	}
+	bootstrapErr := errors.New("console unavailable")
+
+	t.Run("success uses bootstrap", func(t *testing.T) {
+		t.Parallel()
+		creds, usedAmbient, err := prepareCredentialsAfterBootstrap(false, nil, fromBootstrap, ambient)
+		if err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if usedAmbient {
+			t.Fatal("usedAmbient = true, want false")
+		}
+		if creds != fromBootstrap {
+			t.Fatalf("creds = %#v, want %#v", creds, fromBootstrap)
+		}
+	})
+
+	t.Run("soft error uses ambient", func(t *testing.T) {
+		t.Parallel()
+		creds, usedAmbient, err := prepareCredentialsAfterBootstrap(true, bootstrapErr, fromBootstrap, ambient)
+		if err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if !usedAmbient {
+			t.Fatal("usedAmbient = false, want true")
+		}
+		if creds != ambient {
+			t.Fatalf("creds = %#v, want %#v", creds, ambient)
+		}
+	})
+
+	t.Run("hard error fails", func(t *testing.T) {
+		t.Parallel()
+		_, usedAmbient, err := prepareCredentialsAfterBootstrap(false, bootstrapErr, fromBootstrap, ambient)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "console unavailable") {
+			t.Fatalf("error = %v", err)
+		}
+		if usedAmbient {
+			t.Fatal("usedAmbient = true on hard failure")
+		}
+	})
+}
+
+func TestRuntimeCredsFromBootstrap(t *testing.T) {
+	t.Parallel()
+	got := runtimeCredsFromBootstrap("http://appwrite/v1", BootstrapResult{
+		ProjectID: "attesta",
+		APIKey:    "k",
+		Created:   true,
+	})
+	want := appwriteRuntimeCredentials{
+		Endpoint:  "http://appwrite/v1",
+		ProjectID: "attesta",
+		APIKey:    "k",
+	}
+	if got != want {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestPrepareSeedCredentialGate(t *testing.T) {
+	t.Parallel()
+	complete := appwriteRuntimeCredentials{
+		Endpoint:  "http://appwrite/v1",
+		ProjectID: "attesta",
+		APIKey:    "k",
+	}
+	incomplete := appwriteRuntimeCredentials{Endpoint: "http://appwrite/v1"}
+
+	t.Run("complete", func(t *testing.T) {
+		t.Parallel()
+		skip, err := prepareSeedCredentialGate(false, complete)
+		if err != nil || skip {
+			t.Fatalf("skip=%v err=%v", skip, err)
+		}
+	})
+
+	t.Run("soft missing skips", func(t *testing.T) {
+		t.Parallel()
+		skip, err := prepareSeedCredentialGate(true, incomplete)
+		if err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if !skip {
+			t.Fatal("skip = false, want true")
+		}
+	})
+
+	t.Run("hard missing errors", func(t *testing.T) {
+		t.Parallel()
+		skip, err := prepareSeedCredentialGate(false, incomplete)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if skip {
+			t.Fatal("skip = true on hard failure")
+		}
+		if !strings.Contains(err.Error(), "APPWRITE_PROJECT_ID") || !strings.Contains(err.Error(), "APPWRITE_API_KEY") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+}
+
+func TestMissingAppwriteCredentials(t *testing.T) {
+	t.Parallel()
+	missing := missingAppwriteCredentials(appwriteRuntimeCredentials{})
+	if got := strings.Join(missing, ","); got != "APPWRITE_ENDPOINT,APPWRITE_PROJECT_ID,APPWRITE_API_KEY" {
+		t.Fatalf("missing = %q", got)
+	}
+	if len(missingAppwriteCredentials(appwriteRuntimeCredentials{
+		Endpoint:  "http://appwrite/v1",
+		ProjectID: "attesta",
+		APIKey:    "k",
+	})) != 0 {
+		t.Fatal("expected no missing fields")
+	}
+}
+
 func TestPrepareDemoStackWorktreePolicySoftBootstrapContinues(t *testing.T) {
 	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
 	t.Setenv("APPWRITE_PROJECT_ID", "attesta")
 	t.Setenv("APPWRITE_API_KEY", "existing-key")
 
 	var calls []string
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(30),
 		Policy:              PreparePolicyWorktree,
 		Endpoint:            "http://appwrite/v1",
-		WaitAppwriteReady: func(context.Context, string, int) error {
-			calls = append(calls, "wait")
-			return nil
-		},
-		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
-			calls = append(calls, "bootstrap")
-			return BootstrapResult{}, errors.New("console unavailable")
-		},
 		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
 			calls = append(calls, "seed")
 			if creds.Endpoint != "http://appwrite/v1" || creds.ProjectID != "attesta" || creds.APIKey != "existing-key" {
@@ -174,9 +300,18 @@ func TestPrepareDemoStackWorktreePolicySoftBootstrapContinues(t *testing.T) {
 			}
 			return nil
 		},
+	}, prepareHooks{
+		Wait: func(context.Context, string, int) error {
+			calls = append(calls, "wait")
+			return nil
+		},
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			calls = append(calls, "bootstrap")
+			return BootstrapResult{}, errors.New("console unavailable")
+		},
 	})
 	if err != nil {
-		t.Fatalf("PrepareDemoStack: %v", err)
+		t.Fatalf("prepareDemoStack: %v", err)
 	}
 	if got := strings.Join(calls, ","); got != "wait,bootstrap,seed" {
 		t.Fatalf("order = %q, want wait,bootstrap,seed after soft bootstrap", got)
@@ -185,11 +320,16 @@ func TestPrepareDemoStackWorktreePolicySoftBootstrapContinues(t *testing.T) {
 
 func TestPrepareDemoStackCoolifyPolicyHardBootstrapFails(t *testing.T) {
 	var calls []string
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(30),
 		Policy:              PreparePolicyCoolify,
-		WaitAppwriteReady: func(context.Context, string, int) error {
+		Seed: func(context.Context, appwriteRuntimeCredentials) error {
+			calls = append(calls, "seed")
+			return nil
+		},
+	}, prepareHooks{
+		Wait: func(context.Context, string, int) error {
 			calls = append(calls, "wait")
 			return nil
 		},
@@ -197,13 +337,9 @@ func TestPrepareDemoStackCoolifyPolicyHardBootstrapFails(t *testing.T) {
 			calls = append(calls, "bootstrap")
 			return BootstrapResult{}, errors.New("console unavailable")
 		},
-		Seed: func(context.Context, appwriteRuntimeCredentials) error {
-			calls = append(calls, "seed")
-			return nil
-		},
 	})
 	if err == nil {
-		t.Fatal("PrepareDemoStack: expected error")
+		t.Fatal("prepareDemoStack: expected error")
 	}
 	if !strings.Contains(err.Error(), "console unavailable") {
 		t.Fatalf("error = %v", err)
@@ -219,21 +355,22 @@ func TestPrepareDemoStackWorktreePolicySkipsMissingCredentials(t *testing.T) {
 	t.Setenv("APPWRITE_API_KEY", "")
 
 	var seeded bool
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(0),
 		Policy:              PreparePolicyWorktree,
 		Endpoint:            "http://appwrite/v1",
-		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
-			return BootstrapResult{}, errors.New("console unavailable")
-		},
 		Seed: func(context.Context, appwriteRuntimeCredentials) error {
 			seeded = true
 			return nil
 		},
+	}, prepareHooks{
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			return BootstrapResult{}, errors.New("console unavailable")
+		},
 	})
 	if err != nil {
-		t.Fatalf("PrepareDemoStack: %v", err)
+		t.Fatalf("prepareDemoStack: %v", err)
 	}
 	if seeded {
 		t.Fatal("seed ran despite missing credentials under worktree policy")
@@ -245,17 +382,10 @@ func TestPrepareDemoStackTimeoutZeroSkipsWait(t *testing.T) {
 
 	var waited bool
 	var seeded bool
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(0),
 		Endpoint:            "http://127.0.0.1:9/v1",
-		WaitAppwriteReady: func(context.Context, string, int) error {
-			waited = true
-			return errors.New("wait should not run when timeout is 0")
-		},
-		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
-			return BootstrapResult{ProjectID: "attesta", APIKey: "k"}, nil
-		},
 		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
 			if creds.ProjectID != "attesta" || creds.APIKey != "k" {
 				t.Fatalf("seed creds = %#v", creds)
@@ -263,12 +393,20 @@ func TestPrepareDemoStackTimeoutZeroSkipsWait(t *testing.T) {
 			seeded = true
 			return nil
 		},
+	}, prepareHooks{
+		Wait: func(context.Context, string, int) error {
+			waited = true
+			return errors.New("wait should not run when timeout is 0")
+		},
+		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
+			return BootstrapResult{ProjectID: "attesta", APIKey: "k"}, nil
+		},
 	})
 	if err != nil {
-		t.Fatalf("PrepareDemoStack: %v", err)
+		t.Fatalf("prepareDemoStack: %v", err)
 	}
 	if waited {
-		t.Fatal("WaitAppwriteReady was called despite timeout 0")
+		t.Fatal("Wait was called despite timeout 0")
 	}
 	if !seeded {
 		t.Fatal("seed did not run")
@@ -282,24 +420,25 @@ func TestPrepareDemoStackPassesBootstrapCredsWithoutMutatingEnv(t *testing.T) {
 	t.Setenv("APPWRITE_ENDPOINT", "http://appwrite/v1")
 
 	var seedCreds appwriteRuntimeCredentials
-	err := PrepareDemoStack(t.Context(), PrepareDeps{
+	err := prepareDemoStack(t.Context(), PrepareDeps{
 		SeedEnabled:         boolPtr(true),
 		ReadyTimeoutSeconds: intPtr(0),
 		EnvFilePath:         envPath,
 		Endpoint:            "http://appwrite/v1",
+		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
+			seedCreds = creds
+			return nil
+		},
+	}, prepareHooks{
 		Bootstrap: func(context.Context, BootstrapAppwriteDeps) (BootstrapResult, error) {
 			if err := os.WriteFile(envPath, []byte("APPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=fresh-key\n"), 0o600); err != nil {
 				return BootstrapResult{}, err
 			}
 			return BootstrapResult{ProjectID: "attesta", APIKey: "fresh-key", Created: true}, nil
 		},
-		Seed: func(_ context.Context, creds appwriteRuntimeCredentials) error {
-			seedCreds = creds
-			return nil
-		},
 	})
 	if err != nil {
-		t.Fatalf("PrepareDemoStack: %v", err)
+		t.Fatalf("prepareDemoStack: %v", err)
 	}
 	if seedCreds.Endpoint != "http://appwrite/v1" || seedCreds.ProjectID != "attesta" || seedCreds.APIKey != "fresh-key" {
 		t.Fatalf("seed creds = %#v", seedCreds)
