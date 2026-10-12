@@ -27,6 +27,13 @@ func TestSeedStreamLeftEmptyEveryFifth(t *testing.T) {
 	}
 }
 
+func TestSeedDemoInstancesEmptyCatalog(t *testing.T) {
+	_, err := seedDemoInstances(t.Context(), NewMemoryStore(), map[string]RuntimeConfig{}, time.Now().UTC())
+	if err == nil {
+		t.Fatal("expected empty catalog error")
+	}
+}
+
 func TestBuildSeedInstancePlansMix(t *testing.T) {
 	cfg := RuntimeConfig{
 		Workflow: WorkflowDef{
@@ -107,6 +114,44 @@ func TestBuildSeedInstancePlansNoDPPWhenDisabled(t *testing.T) {
 	}
 	if done != 3 {
 		t.Fatalf("done count = %d, want 3", done)
+	}
+}
+
+func TestSeedDoneSubstepCountClamp(t *testing.T) {
+	t.Parallel()
+	if got := seedDoneSubstepCount(0, 0.5); got != 0 {
+		t.Fatalf("total<=0 got %d", got)
+	}
+	if got := seedDoneSubstepCount(-1, 0.5); got != 0 {
+		t.Fatalf("negative total got %d", got)
+	}
+	if got := seedDoneSubstepCount(5, 0); got != 0 {
+		t.Fatalf("fraction 0 got %d", got)
+	}
+	if got := seedDoneSubstepCount(5, 0.01); got != 1 {
+		t.Fatalf("tiny fraction got %d, want 1", got)
+	}
+	if got := seedDoneSubstepCount(5, 2); got != 5 {
+		t.Fatalf("fraction>1 got %d, want 5", got)
+	}
+}
+
+func TestSynthesizeSeedProgressClampEdges(t *testing.T) {
+	t.Parallel()
+	def := WorkflowDef{Steps: []WorkflowStep{{
+		StepID: "1", Order: 1,
+		Substep: []WorkflowSub{
+			{SubstepID: "1.1", Order: 1, InputKey: "a", InputType: "string"},
+			{SubstepID: "1.2", Order: 2, InputKey: "b", InputType: "string"},
+		},
+	}}}
+	now := time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)
+	actor := Actor{ID: "seed", Role: "seed"}
+	if got := synthesizeSeedProgress(def, RuntimeConfig{}, -3, now, actor); len(got) != 0 {
+		t.Fatalf("negative doneCount len=%d", len(got))
+	}
+	if got := synthesizeSeedProgress(def, RuntimeConfig{}, 99, now, actor); len(got) != 2 {
+		t.Fatalf("oversize doneCount len=%d, want 2", len(got))
 	}
 }
 

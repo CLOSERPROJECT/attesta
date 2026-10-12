@@ -49,7 +49,7 @@ workflow:
 organizations:
   - slug: org1
     name: Organization 1
-  subCategorySlug: supplier-onboarding`, "\n") // no trailing newline on last key
+  subCategorySlug: supplier-onboarding`, "\n")
 
 	out, err := applyCatalogStreamCategoryAndName(in, "recycling-and-recovery", "photovoltaic-panels", "Photovoltaic Panels — Pilot")
 	if err != nil {
@@ -78,7 +78,7 @@ func TestTaxonomyLeavesFromTree(t *testing.T) {
 			{Slug: "a1", Name: "A1"},
 			{Slug: "a2", Name: "A2"},
 		}},
-		{Slug: "b", Name: "B"}, // no subs
+		{Slug: "b", Name: "B"},
 	})
 	if len(leaves) != 2 {
 		t.Fatalf("len=%d want 2", len(leaves))
@@ -115,9 +115,13 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 		Progress:    map[string]ProcessStep{},
 	})
 
-	server := &Server{store: store, configDir: t.TempDir()}
+	configDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(configDir, "demo.yaml"), []byte(tmpl), 0o644); err != nil {
+		t.Fatalf("write pack template: %v", err)
+	}
+	now := time.Now().UTC()
 	rng := rand.New(rand.NewSource(1))
-	res, err := seedCatalogStreams(t.Context(), server, rng)
+	res, err := seedCatalogStreams(t.Context(), store, configDir, now, rng)
 	if err != nil {
 		t.Fatalf("seedCatalogStreams: %v", err)
 	}
@@ -135,9 +139,16 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 	if len(streams) != res.Streams {
 		t.Fatalf("listed=%d result=%d", len(streams), res.Streams)
 	}
+	if len(res.Catalog) != res.Streams {
+		t.Fatalf("catalog size=%d streams=%d", len(res.Catalog), res.Streams)
+	}
 	for _, s := range streams {
 		if s.ID == saved.ID {
 			t.Fatal("old formata id survived wipe")
+		}
+		key := s.ID.Hex()
+		if _, ok := res.Catalog[key]; !ok {
+			t.Fatalf("catalog missing saved formata id %s", key)
 		}
 	}
 	if _, err := store.LoadProcessByID(t.Context(), oldProcessID); !errors.Is(err, mongo.ErrNoDocuments) {
@@ -170,7 +181,7 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 		}
 	}
 
-	res2, err := seedCatalogStreams(t.Context(), server, rand.New(rand.NewSource(2)))
+	res2, err := seedCatalogStreams(t.Context(), store, configDir, now, rand.New(rand.NewSource(2)))
 	if err != nil {
 		t.Fatalf("second seed: %v", err)
 	}
@@ -189,7 +200,7 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 	}
 }
 
-func TestSeedCatalogStreamsUsesConfigDirWhenFormataEmpty(t *testing.T) {
+func TestSeedCatalogStreamsUsesPackTemplatesNotLiveFormata(t *testing.T) {
 	store := NewMemoryStore()
 	_ = store.ReplaceTaxonomy(t.Context(),
 		[]Category{{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1}},
@@ -199,13 +210,24 @@ func TestSeedCatalogStreamsUsesConfigDirWhenFormataEmpty(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	server := &Server{store: store, configDir: dir}
-	res, err := seedCatalogStreams(t.Context(), server, rand.New(rand.NewSource(3)))
+	res, err := seedCatalogStreams(t.Context(), store, dir, time.Now().UTC(), rand.New(rand.NewSource(3)))
 	if err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	if res.Streams < 1 {
 		t.Fatal("expected at least one stream from file template")
+	}
+	streams, err := store.ListFormataBuilderStreams(t.Context())
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(res.Catalog) != len(streams) {
+		t.Fatalf("catalog size=%d listed=%d", len(res.Catalog), len(streams))
+	}
+	for _, s := range streams {
+		if _, ok := res.Catalog[s.ID.Hex()]; !ok {
+			t.Fatalf("catalog missing saved formata id %s", s.ID.Hex())
+		}
 	}
 }
 
@@ -213,8 +235,7 @@ func TestSeedCatalogStreamsErrorsWithoutTaxonomy(t *testing.T) {
 	store := NewMemoryStore()
 	dir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(dir, "demo.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
-	server := &Server{store: store, configDir: dir}
-	if _, err := seedCatalogStreams(t.Context(), server, rand.New(rand.NewSource(1))); err == nil {
+	if _, err := seedCatalogStreams(t.Context(), store, dir, time.Now().UTC(), rand.New(rand.NewSource(1))); err == nil {
 		t.Fatal("expected error for empty taxonomy")
 	}
 }

@@ -19,7 +19,8 @@ func TestHandleDigitalLinkDPPHTML(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 
 	store := NewMemoryStore()
-	process := seedDPPProcess(store)
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPProcess(store, key)
 	server := &Server{
 		store:      store,
 		tmpl:       testTemplates(),
@@ -45,7 +46,8 @@ func TestHandleDigitalLinkDPPJSON(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 
 	store := NewMemoryStore()
-	process := seedDPPProcess(store)
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPProcess(store, key)
 	server := &Server{
 		store:     store,
 		tmpl:      testTemplates(),
@@ -132,7 +134,8 @@ func TestHandleDigitalLinkDPPHTMLTemplateIncludesMarkers(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 
 	store := NewMemoryStore()
-	process := seedDPPProcess(store)
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPProcess(store, key)
 	tmpl := parseTestTemplates(t)
 	server := &Server{
 		store:     store,
@@ -184,9 +187,10 @@ func TestHandleDigitalLinkDPPHTMLShowsInlineFileLink(t *testing.T) {
 	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
 	process := Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
@@ -244,6 +248,7 @@ func TestHandleDigitalLinkDPPAttachmentAllowsPublicDownload(t *testing.T) {
 	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
 	processID := primitive.NewObjectID()
 	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
 		ProcessID:   processID,
@@ -258,7 +263,7 @@ func TestHandleDigitalLinkDPPAttachmentAllowsPublicDownload(t *testing.T) {
 	}
 	process := Process{
 		ID:          processID,
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
@@ -309,7 +314,8 @@ func TestHandleDigitalLinkDPPAttachmentRejectsUnlistedAttachment(t *testing.T) {
 	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
 
 	store := NewMemoryStore()
-	process := seedDPPFileProcess(store, primitive.NewObjectID(), "65f2a79b8e7f7d8f3c7c99aa")
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPFileProcess(store, primitive.NewObjectID(), "65f2a79b8e7f7d8f3c7c99aa", key)
 	server := &Server{
 		store:     store,
 		tmpl:      testTemplates(),
@@ -349,7 +355,8 @@ func TestHandleDigitalLinkDPPAttachmentRejectsBadStoredAttachmentID(t *testing.T
 	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
 
 	store := NewMemoryStore()
-	process := seedDPPFileProcess(store, primitive.NewObjectID(), "not-an-object-id")
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPFileProcess(store, primitive.NewObjectID(), "not-an-object-id", key)
 	server := &Server{
 		store:     store,
 		tmpl:      testTemplates(),
@@ -370,8 +377,9 @@ func TestHandleDigitalLinkDPPAttachmentRejectsMissingStoredAttachment(t *testing
 	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
 	attachmentID := primitive.NewObjectID().Hex()
-	process := seedDPPFileProcess(store, primitive.NewObjectID(), attachmentID)
+	process := seedDPPFileProcess(store, primitive.NewObjectID(), attachmentID, key)
 	server := &Server{
 		store:     store,
 		tmpl:      testTemplates(),
@@ -392,6 +400,7 @@ func TestHandleDigitalLinkDPPAttachmentRejectsOtherProcessAttachment(t *testing.
 	writeFileWorkflowConfig(t, tempDir+"/workflow.yaml")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
 	processID := primitive.NewObjectID()
 	attachment, err := store.SaveAttachment(t.Context(), AttachmentUpload{
 		ProcessID:   primitive.NewObjectID(),
@@ -404,7 +413,7 @@ func TestHandleDigitalLinkDPPAttachmentRejectsOtherProcessAttachment(t *testing.
 	if err != nil {
 		t.Fatalf("SaveAttachment: %v", err)
 	}
-	process := seedDPPFileProcess(store, processID, attachment.ID.Hex())
+	process := seedDPPFileProcess(store, processID, attachment.ID.Hex(), key)
 	server := &Server{
 		store:     store,
 		tmpl:      testTemplates(),
@@ -425,7 +434,8 @@ func TestHandleDigitalLinkDPPHTMLShowsPrematureTermination(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 
 	store := NewMemoryStore()
-	process := seedDPPProcess(store)
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPProcess(store, key)
 	endedAt := time.Date(2026, 3, 6, 9, 15, 0, 0, time.UTC)
 	process.Termination = &ProcessTermination{
 		Reason:    "supplier cancelled",
@@ -467,10 +477,11 @@ func TestHandleDigitalLinkDPPHTMLStripsAppwriteOperatorPrefix(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
 	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
 	process := Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
@@ -521,9 +532,10 @@ func TestHandleDigitalLinkDPPHTMLRendersOverrideSubstepValues(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
 	process := Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
@@ -575,11 +587,11 @@ func TestHandleDigitalLinkDPPHTMLRendersOverrideSubstepValues(t *testing.T) {
 	}
 }
 
-func seedDPPProcess(store *MemoryStore) Process {
+func seedDPPProcess(store *MemoryStore, workflowKey string) Process {
 	doneAt := time.Date(2026, 3, 5, 14, 30, 0, 0, time.UTC)
 	process := Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: workflowKey,
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{
@@ -601,10 +613,10 @@ func seedDPPProcess(store *MemoryStore) Process {
 	return process
 }
 
-func seedDPPFileProcess(store *MemoryStore, processID primitive.ObjectID, attachmentID string) Process {
+func seedDPPFileProcess(store *MemoryStore, processID primitive.ObjectID, attachmentID, workflowKey string) Process {
 	process := Process{
 		ID:          processID,
-		WorkflowKey: "workflow",
+		WorkflowKey: workflowKey,
 		CreatedAt:   time.Now().UTC(),
 		Status:      "done",
 		Progress: map[string]ProcessStep{

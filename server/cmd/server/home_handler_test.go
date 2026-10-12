@@ -178,6 +178,7 @@ func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		store:     store,
 		tmpl:      parseTestTemplates(t),
@@ -193,13 +194,25 @@ func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 	if got := strings.Count(body, `class="public-stream-card"`); got != 2 {
 		t.Fatalf("public stream card count = %d, want 2", got)
 	}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	alphaKey, _, ok := catalogKeyByWorkflowName(catalog, "Alpha Stream")
+	if !ok {
+		t.Fatal("missing Alpha Stream")
+	}
+	betaKey, _, ok := catalogKeyByWorkflowName(catalog, "Beta Stream")
+	if !ok {
+		t.Fatal("missing Beta Stream")
+	}
 	for _, want := range []string{
 		"Alpha Stream",
 		"Alpha description",
 		"Beta Stream",
 		"Beta description",
-		`href="/streams/alpha"`,
-		`href="/streams/beta"`,
+		`href="/streams/` + alphaKey + `"`,
+		`href="/streams/` + betaKey + `"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in public home body, got %q", want, body)
@@ -211,7 +224,7 @@ func TestHandlePublicHomeRendersCatalogStreamCards(t *testing.T) {
 	alphaIdx := strings.Index(body, "Alpha Stream")
 	betaIdx := strings.Index(body, "Beta Stream")
 	if alphaIdx < 0 || betaIdx < 0 || alphaIdx > betaIdx {
-		t.Fatalf("expected stable key order alpha before beta, alpha=%d beta=%d", alphaIdx, betaIdx)
+		t.Fatalf("expected stable name order Alpha before Beta, alpha=%d beta=%d", alphaIdx, betaIdx)
 	}
 	if strings.Contains(body, "PV Module Tracing") {
 		t.Fatalf("expected no hard-coded Figma stream tiles, got %q", body)
@@ -278,6 +291,7 @@ users:
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		store:     store,
 		tmpl:      parseTestTemplates(t),
@@ -318,6 +332,7 @@ func TestHandlePublicHomeRendersPassportBadgeOnlyWhenDPPEnabled(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		store:     store,
 		tmpl:      parseTestTemplates(t),
@@ -399,6 +414,7 @@ users:
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		store: store,
 		tmpl:  parseTestTemplates(t),
@@ -455,6 +471,7 @@ func TestHandlePublicHomeRendersNoInstancesYetWhenStreamHasNoProcesses(t *testin
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		store:     store,
 		tmpl:      parseTestTemplates(t),
@@ -491,14 +508,23 @@ func TestHandlePublicHomeRendersAllCompletedMetricsFromSettledInstances(t *testi
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
+	catalog, err := loadWorkflowCatalog(t.Context(), store)
+	if err != nil {
+		t.Fatalf("loadWorkflowCatalog: %v", err)
+	}
+	settledKey, _, ok := catalogKeyByWorkflowName(catalog, "Settled Metrics Stream")
+	if !ok {
+		t.Fatal("missing Settled Metrics Stream")
+	}
 	now := time.Now().UTC()
 	store.SeedProcess(Process{
-		WorkflowKey: "settled",
+		WorkflowKey: settledKey,
 		CreatedAt:   now.Add(-2 * time.Minute),
 		Status:      processStatusDone,
 	})
 	store.SeedProcess(Process{
-		WorkflowKey: "settled",
+		WorkflowKey: settledKey,
 		CreatedAt:   now.Add(-time.Minute),
 		Status:      processStatusTerminated,
 	})
@@ -545,29 +571,42 @@ func TestHandlePublicHomeRendersActiveNowMetricsScopedPerStream(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
+	catalog, err := loadWorkflowCatalog(t.Context(), store)
+	if err != nil {
+		t.Fatalf("loadWorkflowCatalog: %v", err)
+	}
+	liveKey, _, ok := catalogKeyByWorkflowName(catalog, "Live Metrics Stream")
+	if !ok {
+		t.Fatal("missing Live Metrics Stream")
+	}
+	settledKey, _, ok := catalogKeyByWorkflowName(catalog, "Settled Metrics Stream")
+	if !ok {
+		t.Fatal("missing Settled Metrics Stream")
+	}
 	now := time.Now().UTC()
 	store.SeedProcess(Process{
-		WorkflowKey: "live",
+		WorkflowKey: liveKey,
 		CreatedAt:   now.Add(-3 * time.Minute),
 		Status:      processStatusActive,
 	})
 	store.SeedProcess(Process{
-		WorkflowKey: "live",
+		WorkflowKey: liveKey,
 		CreatedAt:   now.Add(-2 * time.Minute),
 		Status:      processStatusTerminated,
 	})
 	store.SeedProcess(Process{
-		WorkflowKey: "live",
+		WorkflowKey: liveKey,
 		CreatedAt:   now.Add(-time.Minute),
 		Status:      processStatusActive,
 	})
 	store.SeedProcess(Process{
-		WorkflowKey: "settled",
+		WorkflowKey: settledKey,
 		CreatedAt:   now.Add(-4 * time.Minute),
 		Status:      processStatusDone,
 	})
 	store.SeedProcess(Process{
-		WorkflowKey: "settled",
+		WorkflowKey: settledKey,
 		CreatedAt:   now.Add(-5 * time.Minute),
 		Status:      processStatusDone,
 	})
@@ -645,6 +684,7 @@ func TestHandlePublicHomeLimitsToFirstSixCatalogStreams(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		store:     store,
 		tmpl:      parseTestTemplates(t),
@@ -787,6 +827,7 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 	writePublicHomeWorkflowConfig(t, filepath.Join(tempDir, "accessible.yaml"), "Accessible Stream", "string", "Visible to org1")
 	writeMyHomeCatalogOtherOrgWorkflow(t, filepath.Join(tempDir, "other-org.yaml"))
 	writeOrg2FirstThenOrg1WorkflowConfig(t, filepath.Join(tempDir, "participant.yaml"))
+	installPackIntoFormata(t, store, tempDir)
 
 	now := time.Now().UTC()
 	sessionID := "session-my-home-catalog"
@@ -818,6 +859,18 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	body := rec.Body.String()
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	accessibleKey, _, ok := catalogKeyByWorkflowName(catalog, "Accessible Stream")
+	if !ok {
+		t.Fatal("missing Accessible Stream")
+	}
+	participantKey, _, ok := catalogKeyByWorkflowName(catalog, "Org2-first workflow")
+	if !ok {
+		t.Fatal("missing Org2-first workflow")
+	}
 	for _, want := range []string{
 		`class="my-home-discovery stream-taxonomy-catalog"`,
 		`id="home-stream-discovery"`,
@@ -832,12 +885,12 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 		`aria-label="Streams"`,
 		`class="public-home-stream-grid"`,
 		"Accessible Stream",
-		`href="/my/streams/accessible/"`,
+		`href="/my/streams/` + accessibleKey + `/"`,
 		"public-stream-card-start",
-		`id="start-instance-accessible"`,
-		`action="/my/streams/accessible/instance/start"`,
+		`id="start-instance-` + accessibleKey + `"`,
+		`action="/my/streams/` + accessibleKey + `/instance/start"`,
 		"Org2-first workflow",
-		`href="/my/streams/participant/"`,
+		`href="/my/streams/` + participantKey + `/"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in affiliated discovery, got: %s", want, body)
@@ -1034,9 +1087,11 @@ func TestHandleHomeCatalogWiring(t *testing.T) {
 			Status:    "active",
 			CreatedAt: now,
 		}
+		emptyStore := NewMemoryStore()
+		seedPlatformAdminTaxonomy(t, emptyStore)
 		emptyServer := &Server{
 			authorizer:  fakeAuthorizer{},
-			store:       store,
+			store:       emptyStore,
 			identity:    testIdentityForSessions(now, map[string]AccountUser{emptySession: emptyUser}),
 			tmpl:        parseTestTemplates(t),
 			configDir:   t.TempDir(),
@@ -1289,9 +1344,11 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 		CreatedAt: now,
 	}
 
+	store := NewMemoryStore()
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		authorizer:  fakeAuthorizer{},
-		store:       NewMemoryStore(),
+		store:       store,
 		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
 		tmpl:        homePickerTemplates(),
 		configDir:   tempDir,
@@ -1310,10 +1367,10 @@ func TestHandleHomeRendersWorkflowPicker(t *testing.T) {
 	if !strings.Contains(body, "PICK DISCOVERY 2") {
 		t.Fatalf("expected discovery stream count, got %q", body)
 	}
-	if !strings.Contains(body, "workflow:Main workflow:Main workflow description:instances=") || !strings.Contains(body, "secondary:Secondary workflow:instances=") {
+	if !strings.Contains(body, "Main workflow:Main workflow description:instances=") || !strings.Contains(body, "Secondary workflow:instances=") {
 		t.Fatalf("expected accessible workflow cards in picker, got %q", body)
 	}
-	if strings.Contains(body, "secondary:Secondary workflow:Secondary workflow description|") {
+	if strings.Contains(body, "Secondary workflow:Secondary workflow description|") {
 		t.Fatalf("expected optional description to be omitted when empty, got %q", body)
 	}
 }
@@ -1431,9 +1488,11 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	}
 
 	tmpl := parseTestTemplates(t)
+	store := NewMemoryStore()
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{
 		authorizer:  fakeAuthorizer{},
-		store:       NewMemoryStore(),
+		store:       store,
 		identity:    testIdentityForSessions(now, map[string]AccountUser{sessionID: user}),
 		tmpl:        tmpl,
 		configDir:   tempDir,
@@ -1462,10 +1521,22 @@ func TestHandleHomePickerRendersWorkflowCardsAndScopedLinks(t *testing.T) {
 	if strings.Contains(body, `class="my-home-catalog"`) || strings.Contains(body, `id="my-home-category-sidebar"`) {
 		t.Fatalf("affiliated home must not render category catalog, got %q", body)
 	}
-	if !strings.Contains(body, `href="/my/streams/workflow/"`) {
-		t.Fatalf("expected scoped workflow href for workflow key, got %q", body)
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
 	}
-	if !strings.Contains(body, `href="/my/streams/secondary/"`) {
+	mainKey, _, ok := catalogKeyByWorkflowName(catalog, "Main workflow")
+	if !ok {
+		t.Fatal("missing Main workflow")
+	}
+	secondaryKey, _, ok := catalogKeyByWorkflowName(catalog, "Secondary workflow")
+	if !ok {
+		t.Fatal("missing Secondary workflow")
+	}
+	if !strings.Contains(body, `href="/my/streams/`+mainKey+`/"`) {
+		t.Fatalf("expected scoped workflow href for main key, got %q", body)
+	}
+	if !strings.Contains(body, `href="/my/streams/`+secondaryKey+`/"`) {
 		t.Fatalf("expected scoped workflow href for secondary key, got %q", body)
 	}
 	if !strings.Contains(body, "Main workflow description") {
@@ -1945,9 +2016,22 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 
 	now := time.Date(2026, 2, 10, 12, 0, 0, 0, time.UTC)
 	store := NewMemoryStore()
+	installPackIntoFormata(t, store, tempDir)
+	catalog, err := loadWorkflowCatalog(t.Context(), store)
+	if err != nil {
+		t.Fatalf("loadWorkflowCatalog: %v", err)
+	}
+	mainKey, _, ok := catalogKeyByWorkflowName(catalog, "Main workflow")
+	if !ok {
+		t.Fatal("missing Main workflow")
+	}
+	secondaryKey, _, ok := catalogKeyByWorkflowName(catalog, "Secondary workflow")
+	if !ok {
+		t.Fatal("missing Secondary workflow")
+	}
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: mainKey,
 		CreatedAt:   now.Add(-6 * time.Hour),
 		Status:      "active",
 		Progress: map[string]ProcessStep{
@@ -1957,7 +2041,7 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	})
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: mainKey,
 		CreatedAt:   now.Add(-5 * time.Hour),
 		Status:      "active",
 		Progress: map[string]ProcessStep{
@@ -1967,7 +2051,7 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	})
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: mainKey,
 		CreatedAt:   now.Add(-4 * time.Hour),
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-3 * time.Hour))},
@@ -1975,9 +2059,10 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 		},
 	})
 	store.SeedProcess(Process{
-		ID:        primitive.NewObjectID(),
-		CreatedAt: now.Add(-3 * time.Hour),
-		Status:    "active",
+		ID:          primitive.NewObjectID(),
+		WorkflowKey: mainKey,
+		CreatedAt:   now.Add(-3 * time.Hour),
+		Status:      "active",
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "pending"},
 			"1_2": {State: "pending"},
@@ -1985,7 +2070,7 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	})
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "secondary",
+		WorkflowKey: secondaryKey,
 		CreatedAt:   now.Add(-2 * time.Hour),
 		Status:      "active",
 		Progress: map[string]ProcessStep{
@@ -1995,7 +2080,7 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 	})
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "secondary",
+		WorkflowKey: secondaryKey,
 		CreatedAt:   now.Add(-1 * time.Hour),
 		Progress: map[string]ProcessStep{
 			"1_1": {State: "done", DoneAt: ptrTime(now.Add(-50 * time.Minute))},
@@ -2020,10 +2105,10 @@ func TestHandleAdminStreamsRendersWorkflowPickerCountsByWorkflow(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "workflow:Main workflow:instances=4:active=3|") {
+	if !strings.Contains(body, "Main workflow:instances=4:active=3|") {
 		t.Fatalf("expected workflow instance metrics, got %q", body)
 	}
-	if !strings.Contains(body, "secondary:Secondary workflow:instances=2:active=1|") {
+	if !strings.Contains(body, "Secondary workflow:instances=2:active=1|") {
 		t.Fatalf("expected secondary instance metrics, got %q", body)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -114,7 +115,7 @@ func (s *Server) publicStreamCardsForPath(ctx context.Context, categorySlug, sub
 	}
 	catalog, err := s.workflowCatalog()
 	if err != nil {
-		if err.Error() == "workflow config catalog is empty" {
+		if errors.Is(err, errFormataWorkflowCatalogEmpty) {
 			return nil, nil
 		}
 		return nil, err

@@ -438,8 +438,9 @@ func TestPageBaseForUserHasAttentionYourTurnStream(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Batch needing action",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -469,7 +470,6 @@ func TestPageBaseForUserHasAttentionYourTurnStream(t *testing.T) {
 		t.Fatal("affiliated Member with your-turn Stream must light HasAttention")
 	}
 
-	// Upcoming: another role's turn — Member with no matching role must not light.
 	otherBase := server.pageBaseForUser(&AccountUser{
 		IdentityUserID: "other-1",
 		Email:          "other@org1.example",
@@ -498,8 +498,9 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	processID := store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Batch needing action",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -507,7 +508,7 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 			"1.1": {State: "pending"},
 		},
 	})
-	instanceHref := streamInstanceSubstepPath("workflow", processID.Hex(), "1.1")
+	instanceHref := streamInstanceSubstepPath(key, processID.Hex(), "1.1")
 
 	if _, err := store.InsertJoinRequest(context.Background(), JoinRequest{
 		RequesterUserID: "joiner-1",
@@ -574,7 +575,6 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 		t.Fatalf("expected Join above Your turn above Choose a stream; join=%d yourTurn=%d choose=%d", joinIdx, yourTurnIdx, chooseIdx)
 	}
 
-	// Resolve your-turn by completing the actionable Substep (process becomes done).
 	doneAt := now
 	if err := store.UpdateProcessProgress(context.Background(), processID, "workflow", "1.1", ProcessStep{
 		State:  "done",
@@ -598,7 +598,6 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 	if strings.Contains(afterBody, "Your turn") || strings.Contains(afterBody, "Batch needing action") {
 		t.Fatalf("expected your-turn band cleared after resolve, got:\n%s", afterBody)
 	}
-	// Join Attention remains — dots stay lit from Join alone.
 	if !strings.Contains(afterBody, "Join requests") || !strings.Contains(afterBody, `attention-dot`) {
 		t.Fatalf("Join Attention should remain after stream resolve, got:\n%s", afterBody)
 	}
@@ -646,8 +645,9 @@ func TestPlatformAdminHomeOmitsStreamAttention(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Should not appear for PA",
 		Status:      processStatusActive,
 		CreatedAt:   now,

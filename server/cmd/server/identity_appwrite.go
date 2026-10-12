@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -39,7 +40,6 @@ type appwriteIdentity struct {
 	orgAssetsBucket string
 }
 
-// NewAppwriteIdentity builds the Appwrite-backed identity adapter used by later auth work.
 func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Client) IdentityStore {
 	adminClient := appwrite.NewClient(
 		appwrite.WithEndpoint(strings.TrimRight(strings.TrimSpace(endpoint), "/")),
@@ -59,6 +59,47 @@ func NewAppwriteIdentity(endpoint, projectID, apiKey string, httpClient *http.Cl
 		sessionClient:   sessionClient,
 		orgAssetsBucket: appwriteOrgAssetsBucket(),
 	}
+}
+
+// PrepareDemoStack passes this into Seed; standalone seed opens from process env.
+type appwriteRuntimeCredentials struct {
+	Endpoint  string
+	ProjectID string
+	APIKey    string
+}
+
+// RequireAll (seed): Endpoint, ProjectID, and APIKey are all required.
+// Lax / default (main): Endpoint defaults to http://appwrite/v1 when unset;
+// project ID and API key may be empty. HTTPClient is never chosen by the helper.
+type appwriteIdentityFromEnvOptions struct {
+	RequireAll bool
+	HTTPClient *http.Client
+}
+
+func appwriteIdentityFromCredentials(creds appwriteRuntimeCredentials, opts appwriteIdentityFromEnvOptions) (IdentityStore, error) {
+	projectID := strings.TrimSpace(creds.ProjectID)
+	apiKey := strings.TrimSpace(creds.APIKey)
+	var endpoint string
+	if opts.RequireAll {
+		endpoint = strings.TrimSpace(creds.Endpoint)
+		if endpoint == "" || projectID == "" || apiKey == "" {
+			return nil, fmt.Errorf("APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY are required")
+		}
+	} else {
+		endpoint = strings.TrimSpace(creds.Endpoint)
+		if endpoint == "" {
+			endpoint = "http://appwrite/v1"
+		}
+	}
+	return NewAppwriteIdentity(endpoint, projectID, apiKey, opts.HTTPClient), nil
+}
+
+func appwriteIdentityFromEnv(opts appwriteIdentityFromEnvOptions) (IdentityStore, error) {
+	return appwriteIdentityFromCredentials(appwriteRuntimeCredentials{
+		Endpoint:  os.Getenv("APPWRITE_ENDPOINT"),
+		ProjectID: os.Getenv("APPWRITE_PROJECT_ID"),
+		APIKey:    os.Getenv("APPWRITE_API_KEY"),
+	}, opts)
 }
 
 func appwriteOrgAssetsBucket() string {
@@ -138,33 +179,39 @@ func (a *appwriteIdentity) CreateOrganizationAsAdmin(ctx context.Context, name s
 }
 
 func (a *appwriteIdentity) EnsurePlatformAdminAccount(ctx context.Context, email, password string) error {
+	_, err := a.EnsureUserAccount(ctx, email, password, "Platform Admin")
+	return err
+}
+
+func (a *appwriteIdentity) EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return IdentityUser{}, err
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	password = strings.TrimSpace(password)
 	if email == "" || password == "" {
-		return nil
+		return IdentityUser{}, nil
 	}
 	user, err := a.GetUserByEmail(ctx, email)
 	switch {
 	case err == nil:
 		if _, err := users.New(a.adminClient).UpdatePassword(strings.TrimSpace(user.ID), password); err != nil {
-			return normalizeIdentityError(err)
+			return IdentityUser{}, normalizeIdentityError(err)
 		}
-		return nil
+		return user, nil
 	case err != nil && !errors.Is(err, ErrIdentityNotFound):
-		return err
+		return IdentityUser{}, err
 	}
-	if _, err := users.New(a.adminClient).Create(
+	created, err := users.New(a.adminClient).Create(
 		id.Unique(),
 		users.New(a.adminClient).WithCreateEmail(email),
 		users.New(a.adminClient).WithCreatePassword(password),
-		users.New(a.adminClient).WithCreateName("Platform Admin"),
-	); err != nil {
-		return normalizeIdentityError(err)
+		users.New(a.adminClient).WithCreateName(identityAccountDisplayName(email, name)),
+	)
+	if err != nil {
+		return IdentityUser{}, normalizeIdentityError(err)
 	}
-	return nil
+	return toIdentityUser(created, nil), nil
 }
 
 func (a *appwriteIdentity) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {
@@ -542,12 +589,9 @@ func (a *appwriteIdentity) ListOrganizationMemberships(ctx context.Context, orgS
 	return memberships, nil
 }
 
-// ListOrganizationMembershipsLite returns memberships decoded from the team membership
-// list only. IsOrgAdmin is derived from membership roles (owner / invite encoding), not
-// user labels. Callers that need label-accurate roles must use ListOrganizationMemberships.
-//
-// When org.ID is set it is used as the Appwrite team ID directly (no slug lookup). That
-// matters for paged platform-admin catalogs where slug may differ from team ID and
+// IsOrgAdmin comes from membership roles (owner / invite encoding), not user labels —
+// use ListOrganizationMemberships for label-accurate roles. When org.ID is set it is
+// the Appwrite team ID (no slug lookup); needed when slug≠team-ID and
 // GetOrganizationBySlug's ListOrganizations fallback is not exhaustive.
 func (a *appwriteIdentity) ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error) {
 	if err := ctx.Err(); err != nil {
