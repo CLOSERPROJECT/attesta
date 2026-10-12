@@ -8,6 +8,11 @@
   persistence.
 - Preserve unrelated work in a dirty tree. Do not commit, push, or change
   external systems unless asked.
+- **Comments are *why*, never *what*.** Keep a comment only when deleting it
+  would lose non-obvious intent, a constraint, or a gotcha the code cannot
+  express. In every region you touch, delete comments that restate identifiers,
+  types, or control flow. Prefer renaming or restructuring over explaining the
+  obvious. Narration, section banners, and commented-out code are out.
 - **Titles:** commits, issues, and pull-request titles use
   [Conventional Commits](https://www.conventionalcommits.org/):
   `type(optional-scope): imperative summary` (lowercase type; typical types
@@ -49,13 +54,11 @@
   clone). Pre-worktree `deployment_*` volumes need a one-time
   `COMPOSE_PROJECT_NAME=deployment` in the primary `.env.worktree`. Unlabeled
   legacy volumes in that project are copied onto labeled replacements on the
-  next start (Docker cannot retag a volume in place). Use
-  `scripts/worktree-compose.sh` (normally through Taskfile tasks); stop/reset/purge
-  must remain scoped to the current checkout.
-- Parallel worktrees keep one point-in-time, all-or-nothing bundle of MongoDB
-  and durable Appwrite state in ignored `.worktree-data/`. Restore only when the
-  stack is stopped and durable volumes are empty; later starts keep that
-  worktree's data. `task reset` clears volumes so the next start re-applies the
-  saved bundle. Reject partial or corrupt bundles. Bootstrap fails closed if the
-  primary's managed project has no durable volumes while legacy `deployment`
-  volumes still exist. Worktrunk `pre-remove` deletes Compose volumes.
+  next start via `scripts/worktree-relabel-volumes.sh` (Docker cannot retag a
+  volume in place). Use `scripts/worktree-compose.sh` (normally through
+  Taskfile tasks); stop/reset/purge must remain scoped to the current checkout.
+- Demo data for empty stacks comes only from the Go seed (`attesta seed` /
+  `ATTESTA_SEED`). There is no worktree volume-copy of MongoDB or Appwrite data.
+  `task reset` / `task purge` clear this checkout's volumes; the next start can
+  re-apply the Go demo seed when credentials exist. Worktrunk `pre-remove`
+  deletes Compose volumes.
