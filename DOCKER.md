@@ -44,7 +44,7 @@ Compose therefore scopes container names, networks, and volumes to that worktree
 The wrapper checks Docker Compose 2.24.4+ before loading the local override.
 
 The local Compose path applies `deployment/appwrite/docker-compose.worktree.yaml` as a local-only override to the vendored Appwrite baseline.
-That override owns the worktree-specific ports, resource labels, scoped names, and fresh-stack seed hook.
+That override owns the worktree-specific ports, resource labels, and scoped names.
 The standalone operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the Coolify paths in `deployment/docker-compose.coolify.yaml` and `deployment/Dockerfile.coolify` remain unchanged and do not consume the local override.
 
 New checkouts get a path-qualified Compose project name automatically.
@@ -122,8 +122,3 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | `PUBLIC_BASE_URL` | `https://${SERVICE_FQDN_ATTESTA_3000}` | Compose default; invite/reset/verify links derive from this origin + fixed paths |
 
 When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → apply runtime env → empty-only seed) then `exec`s the server. The server loads `$ATTESTA_ROOT_DIR/.env.appwrite` at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`).
-
-## Ephemeral previews (PRs)
-Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed
-script if provided via `EPHEMERAL_SEED_SCRIPT` (path inside the container) or
-`/app/seed/seed.sh`. This is intended for anonymized copy/restore flows.

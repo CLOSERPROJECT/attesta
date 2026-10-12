@@ -7,13 +7,10 @@ import (
 	"testing"
 )
 
-func TestOpenCatalogTemplatePackLoadsStreamsAndCategoriesPath(t *testing.T) {
+func TestOpenCatalogTemplatePackLoadsStreams(t *testing.T) {
 	dir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(dir, "workflow.yaml"), "Main", "string")
 	writeWorkflowConfig(t, filepath.Join(dir, "secondary.yaml"), "Secondary", "string")
-	if err := os.WriteFile(filepath.Join(dir, "categories.yaml"), []byte("categories: []\n"), 0o644); err != nil {
-		t.Fatalf("write categories.yaml: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(dir, "note.txt"), []byte("ignore"), 0o644); err != nil {
 		t.Fatalf("write note.txt: %v", err)
 	}
@@ -21,12 +18,6 @@ func TestOpenCatalogTemplatePackLoadsStreamsAndCategoriesPath(t *testing.T) {
 	pack, err := openCatalogTemplatePack(dir)
 	if err != nil {
 		t.Fatalf("openCatalogTemplatePack: %v", err)
-	}
-	if pack.Dir != dir {
-		t.Fatalf("Dir = %q, want %q", pack.Dir, dir)
-	}
-	if pack.CategoriesPath != filepath.Join(dir, "categories.yaml") {
-		t.Fatalf("CategoriesPath = %q", pack.CategoriesPath)
 	}
 	if len(pack.Streams) != 2 {
 		t.Fatalf("Streams = %d, want 2", len(pack.Streams))
@@ -36,12 +27,6 @@ func TestOpenCatalogTemplatePackLoadsStreamsAndCategoriesPath(t *testing.T) {
 	}
 	if !strings.Contains(string(pack.Streams[0].Body), "Secondary") {
 		t.Fatalf("secondary body missing name: %s", pack.Streams[0].Body)
-	}
-}
-
-func TestOpenCatalogTemplatePackDefaultDirMatchesCategoriesSeed(t *testing.T) {
-	if got := resolveCategoriesSeedPath("", ""); got != filepath.Join("config", "categories.yaml") {
-		t.Fatalf("resolveCategoriesSeedPath(\"\", \"\") = %q", got)
 	}
 }
 
