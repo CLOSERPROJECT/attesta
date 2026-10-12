@@ -80,7 +80,7 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		t.Fatal("expected org roles on fixture organization")
 	}
 
-	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com"} {
+	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com", "admin@feragame.com"} {
 		user, err := identity.GetUserByEmail(t.Context(), email)
 		if err != nil {
 			t.Fatalf("user %s: %v", email, err)
@@ -88,6 +88,13 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		if !user.EmailVerified {
 			t.Fatalf("user %s must be email-verified (ADR 0003)", email)
 		}
+	}
+	feragameOrg, feragameErr := identity.GetOrganizationBySlug(t.Context(), "feragame")
+	if feragameErr != nil {
+		t.Fatalf("feragame org missing after seed: %v", feragameErr)
+	}
+	if feragameOrg.Slug != "feragame" {
+		t.Fatalf("feragame slug = %q", feragameOrg.Slug)
 	}
 
 	memberships, err := identity.ListOrganizationMemberships(t.Context(), demoFixtureMarkerOrgSlug)
@@ -150,7 +157,7 @@ func TestSeedLeavesEveryFifthStreamEmpty(t *testing.T) {
 		Identity:  newSeedFakeIdentity(),
 		Store:     store,
 		ConfigDir: dir,
-		RNG:       &fixedCatalogRNG{n: 0}, // 1 stream per leaf → 5 sorted keys
+		RNG:       &fixedCatalogRNG{n: 0}, // 1 stream per leaf → 5 catalog keys + 1 named pilot
 	}); err != nil {
 		t.Fatalf("Seed: %v", err)
 	}
@@ -160,8 +167,12 @@ func TestSeedLeavesEveryFifthStreamEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("workflowCatalog: %v", err)
 	}
-	if len(catalog) != 5 {
-		t.Fatalf("catalog size = %d, want 5", len(catalog))
+	if len(catalog) != 6 {
+		t.Fatalf("catalog size = %d, want 6 (5 clones + named pilot)", len(catalog))
+	}
+	pilotKey := namedPilotStreamURLKey("named-pilot-stream:feragame-pilot")
+	if _, ok := catalog[pilotKey]; !ok {
+		t.Fatalf("catalog missing named pilot key %s", pilotKey)
 	}
 
 	var empty, seeded int
@@ -179,8 +190,9 @@ func TestSeedLeavesEveryFifthStreamEmpty(t *testing.T) {
 			t.Fatalf("%s instances = %d, want 0 or 8", key, len(procs))
 		}
 	}
-	if empty != 1 || seeded != 4 {
-		t.Fatalf("empty=%d seeded=%d, want empty=1 seeded=4", empty, seeded)
+	// Every 5th catalog clone left empty + named pilot seeded after instances (also empty).
+	if empty != 2 || seeded != 4 {
+		t.Fatalf("empty=%d seeded=%d, want empty=2 seeded=4", empty, seeded)
 	}
 }
 
@@ -740,6 +752,35 @@ func writeSeedTestConfigDirWithLeaves(t *testing.T, leafCount int) string {
 		"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
 	)), 0o644); err != nil {
 		t.Fatalf("write workflow: %v", err)
+	}
+	// Named pilot basename must exist for Seed's seedNamedPilotStreams step;
+	// pack still excludes it via isCatalogTemplateFile.
+	if err := os.WriteFile(filepath.Join(dir, "feragame-pilot.yaml"), []byte(`workflow:
+  name: Feragame production day (pilot)
+  completionStrategy: draft-and-seal
+  steps:
+    - id: "1"
+      title: Production day
+      order: 1
+      organization: feragame
+      substeps:
+        - id: "1.1"
+          order: 1
+          title: Batch loads
+          inputKey: batches
+          roles: ["chemist"]
+          inputType: formata
+          schema:
+            type: object
+organizations:
+  - slug: feragame
+    name: Feragame
+roles:
+  - orgSlug: feragame
+    slug: chemist
+    name: Chemist
+`), 0o644); err != nil {
+		t.Fatalf("write feragame-pilot: %v", err)
 	}
 	return dir
 }

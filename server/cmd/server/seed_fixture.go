@@ -44,6 +44,12 @@ func defaultDemoFixture() demoFixture {
 					{Slug: "qainspector", Name: "QA Inspector", Palette: "pink"},
 				},
 			},
+			{
+				Name: "Feragame",
+				Roles: []IdentityRole{
+					{Slug: "chemist", Name: "Chemist", Palette: "blue"},
+				},
+			},
 		},
 		Users: []demoFixtureUser{
 			{
@@ -51,7 +57,7 @@ func defaultDemoFixture() demoFixture {
 				Password:      "admin@attesta.com",
 				Name:          "Platform Admin",
 				PlatformAdmin: true,
-				OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3"},
+				OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3", "feragame"},
 			},
 			{
 				Email:         "admin@org1.com",
@@ -78,6 +84,15 @@ func defaultDemoFixture() demoFixture {
 				OrgAdminSlugs: []string{"organization-3"},
 				MembershipRoles: map[string][]string{
 					"organization-3": {"qainspector"},
+				},
+			},
+			{
+				Email:         "admin@feragame.com",
+				Password:      "admin@feragame.com",
+				Name:          "Feragame Admin",
+				OrgAdminSlugs: []string{"feragame"},
+				MembershipRoles: map[string][]string{
+					"feragame": {"chemist"},
 				},
 			},
 		},

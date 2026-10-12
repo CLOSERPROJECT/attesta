@@ -1,6 +1,7 @@
 # Draft-and-seal browser smoke Stream (Feragame compromise pilot).
-# Catalog key when file-backed: feragame-pilot
-# Org/roles match Appwrite local seed (organization-1 / chemist; org1@admin.org is Org admin).
+# Not a catalog pack template — excluded by isCatalogTemplateFile; upserted once
+# by seedNamedPilotStreams with stable URL key namedPilotStreamURLKey("named-pilot-stream:feragame-pilot").
+# Org: feragame (demo fixture); chemist on Substeps; Org admin seals.
 workflow:
   categorySlug: recycling-and-recovery
   subCategorySlug: flat-screen-displays
@@ -11,7 +12,7 @@ workflow:
     - id: "1"
       title: Production day
       order: 1
-      organization: organization-1
+      organization: feragame
       substeps:
         - id: "1.1"
           order: 1
@@ -65,11 +66,11 @@ workflow:
             title: UdC registrations
 
 organizations:
-  - slug: organization-1
-    name: Organization 1
+  - slug: feragame
+    name: Feragame
 
 roles:
-  - orgSlug: organization-1
+  - orgSlug: feragame
     slug: chemist
     name: Chemist
     color: var(--role-blue)
