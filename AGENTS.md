@@ -51,12 +51,8 @@
 - Every worktree owns a Compose project and generated-once host ports in its
   ignored `.env.worktree`; later manual edits are preserved. Compose project
   names are path-qualified for every checkout (primary, linked, or independent
-  clone). Pre-worktree `deployment_*` volumes need a one-time
-  `COMPOSE_PROJECT_NAME=deployment` in the primary `.env.worktree`. Unlabeled
-  legacy volumes in that project are copied onto labeled replacements on the
-  next start via `scripts/worktree-relabel-volumes.sh` (Docker cannot retag a
-  volume in place). Use `scripts/worktree-compose.sh` (normally through
-  Taskfile tasks); stop/reset/purge must remain scoped to the current checkout.
+  clone). Use `scripts/worktree-compose.sh` (normally through Taskfile tasks);
+  stop/reset/purge must remain scoped to the current checkout.
 - Demo data for empty stacks comes only from the Go seed (`attesta seed` /
   `ATTESTA_SEED`). There is no worktree volume-copy of MongoDB or Appwrite data.
   `task reset` / `task purge` clear this checkout's volumes; the next start can

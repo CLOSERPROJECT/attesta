@@ -47,22 +47,9 @@ The local Compose path applies `deployment/appwrite/docker-compose.worktree.yaml
 That override owns the worktree-specific ports, resource labels, scoped names, and fresh-stack seed hook.
 The standalone operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the Coolify paths in `deployment/docker-compose.coolify.yaml` and `deployment/Dockerfile.coolify` remain unchanged and do not consume the local override.
 
-Stacks created by the old direct command used `deployment` as their implicit Compose project.
 New checkouts get a path-qualified Compose project name automatically.
-To keep pre-worktree `deployment_*` volumes attached, adopt that name once on the primary:
-
-```bash
-docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
-COMPOSE_PROJECT_NAME=deployment task worktree:bootstrap
-task start
-```
-
-Never add `-v` to that migration command.
-If `.env.worktree` already exists, add `COMPOSE_PROJECT_NAME=deployment`; persisted worktree identity wins over shell and `.env` values.
-
 Parallel worktrees get isolated Compose projects and empty durable volumes.
 Demo data comes from the Go seed after Appwrite is ready and credentials exist (`ATTESTA_SEED=true` / `task seed`).
-Adopt `COMPOSE_PROJECT_NAME=deployment` on the primary once if you still need pre-worktree `deployment_*` volumes (see README); the next start relabels unlabeled legacy volumes in place.
 
 Open:
 - Run `bash scripts/worktree-env.sh print` to see the current checkout's URLs.
@@ -106,11 +93,8 @@ task worktree:gc:apply
 ```
 
 Cleanup only considers resources carrying this clone's repository identity and the exact worktree owner.
-Foreign-clone and unlabeled legacy resources are skipped.
+Foreign-clone and unlabeled resources are skipped.
 `task reset` and `task purge` inspect every volume in the current Compose project and fail closed if any ownership label is missing or different.
-That includes preserved volumes from the legacy `deployment` project until the next start copies them onto labeled replacements (Docker cannot add labels to an existing volume).
-`task start` / `task dev` run that copy automatically for unlabeled legacy volumes in the current Compose project.
-To discard legacy data instead, inspect with `docker volume ls --filter label=com.docker.compose.project=deployment` and remove only the confirmed legacy volume names; the next start creates labeled replacements.
 
 ## Coolify
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in

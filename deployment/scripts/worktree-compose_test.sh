@@ -104,10 +104,6 @@ if [[ "${1:-}" == */scripts/worktree-env.sh && "${FAIL_WORKTREE_ENV:-0}" == "1" 
   echo "simulated invalid worktree environment" >&2
   exit 23
 fi
-if [[ "${1:-}" == */scripts/worktree-relabel-volumes.sh ]]; then
-  printf 'relabel-volumes\n' >>"${DOCKER_CALLS_FILE}"
-  exit 0
-fi
 exec /bin/bash "$@"
 EOF
 
@@ -221,11 +217,8 @@ if grep ' up -d ' "${tmpdir}/calls" | sed 's/.* up -d //' | grep -q '\(^\| \)att
 fi
 grep -q '^attesta-prepare$' "${tmpdir}/calls" || fail "attesta prepare did not run after infra up"
 grep -q ' ps$' "${tmpdir}/calls" || fail "status call missing"
-
-relabel_line="$(grep -n '^relabel-volumes$' "${tmpdir}/calls" | cut -d: -f1)"
-up_line="$(grep -n ' up -d ' "${tmpdir}/calls" | cut -d: -f1)"
-[[ -n "${relabel_line}" && -n "${up_line}" && "${relabel_line}" -lt "${up_line}" ]] \
-  || fail "legacy volume relabel must run before writer services start"
+! grep -q 'relabel' "${tmpdir}/calls" \
+  || fail "compose up still invoked retired volume relabel"
 ! grep -q '^data ' "${tmpdir}/calls" \
   || fail "compose up still invoked retired worktree-data snapshot/restore"
 
