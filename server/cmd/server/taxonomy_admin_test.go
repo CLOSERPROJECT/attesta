@@ -220,6 +220,7 @@ func TestBuildCategoriesEditorViewCountsAndCatalogReference(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	installPackIntoFormata(t, store, tempDir)
 
 	server := &Server{store: store, configDir: tempDir}
 	view, err := server.buildCategoriesEditorView(t.Context(), url.Values{}, "", "saved", nil)
@@ -257,6 +258,7 @@ func TestBuildCategoriesEditorViewEditFormPopulation(t *testing.T) {
 	if err := os.WriteFile(path, []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	installPackIntoFormata(t, store, tempDir)
 	server := &Server{store: store, configDir: tempDir}
 
 	q := url.Values{

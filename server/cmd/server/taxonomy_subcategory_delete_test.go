@@ -121,6 +121,7 @@ func TestServerDeleteSubCategoryUsesLiveCatalogRefs(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedProcurementTaxonomy(t, store)
+	installPackIntoFormata(t, store, dir)
 
 	server := &Server{store: store, configDir: dir}
 	if err := server.DeleteSubCategory(t.Context(), "supply-chain", "procurement"); !errors.Is(err, ErrSubCategoryReferencedByStream) {

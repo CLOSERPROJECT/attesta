@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -79,25 +78,16 @@ func applyCatalogStreamCategoryAndName(yamlText, categorySlug, subCategorySlug, 
 	return out, nil
 }
 
-func loadCatalogStreamTemplateBodies(ctx context.Context, store Store, configDir string) ([]string, error) {
-	sources, err := inspectWorkflowCatalogSources(ctx, store, configDir)
+// loadCatalogStreamTemplateBodies reads Stream YAML bodies from the on-disk
+// catalog template pack only — never from live Formata Streams.
+func loadCatalogStreamTemplateBodies(configDir string) ([]string, error) {
+	pack, err := openCatalogTemplatePack(configDir)
 	if err != nil {
 		return nil, err
 	}
-	if len(sources.streams) > 0 {
-		bodies := make([]string, 0, len(sources.streams))
-		for _, stream := range sources.streams {
-			bodies = append(bodies, stream.Stream)
-		}
-		return bodies, nil
-	}
-	bodies := make([]string, 0, len(sources.paths))
-	for _, path := range sources.paths {
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return nil, fmt.Errorf("read template %s: %w", path, readErr)
-		}
-		bodies = append(bodies, string(data))
+	bodies := make([]string, 0, len(pack.Streams))
+	for _, tmpl := range pack.Streams {
+		bodies = append(bodies, string(tmpl.Body))
 	}
 	return bodies, nil
 }
@@ -126,7 +116,7 @@ func seedCatalogStreams(ctx context.Context, store Store, configDir string, now 
 		return zero, fmt.Errorf("catalog stream seed: taxonomy is empty (run attesta seed first)")
 	}
 
-	templates, err := loadCatalogStreamTemplateBodies(ctx, store, configDir)
+	templates, err := loadCatalogStreamTemplateBodies(configDir)
 	if err != nil {
 		return zero, err
 	}

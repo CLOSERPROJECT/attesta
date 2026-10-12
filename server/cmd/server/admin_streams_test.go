@@ -24,6 +24,7 @@ func newStreamsAdminServer(t *testing.T, store Store) *Server {
 	)), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	installPackIntoFormata(t, store, tempDir)
 
 	now := time.Now().UTC()
 	return &Server{
@@ -161,12 +162,12 @@ func TestHandleAdminStreamsHTMXTaxonomyPartials(t *testing.T) {
 	store := NewMemoryStore()
 	seedPlatformAdminTaxonomy(t, store)
 	server := newStreamsAdminServer(t, store)
-	if err := os.WriteFile(
-		filepath.Join(server.configDir, "uncategorized.yaml"),
-		[]byte(strings.Replace(minimalCategorizedWorkflowYAML(""), `name: "Workflow"`, `name: "Uncategorized Workflow"`, 1)),
-		0o644,
-	); err != nil {
+	uncategorizedBody := strings.Replace(minimalCategorizedWorkflowYAML(""), `name: "Workflow"`, `name: "Uncategorized Workflow"`, 1)
+	if err := os.WriteFile(filepath.Join(server.configDir, "uncategorized.yaml"), []byte(uncategorizedBody), 0o644); err != nil {
 		t.Fatalf("write uncategorized config: %v", err)
+	}
+	if _, err := store.SaveFormataBuilderStream(t.Context(), FormataBuilderStream{Stream: uncategorizedBody}); err != nil {
+		t.Fatalf("SaveFormataBuilderStream uncategorized: %v", err)
 	}
 
 	request := func(target, rawQuery string) string {
@@ -235,12 +236,24 @@ func TestHandleAdminStreamsMethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleAdminStreamsCatalogLoadError(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("ADMIN_PASSWORD", "change-me")
+
 	store := &failingListFormataStore{
 		MemoryStore: NewMemoryStore(),
 		err:         errors.New("list formata streams failed"),
 	}
 	seedPlatformAdminTaxonomy(t, store.MemoryStore)
-	server := newStreamsAdminServer(t, store)
+	now := time.Now().UTC()
+	server := &Server{
+		authorizer:  fakeAuthorizer{},
+		store:       store,
+		identity:    &fakeIdentityStore{},
+		tmpl:        parseTestTemplates(t),
+		configDir:   t.TempDir(),
+		enforceAuth: true,
+		now:         func() time.Time { return now },
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/streams", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})

@@ -81,7 +81,7 @@ func TestStreamIsStartableFalseEmptySteps(t *testing.T) {
 func TestListDiscoveryStreamsPAAndUnaffiliatedEmpty(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 
 	pa, err := server.listDiscoveryStreams(context.Background(), &AccountUser{
 		IsPlatformAdmin: true, OrgSlug: "org1", RoleSlugs: []string{"dep1"},
@@ -102,7 +102,7 @@ func TestListDiscoveryStreamsParticipatingOnly(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 	writeOtherOrgOnlyWorkflowConfig(t, filepath.Join(tempDir, "outsider.yaml"))
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 
 	items, err := server.listDiscoveryStreams(context.Background(), &AccountUser{
 		OrgSlug: "org1", RoleSlugs: []string{"dep1"}, Status: "active",
@@ -113,8 +113,19 @@ func TestListDiscoveryStreamsParticipatingOnly(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("participating-only discovery = %+v, want 1 item", items)
 	}
-	if items[0].WorkflowKey != "workflow" {
-		t.Fatalf("WorkflowKey = %q, want workflow", items[0].WorkflowKey)
+	if items[0].WorkflowName != "Two-org workflow" {
+		t.Fatalf("WorkflowName = %q, want Two-org workflow", items[0].WorkflowName)
+	}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	wantKey, _, ok := catalogKeyByWorkflowName(catalog, "Two-org workflow")
+	if !ok {
+		t.Fatal("catalog missing Two-org workflow")
+	}
+	if items[0].WorkflowKey != wantKey {
+		t.Fatalf("WorkflowKey = %q, want %q", items[0].WorkflowKey, wantKey)
 	}
 }
 
@@ -124,7 +135,7 @@ func TestListDiscoveryStreamsOrderingStartableBeforeRest(t *testing.T) {
 	writeOrg2FirstThenOrg1WorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"))
 	// zeta: org1 owns first step → startable for org1.
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "zeta.yaml"))
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 
 	items, err := server.listDiscoveryStreams(context.Background(), &AccountUser{
 		OrgSlug: "org1", RoleSlugs: []string{"dep1"}, Status: "active",
@@ -135,23 +146,21 @@ func TestListDiscoveryStreamsOrderingStartableBeforeRest(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("discovery = %+v, want 2 items", items)
 	}
-	if !items[0].Startable || items[0].WorkflowKey != "zeta" {
-		t.Fatalf("first item = %+v, want startable zeta", items[0])
+	if !items[0].Startable || items[0].WorkflowName != "Two-org workflow" {
+		t.Fatalf("first item = %+v, want startable Two-org workflow", items[0])
 	}
-	if items[1].Startable || items[1].WorkflowKey != "alpha" {
-		t.Fatalf("second item = %+v, want non-startable alpha", items[1])
+	if items[1].Startable || items[1].WorkflowName != "Org2-first workflow" {
+		t.Fatalf("second item = %+v, want non-startable Org2-first workflow", items[1])
 	}
-	if items[0].StartAction != streamPath("zeta")+"/instance/start" {
+	zetaKey := items[0].WorkflowKey
+	if items[0].StartAction != streamPath(zetaKey)+"/instance/start" {
 		t.Fatalf("StartAction = %q", items[0].StartAction)
 	}
 	if items[1].StartAction != "" {
 		t.Fatalf("non-startable StartAction = %q, want empty", items[1].StartAction)
 	}
-	if items[0].Href != streamPath("zeta")+"/" {
+	if items[0].Href != streamPath(zetaKey)+"/" {
 		t.Fatalf("Href = %q", items[0].Href)
-	}
-	if items[0].WorkflowName != "Two-org workflow" {
-		t.Fatalf("WorkflowName = %q", items[0].WorkflowName)
 	}
 }
 

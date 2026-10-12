@@ -438,8 +438,9 @@ func TestPageBaseForUserHasAttentionYourTurnStream(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Batch needing action",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -498,8 +499,9 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	processID := store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Batch needing action",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -507,7 +509,7 @@ func TestOperatorHomeYourTurnStreamAttentionBandAndResolve(t *testing.T) {
 			"1.1": {State: "pending"},
 		},
 	})
-	instanceHref := streamInstanceSubstepPath("workflow", processID.Hex(), "1.1")
+	instanceHref := streamInstanceSubstepPath(key, processID.Hex(), "1.1")
 
 	if _, err := store.InsertJoinRequest(context.Background(), JoinRequest{
 		RequesterUserID: "joiner-1",
@@ -646,8 +648,9 @@ func TestPlatformAdminHomeOmitsStreamAttention(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Should not appear for PA",
 		Status:      processStatusActive,
 		CreatedAt:   now,

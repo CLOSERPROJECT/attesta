@@ -258,7 +258,8 @@ func untpTestServer(t *testing.T) (*Server, *MemoryStore, Process) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Demo workflow", "string")
 	store := NewMemoryStore()
-	process := seedDPPProcess(store)
+	key := mustPackCatalogKey(t, store, tempDir, "Demo workflow")
+	process := seedDPPProcess(store, key)
 	server := &Server{
 		store:     store,
 		tmpl:      testTemplates(),

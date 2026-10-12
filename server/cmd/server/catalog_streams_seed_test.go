@@ -116,6 +116,9 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 	})
 
 	configDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(configDir, "demo.yaml"), []byte(tmpl), 0o644); err != nil {
+		t.Fatalf("write pack template: %v", err)
+	}
 	now := time.Now().UTC()
 	rng := rand.New(rand.NewSource(1))
 	res, err := seedCatalogStreams(t.Context(), store, configDir, now, rng)
@@ -197,7 +200,7 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 	}
 }
 
-func TestSeedCatalogStreamsUsesConfigDirWhenFormataEmpty(t *testing.T) {
+func TestSeedCatalogStreamsUsesPackTemplatesNotLiveFormata(t *testing.T) {
 	store := NewMemoryStore()
 	_ = store.ReplaceTaxonomy(t.Context(),
 		[]Category{{Slug: "supply-chain", Name: "Supply Chain", Icon: "batch-traceability", SortOrder: 1}},

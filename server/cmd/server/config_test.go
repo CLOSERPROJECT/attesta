@@ -128,7 +128,7 @@ func TestWorkflowCatalogLoadsMultipleFiles(t *testing.T) {
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "number")
 
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog(): %v", err)
@@ -136,17 +136,19 @@ func TestWorkflowCatalogLoadsMultipleFiles(t *testing.T) {
 	if len(catalog) != 2 {
 		t.Fatalf("catalog size = %d, want 2", len(catalog))
 	}
-	if catalog["workflow"].Workflow.Name != "Main workflow" {
-		t.Fatalf("workflow key mismatch: got %q", catalog["workflow"].Workflow.Name)
+	_, mainCfg, ok := catalogKeyByWorkflowName(catalog, "Main workflow")
+	if !ok {
+		t.Fatal("missing Main workflow")
 	}
-	if catalog["workflow"].Workflow.Description != "Main workflow description" {
-		t.Fatalf("workflow description mismatch: got %q", catalog["workflow"].Workflow.Description)
+	if mainCfg.Workflow.Description != "Main workflow description" {
+		t.Fatalf("workflow description mismatch: got %q", mainCfg.Workflow.Description)
 	}
-	if catalog["secondary"].Workflow.Name != "Secondary workflow" {
-		t.Fatalf("secondary key mismatch: got %q", catalog["secondary"].Workflow.Name)
+	_, secondaryCfg, ok := catalogKeyByWorkflowName(catalog, "Secondary workflow")
+	if !ok {
+		t.Fatal("missing Secondary workflow")
 	}
-	if catalog["secondary"].Workflow.Description != "" {
-		t.Fatalf("secondary workflow description = %q, want empty", catalog["secondary"].Workflow.Description)
+	if secondaryCfg.Workflow.Description != "" {
+		t.Fatalf("secondary workflow description = %q, want empty", secondaryCfg.Workflow.Description)
 	}
 }
 
@@ -282,7 +284,7 @@ func TestEnsureEmptyConfigFoundationFormataEdgeCases(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected empty workflow catalog error")
 		}
-		if !strings.Contains(err.Error(), "workflow config catalog is empty") {
+		if !strings.Contains(err.Error(), "catalog template pack is empty") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -322,26 +324,32 @@ func TestWorkflowCatalogReturnsListFormataError(t *testing.T) {
 	}
 }
 
-func TestWorkflowCatalogFallsBackToFilesWhenStoreHasNoStreams(t *testing.T) {
+func TestWorkflowCatalogFailsClosedWhenFormataEmpty(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "From file fallback", "string")
 	server := &Server{
 		store:     NewMemoryStore(),
 		configDir: tempDir,
 	}
-	catalog, err := server.workflowCatalog()
-	if err != nil {
-		t.Fatalf("workflowCatalog(): %v", err)
+	_, err := server.workflowCatalog()
+	if err == nil {
+		t.Fatal("expected empty Formata catalog error")
 	}
-	if len(catalog) != 1 {
-		t.Fatalf("catalog size = %d, want 1", len(catalog))
+	if !strings.Contains(err.Error(), "formata workflow catalog is empty") {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	cfg, ok := catalog["workflow"]
-	if !ok {
-		t.Fatal("expected workflow key from filesystem fallback")
+}
+
+func TestWorkflowCatalogFailsClosedWithoutStore(t *testing.T) {
+	tempDir := t.TempDir()
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Disk only", "string")
+	server := &Server{configDir: tempDir}
+	_, err := server.workflowCatalog()
+	if err == nil {
+		t.Fatal("expected empty Formata catalog error")
 	}
-	if cfg.Workflow.Name != "From file fallback" {
-		t.Fatalf("workflow name = %q, want %q", cfg.Workflow.Name, "From file fallback")
+	if !strings.Contains(err.Error(), "formata workflow catalog is empty") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -490,62 +498,80 @@ roles:
 	}
 }
 
-func TestWorkflowCatalogRejectsInvalidFile(t *testing.T) {
+func TestWorkflowCatalogRejectsInvalidStream(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "bad.yaml"), "Bad workflow", "unsupported")
 
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	_, err := server.workflowCatalog()
 	if err == nil {
 		t.Fatal("expected invalid inputType error")
 	}
-	if !strings.Contains(err.Error(), "bad.yaml") || !strings.Contains(err.Error(), "invalid inputType") {
+	if !strings.Contains(err.Error(), "invalid inputType") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestWorkflowCatalogRejectsDuplicateWorkflowKeys(t *testing.T) {
+func TestCatalogTemplatePackInstallsBothYamlAndYml(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha", "string")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yml"), "Alpha duplicate", "string")
 
-	server := &Server{configDir: tempDir}
-	_, err := server.workflowCatalog()
-	if err == nil {
-		t.Fatal("expected duplicate workflow key error")
+	store := NewMemoryStore()
+	installPackIntoFormata(t, store, tempDir)
+	streams, err := store.ListFormataBuilderStreams(t.Context())
+	if err != nil {
+		t.Fatalf("ListFormataBuilderStreams: %v", err)
 	}
-	if !strings.Contains(err.Error(), "duplicate workflow key") {
-		t.Fatalf("unexpected error: %v", err)
+	if len(streams) != 2 {
+		t.Fatalf("stream count = %d, want 2 (pack installs both; Formata keys are ids)", len(streams))
 	}
 }
 
-func TestWorkflowCatalogInvalidatesCacheWhenFileChanges(t *testing.T) {
+func TestWorkflowCatalogInvalidatesCacheWhenFormataStreamChanges(t *testing.T) {
 	tempDir := t.TempDir()
-	path := filepath.Join(tempDir, "workflow.yaml")
-	writeWorkflowConfig(t, path, "First", "string")
+	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "First", "string")
 
-	server := &Server{configDir: tempDir}
+	server, store := newServerWithPackCatalog(t, tempDir)
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog(first): %v", err)
 	}
-	if catalog["workflow"].Workflow.Name != "First" {
-		t.Fatalf("name = %q, want First", catalog["workflow"].Workflow.Name)
+	key, cfg, ok := catalogKeyByWorkflowName(catalog, "First")
+	if !ok {
+		t.Fatal("missing First workflow")
+	}
+	if cfg.Workflow.Name != "First" {
+		t.Fatalf("name = %q, want First", cfg.Workflow.Name)
 	}
 
-	writeWorkflowConfig(t, path, "Second", "string")
-	future := time.Now().Add(2 * time.Second)
-	if err := os.Chtimes(path, future, future); err != nil {
-		t.Fatalf("chtimes: %v", err)
+	id, err := primitive.ObjectIDFromHex(key)
+	if err != nil {
+		t.Fatalf("ObjectIDFromHex: %v", err)
+	}
+	secondPath := filepath.Join(tempDir, "second.yaml")
+	writeWorkflowConfig(t, secondPath, "Second", "string")
+	body, err := os.ReadFile(secondPath)
+	if err != nil {
+		t.Fatalf("read second: %v", err)
+	}
+	existing, err := store.LoadFormataBuilderStreamByID(t.Context(), id)
+	if err != nil {
+		t.Fatalf("LoadFormataBuilderStreamByID: %v", err)
+	}
+	existing.Stream = string(body)
+	existing.UpdatedAt = time.Now().UTC().Add(2 * time.Second)
+	if _, err := store.UpdateFormataBuilderStream(t.Context(), *existing); err != nil {
+		t.Fatalf("UpdateFormataBuilderStream: %v", err)
 	}
 
 	updated, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog(updated): %v", err)
 	}
-	if updated["workflow"].Workflow.Name != "Second" {
-		t.Fatalf("name = %q, want Second", updated["workflow"].Workflow.Name)
+	if updated[key].Workflow.Name != "Second" {
+		t.Fatalf("name = %q, want Second", updated[key].Workflow.Name)
 	}
 }
 
@@ -554,8 +580,16 @@ func TestWorkflowByKeyAndRuntimeConfigUseCatalog(t *testing.T) {
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "zeta.yaml"), "Zeta workflow", "string")
 
-	server := &Server{configDir: tempDir}
-	cfg, err := server.workflowByKey("zeta")
+	server, _ := newServerWithPackCatalog(t, tempDir)
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
+	}
+	zetaKey, _, ok := catalogKeyByWorkflowName(catalog, "Zeta workflow")
+	if !ok {
+		t.Fatal("missing Zeta workflow")
+	}
+	cfg, err := server.workflowByKey(zetaKey)
 	if err != nil {
 		t.Fatalf("workflowByKey(zeta): %v", err)
 	}
@@ -567,8 +601,8 @@ func TestWorkflowByKeyAndRuntimeConfigUseCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runtimeConfig(): %v", err)
 	}
-	if defaultCfg.Workflow.Name != "Main workflow" {
-		t.Fatalf("runtimeConfig default = %q, want Main workflow", defaultCfg.Workflow.Name)
+	if defaultCfg.Workflow.Name == "" {
+		t.Fatal("runtimeConfig returned empty workflow name")
 	}
 }
 
@@ -576,12 +610,15 @@ func TestWorkflowCatalogConfigWithoutDPPRemainsValid(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog(): %v", err)
 	}
-	cfg := catalog["workflow"]
+	_, cfg, ok := catalogKeyByWorkflowName(catalog, "Main workflow")
+	if !ok {
+		t.Fatal("missing Main workflow")
+	}
 	if cfg.DPP.Enabled {
 		t.Fatal("dpp.enabled = true, want false")
 	}
@@ -594,7 +631,7 @@ func TestWorkflowCatalogRejectsEnabledDPPWithoutGTIN(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n")
 
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	_, err := server.workflowCatalog()
 	if err == nil {
 		t.Fatal("expected dpp.gtin validation error")
@@ -834,7 +871,7 @@ func TestWorkflowCatalogRejectsEnabledDPPWithInvalidGTIN(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"abc123\"\n")
 
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	_, err := server.workflowCatalog()
 	if err == nil {
 		t.Fatal("expected dpp.gtin validation error")
@@ -848,12 +885,16 @@ func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfigWithDPP(t, filepath.Join(tempDir, "workflow.yaml"), "  enabled: true\n  gtin: \"9506000134352\"\n")
 
-	server := &Server{configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog(): %v", err)
 	}
-	cfg := catalog["workflow"]
+	var cfg RuntimeConfig
+	for _, item := range catalog {
+		cfg = item
+		break
+	}
 	if cfg.DPP.GTIN != "09506000134352" {
 		t.Fatalf("dpp.gtin = %q, want %q", cfg.DPP.GTIN, "09506000134352")
 	}
@@ -866,6 +907,47 @@ func TestWorkflowCatalogNormalizesEnabledDPPDefaults(t *testing.T) {
 	if cfg.DPP.SerialStrategy != "process_id_hex" {
 		t.Fatalf("dpp.serialStrategy = %q, want %q", cfg.DPP.SerialStrategy, "process_id_hex")
 	}
+}
+
+// installPackIntoFormata copies Stream YAML from configDir into Formata when
+// Formata is empty. Use this instead of relying on a runtime disk catalog.
+func installPackIntoFormata(t *testing.T, store Store, configDir string) {
+	t.Helper()
+	if err := ensureEmptyFormataBuilderStreams(t.Context(), store, configDir, time.Now); err != nil {
+		t.Fatalf("installPackIntoFormata: %v", err)
+	}
+}
+
+func newServerWithPackCatalog(t *testing.T, configDir string) (*Server, *MemoryStore) {
+	t.Helper()
+	store := NewMemoryStore()
+	installPackIntoFormata(t, store, configDir)
+	return &Server{store: store, configDir: configDir}, store
+}
+
+func catalogKeyByWorkflowName(catalog map[string]RuntimeConfig, name string) (string, RuntimeConfig, bool) {
+	for key, cfg := range catalog {
+		if cfg.Workflow.Name == name {
+			return key, cfg, true
+		}
+	}
+	return "", RuntimeConfig{}, false
+}
+
+// mustPackCatalogKey installs the pack into Formata and returns the runtime
+// catalog key for the named Stream.
+func mustPackCatalogKey(t *testing.T, store Store, configDir, workflowName string) string {
+	t.Helper()
+	installPackIntoFormata(t, store, configDir)
+	catalog, err := loadWorkflowCatalog(t.Context(), store)
+	if err != nil {
+		t.Fatalf("loadWorkflowCatalog: %v", err)
+	}
+	key, _, ok := catalogKeyByWorkflowName(catalog, workflowName)
+	if !ok {
+		t.Fatalf("catalog missing workflow %q", workflowName)
+	}
+	return key
 }
 
 func writeWorkflowConfig(t *testing.T, path, name, inputType string, description ...string) {

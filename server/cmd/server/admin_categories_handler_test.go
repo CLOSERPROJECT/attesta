@@ -56,6 +56,7 @@ func newCategoriesAdminServer(t *testing.T, store Store) *Server {
 	if err := os.WriteFile(path, []byte(minimalCategorizedWorkflowYAML("")), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	installPackIntoFormata(t, store, tempDir)
 
 	now := time.Now().UTC()
 	return &Server{
@@ -100,6 +101,7 @@ func newCategoriesAdminServerWithCatalog(t *testing.T, store Store, categoryLine
 	if err := os.WriteFile(path, []byte(minimalCategorizedWorkflowYAML(categoryLines)), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	installPackIntoFormata(t, store, tempDir)
 
 	now := time.Now().UTC()
 	return &Server{
