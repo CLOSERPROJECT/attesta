@@ -212,19 +212,21 @@ const syncSelectedSubstepURL = (substepId = "") => {
   } catch (_err) {}
 };
 
-const currentSelectedSubstep = () => {
+const openProcessSubstepId = () => {
   const selectedPanel = document.querySelector(
     ".js-process-substep-panel[open]",
   );
   if (selectedPanel instanceof HTMLElement) {
     return (selectedPanel.dataset.substepId || "").trim();
   }
-  const selected = (root?.dataset?.selectedSubstep || "").trim();
-  if (selected) {
-    return selected;
-  }
   return "";
 };
+
+const retainedSelectedSubstep = () =>
+  (root?.dataset?.selectedSubstep || "").trim();
+
+const currentSelectedSubstep = () =>
+  openProcessSubstepId() || retainedSelectedSubstep();
 
 const markSelectedSubstep = (substepId = "") => {
   const selected = substepId.trim();
@@ -247,6 +249,27 @@ const markSelectedSubstep = (substepId = "") => {
     );
   }
   syncSelectedSubstepURL(selected);
+};
+
+// Prefer the panel the server marked open (classic Complete may advance), then
+// fall back to retained data-selected-substep when a swap cleared [open].
+const syncProcessSubstepSelectionAfterSwap = () => {
+  const selected = openProcessSubstepId() || retainedSelectedSubstep();
+  if (selected) {
+    for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
+      if (!(panel instanceof HTMLDetailsElement)) {
+        continue;
+      }
+      if ((panel.dataset.substepId || "").trim() !== selected) {
+        continue;
+      }
+      if (!panel.open) {
+        panel.open = true;
+      }
+      break;
+    }
+  }
+  markSelectedSubstep(selected);
 };
 
 const resolveAbsoluteURL = (value) => {
@@ -279,7 +302,7 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     processPageContent.innerHTML = html;
     formatLocalDateTimes(processPageContent);
     await initializeFormataForms(processPageContent);
-    markSelectedSubstep(currentSelectedSubstep());
+    syncProcessSubstepSelectionAfterSwap();
     focusNextActionInput();
   } catch (_err) {}
 };
@@ -1476,7 +1499,7 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
-    markSelectedSubstep(currentSelectedSubstep());
+    syncProcessSubstepSelectionAfterSwap();
     focusNextActionInput();
   }
   if (event.detail?.target?.id === "platform-admin-categories") {
@@ -1540,6 +1563,11 @@ document.body.addEventListener("toggle", (event) => {
     return;
   }
   if (!target.classList.contains("js-process-substep-panel")) {
+    return;
+  }
+  // HTMX innerHTML swaps can fire toggle while disconnecting the old panel;
+  // clearing selection here drops ?substep= before afterSwap can re-sync.
+  if (!target.isConnected) {
     return;
   }
   const substepID = (target.dataset.substepId || "").trim();
