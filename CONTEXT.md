@@ -8,6 +8,14 @@ Attesta tracks multi-party stream instances with notarized substeps, role-based 
 A configured blueprint that defines steps, substeps, roles, and forms (what YAML and code today call a workflow). Starting a stream creates a new stream instance.
 _Avoid_: Workflow, stream type, template
 
+**Import-blocking issue**:
+A Stream document problem that prevents loading a draft in Composer (e.g. invalid YAML or missing workflow shape).
+_Avoid_: Critical error (vague), validation error (when meaning only this tier)
+
+**Composer-fixable issue**:
+A Stream document problem that can load into Composer and be corrected there before Save (schema/taxonomy and similar).
+_Avoid_: Warning (alone), soft error, non-critical
+
 **Stream instance**:
 A single running occurrence of a stream — one tracked batch or case from start through completion or early termination (what code today calls a process).
 _Avoid_: Process, stream (when meaning an instance in domain docs — see UI shorthand below)
