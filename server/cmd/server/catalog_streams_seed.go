@@ -105,6 +105,7 @@ func loadCatalogStreamTemplateBodies(ctx context.Context, store Store, configDir
 type catalogStreamsSeedResult struct {
 	Leaves  int
 	Streams int
+	Catalog map[string]RuntimeConfig
 }
 
 func seedCatalogStreams(ctx context.Context, store Store, configDir string, now time.Time, rng catalogStreamRNG) (catalogStreamsSeedResult, error) {
@@ -147,7 +148,7 @@ func seedCatalogStreams(ctx context.Context, store Store, configDir string, now 
 	}
 
 	creator := platformAdminStreamUserID()
-	inserted := 0
+	saved := make([]FormataBuilderStream, 0, len(leaves))
 	for _, leaf := range leaves {
 		n := 1 + rng.Intn(3)
 		for i := 0; i < n; i++ {
@@ -157,16 +158,25 @@ func seedCatalogStreams(ctx context.Context, store Store, configDir string, now 
 			if applyErr != nil {
 				return zero, fmt.Errorf("build %s/%s: %w", leaf.CategorySlug, leaf.SubCategorySlug, applyErr)
 			}
-			if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
+			doc, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
 				Stream:          yamlOut,
 				UpdatedAt:       now,
 				CreatedByUserID: creator,
 				UpdatedByUserID: creator,
-			}); saveErr != nil {
+			})
+			if saveErr != nil {
 				return zero, fmt.Errorf("save %s/%s: %w", leaf.CategorySlug, leaf.SubCategorySlug, saveErr)
 			}
-			inserted++
+			saved = append(saved, doc)
 		}
 	}
-	return catalogStreamsSeedResult{Leaves: len(leaves), Streams: inserted}, nil
+	catalog, _, err := buildWorkflowCatalog(ctx, store, workflowCatalogSources{streams: saved})
+	if err != nil {
+		return zero, fmt.Errorf("catalog stream seed: build catalog: %w", err)
+	}
+	return catalogStreamsSeedResult{
+		Leaves:  len(leaves),
+		Streams: len(saved),
+		Catalog: catalog,
+	}, nil
 }

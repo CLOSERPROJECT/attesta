@@ -12,7 +12,7 @@ import (
 )
 
 // workflowCatalogLoad is the full catalog load result, including cache metadata
-// used by Server.workflowCatalog. Seed callers use loadWorkflowCatalog instead.
+// used by Server.workflowCatalog.
 type workflowCatalogLoad struct {
 	catalog   map[string]RuntimeConfig
 	modTimes  map[string]time.Time
@@ -52,7 +52,7 @@ func (s *Server) catalogTaxonomyRevision() (int64, error) {
 
 // loadWorkflowCatalog loads workflow runtime configs from Formata builder streams
 // when present, otherwise from configDir YAML files. It applies Store-backed
-// stream categorization. Seed calls this directly.
+// stream categorization.
 func loadWorkflowCatalog(ctx context.Context, store Store, configDir string) (map[string]RuntimeConfig, error) {
 	loaded, err := loadWorkflowCatalogResult(ctx, store, configDir)
 	if err != nil {

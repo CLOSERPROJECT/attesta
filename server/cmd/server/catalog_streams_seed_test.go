@@ -136,9 +136,16 @@ func TestSeedCatalogStreamsFillsEveryLeafAndReplaces(t *testing.T) {
 	if len(streams) != res.Streams {
 		t.Fatalf("listed=%d result=%d", len(streams), res.Streams)
 	}
+	if len(res.Catalog) != res.Streams {
+		t.Fatalf("catalog size=%d streams=%d", len(res.Catalog), res.Streams)
+	}
 	for _, s := range streams {
 		if s.ID == saved.ID {
 			t.Fatal("old formata id survived wipe")
+		}
+		key := s.ID.Hex()
+		if _, ok := res.Catalog[key]; !ok {
+			t.Fatalf("catalog missing saved formata id %s", key)
 		}
 	}
 	if _, err := store.LoadProcessByID(t.Context(), oldProcessID); !errors.Is(err, mongo.ErrNoDocuments) {
@@ -206,6 +213,18 @@ func TestSeedCatalogStreamsUsesConfigDirWhenFormataEmpty(t *testing.T) {
 	}
 	if res.Streams < 1 {
 		t.Fatal("expected at least one stream from file template")
+	}
+	streams, err := store.ListFormataBuilderStreams(t.Context())
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(res.Catalog) != len(streams) {
+		t.Fatalf("catalog size=%d listed=%d", len(res.Catalog), len(streams))
+	}
+	for _, s := range streams {
+		if _, ok := res.Catalog[s.ID.Hex()]; !ok {
+			t.Fatalf("catalog missing saved formata id %s", s.ID.Hex())
+		}
 	}
 }
 

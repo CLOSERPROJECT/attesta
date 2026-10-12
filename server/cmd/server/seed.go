@@ -96,14 +96,11 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	if deps.Now != nil {
 		now = deps.Now().UTC()
 	}
-	if _, err := seedCatalogStreams(ctx, deps.Store, configDir, now, rng); err != nil {
+	catalogResult, err := seedCatalogStreams(ctx, deps.Store, configDir, now, rng)
+	if err != nil {
 		return fmt.Errorf("seed: catalog streams: %w", err)
 	}
-	catalog, err := loadWorkflowCatalog(ctx, deps.Store, configDir)
-	if err != nil {
-		return fmt.Errorf("seed: instances: catalog: %w", err)
-	}
-	if _, err := seedDemoInstances(ctx, deps.Store, catalog, now); err != nil {
+	if _, err := seedDemoInstances(ctx, deps.Store, catalogResult.Catalog, now); err != nil {
 		return fmt.Errorf("seed: instances: %w", err)
 	}
 	return nil
