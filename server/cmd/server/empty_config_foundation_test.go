@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,9 +10,19 @@ import (
 	"time"
 )
 
+type failingSaveFormataStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingSaveFormataStore) SaveFormataBuilderStream(_ context.Context, stream FormataBuilderStream) (FormataBuilderStream, error) {
+	return FormataBuilderStream{}, s.err
+}
+
 func TestEnsureEmptyConfigFoundationSeedsTaxonomyAndFormataWhenEmpty(t *testing.T) {
 	dir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(dir, "workflow.yaml"), "Main workflow", "string")
+	writeWorkflowConfig(t, filepath.Join(dir, "secondary.yaml"), "Secondary workflow", "string")
 	seed := `
 categories:
   - slug: supply-chain
@@ -52,11 +64,28 @@ categories:
 	if err != nil {
 		t.Fatalf("ListFormataBuilderStreams: %v", err)
 	}
-	if len(streams) != 1 {
-		t.Fatalf("stream count = %d, want 1", len(streams))
+	if len(streams) != 2 {
+		t.Fatalf("stream count = %d, want 2", len(streams))
 	}
-	if !streams[0].UpdatedAt.Equal(fixed) {
-		t.Fatalf("UpdatedAt = %v, want %v", streams[0].UpdatedAt, fixed)
+	for _, stream := range streams {
+		if !stream.UpdatedAt.Equal(fixed) {
+			t.Fatalf("UpdatedAt = %v, want %v", stream.UpdatedAt, fixed)
+		}
+		if stream.CreatedByUserID != platformAdminStreamUserID() {
+			t.Fatalf("createdByUserID = %q, want %q", stream.CreatedByUserID, platformAdminStreamUserID())
+		}
+		if stream.UpdatedByUserID != platformAdminStreamUserID() {
+			t.Fatalf("updatedByUserID = %q, want %q", stream.UpdatedByUserID, platformAdminStreamUserID())
+		}
+	}
+
+	server := &Server{store: store}
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog(): %v", err)
+	}
+	if len(catalog) != 2 {
+		t.Fatalf("catalog size = %d, want 2", len(catalog))
 	}
 }
 
@@ -105,4 +134,54 @@ categories:
 	if len(streams) != 1 || streams[0].ID != original.ID {
 		t.Fatalf("formata must stay untouched, got %#v", streams)
 	}
+}
+
+func TestEnsureEmptyConfigFoundationEdgeCases(t *testing.T) {
+	t.Run("nil store", func(t *testing.T) {
+		if err := ensureEmptyConfigFoundation(t.Context(), nil, t.TempDir(), nil); err != nil {
+			t.Fatalf("ensureEmptyConfigFoundation nil store: %v", err)
+		}
+	})
+
+	t.Run("missing config dir", func(t *testing.T) {
+		store := NewMemoryStore()
+		err := ensureEmptyConfigFoundation(t.Context(), store, filepath.Join(t.TempDir(), "missing"), nil)
+		if err == nil {
+			t.Fatal("expected missing config dir error")
+		}
+		if !strings.Contains(err.Error(), "config dir not found") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("no yaml files", func(t *testing.T) {
+		tempDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(tempDir, "note.txt"), []byte("hello"), 0o644); err != nil {
+			t.Fatalf("write note.txt: %v", err)
+		}
+		store := NewMemoryStore()
+		err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, nil)
+		if err == nil {
+			t.Fatal("expected empty workflow catalog error")
+		}
+		if !strings.Contains(err.Error(), "catalog template pack is empty") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("save error", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
+		store := &failingSaveFormataStore{
+			MemoryStore: NewMemoryStore(),
+			err:         errors.New("save failed"),
+		}
+		err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, nil)
+		if err == nil {
+			t.Fatal("expected save error")
+		}
+		if !strings.Contains(err.Error(), "seed formata stream") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }

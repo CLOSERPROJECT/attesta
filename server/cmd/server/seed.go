@@ -39,10 +39,8 @@ type SeedDeps struct {
 	Replace bool
 	// Nil picks a time-based source in Seed.
 	RNG catalogStreamRNG
-	// Nil uses defaultDemoFixture().
 	Fixture *demoFixture
-	// Nil uses time.Now.
-	Now func() time.Time
+	Now     func() time.Time
 }
 
 // Empty-only (default): if the marker org already exists, returns nil without writing.

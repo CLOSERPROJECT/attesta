@@ -104,11 +104,13 @@ func withSeedSession(
 	return fn(sess)
 }
 
-// creds nil → identity from process env (standalone seed); non-nil → prepare→seed by value.
+// creds nil → ambient identity (standalone seed applies the runtime env file);
+// non-nil → prepare→seed by value (skip file apply; main is the Server restart adapter).
 func runSeedSession(ctx context.Context, args []string, replace bool, creds *appwriteRuntimeCredentials) error {
-	// Parity with main: apply checkout-scoped runtime file before identity.
-	if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
-		return err
+	if creds == nil {
+		if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
+			return err
+		}
 	}
 	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
 		opts := appwriteIdentityFromEnvOptions{RequireAll: true}

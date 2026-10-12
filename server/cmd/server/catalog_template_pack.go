@@ -10,9 +10,7 @@ import (
 
 // Not the runtime Formata catalog.
 type catalogTemplatePack struct {
-	Dir            string
-	CategoriesPath string
-	Streams        []catalogTemplateStream
+	Streams []catalogTemplateStream
 }
 
 type catalogTemplateStream struct {
@@ -70,9 +68,5 @@ func openCatalogTemplatePack(configDir string) (catalogTemplatePack, error) {
 		streams = append(streams, catalogTemplateStream{Path: path, Body: data})
 	}
 
-	return catalogTemplatePack{
-		Dir:            dir,
-		CategoriesPath: resolveCategoriesSeedPath("", dir),
-		Streams:        streams,
-	}, nil
+	return catalogTemplatePack{Streams: streams}, nil
 }
