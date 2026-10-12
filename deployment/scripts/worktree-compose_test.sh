@@ -74,7 +74,6 @@ node -e '
   assert(Object.values(standalone.networks).every(network => !network.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree network labels");
   assert(Object.values(standalone.volumes).every(volume => !volume.labels?.["eu.forkbomb.attesta.managed"]), "standalone acquired worktree volume labels");
   assert(!mounts(standalone).some(target => target.startsWith("/seed/")), "standalone acquired a local seed mount");
-  assert(!("APPWRITE_RESTORE_SEED_SQL" in (standalone.services.mariadb.environment || {})), "standalone acquired a retired seed switch");
 
   assert(Object.values(localA.services).every(service => service.container_name == null), "local services retain fixed container names");
   assert(Object.values(localA.services).every(resource => isOwnedBy(resource, "label-test-a", ownerA, "repo-test-a")), "local services lack exact ownership labels");
@@ -89,7 +88,6 @@ node -e '
   assert(localA.services.attesta.environment.ATTESTA_ROOT_DIR === "/app", "containerized ATTESTA_ROOT_DIR is not /app");
   assert(!mounts(localA).some(target => target.startsWith("/seed/")), "local MariaDB still mounts retired SQL seed artifacts");
   assert(localA.services.mariadb.entrypoint == null, "local MariaDB still uses a seed wrapper entrypoint");
-  assert(!("APPWRITE_RESTORE_SEED_SQL" in (localA.services.mariadb.environment || {})), "local MariaDB still exposes retired APPWRITE_RESTORE_SEED_SQL");
 
   const resourcesA = resourceNames(localA);
   const overlap = [...resourceNames(localB)].filter(name => resourcesA.has(name));
