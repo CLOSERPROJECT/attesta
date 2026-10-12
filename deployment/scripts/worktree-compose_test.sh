@@ -27,7 +27,6 @@ ATTESTA_REPOSITORY_ID=repo-test-a \
 APPWRITE_HTTP_PORT=18080 \
 APPWRITE_HTTPS_PORT=18443 \
 DOCKER_APP_PORT=19030 \
-APPWRITE_RESTORE_SEED_SQL=true \
   docker compose \
     --env-file "${ROOT}/deployment/appwrite/.env.appwrite.example" \
     -f "${ROOT}/deployment/docker-compose.local.yaml" \
@@ -38,7 +37,6 @@ ATTESTA_WORKTREE_ROOT="${tmpdir}/owned-worktree-b" \
 ATTESTA_REPOSITORY_ID=repo-test-b \
 APPWRITE_HTTP_PORT=28080 \
 APPWRITE_HTTPS_PORT=28443 \
-APPWRITE_RESTORE_SEED_SQL=true \
   docker compose \
     --env-file "${ROOT}/deployment/appwrite/.env.appwrite.example" \
     -f "${ROOT}/deployment/docker-compose.local.yaml" \
@@ -90,12 +88,9 @@ node -e '
   assert(localA.services.attesta.environment.APPWRITE_INVITE_REDIRECT_URL === "http://localhost:19030/invite/accept", "containerized invite redirect did not use DOCKER_APP_PORT");
   assert(localA.services.attesta.environment.APPWRITE_RESET_REDIRECT_URL === "http://localhost:19030/reset/confirm", "containerized reset redirect did not use DOCKER_APP_PORT");
   assert(localA.services.attesta.environment.APPWRITE_VERIFY_REDIRECT_URL === "http://localhost:19030/verify/confirm", "containerized verify redirect did not use DOCKER_APP_PORT");
-  assert(mounts(localA).includes("/seed/appwrite-seed.sql"), "local seed mount missing");
-  assert(mounts(localA).includes("/seed/mariadb-init-preview-seed.sh"), "local seed hook mount missing");
-  assert(!mounts(localA).includes("/docker-entrypoint-initdb.d/10-preview-seed.sh"), "local seed hook must not bind-mount into initdb.d");
-  assert(Array.isArray(localA.services.mariadb.entrypoint), "local MariaDB seed wrapper entrypoint missing");
-  assert(localA.services.mariadb.entrypoint.join(" ").includes("mariadb-init-preview-seed.sh"), "local MariaDB entrypoint does not install the seed wrapper");
-  assert(localA.services.mariadb.environment.APPWRITE_RESTORE_SEED_SQL === "true", "local seed switch missing");
+  assert(!mounts(localA).some(target => target.startsWith("/seed/")), "local MariaDB still mounts retired SQL seed artifacts");
+  assert(localA.services.mariadb.entrypoint == null, "local MariaDB still uses a seed wrapper entrypoint");
+  assert(!("APPWRITE_RESTORE_SEED_SQL" in (localA.services.mariadb.environment || {})), "local MariaDB still exposes retired APPWRITE_RESTORE_SEED_SQL");
 
   const resourcesA = resourceNames(localA);
   const overlap = [...resourceNames(localB)].filter(name => resourcesA.has(name));
