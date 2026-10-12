@@ -263,7 +263,7 @@ func (s *Server) handleSealStep(w http.ResponseWriter, r *http.Request, processI
 		s.renderProcessContent(w, nextReq, process, actor, "")
 		return
 	}
-	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
+	http.Redirect(w, r, streamInstancePath(workflowKey, processID), http.StatusSeeOther)
 }
 
 var (

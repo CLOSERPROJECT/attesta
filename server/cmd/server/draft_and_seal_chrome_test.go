@@ -397,8 +397,8 @@ func TestHandleSealStepRequiresConfirmAndOrgAdmin(t *testing.T) {
 	okReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: "admin"})
 	okRec := httptest.NewRecorder()
 	server.handleSealStep(okRec, okReq, process.ID.Hex(), "1")
-	if okRec.Code != http.StatusOK {
-		t.Fatalf("admin confirm status = %d, want 200; body=%q", okRec.Code, okRec.Body.String())
+	if okRec.Code != http.StatusSeeOther {
+		t.Fatalf("admin confirm status = %d, want %d; body=%q", okRec.Code, http.StatusSeeOther, okRec.Body.String())
 	}
 
 	reloaded, err := store.LoadProcessByID(t.Context(), process.ID)
@@ -413,6 +413,102 @@ func TestHandleSealStepRequiresConfirmAndOrgAdmin(t *testing.T) {
 		t.Fatalf("notarizations = %d, want 2", len(store.Notarizations()))
 	}
 }
+
+func TestHandleSealStepRedirectsFullPageSuccessToInstance(t *testing.T) {
+	store := NewMemoryStore()
+	def := feragameDraftAndSealDef()
+	process := seedFeragameProcess(t, store, def)
+	fixedNow := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	server := &Server{
+		store:      store,
+		process:    &ProcessService{store: store, now: func() time.Time { return fixedNow }},
+		tmpl:       testTemplates(),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			return RuntimeConfig{Workflow: def}, nil
+		},
+		now:         func() time.Time { return fixedNow },
+		enforceAuth: true,
+		identity: testIdentityForSessions(fixedNow, map[string]AccountUser{
+			"admin": {
+				IdentityUserID: "admin-1",
+				Email:          "admin@example.com",
+				OrgSlug:        "feragame",
+				RoleSlugs:      []string{"org-admin"},
+				Status:         "active",
+			},
+		}),
+	}
+
+	sealPath := "/instance/" + process.ID.Hex() + "/step/1/seal"
+	req := httptest.NewRequest(http.MethodPost, sealPath, strings.NewReader("confirm=true"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "admin"})
+	rec := httptest.NewRecorder()
+	server.handleSealStep(rec, req, process.ID.Hex(), "1")
+
+	wantLocation := streamInstancePath("workflow", process.ID.Hex())
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d; body=%q", rec.Code, http.StatusSeeOther, rec.Body.String())
+	}
+	gotLocation := rec.Header().Get("Location")
+	if gotLocation != wantLocation {
+		t.Fatalf("Location = %q, want instance path %q", gotLocation, wantLocation)
+	}
+	if strings.Contains(gotLocation, "/seal") {
+		t.Fatalf("Location must not be the seal action URL, got %q", gotLocation)
+	}
+}
+
+func TestHandleSealStepHTMXSwapsProcessContent(t *testing.T) {
+	store := NewMemoryStore()
+	def := feragameDraftAndSealDef()
+	process := seedFeragameProcess(t, store, def)
+	fixedNow := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	server := &Server{
+		store:   store,
+		process: &ProcessService{store: store, now: func() time.Time { return fixedNow }},
+		tmpl: template.Must(template.New("test").Parse(
+			`{{define "process_content.html"}}PROCESS_CONTENT {{.Detail.ProcessID}}{{end}}`,
+		)),
+		authorizer: fakeAuthorizer{},
+		sse:        newSSEHub(),
+		configProvider: func() (RuntimeConfig, error) {
+			return RuntimeConfig{Workflow: def}, nil
+		},
+		now:         func() time.Time { return fixedNow },
+		enforceAuth: true,
+		identity: testIdentityForSessions(fixedNow, map[string]AccountUser{
+			"admin": {
+				IdentityUserID: "admin-1",
+				Email:          "admin@example.com",
+				OrgSlug:        "feragame",
+				RoleSlugs:      []string{"org-admin"},
+				Status:         "active",
+			},
+		}),
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/instance/"+process.ID.Hex()+"/step/1/seal", strings.NewReader("confirm=true"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "process-page-content")
+	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "admin"})
+	rec := httptest.NewRecorder()
+	server.handleSealStep(rec, req, process.ID.Hex(), "1")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%q", rec.Code, rec.Body.String())
+	}
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("HTMX seal must not set Location, got %q", loc)
+	}
+	if !strings.Contains(rec.Body.String(), "PROCESS_CONTENT "+process.ID.Hex()) {
+		t.Fatalf("HTMX seal must swap process content, got %q", rec.Body.String())
+	}
+}
+
 
 func TestHandleProcessRoutesDispatchesSeal(t *testing.T) {
 	store := NewMemoryStore()
@@ -446,8 +542,11 @@ func TestHandleProcessRoutesDispatchesSeal(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "admin"})
 	rec := httptest.NewRecorder()
 	server.handleProcessRoutes(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body=%q", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d; body=%q", rec.Code, http.StatusSeeOther, rec.Body.String())
+	}
+	if loc := rec.Header().Get("Location"); loc != streamInstancePath("workflow", process.ID.Hex()) {
+		t.Fatalf("Location = %q, want instance path", loc)
 	}
 }
 
