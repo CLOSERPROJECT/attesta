@@ -42,7 +42,6 @@ type PrepareDeps struct {
 	// Nil → return after bootstrap (env file may still be written for Server restart).
 	Seed func(ctx context.Context, creds appwriteRuntimeCredentials) error
 
-	// Empty fields filled from env.
 	BootstrapDeps BootstrapAppwriteDeps
 }
 
@@ -64,9 +63,9 @@ func defaultPrepareHooks(client *http.Client) prepareHooks {
 	}
 }
 
-// Gates on ATTESTA_SEED, then wait → bootstrap → seed.
-// prepare→seed does not mutate process env or apply the on-disk env file in-process
-// (bootstrap may still write it for Server startup). Disabled seed is a no-op success.
+// Wait → bootstrap → seed when enabled. prepare→seed passes credentials by value;
+// the on-disk env file is only the Server restart adapter (main applies it).
+// Standalone seed applies the file; prepare does not. Disabled seed is a no-op success.
 func PrepareDemoStack(ctx context.Context, deps PrepareDeps) error {
 	return prepareDemoStack(ctx, deps, defaultPrepareHooks(deps.HTTPClient))
 }

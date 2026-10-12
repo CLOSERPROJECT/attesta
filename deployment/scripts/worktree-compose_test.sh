@@ -141,6 +141,18 @@ if [[ " $* " == *" config --services "* ]]; then
   exit 0
 fi
 printf '%s\n' "$*" >>"${DOCKER_CALLS_FILE}"
+# Capture ephemeral compose override file contents at call time (cleaned up after up-app).
+prev=""
+for arg in "$@"; do
+  if [[ "${prev}" == "-f" || "${prev}" == "--file" ]]; then
+    if [[ "${arg}" != *"/deployment/docker-compose.local.yaml" && -f "${arg}" ]]; then
+      printf 'COMPOSE_OVERRIDE_BEGIN\n' >>"${DOCKER_CALLS_FILE}"
+      cat "${arg}" >>"${DOCKER_CALLS_FILE}"
+      printf 'COMPOSE_OVERRIDE_END\n' >>"${DOCKER_CALLS_FILE}"
+    fi
+  fi
+  prev="${arg}"
+done
 EOF
 cat >"${tmpdir}/bin/go" <<'EOF'
 #!/bin/bash
@@ -220,19 +232,105 @@ grep -q ' ps$' "${tmpdir}/calls" || fail "status call missing"
 ! grep -q '^data ' "${tmpdir}/calls" \
   || fail "compose up still invoked retired worktree-data snapshot/restore"
 
+assert_up_app_call_order() {
+  local calls_file="$1"
+  local infra_up=0 prepare=0 attesta_up=0
+  local line services
+  while IFS= read -r line; do
+    if [[ "${line}" == "attesta-prepare" ]]; then
+      [[ "${infra_up}" -eq 1 ]] || fail "up-app ran prepare before infra compose up"
+      [[ "${attesta_up}" -eq 0 ]] || fail "up-app ran prepare after attesta up"
+      prepare=1
+      continue
+    fi
+    [[ "${line}" == *" up -d"* ]] || continue
+    # Service list follows "up -d" / "up -d --build"; project paths may contain "attesta".
+    services="${line##* up -d }"
+    services="${services#--build }"
+    if [[ "${services}" == "attesta" ]]; then
+      [[ "${prepare}" -eq 1 ]] || fail "up-app started attesta before prepare"
+      attesta_up=1
+    elif [[ " ${services} " == *" mongodb "* ]]; then
+      [[ "${prepare}" -eq 0 ]] || fail "up-app started infra after prepare"
+      [[ "${attesta_up}" -eq 0 ]] || fail "up-app started infra after attesta"
+      if [[ " ${services} " == *" attesta "* ]]; then
+        fail "up-app infra compose up unexpectedly includes attesta"
+      fi
+      infra_up=1
+    fi
+  done <"${calls_file}"
+  [[ "${infra_up}" -eq 1 ]] || fail "up-app did not start infrastructure services"
+  [[ "${prepare}" -eq 1 ]] || fail "up-app did not run attesta prepare after infra up"
+  [[ "${attesta_up}" -eq 1 ]] || fail "up-app did not start attesta after prepare"
+  ! grep -Eq '(^|[[:space:]])run([[:space:]]|$)' "${calls_file}" \
+    || fail "up-app used docker run instead of compose up"
+}
+
+# Preserve a pre-existing checkout .env.appwrite across absent/present mount cases.
+had_env_appwrite=0
+created_env_appwrite=0
+if [[ -e "${ROOT}/.env.appwrite" ]]; then
+  had_env_appwrite=1
+  mv "${ROOT}/.env.appwrite" "${tmpdir}/.env.appwrite.preserved"
+fi
+restore_env_appwrite() {
+  if [[ "${had_env_appwrite}" -eq 1 && -e "${tmpdir}/.env.appwrite.preserved" ]]; then
+    mv "${tmpdir}/.env.appwrite.preserved" "${ROOT}/.env.appwrite"
+  fi
+  if [[ "${created_env_appwrite}" -eq 1 && -e "${ROOT}/.env.appwrite" ]]; then
+    rm -f -- "${ROOT}/.env.appwrite"
+  fi
+}
+trap 'restore_env_appwrite; rm -rf -- "$tmpdir"' EXIT
+
 : >"${tmpdir}/calls"
 PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
   DOCKER_PUBLIC_BASE_URL_FILE="${tmpdir}/container-public-base-url" \
   /bin/bash "${ROOT}/scripts/worktree-compose.sh" up-app --build
-grep -q ' up -d --build .*attesta' "${tmpdir}/calls" \
-  || fail "containerized start did not build and start the Attesta service"
-grep -q '^attesta-prepare$' "${tmpdir}/calls" \
-  || fail "containerized start did not run attesta prepare after infra up"
+assert_up_app_call_order "${tmpdir}/calls"
+grep -q ' up -d --build attesta$' "${tmpdir}/calls" \
+  || fail "containerized start did not build and start only the Attesta service"
+! grep -q 'COMPOSE_OVERRIDE_BEGIN' "${tmpdir}/calls" \
+  || fail "up-app mounted .env.appwrite when the host file was absent"
+! grep -Fq '/app/.env.appwrite' "${tmpdir}/calls" \
+  || fail "up-app referenced .env.appwrite mount when the host file was absent"
 docker_app_port="$(/bin/bash "${ROOT}/scripts/worktree-env.sh" print | awk -F= '$1 == "DOCKER_APP_PORT" { print $2 }')"
 expected_public_base_url="http://localhost:${docker_app_port}"
 if grep -Fvxq "${expected_public_base_url}" "${tmpdir}/container-public-base-url"; then
   fail "containerized start did not pass DOCKER_APP_PORT PUBLIC_BASE_URL to Compose"
 fi
+
+if [[ "${had_env_appwrite}" -eq 1 ]]; then
+  mv "${tmpdir}/.env.appwrite.preserved" "${ROOT}/.env.appwrite"
+  had_env_appwrite=0
+else
+  printf 'APPWRITE_API_KEY=test-key\n' >"${ROOT}/.env.appwrite"
+  created_env_appwrite=1
+fi
+: >"${tmpdir}/calls"
+PATH="${tmpdir}/bin:${PATH}" DOCKER_CALLS_FILE="${tmpdir}/calls" \
+  /bin/bash "${ROOT}/scripts/worktree-compose.sh" up-app --build
+assert_up_app_call_order "${tmpdir}/calls"
+grep -q 'COMPOSE_OVERRIDE_BEGIN' "${tmpdir}/calls" \
+  || fail "up-app did not pass a compose override when .env.appwrite exists"
+grep -Fq "${ROOT}/.env.appwrite:/app/.env.appwrite:ro" "${tmpdir}/calls" \
+  || fail "up-app override did not bind-mount .env.appwrite read-only into attesta"
+if [[ "${created_env_appwrite}" -eq 1 ]]; then
+  rm -f -- "${ROOT}/.env.appwrite"
+  created_env_appwrite=0
+fi
+
+# Pit-of-success: DOCKER.md must not claim prepare applies .env.appwrite into the
+# process for seed (seed-by-value / mount-for-runtime handoff).
+for forbidden in \
+  'prepare applies it for seed' \
+  'apply env →' \
+  'apply runtime env → empty-only seed'; do
+  if grep -Fq "${forbidden}" "${ROOT}/DOCKER.md"; then
+    fail "DOCKER.md still claims outdated prepare/env wording: ${forbidden}"
+  fi
+done
+
 task_list="$(task --list-all --json)"
 grep -Eq '"name"[[:space:]]*:[[:space:]]*"start:docker"' <<<"${task_list}" \
   || fail "Taskfile does not expose the containerized Attesta start path"
