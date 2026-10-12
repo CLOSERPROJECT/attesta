@@ -37,6 +37,7 @@ surface.
 | Presentation-only stream edits keep instances | [`adr/0001-stream-presentation-edit-without-purge.md`](adr/0001-stream-presentation-edit-without-purge.md) |
 | Affiliation required before stream authoring | [`adr/0002-affiliation-gated-stream-authoring.md`](adr/0002-affiliation-gated-stream-authoring.md) |
 | Email verification gate after auth | [`adr/0003-email-verification-gate.md`](adr/0003-email-verification-gate.md) |
+| Host-specific demo seed invoke | [`adr/0004-host-specific-demo-seed-invoke.md`](adr/0004-host-specific-demo-seed-invoke.md) |
 
 ## Operational shape
 

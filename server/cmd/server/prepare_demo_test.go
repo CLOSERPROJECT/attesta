@@ -622,7 +622,7 @@ func TestApplyAppwriteRuntimeEnvFile(t *testing.T) {
 	}
 }
 
-func TestRunSeedSessionAppliesRuntimeEnvFile(t *testing.T) {
+func TestRunSeedSessionStandaloneAppliesRuntimeEnvFile(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("ATTESTA_ROOT_DIR", root)
 	t.Setenv("APPWRITE_API_KEY", "stale")
@@ -636,7 +636,34 @@ func TestRunSeedSessionAppliesRuntimeEnvFile(t *testing.T) {
 	defer cancel()
 	_ = runSeedSession(ctx, nil, false, nil)
 	if got := os.Getenv("APPWRITE_API_KEY"); got != "from-file" {
-		t.Fatalf("APPWRITE_API_KEY=%q after seed entry, want from-file", got)
+		t.Fatalf("APPWRITE_API_KEY=%q after standalone seed, want from-file", got)
+	}
+}
+
+func TestRunSeedSessionWithCredsSkipsRuntimeEnvFile(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("ATTESTA_ROOT_DIR", root)
+	t.Setenv("APPWRITE_API_KEY", "stale")
+	t.Setenv("APPWRITE_PROJECT_ID", "stale-project")
+	t.Setenv("APPWRITE_ENDPOINT", "http://127.0.0.1:1/v1")
+	t.Setenv("MONGODB_URI", "mongodb://127.0.0.1:1")
+	path := resolveAppwriteRuntimeEnvFile()
+	if err := os.WriteFile(path, []byte("APPWRITE_PROJECT_ID=attesta\nAPPWRITE_API_KEY=from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	creds := &appwriteRuntimeCredentials{
+		Endpoint:  "http://127.0.0.1:1/v1",
+		ProjectID: "explicit",
+		APIKey:    "explicit-key",
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	_ = runSeedSession(ctx, nil, false, creds)
+	if got := os.Getenv("APPWRITE_API_KEY"); got != "stale" {
+		t.Fatalf("APPWRITE_API_KEY=%q after prepare-path seed, want stale (file not applied)", got)
+	}
+	if got := os.Getenv("APPWRITE_PROJECT_ID"); got != "stale-project" {
+		t.Fatalf("APPWRITE_PROJECT_ID=%q after prepare-path seed, want stale-project", got)
 	}
 }
 

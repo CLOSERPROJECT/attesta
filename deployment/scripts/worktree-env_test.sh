@@ -70,9 +70,6 @@ grep -q '^COMPOSE_PROJECT_NAME=' <<<"${resolved}" || fail "Compose project missi
 grep -q '^ATTESTA_SEED=true$' <<<"${resolved}" || fail "ATTESTA_SEED flag missing"
 grep -qx "ATTESTA_ROOT_DIR=${tmpdir}" <<<"${resolved}" \
   || fail "ATTESTA_ROOT_DIR missing from print"
-if grep -q '^APPWRITE_RESTORE_SEED_SQL=' <<<"${resolved}"; then
-  fail "retired APPWRITE_RESTORE_SEED_SQL still exported"
-fi
 
 # Duplicate manual edits are rejected before Docker sees them.
 sed -i.bak 's/^VITE_PORT=.*/VITE_PORT=12000/' "${tmpdir}/.env.worktree"

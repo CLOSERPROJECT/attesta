@@ -114,6 +114,8 @@ up() {
 
 up_app() {
   local build=0
+  local override=""
+  local -a attesta_compose
   if [[ "${1:-}" == "--build" ]]; then
     build=1
     shift
@@ -128,11 +130,12 @@ up_app() {
   export PUBLIC_BASE_URL
 
   local services=()
+  local status=0
   while IFS= read -r service; do
     [[ -n "${service}" ]] && services+=("${service}")
-  done < <(compose config --services)
+  done < <(infra_services)
   [[ ${#services[@]} -gt 0 ]] || {
-    echo "error: Compose configuration contains no services" >&2
+    echo "error: Compose configuration contains no infrastructure services" >&2
     exit 1
   }
   if [[ "${build}" -eq 1 ]]; then
@@ -141,6 +144,30 @@ up_app() {
     compose up -d "${services[@]}"
   fi
   maybe_run_attesta_prepare
+
+  attesta_compose=(
+    docker compose
+    --project-name "${COMPOSE_PROJECT_NAME}"
+    -f "${COMPOSE_FILE}"
+  )
+  # Optional host credentials: mount only when the file already exists (no stubs).
+  if [[ -f "${ROOT_DIR}/.env.appwrite" ]]; then
+    override="$(mktemp "${TMPDIR:-/tmp}/attesta-envappwrite.XXXXXX")"
+    cat >"${override}" <<EOF
+services:
+  attesta:
+    volumes:
+      - ${ROOT_DIR}/.env.appwrite:/app/.env.appwrite:ro
+EOF
+    attesta_compose+=(-f "${override}")
+  fi
+  if [[ "${build}" -eq 1 ]]; then
+    "${attesta_compose[@]}" up -d --build attesta || status=$?
+  else
+    "${attesta_compose[@]}" up -d attesta || status=$?
+  fi
+  [[ -z "${override}" ]] || rm -f -- "${override}"
+  [[ "${status}" -eq 0 ]] || return "${status}"
   compose ps
 }
 

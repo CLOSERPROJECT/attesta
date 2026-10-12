@@ -31,7 +31,7 @@ Use `task start:docker` for the full containerized stack, or `task start:docker:
 The containerized app is available on `DOCKER_APP_PORT`; `task start` remains infrastructure-only for host development.
 
 ## Bootstrap Appwrite
-Preferred path: with `ATTESTA_SEED=true` (worktree-env default), `task start` / `task start:docker` run `attesta prepare`, which bootstraps Appwrite when needed, writes checkout-scoped `.env.appwrite` (gitignored; `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY`), and applies the empty-only Go demo seed. The server and `task seed` load the same file.
+Preferred path: with `ATTESTA_SEED=true` (worktree-env default), `task start` / `task start:docker` run `attesta prepare`, which bootstraps Appwrite when needed, seeds by value (empty-only), and writes checkout-scoped `.env.appwrite` (gitignored; `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY`) for the server restart adapter. The server and `task seed` load that file when credentials are ambient.
 
 Manual console bootstrap is still possible after the Compose stack is up:
 1. Open the Appwrite console on `http://localhost`.
