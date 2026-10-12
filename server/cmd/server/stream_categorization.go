@@ -39,8 +39,7 @@ func validateWorkflowCategoryPair(workflow WorkflowDef) error {
 
 // Unknown paths (or nil checker) become uncategorized without failing load.
 // Lookup errors leave the declared pair unchanged and are returned so callers
-// can avoid caching a transient resolution. Pair completeness is
-// validateWorkflowCategoryPair.
+// can avoid caching a transient resolution.
 func applyEffectiveStreamCategorization(ctx context.Context, workflow *WorkflowDef, pathExists subCategoryPathExists) error {
 	if workflow == nil {
 		return nil

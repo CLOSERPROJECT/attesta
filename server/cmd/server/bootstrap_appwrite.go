@@ -63,10 +63,9 @@ type BootstrapResult struct {
 	Created   bool
 }
 
-// Ensures project, API key, and org-assets bucket. Usable APPWRITE_API_KEY →
-// skip console bootstrap (still ensure bucket + write EnvFilePath).
-// EnvFilePath always receives runtime credentials so Coolify Preview can
-// overwrite a stale injected API key.
+// Usable APPWRITE_API_KEY → skip console bootstrap (still ensure bucket + write
+// EnvFilePath). EnvFilePath always receives runtime credentials so Coolify
+// Preview can overwrite a stale injected API key.
 func BootstrapAppwriteProject(ctx context.Context, deps BootstrapAppwriteDeps) (BootstrapResult, error) {
 	if err := ctx.Err(); err != nil {
 		return BootstrapResult{}, err

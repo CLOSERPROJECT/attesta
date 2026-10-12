@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Copy legacy unlabeled Compose volumes onto labeled replacements.
 # Docker cannot change labels on an existing local volume; pre-worktree volumes
 # keep a stale compose config-hash without Attesta ownership labels, so Compose
 # prompts to recreate them (and wipe data) on every up.

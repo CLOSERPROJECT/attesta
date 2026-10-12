@@ -156,7 +156,6 @@ prepare_checkout() {
   : >"${checkout}/deployment/docker-compose.local.yaml"
 }
 
-# Legacy unlabeled volumes are copied onto same-named labeled replacements.
 relabel_target="${tmpdir}/relabel-target"
 prepare_checkout "${relabel_target}"
 relabel_project="$(env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" \
@@ -185,7 +184,6 @@ grep -Fxq "true|${relabel_project}|${relabel_root}|${relabel_repository}" \
 [[ -f "${tmpdir}/volumes/${relabel_project}_mongodb_data/nonempty" ]] \
   || fail "relabel lost mongodb data"
 
-# Already-labeled volumes are left alone.
 : >"${tmpdir}/docker-calls"
 env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" FAKE_RUNNING_SERVICES='' \
   FAKE_COMPOSE_VOLUMES='mongodb_data appwrite-cache' \
@@ -211,7 +209,6 @@ fi
 grep -qi 'ownership' "${tmpdir}/foreign-error" \
   || fail "foreign ownership rejection was unclear"
 
-# Relabel refuses to run against a live stack.
 if env "${common_env[@]}" ATTESTA_ROOT_DIR="${relabel_target}" \
   FAKE_RUNNING_SERVICES=mongodb FAKE_COMPOSE_VOLUMES='mongodb_data' \
   bash "${SCRIPT}" >"${tmpdir}/running-output" 2>"${tmpdir}/running-error"; then

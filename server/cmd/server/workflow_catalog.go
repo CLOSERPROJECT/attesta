@@ -46,7 +46,6 @@ func (s *Server) catalogTaxonomyRevision() (int64, error) {
 	return catalogTaxonomyRevision(context.Background(), s.store)
 }
 
-// Formata builder Streams only; empty catalog fails closed.
 func loadWorkflowCatalog(ctx context.Context, store Store) (map[string]RuntimeConfig, error) {
 	loaded, err := loadWorkflowCatalogResult(ctx, store)
 	if err != nil {

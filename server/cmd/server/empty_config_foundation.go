@@ -20,7 +20,6 @@ func ensureEmptyConfigFoundation(ctx context.Context, store Store, configDir str
 	return ensureEmptyFormataBuilderStreams(ctx, store, configDir, now)
 }
 
-// No-op when Formata already has Streams.
 func ensureEmptyFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
 	if store == nil {
 		return nil

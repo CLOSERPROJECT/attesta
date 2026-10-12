@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// On-disk install/seed pack (Stream YAML + categories path), not the runtime Formata catalog.
+// Not the runtime Formata catalog.
 type catalogTemplatePack struct {
 	Dir            string
 	CategoriesPath string

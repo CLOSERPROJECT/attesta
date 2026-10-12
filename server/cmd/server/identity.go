@@ -15,7 +15,7 @@ type IdentityStore interface {
 	CreateOrganization(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	CreateOrganizationAsAdmin(ctx context.Context, name string) (IdentityOrg, error)
 	EnsurePlatformAdminAccount(ctx context.Context, email, password string) error
-	// Admin API create-or-update password. Used by demo seed (public signup may be disabled).
+	// Demo seed needs create-or-update when public signup is disabled.
 	EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error)
 	AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error)
@@ -38,7 +38,6 @@ type IdentityStore interface {
 	// Prefer org.ID (Appwrite team ID) when known so slug≠team-ID orgs resolve without
 	// an unpaged ListOrganizations fallback.
 	ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
-	// Confirmed and pending memberships.
 	ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)

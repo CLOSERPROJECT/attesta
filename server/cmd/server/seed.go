@@ -45,8 +45,6 @@ type SeedDeps struct {
 	Now func() time.Time
 }
 
-// Seed applies the integrated synthetic demo fixture.
-//
 // Empty-only (default): if the marker org already exists, returns nil without writing.
 // Pass Replace to rewrite.
 //
@@ -71,7 +69,6 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 		case err == nil:
 			return nil
 		case errors.Is(err, ErrIdentityNotFound):
-			// Fixture absent — continue to apply.
 		default:
 			return fmt.Errorf("seed: marker org lookup: %w", err)
 		}
