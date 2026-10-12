@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,6 +117,31 @@ func withSeedSession(
 		defer sess.Cleanup()
 	}
 	return fn(sess)
+}
+
+// runSeedSession opens the default demo-seed session (Mongo + required Appwrite
+// identity) and runs Seed. Flag parsing stays in each CLI; replace only changes
+// SeedDeps and the success log line.
+func runSeedSession(ctx context.Context, args []string, replace bool) error {
+	return withSeedSession(ctx, args, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
+		return appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true})
+	}, func(sess seedSession) error {
+		if err := Seed(ctx, SeedDeps{
+			Identity:       sess.Identity,
+			Store:          sess.Store,
+			ConfigDir:      sess.ConfigDir,
+			CategoriesPath: sess.CategoriesPath,
+			Replace:        replace,
+		}); err != nil {
+			return err
+		}
+		if replace {
+			log.Printf("seed: replaced demo fixture")
+		} else {
+			log.Printf("seed: demo fixture ready (empty-only)")
+		}
+		return nil
+	})
 }
 
 func openMongoTaxonomyStore(ctx context.Context) (Store, func(), error) {

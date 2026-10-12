@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -19,21 +18,7 @@ func runPrepareCommand(ctx context.Context, args []string) error {
 	deps := PrepareDeps{Policy: policy}
 
 	return PrepareDemoStack(ctx, deps.withSeedRunner(func(ctx context.Context) error {
-		return withSeedSession(ctx, nil, workflowConfigDir(), openMongoTaxonomyStore, func() (IdentityStore, error) {
-			return appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{RequireAll: true})
-		}, func(sess seedSession) error {
-			if err := Seed(ctx, SeedDeps{
-				Identity:       sess.Identity,
-				Store:          sess.Store,
-				ConfigDir:      sess.ConfigDir,
-				CategoriesPath: sess.CategoriesPath,
-				Replace:        false,
-			}); err != nil {
-				return err
-			}
-			log.Printf("seed: demo fixture ready (empty-only)")
-			return nil
-		})
+		return runSeedSession(ctx, nil, false)
 	}))
 }
 
