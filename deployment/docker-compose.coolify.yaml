@@ -289,8 +289,9 @@ services:
       SMTP_PASSWORD: ${SERVICE_PASSWORD_SMTP:-}
       SMTP_FROM: ${ATTESTA_SMTP_FROM:-attesta@apps.forkbomb.eu}
       SMTP_SECURE: ${SERVICE_SECURE_SMTP:-}
-      # Set only in Coolify Preview env; production must leave unset/false.
-      ATTESTA_SEED: ${ATTESTA_SEED:-false}
+      # Keep ${VAR} (no :-default): Coolify inlines :-defaults from Production into
+      # deployable compose and ignores Preview UI. Set Preview=true, Production=false/empty.
+      ATTESTA_SEED: ${ATTESTA_SEED}
       ATTESTA_ROOT_DIR: /app
       SERVICE_FQDN_ATTESTA_3000:
       # Invite/reset/verify links derive from this origin + fixed paths.

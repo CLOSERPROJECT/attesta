@@ -112,7 +112,7 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 
 | Variable | Preview | Notes |
 |---|---|---|
-| `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
+| `ATTESTA_SEED` | `true` | Leave unset/`false` in production. Compose uses `${ATTESTA_SEED}` (no `:-default`) so Coolify keeps a `.env` reference instead of baking Production’s value into deployable compose |
 | `ATTESTA_ROOT_DIR` | `/app` | App root for `.env.appwrite` (Dockerfile/entrypoint set this; matches image app root, not `WORKDIR /app/server`) |
 | `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
 | `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed), seeds by value, and writes `$ATTESTA_ROOT_DIR/.env.appwrite` for the server restart adapter (`main` loads it at startup) |
@@ -121,4 +121,4 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
 | `PUBLIC_BASE_URL` | `https://${SERVICE_FQDN_ATTESTA_3000}` | Compose default; invite/reset/verify links derive from this origin + fixed paths |
 
-When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → empty-only seed by value) then `exec`s the server. Prepare writes `$ATTESTA_ROOT_DIR/.env.appwrite`; the server loads it at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`).
+When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → empty-only seed by value) then `exec`s the server. Prepare writes `$ATTESTA_ROOT_DIR/.env.appwrite`; the server loads it at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`). After changing Coolify env or compose shape, use **Reload Compose** then redeploy so deployable YAML and Preview `.env` pick up `${ATTESTA_SEED}` (not a baked `false`).
