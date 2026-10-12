@@ -2,6 +2,12 @@
   min-width: 0;
 }
 
+.process-stream-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .stream-mine-filter {
   display: flex;
   align-items: center;
@@ -17,6 +23,23 @@
   color: var(--secondary-foreground);
   cursor: pointer;
   user-select: none;
+}
+
+.stream-mine-filter-root.is-mine-filter
+  .substep:not([data-viewer-owned="true"]):not(.substep-selected) {
+  display: none;
+}
+
+.stream-mine-filter-root.is-mine-filter
+  .stream-timeline-step:not(
+    :has(.substep[data-viewer-owned="true"], .substep-selected)
+  ) {
+  display: none;
+}
+
+.stream-mine-filter-root.is-mine-filter.is-mine-filter-empty
+  .stream-timeline-list {
+  display: none;
 }
 
 /* Process ID under page-header title (process page only) */

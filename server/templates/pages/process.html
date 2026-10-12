@@ -6,19 +6,25 @@
   data-process-id="{{ .ProcessID }}"
   data-workflow-key="{{ .WorkflowKey }}"
   data-selected-substep="{{ .Detail.SelectedSubstepID }}"
+  data-mine-filter="1"
 >
   <div id="process-page-content">{{ template "process_content.html" . }}</div>
 </div>
 {{ end }} {{ define "process_stream_timeline" }}
 {{ if .Detail.ShowMineFilter }}
-  {{ template "stream_mine_filter" .Detail }}
-{{ end }}
-{{ if and .Detail.ShowMineFilter .Detail.MineFilterOn (eq (len .Detail.Timeline) 0) }}
-<div class="empty-state">
-  <p class="empty-state-title">No substeps match your roles</p>
-  <p class="empty-state-hint">Turn off My roles to see the full stream timeline.</p>
+<div class="process-stream-block">
+  {{ template "stream_mine_filter" . }}
+  <div class="js-mine-filter-root stream-mine-filter-root is-mine-filter">
+    <div class="empty-state stream-mine-filter-empty" hidden>
+      <p class="empty-state-title">No matching tasks</p>
+      <p class="empty-state-hint">Turn off My tasks to see the full stream timeline.</p>
+    </div>
+    {{ template "stream_timeline" .Detail.StreamTimeline }}
+  </div>
 </div>
-{{ else }} {{ template "stream_timeline" .Detail.StreamTimeline }} {{ end }}
+{{ else }}
+  {{ template "stream_timeline" .Detail.StreamTimeline }}
+{{ end }}
 {{ end }} {{ define "process_content.html" }} {{ template "error_banner.html"
 .Detail }}
 <div class="stack">

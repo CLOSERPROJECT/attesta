@@ -4,6 +4,7 @@
   <li
     class="substep{{ if not .HideStatus }} substep-{{ $shell.Status }}{{ end }}"
     data-role-palette="{{ $shell.Palette }}"
+    data-viewer-owned="{{ if .Substep.ViewerOwned }}true{{ else }}false{{ end }}"
   >
     <details
       class="substep-accordion js-process-substep-panel"

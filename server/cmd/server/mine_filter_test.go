@@ -14,21 +14,6 @@ func testMineFilterRuntimeConfig() RuntimeConfig {
 	return cfg
 }
 
-func TestParseMineFilterEnabled(t *testing.T) {
-	if !parseMineFilterEnabled("") {
-		t.Fatal("missing mine param should default to on")
-	}
-	if !parseMineFilterEnabled("1") {
-		t.Fatal("mine=1 should be on")
-	}
-	if parseMineFilterEnabled("0") {
-		t.Fatal("mine=0 should be off")
-	}
-	if parseMineFilterEnabled("false") {
-		t.Fatal("mine=false should be off")
-	}
-}
-
 func TestSubstepMineForViewerRequiresOrgAndRole(t *testing.T) {
 	def := testMineFilterRuntimeConfig().Workflow
 
@@ -55,7 +40,7 @@ func TestSubstepMineForViewerIgnoresOrgAdminStanding(t *testing.T) {
 	}
 }
 
-func TestBuildStreamInstanceDetailViewMineFilterOnAndOff(t *testing.T) {
+func TestBuildStreamInstanceDetailViewStampsViewerOwned(t *testing.T) {
 	process := &Process{
 		ID: primitive.NewObjectID(),
 		Progress: map[string]ProcessStep{
@@ -69,38 +54,45 @@ func TestBuildStreamInstanceDetailViewMineFilterOnAndOff(t *testing.T) {
 	cfg := testMineFilterRuntimeConfig()
 	actor := Actor{OrgSlug: "org-a", RoleSlugs: []string{"dep1", "dep2"}, Role: "dep2"}
 
-	on := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "", "", streamInstanceDetailOptions{MineFilterOn: true, ShowMineFilter: true})
-	if len(on.Timeline) != 1 {
-		t.Fatalf("mine on: expected one step, got %d", len(on.Timeline))
+	view := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "", "", streamInstanceDetailOptions{ShowMineFilter: true})
+	if len(view.Timeline) != 3 {
+		t.Fatalf("timeline must stay full for client filter, got %d steps", len(view.Timeline))
 	}
-	if len(on.Timeline[0].Substeps) != 3 {
-		t.Fatalf("mine on: expected three substeps in step 1, got %d", len(on.Timeline[0].Substeps))
+	owned := map[string]bool{}
+	for _, step := range view.Timeline {
+		for _, sub := range step.Substeps {
+			owned[sub.SubstepID] = sub.ViewerOwned
+		}
 	}
-
-	off := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "", "", streamInstanceDetailOptions{MineFilterOn: false, ShowMineFilter: true})
-	if len(off.Timeline) != 3 {
-		t.Fatalf("mine off: expected three steps, got %d", len(off.Timeline))
+	if !owned["1.1"] || !owned["1.2"] || !owned["1.3"] {
+		t.Fatalf("expected org-a dep1/dep2 substeps owned, got %#v", owned)
+	}
+	if owned["2.1"] || owned["3.1"] {
+		t.Fatalf("expected other-org substeps not owned, got %#v", owned)
 	}
 }
 
-func TestBuildStreamInstanceDetailViewMineFilterSubstepCarveOut(t *testing.T) {
+func TestBuildStreamInstanceDetailViewHidesMineFilterWhenProcessDone(t *testing.T) {
+	cfg := testMineFilterRuntimeConfig()
 	process := &Process{
-		ID: primitive.NewObjectID(),
+		ID:     primitive.NewObjectID(),
+		Status: processStatusDone,
 		Progress: map[string]ProcessStep{
-			"1.1": {State: "pending"},
-			"3.1": {State: "pending"},
+			"1.1": {State: "done"},
+			"1.2": {State: "done"},
+			"2.1": {State: "done"},
+			"3.1": {State: "done"},
 		},
 	}
 	server := &Server{}
-	cfg := testMineFilterRuntimeConfig()
 	actor := Actor{OrgSlug: "org-a", RoleSlugs: []string{"dep1"}}
 
-	view := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "3.1", "", streamInstanceDetailOptions{MineFilterOn: true, ShowMineFilter: true})
-	if len(view.Timeline) != 2 {
-		t.Fatalf("carve-out: expected step 1 and step 3, got %d steps", len(view.Timeline))
+	view := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "", "", streamInstanceDetailOptions{ShowMineFilter: true})
+	if !view.ProcessDone {
+		t.Fatal("expected ProcessDone")
 	}
-	if view.SelectedSubstepID != "3.1" {
-		t.Fatalf("SelectedSubstepID = %q, want 3.1", view.SelectedSubstepID)
+	if view.ShowMineFilter {
+		t.Fatal("expected ShowMineFilter false on completed stream")
 	}
 }
 
@@ -120,11 +112,22 @@ func TestBuildStreamInstanceDetailViewUsesAllRoleSlugsNotActiveRole(t *testing.T
 		RoleSlugs: []string{"dep1", "dep2"},
 	}
 
-	view := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "", "", streamInstanceDetailOptions{MineFilterOn: true, ShowMineFilter: true})
-	if len(view.Timeline) != 1 {
-		t.Fatalf("expected only org-a step with dep1 substeps, got %d steps", len(view.Timeline))
+	view := server.buildStreamInstanceDetailView(t.Context(), cfg, "workflow", process, actor, "", "", streamInstanceDetailOptions{ShowMineFilter: true})
+	var found11 bool
+	for _, step := range view.Timeline {
+		for _, sub := range step.Substeps {
+			if sub.SubstepID == "1.1" {
+				found11 = true
+				if !sub.ViewerOwned {
+					t.Fatal("1.1 should be viewer-owned via dep1 slug, not only active Role")
+				}
+			}
+			if sub.SubstepID == "2.1" && sub.ViewerOwned {
+				t.Fatal("2.1 is other org — must not be viewer-owned")
+			}
+		}
 	}
-	if view.SelectedBody == nil || view.SelectedBody.SubstepID != "1.1" {
-		t.Fatalf("expected first available mine substep 1.1 via dep1 slug, got %#v", view.SelectedBody)
+	if !found11 {
+		t.Fatal("expected substep 1.1 in full timeline")
 	}
 }

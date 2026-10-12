@@ -347,6 +347,7 @@ type TimelineSubstep struct {
 	SubstepID   string
 	Title       string
 	Selected    bool
+	ViewerOwned bool
 	Body        *SubstepBodyView
 	Palette     string
 	Status      string
@@ -393,7 +394,6 @@ type StreamTerminationDetailsView struct {
 }
 
 type streamInstanceDetailOptions struct {
-	MineFilterOn   bool
 	ShowMineFilter bool
 }
 
@@ -409,7 +409,6 @@ type StreamInstanceDetailView struct {
 	Error             string
 	Timeline          []TimelineStep
 	ShowMineFilter    bool
-	MineFilterOn      bool
 	HideStatus        bool
 	DPPURL            string
 	DPPGS1            string

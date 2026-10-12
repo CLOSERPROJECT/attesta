@@ -17,14 +17,17 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	if got := resolveSelectedSubstepID(actions, "1.3", false); got != "1.3" {
 		t.Fatalf("resolveSelectedSubstepID requested = %q, want %q", got, "1.3")
 	}
-	if got := resolveSelectedSubstepID(actions, "missing", false); got != "1.2" {
-		t.Fatalf("resolveSelectedSubstepID fallback available = %q, want %q", got, "1.2")
+	if got := resolveSelectedSubstepID(actions, "missing", false); got != "" {
+		t.Fatalf("resolveSelectedSubstepID unknown request = %q, want empty (no auto-pick)", got)
+	}
+	if got := resolveSelectedSubstepID(actions, "", false); got != "" {
+		t.Fatalf("resolveSelectedSubstepID empty request = %q, want empty (no auto-pick)", got)
 	}
 	if got := resolveSelectedSubstepID(actions, "", true); got != "" {
 		t.Fatalf("resolveSelectedSubstepID done = %q, want empty", got)
 	}
-	if got := resolveSelectedSubstepID([]SubstepBodyView{{SubstepID: "9.1", Status: "locked"}}, "", false); got != "9.1" {
-		t.Fatalf("resolveSelectedSubstepID first fallback = %q, want %q", got, "9.1")
+	if got := resolveSelectedSubstepID([]SubstepBodyView{{SubstepID: "9.1", Status: "locked"}}, "", false); got != "" {
+		t.Fatalf("resolveSelectedSubstepID locked-only = %q, want empty", got)
 	}
 	if got := resolveSelectedSubstepID(nil, "", false); got != "" {
 		t.Fatalf("resolveSelectedSubstepID empty list = %q, want empty", got)
@@ -43,14 +46,6 @@ func TestResolveSelectedSubstepIDAndSelectAction(t *testing.T) {
 	}
 	if _, ok := selectedSubstepBody(actions, "1.2", true); ok {
 		t.Fatal("selectedSubstepBody done process should return false")
-	}
-}
-
-func TestCloneRequestWithSelectedSubstepPreservesMine(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/instance/123/content?substep=1.1&mine=0", nil)
-	clone := cloneRequestWithSelectedSubstep(req, "2.1")
-	if got := clone.URL.Query().Get("mine"); got != "0" {
-		t.Fatalf("mine query = %q, want %q", got, "0")
 	}
 }
 

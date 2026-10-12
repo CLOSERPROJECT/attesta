@@ -210,20 +210,17 @@ func resolveSelectedSubstepID(actions []SubstepBodyView, requested string, proce
 	if processDone || len(actions) == 0 {
 		return ""
 	}
+	// Only an explicit ?substep= opens a panel. Never auto-pick "current"/available.
 	requested = strings.TrimSpace(requested)
-	if requested != "" {
-		for _, action := range actions {
-			if action.SubstepID == requested {
-				return requested
-			}
-		}
+	if requested == "" {
+		return ""
 	}
 	for _, action := range actions {
-		if action.Status == "available" {
-			return action.SubstepID
+		if action.SubstepID == requested {
+			return requested
 		}
 	}
-	return actions[0].SubstepID
+	return ""
 }
 
 func selectedSubstepBody(actions []SubstepBodyView, selectedSubstepID string, processDone bool) (SubstepBodyView, bool) {

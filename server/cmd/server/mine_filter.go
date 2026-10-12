@@ -24,15 +24,6 @@ func actorStreamRoleSlugs(actor Actor) []string {
 	return filtered
 }
 
-func parseMineFilterEnabled(raw string) bool {
-	switch strings.TrimSpace(strings.ToLower(raw)) {
-	case "0", "false":
-		return false
-	default:
-		return true
-	}
-}
-
 func workflowSubstepByID(def WorkflowDef, substepID string) (WorkflowSub, bool) {
 	substepID = strings.TrimSpace(substepID)
 	for _, sub := range orderedSubsteps(def) {
@@ -56,48 +47,15 @@ func substepMineForViewer(def WorkflowDef, substepID string, actor Actor) bool {
 	return len(intersectRoles(substepRoles(sub), actorStreamRoleSlugs(actor))) > 0
 }
 
-func filterTimelineForMineFilter(timeline []TimelineStep, def WorkflowDef, actor Actor, carveOutSubstepID string, enabled bool) []TimelineStep {
-	if !enabled || len(timeline) == 0 {
+func decorateTimelineViewerOwnership(timeline []TimelineStep, def WorkflowDef, actor Actor) []TimelineStep {
+	if len(timeline) == 0 {
 		return timeline
 	}
-	carveOutSubstepID = strings.TrimSpace(carveOutSubstepID)
-	filtered := make([]TimelineStep, 0, len(timeline))
-	for _, step := range timeline {
-		substeps := make([]TimelineSubstep, 0, len(step.Substeps))
-		for _, sub := range step.Substeps {
-			if substepMineForViewer(def, sub.SubstepID, actor) {
-				substeps = append(substeps, sub)
-				continue
-			}
-			if carveOutSubstepID != "" && sub.SubstepID == carveOutSubstepID {
-				substeps = append(substeps, sub)
-			}
-		}
-		if len(substeps) == 0 {
-			continue
-		}
-		step.Substeps = substeps
-		filtered = append(filtered, step)
-	}
-	return filtered
-}
-
-func reconcileSelectedSubstepForMineFilter(selected, requestedSubstepID string, actions []SubstepBodyView, def WorkflowDef, actor Actor, processDone, mineFilterOn bool) string {
-	if !mineFilterOn || processDone {
-		return selected
-	}
-	if strings.TrimSpace(requestedSubstepID) != "" {
-		return selected
-	}
-	for _, action := range actions {
-		if action.Status == "available" && substepMineForViewer(def, action.SubstepID, actor) {
-			return action.SubstepID
+	for stepIndex := range timeline {
+		for subIndex := range timeline[stepIndex].Substeps {
+			id := timeline[stepIndex].Substeps[subIndex].SubstepID
+			timeline[stepIndex].Substeps[subIndex].ViewerOwned = substepMineForViewer(def, id, actor)
 		}
 	}
-	for _, action := range actions {
-		if substepMineForViewer(def, action.SubstepID, actor) {
-			return action.SubstepID
-		}
-	}
-	return ""
+	return timeline
 }
