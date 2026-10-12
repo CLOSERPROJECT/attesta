@@ -68,7 +68,6 @@ else
   fi
 
   ./scripts/worktree-env.sh write
-  ./scripts/worktree-data.sh snapshot-primary
 fi
 
 if [[ ! -f .env ]]; then

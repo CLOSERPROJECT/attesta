@@ -18,6 +18,7 @@ type fakeIdentityStore struct {
 	createOrganizationFunc                  func(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	createOrganizationAsAdminFunc           func(ctx context.Context, name string) (IdentityOrg, error)
 	ensurePlatformAdminAccountFunc          func(ctx context.Context, email, password string) error
+	ensureUserAccountFunc                   func(ctx context.Context, email, password, name string) (IdentityUser, error)
 	acceptInviteFunc                        func(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	createEmailPasswordSessionFunc          func(ctx context.Context, email, password string) (IdentitySession, error)
 	createRecoveryFunc                      func(ctx context.Context, email, redirectURL string) error
@@ -79,7 +80,26 @@ func (f *fakeIdentityStore) EnsurePlatformAdminAccount(ctx context.Context, emai
 	if f.ensurePlatformAdminAccountFunc != nil {
 		return f.ensurePlatformAdminAccountFunc(ctx, email, password)
 	}
+	if f.ensureUserAccountFunc != nil {
+		_, err := f.ensureUserAccountFunc(ctx, email, password, "Platform Admin")
+		return err
+	}
 	return nil
+}
+
+func (f *fakeIdentityStore) EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error) {
+	if f.ensureUserAccountFunc != nil {
+		return f.ensureUserAccountFunc(ctx, email, password, name)
+	}
+	if f.ensurePlatformAdminAccountFunc != nil {
+		if err := f.ensurePlatformAdminAccountFunc(ctx, email, password); err != nil {
+			return IdentityUser{}, err
+		}
+	}
+	if f.getUserByEmailFunc != nil {
+		return f.getUserByEmailFunc(ctx, email)
+	}
+	return IdentityUser{}, ErrIdentityNotFound
 }
 
 func (f *fakeIdentityStore) AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error) {

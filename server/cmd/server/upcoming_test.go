@@ -17,9 +17,10 @@ func TestListUpcomingStreamInstancesOrgInvolvedWaitingOnOther(t *testing.T) {
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Two-org workflow")
 	// Step 1 done → next available is org2 / dep2.
 	processID := store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Cross-org batch",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -63,7 +64,7 @@ func TestListUpcomingStreamInstancesOrgInvolvedWaitingOnOther(t *testing.T) {
 	if got.WaitingOn != "Waiting on Organization 2 · Department 2" {
 		t.Fatalf("WaitingOn = %q, want waiting on org2 role", got.WaitingOn)
 	}
-	wantHref := streamInstanceSubstepPath("workflow", processID.Hex(), "2.1")
+	wantHref := streamInstanceSubstepPath(key, processID.Hex(), "2.1")
 	if got.Href != wantHref {
 		t.Fatalf("Href = %q, want %q", got.Href, wantHref)
 	}
@@ -74,8 +75,9 @@ func TestListUpcomingStreamInstancesExcludesYourTurn(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "My turn batch",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -106,8 +108,9 @@ func TestListUpcomingStreamInstancesExcludesPlatformAdminAndUnaffiliated(t *test
 	tempDir := t.TempDir()
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Two-org workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Cross-org batch",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -143,8 +146,9 @@ func TestListUpcomingStreamInstancesSameOrgDifferentRole(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Main workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Waiting on dep1",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -181,8 +185,9 @@ func TestOperatorHomeUpcomingBandBelowYourTurnWithoutDots(t *testing.T) {
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Two-org workflow")
 	yourTurnID := store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "My turn batch",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -192,7 +197,7 @@ func TestOperatorHomeUpcomingBandBelowYourTurnWithoutDots(t *testing.T) {
 		},
 	})
 	upcomingID := store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Waiting on org2",
 		Status:      processStatusActive,
 		CreatedAt:   now.Add(-time.Hour),
@@ -227,8 +232,8 @@ func TestOperatorHomeUpcomingBandBelowYourTurnWithoutDots(t *testing.T) {
 		t.Fatalf("home status=%d body=%q", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	yourTurnHref := streamInstanceSubstepPath("workflow", yourTurnID.Hex(), "1.1")
-	upcomingHref := streamInstanceSubstepPath("workflow", upcomingID.Hex(), "2.1")
+	yourTurnHref := streamInstanceSubstepPath(key, yourTurnID.Hex(), "1.1")
+	upcomingHref := streamInstanceSubstepPath(key, upcomingID.Hex(), "2.1")
 	for _, want := range []string{
 		"Your turn",
 		"My turn batch",
@@ -258,8 +263,9 @@ func TestOperatorHomeUpcomingAloneDoesNotLightAttentionDots(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Two-org workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Waiting on org2",
 		Status:      processStatusActive,
 		CreatedAt:   now,
@@ -345,8 +351,9 @@ func TestPlatformAdminHomeOmitsUpcoming(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Two-org workflow")
 	store.SeedProcess(Process{
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		Name:        "Should not appear for PA",
 		Status:      processStatusActive,
 		CreatedAt:   now,

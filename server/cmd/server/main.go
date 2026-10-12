@@ -31,7 +31,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/yaml.v3"
 )
 
@@ -143,7 +142,6 @@ type FakeNotary struct {
 }
 
 type Server struct {
-	mongo              *mongo.Client
 	store              Store
 	process            *ProcessService
 	identity           IdentityStore
@@ -163,7 +161,6 @@ type Server struct {
 	catalog            map[string]RuntimeConfig
 	viteDevServer      string
 	enforceAuth        bool
-	formataArchURL     string
 	buildVersion       string
 	turnstileSiteKey   string
 	turnstileSecretKey string
@@ -745,50 +742,42 @@ type workflowContextValue struct {
 
 func main() {
 	ctx := context.Background()
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-categories" {
-		if err := runSeedCategoriesCommand(ctx, os.Args[2:]); err != nil {
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "prepare" {
+		if err := runPrepareCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-instances" {
-		if err := runSeedInstancesCommand(ctx, os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed-catalog-streams" {
-		if err := runSeedCatalogStreamsCommand(ctx, os.Args[2:]); err != nil {
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "seed" {
+		if err := runSeedCommand(ctx, os.Args[2:]); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
 
-	mongoURI := envOr("MONGODB_URI", "mongodb://localhost:27017")
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	store, configDir, _, err := openMongoStore(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := client.Ping(ctx, nil); err != nil {
-		log.Fatal(err)
-	}
 
-	db := client.Database("closer_demo")
 	tmpl, err := parseTemplates()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defaultConfigPath := envOr("WORKFLOW_CONFIG", "config/workflow.yaml")
-	configDir := strings.TrimSpace(os.Getenv("WORKFLOW_CONFIG_DIR"))
-	if configDir == "" {
-		configDir = filepath.Dir(defaultConfigPath)
+	// Prepare writes APPWRITE_* under ATTESTA_ROOT_DIR; file wins over stale injected keys.
+	if err := applyAppwriteRuntimeEnvFile(resolveAppwriteRuntimeEnvFile()); err != nil {
+		log.Fatal(err)
+	}
+
+	identity, err := appwriteIdentityFromEnv(appwriteIdentityFromEnvOptions{HTTPClient: http.DefaultClient})
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	server := &Server{
-		mongo:              client,
-		store:              &MongoStore{db: db},
-		identity:           NewAppwriteIdentity(envOr("APPWRITE_ENDPOINT", "http://appwrite/v1"), strings.TrimSpace(os.Getenv("APPWRITE_PROJECT_ID")), strings.TrimSpace(os.Getenv("APPWRITE_API_KEY")), http.DefaultClient),
+		store:              store,
+		identity:           identity,
 		tmpl:               tmpl,
 		authorizer:         NewCerbosAuthorizer(envOr("CERBOS_URL", "http://localhost:3592"), http.DefaultClient, time.Now),
 		sse:                newSSEHub(),
@@ -797,7 +786,6 @@ func main() {
 		configDir:          configDir,
 		viteDevServer:      strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
 		enforceAuth:        true,
-		formataArchURL:     strings.TrimRight(strings.TrimSpace(os.Getenv("FORMATA_ARCH_URL")), "/"),
 		buildVersion:       applicationVersion(),
 		mailer:             newMailerFromEnv(),
 		turnstileSiteKey:   strings.TrimSpace(os.Getenv("TURNSTILE_SITE_KEY")),
@@ -805,10 +793,7 @@ func main() {
 		turnstileClient:    http.DefaultClient,
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
-	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
-		log.Fatal(err)
-	}
-	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
+	if err := ensureEmptyConfigFoundation(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
 	if err := server.bootstrapPlatformAdminIdentity(ctx); err != nil {
@@ -1412,64 +1397,6 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		user.Status = "active"
 	}
 	return user
-}
-
-func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
-	if store == nil {
-		return nil
-	}
-	existing, err := store.ListFormataBuilderStreams(ctx)
-	if err != nil {
-		return err
-	}
-	if len(existing) > 0 {
-		return nil
-	}
-
-	dir := strings.TrimSpace(configDir)
-	if dir == "" {
-		dir = "config"
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("config dir not found: %w", err)
-	}
-	paths := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !isWorkflowCatalogConfigFile(name) {
-			continue
-		}
-		paths = append(paths, filepath.Join(dir, name))
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return errors.New("workflow config catalog is empty")
-	}
-
-	updatedAt := time.Now().UTC()
-	if now != nil {
-		updatedAt = now().UTC()
-	}
-	for _, path := range paths {
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return fmt.Errorf("read config %s: %w", path, readErr)
-		}
-		creatorID := platformAdminStreamUserID()
-		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
-			Stream:          string(data),
-			UpdatedAt:       updatedAt,
-			CreatedByUserID: creatorID,
-			UpdatedByUserID: creatorID,
-		}); saveErr != nil {
-			return fmt.Errorf("seed formata stream %s: %w", filepath.Base(path), saveErr)
-		}
-	}
-	return nil
 }
 
 func attachmentMaxBytes() int64 {
@@ -3116,25 +3043,23 @@ func requestBaseURL(r *http.Request) string {
 	return scheme + "://" + host
 }
 
-func resetRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_RESET_REDIRECT_URL")); configured != "" {
-		return configured
+func redirectBaseURL(r *http.Request) string {
+	if base := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")); base != "" {
+		return strings.TrimRight(base, "/")
 	}
-	return requestBaseURL(r) + "/reset/confirm"
+	return requestBaseURL(r)
+}
+
+func resetRedirectURL(r *http.Request) string {
+	return redirectBaseURL(r) + "/reset/confirm"
 }
 
 func verifyRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_VERIFY_REDIRECT_URL")); configured != "" {
-		return configured
-	}
-	return requestBaseURL(r) + emailVerificationConfirmPath()
+	return redirectBaseURL(r) + emailVerificationConfirmPath()
 }
 
 func inviteRedirectURL(r *http.Request) string {
-	if configured := strings.TrimSpace(os.Getenv("APPWRITE_INVITE_REDIRECT_URL")); configured != "" {
-		return configured
-	}
-	return requestBaseURL(r) + "/invite/accept"
+	return redirectBaseURL(r) + "/invite/accept"
 }
 
 func resetConfirmParams(r *http.Request) (string, string) {
@@ -6434,7 +6359,7 @@ func (s *Server) handleGetSubstepOverride(w http.ResponseWriter, r *http.Request
 		Schema:         marshalJSONCompact(effective.Schema),
 		UISchema:       marshalJSONCompact(effective.UISchema),
 		Reason:         strings.TrimSpace(override.Reason),
-		FormataArchURL: strings.TrimRight(strings.TrimSpace(s.formataArchURL), "/"),
+		FormataArchURL: "",
 		SaveURL:        streamInstancePath(workflowKey, process.ID.Hex()) + "/substep/" + canonical.SubstepID + "/override",
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -6980,152 +6905,6 @@ func parseRuntimeConfigData(source string, data []byte) (RuntimeConfig, error) {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
 	return cfg, nil
-}
-
-func workflowCatalogModTime(stream FormataBuilderStream) time.Time {
-	if !stream.UpdatedAt.IsZero() {
-		return stream.UpdatedAt
-	}
-	if !stream.ID.IsZero() {
-		return stream.ID.Timestamp()
-	}
-	return time.Time{}
-}
-
-func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
-	s.configMu.Lock()
-	defer s.configMu.Unlock()
-
-	taxRev, taxErr := s.catalogTaxonomyRevision()
-	if taxErr != nil {
-		return nil, taxErr
-	}
-
-	if s.store != nil {
-		streams, err := s.store.ListFormataBuilderStreams(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("list formata streams: %w", err)
-		}
-		if len(streams) > 0 {
-			modTimes := make(map[string]time.Time, len(streams))
-			for _, stream := range streams {
-				if stream.ID.IsZero() {
-					return nil, errors.New("formata stream id is empty")
-				}
-				key := stream.ID.Hex()
-				modTimes[key] = workflowCatalogModTime(stream)
-			}
-			if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) && s.catalogTaxonomyRev == taxRev {
-				return cloneWorkflowCatalog(s.catalog), nil
-			}
-
-			catalog := make(map[string]RuntimeConfig, len(streams))
-			cacheable := true
-			for _, stream := range streams {
-				if stream.ID.IsZero() {
-					return nil, errors.New("formata stream id is empty")
-				}
-				key := stream.ID.Hex()
-				cfg, parseErr := parseRuntimeConfigData("stream "+key, []byte(stream.Stream))
-				if parseErr != nil {
-					return nil, parseErr
-				}
-				if resolveErr := s.resolveCatalogStreamCategorization(&cfg); resolveErr != nil {
-					cacheable = false
-				}
-				catalog[key] = cfg
-			}
-			if cacheable {
-				s.catalog = catalog
-				s.catalogModTime = modTimes
-				s.catalogTaxonomyRev = taxRev
-			} else {
-				s.catalog = nil
-				s.catalogModTime = nil
-			}
-			return cloneWorkflowCatalog(catalog), nil
-		}
-	}
-
-	dir := strings.TrimSpace(s.configDir)
-	if dir == "" {
-		dir = "config"
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("config dir not found: %w", err)
-	}
-
-	paths := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !isWorkflowCatalogConfigFile(name) {
-			continue
-		}
-		paths = append(paths, filepath.Join(dir, name))
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return nil, errors.New("workflow config catalog is empty")
-	}
-
-	modTimes := make(map[string]time.Time, len(paths))
-	for _, path := range paths {
-		info, statErr := os.Stat(path)
-		if statErr != nil {
-			return nil, fmt.Errorf("config stat failed for %s: %w", path, statErr)
-		}
-		modTimes[path] = info.ModTime()
-	}
-	if s.catalog != nil && sameCatalogModTimes(s.catalogModTime, modTimes) && s.catalogTaxonomyRev == taxRev {
-		return cloneWorkflowCatalog(s.catalog), nil
-	}
-
-	catalog := make(map[string]RuntimeConfig, len(paths))
-	cacheable := true
-	for _, path := range paths {
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return nil, fmt.Errorf("read config %s: %w", path, readErr)
-		}
-		cfg, parseErr := parseRuntimeConfigData(filepath.Base(path), data)
-		if parseErr != nil {
-			return nil, parseErr
-		}
-		if resolveErr := s.resolveCatalogStreamCategorization(&cfg); resolveErr != nil {
-			cacheable = false
-		}
-		key := strings.TrimSpace(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
-		if key == "" {
-			return nil, fmt.Errorf("workflow key is empty for %s", filepath.Base(path))
-		}
-		if _, exists := catalog[key]; exists {
-			return nil, fmt.Errorf("duplicate workflow key %q", key)
-		}
-		catalog[key] = cfg
-	}
-
-	if cacheable {
-		s.catalog = catalog
-		s.catalogModTime = modTimes
-		s.catalogTaxonomyRev = taxRev
-	} else {
-		s.catalog = nil
-		s.catalogModTime = nil
-	}
-
-	return cloneWorkflowCatalog(catalog), nil
-}
-
-func (s *Server) catalogTaxonomyRevision() (int64, error) {
-	if s == nil || s.store == nil {
-		return 0, nil
-	}
-	return s.store.TaxonomyRevision(context.Background())
 }
 
 func (s *Server) workflowByKey(key string) (RuntimeConfig, error) {

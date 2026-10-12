@@ -112,9 +112,18 @@ func TestHandleWorkflowRoutesDispatchAndUnknownWorkflow(t *testing.T) {
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
 
 	store := NewMemoryStore()
+	installPackIntoFormata(t, store, tempDir)
+	catalog, err := loadWorkflowCatalog(t.Context(), store)
+	if err != nil {
+		t.Fatalf("loadWorkflowCatalog: %v", err)
+	}
+	key, _, ok := catalogKeyByWorkflowName(catalog, "Main workflow")
+	if !ok {
+		t.Fatal("missing Main workflow")
+	}
 	process := Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		CreatedAt:   time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC),
 		Status:      "active",
 		Progress: map[string]ProcessStep{
@@ -132,7 +141,7 @@ func TestHandleWorkflowRoutesDispatchAndUnknownWorkflow(t *testing.T) {
 		configDir:  tempDir,
 	}
 
-	okReq := httptest.NewRequest(http.MethodGet, "/streams/workflow/instance/"+process.ID.Hex(), nil)
+	okReq := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/instance/"+process.ID.Hex(), nil)
 	okRec := httptest.NewRecorder()
 	server.handleStreamRoutes(okRec, okReq)
 	if okRec.Code != http.StatusOK {
@@ -151,14 +160,12 @@ func TestHandleWorkflowRoutesAdditionalBranches(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, tempDir+"/workflow.yaml", "Main workflow", "string")
 
-	server := &Server{
-		store:      NewMemoryStore(),
-		tmpl:       testTemplates(),
-		authorizer: fakeAuthorizer{},
-		sse:        newSSEHub(),
-		now:        func() time.Time { return time.Date(2026, 2, 4, 11, 0, 0, 0, time.UTC) },
-		configDir:  tempDir,
-	}
+	server, _ := newServerWithPackCatalog(t, tempDir)
+	server.tmpl = testTemplates()
+	server.authorizer = fakeAuthorizer{}
+	server.sse = newSSEHub()
+	server.now = func() time.Time { return time.Date(2026, 2, 4, 11, 0, 0, 0, time.UTC) }
+	key := server.defaultWorkflowKey()
 
 	reqMissingWorkflow := httptest.NewRequest(http.MethodGet, "/streams/", nil)
 	recMissingWorkflow := httptest.NewRecorder()
@@ -167,21 +174,21 @@ func TestHandleWorkflowRoutesAdditionalBranches(t *testing.T) {
 		t.Fatalf("status = %d, want %d", recMissingWorkflow.Code, http.StatusNotFound)
 	}
 
-	reqWorkflowHome := httptest.NewRequest(http.MethodGet, "/streams/workflow/", nil)
+	reqWorkflowHome := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/", nil)
 	recWorkflowHome := httptest.NewRecorder()
 	server.handleStreamRoutes(recWorkflowHome, reqWorkflowHome)
 	if recWorkflowHome.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recWorkflowHome.Code, http.StatusOK)
 	}
 
-	reqUnknown := httptest.NewRequest(http.MethodGet, "/streams/workflow/unknown", nil)
+	reqUnknown := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/unknown", nil)
 	recUnknown := httptest.NewRecorder()
 	server.handleStreamRoutes(recUnknown, reqUnknown)
 	if recUnknown.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recUnknown.Code, http.StatusNotFound)
 	}
 
-	reqEvents := httptest.NewRequest(http.MethodGet, "/streams/workflow/events?role=qa", nil)
+	reqEvents := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/events?role=qa", nil)
 	recEvents := httptest.NewRecorder()
 	server.handleStreamRoutes(recEvents, reqEvents)
 	if recEvents.Code != http.StatusBadRequest {
@@ -194,9 +201,18 @@ func TestHandleWorkflowRoutesRedirectsInvalidWorkflowToWorkflowHome(t *testing.T
 	writeTwoSubstepWorkflowConfig(t, tempDir+"/workflow.yaml", "Workflow with missing refs")
 
 	store := NewMemoryStore()
+	installPackIntoFormata(t, store, tempDir)
+	catalog, err := loadWorkflowCatalog(t.Context(), store)
+	if err != nil {
+		t.Fatalf("loadWorkflowCatalog: %v", err)
+	}
+	key, _, ok := catalogKeyByWorkflowName(catalog, "Workflow with missing refs")
+	if !ok {
+		t.Fatal("missing workflow")
+	}
 	process := Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "workflow",
+		WorkflowKey: key,
 		CreatedAt:   time.Date(2026, 2, 4, 10, 0, 0, 0, time.UTC),
 		Status:      "active",
 		Progress: map[string]ProcessStep{
@@ -227,7 +243,7 @@ func TestHandleWorkflowRoutesRedirectsInvalidWorkflowToWorkflowHome(t *testing.T
 		configDir:   tempDir,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/streams/workflow/instance/"+process.ID.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/instance/"+process.ID.Hex(), nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: "session-1"})
 	rec := httptest.NewRecorder()
 	server.handleStreamRoutes(rec, req)
@@ -240,8 +256,8 @@ func TestHandleWorkflowRoutesRedirectsInvalidWorkflowToWorkflowHome(t *testing.T
 	if err != nil {
 		t.Fatalf("parse location: %v", err)
 	}
-	if parsed.Path != "/my/streams/workflow/" {
-		t.Fatalf("redirect path = %q, want %q", parsed.Path, "/my/streams/workflow/")
+	if parsed.Path != "/my/streams/"+key+"/" {
+		t.Fatalf("redirect path = %q, want %q", parsed.Path, "/my/streams/"+key+"/")
 	}
 	if got := parsed.Query().Get("error"); !strings.Contains(got, "workflow references are invalid") {
 		t.Fatalf("redirect error = %q, want workflow validation message", got)

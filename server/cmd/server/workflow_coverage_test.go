@@ -32,15 +32,14 @@ func TestDefaultWorkflowKeyBranches(t *testing.T) {
 	writeWorkflowConfig(t, filepath.Join(tempDir, "zeta.yaml"), "Zeta workflow", "string")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "alpha.yaml"), "Alpha workflow", "string")
 
-	server := &Server{configDir: tempDir}
-	if got := server.defaultWorkflowKey(); got != "alpha" {
-		t.Fatalf("defaultWorkflowKey without 'workflow' = %q, want alpha", got)
+	server, _ := newServerWithPackCatalog(t, tempDir)
+	catalog, err := server.workflowCatalog()
+	if err != nil {
+		t.Fatalf("workflowCatalog: %v", err)
 	}
-
-	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
-	server = &Server{configDir: tempDir}
-	if got := server.defaultWorkflowKey(); got != "workflow" {
-		t.Fatalf("defaultWorkflowKey with 'workflow' = %q, want workflow", got)
+	wantFirst := sortedWorkflowKeys(catalog)[0]
+	if got := server.defaultWorkflowKey(); got != wantFirst {
+		t.Fatalf("defaultWorkflowKey = %q, want first Formata key %q", got, wantFirst)
 	}
 
 	server = &Server{configDir: "/tmp/custom-workflows"}
@@ -53,12 +52,10 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 
-	server := &Server{
-		store:     NewMemoryStore(),
-		tmpl:      testTemplates(),
-		sse:       newSSEHub(),
-		configDir: tempDir,
-	}
+	server, _ := newServerWithPackCatalog(t, tempDir)
+	server.tmpl = testTemplates()
+	server.sse = newSSEHub()
+	key := server.defaultWorkflowKey()
 
 	tests := []struct {
 		name   string
@@ -67,11 +64,11 @@ func TestHandleWorkflowRoutesDispatchFallbacks(t *testing.T) {
 		want   int
 	}{
 		{name: "missing key", method: http.MethodGet, path: "/streams/", want: http.StatusNotFound},
-		{name: "unknown tail", method: http.MethodGet, path: "/streams/workflow/unknown", want: http.StatusNotFound},
-		{name: "events validation", method: http.MethodGet, path: "/streams/workflow/events", want: http.StatusBadRequest},
-		{name: "start method guard", method: http.MethodGet, path: "/streams/workflow/instance/start", want: http.StatusMethodNotAllowed},
-		{name: "backoffice unknown role", method: http.MethodGet, path: "/streams/workflow/backoffice/unknown", want: http.StatusNotFound},
-		{name: "dashboard removed", method: http.MethodGet, path: "/streams/workflow/dashboard", want: http.StatusNotFound},
+		{name: "unknown tail", method: http.MethodGet, path: "/streams/" + key + "/unknown", want: http.StatusNotFound},
+		{name: "events validation", method: http.MethodGet, path: "/streams/" + key + "/events", want: http.StatusBadRequest},
+		{name: "start method guard", method: http.MethodGet, path: "/streams/" + key + "/instance/start", want: http.StatusMethodNotAllowed},
+		{name: "backoffice unknown role", method: http.MethodGet, path: "/streams/" + key + "/backoffice/unknown", want: http.StatusNotFound},
+		{name: "dashboard removed", method: http.MethodGet, path: "/streams/" + key + "/dashboard", want: http.StatusNotFound},
 	}
 
 	for _, tc := range tests {

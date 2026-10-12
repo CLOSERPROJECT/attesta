@@ -74,7 +74,9 @@ services:
       - appwrite-mariadb
       - appwrite-redis
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsI http://localhost:80 | head -n 1 | grep -E '^HTTP/.* 3[0-9]{2} ' || exit 1"]
+      # Appwrite rejects bare localhost when _APP_DOMAIN is set (preview FQDNs);
+      # send that Host so the check matches real proxy traffic.
+      test: ["CMD-SHELL", "curl -fsI -H \"Host: $${_APP_DOMAIN}\" http://localhost:80 | head -n 1 | grep -E '^HTTP/.* 3[0-9]{2} ' || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -206,9 +208,7 @@ services:
       retries: 3
 
   appwrite-mariadb:
-    build:
-      context: .
-      dockerfile: deployment/Dockerfile.appwrite-mariadb
+    image: mariadb:10.11
     container_name: appwrite-mariadb
     networks:
       default:
@@ -223,8 +223,6 @@ services:
       - MYSQL_USER=$SERVICE_USER_MARIADB
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
       - MARIADB_AUTO_UPGRADE=1
-      # Set this only in Coolify preview deployment env vars.
-      - APPWRITE_RESTORE_SEED_SQL=${APPWRITE_RESTORE_SEED_SQL:-false}
     command: 'mysqld --innodb-flush-method=fsync'
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -277,12 +275,12 @@ services:
       MONGODB_URI: mongodb://${SERVICE_NAME_MONGODB:-mongodb}:27017
       CERBOS_URL: http://${SERVICE_NAME_CERBOS:-cerbos}:3592
       APPWRITE_ENDPOINT: https://${SERVICE_FQDN_APPWRITE:-appwrite}/v1
-      APPWRITE_PROJECT_ID:
-      APPWRITE_API_KEY:
-      APPWRITE_INVITE_REDIRECT_URL:
-      APPWRITE_RESET_REDIRECT_URL:
-      APPWRITE_VERIFY_REDIRECT_URL:
-      APPWRITE_ORG_ASSETS_BUCKET: org-assets
+      APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-attesta}
+      # Optional on Preview: attesta prepare regenerates when missing/stale.
+      APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
+      APPWRITE_CONSOLE_EMAIL: ${APPWRITE_CONSOLE_EMAIL:-admin@appwrite.local}
+      APPWRITE_CONSOLE_PASSWORD: ${APPWRITE_CONSOLE_PASSWORD:-admin@appwrite.local}
+      APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?}
       SMTP_HOST: ${SERVICE_HOST_SMTP:-}
@@ -291,7 +289,13 @@ services:
       SMTP_PASSWORD: ${SERVICE_PASSWORD_SMTP:-}
       SMTP_FROM: ${ATTESTA_SMTP_FROM:-attesta@apps.forkbomb.eu}
       SMTP_SECURE: ${SERVICE_SECURE_SMTP:-}
+      # Set only in Coolify Preview env; production must leave unset/false.
+      ATTESTA_SEED: ${ATTESTA_SEED:-false}
+      ATTESTA_ROOT_DIR: /app
       SERVICE_FQDN_ATTESTA_3000:
+      # Invite/reset/verify links derive from this origin + fixed paths.
+      PUBLIC_BASE_URL: https://${SERVICE_FQDN_ATTESTA_3000}
+
     depends_on:
       - mongodb
       - cerbos

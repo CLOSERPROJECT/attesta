@@ -2994,10 +2994,11 @@ func TestHandleOrgAdminUsersDeleteInviteWithIdentity(t *testing.T) {
 }
 
 func TestIdentityOrgAdminHelpers(t *testing.T) {
+	t.Setenv("PUBLIC_BASE_URL", "")
 	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)); !strings.Contains(got, "/invite/accept") {
 		t.Fatalf("invite redirect = %q", got)
 	}
-	t.Setenv("APPWRITE_INVITE_REDIRECT_URL", "https://app.example/invite/accept")
+	t.Setenv("PUBLIC_BASE_URL", "https://app.example")
 	if got := inviteRedirectURL(httptest.NewRequest(http.MethodGet, "/my/organization/users", nil)); got != "https://app.example/invite/accept" {
 		t.Fatalf("configured invite redirect = %q", got)
 	}

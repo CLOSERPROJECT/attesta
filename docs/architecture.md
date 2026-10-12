@@ -13,7 +13,8 @@ tracking. Unresolved work lives as GitHub issues (see
 | Concern | Source of truth |
 |---|---|
 | HTTP routes and request handlers | `server/cmd/server/main.go`: `newMux`, `handleMyRoutes`, `handleStreamRoutes`, `handleProcessRoutes`, and `handleOrganizationRoutes` |
-| Runtime configuration and workflow catalog | `server/cmd/server/main.go`: `runtimeConfig`; `server/config/workflow.yaml`; optional workflow catalog directory configured by environment |
+| Runtime Stream catalog | Formata builder Streams in Mongo (`Server.workflowCatalog` / `loadWorkflowCatalog`); empty Formata fails closed — no disk YAML fallback on the production path |
+| Catalog template pack and taxonomy seed | On-disk `server/config/`: Stream YAML templates via `openCatalogTemplatePack` for empty-install foundation and Seed; `categories.yaml` taxonomy seed via `resolveCategoriesSeedPath` |
 | Process completion and lifecycle artifacts | `server/cmd/server/process_completion.go`; persistence interface and implementations in `server/cmd/server/store.go` |
 | Persistence and attachments | `server/cmd/server/store.go`: Mongo collections and GridFS `attachments` bucket |
 | Identity, sessions, and organization membership | `server/cmd/server/main.go`: `readSession` and `currentUser`; Appwrite client code in `server/cmd/server/identity*.go` |

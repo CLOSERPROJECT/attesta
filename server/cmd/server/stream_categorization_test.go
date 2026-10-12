@@ -210,15 +210,20 @@ func TestWorkflowCatalogUnknownCategoryPathLoadsUncategorized(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedSupplyChainProcurementTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 
 	server := &Server{store: store, configDir: tempDir}
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog: %v", err)
 	}
-	cfg := catalog["workflow"]
-	if cfg.Workflow.IsCategorized() {
-		t.Fatalf("expected uncategorized load, got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+	if len(catalog) != 1 {
+		t.Fatalf("catalog size = %d, want 1", len(catalog))
+	}
+	for _, cfg := range catalog {
+		if cfg.Workflow.IsCategorized() {
+			t.Fatalf("expected uncategorized load, got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+		}
 	}
 }
 
@@ -364,18 +369,23 @@ func TestWorkflowCatalogKnownCategoryPathLoadsCategorized(t *testing.T) {
 
 	store := NewMemoryStore()
 	seedSupplyChainProcurementTaxonomy(t, store)
+	installPackIntoFormata(t, store, tempDir)
 
 	server := &Server{store: store, configDir: tempDir}
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog: %v", err)
 	}
-	cfg := catalog["workflow"]
-	if !cfg.Workflow.IsCategorized() {
-		t.Fatal("expected categorized Stream for known path")
+	if len(catalog) != 1 {
+		t.Fatalf("catalog size = %d, want 1", len(catalog))
 	}
-	if cfg.Workflow.CategorySlug != "supply-chain" || cfg.Workflow.SubCategorySlug != "procurement" {
-		t.Fatalf("got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+	for _, cfg := range catalog {
+		if !cfg.Workflow.IsCategorized() {
+			t.Fatal("expected categorized Stream for known path")
+		}
+		if cfg.Workflow.CategorySlug != "supply-chain" || cfg.Workflow.SubCategorySlug != "procurement" {
+			t.Fatalf("got %q / %q", cfg.Workflow.CategorySlug, cfg.Workflow.SubCategorySlug)
+		}
 	}
 }
 
@@ -387,16 +397,13 @@ func TestWorkflowCatalogSkipsTaxonomySeedFile(t *testing.T) {
 		t.Fatalf("write categories.yaml: %v", err)
 	}
 
-	server := &Server{store: NewMemoryStore(), configDir: tempDir}
+	server, _ := newServerWithPackCatalog(t, tempDir)
 	catalog, err := server.workflowCatalog()
 	if err != nil {
 		t.Fatalf("workflowCatalog: %v", err)
 	}
 	if len(catalog) != 1 {
 		t.Fatalf("catalog size = %d, want 1 (categories.yaml skipped)", len(catalog))
-	}
-	if _, ok := catalog["categories"]; ok {
-		t.Fatal("categories.yaml must not enter the workflow catalog")
 	}
 }
 
@@ -415,7 +422,7 @@ func TestIsWorkflowCatalogConfigFile(t *testing.T) {
 	}
 }
 
-func TestBootstrapFormataBuilderStreamsSkipsTaxonomySeedFile(t *testing.T) {
+func TestEnsureEmptyConfigFoundationSkipsTaxonomySeedFileForFormata(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "formata")
 	seed := "categories:\n  - slug: supply-chain\n    name: Supply Chain\n    icon: batch-traceability\n    sortOrder: 1\n"
@@ -424,8 +431,8 @@ func TestBootstrapFormataBuilderStreamsSkipsTaxonomySeedFile(t *testing.T) {
 	}
 
 	store := NewMemoryStore()
-	if err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil); err != nil {
-		t.Fatalf("bootstrapFormataBuilderStreams: %v", err)
+	if err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, nil); err != nil {
+		t.Fatalf("ensureEmptyConfigFoundation: %v", err)
 	}
 	streams, err := store.ListFormataBuilderStreams(t.Context())
 	if err != nil {

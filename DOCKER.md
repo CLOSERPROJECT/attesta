@@ -47,27 +47,9 @@ The local Compose path applies `deployment/appwrite/docker-compose.worktree.yaml
 That override owns the worktree-specific ports, resource labels, scoped names, and fresh-stack seed hook.
 The standalone operator baseline in `deployment/appwrite/docker-compose.appwrite.yaml` and the Coolify paths in `deployment/docker-compose.coolify.yaml` and `deployment/Dockerfile.coolify` remain unchanged and do not consume the local override.
 
-Stacks created by the old direct command used `deployment` as their implicit Compose project.
 New checkouts get a path-qualified Compose project name automatically.
-To keep pre-worktree `deployment_*` volumes attached, adopt that name once on the primary:
-
-```bash
-docker compose --project-name deployment -f deployment/docker-compose.local.yaml down --remove-orphans
-COMPOSE_PROJECT_NAME=deployment task worktree:bootstrap
-task start
-```
-
-Never add `-v` to that migration command.
-If `.env.worktree` already exists, add `COMPOSE_PROJECT_NAME=deployment`; persisted worktree identity wins over shell and `.env` values.
-
-For a parallel worktree, bootstrap temporarily quiesces the primary Compose project and captures one all-or-nothing bundle containing MongoDB, Appwrite MariaDB, and Appwrite's durable file volumes.
-A repository-wide lock prevents parallel bootstraps from overlapping.
-It then restores the primary's previous running state.
-The bundle is restored only before an uninitialized worktree stack starts; subsequent starts preserve the worktree's own data.
-Partial or corrupt bundles stop startup instead of mixing databases from different points in time.
-If the primary has no durable volumes yet, bootstrap skips the bundle and records a persistent fresh-seed choice.
-Bootstrap fails instead when the primary's managed project is empty but legacy `deployment` volumes still exist under a mismatched primary project name; adopt `COMPOSE_PROJECT_NAME=deployment` on the primary once (see README).
-`task purge` makes the same choice, so its next start uses the checked-in seed instead of copying the primary again.
+Parallel worktrees get isolated Compose projects and empty durable volumes.
+Demo data comes from the Go seed after Appwrite is ready and credentials exist (`ATTESTA_SEED=true` / `task seed`).
 
 Open:
 - Run `bash scripts/worktree-env.sh print` to see the current checkout's URLs.
@@ -82,8 +64,9 @@ After the primary checkout's first boot:
 5. Create the `org-assets` bucket.
 6. Set `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY` for the Attesta service, then run `task start:docker` if using the containerized app.
 
-Fresh stacks without a copied data bundle restore the checked-in local seed on first initialization.
-Copied bundles retain the matching project, users, teams, memberships, API keys, and assets while discarding host-specific sessions, certificates, caches, and routing state.
+Fresh stacks start with empty Appwrite MariaDB; demo data comes from the Go seed after credentials exist.
+
+`task start` / `task start:docker` export `ATTESTA_SEED=true` from worktree-env and run `go run ./cmd/server prepare --policy=worktree` (wait → bootstrap → apply env → empty-only seed; soft-skips bootstrap failure and missing credentials). Bootstrap defaults console credentials to `admin@appwrite.local` / `admin@appwrite.local` when unset. Use `task seed` (optionally with `--replace`) for a manual run.
 
 ## Verifying the Setup
 ```bash
@@ -99,7 +82,7 @@ task stop
 # Remove only this worktree's containers, networks, and data
 task reset
 
-# Also discard the saved coordinated snapshot bundle
+# Same as reset after an interactive confirmation
 task purge
 
 # Preview orphaned Attesta Docker resources left by deleted worktrees
@@ -110,11 +93,8 @@ task worktree:gc:apply
 ```
 
 Cleanup only considers resources carrying this clone's repository identity and the exact worktree owner.
-Foreign-clone and unlabeled legacy resources are skipped.
+Foreign-clone and unlabeled resources are skipped.
 `task reset` and `task purge` inspect every volume in the current Compose project and fail closed if any ownership label is missing or different.
-That includes preserved volumes from the legacy `deployment` project until the next start copies them onto labeled replacements (Docker cannot add labels to an existing volume).
-`task start` / `task dev` run that copy automatically for unlabeled legacy volumes in the current Compose project.
-To discard legacy data instead, inspect with `docker volume ls --filter label=com.docker.compose.project=deployment` and remove only the confirmed legacy volume names; the next start creates labeled replacements.
 
 ## Coolify
 Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
@@ -122,11 +102,26 @@ Use `deployment/Dockerfile.coolify` with the Coolify proxy (no `ports:` in
 vendored Appwrite module instead of assuming an external identity deployment.
 
 Coolify-specific notes:
-- `traefik` from the vendored Appwrite stack is still included, but only as an internal router for `/`, `/console`, and `/v1/realtime`.
-- Set `SERVICE_FQDN_APPWRITE_80` on the `traefik` service if you want a public Appwrite hostname in Coolify.
-- Set `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`, `APPWRITE_INVITE_REDIRECT_URL`, and `APPWRITE_RESET_REDIRECT_URL` on the `attesta` service before testing auth flows.
-- Attesta reaches Appwrite internally through `http://${SERVICE_NAME_APPWRITE:-appwrite}:80/v1`.
-- To restore `deployment/appwrite/appwrite-seed.sql` only in preview deployments, set `APPWRITE_RESTORE_SEED_SQL=true` in Coolify's Preview Deployment environment variables and leave it unset in production. The SQL and init hook are baked into the custom MariaDB image, the import runs only on first MariaDB initialization, and the init hook clears Appwrite runtime tables such as sessions, certificates, and domain rules so each preview can recreate host-specific state cleanly.
+- Coolify owns public routing (no Traefik in this compose). Expose Appwrite with Coolify `SERVICE_FQDN_APPWRITE` / `SERVICE_URL_*` on the Appwrite services.
+- Attesta's compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
+- The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
+- MariaDB uses stock `image: mariadb:10.11` (same as the local Appwrite baseline). Demo identity data comes from the Go seed after console bootstrap.
+
+### Coolify Preview env checklist
+Set these on the `attesta` service for automatic Appwrite project + demo fixture:
+
+| Variable | Preview | Notes |
+|---|---|---|
+| `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
+| `ATTESTA_ROOT_DIR` | `/app` | App root for `.env.appwrite` (Dockerfile/entrypoint set this; matches image app root, not `WORKDIR /app/server`) |
+| `APPWRITE_PROJECT_ID` | e.g. `attesta` | Required; bootstrap creates this project id |
+| `APPWRITE_API_KEY` | optional | Coolify may inject a stale key on empty Appwrite; ignore it — `attesta prepare` bootstraps (probes/regenerates when needed) and writes `$ATTESTA_ROOT_DIR/.env.appwrite`; prepare applies it for seed, and the server loads the same file at startup |
+| `APPWRITE_CONSOLE_EMAIL` | default `admin@appwrite.local` | Console login-first; signup only if login fails (409/501 treated as account may exist) |
+| `APPWRITE_CONSOLE_PASSWORD` | default `admin@appwrite.local` | Demo-only; change if you share console access |
+| `APPWRITE_ORG_ASSETS_BUCKET` | default `org-assets` | Created when missing |
+| `PUBLIC_BASE_URL` | `https://${SERVICE_FQDN_ATTESTA_3000}` | Compose default; invite/reset/verify links derive from this origin + fixed paths |
+
+When `ATTESTA_SEED` is truthy, the Coolify entrypoint runs `./attesta prepare` (default `--policy=coolify`: hard-fail wait for Appwrite `/v1/health` guest 401 or 200 → bootstrap → apply runtime env → empty-only seed) then `exec`s the server. The server loads `$ATTESTA_ROOT_DIR/.env.appwrite` at startup so bootstrap credentials win over stale injected `APPWRITE_API_KEY`. When `ATTESTA_SEED` is unset/false, prepare is a no-op. Manual re-seed is `attesta seed` / `task seed` (optionally `--replace`).
 
 ## Ephemeral previews (PRs)
 Build with `deployment/Dockerfile.ephemeral`. On startup it will run a seed

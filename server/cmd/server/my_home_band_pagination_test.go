@@ -186,9 +186,10 @@ func newMyHomeBandPaginationServer(t *testing.T, yourTurnCount, upcomingCount in
 	writeTwoOrgWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"))
 
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Two-org workflow")
 	for i := 0; i < yourTurnCount; i++ {
 		store.SeedProcess(Process{
-			WorkflowKey: "workflow",
+			WorkflowKey: key,
 			Name:        "Your turn " + strconv.Itoa(i+1),
 			Status:      processStatusActive,
 			CreatedAt:   now.Add(-time.Duration(i) * time.Minute),
@@ -200,7 +201,7 @@ func newMyHomeBandPaginationServer(t *testing.T, yourTurnCount, upcomingCount in
 	}
 	for i := 0; i < upcomingCount; i++ {
 		store.SeedProcess(Process{
-			WorkflowKey: "workflow",
+			WorkflowKey: key,
 			Name:        "Upcoming " + strconv.Itoa(i+1),
 			Status:      processStatusActive,
 			CreatedAt:   now.Add(-time.Duration(100+i) * time.Minute),

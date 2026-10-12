@@ -4,9 +4,8 @@ server/tmp
 # Docker volumes and runtime data
 *.log
 .env
-.env.local
 .env.worktree
-.worktree-data/
+.env.appwrite
 *.pid
 
 # OS files
@@ -48,3 +47,7 @@ coverage.out
 .gestalt/sessions/
 .gestalt/temporal/
 .gestalt/version.json
+
+# Agent / local scratch (not product)
+tmp/
+.cursor/sandbox.json

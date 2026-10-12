@@ -313,11 +313,12 @@ func TestHandlePublicStreamOK(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Pilot Workflow")
 	seedPlatformAdminTaxonomy(t, store)
 	doneAt := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "pilot",
+		WorkflowKey: key,
 		Status:      processStatusDone,
 		CreatedAt:   doneAt,
 		Progress:    map[string]ProcessStep{"1_1": {State: "done", DoneAt: &doneAt}},
@@ -325,7 +326,7 @@ func TestHandlePublicStreamOK(t *testing.T) {
 	})
 	store.SeedProcess(Process{
 		ID:          primitive.NewObjectID(),
-		WorkflowKey: "pilot",
+		WorkflowKey: key,
 		Status:      processStatusActive,
 		CreatedAt:   doneAt,
 		Progress:    map[string]ProcessStep{"1_1": {State: "pending"}},
@@ -333,7 +334,7 @@ func TestHandlePublicStreamOK(t *testing.T) {
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/streams/pilot", nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/"+key, nil)
 	server.handlePublicStream(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
@@ -358,9 +359,11 @@ func TestHandlePublicStreamOK(t *testing.T) {
 func TestHandlePublicStreamHomeHrefUncategorized(t *testing.T) {
 	tempDir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
-	server := &Server{store: NewMemoryStore(), configDir: tempDir, tmpl: parseTestTemplates(t)}
+	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/streams/pilot", nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/"+key, nil)
 	server.handlePublicStream(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
@@ -387,9 +390,11 @@ func TestHandlePublicStreamUnknownKey404(t *testing.T) {
 func TestHandlePublicStreamRejectsNestedPath(t *testing.T) {
 	tempDir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
-	server := &Server{store: NewMemoryStore(), configDir: tempDir, tmpl: parseTestTemplates(t)}
+	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/streams/pilot/instance/abc", nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/instance/abc", nil)
 	server.handlePublicStream(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rec.Code)
@@ -399,9 +404,11 @@ func TestHandlePublicStreamRejectsNestedPath(t *testing.T) {
 func TestHandlePublicStreamTrailingSlashOK(t *testing.T) {
 	tempDir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(tempDir, "pilot.yaml"), []byte(minimalCategorizedWorkflowYAML("")), 0o644)
-	server := &Server{store: NewMemoryStore(), configDir: tempDir, tmpl: parseTestTemplates(t)}
+	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
+	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/streams/pilot/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/"+key+"/", nil)
 	server.handlePublicStream(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -414,12 +421,13 @@ func TestNewMuxPublicStreamAndPublicPartialCoexist(t *testing.T) {
 		"  categorySlug: supply-chain\n  subCategorySlug: procurement\n",
 	)), 0o644)
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
 	seedPlatformAdminTaxonomy(t, store)
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 	mux := server.newMux()
 
 	recPage := httptest.NewRecorder()
-	mux.ServeHTTP(recPage, httptest.NewRequest(http.MethodGet, "/streams/pilot", nil))
+	mux.ServeHTTP(recPage, httptest.NewRequest(http.MethodGet, "/streams/"+key, nil))
 	if recPage.Code != http.StatusOK {
 		t.Fatalf("page status = %d", recPage.Code)
 	}
@@ -438,7 +446,7 @@ func TestHandlePublicStreamMethodAndPathGuards(t *testing.T) {
 	server := &Server{store: NewMemoryStore(), configDir: t.TempDir(), tmpl: parseTestTemplates(t)}
 
 	rec := httptest.NewRecorder()
-	server.handlePublicStream(rec, httptest.NewRequest(http.MethodPost, "/streams/pilot", nil))
+	server.handlePublicStream(rec, httptest.NewRequest(http.MethodPost, "/streams/any", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("POST status = %d", rec.Code)
 	}
@@ -510,9 +518,10 @@ func TestHandlePublicStreamProcessListError(t *testing.T) {
 		err:         errors.New("list failed"),
 	}
 	seedPlatformAdminTaxonomy(t, store.MemoryStore)
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 	rec := httptest.NewRecorder()
-	server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, "/streams/pilot", nil))
+	server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, "/streams/"+key, nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -524,12 +533,13 @@ func TestHandlePublicStreamSignedInUsesPageBaseForUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewMemoryStore()
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
 	seedPlatformAdminTaxonomy(t, store)
 	t.Setenv("ADMIN_EMAIL", "admin@example.com")
 	t.Setenv("ADMIN_PASSWORD", "change-me")
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t), identity: &fakeIdentityStore{}}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/streams/pilot", nil)
+	req := httptest.NewRequest(http.MethodGet, "/streams/"+key, nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: platformAdminSessionValue()})
 	server.handlePublicStream(rec, req)
 	if rec.Code != http.StatusOK {
@@ -561,9 +571,10 @@ func TestHandlePublicStreamCardViewListError(t *testing.T) {
 		err:         errors.New("card list failed"),
 	}
 	seedPlatformAdminTaxonomy(t, store.MemoryStore)
+	key := mustPackCatalogKey(t, store, tempDir, "Workflow")
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 	rec := httptest.NewRecorder()
-	server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, "/streams/pilot", nil))
+	server.handlePublicStream(rec, httptest.NewRequest(http.MethodGet, "/streams/"+key, nil))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}

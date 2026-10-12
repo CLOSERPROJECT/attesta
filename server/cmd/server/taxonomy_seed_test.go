@@ -314,17 +314,15 @@ func TestBootstrapTaxonomyNilStoreNoop(t *testing.T) {
 	}
 }
 
-func TestTaxonomyBootstrapSeedPath(t *testing.T) {
-	t.Setenv("CATEGORIES_SEED", "")
-	if got := taxonomyBootstrapSeedPath(""); got != filepath.Join("config", "categories.yaml") {
+func TestResolveCategoriesSeedPath(t *testing.T) {
+	if got := resolveCategoriesSeedPath("", ""); got != filepath.Join("config", "categories.yaml") {
 		t.Fatalf("empty configDir = %q", got)
 	}
-	if got := taxonomyBootstrapSeedPath("cfg"); got != filepath.Join("cfg", "categories.yaml") {
+	if got := resolveCategoriesSeedPath("", "cfg"); got != filepath.Join("cfg", "categories.yaml") {
 		t.Fatalf("configDir = %q", got)
 	}
-	t.Setenv("CATEGORIES_SEED", "/custom/categories.yaml")
-	if got := taxonomyBootstrapSeedPath("ignored"); got != "/custom/categories.yaml" {
-		t.Fatalf("CATEGORIES_SEED = %q", got)
+	if got := resolveCategoriesSeedPath("/custom/categories.yaml", "ignored"); got != "/custom/categories.yaml" {
+		t.Fatalf("explicit = %q", got)
 	}
 }
 

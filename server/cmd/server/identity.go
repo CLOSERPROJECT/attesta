@@ -15,6 +15,8 @@ type IdentityStore interface {
 	CreateOrganization(ctx context.Context, sessionSecret, name string) (IdentityOrg, error)
 	CreateOrganizationAsAdmin(ctx context.Context, name string) (IdentityOrg, error)
 	EnsurePlatformAdminAccount(ctx context.Context, email, password string) error
+	// Demo seed needs create-or-update when public signup is disabled.
+	EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error)
 	AcceptInvite(ctx context.Context, teamID, membershipID, userID, secret string) (IdentitySession, error)
 	CreateEmailPasswordSession(ctx context.Context, email, password string) (IdentitySession, error)
 	CreateRecovery(ctx context.Context, email, redirectURL string) error
@@ -33,11 +35,9 @@ type IdentityStore interface {
 	ListOrganizations(ctx context.Context) ([]IdentityOrg, error)
 	ListOrganizationsPage(ctx context.Context, opts IdentityOrgListOptions) (IdentityOrgPage, error)
 	ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
-	// ListOrganizationMembershipsLite lists memberships without user hydration.
-	// Prefer org.ID (Appwrite team ID) when known — e.g. from ListOrganizationsPage —
-	// so slug≠team-ID orgs still resolve without an unpaged ListOrganizations fallback.
+	// Prefer org.ID (Appwrite team ID) when known so slug≠team-ID orgs resolve without
+	// an unpaged ListOrganizations fallback.
 	ListOrganizationMembershipsLite(ctx context.Context, org IdentityOrg) ([]IdentityMembership, error)
-	// ListUserMemberships returns all team memberships for a user (confirmed and pending).
 	ListUserMemberships(ctx context.Context, userID string) ([]IdentityMembership, error)
 	ListOrganizationUsers(ctx context.Context, orgSlug string) ([]IdentityUser, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)

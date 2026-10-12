@@ -130,6 +130,7 @@ func TestCurrentUserPropagatesIdentityLookupError(t *testing.T) {
 }
 
 func TestRequestURLsAndCookieHelpers(t *testing.T) {
+	t.Setenv("PUBLIC_BASE_URL", "")
 	req := httptest.NewRequest(http.MethodGet, "http://attesta.local/", nil)
 	if got := requestBaseURL(req); got != "http://attesta.local" {
 		t.Fatalf("requestBaseURL = %q", got)
@@ -144,15 +145,13 @@ func TestRequestURLsAndCookieHelpers(t *testing.T) {
 		t.Fatalf("inviteRedirectURL = %q", got)
 	}
 
-	t.Setenv("APPWRITE_RESET_REDIRECT_URL", "https://app.example/reset/confirm")
+	t.Setenv("PUBLIC_BASE_URL", "https://app.example")
 	if got := resetRedirectURL(req); got != "https://app.example/reset/confirm" {
 		t.Fatalf("configured reset redirect = %q", got)
 	}
-	t.Setenv("APPWRITE_VERIFY_REDIRECT_URL", "https://app.example/verify/confirm")
 	if got := verifyRedirectURL(req); got != "https://app.example/verify/confirm" {
 		t.Fatalf("configured verify redirect = %q", got)
 	}
-	t.Setenv("APPWRITE_INVITE_REDIRECT_URL", "https://app.example/invite/accept")
 	if got := inviteRedirectURL(req); got != "https://app.example/invite/accept" {
 		t.Fatalf("configured invite redirect = %q", got)
 	}
