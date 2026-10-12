@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 )
@@ -82,43 +80,19 @@ func applyCatalogStreamCategoryAndName(yamlText, categorySlug, subCategorySlug, 
 }
 
 func loadCatalogStreamTemplateBodies(ctx context.Context, store Store, configDir string) ([]string, error) {
-	if store != nil {
-		streams, err := store.ListFormataBuilderStreams(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if len(streams) > 0 {
-			bodies := make([]string, 0, len(streams))
-			for _, s := range streams {
-				bodies = append(bodies, s.Stream)
-			}
-			return bodies, nil
-		}
-	}
-	dir := strings.TrimSpace(configDir)
-	if dir == "" {
-		dir = "config"
-	}
-	entries, err := os.ReadDir(dir)
+	sources, err := inspectWorkflowCatalogSources(ctx, store, configDir)
 	if err != nil {
-		return nil, fmt.Errorf("config dir not found: %w", err)
+		return nil, err
 	}
-	var paths []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	if len(sources.streams) > 0 {
+		bodies := make([]string, 0, len(sources.streams))
+		for _, stream := range sources.streams {
+			bodies = append(bodies, stream.Stream)
 		}
-		if !isWorkflowCatalogConfigFile(entry.Name()) {
-			continue
-		}
-		paths = append(paths, filepath.Join(dir, entry.Name()))
+		return bodies, nil
 	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("catalog stream seed: no template workflows found")
-	}
-	bodies := make([]string, 0, len(paths))
-	for _, path := range paths {
+	bodies := make([]string, 0, len(sources.paths))
+	for _, path := range sources.paths {
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
 			return nil, fmt.Errorf("read template %s: %w", path, readErr)

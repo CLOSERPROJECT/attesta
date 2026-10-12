@@ -82,7 +82,7 @@ func loadWorkflowCatalogResult(ctx context.Context, store Store, configDir strin
 	}, nil
 }
 
-// workflowCatalog is a mutex/cache adapter over loadWorkflowCatalog.
+// workflowCatalog is a mutex/cache adapter over loadWorkflowCatalogResult.
 func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
@@ -100,19 +100,19 @@ func (s *Server) workflowCatalog() (map[string]RuntimeConfig, error) {
 		return cloneWorkflowCatalog(s.catalog), nil
 	}
 
-	catalog, cacheable, err := buildWorkflowCatalog(ctx, s.store, sources)
+	loaded, err := loadWorkflowCatalogResult(ctx, s.store, s.configDir)
 	if err != nil {
 		return nil, err
 	}
-	if cacheable {
-		s.catalog = catalog
-		s.catalogModTime = sources.modTimes
-		s.catalogTaxonomyRev = taxRev
+	if loaded.cacheable {
+		s.catalog = loaded.catalog
+		s.catalogModTime = loaded.modTimes
+		s.catalogTaxonomyRev = loaded.taxRev
 	} else {
 		s.catalog = nil
 		s.catalogModTime = nil
 	}
-	return cloneWorkflowCatalog(catalog), nil
+	return cloneWorkflowCatalog(loaded.catalog), nil
 }
 
 func inspectWorkflowCatalogSources(ctx context.Context, store Store, configDir string) (workflowCatalogSources, error) {
