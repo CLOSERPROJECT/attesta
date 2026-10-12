@@ -807,10 +807,7 @@ func main() {
 		turnstileClient:    http.DefaultClient,
 	}
 	server.process = &ProcessService{store: server.store, now: server.now}
-	if err := bootstrapTaxonomy(ctx, server.store, configDir); err != nil {
-		log.Fatal(err)
-	}
-	if err := bootstrapFormataBuilderStreams(ctx, server.store, configDir, server.now); err != nil {
+	if err := ensureEmptyConfigFoundation(ctx, server.store, configDir, server.now); err != nil {
 		log.Fatal(err)
 	}
 	if err := server.bootstrapPlatformAdminIdentity(ctx); err != nil {
@@ -1414,64 +1411,6 @@ func (s *Server) accountUserFromIdentity(ctx context.Context, identityUser Ident
 		user.Status = "active"
 	}
 	return user
-}
-
-func bootstrapFormataBuilderStreams(ctx context.Context, store Store, configDir string, now func() time.Time) error {
-	if store == nil {
-		return nil
-	}
-	existing, err := store.ListFormataBuilderStreams(ctx)
-	if err != nil {
-		return err
-	}
-	if len(existing) > 0 {
-		return nil
-	}
-
-	dir := strings.TrimSpace(configDir)
-	if dir == "" {
-		dir = "config"
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("config dir not found: %w", err)
-	}
-	paths := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !isWorkflowCatalogConfigFile(name) {
-			continue
-		}
-		paths = append(paths, filepath.Join(dir, name))
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return errors.New("workflow config catalog is empty")
-	}
-
-	updatedAt := time.Now().UTC()
-	if now != nil {
-		updatedAt = now().UTC()
-	}
-	for _, path := range paths {
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return fmt.Errorf("read config %s: %w", path, readErr)
-		}
-		creatorID := platformAdminStreamUserID()
-		if _, saveErr := store.SaveFormataBuilderStream(ctx, FormataBuilderStream{
-			Stream:          string(data),
-			UpdatedAt:       updatedAt,
-			CreatedByUserID: creatorID,
-			UpdatedByUserID: creatorID,
-		}); saveErr != nil {
-			return fmt.Errorf("seed formata stream %s: %w", filepath.Base(path), saveErr)
-		}
-	}
-	return nil
 }
 
 func attachmentMaxBytes() int64 {

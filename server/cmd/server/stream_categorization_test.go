@@ -415,7 +415,7 @@ func TestIsWorkflowCatalogConfigFile(t *testing.T) {
 	}
 }
 
-func TestBootstrapFormataBuilderStreamsSkipsTaxonomySeedFile(t *testing.T) {
+func TestEnsureEmptyConfigFoundationSkipsTaxonomySeedFileForFormata(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "formata")
 	seed := "categories:\n  - slug: supply-chain\n    name: Supply Chain\n    icon: batch-traceability\n    sortOrder: 1\n"
@@ -424,8 +424,8 @@ func TestBootstrapFormataBuilderStreamsSkipsTaxonomySeedFile(t *testing.T) {
 	}
 
 	store := NewMemoryStore()
-	if err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil); err != nil {
-		t.Fatalf("bootstrapFormataBuilderStreams: %v", err)
+	if err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, nil); err != nil {
+		t.Fatalf("ensureEmptyConfigFoundation: %v", err)
 	}
 	streams, err := store.ListFormataBuilderStreams(t.Context())
 	if err != nil {

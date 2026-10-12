@@ -187,17 +187,17 @@ func TestWorkflowCatalogUsesFormataBuilderStreamsWhenAvailable(t *testing.T) {
 	}
 }
 
-func TestBootstrapFormataBuilderStreamsSeedsFromConfigWhenEmpty(t *testing.T) {
+func TestEnsureEmptyConfigFoundationSeedsFormataFromConfigWhenEmpty(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 	writeWorkflowConfig(t, filepath.Join(tempDir, "secondary.yaml"), "Secondary workflow", "string")
 
 	store := NewMemoryStore()
-	err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, func() time.Time {
+	err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, func() time.Time {
 		return time.Date(2026, 3, 6, 17, 0, 0, 0, time.UTC)
 	})
 	if err != nil {
-		t.Fatalf("bootstrapFormataBuilderStreams: %v", err)
+		t.Fatalf("ensureEmptyConfigFoundation: %v", err)
 	}
 
 	streams, err := store.ListFormataBuilderStreams(t.Context())
@@ -226,7 +226,7 @@ func TestBootstrapFormataBuilderStreamsSeedsFromConfigWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestBootstrapFormataBuilderStreamsNoopWhenAlreadySeeded(t *testing.T) {
+func TestEnsureEmptyConfigFoundationFormataNoopWhenAlreadySeeded(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string")
 
@@ -239,8 +239,8 @@ func TestBootstrapFormataBuilderStreamsNoopWhenAlreadySeeded(t *testing.T) {
 		t.Fatalf("SaveFormataBuilderStream: %v", err)
 	}
 
-	if err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, time.Now); err != nil {
-		t.Fatalf("bootstrapFormataBuilderStreams: %v", err)
+	if err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, time.Now); err != nil {
+		t.Fatalf("ensureEmptyConfigFoundation: %v", err)
 	}
 	streams, err := store.ListFormataBuilderStreams(t.Context())
 	if err != nil {
@@ -254,16 +254,16 @@ func TestBootstrapFormataBuilderStreamsNoopWhenAlreadySeeded(t *testing.T) {
 	}
 }
 
-func TestBootstrapFormataBuilderStreamsEdgeCases(t *testing.T) {
+func TestEnsureEmptyConfigFoundationFormataEdgeCases(t *testing.T) {
 	t.Run("nil store", func(t *testing.T) {
-		if err := bootstrapFormataBuilderStreams(t.Context(), nil, t.TempDir(), nil); err != nil {
-			t.Fatalf("bootstrapFormataBuilderStreams nil store: %v", err)
+		if err := ensureEmptyConfigFoundation(t.Context(), nil, t.TempDir(), nil); err != nil {
+			t.Fatalf("ensureEmptyConfigFoundation nil store: %v", err)
 		}
 	})
 
 	t.Run("missing config dir", func(t *testing.T) {
 		store := NewMemoryStore()
-		err := bootstrapFormataBuilderStreams(t.Context(), store, filepath.Join(t.TempDir(), "missing"), nil)
+		err := ensureEmptyConfigFoundation(t.Context(), store, filepath.Join(t.TempDir(), "missing"), nil)
 		if err == nil {
 			t.Fatal("expected missing config dir error")
 		}
@@ -278,7 +278,7 @@ func TestBootstrapFormataBuilderStreamsEdgeCases(t *testing.T) {
 			t.Fatalf("write note.txt: %v", err)
 		}
 		store := NewMemoryStore()
-		err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil)
+		err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, nil)
 		if err == nil {
 			t.Fatal("expected empty workflow catalog error")
 		}
@@ -294,7 +294,7 @@ func TestBootstrapFormataBuilderStreamsEdgeCases(t *testing.T) {
 			MemoryStore: NewMemoryStore(),
 			err:         errors.New("save failed"),
 		}
-		err := bootstrapFormataBuilderStreams(t.Context(), store, tempDir, nil)
+		err := ensureEmptyConfigFoundation(t.Context(), store, tempDir, nil)
 		if err == nil {
 			t.Fatal("expected save error")
 		}
