@@ -13,9 +13,27 @@ import (
 // When this organization already exists and Replace is false, Seed is a no-op.
 const demoFixtureMarkerOrgSlug = "organization-1"
 
+// seedIdentity is the Seed-facing slice of IdentityStore: only methods
+// Seed / seedDemoIdentity / ensureDemo* call. Full IdentityStore remains the
+// HTTP and session surface; IdentityStore values assign into SeedDeps.
+type seedIdentity interface {
+	GetOrganizationBySlug(ctx context.Context, slug string) (*IdentityOrg, error)
+	DeleteOrganizationAsAdmin(ctx context.Context, orgSlug string) error
+	UpdateOrganizationAsAdmin(ctx context.Context, currentSlug, name, logoFileID string, roles []IdentityRole) (IdentityOrg, error)
+	CreateOrganizationAsAdmin(ctx context.Context, name string) (IdentityOrg, error)
+	UpdateEmailVerification(ctx context.Context, userID string, verified bool) error
+	UpdateUserLabels(ctx context.Context, userID string, labels []string) (IdentityUser, error)
+	EnsureUserAccount(ctx context.Context, email, password, name string) (IdentityUser, error)
+	GetUserByEmail(ctx context.Context, email string) (IdentityUser, error)
+	ListOrganizationMemberships(ctx context.Context, orgSlug string) ([]IdentityMembership, error)
+	AddOrganizationUserByIDAsAdmin(ctx context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error)
+}
+
+var _ seedIdentity = (*appwriteIdentity)(nil)
+
 // SeedDeps is the injectable seam for the unified demo fixture seeder.
 type SeedDeps struct {
-	Identity IdentityStore
+	Identity seedIdentity
 	Store    Store
 	// ConfigDir holds workflow YAMLs and categories.yaml (default: WORKFLOW_CONFIG_DIR).
 	ConfigDir string
@@ -106,7 +124,7 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	return nil
 }
 
-func seedDemoIdentity(ctx context.Context, identity IdentityStore, fixture demoFixture, replace bool) error {
+func seedDemoIdentity(ctx context.Context, identity seedIdentity, fixture demoFixture, replace bool) error {
 	if replace {
 		for _, org := range fixture.Orgs {
 			slug := demoOrgSlug(org.Name)
@@ -179,7 +197,7 @@ func seedDemoIdentity(ctx context.Context, identity IdentityStore, fixture demoF
 	return nil
 }
 
-func ensureDemoFixtureUser(ctx context.Context, identity IdentityStore, userDef demoFixtureUser) (IdentityUser, error) {
+func ensureDemoFixtureUser(ctx context.Context, identity seedIdentity, userDef demoFixtureUser) (IdentityUser, error) {
 	email := strings.ToLower(strings.TrimSpace(userDef.Email))
 	password := strings.TrimSpace(userDef.Password)
 	if email == "" || password == "" {
@@ -199,7 +217,7 @@ func ensureDemoFixtureUser(ctx context.Context, identity IdentityStore, userDef 
 	return user, nil
 }
 
-func ensureDemoOrgMembership(ctx context.Context, identity IdentityStore, orgSlug string, user IdentityUser, roleSlugs []string, isOrgAdmin bool) error {
+func ensureDemoOrgMembership(ctx context.Context, identity seedIdentity, orgSlug string, user IdentityUser, roleSlugs []string, isOrgAdmin bool) error {
 	memberships, err := identity.ListOrganizationMemberships(ctx, orgSlug)
 	if err != nil {
 		return fmt.Errorf("seed identity: list memberships %s: %w", orgSlug, err)

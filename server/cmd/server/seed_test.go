@@ -282,8 +282,8 @@ func TestSeedReplaceRewritesWhenMarkerPresent(t *testing.T) {
 	}
 }
 
+// seedFakeIdentity implements only seedIdentity for Seed tests.
 type seedFakeIdentity struct {
-	fakeIdentityStore
 	orgs         map[string]IdentityOrg
 	usersByEmail map[string]IdentityUser
 	usersByID    map[string]IdentityUser
@@ -291,121 +291,125 @@ type seedFakeIdentity struct {
 	nextUser     int
 }
 
+var _ seedIdentity = (*seedFakeIdentity)(nil)
+
 func newSeedFakeIdentity() *seedFakeIdentity {
-	s := &seedFakeIdentity{
+	return &seedFakeIdentity{
 		orgs:         map[string]IdentityOrg{},
 		usersByEmail: map[string]IdentityUser{},
 		usersByID:    map[string]IdentityUser{},
 		memberships:  map[string][]IdentityMembership{},
 	}
-	s.getOrganizationBySlugFunc = func(_ context.Context, slug string) (*IdentityOrg, error) {
-		org, ok := s.orgs[slug]
-		if !ok {
-			return nil, ErrIdentityNotFound
-		}
-		cp := org
-		return &cp, nil
+}
+
+func (s *seedFakeIdentity) GetOrganizationBySlug(_ context.Context, slug string) (*IdentityOrg, error) {
+	org, ok := s.orgs[slug]
+	if !ok {
+		return nil, ErrIdentityNotFound
 	}
-	s.createOrganizationAsAdminFunc = func(_ context.Context, name string) (IdentityOrg, error) {
-		slug := canonifySlug(name)
-		id := appwriteTeamIDFromSlug(slug)
-		org := IdentityOrg{ID: id, Slug: slug, Name: strings.TrimSpace(name), Roles: []IdentityRole{defaultOperatorCatalogRole()}}
-		s.orgs[slug] = org
-		return org, nil
+	cp := org
+	return &cp, nil
+}
+
+func (s *seedFakeIdentity) CreateOrganizationAsAdmin(_ context.Context, name string) (IdentityOrg, error) {
+	slug := canonifySlug(name)
+	id := appwriteTeamIDFromSlug(slug)
+	org := IdentityOrg{ID: id, Slug: slug, Name: strings.TrimSpace(name), Roles: []IdentityRole{defaultOperatorCatalogRole()}}
+	s.orgs[slug] = org
+	return org, nil
+}
+
+func (s *seedFakeIdentity) UpdateOrganizationAsAdmin(_ context.Context, currentSlug, name, _ string, roles []IdentityRole) (IdentityOrg, error) {
+	org, ok := s.orgs[currentSlug]
+	if !ok {
+		return IdentityOrg{}, ErrIdentityNotFound
 	}
-	s.updateOrganizationAsAdminFunc = func(_ context.Context, currentSlug, name, _ string, roles []IdentityRole) (IdentityOrg, error) {
-		org, ok := s.orgs[currentSlug]
-		if !ok {
-			return IdentityOrg{}, ErrIdentityNotFound
-		}
-		org.Name = strings.TrimSpace(name)
-		org.Slug = canonifySlug(name)
-		org.Roles = append([]IdentityRole(nil), roles...)
-		delete(s.orgs, currentSlug)
-		s.orgs[org.Slug] = org
-		return org, nil
+	org.Name = strings.TrimSpace(name)
+	org.Slug = canonifySlug(name)
+	org.Roles = append([]IdentityRole(nil), roles...)
+	delete(s.orgs, currentSlug)
+	s.orgs[org.Slug] = org
+	return org, nil
+}
+
+func (s *seedFakeIdentity) DeleteOrganizationAsAdmin(_ context.Context, orgSlug string) error {
+	delete(s.orgs, orgSlug)
+	delete(s.memberships, orgSlug)
+	return nil
+}
+
+func (s *seedFakeIdentity) EnsureUserAccount(_ context.Context, email, password, name string) (IdentityUser, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" || strings.TrimSpace(password) == "" {
+		return IdentityUser{}, nil
 	}
-	s.deleteOrganizationAsAdminFunc = func(_ context.Context, orgSlug string) error {
-		delete(s.orgs, orgSlug)
-		delete(s.memberships, orgSlug)
-		return nil
-	}
-	s.ensureUserAccountFunc = func(_ context.Context, email, password, name string) (IdentityUser, error) {
-		email = strings.ToLower(strings.TrimSpace(email))
-		if email == "" || strings.TrimSpace(password) == "" {
-			return IdentityUser{}, nil
-		}
-		if user, ok := s.usersByEmail[email]; ok {
-			return user, nil
-		}
-		_ = name
-		s.nextUser++
-		id := "user-" + strings.ReplaceAll(email, "@", "-")
-		if strings.Contains(email, "platform_admin") {
-			id = "user-platform-admin"
-		}
-		user := IdentityUser{ID: id, Email: email}
-		s.putUser(user)
+	if user, ok := s.usersByEmail[email]; ok {
 		return user, nil
 	}
-	s.getUserByEmailFunc = func(_ context.Context, email string) (IdentityUser, error) {
-		user, ok := s.usersByEmail[strings.ToLower(strings.TrimSpace(email))]
-		if !ok {
-			return IdentityUser{}, ErrIdentityNotFound
-		}
-		return user, nil
+	_ = name
+	s.nextUser++
+	id := "user-" + strings.ReplaceAll(email, "@", "-")
+	if strings.Contains(email, "platform_admin") {
+		id = "user-platform-admin"
 	}
-	s.getUserByIDFunc = func(_ context.Context, userID string) (IdentityUser, error) {
-		user, ok := s.usersByID[userID]
-		if !ok {
-			return IdentityUser{}, ErrIdentityNotFound
-		}
-		return user, nil
+	user := IdentityUser{ID: id, Email: email}
+	s.putUser(user)
+	return user, nil
+}
+
+func (s *seedFakeIdentity) GetUserByEmail(_ context.Context, email string) (IdentityUser, error) {
+	user, ok := s.usersByEmail[strings.ToLower(strings.TrimSpace(email))]
+	if !ok {
+		return IdentityUser{}, ErrIdentityNotFound
 	}
-	s.updateEmailVerificationFunc = func(_ context.Context, userID string, verified bool) error {
-		user, ok := s.usersByID[userID]
-		if !ok {
-			return ErrIdentityNotFound
-		}
-		user.EmailVerified = verified
-		s.putUser(user)
-		return nil
+	return user, nil
+}
+
+func (s *seedFakeIdentity) UpdateEmailVerification(_ context.Context, userID string, verified bool) error {
+	user, ok := s.usersByID[userID]
+	if !ok {
+		return ErrIdentityNotFound
 	}
-	s.addOrganizationUserByIDAsAdminFunc = func(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
-		if _, ok := s.orgs[orgSlug]; !ok {
-			return IdentityMembership{}, ErrIdentityNotFound
-		}
-		user, ok := s.usersByID[userID]
-		if !ok {
-			return IdentityMembership{}, ErrIdentityNotFound
-		}
-		m := IdentityMembership{
-			ID:         "m-" + userID + "-" + orgSlug,
-			TeamID:     s.orgs[orgSlug].ID,
-			OrgSlug:    orgSlug,
-			UserID:     userID,
-			Email:      user.Email,
-			RoleSlugs:  append([]string(nil), roleSlugs...),
-			IsOrgAdmin: isOrgAdmin,
-			Confirmed:  true,
-		}
-		s.memberships[orgSlug] = append(s.memberships[orgSlug], m)
-		return m, nil
+	user.EmailVerified = verified
+	s.putUser(user)
+	return nil
+}
+
+func (s *seedFakeIdentity) AddOrganizationUserByIDAsAdmin(_ context.Context, orgSlug, userID string, roleSlugs []string, isOrgAdmin bool) (IdentityMembership, error) {
+	if _, ok := s.orgs[orgSlug]; !ok {
+		return IdentityMembership{}, ErrIdentityNotFound
 	}
-	s.listOrganizationMembershipsFunc = func(_ context.Context, orgSlug string) ([]IdentityMembership, error) {
-		return append([]IdentityMembership(nil), s.memberships[orgSlug]...), nil
+	user, ok := s.usersByID[userID]
+	if !ok {
+		return IdentityMembership{}, ErrIdentityNotFound
 	}
-	s.updateUserLabelsFunc = func(_ context.Context, userID string, labels []string) (IdentityUser, error) {
-		user, ok := s.usersByID[userID]
-		if !ok {
-			return IdentityUser{}, ErrIdentityNotFound
-		}
-		user.Labels = append([]string(nil), labels...)
-		user.IsOrgAdmin = hasIdentityLabel(labels, identityOrgAdminLabel)
-		s.putUser(user)
-		return user, nil
+	m := IdentityMembership{
+		ID:         "m-" + userID + "-" + orgSlug,
+		TeamID:     s.orgs[orgSlug].ID,
+		OrgSlug:    orgSlug,
+		UserID:     userID,
+		Email:      user.Email,
+		RoleSlugs:  append([]string(nil), roleSlugs...),
+		IsOrgAdmin: isOrgAdmin,
+		Confirmed:  true,
 	}
-	return s
+	s.memberships[orgSlug] = append(s.memberships[orgSlug], m)
+	return m, nil
+}
+
+func (s *seedFakeIdentity) ListOrganizationMemberships(_ context.Context, orgSlug string) ([]IdentityMembership, error) {
+	return append([]IdentityMembership(nil), s.memberships[orgSlug]...), nil
+}
+
+func (s *seedFakeIdentity) UpdateUserLabels(_ context.Context, userID string, labels []string) (IdentityUser, error) {
+	user, ok := s.usersByID[userID]
+	if !ok {
+		return IdentityUser{}, ErrIdentityNotFound
+	}
+	user.Labels = append([]string(nil), labels...)
+	user.IsOrgAdmin = hasIdentityLabel(labels, identityOrgAdminLabel)
+	s.putUser(user)
+	return user, nil
 }
 
 func (s *seedFakeIdentity) putUser(user IdentityUser) {
