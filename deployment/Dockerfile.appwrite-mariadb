@@ -1,3 +1,0 @@
-# Passthrough for Coolify: previews still request this Dockerfile path from
-# older stored compose/build metadata. No seed files — demo data is Go seed.
-FROM mariadb:10.11

@@ -105,7 +105,7 @@ Coolify-specific notes:
 - Coolify owns public routing (no Traefik in this compose). Expose Appwrite with Coolify `SERVICE_FQDN_APPWRITE` / `SERVICE_URL_*` on the Appwrite services.
 - Attesta's compose default reaches Appwrite at `https://${SERVICE_FQDN_APPWRITE}/v1` (public FQDN). Prefer that when the browser and server must share the same Appwrite origin.
 - The `appwrite` healthcheck sends `Host: $_APP_DOMAIN` so preview stacks (where bare `localhost` returns 404) still report healthy.
-- MariaDB is stock `mariadb:10.11` via a passthrough `deployment/Dockerfile.appwrite-mariadb` (Coolify preview build compatibility; no SQL seed). Demo identity data comes from the Go seed after console bootstrap.
+- MariaDB uses stock `image: mariadb:10.11` (same as the local Appwrite baseline). Demo identity data comes from the Go seed after console bootstrap.
 
 ### Coolify Preview env checklist
 Set these on the `attesta` service for automatic Appwrite project + demo fixture:
