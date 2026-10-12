@@ -275,22 +275,21 @@ services:
       MONGODB_URI: mongodb://${SERVICE_NAME_MONGODB:-mongodb}:27017
       CERBOS_URL: http://${SERVICE_NAME_CERBOS:-cerbos}:3592
       APPWRITE_ENDPOINT: https://${SERVICE_FQDN_APPWRITE:-appwrite}/v1
-      APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID:-attesta}
-      # Optional on Preview: attesta prepare regenerates when missing/stale.
-      APPWRITE_API_KEY: ${APPWRITE_API_KEY:-}
-      APPWRITE_CONSOLE_EMAIL: ${APPWRITE_CONSOLE_EMAIL:-admin@appwrite.local}
-      APPWRITE_CONSOLE_PASSWORD: ${APPWRITE_CONSOLE_PASSWORD:-admin@appwrite.local}
-      APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET:-org-assets}
-      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?}
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?}
+      # Self-ref ${KEY} only (no :- / :?): Coolify bakes ${KEY:-default} into deployable
+      # from Production DB and ignores Preview. Defaults live in Coolify UI / Go (prepare).
+      APPWRITE_PROJECT_ID: ${APPWRITE_PROJECT_ID}
+      APPWRITE_API_KEY: ${APPWRITE_API_KEY}
+      APPWRITE_CONSOLE_EMAIL: ${APPWRITE_CONSOLE_EMAIL}
+      APPWRITE_CONSOLE_PASSWORD: ${APPWRITE_CONSOLE_PASSWORD}
+      APPWRITE_ORG_ASSETS_BUCKET: ${APPWRITE_ORG_ASSETS_BUCKET}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY}
       SMTP_HOST: ${SERVICE_HOST_SMTP:-}
       SMTP_PORT: ${SERVICE_PORT_SMTP:-587}
       SMTP_USER: ${SERVICE_USERNAME_SMTP:-}
       SMTP_PASSWORD: ${SERVICE_PASSWORD_SMTP:-}
       SMTP_FROM: ${ATTESTA_SMTP_FROM:-attesta@apps.forkbomb.eu}
       SMTP_SECURE: ${SERVICE_SECURE_SMTP:-}
-      # Keep ${VAR} (no :-default): Coolify inlines :-defaults from Production into
-      # deployable compose and ignores Preview UI. Set Preview=true, Production=false/empty.
       ATTESTA_SEED: ${ATTESTA_SEED}
       ATTESTA_ROOT_DIR: /app
       SERVICE_FQDN_ATTESTA_3000:
