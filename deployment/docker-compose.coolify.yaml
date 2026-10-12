@@ -208,11 +208,7 @@ services:
       retries: 3
 
   appwrite-mariadb:
-    # Build passthrough (Dockerfile.appwrite-mariadb → stock MariaDB) so Coolify
-    # previews that still target this Dockerfile path succeed. No SQL seed.
-    build:
-      context: .
-      dockerfile: deployment/Dockerfile.appwrite-mariadb
+    image: mariadb:10.11
     container_name: appwrite-mariadb
     networks:
       default:
