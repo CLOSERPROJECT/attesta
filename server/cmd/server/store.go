@@ -31,6 +31,9 @@ type Store interface {
 	ListRecentProcessesByWorkflow(ctx context.Context, workflowKey string, limit int64) ([]Process, error)
 	HasProcessesByWorkflow(ctx context.Context, workflowKey string) (bool, error)
 	UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error
+	// UpdateProcessProgressBatch sets multiple Substep progress entries in one write
+	// (one Mongo document $set). Keys are Substep IDs (dotted); encoding is applied inside.
+	UpdateProcessProgressBatch(ctx context.Context, id primitive.ObjectID, workflowKey string, progressBySubstepID map[string]ProcessStep) error
 	UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error
 	UpdateProcessTermination(ctx context.Context, id primitive.ObjectID, workflowKey string, termination ProcessTermination) error
 	UpdateProcessDPP(ctx context.Context, id primitive.ObjectID, workflowKey string, dpp ProcessDPP) error
@@ -434,6 +437,17 @@ func (s *MongoStore) UpdateProcessProgress(ctx context.Context, id primitive.Obj
 	return s.database().Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": id}, update).Err()
 }
 
+func (s *MongoStore) UpdateProcessProgressBatch(ctx context.Context, id primitive.ObjectID, workflowKey string, progressBySubstepID map[string]ProcessStep) error {
+	if len(progressBySubstepID) == 0 {
+		return nil
+	}
+	setFields := bson.M{"workflowKey": workflowKey}
+	for substepID, progress := range progressBySubstepID {
+		setFields["progress."+encodeProgressKey(substepID)] = progress
+	}
+	return s.database().Collection("processes").FindOneAndUpdate(ctx, bson.M{"_id": id}, bson.M{"$set": setFields}).Err()
+}
+
 func (s *MongoStore) UpdateProcessStatus(ctx context.Context, id primitive.ObjectID, workflowKey, status string) error {
 	_, err := s.database().Collection("processes").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"status": status, "workflowKey": workflowKey}})
 	return err
@@ -775,6 +789,30 @@ func (s *MemoryStore) UpdateProcessProgress(_ context.Context, id primitive.Obje
 	}
 	process.WorkflowKey = strings.TrimSpace(workflowKey)
 	process.Progress[encodeProgressKey(substepID)] = cloneProcessStep(progress)
+	s.processes[id] = process
+	return nil
+}
+
+func (s *MemoryStore) UpdateProcessProgressBatch(_ context.Context, id primitive.ObjectID, workflowKey string, progressBySubstepID map[string]ProcessStep) error {
+	if s.UpdateProgressErr != nil {
+		return s.UpdateProgressErr
+	}
+	if len(progressBySubstepID) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	process, ok := s.processes[id]
+	if !ok {
+		return mongo.ErrNoDocuments
+	}
+	if process.Progress == nil {
+		process.Progress = map[string]ProcessStep{}
+	}
+	process.WorkflowKey = strings.TrimSpace(workflowKey)
+	for substepID, progress := range progressBySubstepID {
+		process.Progress[encodeProgressKey(substepID)] = cloneProcessStep(progress)
+	}
 	s.processes[id] = process
 	return nil
 }

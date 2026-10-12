@@ -101,6 +101,18 @@ func (p *ProcessService) SealStep(ctx context.Context, cmd SealStepCmd) (*Proces
 	return p.completionStrategy(cmd.Config.Workflow).SealStep(ctx, cmd)
 }
 
+// doneSubstepProgress builds the terminal done progress entry for a Substep leaf.
+func doneSubstepProgress(description string, actor Actor, payload map[string]interface{}, now time.Time) ProcessStep {
+	desc := description
+	return ProcessStep{
+		State:       "done",
+		Description: &desc,
+		DoneAt:      &now,
+		DoneBy:      &actor,
+		Data:        payload,
+	}
+}
+
 // persistDoneSubstep marks a Substep done and inserts its notarization record.
 // Callers prepare the actor (classic DoneBy vs sealActor) and keep finalize/reload.
 func (p *ProcessService) persistDoneSubstep(
@@ -113,13 +125,7 @@ func (p *ProcessService) persistDoneSubstep(
 	payload map[string]interface{},
 	now time.Time,
 ) error {
-	progressUpdate := ProcessStep{
-		State:       "done",
-		Description: &description,
-		DoneAt:      &now,
-		DoneBy:      &actor,
-		Data:        payload,
-	}
+	progressUpdate := doneSubstepProgress(description, actor, payload, now)
 	if err := p.store.UpdateProcessProgress(ctx, processID, workflowKey, substepID, progressUpdate); err != nil {
 		return fmt.Errorf("%w: %v", ErrProgressUpdate, err)
 	}
@@ -136,6 +142,27 @@ func (p *ProcessService) persistDoneSubstep(
 	}
 	if err := p.store.InsertNotarization(ctx, notary); err != nil {
 		return fmt.Errorf("%w: %v", ErrNotarization, err)
+	}
+	return nil
+}
+
+// persistSealedSubsteps writes every sealed leaf's progress in one batch, then inserts
+// notarizations. Progress is all-or-nothing at the document level; a notarization
+// failure after progress leaves the Step fully done so a later Seal fails closed.
+func (p *ProcessService) persistSealedSubsteps(
+	ctx context.Context,
+	processID primitive.ObjectID,
+	workflowKey string,
+	progressBySubstepID map[string]ProcessStep,
+	notaries []Notarization,
+) error {
+	if err := p.store.UpdateProcessProgressBatch(ctx, processID, workflowKey, progressBySubstepID); err != nil {
+		return fmt.Errorf("%w: %v", ErrProgressUpdate, err)
+	}
+	for _, notary := range notaries {
+		if err := p.store.InsertNotarization(ctx, notary); err != nil {
+			return fmt.Errorf("%w: %v", ErrNotarization, err)
+		}
 	}
 	return nil
 }

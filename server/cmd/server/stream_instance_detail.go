@@ -106,8 +106,8 @@ const (
 	draftAndSealLockedReason   = "Locked by a prior Step"
 	draftAndSealDraftingLabel  = "drafting"
 	draftAndSealSealedLabel    = "sealed"
-	draftAndSealDraftingNotice = "Kind Substeps can be drafted in parallel. Saves do not freeze or notarize. Seal this Step to close the production day."
-	draftAndSealSealedNotice   = "This Step is sealed. Kind Substeps are frozen evidence."
+	draftAndSealDraftingNotice = "Substeps in this Step can be drafted in parallel. Saves do not freeze or notarize. Seal this Step to close the production day."
+	draftAndSealSealedNotice   = "This Step is sealed. Substeps are frozen evidence."
 )
 
 // applyDraftAndSealChrome owns draft-and-seal view chrome for Stream instance detail:

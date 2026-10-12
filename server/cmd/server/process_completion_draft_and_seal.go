@@ -119,6 +119,10 @@ func (s draftAndSealCompletionStrategy) SealStep(ctx context.Context, cmd SealSt
 	if stepAllSubstepsDone(step, cmd.Process) {
 		return nil, ErrSealAlreadySealed
 	}
+	// Fail closed on a torn Step: some leaves done, peers still open. Do not "seal the remainder."
+	if stepAnySubstepDone(step, cmd.Process) {
+		return nil, ErrSealAlreadySealed
+	}
 	if isProcessClosed(cmd.Config.Workflow, cmd.Process) {
 		return nil, fmt.Errorf("stream instance is closed")
 	}
@@ -129,14 +133,27 @@ func (s draftAndSealCompletionStrategy) SealStep(ctx context.Context, cmd SealSt
 	}
 	sealer := sealActor(cmd.Actor)
 
-	for _, sub := range sortedSubsteps(step) {
-		if progressEntryDone(cmd.Process, sub.SubstepID) {
-			continue
-		}
-		payload := sealedSubstepPayload(cmd.Process, sub.SubstepID)
-		if err := s.svc.persistDoneSubstep(ctx, cmd.Process.ID, cmd.WorkflowKey, sub.SubstepID, sub.InputKey, sealer, payload, now); err != nil {
-			return cmd.Process, err
-		}
+	subs := sortedSubsteps(step)
+	progressBySubstep := make(map[string]ProcessStep, len(subs))
+	notaries := make([]Notarization, 0, len(subs))
+	for _, sub := range subs {
+		payload := sealedSubstepPayload(cmd.Process, sub)
+		progressBySubstep[sub.SubstepID] = doneSubstepProgress(sub.InputKey, sealer, payload, now)
+		notaries = append(notaries, Notarization{
+			ProcessID: cmd.Process.ID,
+			SubstepID: sub.SubstepID,
+			Payload:   payload,
+			Actor:     sealer,
+			CreatedAt: now,
+			FakeNotary: FakeNotary{
+				Method: "sha256",
+				Digest: digestPayload(payload),
+			},
+		})
+	}
+
+	if err := s.svc.persistSealedSubsteps(ctx, cmd.Process.ID, cmd.WorkflowKey, progressBySubstep, notaries); err != nil {
+		return cmd.Process, err
 	}
 
 	reloaded, err := s.svc.reloadProcess(ctx, cmd.Process.ID)
@@ -195,15 +212,36 @@ func sealActor(actor Actor) Actor {
 	return out
 }
 
-func sealedSubstepPayload(process *Process, substepID string) map[string]interface{} {
-	if process == nil {
-		return map[string]interface{}{}
+// sealedSubstepPayload returns the Substep's draft data when present; otherwise an
+// empty Formata payload with array fields from the blueprint schema (or InputKey).
+func sealedSubstepPayload(process *Process, sub WorkflowSub) map[string]interface{} {
+	if process != nil {
+		if entry, ok := process.Progress[sub.SubstepID]; ok && entry.Data != nil {
+			return entry.Data
+		}
 	}
-	entry, ok := process.Progress[substepID]
-	if !ok || entry.Data == nil {
-		return map[string]interface{}{}
+	return emptyFormataArrayPayload(sub)
+}
+
+// emptyFormataArrayPayload builds a never-drafted seal payload: each Formata array
+// property from the Substep schema is an empty array. Falls back to InputKey when
+// the schema has no array properties. Does not invent keys from titles or IDs.
+func emptyFormataArrayPayload(sub WorkflowSub) map[string]interface{} {
+	out := map[string]interface{}{}
+	props, _ := sub.Schema["properties"].(map[string]interface{})
+	for name, rawProp := range props {
+		prop, ok := rawProp.(map[string]interface{})
+		if !ok || schemaType(prop) != "array" {
+			continue
+		}
+		out[name] = []interface{}{}
 	}
-	return entry.Data
+	if len(out) == 0 {
+		if key := strings.TrimSpace(sub.InputKey); key != "" {
+			out[key] = []interface{}{}
+		}
+	}
+	return out
 }
 
 func progressEntryDone(process *Process, substepID string) bool {
@@ -225,6 +263,15 @@ func stepAllSubstepsDone(step WorkflowStep, process *Process) bool {
 		}
 	}
 	return true
+}
+
+func stepAnySubstepDone(step WorkflowStep, process *Process) bool {
+	for _, sub := range sortedSubsteps(step) {
+		if progressEntryDone(process, sub.SubstepID) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateDraftFormataPayload enforces row/field rules from the Substep Formata schema.

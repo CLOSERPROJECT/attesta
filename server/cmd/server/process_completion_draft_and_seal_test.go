@@ -554,11 +554,21 @@ func TestDraftAndSealSealStepEmptyKinds(t *testing.T) {
 	if got, ok := sealed.Progress["1.1"].Data["batches"].([]interface{}); !ok || len(got) != 0 {
 		t.Fatalf("1.1 empty batches = %#v", sealed.Progress["1.1"].Data)
 	}
-	if sealed.Progress["1.2"].Data == nil {
-		t.Fatal("1.2 never-drafted kind should freeze to empty payload map")
+	if got, ok := sealed.Progress["1.2"].Data["udc"].([]interface{}); !ok || len(got) != 0 {
+		t.Fatalf("1.2 never-drafted kind should freeze empty udc array, got %#v", sealed.Progress["1.2"].Data)
 	}
-	if len(store.Notarizations()) != 2 {
-		t.Fatalf("expected 2 notarizations for empty-kind seal, got %d", len(store.Notarizations()))
+	notaries := store.Notarizations()
+	if len(notaries) != 2 {
+		t.Fatalf("expected 2 notarizations for empty-kind seal, got %d", len(notaries))
+	}
+	bySubstep := map[string]Notarization{}
+	for _, n := range notaries {
+		bySubstep[n.SubstepID] = n
+	}
+	wantEmptyUDC := map[string]interface{}{"udc": []interface{}{}}
+	if bySubstep["1.2"].FakeNotary.Digest != digestPayload(wantEmptyUDC) {
+		t.Fatalf("1.2 notarization digest should cover empty udc array payload, got payload %#v digest %q",
+			bySubstep["1.2"].Payload, bySubstep["1.2"].FakeNotary.Digest)
 	}
 }
 
@@ -578,4 +588,156 @@ func TestDraftAndSealRejectsDraftOnDoneSubstep(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error drafting a sealed/done Substep")
 	}
+}
+
+func TestDraftAndSealSealStepRejectsPartialLeaves(t *testing.T) {
+	fixedNow := time.Date(2026, 10, 9, 20, 0, 0, 0, time.UTC)
+	def := feragameDraftAndSealDef()
+	cfg := RuntimeConfig{Workflow: def}
+	store := NewMemoryStore()
+	svc := &ProcessService{store: store, now: func() time.Time { return fixedNow }}
+	process := seedFeragameProcess(t, store, def)
+
+	// Simulate a torn seal: one leaf already done+notarized, peer still drafting.
+	admin := Actor{ID: "admin", Role: "org-admin", RoleSlugs: []string{"org-admin"}, OrgSlug: "feragame"}
+	process.Progress["1.1"] = ProcessStep{
+		State: "done", DoneAt: &fixedNow, DoneBy: &admin,
+		Data: map[string]interface{}{"batches": []interface{}{}},
+	}
+	process.Progress["1.2"] = ProcessStep{
+		State: progressStateDraft,
+		Data: map[string]interface{}{
+			"udc": []interface{}{
+				map[string]interface{}{"station": "S-1", "weightKg": "1"},
+			},
+		},
+	}
+	if err := store.UpdateProcessProgress(context.Background(), process.ID, "feragame", "1.1", process.Progress["1.1"]); err != nil {
+		t.Fatalf("seed 1.1: %v", err)
+	}
+	if err := store.UpdateProcessProgress(context.Background(), process.ID, "feragame", "1.2", process.Progress["1.2"]); err != nil {
+		t.Fatalf("seed 1.2: %v", err)
+	}
+	if err := store.InsertNotarization(context.Background(), Notarization{
+		ProcessID: process.ID, SubstepID: "1.1", Payload: process.Progress["1.1"].Data,
+		Actor: admin, CreatedAt: fixedNow,
+		FakeNotary: FakeNotary{Method: "sha256", Digest: digestPayload(process.Progress["1.1"].Data)},
+	}); err != nil {
+		t.Fatalf("seed notarization: %v", err)
+	}
+	process, err := store.LoadProcessByID(context.Background(), process.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	process.Progress = normalizeProgressKeys(process.Progress)
+
+	_, err = svc.SealStep(context.Background(), SealStepCmd{
+		Process: process, WorkflowKey: "feragame", StepID: "1",
+		Actor: admin, Config: cfg, Confirm: true, Now: fixedNow,
+	})
+	if !errors.Is(err, ErrSealAlreadySealed) {
+		t.Fatalf("partial Step SealStep error = %v, want ErrSealAlreadySealed", err)
+	}
+	reloaded, err := store.LoadProcessByID(context.Background(), process.ID)
+	if err != nil {
+		t.Fatalf("LoadProcessByID: %v", err)
+	}
+	reloaded.Progress = normalizeProgressKeys(reloaded.Progress)
+	if reloaded.Progress["1.2"].State == "done" {
+		t.Fatal("Seal must not finish the remainder of a torn Step")
+	}
+	if len(store.Notarizations()) != 1 {
+		t.Fatalf("partial Seal must not add peer notarization, got %d", len(store.Notarizations()))
+	}
+}
+
+func TestDraftAndSealSealStepAtomicOrFailClosed(t *testing.T) {
+	fixedNow := time.Date(2026, 10, 9, 21, 0, 0, 0, time.UTC)
+	def := feragameDraftAndSealDef()
+	cfg := RuntimeConfig{Workflow: def}
+	base := NewMemoryStore()
+	// failOnCall 1: Seal writes progress as one batch; a failed batch leaves no leaf done.
+	store := &failAfterProgressStore{MemoryStore: base, failOnCall: 1}
+	svc := &ProcessService{store: store, now: func() time.Time { return fixedNow }}
+	process := seedFeragameProcess(t, base, def)
+
+	admin := Actor{ID: "admin", Role: "org-admin", RoleSlugs: []string{"org-admin"}, OrgSlug: "feragame"}
+	_, err := svc.SealStep(context.Background(), SealStepCmd{
+		Process: process, WorkflowKey: "feragame", StepID: "1",
+		Actor: admin, Config: cfg, Confirm: true, Now: fixedNow,
+	})
+	if err == nil {
+		t.Fatal("expected SealStep to fail when progress persistence fails mid-seal")
+	}
+
+	reloaded, err := base.LoadProcessByID(context.Background(), process.ID)
+	if err != nil {
+		t.Fatalf("LoadProcessByID: %v", err)
+	}
+	reloaded.Progress = normalizeProgressKeys(reloaded.Progress)
+
+	doneCount := 0
+	for _, id := range []string{"1.1", "1.2"} {
+		if reloaded.Progress[id].State == "done" {
+			doneCount++
+		}
+	}
+	// Prefer true all-or-nothing (0 done). Fail-closed (some done but not sealable as remainder) is also OK.
+	if doneCount == 0 {
+		if len(base.Notarizations()) != 0 {
+			t.Fatalf("rolled-back seal must not leave notarizations, got %d", len(base.Notarizations()))
+		}
+		return
+	}
+	if doneCount == len([]string{"1.1", "1.2"}) {
+		t.Fatal("mid-seal failure must not leave a fully sealed Step without returning success")
+	}
+
+	process.Progress = reloaded.Progress
+	store.failOnCall = 0 // allow retry to exercise Seal policy, not the injected fault
+	_, err = svc.SealStep(context.Background(), SealStepCmd{
+		Process: process, WorkflowKey: "feragame", StepID: "1",
+		Actor: admin, Config: cfg, Confirm: true, Now: fixedNow,
+	})
+	if !errors.Is(err, ErrSealAlreadySealed) {
+		t.Fatalf("retry after torn seal error = %v, want ErrSealAlreadySealed (not seal-the-remainder)", err)
+	}
+	after, err := base.LoadProcessByID(context.Background(), process.ID)
+	if err != nil {
+		t.Fatalf("reload after retry: %v", err)
+	}
+	after.Progress = normalizeProgressKeys(after.Progress)
+	stillOpen := 0
+	for _, id := range []string{"1.1", "1.2"} {
+		if after.Progress[id].State != "done" {
+			stillOpen++
+		}
+	}
+	if stillOpen == 0 {
+		t.Fatal("fail-closed retry must not complete the remainder of a torn seal")
+	}
+}
+
+// failAfterProgressStore fails UpdateProcessProgress on the Nth call (1-based).
+// When Seal uses UpdateProcessProgressBatch, that single call is counted here too.
+type failAfterProgressStore struct {
+	*MemoryStore
+	failOnCall int
+	calls      int
+}
+
+func (s *failAfterProgressStore) UpdateProcessProgress(ctx context.Context, id primitive.ObjectID, workflowKey, substepID string, progress ProcessStep) error {
+	s.calls++
+	if s.failOnCall > 0 && s.calls >= s.failOnCall {
+		return errors.New("injected progress failure")
+	}
+	return s.MemoryStore.UpdateProcessProgress(ctx, id, workflowKey, substepID, progress)
+}
+
+func (s *failAfterProgressStore) UpdateProcessProgressBatch(ctx context.Context, id primitive.ObjectID, workflowKey string, progressBySubstepID map[string]ProcessStep) error {
+	s.calls++
+	if s.failOnCall > 0 && s.calls >= s.failOnCall {
+		return errors.New("injected progress failure")
+	}
+	return s.MemoryStore.UpdateProcessProgressBatch(ctx, id, workflowKey, progressBySubstepID)
 }
