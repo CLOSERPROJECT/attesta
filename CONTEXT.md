@@ -160,6 +160,10 @@ _Avoid_: Process page
 The accordion tree on stream instance detail (and preview on the stream dashboard): steps, each containing expandable substeps.
 _Avoid_: Workflow timeline, traceability timeline, action list
 
+**My roles filter**:
+A Stream instance detail switch (default on) that shows only Substeps the viewer can complete: their Organization owns the Step, and at least one of their Organization roles matches the Substep’s Stream role gate (Org admin standing does not count). Off shows the full Stream timeline. Steps with no visible Substeps are omitted. A selected Substep stays visible even when it would otherwise be hidden.
+_Avoid_: Role filter (vague), onlyRole, active-role filter, Org admin sees all
+
 **Substep summary**:
 The always-visible row for one substep: ID, title, status, and optional completion meta in the accordion header.
 _Avoid_: Action card header
