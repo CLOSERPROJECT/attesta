@@ -294,7 +294,8 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 		`class="page-header-head"`,
 		`class="page-header-actions"`,
 		"View preview",
-		"New instance",
+		`id="new-instance-dialog"`,
+		`data-start-stream-submit`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in home_body markup, got:\n%s", want, body)
@@ -323,14 +324,14 @@ func TestStreamHomeBodyPanelMarkup(t *testing.T) {
 
 	headerActionsIdx := strings.Index(body, `class="page-header-actions"`)
 	previewIdx := strings.Index(body, "View preview")
-	newIdx := strings.Index(body, "New instance")
+	startIdx := strings.Index(body, `id="new-instance-dialog"`)
 	sidebarIdx := strings.Index(body, `class="panel panel-sticky"`)
 	mainIdx := strings.Index(body, `class="rail-layout-main home-workflow-panel-main"`)
-	if headerActionsIdx == -1 || previewIdx == -1 || newIdx == -1 || sidebarIdx == -1 || mainIdx == -1 {
-		t.Fatal("expected page-header-actions, preview/new buttons, sidebar panel, and rail-layout-main")
+	if headerActionsIdx == -1 || previewIdx == -1 || startIdx == -1 || sidebarIdx == -1 || mainIdx == -1 {
+		t.Fatal("expected page-header-actions, preview/Start, sidebar panel, and rail-layout-main")
 	}
-	if !(headerActionsIdx < previewIdx && previewIdx < newIdx && newIdx < sidebarIdx && sidebarIdx < mainIdx) {
-		t.Fatalf("expected page-header-actions (with View preview / New instance) before sidebar and rail-layout-main")
+	if !(headerActionsIdx < previewIdx && previewIdx < startIdx && startIdx < sidebarIdx && sidebarIdx < mainIdx) {
+		t.Fatalf("expected page-header-actions (with View preview / Start) before sidebar and rail-layout-main")
 	}
 
 	railIdx := strings.Index(body, `class="rail-layout rail-layout-ready"`)

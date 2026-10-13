@@ -44,7 +44,8 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/process/start", nil)
+	req := httptest.NewRequest(http.MethodPost, "/process/start", strings.NewReader("name=Demo+run"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	server.handleStartProcess(rr, req)
 

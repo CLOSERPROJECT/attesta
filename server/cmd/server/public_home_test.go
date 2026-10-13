@@ -92,11 +92,11 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 	installPackIntoFormata(t, store, tempDir)
 	server := &Server{store: store, configDir: tempDir, tmpl: parseTestTemplates(t)}
 
-	cards, err := server.publicStreamCardsForPath(t.Context(), "supply-chain", "procurement")
+	cards, err := server.publicStreamCardsForPath(t.Context(), "supply-chain", "procurement", nil)
 	if err != nil {
 		t.Fatalf("publicStreamCardsForPath: %v", err)
 	}
-	if len(cards) != 1 || cards[0].Name != "Match Stream" {
+	if len(cards) != 1 || cards[0].Card.Name != "Match Stream" {
 		t.Fatalf("cards = %#v, want only Match Stream", cards)
 	}
 	catalog, err := server.workflowCatalog()
@@ -107,11 +107,14 @@ func TestPublicStreamCardsForPathFiltersAndCaps(t *testing.T) {
 	if !ok {
 		t.Fatal("missing Match Stream")
 	}
-	if cards[0].Href != "/streams/"+matchKey {
-		t.Fatalf("Href = %q, want /streams/%s", cards[0].Href, matchKey)
+	if cards[0].Card.Href != "/streams/"+matchKey {
+		t.Fatalf("Href = %q, want /streams/%s", cards[0].Card.Href, matchKey)
+	}
+	if cards[0].Startable {
+		t.Fatalf("anonymous viewer must not be Startable, got %#v", cards[0])
 	}
 
-	empty, err := server.publicStreamCardsForPath(t.Context(), "", "")
+	empty, err := server.publicStreamCardsForPath(t.Context(), "", "", nil)
 	if err != nil || len(empty) != 0 {
 		t.Fatalf("empty path = %#v err=%v", empty, err)
 	}
@@ -126,7 +129,7 @@ func TestBuildPublicHomeStreamResultsViewFillsSelection(t *testing.T) {
 			},
 		},
 	}
-	streams := []PublicStreamCardView{{Name: "Example Stream"}}
+	streams := []ManagedPublicStreamCardView{{Card: PublicStreamCardView{Name: "Example Stream"}}}
 	got := buildPublicHomeStreamResultsView(cats, "supply-chain", "procurement", streams, "/login?next=builder")
 	if got.CategoryName != "Supply Chain" || got.CategoryIconURL != "/static/taxonomy/batch-traceability.svg" {
 		t.Fatalf("category fields = %#v", got)

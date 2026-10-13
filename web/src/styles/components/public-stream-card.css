@@ -17,7 +17,7 @@
  *     .public-stream-card-orgs
  *       .public-stream-card-orgs-head > strong + span.public-stream-card-orgs-count
  *       .public-stream-card-avatars > img | span.public-stream-card-avatar | span.public-stream-card-avatar-more
- *   dialog#start-instance-{key} (optional Startable New-instance dialog)
+ *   start_stream_instance (optional Startable card trigger + dialog)
  *
  * Shared chips: stream-dpp-badge.css, stream-metric.css.
  */

@@ -354,6 +354,9 @@
         {{ end }}
       </main>
 {{ template "site_footer" . }}
+      {{ if .ToastError }}
+        <p class="error" data-toast>{{ .ToastError }}</p>
+      {{ end }}
       <div id="toast-host" class="toast-host" aria-live="polite"></div>
     </body>
   </html>
