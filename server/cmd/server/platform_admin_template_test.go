@@ -396,12 +396,13 @@ func TestPlatformAdminCategoriesConfirmationUsesDataToast(t *testing.T) {
 	if !strings.Contains(body, "Subcategory reordered") {
 		t.Fatalf("expected confirmation text, got:\n%s", body)
 	}
-	if !strings.Contains(body, `class="confirmation" data-toast`) &&
-		!strings.Contains(body, `data-toast`) {
+	if !strings.Contains(body, `data-toast`) {
 		t.Fatalf("expected confirmation to opt into data-toast, got:\n%s", body)
 	}
-	// Prefer exact attribute adjacency used in template:
-	if !strings.Contains(body, `<p class="confirmation" data-toast>`) {
-		t.Fatalf("expected <p class=\"confirmation\" data-toast>, got:\n%s", body)
+	if !strings.Contains(body, `class="confirmation confirmation-with-icon" data-toast`) {
+		t.Fatalf("expected confirmation-with-icon data-toast markup, got:\n%s", body)
+	}
+	if !strings.Contains(body, `icon-svg`) || !strings.Contains(body, `m9 12 2 2 4-4`) {
+		t.Fatalf("expected check-circle icon in toast confirmation, got:\n%s", body)
 	}
 }

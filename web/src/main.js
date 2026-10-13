@@ -270,9 +270,10 @@ const syncSelectedSubstepURL = (substepId = "") => {
   syncProcessPageURL(substepId);
 };
 
-const currentSelectedSubstep = () => {
-  // Only an actually open panel counts — never resurrect a stale dataset id
-  // into ?substep= (that re-opens after SSE/content refresh).
+const isDraftAndSealProcess = () =>
+  (root?.dataset?.completionStrategy || "").trim() === "draft-and-seal";
+
+const openProcessSubstepId = () => {
   const selectedPanel = document.querySelector(
     ".js-process-substep-panel[open]",
   );
@@ -281,6 +282,33 @@ const currentSelectedSubstep = () => {
   }
   return "";
 };
+
+const retainedSelectedSubstep = () =>
+  (root?.dataset?.selectedSubstep || "").trim();
+
+const currentSelectedSubstep = () => {
+  // Only an actually open panel counts — never resurrect a stale dataset id
+  // into ?substep= (that re-opens after SSE/content refresh).
+  // Draft-and-seal retention is handled by syncProcessSubstepSelectionAfterSwap.
+  return openProcessSubstepId();
+};
+
+const collectOpenProcessSubstepIds = () => {
+  const openIds = [];
+  for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
+    if (!(panel instanceof HTMLDetailsElement) || !panel.open) {
+      continue;
+    }
+    const id = (panel.dataset.substepId || "").trim();
+    if (id) {
+      openIds.push(id);
+    }
+  }
+  return openIds;
+};
+
+let retainedOpenProcessSubstepIds = [];
+let suppressProcessSubstepToggle = false;
 
 const markSelectedSubstep = (substepId = "") => {
   const selected = substepId.trim();
@@ -303,6 +331,57 @@ const markSelectedSubstep = (substepId = "") => {
     );
   }
   syncSelectedSubstepURL(selected);
+};
+
+// Prefer the panel the server marked open (classic Complete may advance), then
+// fall back to retained data-selected-substep when a swap cleared [open].
+// Draft-and-seal also restores peer panels that were open before the HTMX swap —
+// capture selection from the fresh HTML before reopening peers.
+const syncProcessSubstepSelectionAfterSwap = () => {
+  const selectionHost = processPageContent?.querySelector("#process-selection");
+  const fromServer = (
+    selectionHost instanceof HTMLElement
+      ? selectionHost.dataset.selectedSubstep
+      : ""
+  )
+    .trim();
+  // Prefer server selection from the swapped fragment (authoritative after
+  // Save draft / Complete). Draft-and-seal may fall back to retained dataset;
+  // classic must not resurrect a stale data-selected-substep into ?substep=.
+  const selected = isDraftAndSealProcess()
+    ? fromServer || openProcessSubstepId() || retainedSelectedSubstep()
+    : fromServer || openProcessSubstepId();
+  const restoreOpen = new Set(retainedOpenProcessSubstepIds);
+  if (selected) {
+    restoreOpen.add(selected);
+  }
+  retainedOpenProcessSubstepIds = [];
+
+  suppressProcessSubstepToggle = true;
+  try {
+    for (const panel of document.querySelectorAll(".js-process-substep-panel")) {
+      if (!(panel instanceof HTMLDetailsElement)) {
+        continue;
+      }
+      const id = (panel.dataset.substepId || "").trim();
+      if (!id) {
+        continue;
+      }
+      if (isDraftAndSealProcess()) {
+        const shouldOpen = restoreOpen.has(id);
+        if (panel.open !== shouldOpen) {
+          panel.open = shouldOpen;
+        }
+        continue;
+      }
+      if (id === selected && !panel.open) {
+        panel.open = true;
+      }
+    }
+  } finally {
+    suppressProcessSubstepToggle = false;
+  }
+  markSelectedSubstep(selected);
 };
 
 const resolveAbsoluteURL = (value) => {
@@ -336,10 +415,16 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
       return;
     }
     const html = await response.text();
+    if (isDraftAndSealProcess()) {
+      retainedOpenProcessSubstepIds = collectOpenProcessSubstepIds();
+    } else {
+      retainedOpenProcessSubstepIds = [];
+    }
     processPageContent.innerHTML = html;
     formatLocalDateTimes(processPageContent);
     await initializeFormataForms(processPageContent);
-    markSelectedSubstep(currentSelectedSubstep());
+    syncProcessSubstepSelectionAfterSwap();
+    focusNextActionInput();
     applyMineFilterRoot(processPageContent);
   } catch (_err) {}
 };
@@ -884,23 +969,6 @@ const serializeFormataValue = async (value) => {
   return value;
 };
 
-const formDataToObject = async (formData) => {
-  const result = {};
-  for (const [key, value] of formData.entries()) {
-    const normalizedValue = await serializeFormataValue(value);
-    if (Object.prototype.hasOwnProperty.call(result, key)) {
-      if (Array.isArray(result[key])) {
-        result[key].push(normalizedValue);
-      } else {
-        result[key] = [result[key], normalizedValue];
-      }
-    } else {
-      result[key] = normalizedValue;
-    }
-  }
-  return result;
-};
-
 const readFormataComponentValue = (component) => {
   if (typeof component?.getValue !== "function") {
     return {};
@@ -912,28 +980,16 @@ const readFormataComponentValue = (component) => {
   return {};
 };
 
-const extractFormataSubmitPayload = async (componentEvent, component) => {
-  const detail =
-    componentEvent instanceof CustomEvent ? componentEvent.detail : undefined;
-  if (detail instanceof FormData) {
-    return await formDataToObject(detail);
-  }
-  if (
-    detail &&
-    typeof detail === "object" &&
-    detail.formData instanceof FormData
-  ) {
-    return await formDataToObject(detail.formData);
-  }
-  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-    return await serializeFormataValue(detail);
-  }
+// Formata CE (pinned merge of #6) owns nested value; no FormData nest fallback.
+const extractFormataSubmitPayload = async (_componentEvent, component) => {
   return await serializeFormataValue(readFormataComponentValue(component));
 };
 
 let formataReadyPromise;
+// Pin to formata#6 merge on main (value/setValue/getValue). Do not float @main.
+// https://github.com/CLOSERPROJECT/formata/pull/6
 const formataScriptURLs = [
-  "https://cdn.jsdelivr.net/gh/CLOSERPROJECT/formata@main/dist/formata-web-component.umd.js",
+  "https://cdn.jsdelivr.net/gh/CLOSERPROJECT/formata@f72d7d5964b590f24fd964414b77b1071e09dba3/dist/formata-web-component.umd.js",
   "https://closerproject.github.io/formata-arch/formata-web-component.umd.js",
 ];
 
@@ -1159,6 +1215,15 @@ const initializeFormataForms = async (container = document) => {
     const hiddenInput = form.querySelector(".js-formata-value");
     if (!(hiddenInput instanceof HTMLInputElement)) {
       continue;
+    }
+
+    const initial = parseJsonAttribute(hiddenInput.value);
+    if (initial && typeof initial === "object" && !Array.isArray(initial)) {
+      if (typeof component.setValue === "function") {
+        component.setValue(initial);
+      } else {
+        component.value = initial;
+      }
     }
 
     const sync = () => syncFormataValue(component, hiddenInput);
@@ -1590,6 +1655,17 @@ document.addEventListener("click", (event) => {
   }
 });
 
+document.body.addEventListener("htmx:beforeSwap", (event) => {
+  if (event.target?.id !== "process-page-content") {
+    return;
+  }
+  if (!isDraftAndSealProcess()) {
+    retainedOpenProcessSubstepIds = [];
+    return;
+  }
+  retainedOpenProcessSubstepIds = collectOpenProcessSubstepIds();
+});
+
 document.body.addEventListener("htmx:afterSwap", (event) => {
   if (event.target instanceof Element) {
     formatLocalDateTimes(event.target);
@@ -1599,16 +1675,21 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
-    // Sync from panels the server actually opened — never resurrect a stale
-    // data-selected-substep on #process-page (outside the swapped partial).
-    const openPanel = event.target.querySelector(
-      ".js-process-substep-panel[open]",
-    );
-    const openId =
-      openPanel instanceof HTMLElement
-        ? (openPanel.dataset.substepId || "").trim()
-        : "";
-    markSelectedSubstep(openId);
+    if (isDraftAndSealProcess()) {
+      syncProcessSubstepSelectionAfterSwap();
+      focusNextActionInput();
+    } else {
+      // Sync from panels the server actually opened — never resurrect a stale
+      // data-selected-substep on #process-page (outside the swapped partial).
+      const openPanel = event.target.querySelector(
+        ".js-process-substep-panel[open]",
+      );
+      const openId =
+        openPanel instanceof HTMLElement
+          ? (openPanel.dataset.substepId || "").trim()
+          : "";
+      markSelectedSubstep(openId);
+    }
     applyMineFilterRoot(event.target);
   }
   if (event.detail?.target?.id === "platform-admin-categories") {
@@ -1674,18 +1755,30 @@ document.body.addEventListener("toggle", (event) => {
   if (!target.classList.contains("js-process-substep-panel")) {
     return;
   }
+  if (suppressProcessSubstepToggle) {
+    return;
+  }
+  // HTMX innerHTML swaps can fire toggle while disconnecting the old panel;
+  // clearing selection here drops ?substep= before afterSwap can re-sync.
+  if (!target.isConnected) {
+    return;
+  }
   const substepID = (target.dataset.substepId || "").trim();
   if (!substepID) {
     return;
   }
   if (target.open) {
-    for (const panel of document.querySelectorAll(
-      ".js-process-substep-panel",
-    )) {
-      if (!(panel instanceof HTMLDetailsElement) || panel === target) {
-        continue;
+    // Classic: one open Substep at a time. Draft-and-seal drafts in parallel —
+    // keep peer panels open across submit/HTMX remount.
+    if (!isDraftAndSealProcess()) {
+      for (const panel of document.querySelectorAll(
+        ".js-process-substep-panel",
+      )) {
+        if (!(panel instanceof HTMLDetailsElement) || panel === target) {
+          continue;
+        }
+        panel.open = false;
       }
-      panel.open = false;
     }
     markSelectedSubstep(substepID);
     return;

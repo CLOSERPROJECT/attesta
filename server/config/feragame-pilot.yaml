@@ -1,0 +1,76 @@
+# Draft-and-seal browser smoke Stream (Feragame compromise pilot).
+# Not a catalog pack template — excluded by isCatalogTemplateFile; upserted once
+# by seedNamedPilotStreams with stable URL key namedPilotStreamURLKey("named-pilot-stream:feragame-pilot").
+# Org: feragame (demo fixture); chemist on Substeps; Org admin seals.
+workflow:
+  categorySlug: recycling-and-recovery
+  subCategorySlug: flat-screen-displays
+  name: Feragame production day (pilot)
+  description: Single-Step draft-and-seal day with parallel Batch loads and UdC registrations
+  completionStrategy: draft-and-seal
+  steps:
+    - id: "1"
+      title: Production day
+      order: 1
+      organization: feragame
+      substeps:
+        - id: "1.1"
+          order: 1
+          title: Batch loads
+          inputKey: batches
+          roles:
+            - chemist
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              batches:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    loadId:
+                      type: string
+                      title: loadId
+                    weightKg:
+                      type: string
+                      title: weightKg
+                  required:
+                    - loadId
+                    - weightKg
+            title: Batch loads
+        - id: "1.2"
+          order: 2
+          title: UdC registrations
+          inputKey: udc
+          roles:
+            - chemist
+          inputType: formata
+          schema:
+            type: object
+            properties:
+              udc:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    station:
+                      type: string
+                      title: station
+                    weightKg:
+                      type: string
+                      title: weightKg
+                  required:
+                    - station
+                    - weightKg
+            title: UdC registrations
+
+organizations:
+  - slug: feragame
+    name: Feragame
+
+roles:
+  - orgSlug: feragame
+    slug: chemist
+    name: Chemist
+    color: var(--role-blue)

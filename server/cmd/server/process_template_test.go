@@ -66,6 +66,9 @@ func TestProcessTemplateRendersAccordionSubstepContent(t *testing.T) {
 	if !strings.Contains(body, `id="process-page"`) || !strings.Contains(body, `id="process-page-content"`) {
 		t.Fatalf("expected process page wrapper and content target, got: %s", body)
 	}
+	if !strings.Contains(body, `data-completion-strategy="`) {
+		t.Fatalf("expected completion strategy data attribute, got: %s", body)
+	}
 	if !strings.Contains(body, `Pilot batch`) || !strings.Contains(body, `process-1`) {
 		t.Fatalf("expected instance name and process id, got: %s", body)
 	}

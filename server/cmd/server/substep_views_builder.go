@@ -16,7 +16,7 @@ func nextAuthorizedSubstepBody(def WorkflowDef, process *Process, workflowKey st
 func buildSubstepViews(def WorkflowDef, process *Process, workflowKey string, actor Actor, roleIndex map[roleMetaKey]RoleMeta, cfgRoles []WorkflowRole) []SubstepBodyView {
 	var actions []SubstepBodyView
 	ordered := orderedSubsteps(def)
-	availMap := computeAvailability(def, process)
+	availMap := substepAvailability(def, process)
 	substepOrgs := substepOrganizationMap(def)
 	terminated := process != nil && process.Termination != nil
 	terminationSubstepID := ""

@@ -18,6 +18,20 @@ type catalogTemplateStream struct {
 	Body []byte
 }
 
+// Pack templates only — named pilots (feragame-pilot.yaml) are denylisted so
+// seedCatalogStreams cannot multiply one pilot into N taxonomy clones.
+func isCatalogTemplateFile(name string) bool {
+	if !isWorkflowCatalogConfigFile(name) {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(name)))
+	switch base {
+	case "feragame-pilot.yaml", "feragame-pilot.yml":
+		return false
+	}
+	return true
+}
+
 func openCatalogTemplatePack(configDir string) (catalogTemplatePack, error) {
 	dir := strings.TrimSpace(configDir)
 	if dir == "" {
@@ -35,7 +49,7 @@ func openCatalogTemplatePack(configDir string) (catalogTemplatePack, error) {
 			continue
 		}
 		name := entry.Name()
-		if !isWorkflowCatalogConfigFile(name) {
+		if !isCatalogTemplateFile(name) {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, name))

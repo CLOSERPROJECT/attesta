@@ -232,7 +232,10 @@
     </p>
 
     {{ if .CategoriesEditor.Confirmation }}
-      <p class="confirmation" data-toast>{{ .CategoriesEditor.Confirmation }}</p>
+      <p class="confirmation confirmation-with-icon" data-toast>
+        {{ template "icon-check-circle" . }}
+        <span>{{ .CategoriesEditor.Confirmation }}</span>
+      </p>
     {{ end }}
 
     {{ if and .CategoriesEditor.Form.Error (not .CategoriesEditor.Form.Open) }}

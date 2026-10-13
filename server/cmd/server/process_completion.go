@@ -33,6 +33,13 @@ type CompleteSubstepCmd struct {
 	Now         time.Time
 }
 
+// SubstepSubmitResult is the post-write UX for a Substep form submit.
+type SubstepSubmitResult struct {
+	Process           *Process
+	SelectedSubstepID string
+	Confirmation      string
+}
+
 func (p *ProcessService) serviceNow(fallback time.Time) time.Time {
 	if p != nil && p.now != nil {
 		return p.now().UTC()
@@ -43,51 +50,121 @@ func (p *ProcessService) serviceNow(fallback time.Time) time.Time {
 	return time.Now().UTC()
 }
 
+// SubmitSubstepForm is the ProcessService edge for Substep form POST.
+// It selects the Stream blueprint completion strategy, then calls SaveDraft
+// (draft-and-seal) or CompleteSubstep (classic) and owns post-write UX.
+func (p *ProcessService) SubmitSubstepForm(ctx context.Context, cmd CompleteSubstepCmd) (SubstepSubmitResult, error) {
+	switch workflowCompletionStrategy(cmd.Config.Workflow) {
+	case CompletionStrategyDraftAndSeal:
+		process, err := p.SaveDraft(ctx, SaveDraftCmd{
+			Process:     cmd.Process,
+			WorkflowKey: cmd.WorkflowKey,
+			SubstepID:   cmd.SubstepID,
+			Substep:     cmd.Substep,
+			Actor:       cmd.Actor,
+			Payload:     cmd.Payload,
+			Config:      cmd.Config,
+			Now:         cmd.Now,
+		})
+		if err != nil {
+			return SubstepSubmitResult{}, err
+		}
+		return SubstepSubmitResult{
+			Process:           process,
+			SelectedSubstepID: cmd.SubstepID,
+			Confirmation:      "Draft saved.",
+		}, nil
+	default:
+		process, err := p.CompleteSubstep(ctx, cmd)
+		if err != nil {
+			return SubstepSubmitResult{}, err
+		}
+		return SubstepSubmitResult{
+			Process: process,
+		}, nil
+	}
+}
+
+// CompleteSubstep selects the Stream blueprint completion strategy, then delegates.
+// Classic Streams keep today's Complete→done+notarize body via classicCompleteSubstep.
 func (p *ProcessService) CompleteSubstep(ctx context.Context, cmd CompleteSubstepCmd) (*Process, error) {
-	if cmd.Process == nil {
-		return nil, fmt.Errorf("missing process")
-	}
-	now := cmd.Now
-	if now.IsZero() {
-		now = p.serviceNow(time.Time{})
-	}
+	return p.completionStrategy(cmd.Config.Workflow).CompleteSubstep(ctx, cmd)
+}
 
-	description := cmd.Substep.InputKey
-	progressUpdate := ProcessStep{
+// SaveDraft selects the Stream blueprint completion strategy, then delegates.
+func (p *ProcessService) SaveDraft(ctx context.Context, cmd SaveDraftCmd) (*Process, error) {
+	return p.completionStrategy(cmd.Config.Workflow).SaveDraft(ctx, cmd)
+}
+
+// SealStep selects the Stream blueprint completion strategy, then delegates.
+func (p *ProcessService) SealStep(ctx context.Context, cmd SealStepCmd) (*Process, error) {
+	return p.completionStrategy(cmd.Config.Workflow).SealStep(ctx, cmd)
+}
+
+// doneSubstepProgress builds the terminal done progress entry for a Substep leaf.
+func doneSubstepProgress(description string, actor Actor, payload map[string]interface{}, now time.Time) ProcessStep {
+	desc := description
+	return ProcessStep{
 		State:       "done",
-		Description: &description,
+		Description: &desc,
 		DoneAt:      &now,
-		DoneBy:      &cmd.Actor,
-		Data:        cmd.Payload,
+		DoneBy:      &actor,
+		Data:        payload,
 	}
-	if err := p.store.UpdateProcessProgress(ctx, cmd.Process.ID, cmd.WorkflowKey, cmd.SubstepID, progressUpdate); err != nil {
-		return cmd.Process, fmt.Errorf("%w: %v", ErrProgressUpdate, err)
-	}
+}
 
+// persistDoneSubstep marks a Substep done and inserts its notarization record.
+// Callers prepare the actor (classic DoneBy vs sealActor) and keep finalize/reload.
+func (p *ProcessService) persistDoneSubstep(
+	ctx context.Context,
+	processID primitive.ObjectID,
+	workflowKey string,
+	substepID string,
+	description string,
+	actor Actor,
+	payload map[string]interface{},
+	now time.Time,
+) error {
+	progressUpdate := doneSubstepProgress(description, actor, payload, now)
+	if err := p.store.UpdateProcessProgress(ctx, processID, workflowKey, substepID, progressUpdate); err != nil {
+		return fmt.Errorf("%w: %v", ErrProgressUpdate, err)
+	}
 	notary := Notarization{
-		ProcessID: cmd.Process.ID,
-		SubstepID: cmd.SubstepID,
-		Payload:   cmd.Payload,
-		Actor:     cmd.Actor,
+		ProcessID: processID,
+		SubstepID: substepID,
+		Payload:   payload,
+		Actor:     actor,
 		CreatedAt: now,
 		FakeNotary: FakeNotary{
 			Method: "sha256",
-			Digest: digestPayload(cmd.Payload),
+			Digest: digestPayload(payload),
 		},
 	}
 	if err := p.store.InsertNotarization(ctx, notary); err != nil {
-		return cmd.Process, fmt.Errorf("%w: %v", ErrNotarization, err)
+		return fmt.Errorf("%w: %v", ErrNotarization, err)
 	}
+	return nil
+}
 
-	reloaded, err := p.reloadProcess(ctx, cmd.Process.ID)
-	if err != nil {
-		return cmd.Process, err
+// persistSealedSubsteps writes every sealed leaf's progress in one batch, then inserts
+// notarizations. Progress is all-or-nothing at the document level; a notarization
+// failure after progress leaves the Step fully done so a later Seal fails closed.
+func (p *ProcessService) persistSealedSubsteps(
+	ctx context.Context,
+	processID primitive.ObjectID,
+	workflowKey string,
+	progressBySubstepID map[string]ProcessStep,
+	notaries []Notarization,
+) error {
+	if err := p.store.UpdateProcessProgressBatch(ctx, processID, workflowKey, progressBySubstepID); err != nil {
+		return fmt.Errorf("%w: %v", ErrProgressUpdate, err)
 	}
-
-	if isProcessDone(cmd.Config.Workflow, reloaded) {
-		return p.finalizeProcessIfDone(ctx, cmd.Config, cmd.WorkflowKey, reloaded, now), nil
+	for _, notary := range notaries {
+		if err := p.store.InsertNotarization(ctx, notary); err != nil {
+			return fmt.Errorf("%w: %v", ErrNotarization, err)
+		}
 	}
-	return reloaded, nil
+	return nil
 }
 
 func (p *ProcessService) EnsureCompletionArtifacts(ctx context.Context, cfg RuntimeConfig, workflowKey string, process *Process) *Process {

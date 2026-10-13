@@ -41,12 +41,13 @@ const (
 )
 
 type WorkflowDef struct {
-	ID              primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
-	Name            string             `bson:"name" yaml:"name"`
-	Description     string             `bson:"description,omitempty" yaml:"description,omitempty"`
-	CategorySlug    string             `bson:"categorySlug,omitempty" yaml:"categorySlug,omitempty"`
-	SubCategorySlug string             `bson:"subCategorySlug,omitempty" yaml:"subCategorySlug,omitempty"`
-	Steps           []WorkflowStep     `bson:"steps" yaml:"steps"`
+	ID                 primitive.ObjectID `bson:"_id,omitempty" yaml:"-"`
+	Name               string             `bson:"name" yaml:"name"`
+	Description        string             `bson:"description,omitempty" yaml:"description,omitempty"`
+	CategorySlug       string             `bson:"categorySlug,omitempty" yaml:"categorySlug,omitempty"`
+	SubCategorySlug    string             `bson:"subCategorySlug,omitempty" yaml:"subCategorySlug,omitempty"`
+	CompletionStrategy string             `bson:"completionStrategy,omitempty" yaml:"completionStrategy,omitempty"`
+	Steps              []WorkflowStep     `bson:"steps" yaml:"steps"`
 }
 
 type WorkflowStep struct {
@@ -600,15 +601,16 @@ func (e *WorkflowRefValidationError) Error() string {
 
 type ProcessPageView struct {
 	PageBase
-	Breadcrumbs  BreadcrumbsView
-	ProcessID    string
-	InstanceName string
-	Status       string
-	StatusLabel  string
-	Detail       StreamInstanceDetailView
-	DPPURL       string
-	DPPGS1       string
-	Attachments  []ProcessDownloadAttachment
+	Breadcrumbs        BreadcrumbsView
+	ProcessID          string
+	InstanceName       string
+	Status             string
+	StatusLabel        string
+	CompletionStrategy string
+	Detail             StreamInstanceDetailView
+	DPPURL             string
+	DPPGS1             string
+	Attachments        []ProcessDownloadAttachment
 }
 
 type ProcessDownloadAttachment struct {
@@ -3855,12 +3857,12 @@ func (s *Server) platformAdminView(user *AccountUser, confirmation string, errs 
 	rows := platformAdminOrganizationRows(context.Background(), orgPage.Organizations, s.identity)
 	pendingRows := platformAdminOrgCreationRequestRows(context.Background(), s)
 	view := PlatformAdminView{
-		PageBase:     s.pageBaseForUser(user, "platform_admin_body", "", ""),
-		ActivePanel:  "organizations",
-		Breadcrumbs:  buildPlatformAdminBreadcrumbs("organizations"),
-		SearchQuery:  errs.SearchQuery,
-		CurrentPage:  currentPage,
-		TotalPages:   totalPages,
+		PageBase:    s.pageBaseForUser(user, "platform_admin_body", "", ""),
+		ActivePanel: "organizations",
+		Breadcrumbs: buildPlatformAdminBreadcrumbs("organizations"),
+		SearchQuery: errs.SearchQuery,
+		CurrentPage: currentPage,
+		TotalPages:  totalPages,
 		Pagination: PaginationView{
 			AriaLabel:       "Organizations pagination",
 			Links:           pageLinks,
@@ -5767,6 +5769,10 @@ func (s *Server) handleProcessRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCompleteSubstep(w, r, processID, parts[2])
 		return
 	}
+	if len(parts) == 4 && parts[1] == "step" && parts[3] == "seal" && r.Method == http.MethodPost {
+		s.handleSealStep(w, r, processID, parts[2])
+		return
+	}
 	if len(parts) == 4 && parts[1] == "substep" && parts[3] == "override" {
 		switch r.Method {
 		case http.MethodGet:
@@ -5846,16 +5852,17 @@ func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cf
 		status = deriveProcessStatus(cfg.Workflow, process)
 	}
 	return ProcessPageView{
-		PageBase:     pageBase,
-		Breadcrumbs:  buildProcessBreadcrumbs(workflowKey, pageBase.WorkflowName, instanceName, processID),
-		ProcessID:    processID,
-		InstanceName: instanceName,
-		Status:       status,
-		StatusLabel:  processStatusLabel(status),
-		Detail:       detail,
-		DPPURL:       detail.DPPURL,
-		DPPGS1:       detail.DPPGS1,
-		Attachments:  detail.Attachments,
+		PageBase:           pageBase,
+		Breadcrumbs:        buildProcessBreadcrumbs(workflowKey, pageBase.WorkflowName, instanceName, processID),
+		ProcessID:          processID,
+		InstanceName:       instanceName,
+		Status:             status,
+		StatusLabel:        processStatusLabel(status),
+		CompletionStrategy: workflowCompletionStrategy(cfg.Workflow),
+		Detail:             detail,
+		DPPURL:             detail.DPPURL,
+		DPPGS1:             detail.DPPGS1,
+		Attachments:        detail.Attachments,
 	}
 }
 
@@ -6365,7 +6372,7 @@ func (s *Server) authorizeSubstepOverrideRequest(r *http.Request, user *AccountU
 	if progress, ok := process.Progress[substepID]; ok && progress.State == "done" {
 		return process, canonical, step, actor, http.StatusConflict, "Completed substeps cannot be adapted.", false
 	}
-	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
+	sequenceOK := substepSequenceOK(cfg.Workflow, process, substepID)
 	if !sequenceOK {
 		return process, canonical, step, actor, http.StatusConflict, "Step is locked: complete previous steps first.", false
 	}
@@ -6512,168 +6519,6 @@ func decodeJSONObject(raw json.RawMessage) (map[string]interface{}, error) {
 	return object, nil
 }
 
-func (s *Server) handleCompleteSubstep(w http.ResponseWriter, r *http.Request, processID, substepID string) {
-	user, _, ok := s.requireVerifiedPost(w, r)
-	if !ok {
-		return
-	}
-	workflowKey, cfg, selected := s.selectedWorkflowOrRedirectHome(w, r)
-	if !selected {
-		return
-	}
-	actor := Actor{
-		ID:          accountActorID(user),
-		OrgSlug:     user.OrgSlug,
-		RoleSlugs:   append([]string(nil), user.RoleSlugs...),
-		WorkflowKey: workflowKey,
-	}
-	if len(user.RoleSlugs) > 0 {
-		actor.Role = user.RoleSlugs[0]
-	}
-	if actor.WorkflowKey != "" && actor.WorkflowKey != workflowKey {
-		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", nil, actor)
-		return
-	}
-
-	ctx := r.Context()
-	process, err := s.loadProcess(ctx, processID)
-	if err != nil {
-		if !errors.Is(err, mongo.ErrNoDocuments) {
-			logRequestError(r, err, "failed to load process %s for substep %s completion", processID, substepID)
-		}
-		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
-		return
-	}
-	if !s.processBelongsToWorkflow(process, workflowKey) {
-		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Process not found.", process, actor)
-		return
-	}
-
-	substep, step, err := findSubstep(cfg.Workflow, substepID)
-	if err != nil {
-		s.renderActionErrorForRequest(w, r, http.StatusNotFound, "Substep not found.", process, actor)
-		return
-	}
-	if len(actor.RoleSlugs) == 0 && strings.TrimSpace(actor.Role) != "" {
-		actor.RoleSlugs = []string{strings.TrimSpace(actor.Role)}
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, completionFormMaxBytes())
-	if err := r.ParseForm(); err != nil {
-		if isRequestTooLarge(err) {
-			s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
-			return
-		}
-		s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
-		return
-	}
-	activeRole := strings.TrimSpace(r.FormValue("activeRole"))
-	if activeRole == "" && len(actor.RoleSlugs) == 1 {
-		activeRole = actor.RoleSlugs[0]
-	}
-	allowedRoles := substepRoles(substep)
-	if !s.enforceAuth && activeRole == "" && len(allowedRoles) > 0 {
-		activeRole = allowedRoles[0]
-		actor.RoleSlugs = append([]string(nil), allowedRoles...)
-	}
-	if activeRole == "" || !containsRole(actor.RoleSlugs, activeRole) || !containsRole(allowedRoles, activeRole) {
-		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
-		return
-	}
-	actor.Role = activeRole
-
-	sequenceOK := isSequenceOK(cfg.Workflow, process, substepID)
-	if s.authorizer == nil {
-		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
-		return
-	}
-	allowed, err := s.authorizer.CanComplete(r.Context(), actor, processID, workflowKey, substep, step.Order, step.OrganizationSlug, sequenceOK)
-	if err != nil {
-		logRequestError(r, err, "cerbos check failed for process %s substep %s", processID, substepID)
-		s.renderActionErrorForRequest(w, r, http.StatusBadGateway, "Cerbos check failed.", process, actor)
-		return
-	}
-	if !sequenceOK {
-		if progress, ok := process.Progress[substepID]; ok && progress.State == "done" && containsRole(allowedRoles, actor.Role) {
-			nextReq := cloneRequestWithSelectedSubstep(r, "")
-			if isProcessContentTargetRequest(r) {
-				s.renderProcessContent(w, nextReq, process, actor, "")
-				return
-			}
-			if isHTMXRequest(r) {
-				s.renderProcessContent(w, nextReq, process, actor, "")
-				return
-			}
-			s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
-			return
-		}
-		s.renderActionErrorForRequest(w, r, http.StatusConflict, "Step is locked: complete previous steps first.", process, actor)
-		return
-	}
-	if !allowed {
-		s.renderActionErrorForRequest(w, r, http.StatusForbidden, "Not authorized for this action.", process, actor)
-		return
-	}
-
-	override := process.Overrides[strings.TrimSpace(substepID)]
-	effective := effectiveSubstep(substep, &override)
-	if strings.TrimSpace(override.SubstepID) == "" {
-		effective = substep
-	}
-	now := s.nowUTC()
-	payload, err := s.parseCompletionPayload(r, process.ID, effective, now)
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrAttachmentTooLarge):
-			s.renderActionErrorForRequest(w, r, http.StatusRequestEntityTooLarge, "File too large.", process, actor)
-		case errors.Is(err, errInvalidForm):
-			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, "Invalid form.", process, actor)
-		default:
-			s.renderActionErrorForRequest(w, r, http.StatusBadRequest, err.Error(), process, actor)
-		}
-		return
-	}
-
-	process, err = s.processService().CompleteSubstep(ctx, CompleteSubstepCmd{
-		Process:     process,
-		WorkflowKey: workflowKey,
-		SubstepID:   substepID,
-		Substep:     substep,
-		Actor:       actor,
-		Payload:     payload,
-		Config:      cfg,
-		Now:         now,
-	})
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrProgressUpdate):
-			logRequestError(r, err, "failed to update process %s substep %s", process.ID.Hex(), substepID)
-			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
-		case errors.Is(err, ErrNotarization):
-			logRequestError(r, err, "failed to notarize process %s substep %s", process.ID.Hex(), substepID)
-			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to notarize payload.", process, actor)
-		default:
-			logRequestError(r, err, "failed to complete process %s substep %s", process.ID.Hex(), substepID)
-			s.renderActionErrorForRequest(w, r, http.StatusInternalServerError, "Failed to update process.", process, actor)
-		}
-		return
-	}
-
-	s.sse.Broadcast("process:"+workflowKey+":"+processID, "process-updated")
-	for _, role := range s.roles(cfg) {
-		s.sse.Broadcast("role:"+workflowKey+":"+role, "role-updated")
-	}
-	nextReq := cloneRequestWithSelectedSubstep(r, "")
-	if isProcessContentTargetRequest(r) {
-		s.renderProcessContent(w, nextReq, process, actor, "")
-		return
-	}
-	if isHTMXRequest(r) {
-		s.renderProcessContent(w, nextReq, process, actor, "")
-		return
-	}
-	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
-}
-
 func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, processID string) {
 	user, _, ok := s.requireVerifiedPost(w, r)
 	if !ok {
@@ -6791,83 +6636,9 @@ func (s *Server) handleTerminateProcess(w http.ResponseWriter, r *http.Request, 
 	s.renderDepartmentProcessPage(w, nextReq, process, actor, "")
 }
 
-var (
-	errInvalidForm = errors.New("invalid form")
-)
-
-func (s *Server) parseCompletionPayload(r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	return s.parseFormataPayload(r, processID, substep, now)
-}
-
 type decodedDataURL struct {
 	ContentType string
 	Data        []byte
-}
-
-func (s *Server) parseFormataPayload(r *http.Request, processID primitive.ObjectID, substep WorkflowSub, now time.Time) (map[string]interface{}, error) {
-	payload, err := parseFormataScalarPayload(r, substep)
-	if err != nil {
-		return nil, err
-	}
-	converted, err := s.persistFormataAttachments(r.Context(), processID, substep, payload, now, nil)
-	if err != nil {
-		return nil, err
-	}
-	convertedPayload, ok := converted.(map[string]interface{})
-	if !ok {
-		return nil, errInvalidForm
-	}
-	return convertedPayload, nil
-}
-
-func parseFormataScalarPayload(r *http.Request, substep WorkflowSub) (map[string]interface{}, error) {
-	if err := r.ParseForm(); err != nil {
-		return nil, errInvalidForm
-	}
-	rawValue := strings.TrimSpace(r.FormValue("value"))
-	if rawValue == "" {
-		fallback := formMapWithoutValue(r.PostForm)
-		if len(fallback) == 0 {
-			rawValue = "{}"
-		} else {
-			data, err := json.Marshal(fallback)
-			if err != nil {
-				return nil, errInvalidForm
-			}
-			rawValue = string(data)
-		}
-	}
-	payload, err := normalizePayload(substep, rawValue)
-	if err != nil {
-		return nil, err
-	}
-	return payload, nil
-}
-
-func formMapWithoutValue(values url.Values) map[string]interface{} {
-	if len(values) == 0 {
-		return nil
-	}
-	result := map[string]interface{}{}
-	for key, rawValues := range values {
-		trimmedKey := strings.TrimSpace(key)
-		if trimmedKey == "" || trimmedKey == "value" {
-			continue
-		}
-		switch len(rawValues) {
-		case 0:
-			continue
-		case 1:
-			result[trimmedKey] = strings.TrimSpace(rawValues[0])
-		default:
-			items := make([]string, 0, len(rawValues))
-			for _, item := range rawValues {
-				items = append(items, strings.TrimSpace(item))
-			}
-			result[trimmedKey] = items
-		}
-	}
-	return result
 }
 
 func (s *Server) persistFormataAttachments(ctx context.Context, processID primitive.ObjectID, substep WorkflowSub, raw interface{}, now time.Time, path []string) (interface{}, error) {
@@ -7196,6 +6967,9 @@ func parseRuntimeConfigData(source string, data []byte) (RuntimeConfig, error) {
 	if err := validateWorkflowCategoryPair(cfg.Workflow); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
+	if err := normalizeCompletionStrategy(&cfg.Workflow); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
+	}
 	if err := normalizeInputTypes(&cfg.Workflow); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("%s: %w", source, err)
 	}
@@ -7233,6 +7007,9 @@ func normalizeWorkflowConfig(cfg *RuntimeConfig) {
 		return
 	}
 	cfg.Workflow.Description = normalizeOptionalText(cfg.Workflow.Description)
+	if strings.TrimSpace(cfg.Workflow.CompletionStrategy) == "" {
+		cfg.Workflow.CompletionStrategy = CompletionStrategyClassic
+	}
 	defaultOrg := ""
 	if len(cfg.Organizations) > 0 {
 		defaultOrg = strings.TrimSpace(cfg.Organizations[0].Slug)
@@ -7617,7 +7394,7 @@ func buildNotarizedExport(def WorkflowDef, process *Process) NotarizedProcessExp
 		export.Termination = notarizedProcessTermination(process.Termination)
 	}
 
-	availableMap := computeAvailability(def, process)
+	availableMap := substepAvailability(def, process)
 	var leaves []MerkleLeaf
 	for _, step := range sortedSteps(def) {
 		stepEntry := NotarizedStep{StepID: step.StepID, Title: step.Title}
@@ -7774,7 +7551,7 @@ func nextAvailableSubstep(def WorkflowDef, process *Process) (WorkflowSub, bool)
 	if process == nil {
 		return WorkflowSub{}, false
 	}
-	availMap := computeAvailability(def, process)
+	availMap := substepAvailability(def, process)
 	for _, sub := range orderedSubsteps(def) {
 		if availMap[sub.SubstepID] {
 			return sub, true
@@ -8054,53 +7831,6 @@ func cssValue(value, fallback string) template.CSS {
 	return template.CSS(trimmed)
 }
 
-func computeAvailability(def WorkflowDef, process *Process) map[string]bool {
-	available := map[string]bool{}
-	if isProcessClosed(def, process) {
-		for _, sub := range orderedSubsteps(def) {
-			available[sub.SubstepID] = false
-		}
-		return available
-	}
-	ordered := orderedSubsteps(def)
-	allPrevDone := true
-	for _, sub := range ordered {
-		done := false
-		if process != nil {
-			if entry, ok := process.Progress[sub.SubstepID]; ok && entry.State == "done" {
-				done = true
-			}
-		}
-		if done {
-			available[sub.SubstepID] = false
-			continue
-		}
-		if allPrevDone {
-			available[sub.SubstepID] = true
-			allPrevDone = false
-		} else {
-			available[sub.SubstepID] = false
-		}
-	}
-	return available
-}
-
-func isSequenceOK(def WorkflowDef, process *Process, substepID string) bool {
-	ordered := orderedSubsteps(def)
-	for _, sub := range ordered {
-		if sub.SubstepID == substepID {
-			return true
-		}
-		if process == nil {
-			return false
-		}
-		if entry, ok := process.Progress[sub.SubstepID]; !ok || entry.State != "done" {
-			return false
-		}
-	}
-	return false
-}
-
 func isProcessDone(def WorkflowDef, process *Process) bool {
 	for _, sub := range orderedSubsteps(def) {
 		entry, ok := process.Progress[sub.SubstepID]
@@ -8350,6 +8080,10 @@ func isProcessContentTargetRequest(r *http.Request) bool {
 }
 
 func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	s.renderDepartmentProcessPageNotice(w, r, process, actor, message, "")
+}
+
+func (s *Server) renderDepartmentProcessPageNotice(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message, confirmation string) {
 	workflowKey := s.defaultWorkflowKey()
 	cfg := RuntimeConfig{}
 	var err error
@@ -8378,12 +8112,17 @@ func (s *Server) renderDepartmentProcessPage(w http.ResponseWriter, r *http.Requ
 		selectedSubstepID,
 		message,
 	)
+	view.Detail.Confirmation = strings.TrimSpace(confirmation)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message string) {
+	s.renderProcessContentNotice(w, r, process, actor, message, "")
+}
+
+func (s *Server) renderProcessContentNotice(w http.ResponseWriter, r *http.Request, process *Process, actor Actor, message, confirmation string) {
 	workflowKey := s.defaultWorkflowKey()
 	cfg := RuntimeConfig{}
 	var err error
@@ -8412,6 +8151,7 @@ func (s *Server) renderProcessContent(w http.ResponseWriter, r *http.Request, pr
 		selectedSubstepID,
 		message,
 	)
+	view.Detail.Confirmation = strings.TrimSpace(confirmation)
 	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

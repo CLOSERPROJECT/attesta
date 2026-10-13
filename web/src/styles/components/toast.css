@@ -2,18 +2,23 @@
  * Toast — fixed notices (CSS-only component).
  *
  * div#toast-host.toast-host[aria-live=polite]
- *   p.confirmation.toast[data-toast] | p.error.toast[data-toast]
- *     (promoted by main.js)
+ *   p.confirmation.confirmation-with-icon.toast[data-toast]   (promoted by main.js)
+ *     icon-check-circle + span (message)
+ *   p.error.toast[data-toast]                                 (promoted by main.js)
  *
  * Opt-in source (still in page HTML until promoted; must not shift layout):
- *   p.confirmation[data-toast] | p.error[data-toast]
+ *   p.confirmation.confirmation-with-icon[data-toast]
+ *   p.error[data-toast]
  *
- * Unmarked .confirmation / .error banners stay in shared.css / document flow.
+ * Stacking: z-index 60 — above tip (30–31), stream-card / account menu (40),
+ * home sticky (45–47), and chrome topbar (50). Native <dialog> stays above via
+ * the top layer (not z-index). Unmarked .confirmation / .error banners stay in
+ * shared.css / document flow; .confirmation-with-icon flex/gap/icon rules live there.
  */
 
 .toast-host {
   position: fixed;
-  z-index: 50;
+  z-index: 60;
   inset: auto var(--space-4) var(--space-4) auto;
   display: flex;
   flex-direction: column-reverse;
@@ -30,7 +35,7 @@
 .confirmation[data-toast],
 .error[data-toast] {
   position: fixed;
-  z-index: 50;
+  z-index: 60;
   inset: auto var(--space-4) var(--space-4) auto;
   width: min(22rem, calc(100vw - 2 * var(--space-4)));
   margin: 0;
@@ -38,6 +43,23 @@
   transition:
     opacity 220ms ease,
     transform 220ms ease;
+}
+
+/* Opaque over the page: muted tokens are low-alpha and read as glass. */
+.confirmation[data-toast] {
+  background: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 16%,
+    var(--background)
+  );
+}
+
+.error[data-toast] {
+  background: color-mix(
+    in srgb,
+    var(--destructive-muted-foreground) 16%,
+    var(--background)
+  );
 }
 
 /* Enter/exit: slide up from below the toast slot */
@@ -54,4 +76,13 @@
   position: relative;
   inset: auto;
   width: 100%;
+}
+
+/* Keep icon+copy row readable in the narrow floating slot */
+.confirmation.confirmation-with-icon[data-toast] {
+  gap: var(--space-2);
+}
+
+.confirmation.confirmation-with-icon[data-toast] .icon-svg {
+  flex-shrink: 0;
 }

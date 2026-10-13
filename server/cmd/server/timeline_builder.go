@@ -36,7 +36,7 @@ type timelineWalkState struct {
 
 func newTimelineWalkState(def WorkflowDef, process *Process) timelineWalkState {
 	substepOrgs := substepOrganizationMap(def)
-	availableMap := computeAvailability(def, process)
+	availableMap := substepAvailability(def, process)
 	terminated := process != nil && process.Termination != nil
 	terminationSubstepID := ""
 	terminationReason := ""

@@ -6,6 +6,7 @@
   data-process-id="{{ .ProcessID }}"
   data-workflow-key="{{ .WorkflowKey }}"
   data-selected-substep="{{ .Detail.SelectedSubstepID }}"
+  data-completion-strategy="{{ .CompletionStrategy }}"
   data-mine-filter="1"
 >
   <div id="process-page-content">{{ template "process_content.html" . }}</div>
@@ -25,8 +26,19 @@
 {{ else }}
   {{ template "stream_timeline" .Detail.StreamTimeline }}
 {{ end }}
-{{ end }} {{ define "process_content.html" }} {{ template "error_banner.html"
-.Detail }}
+{{ end }} {{ define "process_content.html" }}
+<div
+  id="process-selection"
+  hidden
+  data-selected-substep="{{ .Detail.SelectedSubstepID }}"
+></div>
+{{ if .Detail.Confirmation }}
+  <p class="confirmation confirmation-with-icon" data-toast>
+    {{ template "icon-check-circle" . }}
+    <span>{{ .Detail.Confirmation }}</span>
+  </p>
+{{ end }}
+{{ template "error_banner.html" .Detail }}
 <div class="stack">
   <section class="page-header">
     {{ template "breadcrumbs" .Breadcrumbs }}

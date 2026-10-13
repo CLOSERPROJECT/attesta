@@ -46,7 +46,8 @@ type SeedDeps struct {
 // Empty-only (default): if the marker org already exists, returns nil without writing.
 // Pass Replace to rewrite.
 //
-// Apply order is intentional: identity → taxonomy → catalog streams → instances.
+// Apply order is intentional: identity → taxonomy → catalog streams → instances →
+// named pilot streams (stable ObjectIDs; left empty for smoke).
 //
 // Seed does not create the Appwrite project or API key (use prepare for that) and
 // does not read ATTESTA_SEED (hosts gate via PrepareDemoStack / ADR-0004).
@@ -105,6 +106,9 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	}
 	if _, err := seedDemoInstances(ctx, deps.Store, catalogResult.Catalog, now); err != nil {
 		return fmt.Errorf("seed: instances: %w", err)
+	}
+	if _, err := seedNamedPilotStreams(ctx, deps.Store, configDir, now); err != nil {
+		return fmt.Errorf("seed: named pilot streams: %w", err)
 	}
 	return nil
 }

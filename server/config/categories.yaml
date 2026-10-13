@@ -1,5 +1,5 @@
 # Attesta stream-discovery taxonomy seed (applied by `attesta seed` / `task seed`).
-# Extracted from Figma; see .scratch/stream-categories/figma-seed-notes.md for provenance.
+# Extracted from Figma.
 
 categories:
   - slug: recycling-and-recovery
