@@ -1,16 +1,18 @@
 /*
- * Toast — fixed success notices (CSS-only component).
+ * Toast — fixed notices (CSS-only component).
  *
  * div#toast-host.toast-host[aria-live=polite]
  *   p.confirmation.confirmation-with-icon.toast[data-toast]   (promoted by main.js)
  *     icon-check-circle + span (message)
+ *   p.error.toast[data-toast]                                 (promoted by main.js)
  *
  * Opt-in source (still in page HTML until promoted; must not shift layout):
  *   p.confirmation.confirmation-with-icon[data-toast]
+ *   p.error[data-toast]
  *
  * Stacking: z-index 60 — above tip (30–31), stream-card / account menu (40),
  * home sticky (45–47), and chrome topbar (50). Native <dialog> stays above via
- * the top layer (not z-index). Unmarked .confirmation banners stay in
+ * the top layer (not z-index). Unmarked .confirmation / .error banners stay in
  * shared.css / document flow; .confirmation-with-icon flex/gap/icon rules live there.
  */
 
@@ -30,33 +32,47 @@
 }
 
 /* Out of flow from first paint — no panel jump before JS promote */
-.confirmation[data-toast] {
+.confirmation[data-toast],
+.error[data-toast] {
   position: fixed;
   z-index: 60;
   inset: auto var(--space-4) var(--space-4) auto;
   width: min(22rem, calc(100vw - 2 * var(--space-4)));
   margin: 0;
-
-  /* Opaque over the page: dark --success-muted is 12% alpha and reads as glass. */
-  background: color-mix(
-    in srgb,
-    var(--success-muted-foreground) 16%,
-    var(--background)
-  );
   box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent);
   transition:
     opacity 220ms ease,
     transform 220ms ease;
 }
 
+/* Opaque over the page: muted tokens are low-alpha and read as glass. */
+.confirmation[data-toast] {
+  background: color-mix(
+    in srgb,
+    var(--success-muted-foreground) 16%,
+    var(--background)
+  );
+}
+
+.error[data-toast] {
+  background: color-mix(
+    in srgb,
+    var(--destructive-muted-foreground) 16%,
+    var(--background)
+  );
+}
+
 /* Enter/exit: slide up from below the toast slot */
 .confirmation[data-toast].toast-enter,
-.confirmation[data-toast].toast-exit {
+.confirmation[data-toast].toast-exit,
+.error[data-toast].toast-enter,
+.error[data-toast].toast-exit {
   opacity: 0;
   transform: translateY(100%);
 }
 
-.toast-host .confirmation[data-toast] {
+.toast-host .confirmation[data-toast],
+.toast-host .error[data-toast] {
   position: relative;
   inset: auto;
   width: 100%;

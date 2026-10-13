@@ -89,7 +89,7 @@ func (s *Server) buildPublicStreamBlueprint(ctx context.Context, cfg RuntimeConf
 			Actor{},
 			"",
 			"",
-			false,
+			streamInstanceDetailOptions{},
 		),
 		"Public preview.",
 	)
@@ -144,9 +144,12 @@ func (s *Server) handlePublicStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := s.pageBase("public_stream_body", key, cfg.Workflow.Name)
-	if user, _, err := s.currentUser(r); err == nil {
+	var user *AccountUser
+	if u, _, err := s.currentUser(r); err == nil {
+		user = u
 		base = s.pageBaseForUser(user, "public_stream_body", key, cfg.Workflow.Name)
 	}
+	base.ToastError = toastErrorMessage(r)
 
 	view := PublicStreamPageView{
 		PageBase:      base,
@@ -155,6 +158,14 @@ func (s *Server) handlePublicStream(w http.ResponseWriter, r *http.Request) {
 		Organizations: buildPublicStreamOrganizations(cfg, logoURLs),
 		RecentRuns:    recent,
 		Blueprint:     s.buildPublicStreamBlueprint(ctx, cfg, key),
+	}
+	if streamIsStartable(user, cfg) {
+		view.Start = &StartStreamInstanceView{
+			DialogID:    "start-instance-" + key,
+			StartAction: streamPath(key) + "/instance/start",
+			ReturnPath:  publicStreamPath(key),
+			Trigger:     "header",
+		}
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_stream.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -186,17 +186,70 @@ const processPageContent = document.getElementById("process-page-content");
 let skipNextProcessUpdatedEvent = false;
 let skipNextProcessUpdatedEventTimer = 0;
 
-const focusNextActionInput = () => {
-  const container = processPageContent || document;
-  const nextInput = container.querySelector(
-    "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])",
-  );
-  if (nextInput) {
-    nextInput.focus();
+const processPageRoot = () => {
+  if (root instanceof HTMLElement) {
+    return root;
+  }
+  return document.getElementById("process-page");
+};
+
+const mineFilterCheckbox = () => {
+  const page = processPageRoot();
+  const toggle = page?.querySelector(".js-mine-filter");
+  return toggle instanceof HTMLInputElement ? toggle : null;
+};
+
+// Preference lives on #process-page[data-mine-filter] so HTMX/SSE content
+// swaps can recreate the checkbox without resetting the choice.
+const mineFilterEnabled = () => {
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    if (page.dataset.mineFilter === "0") {
+      return false;
+    }
+    if (page.dataset.mineFilter === "1") {
+      return true;
+    }
+  }
+  const toggle = mineFilterCheckbox();
+  if (toggle) {
+    return toggle.checked;
+  }
+  return true;
+};
+
+const applyMineFilterRoot = (scopeRoot = document) => {
+  const scope =
+    scopeRoot instanceof Element || scopeRoot instanceof Document
+      ? scopeRoot
+      : document;
+  const on = mineFilterEnabled();
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    page.dataset.mineFilter = on ? "1" : "0";
+  }
+  const toggle = mineFilterCheckbox();
+  if (toggle) {
+    toggle.checked = on;
+  }
+
+  for (const filterRoot of scope.querySelectorAll(".js-mine-filter-root")) {
+    if (!(filterRoot instanceof HTMLElement)) {
+      continue;
+    }
+    filterRoot.classList.toggle("is-mine-filter", on);
+    const hasVisible =
+      !!filterRoot.querySelector('.substep[data-viewer-owned="true"]') ||
+      !!filterRoot.querySelector(".substep-selected");
+    filterRoot.classList.toggle("is-mine-filter-empty", on && !hasVisible);
+    const empty = filterRoot.querySelector(".stream-mine-filter-empty");
+    if (empty instanceof HTMLElement) {
+      empty.hidden = !on || hasVisible;
+    }
   }
 };
 
-const syncSelectedSubstepURL = (substepId = "") => {
+const syncProcessPageURL = (substepId = "") => {
   // Process-page only: do not leak ?substep= onto stream dashboard URLs.
   if (!processId) {
     return;
@@ -208,8 +261,13 @@ const syncSelectedSubstepURL = (substepId = "") => {
     } else {
       url.searchParams.delete("substep");
     }
+    url.searchParams.delete("mine");
     window.history.replaceState({}, "", url);
   } catch (_err) {}
+};
+
+const syncSelectedSubstepURL = (substepId = "") => {
+  syncProcessPageURL(substepId);
 };
 
 const isDraftAndSealProcess = () =>
@@ -228,8 +286,12 @@ const openProcessSubstepId = () => {
 const retainedSelectedSubstep = () =>
   (root?.dataset?.selectedSubstep || "").trim();
 
-const currentSelectedSubstep = () =>
-  openProcessSubstepId() || retainedSelectedSubstep();
+const currentSelectedSubstep = () => {
+  // Only an actually open panel counts — never resurrect a stale dataset id
+  // into ?substep= (that re-opens after SSE/content refresh).
+  // Draft-and-seal retention is handled by syncProcessSubstepSelectionAfterSwap.
+  return openProcessSubstepId();
+};
 
 const collectOpenProcessSubstepIds = () => {
   const openIds = [];
@@ -284,9 +346,11 @@ const syncProcessSubstepSelectionAfterSwap = () => {
   )
     .trim();
   // Prefer server selection from the swapped fragment (authoritative after
-  // Save draft / Complete). Fall back to [open] / retained dataset.
-  const selected =
-    fromServer || openProcessSubstepId() || retainedSelectedSubstep();
+  // Save draft / Complete). Draft-and-seal may fall back to retained dataset;
+  // classic must not resurrect a stale data-selected-substep into ?substep=.
+  const selected = isDraftAndSealProcess()
+    ? fromServer || openProcessSubstepId() || retainedSelectedSubstep()
+    : fromServer || openProcessSubstepId();
   const restoreOpen = new Set(retainedOpenProcessSubstepIds);
   if (selected) {
     restoreOpen.add(selected);
@@ -332,7 +396,11 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
   if (!processId || !workflowKey || !processPageContent) {
     return;
   }
-  const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
+  const params = new URLSearchParams();
+  if (substepId) {
+    params.set("substep", substepId);
+  }
+  const query = params.toString() ? `?${params.toString()}` : "";
   const url = `/my/streams/${workflowKey}/instance/${processId}/content${query}`;
   if (window.htmx?.ajax) {
     window.htmx.ajax("GET", url, {
@@ -357,6 +425,7 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     await initializeFormataForms(processPageContent);
     syncProcessSubstepSelectionAfterSwap();
     focusNextActionInput();
+    applyMineFilterRoot(processPageContent);
   } catch (_err) {}
 };
 
@@ -1210,6 +1279,21 @@ const initializeFormataForms = async (container = document) => {
   }
 };
 
+document.body.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !processId) {
+    return;
+  }
+  if (!target.classList.contains("js-mine-filter")) {
+    return;
+  }
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    page.dataset.mineFilter = target.checked ? "1" : "0";
+  }
+  applyMineFilterRoot(document);
+});
+
 if (processId && workflowKey && processPageContent) {
   const source = new EventSource(
     `/my/streams/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`,
@@ -1242,8 +1326,10 @@ function dismissToast(el) {
   }, 240);
 }
 
+const TOAST_SELECTOR = ".confirmation[data-toast], .error[data-toast]";
+
 function enforceToastCap(host) {
-  const items = [...host.querySelectorAll(".confirmation[data-toast]")];
+  const items = [...host.querySelectorAll(TOAST_SELECTOR)];
   while (items.length > TOAST_MAX) {
     const oldest = items.pop();
     if (oldest) {
@@ -1258,7 +1344,7 @@ function promoteToasts(root = document) {
     return;
   }
   const scope = root instanceof Element || root instanceof Document ? root : document;
-  const nodes = scope.querySelectorAll?.(".confirmation[data-toast]") ?? [];
+  const nodes = scope.querySelectorAll?.(TOAST_SELECTOR) ?? [];
   for (const node of nodes) {
     if (!(node instanceof HTMLElement)) {
       continue;
@@ -1287,6 +1373,36 @@ function promoteToasts(root = document) {
     }, TOAST_DISMISS_MS);
   }
 }
+
+function syncStartStreamSubmit(dialog) {
+  if (!(dialog instanceof HTMLElement)) {
+    return;
+  }
+  const input = dialog.querySelector("[data-start-stream-name]");
+  const submit = dialog.querySelector("[data-start-stream-submit]");
+  if (!(input instanceof HTMLInputElement) || !(submit instanceof HTMLButtonElement)) {
+    return;
+  }
+  submit.disabled = input.value.trim() === "";
+}
+
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-start-stream-name")) {
+    return;
+  }
+  const dialog = target.closest("[data-start-stream-instance]");
+  syncStartStreamSubmit(dialog);
+});
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-start-stream-name")) {
+    return;
+  }
+  const dialog = target.closest("[data-start-stream-instance]");
+  syncStartStreamSubmit(dialog);
+});
 
 const createRolePill = (label, palette) => {
   const pill = document.createElement("span");
@@ -1519,7 +1635,9 @@ document.addEventListener("DOMContentLoaded", () => {
   formatLocalDateTimes(document);
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
-  focusNextActionInput();
+  applyMineFilterRoot(document);
+  // Do not focus into forms on load — focusing a control inside <details>
+  // can force the accordion open.
   promoteToasts(document);
   initRolePickers(document);
   openAutoOpenDialogs(document);
@@ -1563,8 +1681,22 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
-    syncProcessSubstepSelectionAfterSwap();
-    focusNextActionInput();
+    if (isDraftAndSealProcess()) {
+      syncProcessSubstepSelectionAfterSwap();
+      focusNextActionInput();
+    } else {
+      // Sync from panels the server actually opened — never resurrect a stale
+      // data-selected-substep on #process-page (outside the swapped partial).
+      const openPanel = event.target.querySelector(
+        ".js-process-substep-panel[open]",
+      );
+      const openId =
+        openPanel instanceof HTMLElement
+          ? (openPanel.dataset.substepId || "").trim()
+          : "";
+      markSelectedSubstep(openId);
+    }
+    applyMineFilterRoot(event.target);
   }
   if (event.detail?.target?.id === "platform-admin-categories") {
     const form = document.getElementById("categories-editor-form");
@@ -1655,15 +1787,9 @@ document.body.addEventListener("toggle", (event) => {
       }
     }
     markSelectedSubstep(substepID);
-    const summary = target.querySelector(".substep-accordion-summary");
-    if (summary instanceof HTMLElement) {
-      summary.focus();
-    }
     return;
   }
-  if (currentSelectedSubstep() === substepID) {
-    markSelectedSubstep("");
-  }
+  markSelectedSubstep("");
 });
 
 document.body.addEventListener("click", (event) => {

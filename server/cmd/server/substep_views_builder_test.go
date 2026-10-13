@@ -17,7 +17,7 @@ func TestBuildSubstepViewsDoneScalarValues(t *testing.T) {
 		},
 	}
 
-	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.1")
 	if action.Status != "done" {
 		t.Fatalf("expected status done, got %q", action.Status)
@@ -56,7 +56,7 @@ func TestBuildSubstepViewsDoneFileAttachments(t *testing.T) {
 		},
 	}
 
-	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{Role: "dep1"}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.3")
 	if action.Status != "done" {
 		t.Fatalf("expected status done, got %q", action.Status)
@@ -99,7 +99,7 @@ func TestBuildSubstepViewsTerminatedStreamDetails(t *testing.T) {
 		},
 	}
 
-	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, map[roleMetaKey]RoleMeta{}, nil)
 	terminated := findSubstepView(t, actions, "1.2")
 	if terminated.Status != processStatusTerminated {
 		t.Fatalf("terminated status = %q, want %s", terminated.Status, processStatusTerminated)
@@ -130,7 +130,7 @@ func TestBuildSubstepViewsTerminatedStreamWithoutReason(t *testing.T) {
 		Termination: &ProcessTermination{SubstepID: "1.1"},
 	}
 
-	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(cfg.Workflow, process, "workflow", Actor{RoleSlugs: []string{"dep1"}}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.1")
 	if action.DetailMessage != "No reason provided" {
 		t.Fatalf("detail = %q, want no reason message", action.DetailMessage)
@@ -183,7 +183,7 @@ func TestBuildSubstepViewsDoneFormataValuesAndAttachments(t *testing.T) {
 		},
 	}
 
-	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.1")
 	if action.DoneAt != "19 Feb 2026 at 09:00 UTC" {
 		t.Fatalf("expected doneAt %q, got %q", "19 Feb 2026 at 09:00 UTC", action.DoneAt)
@@ -258,7 +258,7 @@ func TestBuildSubstepViewsDoneFormataPrimitiveAMultiFileAttachments(t *testing.T
 		},
 	}
 
-	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.1")
 	if len(action.Values) != 0 {
 		t.Fatalf("expected no scalar values for multi-file formata payload, got %#v", action.Values)
@@ -308,7 +308,7 @@ func TestBuildSubstepViewsLockedFormataDisabled(t *testing.T) {
 		Progress: map[string]ProcessStep{},
 	}
 
-	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, true, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "workflow", Actor{Role: "dep1"}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.2")
 
 	if action.Status != "locked" {
@@ -353,7 +353,7 @@ func TestBuildSubstepViewsDisablesWrongOrgEvenWithMatchingRole(t *testing.T) {
 		OrgSlug:   "org-b",
 		Role:      "dep1",
 		RoleSlugs: []string{"dep1"},
-	}, true, map[roleMetaKey]RoleMeta{}, nil)
+	}, map[roleMetaKey]RoleMeta{}, nil)
 	action := findSubstepView(t, actions, "1.1")
 
 	if action.Status != "available" {
@@ -394,7 +394,7 @@ func TestBuildSubstepViewsIncludesAllAllowedRoleBadges(t *testing.T) {
 		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
 	})
 
-	actions := buildSubstepViews(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
+	actions := buildSubstepViews(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, roleMeta, nil)
 	action := findSubstepView(t, actions, "1.1")
 	if len(action.RoleBadges) != 2 {
 		t.Fatalf("role badge count = %d, want 2", len(action.RoleBadges))
@@ -448,7 +448,7 @@ func TestBuildSubstepViewsDoneSubstepUsesSelectedRoleBadge(t *testing.T) {
 		"dep2": {ID: "dep2", Label: "Department 2", Palette: "orange"},
 	})
 
-	actions := buildSubstepViews(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, false, roleMeta, nil)
+	actions := buildSubstepViews(def, process, "workflow", Actor{RoleSlugs: []string{"dep1", "dep2"}}, roleMeta, nil)
 	action := findSubstepView(t, actions, "1.1")
 	if action.Status != "done" {
 		t.Fatalf("status = %q, want done", action.Status)

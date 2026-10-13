@@ -51,8 +51,8 @@ The unaffiliated-user surface at `/my/onboarding` to obtain an Affiliation: acce
 _Avoid_: Signup (account creation), registration wizard, folding Onboarding into `/my`, Email verification waiting path
 
 **Public stream card**:
-A public-homepage presentation of a **Stream** (blueprint): name, description, a static “Stream” badge in markup plus an optional passport badge when DPP is enabled, step preview (titles and substep counts), live stream-instance metrics (total count plus active-or-completed activity, or that none exist yet), and participating **organizations**. Distinct UI from the authenticated stream-discovery card on Operator home. Not clickable in v1.
-_Avoid_: Stream card (when meaning the Operator home discovery card), process card, landing stream tile, showcase stream
+A public-homepage presentation of a **Stream** (blueprint): name, description, optional passport badge when DPP is enabled, live stream-instance metrics, step/role counts, and participating **organizations**. Links to the public stream page when an href is set. When the viewer has a **Startable stream**, may show the same Start control as Stream discovery (outside the card link). Distinct presentation from the Operator-home discovery card shell, which reuses this card inside management chrome.
+_Avoid_: Stream card (when meaning the Operator home discovery card alone), process card, landing stream tile, showcase stream
 
 ### Stream discovery taxonomy
 
@@ -165,8 +165,12 @@ _Avoid_: Process page
 ### Stream instance detail UI
 
 **Stream timeline**:
-The accordion tree on stream instance detail (and preview on the stream dashboard): steps, each containing expandable substeps.
-_Avoid_: Workflow timeline, traceability timeline, action list
+The accordion tree on stream instance detail (and preview on the stream dashboard): steps, each containing expandable substeps. Substeps open only from an explicit user expand or `?substep=` — the next available Substep is never auto-expanded.
+_Avoid_: Workflow timeline, traceability timeline, action list, auto-open current substep
+
+**My tasks filter**:
+A Stream instance detail switch shown only while the instance is in progress (hidden when completed or terminated), placed between the page header and the Stream timeline. The server stamps each Substep with viewer ownership (org + Organization role ∩ Stream role gate; Org admin standing does not count); the browser hides non-owned rows without reloading the timeline, keeping the on/off preference on the process-page shell across HTMX/SSE content swaps. Default on. Off shows the full Stream timeline. Steps with no visible Substeps are omitted. A selected Substep may stay visible when it would otherwise be hidden.
+_Avoid_: My roles filter, Role filter (vague), onlyRole, active-role filter, Org admin sees all, mine query param, server-side timeline filtering for this switch
 
 **Substep summary**:
 The always-visible row for one substep: ID, title, status, and optional completion meta in the accordion header.

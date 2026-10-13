@@ -1,142 +1,141 @@
 {{ define "public_stream_body" }}
-<div class="public-stream">
-  <header class="public-stream-header">
-    {{ template "back_link" (dict "Href" .HomeHref "Label" "Home") }}
-    <div class="public-stream-title-wrapper">
-      <h1 class="public-stream-title">{{ .Header.Name }}</h1>
-      {{ if .Header.PassportEnabled }}
-      <span class="stream-dpp-badge public-stream-dpp-beside">
-        DPP {{ template "icon-file-text" . }}
-      </span>
-      {{ end }}
-    </div>
-    {{ if .Header.Description }}
-    <p class="public-stream-description">{{ .Header.Description }}</p>
-    {{ end }}
-    {{ if .Header.PassportEnabled }}
-    <span class="stream-dpp-badge public-stream-dpp-below">
-      DPP {{ template "icon-file-text" . }}
-    </span>
-    {{ end }}
+  <div class="public-stream">
+    <section class="page-header public-stream-header">
+      {{ template "back_link" (dict "Href" .HomeHref "Label" "Home") }}
+      <div class="page-header-head">
+        <div class="page-header-body">
+          <div class="public-stream-title-wrapper">
+            <h1 class="public-stream-title">{{ .Header.Name }}</h1>
+            {{ if .Header.PassportEnabled }}
+              <span class="stream-dpp-badge public-stream-dpp-beside">
+                DPP {{ template "icon-file-text" . }}
+              </span>
+            {{ end }}
+          </div>
+          {{ if .Header.Description }}
+            <p class="public-stream-description">{{ .Header.Description }}</p>
+          {{ end }}
+          {{ if .Header.PassportEnabled }}
+            <span class="stream-dpp-badge public-stream-dpp-below">
+              DPP {{ template "icon-file-text" . }}
+            </span>
+          {{ end }}
+        </div>
+        {{ if .Start }}
+          <div class="page-header-actions">
+            {{ template "start_stream_instance" .Start }}
+          </div>
+        {{ end }}
+      </div>
 
-    <div class="public-stream-metrics">
-      {{ if eq .Header.InstanceCount 0 }}
-      <span class="stream-metric">
-        {{ template "icon-layers-2" . }} no runs yet
-      </span>
-      {{ else if .Header.AllCompleted }}
-      <span class="stream-metric">
-        {{ template "icon-layers-2" . }} {{ if eq .Header.InstanceCount 1 }}1
-        run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
-      </span>
-      <span class="stream-metric">
-        {{ template "icon-check-circle" . }} all completed
-      </span>
-      {{ else }}
-      <span class="stream-metric">
-        {{ template "icon-layers-2" . }} {{ if eq .Header.InstanceCount 1 }}1
-        run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
-      </span>
-      <span class="stream-metric">
-        {{ template "icon-activity" . }} {{ if eq .Header.ActiveCount 1 }}1
-        active now{{ else }}{{ .Header.ActiveCount }} active now{{ end }}
-      </span>
-      {{ end }}
-      <span class="stream-metric">
-        {{ template "icon-list" . }} {{ if eq .Header.StepCount 1 }}1 step{{
-        else }}{{ .Header.StepCount }} steps{{ end }}
-      </span>
-      <span class="stream-metric">
-        {{ template "icon-users-group" . }} {{ if eq .Header.RoleCount 1 }}1
-        role{{ else }}{{ .Header.RoleCount }} roles{{ end }}
-      </span>
-      {{ if gt .Header.OrganizationCount 0 }}
-      <span class="stream-metric">
-        {{ template "icon-building-grid" . }}
-        {{ if eq .Header.OrganizationCount 1 }}1 organization{{ else
-        }}{{ .Header.OrganizationCount }} organizations{{ end }}
-      </span>
-      {{ end }}
-    </div>
-  </header>
-
-  <div class="public-stream-main">
-    <section
-      class="public-stream-section public-stream-blueprint"
-      aria-labelledby="public-stream-blueprint-heading"
-    >
-      <h2 id="public-stream-blueprint-heading">Workflow</h2>
-      {{ template "stream_timeline" .Blueprint.StreamTimeline }}
+      <div class="public-stream-metrics">
+        {{ if eq .Header.InstanceCount 0 }}
+          <span class="stream-metric">
+            {{ template "icon-layers-2" . }} no runs yet
+          </span>
+        {{ else if .Header.AllCompleted }}
+          <span class="stream-metric">
+            {{ template "icon-layers-2" . }}
+            {{ if eq .Header.InstanceCount 1 }}1 run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
+          </span>
+          <span class="stream-metric">
+            {{ template "icon-check-circle" . }} all completed
+          </span>
+        {{ else }}
+          <span class="stream-metric">
+            {{ template "icon-layers-2" . }}
+            {{ if eq .Header.InstanceCount 1 }}1 run{{ else }}{{ .Header.InstanceCount }} runs{{ end }}
+          </span>
+          <span class="stream-metric">
+            {{ template "icon-activity" . }}
+            {{ if eq .Header.ActiveCount 1 }}1 active now{{ else }}{{ .Header.ActiveCount }} active now{{ end }}
+          </span>
+        {{ end }}
+        <span class="stream-metric">
+          {{ template "icon-list" . }}
+          {{ if eq .Header.StepCount 1 }}1 step{{ else }}{{ .Header.StepCount }} steps{{ end }}
+        </span>
+        <span class="stream-metric">
+          {{ template "icon-users-group" . }}
+          {{ if eq .Header.RoleCount 1 }}1 role{{ else }}{{ .Header.RoleCount }} roles{{ end }}
+        </span>
+        {{ if gt .Header.OrganizationCount 0 }}
+          <span class="stream-metric">
+            {{ template "icon-building-grid" . }}
+            {{ if eq .Header.OrganizationCount 1 }}1 organization{{ else }}{{ .Header.OrganizationCount }} organizations{{ end }}
+          </span>
+        {{ end }}
+      </div>
     </section>
 
-    {{ if or .Organizations .Header.PassportEnabled }}
-    <aside class="public-stream-aside">
-      {{ if .Organizations }}
-      <section
-        class="public-stream-section public-stream-orgs"
-        aria-labelledby="public-stream-orgs-heading"
-      >
-        <h2 id="public-stream-orgs-heading">Organizations</h2>
-        <ul class="public-stream-orgs-list">
-          {{ range .Organizations }}
-          <li class="public-stream-org">
-            {{ if .LogoURL }}
-            <img
-              class="public-stream-org-mark"
-              src="{{ .LogoURL }}"
-              alt=""
-              width="32"
-              height="32"
-            />
-            {{ else }}
-            <span class="public-stream-org-mark" aria-hidden="true"
-              >{{ .Initials }}</span
-            >
-            {{ end }}
-            <span class="public-stream-org-name">{{ .Name }}</span>
-          </li>
-          {{ end }}
-        </ul>
+    <div class="public-stream-main">
+      <section class="public-stream-section public-stream-blueprint"
+               aria-labelledby="public-stream-blueprint-heading">
+        <h2 id="public-stream-blueprint-heading">Workflow</h2>
+        {{ template "stream_timeline" .Blueprint.StreamTimeline }}
       </section>
-      {{ end }}
 
-      {{ if .Header.PassportEnabled }}
-      <section
-        class="public-stream-section public-stream-runs"
-        aria-labelledby="public-stream-runs-heading"
-      >
-        <h2 id="public-stream-runs-heading">Recent completed runs</h2>
-        {{ if .RecentRuns }}
-        <ul class="public-stream-runs-list">
-          {{ range .RecentRuns }}
-          <li class="public-stream-runs-item">
-            <time class="public-stream-runs-time">{{ .CompletedAt }}</time>
-            <span class="public-stream-runs-sep" aria-hidden="true">•</span>
-            <a
-              class="public-stream-runs-dpp"
-              href="{{ .DigitalLink }}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              DPP {{ template "icon-arrow-up-right" . }}
-            </a>
-          </li>
+      {{ if or .Organizations .Header.PassportEnabled }}
+        <aside class="public-stream-aside">
+          {{ if .Organizations }}
+            <section class="public-stream-section public-stream-orgs"
+                     aria-labelledby="public-stream-orgs-heading">
+              <h2 id="public-stream-orgs-heading">Organizations</h2>
+              <ul class="public-stream-orgs-list">
+                {{ range .Organizations }}
+                  <li class="public-stream-org">
+                    {{ if .LogoURL }}
+                      <img class="public-stream-org-mark"
+                           src="{{ .LogoURL }}"
+                           alt=""
+                           width="32"
+                           height="32" />
+                    {{ else }}
+                      <span class="public-stream-org-mark" aria-hidden="true">{{ .Initials }}</span>
+                    {{ end }}
+                    <span class="public-stream-org-name">{{ .Name }}</span>
+                  </li>
+                {{ end }}
+              </ul>
+            </section>
           {{ end }}
-        </ul>
-        {{ else }}
-        <div class="empty-state">
-          {{ template "icon-layers-2" . }}
-          <p class="empty-state-title">No completed runs yet</p>
-          <p class="empty-state-hint">
-            Finished runs with a DPP will appear here.
-          </p>
-        </div>
-        {{ end }}
-      </section>
+
+          {{ if .Header.PassportEnabled }}
+            <section class="public-stream-section public-stream-runs"
+                     aria-labelledby="public-stream-runs-heading">
+              <h2 id="public-stream-runs-heading">Recent completed runs</h2>
+              {{ if .RecentRuns }}
+                <ul class="public-stream-runs-list">
+                  {{ range .RecentRuns }}
+                    <li class="public-stream-runs-item">
+                      <time class="public-stream-runs-time">{{ .CompletedAt }}</time>
+                      <span class="public-stream-runs-sep" aria-hidden="true">•</span>
+                      <a class="public-stream-runs-dpp"
+                         href="{{ .DigitalLink }}"
+                         target="_blank"
+                         rel="noopener noreferrer">
+                        DPP {{ template "icon-arrow-up-right" . }}
+                      </a>
+                    </li>
+                  {{ end }}
+                </ul>
+              {{ else }}
+                <div class="empty-state">
+                  {{ template "icon-layers-2" . }}
+                  <p class="empty-state-title">No completed runs yet</p>
+                  <p class="empty-state-hint">
+                    Finished runs with a DPP will appear here.
+                  </p>
+                </div>
+              {{ end }}
+            </section>
+          {{ end }}
+        </aside>
       {{ end }}
-    </aside>
-    {{ end }}
+    </div>
   </div>
-</div>
-{{ end }} {{ define "public_stream.html" }} {{ template "layout.html" . }} {{
-end }}
+{{ end }}
+
+{{ define "public_stream.html" }}
+  {{ template "layout.html" . }}
+{{ end }}

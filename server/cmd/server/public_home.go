@@ -41,7 +41,7 @@ func resolvePublicHomeSelection(categories []TaxonomyCategoryNode, categorySlug,
 	return categories[0].Slug, categories[0].SubCategories[0].Slug
 }
 
-func buildPublicHomeStreamResultsView(categories []TaxonomyCategoryNode, cat, sub string, streams []PublicStreamCardView, createHref string) PublicHomeStreamResultsView {
+func buildPublicHomeStreamResultsView(categories []TaxonomyCategoryNode, cat, sub string, streams []ManagedPublicStreamCardView, createHref string) PublicHomeStreamResultsView {
 	view := PublicHomeStreamResultsView{
 		Streams:          streams,
 		CreateStreamHref: createHref,
@@ -107,7 +107,7 @@ func publicHomeCreateStreamHref(signedIn bool) string {
 	return "/login?next=" + url.QueryEscape(target)
 }
 
-func (s *Server) publicStreamCardsForPath(ctx context.Context, categorySlug, subCategorySlug string) ([]PublicStreamCardView, error) {
+func (s *Server) publicStreamCardsForPath(ctx context.Context, categorySlug, subCategorySlug string, user *AccountUser) ([]ManagedPublicStreamCardView, error) {
 	cat := strings.TrimSpace(categorySlug)
 	sub := strings.TrimSpace(subCategorySlug)
 	if cat == "" || sub == "" {
@@ -122,7 +122,8 @@ func (s *Server) publicStreamCardsForPath(ctx context.Context, categorySlug, sub
 	}
 	keys := sortedWorkflowKeys(catalog)
 	logoURLs := organizationLogoURLMap(ctx, s.identity)
-	cards := make([]PublicStreamCardView, 0, publicHomeStreamCardLimit)
+	returnPath := publicHomePath(cat, sub)
+	cards := make([]ManagedPublicStreamCardView, 0, publicHomeStreamCardLimit)
 	for _, key := range keys {
 		cfg := catalog[key]
 		if !cfg.Workflow.IsCategorized() {
@@ -135,7 +136,16 @@ func (s *Server) publicStreamCardsForPath(ctx context.Context, categorySlug, sub
 		if buildErr != nil {
 			return nil, buildErr
 		}
-		cards = append(cards, card)
+		managed := ManagedPublicStreamCardView{
+			Key:        key,
+			Card:       card,
+			ReturnPath: returnPath,
+		}
+		if streamIsStartable(user, cfg) {
+			managed.Startable = true
+			managed.StartAction = streamPath(key) + "/instance/start"
+		}
+		cards = append(cards, managed)
 		if len(cards) >= publicHomeStreamCardLimit {
 			break
 		}
@@ -159,14 +169,16 @@ func (s *Server) handlePublicStreamsPartial(w http.ResponseWriter, r *http.Reque
 		http.NotFound(w, r)
 		return
 	}
-	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub)
+	var user *AccountUser
+	signedIn := false
+	if u, _, err := s.currentUser(r); err == nil {
+		user = u
+		signedIn = true
+	}
+	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub, user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	signedIn := false
-	if _, _, err := s.currentUser(r); err == nil {
-		signedIn = true
 	}
 	view := buildPublicHomeStreamResultsView(categories, cat, sub, streams, publicHomeCreateStreamHref(signedIn))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

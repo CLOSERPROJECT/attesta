@@ -28,6 +28,15 @@ type PublicStreamCardOrgView struct {
 	Initials string
 }
 
+// StartStreamInstanceView is the view model for
+// templates/components/start_stream_instance.html.
+type StartStreamInstanceView struct {
+	DialogID    string // unique dialog element id
+	StartAction string // POST /my/streams/:key/instance/start
+	ReturnPath  string // same-origin path posted as next on reject
+	Trigger     string // "card" | "header"
+}
+
 // ManagedPublicStreamCardView wraps a public stream card with optional /my management actions.
 type ManagedPublicStreamCardView struct {
 	Card              PublicStreamCardView
@@ -41,6 +50,7 @@ type ManagedPublicStreamCardView struct {
 	DeleteAction      string
 	Startable         bool
 	StartAction       string
+	ReturnPath        string // page that opened Start; posted as next
 }
 
 // StreamTaxonomyOptionView is one option in a taxonomy filter select.
@@ -124,6 +134,7 @@ type PublicStreamPageView struct {
 	PageBase
 	HomeHref      string // /?category=…&subCategory=… or /
 	Header        PublicStreamCardView
+	Start         *StartStreamInstanceView // set when the viewer has a Startable stream
 	Organizations []PublicStreamCardOrgView // step-order unique orgs; full list
 	RecentRuns    []PublicStreamRunView
 	Blueprint     StreamInstanceDetailView
@@ -159,7 +170,7 @@ type CategorySidebarView struct {
 
 // PublicHomeStreamResultsView is the HTMX swap target for landing stream cards.
 type PublicHomeStreamResultsView struct {
-	Streams                []PublicStreamCardView
+	Streams                []ManagedPublicStreamCardView
 	CreateStreamHref       string
 	CategoryName           string
 	CategoryIconURL        string
@@ -356,6 +367,7 @@ type TimelineSubstep struct {
 	SubstepID   string
 	Title       string
 	Selected    bool
+	ViewerOwned bool
 	Body        *SubstepBodyView
 	Palette     string
 	Status      string
@@ -406,6 +418,10 @@ type StreamTerminationDetailsView struct {
 	Reason       string
 }
 
+type streamInstanceDetailOptions struct {
+	ShowMineFilter bool
+}
+
 // StreamInstanceDetailView is the HTMX/SSE partial payload for stream instance detail content.
 type StreamInstanceDetailView struct {
 	WorkflowKey       string
@@ -418,6 +434,7 @@ type StreamInstanceDetailView struct {
 	Error             string
 	Confirmation      string // opt-in floating toast via data-toast
 	Timeline          []TimelineStep
+	ShowMineFilter    bool
 	HideStatus        bool
 	DPPURL            string
 	DPPGS1            string

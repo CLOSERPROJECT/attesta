@@ -81,7 +81,8 @@ func TestManagedPublicStreamCardRendersStartWhenStartable(t *testing.T) {
 		`action="/my/streams/wf-a/instance/start"`,
 		`name="name"`,
 		"New instance",
-		"Start instance",
+		`data-start-stream-instance`,
+		`disabled`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in %s", want, body)

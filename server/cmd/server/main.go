@@ -300,6 +300,7 @@ type PageBase struct {
 	HasAttention            bool
 	HasJoinRequestAttention bool
 	HasOrgCreationAttention bool
+	ToastError              string // ?toast_error=; promoted into #toast-host
 }
 
 type PublicCatalogResponse struct {
@@ -367,6 +368,7 @@ type HomeView struct {
 	Breadcrumbs         BreadcrumbsView
 	WorkflowDescription string
 	Error               string
+	StartReturnPath     string // same-origin path for start dialog next field
 	Sort                string
 	StatusFilter        string
 	FilterOptions       []ProcessStatusGroup
@@ -2122,24 +2124,64 @@ func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, wor
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
+const (
+	toastErrorQueryKey       = "toast_error"
+	errInstanceNameRequired  = "Instance name is required"
+)
+
+func toastErrorMessage(r *http.Request) string {
+	return homePickerMessage(r, toastErrorQueryKey)
+}
+
+// safeReturnPath accepts same-origin absolute paths only (rejects protocol-relative //…).
+func safeReturnPath(raw, fallback string) string {
+	next := strings.TrimSpace(raw)
+	if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
+		return fallback
+	}
+	if strings.ContainsAny(next, " \t\r\n") {
+		return fallback
+	}
+	return next
+}
+
+func redirectWithToastError(w http.ResponseWriter, r *http.Request, returnPath, message string) {
+	trimmedMessage := strings.TrimSpace(message)
+	fallback := appHomePath
+	target := safeReturnPath(returnPath, fallback)
+	u, err := url.Parse(target)
+	if err != nil || strings.TrimSpace(u.Path) == "" {
+		u = &url.URL{Path: fallback}
+	}
+	if trimmedMessage != "" {
+		q := u.Query()
+		q.Set(toastErrorQueryKey, trimmedMessage)
+		u.RawQuery = q.Encode()
+	}
+	http.Redirect(w, r, u.String(), http.StatusSeeOther)
+}
+
 func (s *Server) handlePublicHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
 	base := s.pageBase("public_home_body", "", "")
+	var user *AccountUser
 	signedIn := false
-	if user, _, err := s.currentUser(r); err == nil {
+	if u, _, err := s.currentUser(r); err == nil {
+		user = u
 		base = s.pageBaseForUser(user, "public_home_body", "", "")
 		signedIn = true
 	}
+	base.ToastError = toastErrorMessage(r)
 	categories, err := loadTaxonomyTree(r.Context(), s.store)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	cat, sub := resolvePublicHomeSelection(categories, r.URL.Query().Get("category"), r.URL.Query().Get("subCategory"))
-	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub)
+	streams, err := s.publicStreamCardsForPath(r.Context(), cat, sub, user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2198,7 +2240,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		discoveryStreams, err = s.buildDiscoveryManagedCards(r.Context(), user, items)
+		discoveryStreams, err = s.buildDiscoveryManagedCards(r.Context(), user, items, appHomePath)
 		if err != nil {
 			logRequestError(r, err, "build discovery stream cards")
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -2254,8 +2296,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	upcomingBand := buildMyHomeUpcomingBand(upcomingStreams, 1)
 	joinRequestsBand := buildMyHomeJoinRequestsBand(pendingJoins, 1)
 	orgCreationBand := buildMyHomeOrgCreationBand(pendingOrgCreation, 1)
+	base := s.pageBaseForUser(user, "home_picker_body", "", "")
+	base.ToastError = toastErrorMessage(r)
 	view := HomeWorkflowPickerView{
-		PageBase:                   s.pageBaseForUser(user, "home_picker_body", "", ""),
+		PageBase:                   base,
 		DiscoveryStreams:           discoveryStreams,
 		DiscoveryCatalog:           discoveryCatalog,
 		ShowCreateStream:           showCreateStream && authErr == nil,
@@ -5518,16 +5562,22 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 	activeGroup := buildHomeActiveProcessGroup(path, processes, statusFilter, sortKey, page)
 
 	preview := makeStreamInstanceDetailReadOnly(
-		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", false),
+		s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, buildWorkflowPreviewProcess(cfg.Workflow, workflowKey), actor, "", "", streamInstanceDetailOptions{}),
 		"Preview only. Start an instance to submit data.",
 	)
 	preview.HideStatus = true
 
+	base := s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name)
+	if r != nil {
+		base.ToastError = toastErrorMessage(r)
+	}
+	returnPath := streamPath(workflowKey) + "/"
 	return HomeView{
-		PageBase:            s.pageBaseForUser(user, "home_body", workflowKey, cfg.Workflow.Name),
+		PageBase:            base,
 		Breadcrumbs:         buildStreamBreadcrumbs(workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: normalizeOptionalText(cfg.Workflow.Description),
 		Error:               workflowError,
+		StartReturnPath:     returnPath,
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
 		FilterOptions:       filterOptions,
@@ -5588,11 +5638,19 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	fallbackReturn := streamPath(workflowKey) + "/"
+	_ = r.ParseForm()
+	returnPath := safeReturnPath(r.FormValue("next"), fallbackReturn)
+	name := normalizeProcessName(r.FormValue("name"))
+	if name == "" {
+		redirectWithToastError(w, r, returnPath, errInstanceNameRequired)
+		return
+	}
 	ctx := r.Context()
 	process := Process{
 		WorkflowDefID: s.workflowDefID,
 		WorkflowKey:   workflowKey,
-		Name:          normalizeProcessName(r.FormValue("name")),
+		Name:          name,
 		CreatedAt:     s.nowUTC(),
 		CreatedBy:     "demo",
 		Status:        "active",
@@ -5761,15 +5819,16 @@ func (s *Server) handleProcessPage(w http.ResponseWriter, r *http.Request, proce
 		actor,
 		selectedSubstepID,
 		"",
-		false,
 	)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string, onlyRole bool) ProcessPageView {
-	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, onlyRole)
+func (s *Server) buildProcessPageView(ctx context.Context, pageBase PageBase, cfg RuntimeConfig, workflowKey string, process *Process, actor Actor, selectedSubstepID, message string) ProcessPageView {
+	detail := s.buildStreamInstanceDetailView(ctx, cfg, workflowKey, process, actor, selectedSubstepID, message, streamInstanceDetailOptions{
+		ShowMineFilter: true,
+	})
 	processID := ""
 	instanceName := ""
 	status := processStatusActive
@@ -6072,7 +6131,6 @@ func (s *Server) handleProcessContentPartial(w http.ResponseWriter, r *http.Requ
 		actor,
 		strings.TrimSpace(r.URL.Query().Get("substep")),
 		"",
-		false,
 	)
 	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -8039,7 +8097,6 @@ func (s *Server) renderDepartmentProcessPageNotice(w http.ResponseWriter, r *htt
 		actor,
 		selectedSubstepID,
 		message,
-		false,
 	)
 	view.Detail.Confirmation = strings.TrimSpace(confirmation)
 	if err := s.tmpl.ExecuteTemplate(w, "process.html", view); err != nil {
@@ -8079,7 +8136,6 @@ func (s *Server) renderProcessContentNotice(w http.ResponseWriter, r *http.Reque
 		actor,
 		selectedSubstepID,
 		message,
-		false,
 	)
 	view.Detail.Confirmation = strings.TrimSpace(confirmation)
 	if err := s.tmpl.ExecuteTemplate(w, "process_content.html", view); err != nil {
