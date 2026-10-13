@@ -24,7 +24,7 @@ func TestApplyDraftAndSealChromeParallelDrafting(t *testing.T) {
 	}
 	actor := Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}
 
-	actions := buildSubstepViews(def, process, "feragame", actor, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "feragame", actor, map[roleMetaKey]RoleMeta{}, nil)
 	_, actions = applyDraftAndSealChrome(nil, actions, def, process, actor, "feragame")
 	if len(actions) != 2 {
 		t.Fatalf("actions = %d, want 2", len(actions))
@@ -68,7 +68,7 @@ func TestApplyDraftAndSealChromeSealedCopy(t *testing.T) {
 	}
 	actor := Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}
 
-	actions := buildSubstepViews(def, process, "feragame", actor, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "feragame", actor, map[roleMetaKey]RoleMeta{}, nil)
 	_, actions = applyDraftAndSealChrome(nil, actions, def, process, actor, "feragame")
 	for _, action := range actions {
 		if action.Status != "done" {
@@ -99,7 +99,7 @@ func TestBuildSubstepViewsStrategyBlindForDraftAndSealChrome(t *testing.T) {
 			"1.2": {State: "pending"},
 		},
 	}
-	actions := buildSubstepViews(def, process, "feragame", Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}, false, map[roleMetaKey]RoleMeta{}, nil)
+	actions := buildSubstepViews(def, process, "feragame", Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}, map[roleMetaKey]RoleMeta{}, nil)
 	for _, action := range actions {
 		if action.SaveDraft || action.Sealed || action.Hint != "" || action.StatusLabel != "" || action.FormValue != "" {
 			t.Fatalf("%s still carries draft-and-seal chrome before apply: %#v", action.SubstepID, action)
@@ -119,7 +119,7 @@ func TestBuildStreamInstanceDetailViewDraftAndSealChrome(t *testing.T) {
 		},
 	}
 	admin := Actor{ID: "admin", Role: "org-admin", RoleSlugs: []string{"org-admin"}, OrgSlug: "feragame"}
-	view := (&Server{}).buildStreamInstanceDetailView(t.Context(), cfg, "feragame", process, admin, "", "", false)
+	view := (&Server{}).buildStreamInstanceDetailView(t.Context(), cfg, "feragame", process, admin, "", "", streamInstanceDetailOptions{})
 
 	if len(view.Timeline) != 1 {
 		t.Fatalf("timeline steps = %d, want 1", len(view.Timeline))
@@ -148,7 +148,7 @@ func TestBuildStreamInstanceDetailViewDraftAndSealChrome(t *testing.T) {
 	}
 
 	registrar := Actor{Role: "registrar", RoleSlugs: []string{"registrar"}, OrgSlug: "feragame"}
-	registrarView := (&Server{}).buildStreamInstanceDetailView(t.Context(), cfg, "feragame", process, registrar, "", "", false)
+	registrarView := (&Server{}).buildStreamInstanceDetailView(t.Context(), cfg, "feragame", process, registrar, "", "", streamInstanceDetailOptions{})
 	if registrarView.Timeline[0].CanSeal {
 		t.Fatal("registrar must not see Seal control")
 	}
@@ -170,7 +170,7 @@ func TestBuildStreamInstanceDetailViewClassicHasNoSealChrome(t *testing.T) {
 			"3.2": {State: "pending"},
 		},
 	}
-	view := (&Server{}).buildStreamInstanceDetailView(t.Context(), testRuntimeConfig(), "workflow", process, Actor{Role: "dep1", RoleSlugs: []string{"dep1"}}, "", "", false)
+	view := (&Server{}).buildStreamInstanceDetailView(t.Context(), testRuntimeConfig(), "workflow", process, Actor{Role: "dep1", RoleSlugs: []string{"dep1"}}, "", "", streamInstanceDetailOptions{})
 	if view.Timeline[0].DraftAndSeal || view.Timeline[0].CanSeal {
 		t.Fatalf("classic step must not expose seal chrome, got %#v", view.Timeline[0])
 	}
