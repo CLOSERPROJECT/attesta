@@ -1321,23 +1321,17 @@ function syncStartStreamSubmit(dialog) {
   submit.disabled = input.value.trim() === "";
 }
 
-document.addEventListener("input", (event) => {
+function handleStartStreamNameChange(event) {
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-start-stream-name")) {
     return;
   }
   const dialog = target.closest("[data-start-stream-instance]");
   syncStartStreamSubmit(dialog);
-});
+}
 
-document.addEventListener("change", (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-start-stream-name")) {
-    return;
-  }
-  const dialog = target.closest("[data-start-stream-instance]");
-  syncStartStreamSubmit(dialog);
-});
+document.addEventListener("input", handleStartStreamNameChange);
+document.addEventListener("change", handleStartStreamNameChange);
 
 const createRolePill = (label, palette) => {
   const pill = document.createElement("span");

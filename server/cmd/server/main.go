@@ -299,7 +299,7 @@ type PageBase struct {
 	HasAttention            bool
 	HasJoinRequestAttention bool
 	HasOrgCreationAttention bool
-	ToastError              string // ?toast_error=; promoted into #toast-host
+	ToastError              string
 }
 
 type PublicCatalogResponse struct {
@@ -367,7 +367,7 @@ type HomeView struct {
 	Breadcrumbs         BreadcrumbsView
 	WorkflowDescription string
 	Error               string
-	StartReturnPath     string // same-origin path for start dialog next field
+	Start               *StartStreamInstanceView
 	Sort                string
 	StatusFilter        string
 	FilterOptions       []ProcessStatusGroup
@@ -2123,8 +2123,8 @@ func redirectWorkflowHomeWithMessage(w http.ResponseWriter, r *http.Request, wor
 }
 
 const (
-	toastErrorQueryKey       = "toast_error"
-	errInstanceNameRequired  = "Instance name is required"
+	toastErrorQueryKey      = "toast_error"
+	errInstanceNameRequired = "Instance name is required"
 )
 
 func toastErrorMessage(r *http.Request) string {
@@ -5569,19 +5569,25 @@ func (s *Server) buildWorkflowHomeView(ctx context.Context, r *http.Request, use
 	if r != nil {
 		base.ToastError = toastErrorMessage(r)
 	}
-	returnPath := streamPath(workflowKey) + "/"
-	return HomeView{
+	view := HomeView{
 		PageBase:            base,
 		Breadcrumbs:         buildStreamBreadcrumbs(workflowKey, cfg.Workflow.Name),
 		WorkflowDescription: normalizeOptionalText(cfg.Workflow.Description),
 		Error:               workflowError,
-		StartReturnPath:     returnPath,
 		Sort:                sortKey,
 		StatusFilter:        statusFilter,
 		FilterOptions:       filterOptions,
 		ProcessGroups:       []ProcessStatusGroup{activeGroup},
 		Preview:             preview,
 	}
+	if streamIsStartable(user, cfg) {
+		view.Start = &StartStreamInstanceView{
+			DialogID:    "new-instance-dialog",
+			StartAction: streamPath(workflowKey) + "/instance/start",
+			ReturnPath:  streamPath(workflowKey) + "/",
+		}
+	}
+	return view
 }
 
 func (s *Server) renderStreamDashboard(w http.ResponseWriter, view HomeView) {
@@ -5642,6 +5648,14 @@ func (s *Server) handleStartProcess(w http.ResponseWriter, r *http.Request) {
 	name := normalizeProcessName(r.FormValue("name"))
 	if name == "" {
 		redirectWithToastError(w, r, returnPath, errInstanceNameRequired)
+		return
+	}
+	user, _, ok := s.requireVerifiedPage(w, r)
+	if !ok {
+		return
+	}
+	if !streamIsStartable(user, cfg) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	ctx := r.Context()

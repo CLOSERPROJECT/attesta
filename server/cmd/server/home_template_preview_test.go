@@ -35,10 +35,15 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 			WorkflowName: "Demo workflow",
 		},
 		WorkflowDescription: "Previewable workflow",
-		Sort:                "time_desc",
-		StatusFilter:        "all",
-		FilterOptions:       testHomeFilterOptions(process),
-		ProcessGroups:       testHomeActiveGroup("all", process),
+		Start: &StartStreamInstanceView{
+			DialogID:    "new-instance-dialog",
+			StartAction: "/my/streams/workflow/instance/start",
+			ReturnPath:  "/my/streams/workflow/",
+		},
+		Sort:          "time_desc",
+		StatusFilter:  "all",
+		FilterOptions: testHomeFilterOptions(process),
+		ProcessGroups: testHomeActiveGroup("all", process),
 		Preview: StreamInstanceDetailView{
 			HideStatus: true,
 			Timeline: []TimelineStep{
@@ -134,6 +139,50 @@ func TestHomeTemplateRendersSidebarAndReadOnlyPreview(t *testing.T) {
 	}
 	if strings.Contains(body, `class="substep substep-available"`) {
 		t.Fatalf("did not expect preview to render status-colored substep class, got: %s", body)
+	}
+}
+
+func TestHomeTemplateGatesStartControl(t *testing.T) {
+	tmpl := parseTestTemplates(t)
+	base := HomeView{
+		PageBase: PageBase{
+			WorkflowKey:  "workflow",
+			WorkflowPath: "/my/streams/workflow",
+			WorkflowName: "Demo workflow",
+		},
+		Sort:          "time_desc",
+		StatusFilter:  "all",
+		FilterOptions: testHomeFilterOptions(),
+		ProcessGroups: testHomeActiveGroup("all"),
+	}
+
+	var out bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&out, "home_body", base); err != nil {
+		t.Fatalf("render without start: %v", err)
+	}
+	if body := out.String(); strings.Contains(body, `id="new-instance-dialog"`) || strings.Contains(body, `action="/my/streams/workflow/instance/start"`) {
+		t.Fatalf("non-startable stream must not render Start controls, got: %s", body)
+	}
+
+	base.Start = &StartStreamInstanceView{
+		DialogID:    "new-instance-dialog",
+		StartAction: "/my/streams/workflow/instance/start",
+		ReturnPath:  "/my/streams/workflow/",
+	}
+	out.Reset()
+	if err := tmpl.ExecuteTemplate(&out, "home_body", base); err != nil {
+		t.Fatalf("render with start: %v", err)
+	}
+	body := out.String()
+	for _, want := range []string{
+		`id="new-instance-dialog"`,
+		`action="/my/streams/workflow/instance/start"`,
+		`name="next"`,
+		`value="/my/streams/workflow/"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("startable stream missing %q, got: %s", want, body)
+		}
 	}
 }
 
