@@ -46,7 +46,7 @@
         "DialogID" (printf "start-instance-%s" .Key)
         "StartAction" .StartAction
         "ReturnPath" .ReturnPath
-        "Trigger" "card"
+        "CardTrigger" true
       ) }}
     {{ end }}
     {{ template "public_stream_card" .Card }}

@@ -1588,6 +1588,40 @@ func TestHandleWorkflowHomeMarksProcessesWithMyTurn(t *testing.T) {
 	}
 }
 
+func TestBuildWorkflowHomeViewGatesStartByStartableStream(t *testing.T) {
+	server := &Server{
+		store: NewMemoryStore(),
+		configProvider: func() (RuntimeConfig, error) {
+			return startableTestRuntimeConfig(), nil
+		},
+	}
+	cfg := startableTestRuntimeConfig()
+	req := httptest.NewRequest(http.MethodGet, "/my/streams/workflow/", nil)
+
+	notStartable := &AccountUser{
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep2"},
+		Status:    "active",
+	}
+	view := server.buildWorkflowHomeView(req.Context(), req, notStartable, "workflow", cfg, "")
+	if view.Start != nil {
+		t.Fatalf("non-startable user got Start view: %#v", view.Start)
+	}
+
+	startable := &AccountUser{
+		OrgSlug:   "org1",
+		RoleSlugs: []string{"dep1"},
+		Status:    "active",
+	}
+	view = server.buildWorkflowHomeView(req.Context(), req, startable, "workflow", cfg, "")
+	if view.Start == nil {
+		t.Fatal("startable user must get Start view")
+	}
+	if view.Start.StartAction != "/my/streams/workflow/instance/start" || view.Start.ReturnPath != "/my/streams/workflow/" {
+		t.Fatalf("unexpected Start view: %#v", view.Start)
+	}
+}
+
 func TestHandleHomePickerCreateStreamCardVisibility(t *testing.T) {
 	tempDir := t.TempDir()
 	writeWorkflowConfig(t, filepath.Join(tempDir, "workflow.yaml"), "Main workflow", "string", "Main workflow description")

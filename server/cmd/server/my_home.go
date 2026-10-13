@@ -227,9 +227,6 @@ func (s *Server) buildMyHomeCatalogData(ctx context.Context, user *AccountUser) 
 	return categories, buildMyHomeStreamGroups(categories, cardsByKey, catalog, accessibleKeys), nil
 }
 
-// buildDiscoveryManagedCards turns catalog discovery rows into managed card views
-// (metrics + optional clone/edit/delete), preserving discovery order and Startable.
-// returnPath is the same-origin page that opened Start (posted as next on reject).
 func (s *Server) buildDiscoveryManagedCards(ctx context.Context, user *AccountUser, items []StreamDiscoveryItem, returnPath string) ([]ManagedPublicStreamCardView, error) {
 	if len(items) == 0 {
 		return nil, nil

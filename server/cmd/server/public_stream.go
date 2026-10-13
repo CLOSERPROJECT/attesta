@@ -164,7 +164,6 @@ func (s *Server) handlePublicStream(w http.ResponseWriter, r *http.Request) {
 			DialogID:    "start-instance-" + key,
 			StartAction: streamPath(key) + "/instance/start",
 			ReturnPath:  publicStreamPath(key),
-			Trigger:     "header",
 		}
 	}
 	if err := s.tmpl.ExecuteTemplate(w, "public_stream.html", view); err != nil {

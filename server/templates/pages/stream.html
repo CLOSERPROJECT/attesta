@@ -28,12 +28,9 @@
               {{ template "icon-eye" . }}
               View preview
             </button>
-            {{ template "start_stream_instance" (dict
-              "DialogID" "new-instance-dialog"
-              "StartAction" (printf "%s/instance/start" .WorkflowPath)
-              "ReturnPath" .StartReturnPath
-              "Trigger" "header"
-            ) }}
+            {{ if .Start }}
+              {{ template "start_stream_instance" .Start }}
+            {{ end }}
           </div>
         </div>
       {{ end }}
