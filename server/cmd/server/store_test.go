@@ -40,12 +40,13 @@ func TestHandleStartProcessWithMemoryStore(t *testing.T) {
 		now:           func() time.Time { return fixedNow },
 		workflowDefID: primitive.NewObjectID(),
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			return startableTestRuntimeConfig(), nil
 		},
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/process/start", strings.NewReader("name=Demo+run"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	addStartableSession(req, server, fixedNow)
 	rr := httptest.NewRecorder()
 	server.handleStartProcess(rr, req)
 
@@ -86,12 +87,13 @@ func TestHandleStartProcessStoresInstanceName(t *testing.T) {
 		now:           func() time.Time { return time.Date(2026, 2, 2, 13, 0, 0, 0, time.UTC) },
 		workflowDefID: primitive.NewObjectID(),
 		configProvider: func() (RuntimeConfig, error) {
-			return testRuntimeConfig(), nil
+			return startableTestRuntimeConfig(), nil
 		},
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/process/start", strings.NewReader("name=+Pilot++batch++42+"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	addStartableSession(req, server, time.Date(2026, 2, 2, 13, 0, 0, 0, time.UTC))
 	rr := httptest.NewRecorder()
 	server.handleStartProcess(rr, req)
 

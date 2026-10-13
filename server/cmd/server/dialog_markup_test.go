@@ -20,6 +20,11 @@ func TestStreamPageNewInstanceDialogMarkup(t *testing.T) {
 		Sort:          "time_desc",
 		FilterOptions: testHomeFilterOptions(),
 		ProcessGroups: testHomeActiveProcessGroups(nil, "all", "time_desc", 1),
+		Start: &StartStreamInstanceView{
+			DialogID:    "new-instance-dialog",
+			StartAction: "/my/streams/workflow/instance/start",
+			ReturnPath:  "/my/streams/workflow/",
+		},
 	}
 	if err := tmpl.ExecuteTemplate(&out, "home_body", view); err != nil {
 		t.Fatalf("render home_body: %v", err)
@@ -67,8 +72,7 @@ func TestPlatformAdminCreateOrgDialogMarkup(t *testing.T) {
 	tmpl := parseTestTemplates(t)
 
 	var out bytes.Buffer
-	view := PlatformAdminView{
-	}
+	view := PlatformAdminView{}
 	if err := tmpl.ExecuteTemplate(&out, "platform_admin_body", view); err != nil {
 		t.Fatalf("render platform_admin_body: %v", err)
 	}

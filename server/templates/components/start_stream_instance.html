@@ -1,7 +1,5 @@
-{{/* Start control: trigger (card|header) + name dialog; submit disabled until name is non-empty. */}}
-
 {{ define "start_stream_instance" }}
-  {{ if eq .Trigger "card" }}
+  {{ if .CardTrigger }}
     <button type="button"
             class="btn btn-primary btn-lg public-stream-card-start"
             onclick="document.getElementById('{{ .DialogID }}').showModal()">

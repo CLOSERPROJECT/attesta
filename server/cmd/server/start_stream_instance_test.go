@@ -13,7 +13,7 @@ func TestStartStreamInstanceTemplateCardTrigger(t *testing.T) {
 		DialogID:    "start-instance-wf-a",
 		StartAction: "/my/streams/wf-a/instance/start",
 		ReturnPath:  "/?category=supply-chain&subCategory=procurement",
-		Trigger:     "card",
+		CardTrigger: true,
 	}
 	if err := tmpl.ExecuteTemplate(&out, "start_stream_instance", view); err != nil {
 		t.Fatalf("render: %v", err)
@@ -47,7 +47,6 @@ func TestStartStreamInstanceTemplateHeaderTrigger(t *testing.T) {
 		DialogID:    "new-instance-dialog",
 		StartAction: "/my/streams/workflow/instance/start",
 		ReturnPath:  "/my/streams/workflow/",
-		Trigger:     "header",
 	}
 	if err := tmpl.ExecuteTemplate(&out, "start_stream_instance", view); err != nil {
 		t.Fatalf("render: %v", err)

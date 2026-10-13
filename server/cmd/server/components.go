@@ -28,13 +28,12 @@ type PublicStreamCardOrgView struct {
 	Initials string
 }
 
-// StartStreamInstanceView is the view model for
-// templates/components/start_stream_instance.html.
+// StartStreamInstanceView is the view model for templates/components/start_stream_instance.html.
 type StartStreamInstanceView struct {
-	DialogID    string // unique dialog element id
-	StartAction string // POST /my/streams/:key/instance/start
-	ReturnPath  string // same-origin path posted as next on reject
-	Trigger     string // "card" | "header"
+	DialogID    string
+	StartAction string
+	ReturnPath  string
+	CardTrigger bool
 }
 
 // ManagedPublicStreamCardView wraps a public stream card with optional /my management actions.
@@ -50,7 +49,7 @@ type ManagedPublicStreamCardView struct {
 	DeleteAction      string
 	Startable         bool
 	StartAction       string
-	ReturnPath        string // page that opened Start; posted as next
+	ReturnPath        string
 }
 
 // StreamTaxonomyOptionView is one option in a taxonomy filter select.
@@ -132,10 +131,10 @@ type PublicStreamRunView struct {
 // PublicStreamPageView is the view model for templates/pages/public_stream.html.
 type PublicStreamPageView struct {
 	PageBase
-	HomeHref      string // /?category=…&subCategory=… or /
+	HomeHref      string
 	Header        PublicStreamCardView
-	Start         *StartStreamInstanceView // set when the viewer has a Startable stream
-	Organizations []PublicStreamCardOrgView // step-order unique orgs; full list
+	Start         *StartStreamInstanceView
+	Organizations []PublicStreamCardOrgView
 	RecentRuns    []PublicStreamRunView
 	Blueprint     StreamInstanceDetailView
 }
