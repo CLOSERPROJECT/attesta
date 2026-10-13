@@ -117,7 +117,7 @@ func TestHandleCompleteSubstepMissingActorFallsBackToDefault(t *testing.T) {
 	}
 }
 
-func TestHandleCompleteSubstepProcessContentSelectsNextAvailable(t *testing.T) {
+func TestHandleCompleteSubstepProcessContentClearsSelection(t *testing.T) {
 	store := NewMemoryStore()
 	server, processID, _ := newServerForCompleteTests(t, store, fakeAuthorizer{})
 	server.tmpl = template.Must(template.New("test").Parse(`{{define "process_content.html"}}SEL {{.Detail.SelectedSubstepID}}{{end}}`))
@@ -134,8 +134,9 @@ func TestHandleCompleteSubstepProcessContentSelectsNextAvailable(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "SEL 1.2") {
-		t.Fatalf("expected next available substep selection, got %q", rr.Body.String())
+	// Completing a substep must not auto-open the next available one.
+	if rr.Body.String() != "SEL " {
+		t.Fatalf("expected cleared substep selection, got %q", rr.Body.String())
 	}
 }
 

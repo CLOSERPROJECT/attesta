@@ -186,17 +186,70 @@ const processPageContent = document.getElementById("process-page-content");
 let skipNextProcessUpdatedEvent = false;
 let skipNextProcessUpdatedEventTimer = 0;
 
-const focusNextActionInput = () => {
-  const container = processPageContent || document;
-  const nextInput = container.querySelector(
-    "input:not([disabled]):not([type='hidden']), textarea:not([disabled]), select:not([disabled])",
-  );
-  if (nextInput) {
-    nextInput.focus();
+const processPageRoot = () => {
+  if (root instanceof HTMLElement) {
+    return root;
+  }
+  return document.getElementById("process-page");
+};
+
+const mineFilterCheckbox = () => {
+  const page = processPageRoot();
+  const toggle = page?.querySelector(".js-mine-filter");
+  return toggle instanceof HTMLInputElement ? toggle : null;
+};
+
+// Preference lives on #process-page[data-mine-filter] so HTMX/SSE content
+// swaps can recreate the checkbox without resetting the choice.
+const mineFilterEnabled = () => {
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    if (page.dataset.mineFilter === "0") {
+      return false;
+    }
+    if (page.dataset.mineFilter === "1") {
+      return true;
+    }
+  }
+  const toggle = mineFilterCheckbox();
+  if (toggle) {
+    return toggle.checked;
+  }
+  return true;
+};
+
+const applyMineFilterRoot = (scopeRoot = document) => {
+  const scope =
+    scopeRoot instanceof Element || scopeRoot instanceof Document
+      ? scopeRoot
+      : document;
+  const on = mineFilterEnabled();
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    page.dataset.mineFilter = on ? "1" : "0";
+  }
+  const toggle = mineFilterCheckbox();
+  if (toggle) {
+    toggle.checked = on;
+  }
+
+  for (const filterRoot of scope.querySelectorAll(".js-mine-filter-root")) {
+    if (!(filterRoot instanceof HTMLElement)) {
+      continue;
+    }
+    filterRoot.classList.toggle("is-mine-filter", on);
+    const hasVisible =
+      !!filterRoot.querySelector('.substep[data-viewer-owned="true"]') ||
+      !!filterRoot.querySelector(".substep-selected");
+    filterRoot.classList.toggle("is-mine-filter-empty", on && !hasVisible);
+    const empty = filterRoot.querySelector(".stream-mine-filter-empty");
+    if (empty instanceof HTMLElement) {
+      empty.hidden = !on || hasVisible;
+    }
   }
 };
 
-const syncSelectedSubstepURL = (substepId = "") => {
+const syncProcessPageURL = (substepId = "") => {
   // Process-page only: do not leak ?substep= onto stream dashboard URLs.
   if (!processId) {
     return;
@@ -208,20 +261,23 @@ const syncSelectedSubstepURL = (substepId = "") => {
     } else {
       url.searchParams.delete("substep");
     }
+    url.searchParams.delete("mine");
     window.history.replaceState({}, "", url);
   } catch (_err) {}
 };
 
+const syncSelectedSubstepURL = (substepId = "") => {
+  syncProcessPageURL(substepId);
+};
+
 const currentSelectedSubstep = () => {
+  // Only an actually open panel counts — never resurrect a stale dataset id
+  // into ?substep= (that re-opens after SSE/content refresh).
   const selectedPanel = document.querySelector(
     ".js-process-substep-panel[open]",
   );
   if (selectedPanel instanceof HTMLElement) {
     return (selectedPanel.dataset.substepId || "").trim();
-  }
-  const selected = (root?.dataset?.selectedSubstep || "").trim();
-  if (selected) {
-    return selected;
   }
   return "";
 };
@@ -261,7 +317,11 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
   if (!processId || !workflowKey || !processPageContent) {
     return;
   }
-  const query = substepId ? `?substep=${encodeURIComponent(substepId)}` : "";
+  const params = new URLSearchParams();
+  if (substepId) {
+    params.set("substep", substepId);
+  }
+  const query = params.toString() ? `?${params.toString()}` : "";
   const url = `/my/streams/${workflowKey}/instance/${processId}/content${query}`;
   if (window.htmx?.ajax) {
     window.htmx.ajax("GET", url, {
@@ -280,7 +340,7 @@ const loadProcessContent = async (substepId = currentSelectedSubstep()) => {
     formatLocalDateTimes(processPageContent);
     await initializeFormataForms(processPageContent);
     markSelectedSubstep(currentSelectedSubstep());
-    focusNextActionInput();
+    applyMineFilterRoot(processPageContent);
   } catch (_err) {}
 };
 
@@ -1154,6 +1214,21 @@ const initializeFormataForms = async (container = document) => {
   }
 };
 
+document.body.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !processId) {
+    return;
+  }
+  if (!target.classList.contains("js-mine-filter")) {
+    return;
+  }
+  const page = processPageRoot();
+  if (page instanceof HTMLElement) {
+    page.dataset.mineFilter = target.checked ? "1" : "0";
+  }
+  applyMineFilterRoot(document);
+});
+
 if (processId && workflowKey && processPageContent) {
   const source = new EventSource(
     `/my/streams/${workflowKey}/events?workflow=${workflowKey}&processId=${processId}`,
@@ -1463,7 +1538,9 @@ document.addEventListener("DOMContentLoaded", () => {
   formatLocalDateTimes(document);
   void initializeFormataForms(document);
   markSelectedSubstep(currentSelectedSubstep());
-  focusNextActionInput();
+  applyMineFilterRoot(document);
+  // Do not focus into forms on load — focusing a control inside <details>
+  // can force the accordion open.
   promoteToasts(document);
   initRolePickers(document);
   openAutoOpenDialogs(document);
@@ -1496,8 +1573,17 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   }
   if (event.target && event.target.id === "process-page-content") {
     void initializeFormataForms(event.target);
-    markSelectedSubstep(currentSelectedSubstep());
-    focusNextActionInput();
+    // Sync from panels the server actually opened — never resurrect a stale
+    // data-selected-substep on #process-page (outside the swapped partial).
+    const openPanel = event.target.querySelector(
+      ".js-process-substep-panel[open]",
+    );
+    const openId =
+      openPanel instanceof HTMLElement
+        ? (openPanel.dataset.substepId || "").trim()
+        : "";
+    markSelectedSubstep(openId);
+    applyMineFilterRoot(event.target);
   }
   if (event.detail?.target?.id === "platform-admin-categories") {
     const form = document.getElementById("categories-editor-form");
@@ -1576,15 +1662,9 @@ document.body.addEventListener("toggle", (event) => {
       panel.open = false;
     }
     markSelectedSubstep(substepID);
-    const summary = target.querySelector(".substep-accordion-summary");
-    if (summary instanceof HTMLElement) {
-      summary.focus();
-    }
     return;
   }
-  if (currentSelectedSubstep() === substepID) {
-    markSelectedSubstep("");
-  }
+  markSelectedSubstep("");
 });
 
 document.body.addEventListener("click", (event) => {

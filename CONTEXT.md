@@ -165,8 +165,12 @@ _Avoid_: Process page
 ### Stream instance detail UI
 
 **Stream timeline**:
-The accordion tree on stream instance detail (and preview on the stream dashboard): steps, each containing expandable substeps.
-_Avoid_: Workflow timeline, traceability timeline, action list
+The accordion tree on stream instance detail (and preview on the stream dashboard): steps, each containing expandable substeps. Substeps open only from an explicit user expand or `?substep=` — the next available Substep is never auto-expanded.
+_Avoid_: Workflow timeline, traceability timeline, action list, auto-open current substep
+
+**My tasks filter**:
+A Stream instance detail switch shown only while the instance is in progress (hidden when completed or terminated), placed between the page header and the Stream timeline. The server stamps each Substep with viewer ownership (org + Organization role ∩ Stream role gate; Org admin standing does not count); the browser hides non-owned rows without reloading the timeline, keeping the on/off preference on the process-page shell across HTMX/SSE content swaps. Default on. Off shows the full Stream timeline. Steps with no visible Substeps are omitted. A selected Substep may stay visible when it would otherwise be hidden.
+_Avoid_: My roles filter, Role filter (vague), onlyRole, active-role filter, Org admin sees all, mine query param, server-side timeline filtering for this switch
 
 **Substep summary**:
 The always-visible row for one substep: ID, title, status, and optional completion meta in the accordion header.
