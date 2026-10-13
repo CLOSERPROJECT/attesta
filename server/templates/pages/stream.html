@@ -28,14 +28,12 @@
               {{ template "icon-eye" . }}
               View preview
             </button>
-            <button
-              class="btn btn-primary"
-              type="button"
-              onclick="document.getElementById('new-instance-dialog').showModal()"
-            >
-              {{ template "icon-play" . }}
-              New instance
-            </button>
+            {{ template "start_stream_instance" (dict
+              "DialogID" "new-instance-dialog"
+              "StartAction" (printf "%s/instance/start" .WorkflowPath)
+              "ReturnPath" .StartReturnPath
+              "Trigger" "header"
+            ) }}
           </div>
         </div>
       {{ end }}
@@ -50,47 +48,6 @@
         <div class="error-detail">{{ .Error }}</div>
       </div>
     {{ else }}
-      <dialog id="new-instance-dialog" class="dialog">
-        <div class="dialog-card">
-          <header class="dialog-head">
-            <div>
-              <h3 class="dialog-title">New instance</h3>
-              <p class="dialog-subtitle">
-                Give this stream instance a brief name
-              </p>
-            </div>
-            <button
-              type="button"
-              class="btn btn-ghost btn-icon dialog-close"
-              onclick="document.getElementById('new-instance-dialog').close()"
-            >
-              {{ template "icon-close" . }}
-            </button>
-          </header>
-          <form
-            method="post"
-            action="{{ .WorkflowPath }}/instance/start"
-            class="input-form"
-          >
-            <div class="form-field">
-              <label for="instance-name">Instance name</label>
-              <input
-                id="instance-name"
-                name="name"
-                type="text"
-                maxlength="80"
-                autocomplete="off"
-              />
-            </div>
-            <div class="dialog-actions">
-              <button class="btn btn-primary" type="submit">
-                {{ template "icon-play" . }}
-                Start instance
-              </button>
-            </div>
-          </form>
-        </div>
-      </dialog>
       <dialog id="stream-preview-dialog" class="dialog">
         <div class="dialog-card">
           <header class="dialog-head">

@@ -1,0 +1,56 @@
+{{/* Start control: trigger (card|header) + name dialog; submit disabled until name is non-empty. */}}
+
+{{ define "start_stream_instance" }}
+  {{ if eq .Trigger "card" }}
+    <button type="button"
+            class="btn btn-primary btn-lg public-stream-card-start"
+            onclick="document.getElementById('{{ .DialogID }}').showModal()">
+      {{ template "icon-play" . }}
+      Start
+    </button>
+  {{ else }}
+    <button type="button"
+            class="btn btn-primary"
+            onclick="document.getElementById('{{ .DialogID }}').showModal()">
+      {{ template "icon-play" . }}
+      Start
+    </button>
+  {{ end }}
+  <dialog id="{{ .DialogID }}" class="dialog" data-start-stream-instance>
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <div>
+          <h3 class="dialog-title">New instance</h3>
+          <p class="dialog-subtitle">Give this stream instance a brief name</p>
+        </div>
+        <button type="button"
+                class="btn btn-ghost btn-icon dialog-close"
+                onclick="document.getElementById('{{ .DialogID }}').close()">{{ template "icon-close" . }}</button>
+      </header>
+      <form method="post" action="{{ .StartAction }}" class="input-form">
+        {{ if .ReturnPath }}
+          <input type="hidden" name="next" value="{{ .ReturnPath }}" />
+        {{ end }}
+        <div class="form-field">
+          <label for="{{ .DialogID }}-name">Instance name</label>
+          <input id="{{ .DialogID }}-name"
+                 name="name"
+                 type="text"
+                 maxlength="80"
+                 autocomplete="off"
+                 required
+                 data-start-stream-name />
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-primary"
+                  type="submit"
+                  disabled
+                  data-start-stream-submit>
+            {{ template "icon-play" . }}
+            Start
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+{{ end }}

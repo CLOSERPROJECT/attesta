@@ -1261,8 +1261,10 @@ function dismissToast(el) {
   }, 240);
 }
 
+const TOAST_SELECTOR = ".confirmation[data-toast], .error[data-toast]";
+
 function enforceToastCap(host) {
-  const items = [...host.querySelectorAll(".confirmation[data-toast]")];
+  const items = [...host.querySelectorAll(TOAST_SELECTOR)];
   while (items.length > TOAST_MAX) {
     const oldest = items.pop();
     if (oldest) {
@@ -1277,7 +1279,7 @@ function promoteToasts(root = document) {
     return;
   }
   const scope = root instanceof Element || root instanceof Document ? root : document;
-  const nodes = scope.querySelectorAll?.(".confirmation[data-toast]") ?? [];
+  const nodes = scope.querySelectorAll?.(TOAST_SELECTOR) ?? [];
   for (const node of nodes) {
     if (!(node instanceof HTMLElement)) {
       continue;
@@ -1306,6 +1308,36 @@ function promoteToasts(root = document) {
     }, TOAST_DISMISS_MS);
   }
 }
+
+function syncStartStreamSubmit(dialog) {
+  if (!(dialog instanceof HTMLElement)) {
+    return;
+  }
+  const input = dialog.querySelector("[data-start-stream-name]");
+  const submit = dialog.querySelector("[data-start-stream-submit]");
+  if (!(input instanceof HTMLInputElement) || !(submit instanceof HTMLButtonElement)) {
+    return;
+  }
+  submit.disabled = input.value.trim() === "";
+}
+
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-start-stream-name")) {
+    return;
+  }
+  const dialog = target.closest("[data-start-stream-instance]");
+  syncStartStreamSubmit(dialog);
+});
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-start-stream-name")) {
+    return;
+  }
+  const dialog = target.closest("[data-start-stream-instance]");
+  syncStartStreamSubmit(dialog);
+});
 
 const createRolePill = (label, palette) => {
   const pill = document.createElement("span");

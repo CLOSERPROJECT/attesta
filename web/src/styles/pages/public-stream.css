@@ -4,15 +4,18 @@
  * Uses default <main class="page"> chrome padding; this module does not add inset.
  *
  * div.public-stream
- *   header.public-stream-header
+ *   section.page-header.public-stream-header
  *     a.back-link (+ icon-arrow-left)
- *     .public-stream-title-wrapper > h1.public-stream-title + span.stream-dpp-badge.public-stream-dpp-beside?
- *     p.public-stream-description?
- *     span.stream-dpp-badge.public-stream-dpp-below?  (shown on sm-down; beside hidden)
+ *     .page-header-head
+ *       .page-header-body
+ *         .public-stream-title-wrapper > h1.public-stream-title + span.stream-dpp-badge.public-stream-dpp-beside?
+ *         p.public-stream-description?
+ *         span.stream-dpp-badge.public-stream-dpp-below?  (shown on sm-down; beside hidden)
+ *       .page-header-actions? > start_stream_instance (header trigger)
  *     .public-stream-metrics > span.stream-metric
  *       (+ org count metric when OrganizationCount > 0; no avatars)
  *
- * Shared chips: stream-dpp-badge.css, stream-metric.css.
+ * Shared: page-header.css, stream-dpp-badge.css, stream-metric.css.
  *   .public-stream-main
  *     section.public-stream-section.public-stream-blueprint > h2 + .stream-timeline-list
  *     aside.public-stream-aside?
@@ -49,11 +52,18 @@
 }
 
 .public-stream-header {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-2);
   padding-bottom: var(--space-6);
   border-bottom: 1px solid var(--border);
+}
+
+.public-stream-header.page-header {
+  align-items: stretch;
+}
+
+.public-stream-header .page-header-body .public-stream-description {
+  margin-top: var(--space-1);
+  opacity: 1;
 }
 
 .public-stream-title {
