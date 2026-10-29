@@ -9,11 +9,13 @@ import (
 )
 
 const (
-	registerTaskPath     = "intake/register"
-	codiceFirTaskPath    = "intake/codiceFir"
-	palletWeightTaskPath = "intake/palletWeight"
-	lineShiftTaskPath    = "line/shift"
-	lineLoadTaskPath     = "line/lineLoad"
+	registerTaskPath        = "intake/register"
+	codiceFirTaskPath       = "intake/codiceFir"
+	palletWeightTaskPath    = "intake/palletWeight"
+	lineShiftTaskPath       = "line/shift"
+	lineLoadTaskPath        = "line/lineLoad"
+	containerRegTaskPath    = "line/containerReg"
+	loadedExtractedTaskPath = "line/loadedExtracted"
 )
 
 // CommitRequest is the Commit wire body (no run id).
@@ -123,6 +125,10 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		next, err = applyShiftCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case lineLoadTaskPath:
 		next, err = applyLineLoadCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case containerRegTaskPath:
+		next, err = applyContainerRegCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case loadedExtractedTaskPath:
+		next, err = applyLoadedExtractedCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	default:
 		return CommitResult{}, &CommitError{
 			Kind:    "unknown-target",
@@ -326,6 +332,66 @@ func applyLineLoadCommit(domain Domain, userID, jobInstanceID string, value map[
 		Ops:           ops,
 		Timestamp:     ts,
 		UserID:        userID,
+	})
+}
+
+// Flatten form material arrays → mintMany containers (C-n); unlockFrom instance (not lineLoad).
+func applyContainerRegCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	facts, err := flattenContainerRegFacts(value)
+	if err != nil {
+		return Domain{}, &CommitError{Kind: "prep", Message: err.Error()}
+	}
+
+	base := len(domain.Container)
+	ops := make([]MutateOp, 0, len(facts.Rows))
+	for i, row := range facts.Rows {
+		set := map[string]any{
+			"weight":       row.Weight,
+			"material":     row.Material,
+			"sourceLoadId": facts.SourceLoadID,
+		}
+		// Omit undefined secondary so single-source Records stay clean (evalSet omit).
+		if row.SecondarySourceLoadID != "" {
+			set["secondarySourceLoadId"] = row.SecondarySourceLoadID
+		}
+		ops = append(ops, MintOp{
+			Entity: EntityContainer,
+			ID:     fmt.Sprintf("C-%d", base+i+1),
+			Set:    set,
+		})
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "line",
+		TaskID:        "containerReg",
+		JobInstanceID: jobInstanceID,
+		Facts:         containerRegFactsAsMap(facts),
+		Ops:           ops,
+		Timestamp:     ts,
+		UserID:        userID,
+	})
+}
+
+// Submission facts only — fixture transform is empty (no Domain entity to patch).
+func applyLoadedExtractedCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	loaded, ok := floatFromAny(value["checkedLoadedWeight"])
+	if !ok || !(loaded > 0) {
+		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedLoadedWeight must be a number > 0"}
+	}
+	extracted, ok := floatFromAny(value["checkedContainerSum"])
+	if !ok || !(extracted > 0) {
+		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedContainerSum must be a number > 0"}
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "line",
+		TaskID:        "loadedExtracted",
+		JobInstanceID: jobInstanceID,
+		Facts: map[string]any{
+			"checkedLoadedWeight": loaded,
+			"checkedContainerSum": extracted,
+		},
+		Ops:       nil,
+		Timestamp: ts,
+		UserID:    userID,
 	})
 }
 

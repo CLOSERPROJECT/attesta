@@ -4,9 +4,9 @@
 
 **Blocked by:** 07: Line — Job instances + Leftovers some
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Remaining line Tasks Commit successfully in authored order on a Job instance
-- [ ] Instance-scoped unlock behaviour from the fixture is honoured
-- [ ] End-to-end HTTP walk of one line Job instance completes
-- [ ] Tests cover the remaining Task paths
+- [x] Remaining line Tasks Commit successfully in authored order on a Job instance
+- [x] Instance-scoped unlock behaviour from the fixture is honoured
+- [x] End-to-end HTTP walk of one line Job instance completes
+- [x] Tests cover the remaining Task paths
