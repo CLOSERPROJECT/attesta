@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	registerTaskPath  = "intake/register"
-	codiceFirTaskPath = "intake/codiceFir"
+	registerTaskPath     = "intake/register"
+	codiceFirTaskPath    = "intake/codiceFir"
+	palletWeightTaskPath = "intake/palletWeight"
 )
 
 // CommitRequest is the Commit wire body (no run id).
@@ -114,6 +115,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		next, err = applyRegisterCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case codiceFirTaskPath:
 		next, err = applyCodiceFirCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case palletWeightTaskPath:
+		next, err = applyPalletWeightCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	default:
 		return CommitResult{}, &CommitError{
 			Kind:    "unknown-target",
@@ -201,6 +204,62 @@ func applyCodiceFirCommit(domain Domain, userID, jobInstanceID string, value map
 		},
 		Timestamp: ts,
 		UserID:    userID,
+	})
+}
+
+// Leftovers completeness all: one Commit must cover every eligible pallet
+// (weight still unset for this Job instance). Partial maps are prep-rejected.
+func applyPalletWeightCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	leftoverIDs := palletWeightLeftoverIDs(domain, jobInstanceID)
+	weightsRaw, _ := value["weights"].(map[string]any)
+	if weightsRaw == nil {
+		weightsRaw = map[string]any{}
+	}
+
+	if len(leftoverIDs) == 0 {
+		return Mutate(domain, MutateRequest{
+			JobID:         "intake",
+			TaskID:        "palletWeight",
+			JobInstanceID: jobInstanceID,
+			Facts:         map[string]any{},
+			Ops:           nil,
+			Timestamp:     ts,
+			UserID:        userID,
+		})
+	}
+
+	filled, err := filterFilledObjectWeights(weightsRaw)
+	if err != nil {
+		return Domain{}, &CommitError{Kind: "prep", Message: err.Error()}
+	}
+	if msg := validateWeighFacts(filled, leftoverIDs); msg != "" {
+		return Domain{}, &CommitError{Kind: "prep", Message: msg}
+	}
+	if msg := enforceAllCompleteness(filled, leftoverIDs); msg != "" {
+		return Domain{}, &CommitError{Kind: "prep", Message: msg}
+	}
+
+	ops := make([]MutateOp, 0, len(filled))
+	for id, row := range filled {
+		ops = append(ops, PatchOp{
+			Entity: EntityPallet,
+			ID:     id,
+			Set: map[string]any{
+				"weight":     row.Weight,
+				"tareKind":   row.TareKind,
+				"idoneita":   row.Idoneita,
+				"panelCount": row.PanelCount,
+			},
+		})
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "intake",
+		TaskID:        "palletWeight",
+		JobInstanceID: jobInstanceID,
+		Facts:         weighFactsAsMap(filled),
+		Ops:           ops,
+		Timestamp:     ts,
+		UserID:        userID,
 	})
 }
 

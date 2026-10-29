@@ -4,9 +4,9 @@
 
 **Blocked by:** 04: Intake — Unlock order for simple Tasks
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Operator can Commit palletWeight leftover progress through to `all` complete
-- [ ] Incomplete `all` leftover does not unlock the next Task
-- [ ] Completed `all` leftover unlocks (or enables startsWhen target) as authored
-- [ ] Tests cover partial vs complete leftover behaviour
+- [x] Operator can Commit palletWeight leftover progress through to `all` complete
+- [x] Incomplete `all` leftover does not unlock the next Task
+- [x] Completed `all` leftover unlocks (or enables startsWhen target) as authored
+- [x] Tests cover partial vs complete leftover behaviour
