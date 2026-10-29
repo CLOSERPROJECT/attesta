@@ -16,6 +16,28 @@ export function palletWeightLeftoverIds(
 	return ids;
 }
 
+function palletWeightExists(facts: Record<string, unknown> | undefined): boolean {
+	if (!facts) return false;
+	const w = facts.weight;
+	return typeof w === 'number' && Number.isFinite(w);
+}
+
+/**
+ * Weighted pallets not yet progress=done (lineLoad leftovers completeness some).
+ * Shared pool across line Job instances — not scoped to a shift id.
+ */
+export function lineLoadLeftoverIds(domain: Domain | null | undefined): string[] {
+	if (!domain?.pallet) return [];
+	const ids: string[] = [];
+	for (const [id, facts] of Object.entries(domain.pallet)) {
+		if (!palletWeightExists(facts)) continue;
+		if (facts.progress === 'done') continue;
+		ids.push(id);
+	}
+	ids.sort();
+	return ids;
+}
+
 export type WeighRowDraft = {
 	weight: number | '';
 	tareKind: string;

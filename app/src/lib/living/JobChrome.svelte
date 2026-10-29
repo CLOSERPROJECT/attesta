@@ -1,5 +1,6 @@
 <script lang="ts">
 	import IntakeJob from './IntakeJob.svelte';
+	import LineJob from './LineJob.svelte';
 	import { jobInstancesFor, type Domain, type JobConfig } from './types.js';
 
 	type Props = {
@@ -16,6 +17,8 @@
 
 {#if jobId === 'intake'}
 	<IntakeJob {jobId} {job} {domain} />
+{:else if jobId === 'line'}
+	<LineJob {jobId} {job} {domain} />
 {:else}
 	<section
 		class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
@@ -56,7 +59,5 @@
 		{:else}
 			<p class="mt-3 text-sm text-zinc-500">No Job instances yet.</p>
 		{/if}
-
-		<p class="mt-3 text-xs text-zinc-400">Line Commit UI arrives in a later slice.</p>
 	</section>
 {/if}

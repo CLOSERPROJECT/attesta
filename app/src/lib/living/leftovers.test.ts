@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	derivedPanelCount,
+	lineLoadLeftoverIds,
 	palletWeightLeftoverIds
 } from './leftovers.js';
 import { emptyDomain } from './types.js';
@@ -22,6 +23,28 @@ describe('palletWeightLeftoverIds', () => {
 		const domain = emptyDomain();
 		domain.pallet = { 'A.1': { loadId: 'A', weight: 1 } };
 		expect(palletWeightLeftoverIds(domain, 'A')).toEqual([]);
+	});
+});
+
+describe('lineLoadLeftoverIds', () => {
+	test('lists weighted pallets not progress=done', () => {
+		const domain = emptyDomain();
+		domain.pallet = {
+			a: { loadId: 'load-1', weight: 11 },
+			b: { loadId: 'load-1', weight: 22, progress: 'partial' },
+			c: { loadId: 'load-1', weight: 33, progress: 'done' },
+			d: { loadId: 'load-1' }
+		};
+		expect(lineLoadLeftoverIds(domain)).toEqual(['a', 'b']);
+	});
+
+	test('empty when all done or unweighted', () => {
+		const domain = emptyDomain();
+		domain.pallet = {
+			c: { loadId: 'load-1', weight: 33, progress: 'done' },
+			d: { loadId: 'load-1' }
+		};
+		expect(lineLoadLeftoverIds(domain)).toEqual([]);
 	});
 });
 

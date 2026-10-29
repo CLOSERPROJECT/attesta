@@ -4,9 +4,9 @@
 
 **Blocked by:** 08: Line — remaining Tasks; 10: /app — intake Commit UI
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Browser can start line after intake gate and Commit line Tasks on a Job instance
-- [ ] Multiple Job instances usable from the UI where the fixture allows
-- [ ] Leftovers `some` UX matches non-unlock rules
-- [ ] Smoke: intake + one line instance completable in `/app`
+- [x] Browser can start line after intake gate and Commit line Tasks on a Job instance
+- [x] Multiple Job instances usable from the UI where the fixture allows
+- [x] Leftovers `some` UX matches non-unlock rules
+- [x] Smoke: intake + one line instance completable in `/app`
