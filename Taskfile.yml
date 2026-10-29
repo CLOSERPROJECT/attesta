@@ -99,7 +99,9 @@ tasks:
           server_pid=$!
           task dev:web &
           web_pid=$!
-          wait $server_pid $web_pid
+          task dev:app &
+          app_pid=$!
+          wait $server_pid $web_pid $app_pid
           '
 
   dev:server:
@@ -133,6 +135,24 @@ tasks:
           cd web
           npm run dev -- --port "$VITE_PORT" --strictPort
           '
+
+  dev:app:
+    desc: SvelteKit app (HMR) on APP_PORT; Go proxies /app when APP_DEV_SERVER is set.
+    cmds:
+      - bash deployment/scripts/dev-stop-local.sh --app-only
+      - sh -c 'cd app && bun install'
+      - |
+          bash -c '
+          set -euo pipefail
+          source deployment/scripts/dev-env.sh
+          cd app
+          bun run dev -- --port "$APP_PORT" --strictPort
+          '
+
+  app:build:
+    desc: Build the SvelteKit /app static shell into app/build.
+    cmds:
+      - sh -c 'cd app && bun install && bun run build'
 
   run:server:
     desc: Generate Goa artifacts, sync Go deps, and run the backend on the configured worktree port.

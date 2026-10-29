@@ -159,6 +159,7 @@ type Server struct {
 	catalogTaxonomyRev int64
 	catalog            map[string]RuntimeConfig
 	viteDevServer      string
+	appDevServer       string
 	enforceAuth        bool
 	buildVersion       string
 	turnstileSiteKey   string
@@ -785,6 +786,7 @@ func main() {
 		workflowDefID:      primitive.NewObjectID(),
 		configDir:          configDir,
 		viteDevServer:      strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+		appDevServer:       strings.TrimRight(strings.TrimSpace(os.Getenv("APP_DEV_SERVER")), "/"),
 		enforceAuth:        true,
 		buildVersion:       applicationVersion(),
 		mailer:             newMailerFromEnv(),
@@ -2544,6 +2546,8 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/reset/", s.handleResetSet)
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
+	mux.HandleFunc("/app", s.handleAppSPA)
+	mux.HandleFunc("/app/", s.handleAppSPA)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
 	mux.HandleFunc("/streams/public", s.handlePublicStreamsPartial)
 	mux.HandleFunc("/streams/", s.handlePublicStream)
