@@ -30,6 +30,7 @@ func TestCerbosAuthorizerAllowCommitBuildsLivingCheck(t *testing.T) {
 		JobID:        "intake",
 		TaskID:       "register",
 		RolesAllowed: []string{"administration"},
+		SequenceOk:   true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +68,9 @@ func TestCerbosAuthorizerAllowCommitBuildsLivingCheck(t *testing.T) {
 	allowedRoles := attr["rolesAllowed"].([]any)
 	if len(allowedRoles) != 1 || allowedRoles[0] != "administration" {
 		t.Fatalf("rolesAllowed = %#v", allowedRoles)
+	}
+	if attr["sequenceOk"] != true {
+		t.Fatalf("sequenceOk = %#v", attr["sequenceOk"])
 	}
 	actions := captured["actions"].([]any)
 	if len(actions) != 1 || actions[0] != "commit" {

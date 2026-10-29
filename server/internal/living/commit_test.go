@@ -103,16 +103,54 @@ func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 	}
 }
 
-func TestCommitRejectsRunIdShapedUnsupportedPath(t *testing.T) {
+func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
-		TaskPath:      "intake/codiceFir",
+		TaskPath:      "intake/weightCheck",
 		JobInstanceID: "NIR-261019-NO-1",
-		Value:         map[string]any{"codiceFir": "FIR-1"},
+		Value:         map[string]any{},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestCommitCodiceFirInOrderAfterRegister(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	instanceID := "NIR-261019-NO-1"
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
+		Value: map[string]any{"codiceFir": "FIR-TEST-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Domain.Load[instanceID]["codiceFir"] != "FIR-TEST-1" {
+		t.Fatalf("load = %#v", result.Domain.Load[instanceID])
+	}
+	if len(result.Domain.Submissions) != 2 {
+		t.Fatalf("submissions = %#v", result.Domain.Submissions)
+	}
+	if result.Domain.Submissions[1].TaskID != "codiceFir" {
+		t.Fatalf("second submission = %#v", result.Domain.Submissions[1])
+	}
+	cfg, err := LoadTruckLoopFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	intake := cfg.Jobs.Values["intake"].(Job)
+	if !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "palletWeight",
+		JobInstanceID: instanceID, Submissions: result.Domain.Submissions, Tasks: intake.Tasks,
+	}) {
+		t.Fatal("codiceFir Submission should unlock palletWeight (gate into later intake)")
 	}
 }
 

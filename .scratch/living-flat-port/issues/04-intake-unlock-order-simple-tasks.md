@@ -4,9 +4,9 @@
 
 **Blocked by:** 03: Cerbos on living Commit
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] In-order Commit of the simple intake Tasks succeeds and Submissions unlock the next
-- [ ] Out-of-order Commit is denied; Domain unchanged
-- [ ] Unlock order is distinct from startsWhen / readyWhen in behaviour
-- [ ] Tests cover allow and deny ordering
+- [x] In-order Commit of the simple intake Tasks succeeds and Submissions unlock the next
+- [x] Out-of-order Commit is denied; Domain unchanged
+- [x] Unlock order is distinct from startsWhen / readyWhen in behaviour
+- [x] Tests cover allow and deny ordering

@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const registerTaskPath = "intake/register"
+const (
+	registerTaskPath  = "intake/register"
+	codiceFirTaskPath = "intake/codiceFir"
+)
 
 // CommitRequest is the Commit wire body (no run id).
 type CommitRequest struct {
@@ -74,6 +77,14 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, err
 	}
 
+	domain, err := c.Domains.Get(ctx, org)
+	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			return CommitResult{}, err
+		}
+		domain = EmptyDomain()
+	}
+
 	allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 		Operator:      op,
 		Org:           org,
@@ -82,20 +93,13 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		TaskID:        ref.TaskID,
 		JobInstanceID: jobInstanceID,
 		RolesAllowed:  rolesAllowedForTask(cfg, ref.JobID, ref.TaskID),
+		SequenceOk:    sequenceOkForCommit(cfg, domain, ref.JobID, ref.TaskID, jobInstanceID),
 	})
 	if err != nil {
 		return CommitResult{}, err
 	}
 	if !allowed {
 		return CommitResult{}, &CommitError{Kind: "unauthorized"}
-	}
-
-	domain, err := c.Domains.Get(ctx, org)
-	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			return CommitResult{}, err
-		}
-		domain = EmptyDomain()
 	}
 
 	now := c.Now
@@ -108,6 +112,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	switch taskPath {
 	case registerTaskPath:
 		next, err = applyRegisterCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case codiceFirTaskPath:
+		next, err = applyCodiceFirCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	default:
 		return CommitResult{}, &CommitError{
 			Kind:    "unknown-target",
@@ -173,6 +179,28 @@ func applyRegisterCommit(domain Domain, userID, jobInstanceID string, value map[
 			ID:    jobInstanceID,
 			Label: jobInstanceID,
 		},
+	})
+}
+
+func applyCodiceFirCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	codiceFir, ok := value["codiceFir"].(string)
+	if !ok || strings.TrimSpace(codiceFir) == "" {
+		return Domain{}, &CommitError{Kind: "prep", Message: "value.codiceFir must be a non-empty string"}
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "intake",
+		TaskID:        "codiceFir",
+		JobInstanceID: jobInstanceID,
+		Facts:         cloneFacts(value),
+		Ops: []MutateOp{
+			PatchOp{
+				Entity: EntityLoad,
+				ID:     jobInstanceID,
+				Set:    map[string]any{"codiceFir": codiceFir},
+			},
+		},
+		Timestamp: ts,
+		UserID:    userID,
 	})
 }
 

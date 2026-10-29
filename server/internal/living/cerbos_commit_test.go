@@ -40,7 +40,8 @@ func policySimulatingPDP(t *testing.T) *httptest.Server {
 		effect := "EFFECT_DENY"
 		if len(req.Actions) == 1 && req.Actions[0] == "commit" &&
 			strAttr(req.Principal.Attr, "orgSlug") == strAttr(attr, "orgSlug") &&
-			roleIntersect(req.Principal.Attr["roleSlugs"], attr["rolesAllowed"]) {
+			roleIntersect(req.Principal.Attr["roleSlugs"], attr["rolesAllowed"]) &&
+			boolAttr(attr, "sequenceOk") {
 			effect = "EFFECT_ALLOW"
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -61,6 +62,14 @@ func strAttr(m map[string]any, key string) string {
 	return s
 }
 
+func boolAttr(m map[string]any, key string) bool {
+	if m == nil {
+		return false
+	}
+	b, _ := m[key].(bool)
+	return b
+}
+
 func roleIntersect(principal any, allowed any) bool {
 	var pStr, aStr []string
 	pb, _ := json.Marshal(principal)
@@ -75,6 +84,99 @@ func roleIntersect(principal any, allowed any) bool {
 		}
 	}
 	return false
+}
+
+func TestCommitCodiceFirDeniedViaCerbosWhenOutOfUnlockOrder(t *testing.T) {
+	pdp := policySimulatingPDP(t)
+	defer pdp.Close()
+
+	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	_, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath:      "intake/codiceFir",
+		JobInstanceID: "NIR-261019-NO-1",
+		Value:         map[string]any{"codiceFir": "FIR-TOO-EARLY"},
+	})
+	var ce *CommitError
+	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
+		t.Fatalf("err = %v", err)
+	}
+	if _, getErr := domains.Get(t.Context(), "feragame"); getErr == nil {
+		t.Fatal("domain must stay unset when Unlock order denies")
+	}
+}
+
+func TestCommitCodiceFirAllowedViaCerbosInUnlockOrder(t *testing.T) {
+	pdp := policySimulatingPDP(t)
+	defer pdp.Close()
+
+	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	instanceID := "NIR-261019-NO-1"
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before.Submissions) != 1 {
+		t.Fatalf("submissions before codiceFir = %#v", before.Submissions)
+	}
+
+	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
+		Value: map[string]any{"codiceFir": "FIR-OK"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Domain.Load[instanceID]["codiceFir"] != "FIR-OK" {
+		t.Fatalf("domain = %#v", result.Domain.Load[instanceID])
+	}
+	if len(result.Domain.Submissions) != 2 || result.Domain.Submissions[1].TaskID != "codiceFir" {
+		t.Fatalf("submissions = %#v", result.Domain.Submissions)
+	}
+}
+
+func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
+	pdp := policySimulatingPDP(t)
+	defer pdp.Close()
+
+	c, domains, _ := testCommitter(t, NewCerbosAuthorizer(pdp.URL, pdp.Client(), time.Now))
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	instanceID := "NIR-261019-NO-1"
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// palletWeight is next after codiceFir only; skipping codiceFir must deny and leave Domain intact.
+	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
+		Value: map[string]any{},
+	})
+	var ce *CommitError
+	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
+		t.Fatalf("skipping codiceFir should deny via Unlock: %v", err)
+	}
+	after, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Submissions) != len(before.Submissions) {
+		t.Fatalf("submissions mutated on deny: before=%d after=%d", len(before.Submissions), len(after.Submissions))
+	}
+	if _, hasFir := after.Load[instanceID]["codiceFir"]; hasFir {
+		t.Fatal("codiceFir fact must not appear on out-of-order deny")
+	}
 }
 
 func TestCommitRegisterAllowedViaCerbosWhenRolePermitted(t *testing.T) {
