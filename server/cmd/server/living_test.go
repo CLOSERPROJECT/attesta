@@ -199,6 +199,19 @@ func TestLivingCommitUnauthenticated(t *testing.T) {
 	}
 }
 
+func TestLivingProductAuthorizerDefaultsToCerbos(t *testing.T) {
+	server := &Server{now: time.Now}
+	auth := server.livingProductAuthorizer()
+	if _, ok := auth.(*living.CerbosAuthorizer); !ok {
+		t.Fatalf("product Authorizer type = %T, want *living.CerbosAuthorizer", auth)
+	}
+	stub := living.DenyAllAuthorizer{}
+	server.livingAuthorizer = stub
+	if got := server.livingProductAuthorizer(); got != stub {
+		t.Fatalf("override Authorizer = %#v", got)
+	}
+}
+
 func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 	sessionID := "living-commit-deny"
@@ -252,14 +265,16 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 				IdentityUserID: "user-1",
 				Email:          "op@example.com",
 				OrgSlug:        "feragame",
+				RoleSlugs:      []string{"administration"},
 				Status:         "active",
 				EmailVerified:  true,
 			},
 		}),
-		store:       NewMemoryStore(),
-		enforceAuth: true,
-		now:         func() time.Time { return now },
-		tmpl:        testTemplates(),
+		store:            NewMemoryStore(),
+		enforceAuth:      true,
+		now:              func() time.Time { return now },
+		tmpl:             testTemplates(),
+		livingAuthorizer: living.AllowAllAuthorizer{},
 	}
 	mux := server.newMux()
 	body := `{"taskPath":"intake/register","jobInstanceId":"NIR-261019-NO-1","value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1}}`

@@ -11,6 +11,11 @@ func TestLoadTruckLoopFixtureRenamesJobsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	roles := rolesAllowedForTask(cfg, "intake", "register")
+	if len(roles) != 1 || roles[0] != "administration" {
+		t.Fatalf("register rolesAllowed = %#v, want [administration]", roles)
+	}
+
 	if cfg.ID != "truck-loop" {
 		t.Fatalf("id = %q", cfg.ID)
 	}

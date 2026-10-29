@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
@@ -20,18 +22,29 @@ func (s *Server) ensureLivingStores() {
 	}
 }
 
+func (s *Server) livingProductAuthorizer() living.Authorizer {
+	if s.livingAuthorizer != nil {
+		return s.livingAuthorizer
+	}
+	now := s.now
+	if now == nil {
+		now = time.Now
+	}
+	url := strings.TrimSpace(os.Getenv("CERBOS_URL"))
+	if url == "" {
+		url = "http://localhost:3592"
+	}
+	return living.NewCerbosAuthorizer(url, http.DefaultClient, now)
+}
+
 func (s *Server) livingHandler() http.Handler {
 	s.ensureLivingStores()
-	auth := s.livingAuthorizer
-	if auth == nil {
-		auth = living.AllowAllAuthorizer{}
-	}
 	return &living.Handler{
 		Loader: &living.Loader{Domains: s.livingDomains, Configs: s.livingConfigs},
 		Committer: &living.Committer{
 			Domains:    s.livingDomains,
 			Configs:    s.livingConfigs,
-			Authorizer: auth,
+			Authorizer: s.livingProductAuthorizer(),
 		},
 		Gate: s.livingVerifiedGate,
 	}

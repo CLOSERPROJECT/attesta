@@ -4,9 +4,9 @@
 
 **Blocked by:** 02: Commit skeleton — register Task (test Authorizer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Living Commit calls Cerbos; no product bypass that allows without Cerbos
-- [ ] Allow case: permitted Config role can Commit register
-- [ ] Deny case: disallowed principal cannot Commit; Domain unchanged
-- [ ] Policy/attrs stay small (no full DomainSnapshot dumped into Cerbos)
+- [x] Living Commit calls Cerbos; no product bypass that allows without Cerbos
+- [x] Allow case: permitted Config role can Commit register
+- [x] Deny case: disallowed principal cannot Commit; Domain unchanged
+- [x] Policy/attrs stay small (no full DomainSnapshot dumped into Cerbos)

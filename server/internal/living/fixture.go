@@ -212,6 +212,22 @@ func rolesFromTask(payload any) []string {
 	return out
 }
 
+func rolesAllowedForTask(cfg OrgConfig, jobID, taskID string) []string {
+	jobVal, ok := cfg.Jobs.Get(jobID)
+	if !ok {
+		return nil
+	}
+	job, ok := jobVal.(Job)
+	if !ok {
+		return nil
+	}
+	taskVal, ok := job.Tasks.Get(taskID)
+	if !ok {
+		return nil
+	}
+	return rolesFromTask(taskVal)
+}
+
 func mappingContent(n *yaml.Node) *yaml.Node {
 	if n == nil {
 		return nil

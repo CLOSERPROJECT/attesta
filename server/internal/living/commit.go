@@ -65,16 +65,23 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, &CommitError{Kind: "prep", Message: "value required"}
 	}
 
-	if _, err := c.Configs.ActiveVersion(ctx, org); err != nil {
+	version, err := c.Configs.ActiveVersion(ctx, org)
+	if err != nil {
+		return CommitResult{}, err
+	}
+	cfg, err := c.Configs.Get(ctx, org, version)
+	if err != nil {
 		return CommitResult{}, err
 	}
 
 	allowed, err := c.Authorizer.AllowCommit(ctx, AuthorizeCommit{
 		Operator:      op,
+		Org:           org,
 		TaskPath:      taskPath,
 		JobID:         ref.JobID,
 		TaskID:        ref.TaskID,
 		JobInstanceID: jobInstanceID,
+		RolesAllowed:  rolesAllowedForTask(cfg, ref.JobID, ref.TaskID),
 	})
 	if err != nil {
 		return CommitResult{}, err
