@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Verified user receives Domain (empty) + Active Config version for the flat fixture
-- [ ] Unauthenticated / unverified request cannot Load
-- [ ] Memory DomainStore and ConfigStore are wired for this path
-- [ ] Behaviour is covered by automated tests
+- [x] Verified user receives Domain (empty) + Active Config version for the flat fixture
+- [x] Unauthenticated / unverified request cannot Load
+- [x] Memory DomainStore and ConfigStore are wired for this path
+- [x] Behaviour is covered by automated tests

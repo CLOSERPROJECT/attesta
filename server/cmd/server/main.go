@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/yaml.v3"
@@ -166,6 +167,8 @@ type Server struct {
 	turnstileSecretKey string
 	turnstileClient    *http.Client
 	turnstileVerifyURL string
+	livingDomains      living.DomainStore
+	livingConfigs      living.ConfigStore
 }
 
 type SSEHub struct {
@@ -2528,6 +2531,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/docs/", s.handleDocs)
 	mux.HandleFunc("/about", s.handleAbout)
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
+	mux.Handle("/api/living/domain", s.livingDomainHandler())
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
