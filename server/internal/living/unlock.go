@@ -97,12 +97,20 @@ func sequenceOkForCommit(cfg OrgConfig, domain Domain, jobID, taskID, jobInstanc
 	if !ok {
 		return false
 	}
-	return IsTaskUnlocked(UnlockQuery{
+	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs:    OrderedTaskIDs(job.Tasks),
 		JobID:         jobID,
 		TaskID:        taskID,
 		JobInstanceID: jobInstanceID,
 		Submissions:   domain.Submissions,
 		Tasks:         job.Tasks,
-	})
+	}) {
+		return false
+	}
+	// Job-level startsWhen folds into the same Cerbos sequenceOk attr as Unlock.
+	if job.StartsWhen != nil &&
+		!IsStartsWhenSatisfied(job.StartsWhen, domain.Submissions, domain.JobInstances, referencedStartsWhenTask(cfg, job.StartsWhen)) {
+		return false
+	}
+	return true
 }

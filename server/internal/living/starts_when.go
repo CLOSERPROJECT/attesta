@@ -49,3 +49,36 @@ func IsStartsWhenSatisfied(startsWhen *StartsWhen, submissions []Submission, job
 	// default / "some"
 	return len(matching) > 0
 }
+
+// CanStartJob: start affordance when startsWhen holds and (repeatable or no instance yet).
+func CanStartJob(job Job, jobID string, submissions []Submission, jobInstances []JobInstance, referencedTask any) bool {
+	n := 0
+	for _, inst := range jobInstances {
+		if inst.JobID == jobID {
+			n++
+		}
+	}
+	if !(job.Repeatable || n == 0) {
+		return false
+	}
+	return IsStartsWhenSatisfied(job.StartsWhen, submissions, jobInstances, referencedTask)
+}
+
+func referencedStartsWhenTask(cfg OrgConfig, sw *StartsWhen) any {
+	if sw == nil {
+		return nil
+	}
+	jobVal, ok := cfg.Jobs.Get(sw.Task.JobID)
+	if !ok {
+		return nil
+	}
+	job, ok := jobVal.(Job)
+	if !ok {
+		return nil
+	}
+	task, ok := job.Tasks.Get(sw.Task.TaskID)
+	if !ok {
+		return nil
+	}
+	return task
+}

@@ -12,6 +12,7 @@ const (
 	registerTaskPath     = "intake/register"
 	codiceFirTaskPath    = "intake/codiceFir"
 	palletWeightTaskPath = "intake/palletWeight"
+	lineShiftTaskPath    = "line/shift"
 )
 
 // CommitRequest is the Commit wire body (no run id).
@@ -117,6 +118,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		next, err = applyCodiceFirCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case palletWeightTaskPath:
 		next, err = applyPalletWeightCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case lineShiftTaskPath:
+		next, err = applyShiftCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	default:
 		return CommitResult{}, &CommitError{
 			Kind:    "unknown-target",
@@ -260,6 +263,31 @@ func applyPalletWeightCommit(domain Domain, userID, jobInstanceID string, value 
 		Ops:           ops,
 		Timestamp:     ts,
 		UserID:        userID,
+	})
+}
+
+// First line Task: mint the line Job instance from value.shift (fixture instanceId $.shift).
+func applyShiftCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	shift, ok := value["shift"].(string)
+	if !ok || strings.TrimSpace(shift) == "" {
+		return Domain{}, &CommitError{Kind: "prep", Message: "value.shift must be a non-empty string"}
+	}
+	if jobInstanceID != shift {
+		return Domain{}, &CommitError{Kind: "prep", Message: "jobInstanceId must match value.shift"}
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "line",
+		TaskID:        "shift",
+		JobInstanceID: jobInstanceID,
+		Facts:         cloneFacts(value),
+		Ops:           nil,
+		Timestamp:     ts,
+		UserID:        userID,
+		NewJobInstance: &JobInstance{
+			JobID: "line",
+			ID:    jobInstanceID,
+			Label: "Turno: " + shift,
+		},
 	})
 }
 

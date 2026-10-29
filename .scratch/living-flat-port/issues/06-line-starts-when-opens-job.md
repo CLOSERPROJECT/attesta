@@ -4,9 +4,9 @@
 
 **Blocked by:** 05: Intake — Leftovers completeness all (palletWeight)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Before intake gate: line Task Commit denied
-- [ ] After gate Submissions: line Job can start / first line Task Commit allowed
-- [ ] startsWhen quantifier behaviour matches Org Config fixture
-- [ ] Tests cover before/after gate
+- [x] Before intake gate: line Task Commit denied
+- [x] After gate Submissions: line Job can start / first line Task Commit allowed
+- [x] startsWhen quantifier behaviour matches Org Config fixture
+- [x] Tests cover before/after gate
