@@ -4,9 +4,9 @@
 
 **Blocked by:** 06: Line — startsWhen opens Job
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Two (or more) line Job instances can be progressed independently
-- [ ] lineLoad `some` accepts batch Commits without unlocking the next Task
-- [ ] lineLoad cannot be used as a startsWhen target
-- [ ] Tests cover multi-instance and `some` non-unlock rules
+- [x] Two (or more) line Job instances can be progressed independently
+- [x] lineLoad `some` accepts batch Commits without unlocking the next Task
+- [x] lineLoad cannot be used as a startsWhen target
+- [x] Tests cover multi-instance and `some` non-unlock rules

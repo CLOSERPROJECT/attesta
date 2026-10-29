@@ -13,6 +13,7 @@ const (
 	codiceFirTaskPath    = "intake/codiceFir"
 	palletWeightTaskPath = "intake/palletWeight"
 	lineShiftTaskPath    = "line/shift"
+	lineLoadTaskPath     = "line/lineLoad"
 )
 
 // CommitRequest is the Commit wire body (no run id).
@@ -120,6 +121,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		next, err = applyPalletWeightCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case lineShiftTaskPath:
 		next, err = applyShiftCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case lineLoadTaskPath:
+		next, err = applyLineLoadCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	default:
 		return CommitResult{}, &CommitError{
 			Kind:    "unknown-target",
@@ -288,6 +291,41 @@ func applyShiftCommit(domain Domain, userID, jobInstanceID string, value map[str
 			ID:    jobInstanceID,
 			Label: "Turno: " + shift,
 		},
+	})
+}
+
+// Leftovers completeness some: batch progress patches; never an unlock / startsWhen gate.
+func applyLineLoadCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	leftoverIDs := lineLoadLeftoverIDs(domain)
+	progressRaw, _ := value["progress"].(map[string]any)
+	if progressRaw == nil {
+		progressRaw = map[string]any{}
+	}
+
+	filled, err := filterFilledProgress(progressRaw)
+	if err != nil {
+		return Domain{}, &CommitError{Kind: "prep", Message: err.Error()}
+	}
+	if msg := validateProgressFacts(filled, leftoverIDs); msg != "" {
+		return Domain{}, &CommitError{Kind: "prep", Message: msg}
+	}
+
+	ops := make([]MutateOp, 0, len(filled))
+	for id, progress := range filled {
+		ops = append(ops, PatchOp{
+			Entity: EntityPallet,
+			ID:     id,
+			Set:    map[string]any{"progress": progress},
+		})
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "line",
+		TaskID:        "lineLoad",
+		JobInstanceID: jobInstanceID,
+		Facts:         cloneFacts(filled),
+		Ops:           ops,
+		Timestamp:     ts,
+		UserID:        userID,
 	})
 }
 

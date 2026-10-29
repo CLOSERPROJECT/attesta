@@ -126,6 +126,71 @@ func enforceAllCompleteness(facts map[string]WeighRowFact, leftoverIDs []string)
 	return "completeness all requires every leftover — missing " + strings.Join(missing, ", ")
 }
 
+// lineLoadLeftoverIDs: weighted pallets not yet progress=done
+// (fixture reads.leftovers where: $exists(weight) and $not(progress = 'done')).
+func lineLoadLeftoverIDs(domain Domain) []string {
+	ids := make([]string, 0)
+	for id, facts := range domain.Pallet {
+		if !palletWeightExists(facts) {
+			continue
+		}
+		if progress, ok := facts["progress"].(string); ok && progress == "done" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// Untouched this pass — omit from batch (not the same as clear null).
+func isUntouchedProgressCell(cell any) bool {
+	if cell == nil {
+		return false
+	}
+	if s, ok := cell.(string); ok {
+		return strings.TrimSpace(s) == ""
+	}
+	return false
+}
+
+// Set or clear progress cells; untouched rows stay out of the batch.
+// nil in the result means clear/unset entity progress.
+func filterFilledProgress(value map[string]any) (map[string]any, error) {
+	filled := make(map[string]any)
+	for id, cell := range value {
+		if isUntouchedProgressCell(cell) {
+			continue
+		}
+		if cell == nil {
+			filled[id] = nil
+			continue
+		}
+		s, ok := cell.(string)
+		if !ok || (s != "partial" && s != "done") {
+			return nil, fmt.Errorf("invalid progress for %s", id)
+		}
+		filled[id] = s
+	}
+	return filled, nil
+}
+
+func validateProgressFacts(facts map[string]any, leftoverIDs []string) string {
+	if len(facts) == 0 {
+		return "nothing to submit — set or clear progress on at least one pallet"
+	}
+	allowed := make(map[string]struct{}, len(leftoverIDs))
+	for _, id := range leftoverIDs {
+		allowed[id] = struct{}{}
+	}
+	for id := range facts {
+		if _, ok := allowed[id]; !ok {
+			return fmt.Sprintf("pallet not in leftovers: %s", id)
+		}
+	}
+	return ""
+}
+
 func floatFromAny(v any) (float64, bool) {
 	switch n := v.(type) {
 	case float64:

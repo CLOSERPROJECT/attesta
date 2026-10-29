@@ -49,3 +49,39 @@ func TestFilterFilledObjectWeightsRequiresRowFields(t *testing.T) {
 		t.Fatalf("filled = %#v", filled)
 	}
 }
+
+func TestLineLoadLeftoverIDsSkipsDone(t *testing.T) {
+	domain := EmptyDomain()
+	domain.Pallet = EntityMap{
+		"a": map[string]any{"loadId": "load-1", "weight": 11.0},
+		"b": map[string]any{"loadId": "load-1", "weight": 22.0, "progress": "partial"},
+		"c": map[string]any{"loadId": "load-1", "weight": 33.0, "progress": "done"},
+		"d": map[string]any{"loadId": "load-1"},
+	}
+	got := lineLoadLeftoverIDs(domain)
+	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
+	filled, err := filterFilledProgress(map[string]any{
+		"a": "done", "b": "partial", "c": "", "d": nil,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filled) != 3 {
+		t.Fatalf("filled = %#v", filled)
+	}
+	if filled["a"] != "done" || filled["b"] != "partial" || filled["d"] != nil {
+		t.Fatalf("filled = %#v", filled)
+	}
+	if validateProgressFacts(filled, []string{"a", "b", "d"}) != "" {
+		t.Fatal("valid batch must pass")
+	}
+	_, err = filterFilledProgress(map[string]any{"a": false})
+	if err == nil || !strings.Contains(err.Error(), "invalid progress") {
+		t.Fatalf("err = %v", err)
+	}
+}
