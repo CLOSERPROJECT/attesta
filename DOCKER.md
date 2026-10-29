@@ -113,6 +113,7 @@ Set these on the `attesta` service for automatic Appwrite project + demo fixture
 | Variable | Preview | Notes |
 |---|---|---|
 | `ATTESTA_SEED` | `true` | Leave unset/`false` in production |
+| `ATTESTA_LIVING_SEED` | optional | When truthy, wipe living Domain + re-seed truck-loop Active Config on Memory store birth; leave unset in production |
 | `ATTESTA_ROOT_DIR` | `/app` | App root for `.env.appwrite` (Dockerfile/entrypoint set this; matches image app root, not `WORKDIR /app/server`) |
 | `APPWRITE_PROJECT_ID` | `attesta` | Required; bootstrap creates this project id. Do **not** reuse production’s id on Preview |
 | `APPWRITE_API_KEY` | optional / empty | Stale Coolify keys are fine — `attesta prepare` bootstraps and writes `$ATTESTA_ROOT_DIR/.env.appwrite`; `main` loads it at startup |

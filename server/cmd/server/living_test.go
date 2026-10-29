@@ -11,6 +11,69 @@ import (
 	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
 
+func TestLivingSeedWipeEnabled(t *testing.T) {
+	if livingSeedWipeEnabled("") || livingSeedWipeEnabled("0") || livingSeedWipeEnabled("false") {
+		t.Fatal("expected disabled")
+	}
+	for _, v := range []string{"1", "true", "YES", "on"} {
+		if !livingSeedWipeEnabled(v) {
+			t.Fatalf("livingSeedWipeEnabled(%q) = false", v)
+		}
+	}
+}
+
+func TestEnsureLivingStoresSeedsFixtureAndOptionalWipe(t *testing.T) {
+	t.Setenv("ATTESTA_LIVING_SEED", "true")
+	domains := living.NewMemoryDomainStore()
+	if err := domains.Put(t.Context(), "feragame", living.Domain{
+		Load: living.EntityMap{"L1": {"client": "NO"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{livingDomains: domains}
+	server.ensureLivingStores()
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Load) != 0 {
+		t.Fatalf("expected wipe when ATTESTA_LIVING_SEED set: %#v", got)
+	}
+	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+}
+
+func TestEnsureLivingStoresSeedsFixtureWithoutWipeByDefault(t *testing.T) {
+	t.Setenv("ATTESTA_LIVING_SEED", "")
+	domains := living.NewMemoryDomainStore()
+	if err := domains.Put(t.Context(), "feragame", living.Domain{
+		Load: living.EntityMap{"L1": {"client": "NO"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{livingDomains: domains}
+	server.ensureLivingStores()
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Load) != 1 {
+		t.Fatalf("domain wiped without ATTESTA_LIVING_SEED: %#v", got)
+	}
+	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+}
+
 func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 	sessionID := "living-load-ok"
