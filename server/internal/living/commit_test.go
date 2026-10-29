@@ -106,13 +106,42 @@ func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 func TestCommitRejectsUnsupportedPath(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	_, err := c.Commit(t.Context(), "feragame", OperatorIdentity{UserID: "ada", Org: "feragame"}, CommitRequest{
-		TaskPath:      "intake/weightCheck",
+		TaskPath:      "intake/notATask",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         map[string]any{},
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unknown-target" {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestCommitWeightCheckAfterPalletWeight(t *testing.T) {
+	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+	instanceID := "NIR-261019-NO-1"
+	commitThroughCodiceFir(t, c, instanceID)
+	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic"}}
+	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
+		Value: palletWeightValue(map[string]any{
+			instanceID + ".1": weighRow(11),
+			instanceID + ".2": weighRow(22),
+		}),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
+		TaskPath: "intake/weightCheck", JobInstanceID: instanceID,
+		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 33.0},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Domain.Load[instanceID]["checkedTruckWeight"] != 100.0 {
+		t.Fatalf("load = %#v", result.Domain.Load[instanceID])
+	}
+	if len(result.Domain.Submissions) != 4 || result.Domain.Submissions[3].TaskID != "weightCheck" {
+		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
 }
 

@@ -42,7 +42,7 @@ export type OrgConfig = {
 	jobs: Record<string, JobConfig>;
 };
 
-/** Chrome fields used by the Jobs shell; Task bodies land in later tickets. */
+/** Job chrome + Task map (authored Unlock order = object key order). */
 export type JobConfig = {
 	repeatable: boolean;
 	instanceId?: string;
@@ -54,6 +54,10 @@ export type JobConfig = {
 	} | null;
 	tasks: Record<string, unknown>;
 };
+
+export function taskPath(jobId: string, taskId: string): string {
+	return `${jobId}/${taskId}`;
+}
 
 export function emptyDomain(): Domain {
 	return {

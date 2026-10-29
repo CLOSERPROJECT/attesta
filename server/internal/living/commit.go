@@ -12,6 +12,7 @@ const (
 	registerTaskPath        = "intake/register"
 	codiceFirTaskPath       = "intake/codiceFir"
 	palletWeightTaskPath    = "intake/palletWeight"
+	weightCheckTaskPath     = "intake/weightCheck"
 	lineShiftTaskPath       = "line/shift"
 	lineLoadTaskPath        = "line/lineLoad"
 	containerRegTaskPath    = "line/containerReg"
@@ -121,6 +122,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		next, err = applyCodiceFirCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case palletWeightTaskPath:
 		next, err = applyPalletWeightCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
+	case weightCheckTaskPath:
+		next, err = applyWeightCheckCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case lineShiftTaskPath:
 		next, err = applyShiftCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
 	case lineLoadTaskPath:
@@ -272,6 +275,35 @@ func applyPalletWeightCommit(domain Domain, userID, jobInstanceID string, value 
 		Ops:           ops,
 		Timestamp:     ts,
 		UserID:        userID,
+	})
+}
+
+func applyWeightCheckCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
+	truck, ok := floatFromAny(value["checkedTruckWeight"])
+	if !ok || truck <= 0 {
+		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedTruckWeight must be a positive number"}
+	}
+	sum, ok := floatFromAny(value["checkedPalletSum"])
+	if !ok || sum <= 0 {
+		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedPalletSum must be a positive number"}
+	}
+	return Mutate(domain, MutateRequest{
+		JobID:         "intake",
+		TaskID:        "weightCheck",
+		JobInstanceID: jobInstanceID,
+		Facts:         cloneFacts(value),
+		Ops: []MutateOp{
+			PatchOp{
+				Entity: EntityLoad,
+				ID:     jobInstanceID,
+				Set: map[string]any{
+					"checkedTruckWeight": truck,
+					"checkedPalletSum":   sum,
+				},
+			},
+		},
+		Timestamp: ts,
+		UserID:    userID,
 	})
 }
 

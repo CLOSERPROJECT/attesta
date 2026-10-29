@@ -1,3 +1,6 @@
+import type { CommitDomainPort, CommitRequest } from './commit-port.js';
+import { createHttpCommitDomainPort } from './http-commit-port.js';
+import { draftKey } from './drafts.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
 import type { LoadDomainPort } from './load-port.js';
 import {
@@ -8,22 +11,26 @@ import {
 
 export type LivingSessionOptions = {
 	load?: LoadDomainPort;
+	commit?: CommitDomainPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
 };
 
-/**
- * Living org session: Domain + Active Config via LoadDomainPort.
- * Commit / Task UI arrive in later tickets — this holds Load + Jobs chrome state.
- */
+/** Living org session: Load Domain + Active Config; Commit sealed Tasks; client Drafts. */
 export class LivingSession {
 	readonly load: LoadDomainPort;
+	readonly commitPort: CommitDomainPort;
 	result = $state.raw<LoadResult | null>(null);
 	loading = $state(false);
+	committing = $state(false);
 	error = $state.raw<string | null>(null);
+	commitError = $state.raw<string | null>(null);
+	/** taskPath::jobInstanceId → sealed-shape draft object */
+	drafts = $state.raw<Record<string, Record<string, unknown>>>({});
 
 	constructor(options: LivingSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
+		this.commitPort = options.commit ?? createHttpCommitDomainPort();
 		if (options.hydrate !== false) {
 			void this.hydrate();
 		}
@@ -37,6 +44,27 @@ export class LivingSession {
 		return jobs[jobId] ?? null;
 	};
 
+	getDraft = (taskPath: string, jobInstanceId: string): Record<string, unknown> | null => {
+		return this.drafts[draftKey(taskPath, jobInstanceId)] ?? null;
+	};
+
+	setDraft = (
+		taskPath: string,
+		jobInstanceId: string,
+		value: Record<string, unknown>
+	): void => {
+		const key = draftKey(taskPath, jobInstanceId);
+		this.drafts = { ...this.drafts, [key]: value };
+	};
+
+	clearDraft = (taskPath: string, jobInstanceId: string): void => {
+		const key = draftKey(taskPath, jobInstanceId);
+		if (!(key in this.drafts)) return;
+		const next = { ...this.drafts };
+		delete next[key];
+		this.drafts = next;
+	};
+
 	hydrate = async (): Promise<void> => {
 		this.loading = true;
 		this.error = null;
@@ -47,6 +75,57 @@ export class LivingSession {
 			this.error = err instanceof Error ? err.message : String(err);
 		} finally {
 			this.loading = false;
+		}
+	};
+
+	/**
+	 * Re-Load Domain + Config without wiping client Drafts.
+	 * Used after Commit denial so chrome matches server truth.
+	 */
+	refreshKeepDrafts = async (): Promise<void> => {
+		this.loading = true;
+		try {
+			this.result = await this.load.load();
+			this.error = null;
+		} catch (err) {
+			// Keep prior Domain; surface Load failure separately from Commit denial.
+			this.error = err instanceof Error ? err.message : String(err);
+		} finally {
+			this.loading = false;
+		}
+	};
+
+	/**
+	 * Commit sealed value. On success: replace Domain from response, clear that Draft.
+	 * On failure: keep Domain + Draft, re-Load, surface error (Cerbos / Unlock / prep).
+	 */
+	commit = async (req: CommitRequest): Promise<boolean> => {
+		this.committing = true;
+		this.commitError = null;
+		try {
+			const committed = await this.commitPort.commit(req);
+			const prior = this.result;
+			if (prior) {
+				this.result = {
+					...prior,
+					org: committed.org || prior.org,
+					domain: committed.domain
+				};
+			} else {
+				await this.refreshKeepDrafts();
+				const loaded = this.result;
+				if (loaded) {
+					this.result = { ...loaded, domain: committed.domain };
+				}
+			}
+			this.clearDraft(req.taskPath, req.jobInstanceId);
+			return true;
+		} catch (err) {
+			this.commitError = err instanceof Error ? err.message : String(err);
+			await this.refreshKeepDrafts();
+			return false;
+		} finally {
+			this.committing = false;
 		}
 	};
 }

@@ -4,9 +4,9 @@
 
 **Blocked by:** 05: Intake — Leftovers completeness all (palletWeight); 09: /app — Load shell + HTTP ports
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Browser can complete intake Tasks in Unlock order via living Commit
-- [ ] Leftovers UI for palletWeight works against the API
-- [ ] Failed Cerbos / Unlock denial surfaces without corrupting Domain
-- [ ] No harness impersonation controls
+- [x] Browser can complete intake Tasks in Unlock order via living Commit
+- [x] Leftovers UI for palletWeight works against the API
+- [x] Failed Cerbos / Unlock denial surfaces without corrupting Domain
+- [x] No harness impersonation controls

@@ -41,6 +41,14 @@
 				Domain not loaded yet.
 			</p>
 		{/if}
+		{#if living.commitError}
+			<p class="text-sm text-red-700" data-testid="living-commit-error" role="alert">
+				Commit denied: {living.commitError}
+			</p>
+		{/if}
+		{#if living.committing}
+			<p class="text-sm text-zinc-500" data-testid="living-commit-status">Committing…</p>
+		{/if}
 	</header>
 
 	{#if living.result}

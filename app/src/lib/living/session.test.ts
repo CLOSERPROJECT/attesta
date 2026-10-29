@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
+import { CommitDomainError } from './commit-port.js';
 import { LivingSession } from './session.svelte.js';
 import type { LoadDomainPort } from './load-port.js';
 import { emptyDomain, type LoadResult } from './types.js';
@@ -58,5 +59,76 @@ describe('LivingSession', () => {
 		await session.hydrate();
 		expect(session.result).toBeNull();
 		expect(session.error).toBe('boom');
+	});
+
+	test('commit success replaces Domain and clears Draft', async () => {
+		const nextDomain = {
+			...emptyDomain(),
+			load: { 'NIR-1': { client: 'NO' } },
+			jobInstances: [{ jobId: 'intake', id: 'NIR-1', label: 'NIR-1' }],
+			submissions: [
+				{
+					jobId: 'intake',
+					taskId: 'register',
+					jobInstanceId: 'NIR-1',
+					timestamp: 't',
+					userId: 'ada',
+					facts: {},
+					idsTouched: ['NIR-1']
+				}
+			]
+		};
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			domain: nextDomain
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
+		const ok = await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: { client: 'NO', palletCount: 1 }
+		});
+		expect(ok).toBe(true);
+		expect(session.result?.domain.load['NIR-1']?.client).toBe('NO');
+		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
+		expect(session.commitError).toBeNull();
+	});
+
+	test('commit denial keeps Domain + Draft and re-Loads', async () => {
+		const load = vi.fn(async () => sample);
+		const commit = vi.fn(async () => {
+			throw new CommitDomainError('forbidden', 403);
+		});
+		const session = new LivingSession({
+			load: { load },
+			commit: { commit },
+			hydrate: false
+		});
+		const seeded = structuredClone(sample);
+		seeded.domain.load = { existing: { client: 'SU' } };
+		session.result = seeded;
+		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
+
+		const ok = await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: { client: 'NO' }
+		});
+		expect(ok).toBe(false);
+		expect(session.commitError).toBe('forbidden');
+		expect(session.getDraft('intake/register', '_new')).toEqual({
+			client: 'NO',
+			notes: 'keep me'
+		});
+		expect(load).toHaveBeenCalledOnce();
+		// Re-Load returned empty Domain — still no corruption from failed Commit body.
+		expect(session.result?.domain.load).toEqual({});
 	});
 });
