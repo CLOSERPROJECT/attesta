@@ -20,12 +20,25 @@ func (s *Server) ensureLivingStores() {
 	}
 }
 
-func (s *Server) livingDomainHandler() http.Handler {
+func (s *Server) livingHandler() http.Handler {
 	s.ensureLivingStores()
+	auth := s.livingAuthorizer
+	if auth == nil {
+		auth = living.AllowAllAuthorizer{}
+	}
 	return &living.Handler{
 		Loader: &living.Loader{Domains: s.livingDomains, Configs: s.livingConfigs},
-		Gate:   s.livingVerifiedGate,
+		Committer: &living.Committer{
+			Domains:    s.livingDomains,
+			Configs:    s.livingConfigs,
+			Authorizer: auth,
+		},
+		Gate: s.livingVerifiedGate,
 	}
+}
+
+func (s *Server) livingDomainHandler() http.Handler {
+	return s.livingHandler()
 }
 
 func (s *Server) livingVerifiedGate(w http.ResponseWriter, r *http.Request) (living.OperatorIdentity, bool) {

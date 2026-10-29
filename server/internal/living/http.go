@@ -3,6 +3,7 @@ package living
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -14,21 +15,23 @@ type OperatorIdentity struct {
 	Roles  []string
 }
 
-// Gate authenticates and verifies the caller. It writes the HTTP error response
-// and returns ok=false when the request must not proceed.
+// Gate authenticates the caller; on failure it writes the HTTP error and returns ok=false.
 type Gate func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool)
 
-// Handler serves living Load (and later Commit) over placeholder HTTP seams.
+// Handler serves Load and Commit over placeholder HTTP seams.
 type Handler struct {
-	Loader *Loader
-	Gate   Gate
+	Loader    *Loader
+	Committer *Committer
+	Gate      Gate
 }
 
-// ServeHTTP routes GET /api/living/domain (and method-not-allowed otherwise).
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case r.URL.Path == "/api/living/domain" || strings.TrimSuffix(r.URL.Path, "/") == "/api/living/domain":
+	path := strings.TrimSuffix(r.URL.Path, "/")
+	switch path {
+	case "/api/living/domain":
 		h.handleLoad(w, r)
+	case "/api/living/commit":
+		h.handleCommit(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -73,4 +76,72 @@ func (h *Handler) handleLoad(w http.ResponseWriter, r *http.Request) {
 	if err := enc.Encode(result); err != nil {
 		return
 	}
+}
+
+func (h *Handler) handleCommit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.Gate == nil || h.Committer == nil {
+		http.Error(w, "living commit not configured", http.StatusInternalServerError)
+		return
+	}
+	op, ok := h.Gate(w, r)
+	if !ok {
+		return
+	}
+	org := strings.TrimSpace(op.Org)
+	if org == "" {
+		http.Error(w, "organization required", http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+	var req CommitRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.Committer.Commit(r.Context(), org, op, req)
+	if err != nil {
+		writeCommitError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(result)
+}
+
+func writeCommitError(w http.ResponseWriter, err error) {
+	var ce *CommitError
+	if errors.As(err, &ce) {
+		switch ce.Kind {
+		case "unauthorized":
+			http.Error(w, "forbidden", http.StatusForbidden)
+		case "unknown-target", "prep":
+			http.Error(w, ce.Message, http.StatusBadRequest)
+		case "forbidden":
+			http.Error(w, ce.Message, http.StatusForbidden)
+		case "mutate":
+			http.Error(w, ce.Message, http.StatusConflict)
+		default:
+			http.Error(w, "commit failed", http.StatusInternalServerError)
+		}
+		return
+	}
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "active config not found", http.StatusNotFound)
+		return
+	}
+	http.Error(w, "failed to commit", http.StatusInternalServerError)
 }

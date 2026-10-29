@@ -169,6 +169,7 @@ type Server struct {
 	turnstileVerifyURL string
 	livingDomains      living.DomainStore
 	livingConfigs      living.ConfigStore
+	livingAuthorizer   living.Authorizer
 }
 
 type SSEHub struct {
@@ -2531,7 +2532,9 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/docs/", s.handleDocs)
 	mux.HandleFunc("/about", s.handleAbout)
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
-	mux.Handle("/api/living/domain", s.livingDomainHandler())
+	livingAPI := s.livingHandler()
+	mux.Handle("/api/living/domain", livingAPI)
+	mux.Handle("/api/living/commit", livingAPI)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)

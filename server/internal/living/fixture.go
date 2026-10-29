@@ -174,8 +174,8 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 	if err != nil {
 		return nil, fmt.Errorf("jobs.%s.startsWhen.task (from substep): %w", jobID, err)
 	}
-	ref, ok := parseTaskPath(path)
-	if !ok {
+	ref, err := ParseTaskPath(path)
+	if err != nil {
 		return nil, fmt.Errorf("jobs.%s.startsWhen.task must be \"<jobId>/<taskId>\"", jobID)
 	}
 	quantifier := "some"
@@ -185,18 +185,7 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 		}
 		quantifier = q
 	}
-	return &StartsWhen{Task: ref, Quantifier: quantifier}, nil
-}
-
-func parseTaskPath(path string) (StartsWhenRef, bool) {
-	slash := strings.IndexByte(path, '/')
-	if slash <= 0 || slash == len(path)-1 {
-		return StartsWhenRef{}, false
-	}
-	if strings.IndexByte(path[slash+1:], '/') >= 0 {
-		return StartsWhenRef{}, false
-	}
-	return StartsWhenRef{JobID: path[:slash], TaskID: path[slash+1:]}, true
+	return &StartsWhen{Task: StartsWhenRef{JobID: ref.JobID, TaskID: ref.TaskID}, Quantifier: quantifier}, nil
 }
 
 func rolesFromTask(payload any) []string {

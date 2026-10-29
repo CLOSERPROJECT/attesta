@@ -4,9 +4,9 @@
 
 **Blocked by:** 01: Living Load — empty Domain + fixture Org Config
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Commit for `intake/register` updates Domain and records a Submission keyed by Task path
-- [ ] Subsequent Load shows the committed Domain
-- [ ] Request shape uses Task path + Job instance id (not a run id)
-- [ ] Verified session required; tests cover the happy path with stub Authorizer
+- [x] Commit for `intake/register` updates Domain and records a Submission keyed by Task path
+- [x] Subsequent Load shows the committed Domain
+- [x] Request shape uses Task path + Job instance id (not a run id)
+- [x] Verified session required; tests cover the happy path with stub Authorizer
