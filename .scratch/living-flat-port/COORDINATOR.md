@@ -22,7 +22,7 @@
 | 17 | 9ca1870 | readyWhenOk Cerbos attr; reviewer APPROVE; human smoke |
 | 18 | ce9974c | HttpPort after mutate + FakeHttpPort; reviewer APPROVE; human smoke |
 | 14 | 4789ecd | FormPlan UI; reviewer APPROVE; human smoke |
-| 19 | pending squash SHA | durable Mongo Domain/OrgConfig; reviewer APPROVE; human smoke |
+| 19 | c815ebc | durable Mongo Domain/OrgConfig; reviewer APPROVE; human smoke |
 
 ## Diagnostics
 
