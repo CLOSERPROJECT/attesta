@@ -3,11 +3,7 @@ import { createHttpCommitDomainPort } from './http-commit-port.js';
 import { draftKey } from './drafts.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
 import type { LoadDomainPort } from './load-port.js';
-import {
-	orderedJobIds,
-	type JobConfig,
-	type LoadResult
-} from './types.js';
+import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 export type LivingSessionOptions = {
 	load?: LoadDomainPort;
@@ -16,7 +12,7 @@ export type LivingSessionOptions = {
 	hydrate?: boolean;
 };
 
-/** Living org session: Load Domain + Active Config; Commit sealed Tasks; client Drafts. */
+/** Living org session: Load Worklist + bundles; Commit sealed Tasks; client Drafts. */
 export class LivingSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
@@ -39,12 +35,12 @@ export class LivingSession {
 		}
 	}
 
-	jobIds = $derived(orderedJobIds(this.result?.config));
+	jobIds = $derived(orderedJobIdsFromWorklist(this.result?.worklist));
 
-	job = (jobId: string): JobConfig | null => {
-		const jobs = this.result?.config.jobs;
-		if (!jobs) return null;
-		return jobs[jobId] ?? null;
+	worklistJob = (jobId: string): WorklistJob | null => {
+		const jobs = this.result?.worklist.jobs;
+		if (!jobs?.length) return null;
+		return jobs.find((row) => row.jobId === jobId) ?? null;
 	};
 
 	getDraft = (taskPath: string, jobInstanceId: string): Record<string, unknown> | null => {
@@ -82,7 +78,7 @@ export class LivingSession {
 	};
 
 	/**
-	 * Re-Load Domain + Config without wiping client Drafts.
+	 * Re-Load Worklist + bundles without wiping client Drafts.
 	 * Used after Commit denial so chrome matches server truth.
 	 */
 	refreshKeepDrafts = async (): Promise<void> => {
@@ -91,7 +87,7 @@ export class LivingSession {
 			this.result = await this.load.load();
 			this.error = null;
 		} catch (err) {
-			// Keep prior Domain; surface Load failure separately from Commit denial.
+			// Keep prior result; surface Load failure separately from Commit denial.
 			this.error = err instanceof Error ? err.message : String(err);
 		} finally {
 			this.loading = false;
@@ -99,9 +95,9 @@ export class LivingSession {
 	};
 
 	/**
-	 * Commit sealed value. On success: replace Domain from response, clear Draft
-	 * keyed by the request id (provisional '' → `_new`), return response jobInstanceId.
-	 * On failure: keep Domain + Draft, re-Load, surface error (Cerbos / Unlock / prep).
+	 * Commit sealed value. On success: replace Worklist + Task form bundles
+	 * from response, clear Draft keyed by the request id (provisional '' → `_new`),
+	 * return response jobInstanceId. On failure: keep Draft, re-Load, surface error.
 	 */
 	commit = async (req: CommitRequest): Promise<string | null> => {
 		this.committing = true;
@@ -113,13 +109,18 @@ export class LivingSession {
 				this.result = {
 					...prior,
 					org: committed.org || prior.org,
-					domain: committed.domain
+					worklist: committed.worklist,
+					taskFormBundles: committed.taskFormBundles
 				};
 			} else {
 				await this.refreshKeepDrafts();
 				const loaded = this.result;
 				if (loaded) {
-					this.result = { ...loaded, domain: committed.domain };
+					this.result = {
+						...loaded,
+						worklist: committed.worklist,
+						taskFormBundles: committed.taskFormBundles
+					};
 				}
 			}
 			this.lastHttpLinks = committed.links ?? [];

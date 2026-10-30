@@ -1,0 +1,5 @@
+# Living Worklist is server-projected; SPA does not re-gate
+
+Unlock order, startsWhen, and Leftovers openness for the operator UI are evaluated only in Go and shipped as a **Worklist** on living Load and Commit. The SPA reads Task statuses (`locked` | `available` | `done`) and Job `canStart`; it must not re-implement those rules (no production TS Unlock/startsWhen plant). This reverses the flat-port “copy pure Unlock/startsWhen into `app/` for chrome” policy: Commit remains Cerbos-authoritative, but chrome affordances are a Go projection, not a second rule body. **readyWhen** stays Commit-only until unavailable chrome is a product need.
+
+Once full Org Config leaves the wire, each Worklist Job also carries chrome metadata the SPA cannot invent: authored `taskIds` order, `startLabel`, and `repeatable`. Status vocabulary stays `locked` | `available` | `done` only. **Task form bundle**s (minimum form payload; bindings bag is DomainSnapshot-shaped for live Chrome/Derived) ship for every `available` Task plus provisional start (`jobInstanceId` empty when `canStart`). Load/Commit JSON do not include full Domain or Org Config.

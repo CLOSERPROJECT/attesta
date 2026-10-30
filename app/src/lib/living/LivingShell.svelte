@@ -27,18 +27,18 @@
 			<p class="text-sm text-zinc-600" data-testid="living-load-meta">
 				Org <span class="font-medium text-zinc-800">{living.result.org}</span>
 				· Config
-				<span class="font-medium text-zinc-800">{living.result.config.id}</span>
+				<span class="font-medium text-zinc-800">{living.result.configId}</span>
 				v{living.result.activeConfigVersion}
 			</p>
 		{:else if living.loading}
-			<p class="text-sm text-zinc-500" data-testid="living-load-status">Loading Domain…</p>
+			<p class="text-sm text-zinc-500" data-testid="living-load-status">Loading…</p>
 		{:else if living.error}
 			<p class="text-sm text-red-700" data-testid="living-load-error" role="alert">
 				{living.error}
 			</p>
 		{:else}
 			<p class="text-sm text-zinc-500" data-testid="living-load-status">
-				Domain not loaded yet.
+				Not loaded yet.
 			</p>
 		{/if}
 		{#if living.commitError}
@@ -54,9 +54,9 @@
 	{#if living.result}
 		<div class="space-y-4" data-testid="living-jobs">
 			{#each living.jobIds as jobId (jobId)}
-				{@const job = living.job(jobId)}
-				{#if job}
-					<JobChrome {jobId} {job} domain={living.result.domain} />
+				{@const worklistJob = living.worklistJob(jobId)}
+				{#if worklistJob}
+					<JobChrome {jobId} {worklistJob} />
 				{/if}
 			{/each}
 		</div>

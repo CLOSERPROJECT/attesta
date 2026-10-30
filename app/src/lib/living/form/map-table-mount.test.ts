@@ -73,16 +73,16 @@ describe('mapTable Substep mount', () => {
 		expect(prepared.options.getDomain?.()).toEqual({ tareKinds: cfg.tareKinds });
 	});
 
-	test('living TaskForm + FormPlan own mapTable mount; seed helpers stay pure', () => {
+	test('living TaskForm mounts from Task form bundle; mapTable seed helpers stay pure', () => {
 		const taskForm = readFileSync(join(libDir, '../TaskForm.svelte'), 'utf8');
 		const planSource = readFileSync(join(libDir, './task-form-plan.ts'), 'utf8');
 		const mountSvelte = readFileSync(join(libDir, './map-table-mount.svelte.ts'), 'utf8');
 		const mountPure = readFileSync(join(libDir, './map-table-mount.ts'), 'utf8');
 		expect(taskForm).toContain('LiveTaskForm');
-		expect(taskForm).toContain('compileTaskFormPlan');
-		expect(taskForm).toContain('buildLiveTaskPlanContext');
-		expect(taskForm).toContain('seedMapTableDraft');
-		expect(taskForm).toContain('isMapTableTask');
+		expect(taskForm).toContain('planFromTaskFormBundle');
+		expect(taskForm).not.toContain('compileTaskFormPlan');
+		expect(taskForm).not.toContain('buildLiveTaskPlanContext');
+		expect(taskForm).not.toContain('seedMapTableDraft');
 		expect(taskForm).toContain('startingNew');
 		expect(taskForm).not.toMatch(/jobInstanceId:\s*['"]_new['"]/);
 		expect(planSource).toContain('projectedSchemas');

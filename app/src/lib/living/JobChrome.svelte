@@ -1,14 +1,13 @@
 <script lang="ts">
 	import JobPanel from './JobPanel.svelte';
-	import type { Domain, JobConfig } from './types.js';
+	import type { WorklistJob } from './types.js';
 
 	type Props = {
 		jobId: string;
-		job: JobConfig;
-		domain: Domain;
+		worklistJob: WorklistJob;
 	};
 
-	let { jobId, job, domain }: Props = $props();
+	let { jobId, worklistJob }: Props = $props();
 </script>
 
-<JobPanel {jobId} {job} {domain} />
+<JobPanel {jobId} {worklistJob} />

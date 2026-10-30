@@ -58,7 +58,8 @@ describe('submit validation visibility', () => {
 		expect(task).toContain('task-submit-error');
 		expect(task).toContain('onSubmitError');
 		expect(task).toContain('shellEpoch');
-		expect(task).toContain('progressDraftFromDomain');
+		expect(task).toContain('findTaskFormBundle');
+		expect(task).toContain('initialData');
 	});
 
 	test('successful partial Commit seed restores domain progress for remount', () => {

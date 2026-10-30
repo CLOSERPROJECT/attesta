@@ -40,12 +40,16 @@ func startingNewMint() *CommitMint {
 	return &CommitMint{Kind: MintKindStartingNew}
 }
 
+// CommitResult is the SPA Commit response: Worklist + Task form bundles.
+// Domain stays on the Go value for server tests / callers but is omitted from JSON.
 type CommitResult struct {
-	Org           string         `json:"org"`
-	JobInstanceID string         `json:"jobInstanceId"`
-	Domain        Domain         `json:"domain"`
-	Links         []HttpLinkItem `json:"links,omitempty"`
-	HttpErrors    []string       `json:"httpErrors,omitempty"`
+	Org             string            `json:"org"`
+	JobInstanceID   string            `json:"jobInstanceId"`
+	Domain          Domain            `json:"-"`
+	Worklist        Worklist          `json:"worklist"`
+	TaskFormBundles []*TaskFormBundle `json:"taskFormBundles"`
+	Links           []HttpLinkItem    `json:"links,omitempty"`
+	HttpErrors      []string          `json:"httpErrors,omitempty"`
 }
 
 // CommitError maps to HTTP status in the handler.
@@ -189,7 +193,18 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, err
 	}
 
-	result := CommitResult{Org: org, JobInstanceID: applied.JobInstanceID, Domain: applied.Domain}
+	wl := ProjectWorklist(cfg, applied.Domain)
+	bundles, err := ProjectAvailableBundles(cfg, applied.Domain, wl)
+	if err != nil {
+		return CommitResult{}, err
+	}
+	result := CommitResult{
+		Org:             org,
+		JobInstanceID:   applied.JobInstanceID,
+		Domain:          applied.Domain,
+		Worklist:        wl,
+		TaskFormBundles: bundles,
+	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
 			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, applied.Bindings, applied.Domain, applied.JobInstanceID)

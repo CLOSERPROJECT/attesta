@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import { parseAuthoredPayload } from './dynamic-properties.js';
 import type { TaskConfig } from '../types.js';
-import { taskById } from '../unlock.js';
+import { taskById } from '../types.js';
 
 export type JobTemplate = {
 	repeatable: boolean;

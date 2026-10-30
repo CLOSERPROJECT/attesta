@@ -3,35 +3,38 @@ import { describe, expect, test, vi } from 'vitest';
 import { CommitDomainError } from './commit-port.js';
 import { LivingSession } from './session.svelte.js';
 import type { LoadDomainPort } from './load-port.js';
-import { emptyDomain, type LoadResult } from './types.js';
+import type { TaskFormBundle } from './form/task-form-bundle.js';
+import { emptyWorklist, type LoadResult } from './types.js';
 
 const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
-	domain: emptyDomain(),
-	config: {
-		id: 'truck-loop',
-		org: 'feragame',
-		version: '1',
-		jobs: {
-			intake: {
+	configId: 'truck-loop',
+	worklist: {
+		jobs: [
+			{
+				jobId: 'intake',
+				canStart: true,
 				repeatable: true,
-				label: '$load.id',
 				startLabel: 'Nuovo camion',
-				tasks: [{ id: 'register' }]
+				taskIds: ['register'],
+				instances: []
 			},
-			line: {
+			{
+				jobId: 'line',
+				canStart: false,
 				repeatable: true,
-				label: 'line',
 				startLabel: 'Nuovo turno',
-				tasks: [{ id: 'shift' }]
+				taskIds: ['shift'],
+				instances: []
 			}
-		}
-	}
+		]
+	},
+	taskFormBundles: []
 };
 
 describe('LivingSession', () => {
-	test('hydrate loads Domain + Active Config via LoadDomainPort', async () => {
+	test('hydrate loads Worklist + bundles via LoadDomainPort', async () => {
 		const load = vi.fn(async () => sample) satisfies LoadDomainPort['load'];
 		const session = new LivingSession({
 			load: { load },
@@ -43,7 +46,7 @@ describe('LivingSession', () => {
 		expect(session.error).toBeNull();
 		expect(session.result?.org).toBe('feragame');
 		expect(session.jobIds).toEqual(['intake', 'line']);
-		expect(session.job('intake')?.startLabel).toBe('Nuovo camion');
+		expect(session.worklistJob('intake')?.startLabel).toBe('Nuovo camion');
 	});
 
 	test('hydrate surfaces port errors without leaving stale result', async () => {
@@ -61,27 +64,46 @@ describe('LivingSession', () => {
 		expect(session.error).toBe('boom');
 	});
 
-	test('commit success replaces Domain and clears Draft', async () => {
-		const nextDomain = {
-			...emptyDomain(),
-			load: { 'NIR-1': { client: 'NO' } },
-			jobInstances: [{ jobId: 'intake', id: 'NIR-1', label: 'NIR-1' }],
-			submissions: [
+	test('commit success replaces Worklist + bundles and clears Draft', async () => {
+		const nextWorklist = {
+			jobs: [
 				{
 					jobId: 'intake',
-					taskId: 'register',
-					jobInstanceId: 'NIR-1',
-					timestamp: 't',
-					userId: 'ada',
-					facts: {},
-					idsTouched: ['NIR-1']
-				}
+					canStart: true,
+					repeatable: true,
+					taskIds: ['register', 'codiceFir'],
+					instances: [
+						{
+							id: 'NIR-1',
+							label: 'NIR-1',
+							tasks: { register: 'done' as const, codiceFir: 'available' as const }
+						}
+					]
+				},
+				{ jobId: 'line', canStart: false, repeatable: true, taskIds: ['shift'], instances: [] }
 			]
 		};
+		const nextBundles: TaskFormBundle[] = [
+			{
+				jobId: 'intake',
+				taskId: 'codiceFir',
+				jobInstanceId: 'NIR-1',
+				title: 'Codice FIR',
+				surface: 'live',
+				schema: { type: 'object' },
+				uiSchema: {},
+				initialData: {},
+				chrome: [],
+				chromeFieldIds: [],
+				sealFieldIds: ['codiceFir'],
+				bindings: { domain: {} }
+			}
+		];
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
-			domain: nextDomain
+			worklist: nextWorklist,
+			taskFormBundles: nextBundles
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
@@ -97,22 +119,18 @@ describe('LivingSession', () => {
 			mint: { kind: 'none' }
 		});
 		expect(minted).toBe('NIR-1');
-		expect(session.result?.domain.load['NIR-1']?.client).toBe('NO');
+		expect(session.result?.worklist).toEqual(nextWorklist);
+		expect(session.result?.taskFormBundles).toEqual(nextBundles);
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
 		expect(session.commitError).toBeNull();
 	});
 
 	test('provisional startingNew clears _new draft and returns response id', async () => {
-		const nextDomain = {
-			...emptyDomain(),
-			load: { 'NIR-1': { client: 'NO' } },
-			jobInstances: [{ jobId: 'intake', id: 'NIR-1', label: 'NIR-1' }],
-			submissions: []
-		};
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
-			domain: nextDomain
+			worklist: emptyWorklist(),
+			taskFormBundles: []
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
@@ -138,8 +156,20 @@ describe('LivingSession', () => {
 		expect(session.getDraft('intake/register', '_new')).toBeNull();
 	});
 
-	test('commit denial keeps Domain + Draft and re-Loads', async () => {
-		const load = vi.fn(async () => sample);
+	test('commit denial keeps Draft and re-Loads Worklist', async () => {
+		const reloaded = structuredClone(sample);
+		reloaded.worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: true,
+					repeatable: true,
+					taskIds: ['register'],
+					instances: []
+				}
+			]
+		};
+		const load = vi.fn(async () => reloaded);
 		const commit = vi.fn(async () => {
 			throw new CommitDomainError('forbidden', 403);
 		});
@@ -148,9 +178,7 @@ describe('LivingSession', () => {
 			commit: { commit },
 			hydrate: false
 		});
-		const seeded = structuredClone(sample);
-		seeded.domain.load = { existing: { client: 'SU' } };
-		session.result = seeded;
+		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
 
 		const minted = await session.commit({
@@ -166,7 +194,6 @@ describe('LivingSession', () => {
 			notes: 'keep me'
 		});
 		expect(load).toHaveBeenCalledOnce();
-		// Re-Load returned empty Domain — still no corruption from failed Commit body.
-		expect(session.result?.domain.load).toEqual({});
+		expect(session.result?.worklist).toEqual(reloaded.worklist);
 	});
 });

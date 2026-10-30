@@ -271,7 +271,7 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		},
 	}
 
-	post := func(body string) CommitResult {
+	post := func(body string) {
 		t.Helper()
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
@@ -279,11 +279,16 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d body=%s for %s", rec.Code, rec.Body.String(), body)
 		}
-		var got CommitResult
-		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		var wire map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 			t.Fatal(err)
 		}
-		return got
+		if _, has := wire["domain"]; has {
+			t.Fatalf("Commit JSON must omit domain: %#v", wire["domain"])
+		}
+		if _, ok := wire["worklist"].(map[string]any); !ok {
+			t.Fatalf("Commit JSON missing worklist for %s", body)
+		}
 	}
 
 	intakeID := "NIR-261019-NO-1"
@@ -292,14 +297,18 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	post(`{"taskPath":"intake/palletWeight","jobInstanceId":"NIR-261019-NO-1","value":{"averagePanelWeight":10,"tareKind":"euro","weights":{"NIR-261019-NO-1.1":{"weight":400,"tareKind":"euro","idoneita":"NIR","panelCount":1},"NIR-261019-NO-1.2":{"weight":450,"tareKind":"euro","idoneita":"NIR","panelCount":1}}}}`)
 	post(`{"taskPath":"line/shift","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"shift":"1st"}}`)
 	post(`{"taskPath":"line/lineLoad","jobInstanceId":"1st","value":{"progress":{"NIR-261019-NO-1.1":"done","NIR-261019-NO-1.2":"done"}}}`)
-	afterContainers := post(`{"taskPath":"line/containerReg","jobInstanceId":"1st","value":{"sourceLoadId":"NIR-261019-NO-1","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)
-	if len(afterContainers.Domain.Container) != 2 {
-		t.Fatalf("containers = %#v", afterContainers.Domain.Container)
-	}
-	final := post(`{"taskPath":"line/loadedExtracted","jobInstanceId":"1st","value":{"checkedLoadedWeight":850,"checkedContainerSum":160}}`)
+	post(`{"taskPath":"line/containerReg","jobInstanceId":"1st","value":{"sourceLoadId":"NIR-261019-NO-1","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)
+	post(`{"taskPath":"line/loadedExtracted","jobInstanceId":"1st","value":{"checkedLoadedWeight":850,"checkedContainerSum":160}}`)
 
+	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(domain.Container) != 2 {
+		t.Fatalf("containers = %#v", domain.Container)
+	}
 	var sawShift, sawLineLoad, sawContainerReg, sawLoadedExtracted bool
-	for _, s := range final.Domain.Submissions {
+	for _, s := range domain.Submissions {
 		if s.JobID != "line" || s.JobInstanceID != "1st" {
 			continue
 		}
@@ -315,10 +324,10 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 		}
 	}
 	if !sawShift || !sawLineLoad || !sawContainerReg || !sawLoadedExtracted {
-		t.Fatalf("line Submissions incomplete: %#v", final.Domain.Submissions)
+		t.Fatalf("line Submissions incomplete: %#v", domain.Submissions)
 	}
-	if final.Domain.Container["C-1"]["sourceLoadId"] != intakeID {
-		t.Fatalf("C-1 = %#v", final.Domain.Container["C-1"])
+	if domain.Container["C-1"]["sourceLoadId"] != intakeID {
+		t.Fatalf("C-1 = %#v", domain.Container["C-1"])
 	}
 
 	loadRec := httptest.NewRecorder()
@@ -327,15 +336,18 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d", loadRec.Code)
 	}
-	var loaded LoadResult
-	if err := json.Unmarshal(loadRec.Body.Bytes(), &loaded); err != nil {
+	var loadWire map[string]any
+	if err := json.Unmarshal(loadRec.Body.Bytes(), &loadWire); err != nil {
 		t.Fatal(err)
 	}
-	if len(loaded.Domain.Container) != 2 {
-		t.Fatalf("load containers = %#v", loaded.Domain.Container)
+	if _, has := loadWire["domain"]; has {
+		t.Fatalf("Load JSON must omit domain")
 	}
-	last := loaded.Domain.Submissions[len(loaded.Domain.Submissions)-1]
-	if last.TaskID != "loadedExtracted" {
-		t.Fatalf("last submission = %#v", last)
+	if _, has := loadWire["config"]; has {
+		t.Fatalf("Load JSON must omit config")
+	}
+	wl, _ := loadWire["worklist"].(map[string]any)
+	if wl == nil {
+		t.Fatalf("Load JSON missing worklist: %#v", loadWire)
 	}
 }

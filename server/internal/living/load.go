@@ -7,12 +7,17 @@ import (
 	"strings"
 )
 
-// LoadResult is the Domain + Active Config version hydrate for an org.
+// LoadResult is the SPA hydrate for an org: Worklist + Task form bundles +
+// Active Config version metadata. Full Domain / Org Config stay server-side
+// (json:"-" for Go callers); they are not on the wire.
 type LoadResult struct {
-	Org                 string    `json:"org"`
-	ActiveConfigVersion string    `json:"activeConfigVersion"`
-	Domain              Domain    `json:"domain"`
-	Config              OrgConfig `json:"config"`
+	Org                 string            `json:"org"`
+	ActiveConfigVersion string            `json:"activeConfigVersion"`
+	ConfigID            string            `json:"configId"`
+	Domain              Domain            `json:"-"`
+	Config              OrgConfig         `json:"-"`
+	Worklist            Worklist          `json:"worklist"`
+	TaskFormBundles     []*TaskFormBundle `json:"taskFormBundles"`
 }
 
 // Loader hydrates Domain + Active Org Config for an org.
@@ -48,10 +53,18 @@ func (l *Loader) Load(ctx context.Context, org string) (LoadResult, error) {
 		domain = EmptyDomain()
 	}
 
+	wl := ProjectWorklist(cfg, domain)
+	bundles, err := ProjectAvailableBundles(cfg, domain, wl)
+	if err != nil {
+		return LoadResult{}, err
+	}
 	return LoadResult{
 		Org:                 org,
 		ActiveConfigVersion: version,
+		ConfigID:            cfg.ID,
 		Domain:              domain,
 		Config:              cfg,
+		Worklist:            wl,
+		TaskFormBundles:     bundles,
 	}, nil
 }

@@ -203,12 +203,27 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
-	var got CommitResult
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+	var wire map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if got.Domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
-		t.Fatalf("got = %#v", got)
+	if wire["jobInstanceId"] != "NIR-261019-NO-1" {
+		t.Fatalf("jobInstanceId = %#v", wire["jobInstanceId"])
+	}
+	if _, has := wire["domain"]; has {
+		t.Fatalf("Commit JSON must omit domain: %#v", wire["domain"])
+	}
+	wl, _ := wire["worklist"].(map[string]any)
+	if wl == nil {
+		t.Fatalf("Commit JSON missing worklist: %#v", wire)
+	}
+
+	domain, err := c.Domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
+		t.Fatalf("stored domain = %#v", domain)
 	}
 
 	loadRec := httptest.NewRecorder()
@@ -217,12 +232,15 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d", loadRec.Code)
 	}
-	var loaded LoadResult
-	if err := json.Unmarshal(loadRec.Body.Bytes(), &loaded); err != nil {
+	var loadWire map[string]any
+	if err := json.Unmarshal(loadRec.Body.Bytes(), &loadWire); err != nil {
 		t.Fatal(err)
 	}
-	if len(loaded.Domain.Submissions) != 1 {
-		t.Fatalf("loaded submissions = %#v", loaded.Domain.Submissions)
+	if _, has := loadWire["domain"]; has {
+		t.Fatalf("Load JSON must omit domain after Commit")
+	}
+	if _, ok := loadWire["worklist"].(map[string]any); !ok {
+		t.Fatalf("Load JSON missing worklist: %#v", loadWire)
 	}
 }
 

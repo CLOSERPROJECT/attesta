@@ -1,4 +1,4 @@
-import type { Domain } from './types.js';
+import type { TaskFormBundle, Worklist } from './types.js';
 
 /** Commit wire mint knob (omit → none on server). */
 export type CommitMint =
@@ -25,10 +25,13 @@ export type HttpLinkItem = {
 export type CommitResult = {
 	org: string;
 	jobInstanceId: string;
-	domain: Domain;
+	/** Server-projected board after this Commit (same projector as Load). */
+	worklist: Worklist;
+	/** Replaces prior Load/Commit bundle set (available + provisional). */
+	taskFormBundles: TaskFormBundle[];
 	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
 	links?: HttpLinkItem[];
-	/** HttpPort failures; Domain remains committed. */
+	/** HttpPort failures; Domain remains committed server-side. */
 	httpErrors?: string[];
 };
 

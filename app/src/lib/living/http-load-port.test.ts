@@ -2,32 +2,14 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { createHttpLoadDomainPort } from './http-load-port.js';
 import { LoadDomainError } from './load-port.js';
-import { emptyDomain, type LoadResult } from './types.js';
+import { emptyWorklist, type LoadResult } from './types.js';
 
 const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
-	domain: emptyDomain(),
-	config: {
-		id: 'truck-loop',
-		org: 'feragame',
-		version: '1',
-		roles: ['administration', 'logistic', 'line'],
-		jobs: {
-			intake: {
-				repeatable: true,
-				label: '$load.id',
-				startLabel: 'Nuovo camion',
-				tasks: [{ id: 'register' }, { id: 'codiceFir' }]
-			},
-			line: {
-				repeatable: true,
-				label: "'Turno: ' & $.shift",
-				startLabel: 'Nuovo turno',
-				tasks: [{ id: 'lineLoad' }, { id: 'shift' }]
-			}
-		}
-	}
+	configId: 'truck-loop',
+	worklist: emptyWorklist(),
+	taskFormBundles: []
 };
 
 describe('HttpLoadDomainPort', () => {
@@ -46,8 +28,9 @@ describe('HttpLoadDomainPort', () => {
 		const got = await port.load();
 		expect(got.org).toBe('feragame');
 		expect(got.activeConfigVersion).toBe('1');
-		expect(Object.keys(got.config.jobs)).toEqual(['intake', 'line']);
-		expect(got.domain.submissions).toEqual([]);
+		expect(got.configId).toBe('truck-loop');
+		expect(got.worklist).toEqual(emptyWorklist());
+		expect(got.taskFormBundles).toEqual([]);
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
 

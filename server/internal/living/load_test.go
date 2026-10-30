@@ -68,15 +68,24 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
 
-	var got LoadResult
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+	var wire map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if got.ActiveConfigVersion != "1" || got.Config.Org != "feragame" {
-		t.Fatalf("got = %#v", got)
+	if wire["activeConfigVersion"] != "1" || wire["org"] != "feragame" {
+		t.Fatalf("got = %#v", wire)
 	}
-	if len(got.Domain.JobInstances) != 0 {
-		t.Fatalf("expected empty domain")
+	if wire["configId"] != "truck-loop" {
+		t.Fatalf("configId = %#v", wire["configId"])
+	}
+	if _, has := wire["domain"]; has {
+		t.Fatalf("Load JSON must omit domain: %#v", wire["domain"])
+	}
+	if _, has := wire["config"]; has {
+		t.Fatalf("Load JSON must omit config: %#v", wire["config"])
+	}
+	if _, ok := wire["worklist"].(map[string]any); !ok {
+		t.Fatalf("Load JSON missing worklist: %#v", wire)
 	}
 }
 

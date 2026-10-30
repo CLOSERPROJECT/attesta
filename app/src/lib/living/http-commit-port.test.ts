@@ -2,29 +2,65 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { CommitDomainError } from './commit-port.js';
 import { createHttpCommitDomainPort } from './http-commit-port.js';
-import { emptyDomain } from './types.js';
+import { emptyWorklist } from './types.js';
 
 const sampleResult = {
 	org: 'feragame',
 	jobInstanceId: 'NIR-261019-NO-1',
-	domain: {
-		...emptyDomain(),
-		load: {
-			'NIR-261019-NO-1': { client: 'NO', palletCount: 1 }
-		},
-		jobInstances: [{ jobId: 'intake', id: 'NIR-261019-NO-1', label: 'NIR-261019-NO-1' }],
-		submissions: [
+	worklist: {
+		jobs: [
 			{
 				jobId: 'intake',
-				taskId: 'register',
-				jobInstanceId: 'NIR-261019-NO-1',
-				timestamp: '2026-10-29T15:00:00Z',
-				userId: 'ada',
-				facts: {},
-				idsTouched: ['NIR-261019-NO-1']
+				canStart: true,
+				repeatable: true,
+				taskIds: ['register', 'codiceFir'],
+				instances: [
+					{
+						id: 'NIR-261019-NO-1',
+						label: 'NIR-261019-NO-1',
+						tasks: { register: 'done' as const, codiceFir: 'available' as const }
+					}
+				]
+			},
+			{
+				jobId: 'line',
+				canStart: false,
+				repeatable: true,
+				taskIds: ['shift'],
+				instances: []
 			}
 		]
 	},
+	taskFormBundles: [
+		{
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '',
+			title: 'Register',
+			surface: 'live' as const,
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		},
+		{
+			jobId: 'intake',
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-261019-NO-1',
+			title: 'Codice FIR',
+			surface: 'live' as const,
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: ['codiceFir'],
+			bindings: { domain: {} }
+		}
+	],
 	links: [
 		{ label: 'Stampa etichette', url: 'blob:labels', action: 'link' as const },
 		{
@@ -64,14 +100,16 @@ describe('HttpCommitDomainPort', () => {
 		});
 		expect(got.org).toBe('feragame');
 		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
-		expect(got.domain.load['NIR-261019-NO-1']?.client).toBe('NO');
+		expect(got.worklist).toEqual(sampleResult.worklist);
+		expect(got.taskFormBundles).toEqual(sampleResult.taskFormBundles);
 		expect(got.links).toEqual(sampleResult.links);
 		expect(got.httpErrors).toEqual([]);
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
 
-	test('normalizes missing links/httpErrors to empty arrays', async () => {
-		const { links: _l, httpErrors: _e, ...withoutHttp } = sampleResult;
+	test('normalizes missing links/httpErrors/worklist/bundles', async () => {
+		const { links: _l, httpErrors: _e, worklist: _w, taskFormBundles: _b, ...withoutHttp } =
+			sampleResult;
 		const fetchFn = vi.fn(
 			async () =>
 				new Response(JSON.stringify(withoutHttp), {
@@ -88,6 +126,8 @@ describe('HttpCommitDomainPort', () => {
 		});
 		expect(got.links).toEqual([]);
 		expect(got.httpErrors).toEqual([]);
+		expect(got.worklist).toEqual(emptyWorklist());
+		expect(got.taskFormBundles).toEqual([]);
 	});
 
 	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {

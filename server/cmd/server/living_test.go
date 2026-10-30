@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -155,21 +156,26 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
-	var got living.LoadResult
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+	var wire map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if got.Org != "feragame" || got.ActiveConfigVersion != living.DefaultFixtureVersion {
-		t.Fatalf("got = %#v", got)
+	if wire["org"] != "feragame" || wire["activeConfigVersion"] != living.DefaultFixtureVersion {
+		t.Fatalf("got = %#v", wire)
 	}
-	if len(got.Domain.Load) != 0 || len(got.Domain.Submissions) != 0 {
-		t.Fatalf("domain should be empty: %#v", got.Domain)
+	if wire["configId"] != "truck-loop" {
+		t.Fatalf("configId = %#v", wire["configId"])
 	}
-	if _, ok := got.Config.Jobs.Get("intake"); !ok {
-		t.Fatalf("config missing intake job: keys=%v", got.Config.Jobs.Keys)
+	if _, has := wire["domain"]; has {
+		t.Fatalf("Load JSON must omit domain: %#v", wire["domain"])
 	}
-	if _, ok := got.Config.Jobs.Get("line"); !ok {
-		t.Fatalf("config missing line job: keys=%v", got.Config.Jobs.Keys)
+	if _, has := wire["config"]; has {
+		t.Fatalf("Load JSON must omit config: %#v", wire["config"])
+	}
+	wl, _ := wire["worklist"].(map[string]any)
+	jobs, _ := wl["jobs"].([]any)
+	if len(jobs) != 2 {
+		t.Fatalf("worklist jobs = %#v", wl)
 	}
 }
 
@@ -262,7 +268,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		livingAuthorizer: living.AllowAllAuthorizer{},
 	}
 
-	body := `{"taskPath":"intake/register","jobInstanceId":"NIR-261019-NO-1","value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
+	body := `{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
 	rec := httptest.NewRecorder()
@@ -274,11 +280,25 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &committed); err != nil {
 		t.Fatal(err)
 	}
-	if committed.Domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
-		t.Fatalf("commit result = %#v", committed)
+	var commitWire map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &commitWire); err != nil {
+		t.Fatal(err)
 	}
-	if len(committed.Domain.Submissions) != 1 || committed.Domain.Submissions[0].TaskID != "register" {
-		t.Fatalf("submissions = %#v", committed.Domain.Submissions)
+	if _, has := commitWire["domain"]; has {
+		t.Fatalf("Commit JSON must omit domain: %#v", commitWire["domain"])
+	}
+	domain, err := server.livingDomains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
+		t.Fatalf("stored domain = %#v", domain)
+	}
+	if len(domain.Submissions) != 1 || domain.Submissions[0].TaskID != "register" {
+		t.Fatalf("submissions = %#v", domain.Submissions)
+	}
+	if len(domain.JobInstances) != 1 || domain.JobInstances[0].ID != "NIR-261019-NO-1" {
+		t.Fatalf("jobInstances = %#v", domain.JobInstances)
 	}
 	if len(committed.Links) != 2 {
 		t.Fatalf("wired HttpPort links = %#v", committed.Links)
@@ -298,6 +318,19 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if len(committed.HttpErrors) != 0 {
 		t.Fatalf("httpErrors = %#v", committed.HttpErrors)
 	}
+	if len(committed.Worklist.Jobs) == 0 {
+		t.Fatal("Commit JSON missing worklist jobs")
+	}
+	var commitIntakeDone bool
+	for _, j := range committed.Worklist.Jobs {
+		if j.JobID == "intake" && len(j.Instances) == 1 &&
+			j.Instances[0].Tasks["register"] == living.TaskStatusDone {
+			commitIntakeDone = true
+		}
+	}
+	if !commitIntakeDone {
+		t.Fatalf("Commit worklist intake register not done: %#v", committed.Worklist)
+	}
 
 	loadReq := httptest.NewRequest(http.MethodGet, "/api/living/domain", nil)
 	loadReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
@@ -306,15 +339,34 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d body=%s", loadRec.Code, loadRec.Body.String())
 	}
+	var loadWire map[string]any
+	if err := json.Unmarshal(loadRec.Body.Bytes(), &loadWire); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := loadWire["domain"]; has {
+		t.Fatalf("Load JSON must omit domain after Commit")
+	}
+	if _, has := loadWire["config"]; has {
+		t.Fatalf("Load JSON must omit config after Commit")
+	}
 	var loaded living.LoadResult
 	if err := json.Unmarshal(loadRec.Body.Bytes(), &loaded); err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
-		t.Fatalf("load after commit = %#v", loaded.Domain)
+	if len(loaded.Worklist.Jobs) == 0 {
+		t.Fatal("Load JSON missing worklist jobs")
 	}
-	if len(loaded.Domain.JobInstances) != 1 {
-		t.Fatalf("jobInstances = %#v", loaded.Domain.JobInstances)
+	var intakeCanStart bool
+	for _, j := range loaded.Worklist.Jobs {
+		if j.JobID == "intake" {
+			intakeCanStart = j.CanStart
+			if len(j.Instances) != 1 || j.Instances[0].Tasks["register"] != living.TaskStatusDone {
+				t.Fatalf("intake worklist = %#v", j)
+			}
+		}
+	}
+	if !intakeCanStart {
+		t.Fatal("intake worklist canStart")
 	}
 }
 
@@ -403,12 +455,28 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	if loadRec.Code != http.StatusOK {
 		t.Fatalf("load status = %d", loadRec.Code)
 	}
+	var loadWire map[string]any
+	if err := json.Unmarshal(loadRec.Body.Bytes(), &loadWire); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := loadWire["domain"]; has {
+		t.Fatalf("Load JSON must omit domain")
+	}
+	domain, err := server.livingDomains.Get(t.Context(), "feragame")
+	if err != nil && !errors.Is(err, living.ErrNotFound) {
+		t.Fatal(err)
+	}
+	if err == nil && (len(domain.Submissions) != 0 || len(domain.Load) != 0) {
+		t.Fatalf("domain should be unchanged after deny: %#v", domain)
+	}
 	var loaded living.LoadResult
 	if err := json.Unmarshal(loadRec.Body.Bytes(), &loaded); err != nil {
 		t.Fatal(err)
 	}
-	if len(loaded.Domain.Submissions) != 0 || len(loaded.Domain.Load) != 0 {
-		t.Fatalf("domain should be unchanged after deny: %#v", loaded.Domain)
+	for _, j := range loaded.Worklist.Jobs {
+		if len(j.Instances) != 0 {
+			t.Fatalf("worklist should stay empty after deny: %#v", loaded.Worklist)
+		}
 	}
 }
 

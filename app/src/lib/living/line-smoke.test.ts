@@ -1,58 +1,18 @@
 import { describe, expect, test, vi } from 'vitest';
 
+import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { lineLoadLeftoverIds } from './leftovers.js';
 import { LivingSession } from './session.svelte.js';
-import { canStartJob } from './starts-when.js';
 import {
 	emptyDomain,
+	worklistJobFor,
 	type Domain,
 	type LoadResult,
 	type Submission,
-	type TaskConfig
+	type Worklist
 } from './types.js';
-import { isTaskUnlocked, orderedTaskIds } from './unlock.js';
 
-const lineTasks: TaskConfig[] = [
-	{ id: 'shift' },
-	{
-		id: 'lineLoad',
-		dynamicProperties: {
-			progress: { read: 'leftovers', completeness: 'some' }
-		}
-	},
-	{ id: 'containerReg', unlockFrom: 'instance' },
-	{ id: 'loadedExtracted' }
-];
-
-const sampleConfig: LoadResult['config'] = {
-	id: 'truck-loop',
-	org: 'feragame',
-	version: '1',
-	jobs: {
-		intake: {
-			repeatable: true,
-			label: 'intake',
-			tasks: [
-				{
-					id: 'palletWeight',
-					dynamicProperties: {
-						weights: { read: 'leftovers', completeness: 'all' }
-					}
-				}
-			]
-		},
-		line: {
-			repeatable: true,
-			label: 'line',
-			startLabel: 'Nuovo turno',
-			startsWhen: {
-				task: { jobId: 'intake', taskId: 'palletWeight' },
-				quantifier: 'some'
-			},
-			tasks: lineTasks
-		}
-	}
-};
+const lineTaskIds = ['shift', 'lineLoad', 'containerReg', 'loadedExtracted'];
 
 function sub(
 	jobId: string,
@@ -71,7 +31,81 @@ function sub(
 	};
 }
 
-describe('line Commit smoke (session + unlock + leftovers some)', () => {
+/** Fixture Worklist — mirrors Go ProjectWorklist for this smoke path (no SPA gates). */
+function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
+	const lineInst = domain.jobInstances.find((i) => i.jobId === 'line');
+	if (!lineInst) {
+		return {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: true,
+					repeatable: true,
+					taskIds: ['register', 'codiceFir', 'palletWeight', 'weightCheck'],
+					instances: []
+				},
+				{
+					jobId: 'line',
+					canStart: canStartLine,
+					repeatable: true,
+					startLabel: 'Nuovo turno',
+					taskIds: lineTaskIds,
+					instances: []
+				}
+			]
+		};
+	}
+	const tasks: Record<string, 'locked' | 'available' | 'done'> = {
+		shift: 'locked',
+		lineLoad: 'locked',
+		containerReg: 'locked',
+		loadedExtracted: 'locked'
+	};
+	const lineSubs = domain.submissions.filter(
+		(s) => s.jobId === 'line' && s.jobInstanceId === lineInst.id
+	);
+	const has = (taskId: string) => lineSubs.some((s) => s.taskId === taskId);
+	const leftoversOpen = lineLoadLeftoverIds(domain).length > 0;
+
+	if (has('shift')) tasks.shift = 'done';
+	else tasks.shift = 'available';
+
+	if (has('shift')) {
+		tasks.lineLoad = leftoversOpen || !has('lineLoad') ? 'available' : 'done';
+		tasks.containerReg = has('containerReg') ? 'done' : 'available';
+	}
+	if (has('containerReg')) {
+		tasks.loadedExtracted = has('loadedExtracted') ? 'done' : 'available';
+	}
+
+	return {
+		jobs: [
+			{
+				jobId: 'intake',
+				canStart: true,
+				repeatable: true,
+				taskIds: ['register', 'codiceFir', 'palletWeight', 'weightCheck'],
+				instances: []
+			},
+			{
+				jobId: 'line',
+				canStart: canStartLine,
+				repeatable: true,
+				startLabel: 'Nuovo turno',
+				taskIds: lineTaskIds,
+				instances: [
+					{
+						id: lineInst.id,
+						label: lineInst.label,
+						tasks
+					}
+				]
+			}
+		]
+	};
+}
+
+describe('line Commit smoke (session + Worklist + leftovers some)', () => {
 	test('intake gate then one line instance through loadedExtracted', async () => {
 		const intakeId = 'NIR-261019-NO-1';
 		let domain: Domain = {
@@ -86,96 +120,147 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 			jobInstances: [{ jobId: 'intake', id: intakeId, label: intakeId }],
 			submissions: [sub('intake', 'palletWeight', intakeId)]
 		};
+		let worklist = worklistFor(domain, true);
 
-		const commit = vi.fn(async (req: { taskPath: string; jobInstanceId: string; value: Record<string, unknown> }) => {
-			if (req.taskPath === 'line/shift') {
-				domain = {
-					...domain,
-					jobInstances: [
-						...domain.jobInstances,
-						{
-							jobId: 'line',
-							id: req.jobInstanceId,
-							label: `Turno: ${req.jobInstanceId}`
-						}
-					],
-					submissions: [
-						...domain.submissions,
-						sub('line', 'shift', req.jobInstanceId, req.value)
-					]
-				};
-			} else if (req.taskPath === 'line/lineLoad') {
-				const progress = (req.value.progress ?? {}) as Record<string, string | null>;
-				const pallet = { ...domain.pallet };
-				for (const [id, cell] of Object.entries(progress)) {
-					const facts = { ...(pallet[id] ?? {}) };
-					if (cell === null) delete facts.progress;
-					else facts.progress = cell;
-					pallet[id] = facts;
-				}
-				domain = {
-					...domain,
-					pallet,
-					submissions: [
-						...domain.submissions,
-						sub('line', 'lineLoad', req.jobInstanceId, progress)
-					]
-				};
-			} else if (req.taskPath === 'line/containerReg') {
-				domain = {
-					...domain,
-					container: {
-						'C-1': {
-							weight: 120,
-							material: 'Polvere di vetro',
-							sourceLoadId: intakeId
+		const commit = vi.fn(
+			async (req: {
+				taskPath: string;
+				jobInstanceId: string;
+				value: Record<string, unknown>;
+			}) => {
+				if (req.taskPath === 'line/shift') {
+					domain = {
+						...domain,
+						jobInstances: [
+							...domain.jobInstances,
+							{
+								jobId: 'line',
+								id: req.jobInstanceId,
+								label: `Turno: ${req.jobInstanceId}`
+							}
+						],
+						submissions: [
+							...domain.submissions,
+							sub('line', 'shift', req.jobInstanceId, req.value)
+						]
+					};
+				} else if (req.taskPath === 'line/lineLoad') {
+					const progress = (req.value.progress ?? {}) as Record<string, string | null>;
+					const pallet = { ...domain.pallet };
+					for (const [id, cell] of Object.entries(progress)) {
+						const facts = { ...(pallet[id] ?? {}) };
+						if (cell === null) delete facts.progress;
+						else facts.progress = cell;
+						pallet[id] = facts;
+					}
+					domain = {
+						...domain,
+						pallet,
+						submissions: [
+							...domain.submissions,
+							sub('line', 'lineLoad', req.jobInstanceId, progress)
+						]
+					};
+				} else if (req.taskPath === 'line/containerReg') {
+					domain = {
+						...domain,
+						container: {
+							'C-1': {
+								weight: 120,
+								material: 'Polvere di vetro',
+								sourceLoadId: intakeId
+							},
+							'C-2': {
+								weight: 40,
+								material: 'Plastica',
+								sourceLoadId: intakeId
+							}
 						},
-						'C-2': {
-							weight: 40,
-							material: 'Plastica',
-							sourceLoadId: intakeId
-						}
-					},
-					submissions: [
-						...domain.submissions,
-						sub('line', 'containerReg', req.jobInstanceId, req.value)
-					]
-				};
-			} else if (req.taskPath === 'line/loadedExtracted') {
-				domain = {
-					...domain,
-					submissions: [
-						...domain.submissions,
-						sub('line', 'loadedExtracted', req.jobInstanceId, req.value)
-					]
+						submissions: [
+							...domain.submissions,
+							sub('line', 'containerReg', req.jobInstanceId, req.value)
+						]
+					};
+				} else if (req.taskPath === 'line/loadedExtracted') {
+					domain = {
+						...domain,
+						submissions: [
+							...domain.submissions,
+							sub('line', 'loadedExtracted', req.jobInstanceId, req.value)
+						]
+					};
+				}
+				worklist = worklistFor(domain, true);
+				const lineJob = worklistJobFor(worklist, 'line');
+				const lineInst = lineJob?.instances[0];
+				const taskFormBundles: TaskFormBundle[] = [];
+				if (lineJob?.canStart) {
+					taskFormBundles.push({
+						jobId: 'line',
+						taskId: 'shift',
+						jobInstanceId: '',
+						title: 'Shift',
+						surface: 'live',
+						schema: { type: 'object' },
+						uiSchema: {},
+						initialData: {},
+						chrome: [],
+						chromeFieldIds: [],
+						sealFieldIds: ['shift'],
+						bindings: { domain: {} }
+					});
+				}
+				if (lineInst) {
+					for (const taskId of lineTaskIds) {
+						const st = lineInst.tasks[taskId];
+						if (st !== 'available') continue;
+						taskFormBundles.push({
+							jobId: 'line',
+							taskId,
+							jobInstanceId: lineInst.id,
+							title: taskId,
+							surface: taskId === 'lineLoad' ? 'leftover-table' : 'live',
+							schema: { type: 'object' },
+							uiSchema: {},
+							initialData: {},
+							chrome: [],
+							chromeFieldIds: [],
+							sealFieldIds: [],
+							bindings: { domain: {} }
+						});
+					}
+				}
+				return {
+					org: 'feragame',
+					jobInstanceId: req.jobInstanceId,
+					worklist,
+					taskFormBundles
 				};
 			}
-			return { org: 'feragame', jobInstanceId: req.jobInstanceId, domain };
-		});
+		);
+
+		const initial: LoadResult = {
+			org: 'feragame',
+			activeConfigVersion: '1',
+			configId: 'truck-loop',
+			worklist,
+			taskFormBundles: []
+		};
 
 		const session = new LivingSession({
 			load: {
 				load: async () => ({
-					org: 'feragame',
-					activeConfigVersion: '1',
-					domain,
-					config: sampleConfig
+					...initial,
+					worklist,
+					taskFormBundles: []
 				})
 			},
 			commit: { commit },
 			hydrate: false
 		});
-		session.result = {
-			org: 'feragame',
-			activeConfigVersion: '1',
-			domain,
-			config: sampleConfig
-		};
+		session.result = { ...initial, worklist, taskFormBundles: [] };
 
-		const line = sampleConfig.jobs.line!;
-		expect(canStartJob({ job: line, jobId: 'line', domain, config: sampleConfig })).toBe(
-			true
-		);
+		expect(worklistJobFor(session.result.worklist, 'line')?.canStart).toBe(true);
 		expect(lineLoadLeftoverIds(domain)).toEqual([`${intakeId}.1`, `${intakeId}.2`]);
 
 		expect(
@@ -187,17 +272,19 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 			})
 		).toBe('1st');
 
-		domain = session.result!.domain;
-		const ordered = orderedTaskIds(lineTasks);
+		expect(session.result?.worklist).toEqual(worklist);
 		expect(
-			isTaskUnlocked({
-				orderedIds: ordered,
-				jobId: 'line',
-				taskId: 'containerReg',
-				jobInstanceId: '1st',
-				submissions: domain.submissions,
-				tasks: lineTasks
-			})
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
+		).toBe('available');
+		expect(
+			session.result?.taskFormBundles.some(
+				(b) => b.jobId === 'line' && b.taskId === 'lineLoad' && b.jobInstanceId === '1st'
+			)
+		).toBe(true);
+		expect(
+			session.result?.taskFormBundles.some(
+				(b) => b.jobId === 'line' && b.taskId === 'shift' && b.jobInstanceId === ''
+			)
 		).toBe(true);
 
 		expect(
@@ -213,22 +300,15 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 				mint: { kind: 'none' }
 			})
 		).toBe('1st');
-		domain = session.result!.domain;
 		expect(lineLoadLeftoverIds(domain)).toEqual([`${intakeId}.2`]);
-		// some Submission must not be treated as an unlock gate for a synthetic successor.
 		expect(
-			isTaskUnlocked({
-				orderedIds: ['lineLoad', 'next'],
-				jobId: 'line',
-				taskId: 'next',
-				jobInstanceId: '1st',
-				submissions: domain.submissions,
-				tasks: [
-					lineTasks.find((t) => t.id === 'lineLoad')!,
-					{ id: 'next' }
-				]
-			})
-		).toBe(false);
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
+		).toBe('available');
+		expect(
+			session.result?.taskFormBundles.some(
+				(b) => b.jobId === 'line' && b.taskId === 'containerReg' && b.jobInstanceId === '1st'
+			)
+		).toBe(true);
 
 		expect(
 			await session.commit({
@@ -238,8 +318,10 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 				mint: { kind: 'none' }
 			})
 		).toBe('1st');
-		domain = session.result!.domain;
 		expect(lineLoadLeftoverIds(domain)).toEqual([]);
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
+		).toBe('done');
 
 		expect(
 			await session.commit({
@@ -263,8 +345,7 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 			})
 		).toBe('1st');
 
-		const final = session.result!.domain;
-		const lineSubs = final.submissions.filter(
+		const lineSubs = domain.submissions.filter(
 			(s) => s.jobId === 'line' && s.jobInstanceId === '1st'
 		);
 		expect(lineSubs.map((s) => s.taskId)).toEqual([
@@ -274,9 +355,10 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 			'containerReg',
 			'loadedExtracted'
 		]);
-		expect(Object.keys(final.container)).toHaveLength(2);
-		expect(canStartJob({ job: line, jobId: 'line', domain: final, config: sampleConfig })).toBe(
-			true
-		);
+		expect(Object.keys(domain.container)).toHaveLength(2);
+		expect(worklistJobFor(session.result!.worklist, 'line')?.canStart).toBe(true);
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.loadedExtracted
+		).toBe('done');
 	});
 });

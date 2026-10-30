@@ -4,6 +4,7 @@ import {
 	type CommitResult,
 	type HttpLinkItem
 } from './commit-port.js';
+import { emptyWorklist, type TaskFormBundle, type Worklist } from './types.js';
 
 export type HttpCommitDomainPortOptions = {
 	fetch?: typeof fetch;
@@ -25,7 +26,22 @@ function parseHttpLinkItem(raw: unknown): HttpLinkItem | null {
 	return item;
 }
 
-/** Normalize Commit JSON so SPA always sees arrays for links / httpErrors. */
+function parseWorklist(raw: unknown): Worklist {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return emptyWorklist();
+	const jobs = (raw as { jobs?: unknown }).jobs;
+	if (!Array.isArray(jobs)) return emptyWorklist();
+	return { jobs: jobs as Worklist['jobs'] };
+}
+
+function parseTaskFormBundles(raw: unknown): TaskFormBundle[] {
+	if (!Array.isArray(raw)) return [];
+	return raw.filter(
+		(item): item is TaskFormBundle =>
+			item != null && typeof item === 'object' && !Array.isArray(item)
+	) as TaskFormBundle[];
+}
+
+/** Normalize Commit JSON so SPA always sees arrays for links / httpErrors / bundles. */
 export function parseCommitResult(raw: unknown): CommitResult {
 	const body = raw as CommitResult;
 	const linksRaw = Array.isArray((raw as { links?: unknown })?.links)
@@ -42,12 +58,16 @@ export function parseCommitResult(raw: unknown): CommitResult {
 	const httpErrors = errorsRaw.filter((e): e is string => typeof e === 'string');
 	return {
 		...body,
+		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
+		taskFormBundles: parseTaskFormBundles(
+			(raw as { taskFormBundles?: unknown })?.taskFormBundles
+		),
 		links,
 		httpErrors
 	};
 }
 
-/** Browser Adapter: POST /api/living/commit → Domain. Drafts stay client-side. */
+/** Browser Adapter: POST /api/living/commit → Worklist + bundles. Drafts stay client-side. */
 export function createHttpCommitDomainPort(
 	options: HttpCommitDomainPortOptions = {}
 ): CommitDomainPort {

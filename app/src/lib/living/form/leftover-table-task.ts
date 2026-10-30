@@ -4,7 +4,7 @@ import {
 	primaryDynamicProperty
 } from './dynamic-properties.js';
 import type { TaskConfig } from '../types.js';
-import { orderedTaskIds, taskById } from '../unlock.js';
+import { orderedTaskIds, taskById } from '../types.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);

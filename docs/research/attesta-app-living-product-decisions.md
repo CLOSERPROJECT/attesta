@@ -96,7 +96,8 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/l
 
 **Copy (then adapt to living glossary)**
 
-- Pure TS Modules + Vitest that do not need Kit: Domain store, Unlock order, Leftovers, `startsWhen` / `readyWhen`, submit prep, ELT runner, FormPlan / live chrome, wire DTOs, Local Commit/Load for unit tests only → into `app/` (or thin lib under `app/`).
+- Pure TS Modules + Vitest that do not need Kit: Domain store helpers used only where still needed, Leftovers/submit prep while FormPlan remains client-side, ELT runner references, FormPlan / live chrome (until **Task form bundle**), wire DTOs, Local Commit/Load for unit tests only → into `app/` (or thin lib under `app/`).
+- **Superseded for Unlock / startsWhen chrome:** do **not** keep production TS copies of Unlock order or startsWhen for Job chrome. Go projects a **Worklist** on Load/Commit; see [`docs/adr/0005-living-worklist-server-projection.md`](../adr/0005-living-worklist-server-projection.md). Delete SPA gate plants once Worklist ships.
 - Rename Step / Substep / Step instance → Job / Task / Job instance on the Commit path as files are ported (no big-bang rename for untouched files).
 - Flat truck-loop fixture: copy content; prefer **one** `steps`/`substeps` → Job/Task key rename when ConfigStore first loads Org Config so Load does not speak two languages.
 - Truck-loop / stack UI → `app/` + sv-router; HTTP Adapters → `/api/living/…`. Drop harness gear.
@@ -105,6 +106,7 @@ Source: `attesta-experiment`. Destination: `attesta` `/app` + `server/internal/l
 
 - Kit `+server`, SQLite RunStore, run-id routes — behaviour reference only; production = Go living package + DomainStore / ConfigStore.
 - Go Commit accept path — reimplement (resolve Org Config, re-gate, re-prep, ELT, Cerbos). TS Local Commit stays for Vitest only.
+- Go **Worklist** projection (Unlock / startsWhen / Leftovers openness → Task statuses + `canStart`) — server-only; SPA consumes JSON.
 - Harness AuthPort passthrough and snapshot-replace PUT — do not port; verified session + seed/wipe instead.
 
 **Do not copy**

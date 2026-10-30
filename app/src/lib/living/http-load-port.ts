@@ -7,7 +7,7 @@ export type HttpLoadDomainPortOptions = {
 	baseUrl?: string;
 };
 
-/** Browser Adapter: GET /api/living/domain → Domain + Active Config. */
+/** Browser Adapter: GET /api/living/domain → Worklist + bundles + config metadata. */
 export function createHttpLoadDomainPort(
 	options: HttpLoadDomainPortOptions = {}
 ): LoadDomainPort {

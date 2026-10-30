@@ -95,8 +95,8 @@ Task field value from an expression under `derived`; may persist into Domain on 
 _Avoid_: Putting GUI-only chrome under `derived`
 
 **Chrome**:
-Task-root display catalog (print, readonly, recap, …). Sibling to `derived`; stripped before Submission facts.
-_Avoid_: Encoding live readouts as schema fields meant for submit
+Task-root display catalog (print, readonly, recap, …). Sibling to `derived`; stripped before Submission facts. Not the operator board (see **Worklist**).
+_Avoid_: Encoding live readouts as schema fields meant for submit; naming the Worklist “Chrome”
 
 **dynamicProperties**:
 Field-keyed leftover/map config for leftover-style Tasks (see Leftovers).
@@ -117,8 +117,16 @@ Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Ta
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group
 
 **Load**:
-Hydrate the org’s Domain plus the Active Config version (or a pinned version later) for the operator UI.
-_Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam
+Hydrate what the operator UI needs for the org: **Worklist**, **Task form bundle**s for available work, and Active Config version metadata — not a dump of full Domain + full Org Config for client-side gate or FormPlan compile.
+_Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan
+
+**Worklist**:
+Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, and `repeatable` for Config-free chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order, startsWhen, and Leftovers openness are evaluated only on the server; the UI reads the projection and does not re-implement those rules.
+_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; a second boolean visibility matrix beside status; inventing Task order/labels from a client Org Config snapshot
+
+**Task form bundle**:
+Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, leftover ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. Load/Commit ship a set for every Worklist-`available` Task plus a provisional bundle (`jobInstanceId` empty) when `canStart`.
+_Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live Chrome results as static strings when the draft must still drive them
 
 **AuthPort / AuthorizerPort**:
 Who is calling (`OperatorIdentity`) vs who may complete a Task; Commit uses both. Production AuthorizerPort Adapter is Cerbos.
