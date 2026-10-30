@@ -12,7 +12,6 @@
 | --- | --- | --- | --- |
 | 13 | — | **paused** | discussion notes: `13-rename-placeholders-discussion.md` |
 | 15 | — | revised | gaps inventory (not implement) |
-| 19 | — | queued later | durable Mongo Domain/OrgConfig stores — next after 14 squash |
 
 ## Done
 
@@ -23,6 +22,7 @@
 | 17 | 9ca1870 | readyWhenOk Cerbos attr; reviewer APPROVE; human smoke |
 | 18 | ce9974c | HttpPort after mutate + FakeHttpPort; reviewer APPROVE; human smoke |
 | 14 | 4789ecd | FormPlan UI; reviewer APPROVE; human smoke |
+| 19 | pending squash SHA | durable Mongo Domain/OrgConfig; reviewer APPROVE; human smoke |
 
 ## Diagnostics
 
@@ -40,10 +40,10 @@
 
 See `.scratch/living-flat-port/issues/13-rename-placeholders-discussion.md`.  
 Settled: drop `living`; do not name package bare `domain` (clashes with Org Config `domain` section).  
-Open: package name, HTTP paths, Cerbos kind, store renames, env flag, order vs ticket 14.
+Open: package name, HTTP paths, Cerbos kind, store renames, env flag, order vs FormPlan (14 done).
 
 ## Env improvements
 
-- Soft: large IntakeJob/LineJob — defer split (may be moot after FormPlan)
 - Demo: `living@attesta.com` / org `feragame`; wipe via `ATTESTA_LIVING_SEED`
-- Follow-on: **19** durable stores; chrome/HttpLinkStrip polish optional
+- Optional polish: accordion chrome / HttpLinkStrip depth
+- Implementable follow-on queue empty except **13** when names agreed

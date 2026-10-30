@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/CLOSERPROJECT/attesta/server/internal/living"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (s *Server) ensureLivingStores() {
 	if s.livingDomains == nil {
-		s.livingDomains = living.NewMemoryDomainStore()
+		s.livingDomains = s.newLivingDomainStore()
 	}
 	if s.livingConfigs == nil {
-		s.livingConfigs = living.NewMemoryConfigStore()
-		// Memory birth: always load Active Config fixture. Wipe Domain only when
+		s.livingConfigs = s.newLivingConfigStore()
+		// Always load Active Config fixture. Wipe Domain only when
 		// ATTESTA_LIVING_SEED is set (local/dev gate — not an ungated prod footgun).
 		wipe := livingSeedWipeEnabled(os.Getenv("ATTESTA_LIVING_SEED"))
 		if _, err := living.SeedDemo(context.Background(), s.livingDomains, s.livingConfigs, living.SeedOptions{
@@ -26,6 +27,31 @@ func (s *Server) ensureLivingStores() {
 			log.Printf("living: seed demo: %v", err)
 		}
 	}
+}
+
+func (s *Server) livingMongoDB() *mongo.Database {
+	if s == nil {
+		return nil
+	}
+	ms, ok := s.store.(*MongoStore)
+	if !ok || ms == nil {
+		return nil
+	}
+	return ms.db
+}
+
+func (s *Server) newLivingDomainStore() living.DomainStore {
+	if db := s.livingMongoDB(); db != nil {
+		return living.NewMongoDomainStore(db)
+	}
+	return living.NewMemoryDomainStore()
+}
+
+func (s *Server) newLivingConfigStore() living.ConfigStore {
+	if db := s.livingMongoDB(); db != nil {
+		return living.NewMongoConfigStore(db)
+	}
+	return living.NewMemoryConfigStore()
 }
 
 func livingSeedWipeEnabled(value string) bool {

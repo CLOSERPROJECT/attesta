@@ -41,11 +41,12 @@ type SeedDeps struct {
 	Replace bool
 	// Optional living stores (tests / in-process). When set, SeedDemo runs after
 	// identity+catalog; Replace wipes Domain. CLI seed leaves these nil — the
-	// server Memory path seeds via ensureLivingStores / ATTESTA_LIVING_SEED.
+	// server path seeds via ensureLivingStores / ATTESTA_LIVING_SEED (Mongo when
+	// the process Store is MongoStore, else Memory).
 	LivingDomains living.DomainStore
 	LivingConfigs living.ConfigStore
 	// Nil picks a time-based source in Seed.
-	RNG catalogStreamRNG
+	RNG     catalogStreamRNG
 	Fixture *demoFixture
 	Now     func() time.Time
 }
