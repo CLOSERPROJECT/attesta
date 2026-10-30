@@ -4,7 +4,7 @@
 
 **Blocked by:** 11: /app — line Commit UI; 12: Demo seed — Domain wipe + all-roles user
 
-**Status:** ready-for-agent
+**Status:** discussion paused — see `13-rename-placeholders-discussion.md` (open decisions). Do not implement until names agreed.
 
 - [ ] Agreed lasting names recorded (decisions dump and/or glossary-adjacent note)
 - [ ] Package, Interfaces, HTTP paths, and Cerbos kind renamed consistently
