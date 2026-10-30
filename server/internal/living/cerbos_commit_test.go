@@ -41,7 +41,8 @@ func policySimulatingPDP(t *testing.T) *httptest.Server {
 		if len(req.Actions) == 1 && req.Actions[0] == "commit" &&
 			strAttr(req.Principal.Attr, "orgSlug") == strAttr(attr, "orgSlug") &&
 			roleIntersect(req.Principal.Attr["roleSlugs"], attr["rolesAllowed"]) &&
-			boolAttr(attr, "sequenceOk") {
+			boolAttr(attr, "sequenceOk") &&
+			boolAttr(attr, "readyWhenOk") {
 			effect = "EFFECT_ALLOW"
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{

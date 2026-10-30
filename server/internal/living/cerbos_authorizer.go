@@ -72,6 +72,7 @@ func (a *CerbosAuthorizer) AllowCommit(ctx context.Context, q AuthorizeCommit) (
 			"taskId":       strings.TrimSpace(q.TaskID),
 			"rolesAllowed": rolesAllowed,
 			"sequenceOk":   q.SequenceOk,
+			"readyWhenOk":  q.ReadyWhenOk,
 		},
 		livingCommitAction,
 	)

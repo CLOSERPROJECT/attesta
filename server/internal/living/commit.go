@@ -101,6 +101,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		JobInstanceID: jobInstanceID,
 		RolesAllowed:  rolesAllowedForTask(cfg, ref.JobID, ref.TaskID),
 		SequenceOk:    sequenceOkForCommit(cfg, domain, ref.JobID, ref.TaskID, jobInstanceID),
+		ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID),
 	})
 	if err != nil {
 		return CommitResult{}, err
