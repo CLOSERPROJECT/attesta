@@ -24,7 +24,7 @@
 | 18 | ce9974c | HttpPort after mutate + FakeHttpPort; reviewer APPROVE; human smoke |
 | 14 | 4789ecd | FormPlan UI; reviewer APPROVE; human smoke |
 | 19 | c815ebc | durable Mongo Domain/OrgConfig; reviewer APPROVE; human smoke |
-| smoke-issues | *(this squash)* | truck-loop smoke cascade: mint.startingNew, AsJob/Task order/tasks-array, lineLoad progress, schema defaults + `$today`; human smoke green |
+| smoke-issues | 87714c2 | truck-loop smoke cascade: mint.startingNew, AsJob/Task order/tasks-array, lineLoad progress, schema defaults + `$today`; human smoke green |
 
 ## Diagnostics
 
