@@ -11,11 +11,10 @@
 | Ticket | Branch | Stage | Notes |
 | --- | --- | --- | --- |
 | 13 | — | **paused** | discussion notes: `13-rename-placeholders-discussion.md` |
-| 14 | — | queued | FormPlan rendering (after/beside 16) |
+| 14 | — | queued | FormPlan rendering (next UI; after/beside server follow-ons) |
 | 15 | — | revised | gaps inventory (not implement) |
-| 16 | — | ready | **config-driven Commit** — next implement |
-| 17 | — | queued later | readyWhen → Cerbos (`blocked by 16`) |
-| 18 | — | queued later | HttpPort after mutate (`blocked by 16`) |
+| 17 | — | queued later | readyWhen → Cerbos (unblocked by 16) |
+| 18 | — | queued later | HttpPort after mutate (unblocked by 16) |
 | 19 | — | queued later | durable Mongo Domain/OrgConfig stores |
 
 ## Done
@@ -23,6 +22,7 @@
 | Ticket | Squash on rework | Notes |
 | --- | --- | --- |
 | 01–12 | through `dea2e04` | flat port implementable; rename deferred |
+| 16 | pending squash SHA | config-driven Commit (ELT); reviewer APPROVE; human smoke |
 
 ## Diagnostics
 
@@ -47,5 +47,4 @@ Open: package name, HTTP paths, Cerbos kind, store renames, env flag, order vs t
 - Soft: large IntakeJob/LineJob — defer split
 - Demo: `living@attesta.com` / org `feragame`; wipe via `ATTESTA_LIVING_SEED`
 - **UI gap:** FormPlan/derived → ticket **14**
-- **Config-driven gap (pressing):** server Commit is Feragame `apply*Commit` switch, not Org Config ELT → ticket **16**
-- Follow-ons filed for later: **17** readyWhen, **18** HttpPort, **19** durable stores
+- Follow-ons: **17** readyWhen, **18** HttpPort, **19** durable stores

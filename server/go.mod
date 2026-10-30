@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/appwrite/sdk-for-go v1.0.0
+	github.com/blues/jsonata-go v1.5.4
 	go.mongodb.org/mongo-driver v1.17.1
 	goa.design/goa/v3 v3.24.3
 	gopkg.in/yaml.v3 v3.0.1

@@ -8,17 +8,6 @@ import (
 	"time"
 )
 
-const (
-	registerTaskPath        = "intake/register"
-	codiceFirTaskPath       = "intake/codiceFir"
-	palletWeightTaskPath    = "intake/palletWeight"
-	weightCheckTaskPath     = "intake/weightCheck"
-	lineShiftTaskPath       = "line/shift"
-	lineLoadTaskPath        = "line/lineLoad"
-	containerRegTaskPath    = "line/containerReg"
-	loadedExtractedTaskPath = "line/loadedExtracted"
-)
-
 // CommitRequest is the Commit wire body (no run id).
 type CommitRequest struct {
 	TaskPath      string         `json:"taskPath"`
@@ -83,6 +72,18 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, err
 	}
 
+	job, task, err := lookupTask(cfg, ref.JobID, ref.TaskID)
+	if err != nil {
+		return CommitResult{}, &CommitError{Kind: "unknown-target", Message: err.Error()}
+	}
+	transform, hasTransform := taskOnSubmitTransform(task)
+	if !hasTransform {
+		return CommitResult{}, &CommitError{
+			Kind:    "unknown-target",
+			Message: fmt.Sprintf("Task %q has no onSubmit.transform", taskPath),
+		}
+	}
+
 	domain, err := c.Domains.Get(ctx, org)
 	if err != nil {
 		if !errors.Is(err, ErrNotFound) {
@@ -114,34 +115,19 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	ts := now().UTC().Format(time.RFC3339Nano)
 
-	var next Domain
-	switch taskPath {
-	case registerTaskPath:
-		next, err = applyRegisterCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case codiceFirTaskPath:
-		next, err = applyCodiceFirCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case palletWeightTaskPath:
-		next, err = applyPalletWeightCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case weightCheckTaskPath:
-		next, err = applyWeightCheckCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case lineShiftTaskPath:
-		next, err = applyShiftCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case lineLoadTaskPath:
-		next, err = applyLineLoadCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case containerRegTaskPath:
-		next, err = applyContainerRegCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	case loadedExtractedTaskPath:
-		next, err = applyLoadedExtractedCommit(domain, op.UserID, jobInstanceID, req.Value, ts)
-	default:
-		return CommitResult{}, &CommitError{
-			Kind:    "unknown-target",
-			Message: fmt.Sprintf("unsupported task path %q", taskPath),
-		}
-	}
+	next, resultInstanceID, err := applyConfigCommit(domain, cfg, job, task, ref.JobID, ref.TaskID, jobInstanceID, op.UserID, req.Value, transform, ts)
 	if err != nil {
 		var ce *CommitError
 		if errors.As(err, &ce) {
 			return CommitResult{}, ce
+		}
+		var te TransformError
+		if errors.As(err, &te) {
+			return CommitResult{}, &CommitError{Kind: "prep", Message: te.Error()}
+		}
+		var ie InstanceExprError
+		if errors.As(err, &ie) {
+			return CommitResult{}, &CommitError{Kind: "prep", Message: ie.Error()}
 		}
 		var me MutateError
 		if errors.As(err, &me) {
@@ -154,277 +140,67 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, err
 	}
 
-	return CommitResult{Org: org, JobInstanceID: jobInstanceID, Domain: next}, nil
+	return CommitResult{Org: org, JobInstanceID: resultInstanceID, Domain: next}, nil
 }
 
-func applyRegisterCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	palletCount, ok := intFromAny(value["palletCount"])
-	if !ok || palletCount < 1 {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.palletCount must be a positive integer"}
-	}
-
-	loadFacts := map[string]any{}
-	for _, key := range []string{
-		"client", "date", "wasteCode", "idoneitaRiutilizzo",
-		"truckWeight", "truckTare", "palletCount", "notes",
-	} {
-		if v, exists := value[key]; exists {
-			loadFacts[key] = v
+func applyConfigCommit(
+	domain Domain,
+	cfg OrgConfig,
+	job Job,
+	task map[string]any,
+	jobID, taskID, jobInstanceID, userID string,
+	value map[string]any,
+	transform any,
+	ts string,
+) (Domain, string, error) {
+	var leftoverIDs []string
+	if needsLeftoverProjection(task) {
+		ids, err := leftoverIDsForTask(domain, jobID, task, jobInstanceID)
+		if err != nil {
+			return Domain{}, "", &CommitError{Kind: "prep", Message: err.Error()}
 		}
+		leftoverIDs = ids
 	}
 
-	ops := make([]MutateOp, 0, 1+palletCount)
-	ops = append(ops, MintOp{Entity: EntityLoad, ID: jobInstanceID, Set: loadFacts})
-	for i := 1; i <= palletCount; i++ {
-		palletID := fmt.Sprintf("%s.%d", jobInstanceID, i)
-		ops = append(ops, MintOp{
-			Entity: EntityPallet,
-			ID:     palletID,
-			Set:    map[string]any{"loadId": jobInstanceID},
-		})
-	}
-
-	return Mutate(domain, MutateRequest{
-		JobID:         "intake",
-		TaskID:        "register",
-		JobInstanceID: jobInstanceID,
-		Facts:         cloneFacts(value),
-		Ops:           ops,
-		Timestamp:     ts,
-		UserID:        userID,
-		NewJobInstance: &JobInstance{
-			JobID: "intake",
-			ID:    jobInstanceID,
-			Label: jobInstanceID,
-		},
-	})
-}
-
-func applyCodiceFirCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	codiceFir, ok := value["codiceFir"].(string)
-	if !ok || strings.TrimSpace(codiceFir) == "" {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.codiceFir must be a non-empty string"}
-	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "intake",
-		TaskID:        "codiceFir",
-		JobInstanceID: jobInstanceID,
-		Facts:         cloneFacts(value),
-		Ops: []MutateOp{
-			PatchOp{
-				Entity: EntityLoad,
-				ID:     jobInstanceID,
-				Set:    map[string]any{"codiceFir": codiceFir},
-			},
-		},
-		Timestamp: ts,
-		UserID:    userID,
-	})
-}
-
-// Leftovers completeness all: one Commit must cover every eligible pallet
-// (weight still unset for this Job instance). Partial maps are prep-rejected.
-func applyPalletWeightCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	leftoverIDs := palletWeightLeftoverIDs(domain, jobInstanceID)
-	weightsRaw, _ := value["weights"].(map[string]any)
-	if weightsRaw == nil {
-		weightsRaw = map[string]any{}
-	}
-
-	if len(leftoverIDs) == 0 {
-		return Mutate(domain, MutateRequest{
-			JobID:         "intake",
-			TaskID:        "palletWeight",
-			JobInstanceID: jobInstanceID,
-			Facts:         map[string]any{},
-			Ops:           nil,
-			Timestamp:     ts,
-			UserID:        userID,
-		})
-	}
-
-	filled, err := filterFilledObjectWeights(weightsRaw)
+	prep, err := prepTaskSubmission(task, value, leftoverIDs)
 	if err != nil {
-		return Domain{}, &CommitError{Kind: "prep", Message: err.Error()}
-	}
-	if msg := validateWeighFacts(filled, leftoverIDs); msg != "" {
-		return Domain{}, &CommitError{Kind: "prep", Message: msg}
-	}
-	if msg := enforceAllCompleteness(filled, leftoverIDs); msg != "" {
-		return Domain{}, &CommitError{Kind: "prep", Message: msg}
+		return Domain{}, "", &CommitError{Kind: "prep", Message: err.Error()}
 	}
 
-	ops := make([]MutateOp, 0, len(filled))
-	for id, row := range filled {
-		ops = append(ops, PatchOp{
-			Entity: EntityPallet,
-			ID:     id,
-			Set: map[string]any{
-				"weight":     row.Weight,
-				"tareKind":   row.TareKind,
-				"idoneita":   row.Idoneita,
-				"panelCount": row.PanelCount,
-			},
-		})
-	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "intake",
-		TaskID:        "palletWeight",
+	run, err := RunTransform(domain, RunTransformInput{
+		JobID:         jobID,
+		TaskID:        taskID,
 		JobInstanceID: jobInstanceID,
-		Facts:         weighFactsAsMap(filled),
-		Ops:           ops,
-		Timestamp:     ts,
 		UserID:        userID,
+		Facts:         prep.Facts,
+		Transform:     transform,
+		Allowed:       EntityKindsFromConfig(cfg),
 	})
-}
-
-func applyWeightCheckCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	truck, ok := floatFromAny(value["checkedTruckWeight"])
-	if !ok || truck <= 0 {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedTruckWeight must be a positive number"}
-	}
-	sum, ok := floatFromAny(value["checkedPalletSum"])
-	if !ok || sum <= 0 {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedPalletSum must be a positive number"}
-	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "intake",
-		TaskID:        "weightCheck",
-		JobInstanceID: jobInstanceID,
-		Facts:         cloneFacts(value),
-		Ops: []MutateOp{
-			PatchOp{
-				Entity: EntityLoad,
-				ID:     jobInstanceID,
-				Set: map[string]any{
-					"checkedTruckWeight": truck,
-					"checkedPalletSum":   sum,
-				},
-			},
-		},
-		Timestamp: ts,
-		UserID:    userID,
-	})
-}
-
-// First line Task: mint the line Job instance from value.shift (fixture instanceId $.shift).
-func applyShiftCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	shift, ok := value["shift"].(string)
-	if !ok || strings.TrimSpace(shift) == "" {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.shift must be a non-empty string"}
-	}
-	if jobInstanceID != shift {
-		return Domain{}, &CommitError{Kind: "prep", Message: "jobInstanceId must match value.shift"}
-	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "line",
-		TaskID:        "shift",
-		JobInstanceID: jobInstanceID,
-		Facts:         cloneFacts(value),
-		Ops:           nil,
-		Timestamp:     ts,
-		UserID:        userID,
-		NewJobInstance: &JobInstance{
-			JobID: "line",
-			ID:    jobInstanceID,
-			Label: "Turno: " + shift,
-		},
-	})
-}
-
-// Leftovers completeness some: batch progress patches; never an unlock / startsWhen gate.
-func applyLineLoadCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	leftoverIDs := lineLoadLeftoverIDs(domain)
-	progressRaw, _ := value["progress"].(map[string]any)
-	if progressRaw == nil {
-		progressRaw = map[string]any{}
-	}
-
-	filled, err := filterFilledProgress(progressRaw)
 	if err != nil {
-		return Domain{}, &CommitError{Kind: "prep", Message: err.Error()}
-	}
-	if msg := validateProgressFacts(filled, leftoverIDs); msg != "" {
-		return Domain{}, &CommitError{Kind: "prep", Message: msg}
+		return Domain{}, "", err
 	}
 
-	ops := make([]MutateOp, 0, len(filled))
-	for id, progress := range filled {
-		ops = append(ops, PatchOp{
-			Entity: EntityPallet,
-			ID:     id,
-			Set:    map[string]any{"progress": progress},
-		})
-	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "line",
-		TaskID:        "lineLoad",
-		JobInstanceID: jobInstanceID,
-		Facts:         cloneFacts(filled),
-		Ops:           ops,
-		Timestamp:     ts,
-		UserID:        userID,
-	})
-}
+	req := run.Request
+	req.Timestamp = ts
+	req.UserID = userID
 
-// Flatten form material arrays → mintMany containers (C-n); unlockFrom instance (not lineLoad).
-func applyContainerRegCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	facts, err := flattenContainerRegFacts(value)
-	if err != nil {
-		return Domain{}, &CommitError{Kind: "prep", Message: err.Error()}
-	}
-
-	base := len(domain.Container)
-	ops := make([]MutateOp, 0, len(facts.Rows))
-	for i, row := range facts.Rows {
-		set := map[string]any{
-			"weight":       row.Weight,
-			"material":     row.Material,
-			"sourceLoadId": facts.SourceLoadID,
+	resultInstanceID := jobInstanceID
+	if shouldMintJobInstance(job, jobID, taskID, jobInstanceID, domain) {
+		id, label, err := EvaluateJobInstanceExprs(job, prep.Facts, run.Bindings)
+		if err != nil {
+			return Domain{}, "", err
 		}
-		// Omit undefined secondary so single-source Records stay clean (evalSet omit).
-		if row.SecondarySourceLoadID != "" {
-			set["secondarySourceLoadId"] = row.SecondarySourceLoadID
-		}
-		ops = append(ops, MintOp{
-			Entity: EntityContainer,
-			ID:     fmt.Sprintf("C-%d", base+i+1),
-			Set:    set,
-		})
+		// Config instanceId/label are authority (not client-provisional jobInstanceId).
+		req.NewJobInstance = &JobInstance{JobID: jobID, ID: id, Label: label}
+		req.JobInstanceID = id
+		resultInstanceID = id
 	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "line",
-		TaskID:        "containerReg",
-		JobInstanceID: jobInstanceID,
-		Facts:         containerRegFactsAsMap(facts),
-		Ops:           ops,
-		Timestamp:     ts,
-		UserID:        userID,
-	})
-}
 
-// Submission facts only — fixture transform is empty (no Domain entity to patch).
-func applyLoadedExtractedCommit(domain Domain, userID, jobInstanceID string, value map[string]any, ts string) (Domain, error) {
-	loaded, ok := floatFromAny(value["checkedLoadedWeight"])
-	if !ok || !(loaded > 0) {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedLoadedWeight must be a number > 0"}
+	next, err := Mutate(domain, req)
+	if err != nil {
+		return Domain{}, "", err
 	}
-	extracted, ok := floatFromAny(value["checkedContainerSum"])
-	if !ok || !(extracted > 0) {
-		return Domain{}, &CommitError{Kind: "prep", Message: "value.checkedContainerSum must be a number > 0"}
-	}
-	return Mutate(domain, MutateRequest{
-		JobID:         "line",
-		TaskID:        "loadedExtracted",
-		JobInstanceID: jobInstanceID,
-		Facts: map[string]any{
-			"checkedLoadedWeight": loaded,
-			"checkedContainerSum": extracted,
-		},
-		Ops:       nil,
-		Timestamp: ts,
-		UserID:    userID,
-	})
+	return next, resultInstanceID, nil
 }
 
 func intFromAny(v any) (int, bool) {

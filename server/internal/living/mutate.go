@@ -115,7 +115,11 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 }
 
 func entityMap(d *Domain, entity EntityType) (*EntityMap, error) {
-	switch entity {
+	kind := string(entity)
+	if kind == "" {
+		return nil, fmt.Errorf("living: empty entity kind")
+	}
+	switch EntityType(kind) {
 	case EntityLoad:
 		if d.Load == nil {
 			d.Load = EntityMap{}
@@ -132,7 +136,15 @@ func entityMap(d *Domain, entity EntityType) (*EntityMap, error) {
 		}
 		return &d.Container, nil
 	default:
-		return nil, fmt.Errorf("living: unknown entity %q", entity)
+		if d.Extra == nil {
+			d.Extra = map[string]*EntityMap{}
+		}
+		if p, ok := d.Extra[kind]; ok && p != nil {
+			return p, nil
+		}
+		m := EntityMap{}
+		d.Extra[kind] = &m
+		return d.Extra[kind], nil
 	}
 }
 

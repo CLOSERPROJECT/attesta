@@ -25,7 +25,7 @@ var ErrNotFound = fmt.Errorf("living: not found")
 
 // MemoryDomainStore is an in-memory DomainStore.
 type MemoryDomainStore struct {
-	mu   sync.RWMutex
+	mu    sync.RWMutex
 	byOrg map[string]Domain
 }
 
@@ -114,6 +114,18 @@ func cloneDomain(d Domain) Domain {
 		Container:    cloneEntityMap(d.Container),
 		Submissions:  append([]Submission(nil), d.Submissions...),
 		JobInstances: append([]JobInstance(nil), d.JobInstances...),
+	}
+	if len(d.Extra) > 0 {
+		out.Extra = make(map[string]*EntityMap, len(d.Extra))
+		for kind, m := range d.Extra {
+			if m == nil {
+				empty := EntityMap{}
+				out.Extra[kind] = &empty
+				continue
+			}
+			cloned := cloneEntityMap(*m)
+			out.Extra[kind] = &cloned
+		}
 	}
 	if out.Submissions == nil {
 		out.Submissions = []Submission{}

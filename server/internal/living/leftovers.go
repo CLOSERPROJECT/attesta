@@ -2,7 +2,6 @@ package living
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -12,29 +11,6 @@ type WeighRowFact struct {
 	TareKind   string
 	Idoneita   string
 	PanelCount float64
-}
-
-// palletWeightLeftoverIDs: pallets for this Job instance that still lack weight
-// (fixture reads.leftovers where: loadId = $instance.id and $not($exists(weight))).
-func palletWeightLeftoverIDs(domain Domain, jobInstanceID string) []string {
-	ids := make([]string, 0)
-	for id, facts := range domain.Pallet {
-		loadID, _ := facts["loadId"].(string)
-		if loadID != jobInstanceID {
-			continue
-		}
-		if palletWeightExists(facts) {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func palletWeightExists(facts map[string]any) bool {
-	v, ok := facts["weight"]
-	return ok && v != nil
 }
 
 func filterFilledObjectWeights(value map[string]any) (map[string]WeighRowFact, error) {
@@ -111,36 +87,11 @@ func validateWeighFacts(facts map[string]WeighRowFact, leftoverIDs []string) str
 
 // completeness all: every leftover id must appear in facts (empty leftover set → OK).
 func enforceAllCompleteness(facts map[string]WeighRowFact, leftoverIDs []string) string {
-	if len(leftoverIDs) == 0 {
-		return ""
+	asMap := make(map[string]any, len(facts))
+	for id := range facts {
+		asMap[id] = struct{}{}
 	}
-	var missing []string
-	for _, id := range leftoverIDs {
-		if _, ok := facts[id]; !ok {
-			missing = append(missing, id)
-		}
-	}
-	if len(missing) == 0 {
-		return ""
-	}
-	return "completeness all requires every leftover — missing " + strings.Join(missing, ", ")
-}
-
-// lineLoadLeftoverIDs: weighted pallets not yet progress=done
-// (fixture reads.leftovers where: $exists(weight) and $not(progress = 'done')).
-func lineLoadLeftoverIDs(domain Domain) []string {
-	ids := make([]string, 0)
-	for id, facts := range domain.Pallet {
-		if !palletWeightExists(facts) {
-			continue
-		}
-		if progress, ok := facts["progress"].(string); ok && progress == "done" {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
+	return enforceAllCompletenessKeys(asMap, leftoverIDs)
 }
 
 // Untouched this pass — omit from batch (not the same as clear null).
@@ -219,4 +170,42 @@ func weighFactsAsMap(facts map[string]WeighRowFact) map[string]any {
 		}
 	}
 	return out
+}
+
+// leftoverIDsForTask resolves leftover eligibility from Task reads.where (config-driven).
+func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string) ([]string, error) {
+	read, _, ok, err := leftoverReadFromTask(task)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil
+	}
+	label := jobInstanceLabel(domain, jobID, jobInstanceID)
+	return ResolveRead(domain, read, jobInstanceID, label)
+}
+
+// Test helpers kept as thin wrappers over fixture where exprs (no plant filters in Go).
+func palletWeightLeftoverIDs(domain Domain, jobInstanceID string) []string {
+	ids, err := ResolveRead(domain, ReadDef{
+		Entity: EntityPallet,
+		Where:  "loadId = $instance.id and $not($exists(weight))",
+		Key:    "id",
+	}, jobInstanceID, "")
+	if err != nil {
+		return nil
+	}
+	return ids
+}
+
+func lineLoadLeftoverIDs(domain Domain) []string {
+	ids, err := ResolveRead(domain, ReadDef{
+		Entity: EntityPallet,
+		Where:  "$exists(weight) and $not(progress = 'done')",
+		Key:    "id",
+	}, "", "")
+	if err != nil {
+		return nil
+	}
+	return ids
 }

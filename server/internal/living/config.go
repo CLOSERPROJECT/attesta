@@ -12,12 +12,12 @@ type OrgConfig struct {
 
 // Job is a top-level authored chapter (intake, line, …).
 type Job struct {
-	Repeatable bool           `json:"repeatable"`
-	InstanceID string         `json:"instanceId"`
-	Label      string         `json:"label"`
-	StartLabel string         `json:"startLabel,omitempty"`
-	StartsWhen *StartsWhen    `json:"startsWhen,omitempty"`
-	Tasks      OrderedObject  `json:"tasks"`
+	Repeatable bool          `json:"repeatable"`
+	InstanceID string        `json:"instanceId"`
+	Label      string        `json:"label"`
+	StartLabel string        `json:"startLabel,omitempty"`
+	StartsWhen *StartsWhen   `json:"startsWhen,omitempty"`
+	Tasks      OrderedObject `json:"tasks"`
 }
 
 // StartsWhen is a Job-level start gate over Submissions of a named Task path.
