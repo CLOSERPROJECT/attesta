@@ -50,6 +50,18 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
-		"sv-router": "^0.14.0"
+		"@lucide/svelte": "^0.503.0",
+		"@sjsf/ajv8-validator": "3.9.0",
+		"@sjsf/form": "3.9.0",
+		"@sjsf/lucide-icons": "3.9.0",
+		"@sjsf/shadcn4-theme": "3.9.0",
+		"ajv": "8",
+		"bits-ui": "^2.14.0",
+		"clsx": "^2.1.1",
+		"jsonata": "2.2.2",
+		"sv-router": "^0.14.0",
+		"tailwind-merge": "^3.3.1",
+		"tailwind-variants": "^1.0.0",
+		"yaml": "^2.8.0"
 	}
 }

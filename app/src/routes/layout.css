@@ -1,3 +1,58 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+@import '@sjsf/shadcn4-theme/styles.css';
+@source '../../node_modules/@sjsf/shadcn4-theme/dist';
+
+/* Living FormPlan / sjsf light tokens */
+:root {
+	--background: #fafcfb;
+	--foreground: #12210c;
+	--card: #fff;
+	--card-foreground: #12210c;
+	--popover: #fff;
+	--popover-foreground: #12210c;
+	--primary: #1e6f5c;
+	--primary-foreground: #fff;
+	--secondary: #fff;
+	--secondary-foreground: #7a847c;
+	--muted: #f2f6f5;
+	--muted-foreground: #aeb6ae;
+	--accent: #f2f6f5;
+	--accent-foreground: #12210c;
+	--destructive: #c0392b;
+	--border: #dde2e0;
+	--input: #fff;
+	--ring: #1e6f5c;
+	--radius: 4px;
+}
+
+[data-slot='input'],
+[data-slot='textarea'],
+[data-slot='select-trigger'] {
+	background-color: var(--input);
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--radius-sm: calc(var(--radius) - 2px);
+	--radius-md: var(--radius);
+	--radius-lg: calc(var(--radius) + 2px);
+}

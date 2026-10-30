@@ -4,14 +4,14 @@
 
 **Blocked by:** flat port 09–11 (done). Coordinate with 13 rename if overlapping.
 
-**Status:** ready-for-agent
+**Status:** done — reviewer APPROVE; squash into rework; human smoke
 
-- [ ] FormPlan (or living equivalent) drives intake + line Task UIs from Org Config, not hand-built field lists
-- [ ] Custom field widgets used by the truck-loop fixture are available (e.g. leftover-table / map-table equivalents)
-- [ ] Derived readonly fields and derived overridable fields (override/restore) match experiment behaviour; sealed Commit values include effective derived facts
-- [ ] Living Commit/Load ports and Cerbos path unchanged in contract (path + Job instance + value)
-- [ ] No harness / snapshot-replace UI revived
-- [ ] `bun run check` + living unit tests green; smoke intake + one line instance still works in `/app`
+- [x] FormPlan (or living equivalent) drives intake + line Task UIs from Org Config, not hand-built field lists
+- [x] Custom field widgets used by the truck-loop fixture are available (e.g. leftover-table / map-table equivalents)
+- [x] Derived readonly fields and derived overridable fields (override/restore) match experiment behaviour; sealed Commit values include effective derived facts
+- [x] Living Commit/Load ports and Cerbos path unchanged in contract (path + Job instance + value)
+- [x] No harness / snapshot-replace UI revived
+- [x] `bun run check` + living unit tests green; smoke intake + one line instance still works in `/app`
 
 **Out of scope:** ticket 13 placeholder rename; Task groups / lot intake; HTMX `/my` / `web/` templates.
 
