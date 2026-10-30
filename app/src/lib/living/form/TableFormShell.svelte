@@ -21,7 +21,7 @@
 
 	let props: Props = $props();
 
-	// Parent remounts via {#key leftoversIdentity}; capture mount snapshot once.
+	// Parent remounts via {#key projectionKey}; capture mount snapshot once.
 	const mount = untrack(() => ({
 		schema: props.schema,
 		uiSchema: props.uiSchema,

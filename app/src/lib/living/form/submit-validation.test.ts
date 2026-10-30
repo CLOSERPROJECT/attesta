@@ -6,11 +6,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAjvFormValidator } from './ajv-form-validator.js';
-import { emptySnapshot } from './domain-snapshot.js';
-import {
-	domainProgressForIds,
-	progressDraftFromDomain
-} from './pallet-progress.js';
 import {
 	formatSubmitValidationError,
 	messagesAtExactPath,
@@ -60,18 +55,9 @@ describe('submit validation visibility', () => {
 		expect(task).toContain('shellEpoch');
 		expect(task).toContain('findTaskFormBundle');
 		expect(task).toContain('initialData');
-	});
-
-	test('successful partial Commit seed restores domain progress for remount', () => {
-		const snapshot = emptySnapshot();
-		snapshot.pallet['NIR-1.1'] = { loadId: 'NIR-1', weight: 400, progress: 'partial' };
-		snapshot.pallet['NIR-1.2'] = { loadId: 'NIR-1', weight: 450 };
-		const ids = ['NIR-1.1', 'NIR-1.2'] as const;
-		const domainProg = domainProgressForIds(snapshot, ids);
-		// Commit clearDraft → empty; remount must paint Parziale from domain.
-		const seeded = progressDraftFromDomain(domainProg, ids);
-		expect(seeded['NIR-1.1']).toBe('partial');
-		expect(seeded['NIR-1.2']).toBeUndefined();
-		expect(Object.hasOwn(seeded, 'NIR-1.2')).toBe(false);
+		expect(task).toContain('planFromTaskFormBundle');
+		expect(task).not.toContain('compileTaskFormPlan');
+		expect(task).not.toContain('seedMapTableDraft');
+		expect(task).not.toContain('seedProgressDraftFromDomain');
 	});
 });

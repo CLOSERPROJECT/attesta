@@ -2,36 +2,59 @@
  * Cascade #6 regression: Completo on one leftover + untouched siblings.
  * Untouched wire (`""` / own-property undefined) must be omitted before Ajv
  * so Invia can Commit; null clear stays.
+ *
+ * Projected schema shape mirrors Go TaskFormBundle (propertyNames + nullability);
+ * seal uses planFromTaskFormBundle — no client compile / projectFormSchema.
  */
 import { describe, expect, test } from 'vitest';
-import type { Schema } from '@sjsf/form';
-import { emptySnapshot } from './domain-snapshot.js';
-import truckLoopStepsYaml from './fixtures/truck-loop-steps.yaml?raw';
-import { loadTruckLoop, taskConfig } from './load-truck-loop.js';
-import { projectFormSchema } from './project-form-schema.js';
+import type { Schema, UiSchemaRoot } from '@sjsf/form';
 import { createAjvFormValidator } from './ajv-form-validator.js';
 import {
 	normalizeFormProgress,
 	omitUntouchedProgressCells
 } from './pallet-progress.js';
-import { compileTaskFormPlan } from './task-form-plan.js';
+import { planFromTaskFormBundle, type TaskFormBundle } from './task-form-bundle.js';
+
+/** Fixture: lineLoad leftoverTable after Go leftover projection. */
+function lineLoadProjectedSchema(leftoverIds: string[]): Schema {
+	return {
+		type: 'object',
+		properties: {
+			progress: {
+				type: 'object',
+				propertyNames: { enum: leftoverIds },
+				additionalProperties: {
+					anyOf: [{ type: 'null' }, { type: 'string', enum: ['partial', 'done'] }]
+				}
+			}
+		}
+	} as Schema;
+}
+
+function sealPlan() {
+	const leftoverIds = ['NIR-1.1', 'NIR-1.2', 'NIR-1.3'];
+	const bundle: TaskFormBundle = {
+		jobId: 'line',
+		taskId: 'lineLoad',
+		jobInstanceId: '1st',
+		title: 'lineLoad',
+		surface: 'leftover-table',
+		schema: lineLoadProjectedSchema(leftoverIds),
+		uiSchema: {} as UiSchemaRoot,
+		initialData: {},
+		leftoverIds,
+		chrome: [],
+		chromeFieldIds: [],
+		sealFieldIds: [],
+		bindings: {}
+	};
+	return planFromTaskFormBundle(bundle);
+}
 
 describe('cascade #6 omit untouched progress cells', () => {
-	const config = loadTruckLoop(truckLoopStepsYaml);
-	const authored = taskConfig(config.jobs.line, 'lineLoad')!;
+	const leftoverIds = ['NIR-1.1', 'NIR-1.2'];
+	const schema = lineLoadProjectedSchema(leftoverIds);
 	const validator = createAjvFormValidator<Record<string, unknown>>();
-
-	async function projected() {
-		const snapshot = emptySnapshot();
-		snapshot.pallet['NIR-1.1'] = { loadId: 'NIR-1', weight: 400 };
-		snapshot.pallet['NIR-1.2'] = { loadId: 'NIR-1', weight: 450 };
-		const projected = await projectFormSchema(snapshot, authored, {
-			instance: { id: '1st', label: '1st' }
-		});
-		expect(projected.ok).toBe(true);
-		if (!projected.ok) throw new Error('project failed');
-		return projected.value;
-	}
 
 	test('omitUntouchedProgressCells drops "" and undefined; keeps null|partial|done', () => {
 		expect(
@@ -55,42 +78,33 @@ describe('cascade #6 omit untouched progress cells', () => {
 		).toEqual({ a: 'done' });
 	});
 
-	test('createAjvFormValidator: Completo + sibling "" validates (Invia path)', async () => {
-		const slice = await projected();
-		const schema = slice.schema as Schema;
-		const [touched, sibling] = slice.leftoverIds;
-		expect(touched && sibling).toBeTruthy();
-		const progress = { [touched!]: 'done', [sibling!]: '' };
+	test('createAjvFormValidator: Completo + sibling "" validates (Invia path)', () => {
+		const [touched, sibling] = leftoverIds;
+		const progress = { [touched]: 'done', [sibling]: '' };
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
 		const result = validator.validateFormValue(schema, { progress });
 		expect(result.errors).toBeUndefined();
-		expect(result.value).toEqual({ progress: { [touched!]: 'done' } });
+		expect(result.value).toEqual({ progress: { [touched]: 'done' } });
 	});
 
-	test('createAjvFormValidator: Completo + own-property undefined validates', async () => {
-		const slice = await projected();
-		const schema = slice.schema as Schema;
-		const [touched, sibling] = slice.leftoverIds;
-		expect(touched && sibling).toBeTruthy();
-		const progress = { [touched!]: 'done', [sibling!]: undefined };
+	test('createAjvFormValidator: Completo + own-property undefined validates', () => {
+		const [touched, sibling] = leftoverIds;
+		const progress = { [touched]: 'done', [sibling]: undefined };
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
 		const result = validator.validateFormValue(schema, { progress });
 		expect(result.errors).toBeUndefined();
-		expect(result.value).toEqual({ progress: { [touched!]: 'done' } });
+		expect(result.value).toEqual({ progress: { [touched]: 'done' } });
 	});
 
-	test('null clear sibling still validates; normalizeFormProgress keeps null', async () => {
-		const slice = await projected();
-		const schema = slice.schema as Schema;
-		const [touched, sibling] = slice.leftoverIds;
-		expect(touched && sibling).toBeTruthy();
-		const progress = { [touched!]: 'partial', [sibling!]: null };
+	test('null clear sibling still validates; normalizeFormProgress keeps null', () => {
+		const [touched, sibling] = leftoverIds;
+		const progress = { [touched]: 'partial', [sibling]: null };
 		expect(normalizeFormProgress({ progress })).toEqual({ progress });
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
 	});
 
 	test('sealSubmission omits untouched progress cells', () => {
-		const plan = compileTaskFormPlan(authored as Record<string, unknown>);
+		const plan = sealPlan();
 		expect(
 			plan.sealSubmission({
 				progress: { 'NIR-1.1': 'done', 'NIR-1.2': '', 'NIR-1.3': undefined }

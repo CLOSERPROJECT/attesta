@@ -1,4 +1,4 @@
-/** Living Domain slice FormPlan / resolve-reads need (entities + submissions). */
+/** Living Domain slice for chrome / finalResults (entities + submissions). */
 export type EntityType = 'load' | 'pallet' | 'container';
 
 export type EntityFacts = Record<string, unknown>;

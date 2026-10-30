@@ -34,7 +34,7 @@
 		objectRowMapColumnKeys,
 		writeObjectRowMapCell
 	} from './object-row-weigh.js';
-	import { readColumns } from './project-form-schema.js';
+	import { readColumns } from './read-columns.js';
 
 	let {
 		config,

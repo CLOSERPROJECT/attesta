@@ -1,11 +1,13 @@
 /**
- * Cascade #8: register FormPlan open must surface JSON Schema `default`
+ * Cascade #8: register form open must surface JSON Schema `default`
  * (`idoneitaRiutilizzo: NIR`) and authored date sentinel (`$today` → today).
  *
  * Root: createConfigForm always passes sjsf `value` bind; createForm then
  * skips mergeFormDataAndSchemaDefaults. Empty Draft → empty widget value.
  * Fix: resolve `$today` once, pass resolved schema into merge + createForm
  * so sjsf re-merge/reset cannot inject the sentinel literal.
+ *
+ * Authored schema comes from truck-loop YAML (Go ships the same shape in the bundle).
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -22,19 +24,16 @@ import {
 	resolveSchemaDateDefaultSentinels,
 	TODAY_DEFAULT_SENTINEL
 } from './schema-defaults.js';
-import { compileTaskFormPlan } from './task-form-plan.js';
 
 const libDir = dirname(fileURLToPath(import.meta.url));
 
 describe('cascade #8 schema defaults on register open', () => {
 	const config = loadTruckLoop(truckLoopStepsYaml);
 	const authored = taskConfig(config.jobs.intake, 'register')!;
-	const plan = compileTaskFormPlan(authored as Record<string, unknown>);
-	if ('error' in plan) throw new Error(plan.error);
-	const schema = plan.schemas.schema as Schema;
+	const schema = authored.schema as Schema;
 	const props = (schema.properties ?? {}) as Record<string, Schema>;
 
-	test('authored idoneitaRiutilizzo default NIR and date $today survive FormPlan compile', () => {
+	test('authored idoneitaRiutilizzo default NIR and date $today survive bundle schema', () => {
 		expect(props.idoneitaRiutilizzo?.default).toBe('NIR');
 		expect(props.date?.default).toBe(TODAY_DEFAULT_SENTINEL);
 		expect(props.date?.format).toBe('date');
