@@ -5,15 +5,15 @@ import type {
 	ChromeDisplay,
 	ChromeRecapRowDisplay
 } from './chrome-context.js';
-import { isChromeTone, resolveChromeTone } from './chrome-tone.js';
+import { isChromeTone } from './chrome-tone.js';
 import { evaluateSafe, formatJsonataError } from './jsonata-safe.js';
 import type { OperatorIdentity } from './operator-identity.js';
-import type { ChromeDataReport, ChromeRecap, TaskFormPlan } from './task-form-plan.js';
+import type { ChromeDataReport, TaskFormPlan } from './task-form-plan.js';
 
 export type LiveTaskFormPorts = {
 	getValue: () => Record<string, unknown>;
 	setValue: (next: Record<string, unknown>) => void;
-	/** JSONata `$domain` binding (recap / valuePrint / derived) — may be a thin projection. */
+	/** JSONata `$domain` binding (valuePrint / derived) — may be a thin projection. */
 	getDomain: () => unknown;
 	/** Server `bindings.chromeDisplay` bag for `kind: dataReport` (Load/Commit only). */
 	getChromeDisplayBag?: () => Record<string, unknown> | undefined;
@@ -65,44 +65,6 @@ export async function evaluateChromeEntry(
 		return { value: null, error: formatJsonataError(result.error) };
 	}
 	return formatChromeEvalValue(result.value);
-}
-
-export async function evaluateRecapEntry(
-	entry: ChromeRecap,
-	sealableDraft: Record<string, unknown>,
-	domain: unknown,
-	instance: unknown | undefined,
-	operator?: OperatorIdentity
-): Promise<ChromeDisplay> {
-	const bindings = chromeBindings(domain, instance, operator);
-
-	const rows: ChromeRecapRowDisplay[] = [];
-	for (const row of entry.rows) {
-		const result = await evaluateSafe(row.expr, sealableDraft, bindings);
-		if (!result.ok) {
-			rows.push({
-				label: row.label,
-				value: null,
-				error: formatJsonataError(result.error),
-				tone: null
-			});
-			continue;
-		}
-		const formatted = formatChromeEvalValue(result.value);
-		rows.push({
-			label: row.label,
-			value: formatted.value,
-			error: formatted.error,
-			tone: resolveChromeTone(result.value, { tone: row.tone, bands: row.bands })
-		});
-	}
-
-	return {
-		value: null,
-		error: null,
-		title: entry.title ?? null,
-		rows
-	};
 }
 
 function normalizeRow(raw: unknown): ChromeRecapRowDisplay | null {
@@ -157,6 +119,9 @@ export function displayFromChromeDisplayBag(
 				.map(normalizeSection)
 				.filter((s): s is ChromeDataReportSectionDisplay => s != null)
 		: [];
+	const rows = Array.isArray(rec.rows)
+		? rec.rows.map(normalizeRow).filter((row): row is ChromeRecapRowDisplay => row != null)
+		: undefined;
 	const title =
 		typeof rec.title === 'string'
 			? rec.title
@@ -167,6 +132,7 @@ export function displayFromChromeDisplayBag(
 		value: rec.value == null ? null : String(rec.value),
 		error: rec.error == null ? null : String(rec.error),
 		title,
+		...(rows !== undefined ? { rows } : {}),
 		sections
 	};
 }
@@ -237,15 +203,7 @@ async function applyChrome(
 	const next: Record<string, ChromeDisplay> = {};
 	for (const entry of plan.chrome) {
 		if (!isCurrent()) return;
-		if (entry.kind === 'recap') {
-			next[entry.id] = await evaluateRecapEntry(
-				entry,
-				sealableDraft,
-				domain,
-				instance,
-				operator
-			);
-		} else if (entry.kind === 'dataReport') {
+		if (entry.kind === 'dataReport') {
 			next[entry.id] = displayFromChromeDisplayBag(chromeDisplayBag, entry);
 		} else {
 			next[entry.id] = await evaluateChromeEntry(

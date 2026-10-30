@@ -166,6 +166,107 @@ func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {
 	}
 }
 
+func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
+	cfg, err := LoadTruckLoopFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Probe: L1 truck 1000; pallets 125+100 → sum 225; match 22.5% → danger.
+	bundle, err := BuildTaskFormBundle(cfg, dataReportProbeDomain(), AvailableTaskRef{
+		JobID: "intake", TaskID: "weightCheck", JobInstanceID: "L1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := json.Marshal(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		t.Fatal(err)
+	}
+
+	chrome, _ := wire["chrome"].([]any)
+	var registered map[string]any
+	var operator map[string]any
+	for _, entry := range chrome {
+		rule, _ := entry.(map[string]any)
+		switch rule["id"] {
+		case "registeredData":
+			registered = rule
+		case "currentOperator":
+			operator = rule
+		}
+	}
+	if registered == nil || registered["kind"] != "dataReport" {
+		t.Fatalf("registeredData chrome = %#v", registered)
+	}
+	if registered["title"] != "Dati registrati" {
+		t.Fatalf("title = %#v", registered["title"])
+	}
+	expr, _ := registered["expr"].(string)
+	if expr == "" {
+		t.Fatal("registeredData dataReport missing expr")
+	}
+	if operator == nil || operator["kind"] != "readonly" {
+		t.Fatalf("currentOperator must stay readonly: %#v", operator)
+	}
+
+	ui, _ := wire["uiSchema"].(map[string]any)
+	fieldUI, _ := ui["registeredData"].(map[string]any)
+	comps, _ := fieldUI["ui:components"].(map[string]any)
+	if comps["stringField"] != "dataReportField" {
+		t.Fatalf("stringField = %#v", comps["stringField"])
+	}
+
+	bindings, _ := wire["bindings"].(map[string]any)
+	chromeDisplay, _ := bindings["chromeDisplay"].(map[string]any)
+	display, _ := chromeDisplay["registeredData"].(map[string]any)
+	if display == nil {
+		t.Fatalf("bindings.chromeDisplay.registeredData missing: %#v", bindings["chromeDisplay"])
+	}
+	if display["title"] != "Dati registrati" {
+		t.Fatalf("display title = %#v", display["title"])
+	}
+	if display["value"] != nil || display["error"] != nil {
+		t.Fatalf("value/error = %#v %#v", display["value"], display["error"])
+	}
+	if _, hasSections := display["sections"]; hasSections {
+		t.Fatalf("flat weightCheck DTO must not set sections: %#v", display["sections"])
+	}
+	rows, _ := display["rows"].([]any)
+	if len(rows) != 3 {
+		t.Fatalf("rows = %#v", rows)
+	}
+	byLabel := map[string]map[string]any{}
+	for _, rawRow := range rows {
+		row, _ := rawRow.(map[string]any)
+		label, _ := row["label"].(string)
+		byLabel[label] = row
+	}
+	assertRow := func(label, value string, tone any) {
+		t.Helper()
+		row := byLabel[label]
+		if row == nil {
+			t.Fatalf("missing row %q in %#v", label, byLabel)
+		}
+		if row["value"] != value {
+			t.Fatalf("%s value = %#v, want %q", label, row["value"], value)
+		}
+		if row["error"] != nil {
+			t.Fatalf("%s error = %#v", label, row["error"])
+		}
+		if row["tone"] != tone {
+			t.Fatalf("%s tone = %#v, want %#v", label, row["tone"], tone)
+		}
+	}
+	assertRow("Peso camion live", "1000", nil)
+	assertRow("Somma pesi bancali live", "225", nil)
+	assertRow("Match %", "22.5", "danger")
+}
+
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
 	cfg, err := LoadTruckLoopFixture()
 	if err != nil {

@@ -162,4 +162,65 @@ describe('task-form-bundle', () => {
 		expect(display.title).toBe('Risultati finali');
 		expect(display.sections).toEqual([]);
 	});
+
+	test('dataReport flat rows chrome paints without sections / loadId', () => {
+		const bundle = sampleBundle({
+			jobId: 'line',
+			taskId: 'weightCheck',
+			jobInstanceId: 'NIR-1',
+			chrome: [{ id: 'registeredData', kind: 'dataReport', title: 'Dati registrati' }],
+			chromeFieldIds: ['registeredData'],
+			bindings: {
+				domain: {
+					load: {},
+					pallet: {},
+					container: {},
+					submissions: []
+				},
+				chromeDisplay: {
+					registeredData: {
+						value: null,
+						error: null,
+						title: 'Dati registrati',
+						rows: [
+							{
+								label: 'Peso camion live',
+								value: '1200',
+								error: null,
+								tone: null
+							},
+							{
+								label: 'Somma pesi bancali live',
+								value: '1180',
+								error: null,
+								tone: null
+							},
+							{
+								label: 'Match %',
+								value: '98.33333333333333',
+								error: null,
+								tone: 'green'
+							}
+						]
+					}
+				},
+				instance: { id: 'NIR-1' }
+			}
+		});
+
+		const bag = chromeDisplayFromBundleBindings(bundle.bindings);
+		const display = displayFromChromeDisplayBag(bag, {
+			id: 'registeredData',
+			kind: 'dataReport',
+			title: 'Dati registrati'
+		});
+		expect(display.error).toBeNull();
+		expect(display.title).toBe('Dati registrati');
+		expect(display.sections).toEqual([]);
+		expect(display.rows).toEqual([
+			{ label: 'Peso camion live', value: '1200', error: null, tone: null },
+			{ label: 'Somma pesi bancali live', value: '1180', error: null, tone: null },
+			{ label: 'Match %', value: '98.33333333333333', error: null, tone: 'green' }
+		]);
+	});
 });

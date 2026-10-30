@@ -35,29 +35,14 @@ type FormColumns struct {
 }
 
 // ChromeRule is a display chrome entry. dataReport is evaluated server-side into
-// bindings.chromeDisplay; other kinds stay client-eval for now.
+// bindings.chromeDisplay; valuePrint / readonly stay client-eval for now.
 type ChromeRule struct {
-	ID     string          `json:"id"`
-	Kind   string          `json:"kind"`
-	Expr   string          `json:"expr,omitempty"`
-	Title  string          `json:"title,omitempty"`
-	Before string          `json:"before,omitempty"`
-	After  string          `json:"after,omitempty"`
-	Rows   []ChromeRecapRow `json:"rows,omitempty"`
-}
-
-// ChromeRecapRow is one recap row rule.
-type ChromeRecapRow struct {
-	Label string           `json:"label"`
-	Expr  string           `json:"expr"`
-	Tone  string           `json:"tone,omitempty"`
-	Bands []ChromeToneBand `json:"bands,omitempty"`
-}
-
-// ChromeToneBand is a numeric tone threshold.
-type ChromeToneBand struct {
-	Min  float64 `json:"min"`
-	Tone string  `json:"tone"`
+	ID     string `json:"id"`
+	Kind   string `json:"kind"`
+	Expr   string `json:"expr,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Before string `json:"before,omitempty"`
+	After  string `json:"after,omitempty"`
 }
 
 // DerivedRule is a Derived key expr (concrete or expanded from map-star).

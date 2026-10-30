@@ -33,11 +33,6 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 				ID: id, Kind: kind, Expr: expr,
 				Title: title, Before: before, After: after,
 			})
-		case "recap":
-			rows := readChromeRecapRows(entry["rows"])
-			out = append(out, ChromeRule{
-				ID: id, Kind: kind, Title: title, Before: before, After: after, Rows: rows,
-			})
 		case "dataReport":
 			expr, _ := entry["expr"].(string)
 			if strings.TrimSpace(expr) == "" {
@@ -52,59 +47,6 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 	return out
 }
 
-func readChromeRecapRows(raw any) []ChromeRecapRow {
-	arr, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-	out := make([]ChromeRecapRow, 0, len(arr))
-	for _, entry := range arr {
-		rec, _ := entry.(map[string]any)
-		if rec == nil {
-			continue
-		}
-		label, _ := rec["label"].(string)
-		expr, _ := rec["expr"].(string)
-		if label == "" || expr == "" {
-			continue
-		}
-		row := ChromeRecapRow{Label: label, Expr: expr}
-		if tone, ok := rec["tone"].(string); ok && tone != "" {
-			row.Tone = tone
-		}
-		row.Bands = readChromeBands(rec["bands"])
-		out = append(out, row)
-	}
-	return out
-}
-
-func readChromeBands(raw any) []ChromeToneBand {
-	arr, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-	out := make([]ChromeToneBand, 0, len(arr))
-	for _, entry := range arr {
-		rec, _ := entry.(map[string]any)
-		if rec == nil {
-			continue
-		}
-		min, ok := floatFromAny(rec["min"])
-		if !ok {
-			continue
-		}
-		tone, _ := rec["tone"].(string)
-		if tone == "" {
-			continue
-		}
-		out = append(out, ChromeToneBand{Min: min, Tone: tone})
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
 func authoredPropertyKeys(schema map[string]any) map[string]struct{} {
 	props, _ := schema["properties"].(map[string]any)
 	out := make(map[string]struct{}, len(props))
@@ -115,7 +57,7 @@ func authoredPropertyKeys(schema map[string]any) map[string]struct{} {
 }
 
 func chromeTitle(entry map[string]any, id string, rule ChromeRule) string {
-	if (rule.Kind == "recap" || rule.Kind == "dataReport") && rule.Title != "" {
+	if rule.Kind == "dataReport" && rule.Title != "" {
 		return rule.Title
 	}
 	if title, ok := entry["title"].(string); ok && title != "" {
@@ -126,8 +68,6 @@ func chromeTitle(entry map[string]any, id string, rule ChromeRule) string {
 
 func stringFieldForChrome(kind string) string {
 	switch kind {
-	case "recap":
-		return "recapField"
 	case "readonly":
 		return "readonlyField"
 	case "dataReport":

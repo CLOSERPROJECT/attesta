@@ -19,10 +19,17 @@ export type ChromeDataReportSectionDisplay = {
 export type ChromeDisplay = {
 	value: string | null;
 	error: string | null;
-	/** Present for `kind: recap` / `kind: dataReport` chrome. */
-	title?: string | null;
-	rows?: readonly ChromeRecapRowDisplay[];
 	/** Present for `kind: dataReport` chrome. */
+	title?: string | null;
+	/**
+	 * Flat row list for flat `kind: dataReport` (e.g. weightCheck).
+	 * When non-empty and `sections` empty/absent, dataReportField paints title+rows.
+	 */
+	rows?: readonly ChromeRecapRowDisplay[];
+	/**
+	 * Multi-load sections for `kind: dataReport` (e.g. loadedExtracted).
+	 * Sections mode when non-empty; flat `rows` paint when sections empty/absent.
+	 */
 	sections?: readonly ChromeDataReportSectionDisplay[];
 };
 

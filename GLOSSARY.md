@@ -95,7 +95,7 @@ Task field value from an expression under `derived`; may persist into Domain on 
 _Avoid_: Putting GUI-only chrome under `derived`
 
 **Chrome**:
-Task-root display catalog (print, readonly, recap, dataReport, …). Sibling to `derived`; stripped before Submission facts. Not the operator board (see **Worklist**). `dataReport` is evaluated on Load/Commit into `bindings.chromeDisplay`; live draft-driven kinds (`recap`, `readonly`, `valuePrint`, …) stay client-side.
+Task-root display catalog (print, readonly, dataReport, …). Sibling to `derived`; stripped before Submission facts. Not the operator board (see **Worklist**). `dataReport` is evaluated on Load/Commit into `bindings.chromeDisplay` (Domain-only; flat or sections DTO); live kinds that still need draft/operator (`readonly`, `valuePrint`, …) stay client-side.
 _Avoid_: Encoding live readouts as schema fields meant for submit; naming the Worklist “Chrome”; SPA Domain aggregation for dataReport
 
 **dynamicProperties**:

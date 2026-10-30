@@ -281,30 +281,30 @@ steps:
                 ui:options:
                     order: [checkedTruckWeight, checkedPalletSum]
               chrome:
+                # Domain-only chrome → display DTO (Go eval on Load/Commit).
                 registeredData:
-                    kind: recap
+                    kind: dataReport
                     title: Dati registrati
                     before: checkedTruckWeight
-                    rows:
-                        - label: Peso camion live
-                          expr: >-
-                            $lookup($domain.load, $instance.id).truckWeight
-                        - label: Somma pesi bancali live
-                          expr: >-
-                            $sum($domain.pallet.*[loadId=$instance.id].weight)
-                        - label: Match %
-                          expr: >-
-                            (
-
-                              $a := $lookup($domain.load, $instance.id).truckWeight;
-                              $b := $sum($domain.pallet.*[loadId=$instance.id].weight);
-                              $m := $max([$a, $b]);
-                              $m = 0 ? 0 : 100 * $min([$a, $b]) / $m
-                            )
-                          bands:
-                            - {min: 98, tone: green}
-                            - {min: 90, tone: warning}
-                            - {min: 0, tone: danger}
+                    expr: |-
+                        (
+                          $load := $lookup($domain.load, $instance.id);
+                          $truck := $load.truckWeight;
+                          $palletSum := $sum($append([], $domain.pallet.*[loadId=$instance.id].weight));
+                          $m := $max([$truck, $palletSum]);
+                          $pct := $m = 0 ? 0 : 100 * $min([$truck, $palletSum]) / $m;
+                          $tone := $pct >= 98 ? "green" : $pct >= 90 ? "warning" : "danger";
+                          $kg := function($v){ $type($v) = "number" ? $string($v) : null };
+                          {
+                            "value": null,
+                            "error": null,
+                            "rows": [
+                              {"label": "Peso camion live", "value": $kg($truck), "error": null, "tone": null},
+                              {"label": "Somma pesi bancali live", "value": $kg($palletSum), "error": null, "tone": null},
+                              {"label": "Match %", "value": $string($pct), "error": null, "tone": $tone}
+                            ]
+                          }
+                        )
                 currentOperator:
                     kind: readonly
                     title: Operatore corrente

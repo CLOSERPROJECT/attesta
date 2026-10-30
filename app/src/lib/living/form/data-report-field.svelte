@@ -28,7 +28,7 @@
 		getFormContext,
 		type ComponentProps
 	} from '@sjsf/form';
-	import { getChromeContext } from './chrome-context.js';
+	import { getChromeContext, type ChromeRecapRowDisplay } from './chrome-context.js';
 	import type { ChromeTone } from './chrome-tone.js';
 
 	let {
@@ -45,6 +45,9 @@
 	const title = $derived(display.title ?? null);
 	const chromeError = $derived(display.error);
 	const sections = $derived(display.sections ?? []);
+	const rows = $derived(display.rows ?? []);
+	const flatMode = $derived(rows.length > 0 && sections.length === 0);
+	const sectionsEmpty = $derived(!flatMode && sections.length === 0 && display.rows === undefined);
 
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
 	const errors = $derived(getFieldErrors(ctx, config.path));
@@ -75,6 +78,31 @@
 	{/if}
 {/snippet}
 
+{#snippet reportRows(rowList: readonly ChromeRecapRowDisplay[])}
+	<ul class="data-report__rows">
+		{#each rowList as row (row.label)}
+			<li
+				class="data-report__row"
+				data-tone={row.tone ?? undefined}
+				class:data-report__row--info={row.tone === 'info'}
+				class:data-report__row--warning={row.tone === 'warning'}
+				class:data-report__row--danger={row.tone === 'danger'}
+				class:data-report__row--green={row.tone === 'green'}
+			>
+				<span class="data-report__label">{row.label}</span>
+				{#if row.error}
+					<span class="data-report__error">{row.error}</span>
+				{:else}
+					<span class="data-report__value">
+						{@render statusIcon(row.tone)}
+						{row.value ?? '…'}
+					</span>
+				{/if}
+			</li>
+		{/each}
+	</ul>
+{/snippet}
+
 <Template
 	type="template"
 	showTitle={false}
@@ -91,7 +119,9 @@
 		{/if}
 		{#if chromeError}
 			<p class="data-report__error" data-testid="data-report-error">{chromeError}</p>
-		{:else if sections.length === 0}
+		{:else if flatMode}
+			{@render reportRows(rows)}
+		{:else if sectionsEmpty}
 			<p class="data-report__empty">Nessun carico primario</p>
 		{:else}
 			{#each sections as section (section.loadId)}
@@ -103,28 +133,7 @@
 						</p>
 					{/if}
 					{#if section.rows && section.rows.length > 0}
-						<ul class="data-report__rows">
-							{#each section.rows as row (row.label)}
-								<li
-									class="data-report__row"
-									data-tone={row.tone ?? undefined}
-									class:data-report__row--info={row.tone === 'info'}
-									class:data-report__row--warning={row.tone === 'warning'}
-									class:data-report__row--danger={row.tone === 'danger'}
-									class:data-report__row--green={row.tone === 'green'}
-								>
-									<span class="data-report__label">{row.label}</span>
-									{#if row.error}
-										<span class="data-report__error">{row.error}</span>
-									{:else}
-										<span class="data-report__value">
-											{@render statusIcon(row.tone)}
-											{row.value ?? '…'}
-										</span>
-									{/if}
-								</li>
-							{/each}
-						</ul>
+						{@render reportRows(section.rows)}
 					{/if}
 				</article>
 			{/each}
