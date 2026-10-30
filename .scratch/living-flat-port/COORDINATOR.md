@@ -22,7 +22,7 @@
 | Ticket | Squash on rework | Notes |
 | --- | --- | --- |
 | 01–12 | through `dea2e04` | flat port implementable; rename deferred |
-| 16 | pending squash SHA | config-driven Commit (ELT); reviewer APPROVE; human smoke |
+| 16 | d03f0ba | config-driven Commit (ELT); reviewer APPROVE; human smoke |
 
 ## Diagnostics
 
