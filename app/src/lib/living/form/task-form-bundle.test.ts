@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { evaluateFinalResultsEntry } from './live-task-chrome.svelte.js';
+import { displayFromChromeDisplayBag } from './live-task-chrome.svelte.js';
 import {
 	bundleMatches,
+	chromeDisplayFromBundleBindings,
 	domainFromBundleBindings,
 	findTaskFormBundle,
 	planFromTaskFormBundle,
@@ -74,37 +75,91 @@ describe('task-form-bundle', () => {
 		});
 	});
 
-	test('bindings.domain alone satisfies DomainSnapshot for finalResults chrome', async () => {
+	test('dataReport chrome paints bindings.chromeDisplay without Domain walk', () => {
 		const bundle = sampleBundle({
 			jobId: 'line',
 			taskId: 'loadedExtracted',
 			jobInstanceId: '1st',
+			chrome: [{ id: 'resultsReport', kind: 'dataReport', title: 'Risultati finali' }],
+			chromeFieldIds: ['resultsReport'],
 			bindings: {
 				domain: {
 					load: {},
 					pallet: {},
 					container: {},
-					submissions: [
-						{
-							jobId: 'line',
-							taskId: 'lineLoad',
-							jobInstanceId: '1st',
-							facts: {},
-							idsTouched: []
-						}
-					]
+					submissions: []
+				},
+				chromeDisplay: {
+					resultsReport: {
+						value: null,
+						error: null,
+						title: 'Risultati finali',
+						sections: [
+							{
+								loadId: 'L1',
+								secondaryLoadIds: ['L2'],
+								rows: [
+									{
+										label: 'Camion lordo',
+										value: '1000',
+										error: null,
+										tone: null
+									},
+									{
+										label: 'Pannelli vs estratto',
+										value: '70 kg (60%)',
+										error: null,
+										tone: 'danger'
+									}
+								]
+							}
+						]
+					}
 				},
 				instance: { id: '1st' }
 			}
 		});
-		const snapshot = domainFromBundleBindings(bundle.bindings);
-		const display = await evaluateFinalResultsEntry(
-			{ id: 'results', kind: 'finalResults' },
-			{},
-			snapshot,
-			undefined
-		);
+
+		expect(domainFromBundleBindings(bundle.bindings)).toEqual({
+			load: {},
+			pallet: {},
+			container: {},
+			submissions: []
+		});
+
+		const bag = chromeDisplayFromBundleBindings(bundle.bindings);
+		const display = displayFromChromeDisplayBag(bag, {
+			id: 'resultsReport',
+			kind: 'dataReport',
+			title: 'Risultati finali'
+		});
 		expect(display.error).toBeNull();
+		expect(display.title).toBe('Risultati finali');
+		expect(display.sections).toEqual([
+			{
+				loadId: 'L1',
+				secondaryLoadIds: ['L2'],
+				rows: [
+					{ label: 'Camion lordo', value: '1000', error: null, tone: null },
+					{
+						label: 'Pannelli vs estratto',
+						value: '70 kg (60%)',
+						error: null,
+						tone: 'danger'
+					}
+				]
+			}
+		]);
+	});
+
+	test('missing chromeDisplay entry yields chrome-display-missing', () => {
+		const display = displayFromChromeDisplayBag(undefined, {
+			id: 'resultsReport',
+			kind: 'dataReport',
+			title: 'Risultati finali'
+		});
+		expect(display.error).toBe('chrome-display-missing');
+		expect(display.title).toBe('Risultati finali');
 		expect(display.sections).toEqual([]);
 	});
 });

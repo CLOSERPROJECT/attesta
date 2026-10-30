@@ -8,8 +8,8 @@ export type ChromeRecapRowDisplay = {
 	tone: ChromeTone | null;
 };
 
-/** One primary-load section for `kind: finalResults` (projector fills; stub may be empty). */
-export type ChromeFinalResultsSectionDisplay = {
+/** One primary-load section for `kind: dataReport` (server chromeDisplay fills). */
+export type ChromeDataReportSectionDisplay = {
 	loadId: string;
 	/** Dual secondary load ids — muted chrome text only, never their own section. */
 	secondaryLoadIds?: readonly string[];
@@ -19,11 +19,11 @@ export type ChromeFinalResultsSectionDisplay = {
 export type ChromeDisplay = {
 	value: string | null;
 	error: string | null;
-	/** Present for `kind: recap` / `kind: finalResults` chrome. */
+	/** Present for `kind: recap` / `kind: dataReport` chrome. */
 	title?: string | null;
 	rows?: readonly ChromeRecapRowDisplay[];
-	/** Present for `kind: finalResults` chrome. */
-	sections?: readonly ChromeFinalResultsSectionDisplay[];
+	/** Present for `kind: dataReport` chrome. */
+	sections?: readonly ChromeDataReportSectionDisplay[];
 };
 
 export type ChromeContext = {

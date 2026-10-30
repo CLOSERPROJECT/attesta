@@ -38,9 +38,14 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 			out = append(out, ChromeRule{
 				ID: id, Kind: kind, Title: title, Before: before, After: after, Rows: rows,
 			})
-		case "finalResults":
+		case "dataReport":
+			expr, _ := entry["expr"].(string)
+			if strings.TrimSpace(expr) == "" {
+				continue
+			}
 			out = append(out, ChromeRule{
-				ID: id, Kind: kind, Title: title, Before: before, After: after,
+				ID: id, Kind: kind, Expr: expr,
+				Title: title, Before: before, After: after,
 			})
 		}
 	}
@@ -110,7 +115,7 @@ func authoredPropertyKeys(schema map[string]any) map[string]struct{} {
 }
 
 func chromeTitle(entry map[string]any, id string, rule ChromeRule) string {
-	if (rule.Kind == "recap" || rule.Kind == "finalResults") && rule.Title != "" {
+	if (rule.Kind == "recap" || rule.Kind == "dataReport") && rule.Title != "" {
 		return rule.Title
 	}
 	if title, ok := entry["title"].(string); ok && title != "" {
@@ -125,8 +130,8 @@ func stringFieldForChrome(kind string) string {
 		return "recapField"
 	case "readonly":
 		return "readonlyField"
-	case "finalResults":
-		return "feragameFinalResultsField"
+	case "dataReport":
+		return "dataReportField"
 	default:
 		return "valuePrintField"
 	}

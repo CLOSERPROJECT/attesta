@@ -34,16 +34,18 @@ export type ChromeRecap = {
 	rows: ChromeRecapRow[];
 };
 
-/** Presentation-only C7 chrome; payload from projector via chrome context. */
-export type ChromeFinalResults = {
+/** Server-eval display chrome; SPA paints `bindings.chromeDisplay[id]` only. */
+export type ChromeDataReport = {
 	id: string;
-	kind: 'finalResults';
+	kind: 'dataReport';
 	title?: string;
 	before?: string;
 	after?: string;
+	/** Authored on server; optional on wire if Go strips it after eval. */
+	expr?: string;
 };
 
-export type ChromeEntry = ChromeValuePrint | ChromeReadonly | ChromeRecap | ChromeFinalResults;
+export type ChromeEntry = ChromeValuePrint | ChromeReadonly | ChromeRecap | ChromeDataReport;
 
 /** Frozen FormPlan — produced from a server TaskFormBundle, never client compile. */
 export type TaskFormPlan = {

@@ -1,31 +1,22 @@
 import type { FailureValidationResult } from '@sjsf/form';
 import { untrack } from 'svelte';
 import type {
+	ChromeDataReportSectionDisplay,
 	ChromeDisplay,
-	ChromeFinalResultsSectionDisplay,
 	ChromeRecapRowDisplay
 } from './chrome-context.js';
-import { resolveChromeTone } from './chrome-tone.js';
-import type { DomainSnapshot } from './domain-snapshot.js';
+import { isChromeTone, resolveChromeTone } from './chrome-tone.js';
 import { evaluateSafe, formatJsonataError } from './jsonata-safe.js';
 import type { OperatorIdentity } from './operator-identity.js';
-import {
-	FINAL_RESULTS_MATCH_BANDS,
-	projectFinalResults,
-	type FinalResultsSection
-} from './project-final-results.js';
-import type { ChromeFinalResults, ChromeRecap, TaskFormPlan } from './task-form-plan.js';
+import type { ChromeDataReport, ChromeRecap, TaskFormPlan } from './task-form-plan.js';
 
 export type LiveTaskFormPorts = {
 	getValue: () => Record<string, unknown>;
 	setValue: (next: Record<string, unknown>) => void;
 	/** JSONata `$domain` binding (recap / valuePrint / derived) — may be a thin projection. */
 	getDomain: () => unknown;
-	/**
-	 * Full DomainSnapshot for `kind: finalResults` projector.
-	 * Separate from getDomain so host JSONata bindings cannot starve the projector.
-	 */
-	getSnapshot?: () => unknown;
+	/** Server `bindings.chromeDisplay` bag for `kind: dataReport` (Load/Commit only). */
+	getChromeDisplayBag?: () => Record<string, unknown> | undefined;
 	getInstance?: () => unknown;
 	/** Chrome eval `$operator` — not readyWhen. */
 	getOperator?: () => OperatorIdentity;
@@ -114,90 +105,69 @@ export async function evaluateRecapEntry(
 	};
 }
 
-function isDomainSnapshot(value: unknown): value is DomainSnapshot {
-	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-	const rec = value as Record<string, unknown>;
-	return (
-		rec.load !== null &&
-		typeof rec.load === 'object' &&
-		!Array.isArray(rec.load) &&
-		rec.pallet !== null &&
-		typeof rec.pallet === 'object' &&
-		!Array.isArray(rec.pallet) &&
-		rec.container !== null &&
-		typeof rec.container === 'object' &&
-		!Array.isArray(rec.container) &&
-		Array.isArray(rec.submissions)
-	);
-}
-
-function formatKg(value: number | null): string | null {
-	return value === null ? null : String(value);
-}
-
-function kgRow(label: string, value: number | null): ChromeRecapRowDisplay {
-	return { label, value: formatKg(value), error: null, tone: null };
-}
-
-/** Map projector section → chrome display rows (Destination C7 recipe). */
-export function finalResultsSectionDisplay(
-	section: FinalResultsSection
-): ChromeFinalResultsSectionDisplay {
-	const rows: ChromeRecapRowDisplay[] = [
-		kgRow('Camion lordo', section.grossTruckKg),
-		kgRow('Tara camion', section.truckTareKg),
-		kgRow('Carico netto', section.effectiveLoadKg),
-		kgRow('Σ bancali lordi', section.grossPalletSumKg),
-		kgRow('Σ bancali effettivi (fatti)', section.actualPalletSumKg),
-		kgRow('Tara totale bancali', section.totalPalletTareKg),
-		kgRow('Massa netta pannelli', section.netPanelMassKg)
-	];
-	for (const material of section.extractedByMaterial) {
-		rows.push({
-			label: material.label,
-			value: String(material.weightKg),
-			error: null,
-			tone: 'info'
-		});
-	}
-	rows.push(kgRow('Totale estratto', section.totalExtractedKg));
-	rows.push({
-		label: 'Pannelli vs estratto',
-		value: `${section.panelsVsExtractedDeltaKg} kg (${section.panelsVsExtractedPct}%)`,
-		error: null,
-		tone: resolveChromeTone(section.panelsVsExtractedPct, {
-			bands: FINAL_RESULTS_MATCH_BANDS
-		})
-	});
+function normalizeRow(raw: unknown): ChromeRecapRowDisplay | null {
+	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const rec = raw as Record<string, unknown>;
+	if (typeof rec.label !== 'string') return null;
 	return {
-		loadId: section.loadId,
-		secondaryLoadIds: section.secondaryLoadIds,
-		rows
+		label: rec.label,
+		value: rec.value == null ? null : String(rec.value),
+		error: rec.error == null ? null : String(rec.error),
+		tone: isChromeTone(rec.tone) ? rec.tone : null
 	};
 }
 
-/** Project DomainSnapshot into finalResults chrome display. */
-export async function evaluateFinalResultsEntry(
-	entry: ChromeFinalResults,
-	_sealableDraft: Record<string, unknown>,
-	snapshot: unknown,
-	_instance: unknown | undefined,
-	_operator?: OperatorIdentity
-): Promise<ChromeDisplay> {
-	if (!isDomainSnapshot(snapshot)) {
+function normalizeSection(raw: unknown): ChromeDataReportSectionDisplay | null {
+	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const rec = raw as Record<string, unknown>;
+	if (typeof rec.loadId !== 'string') return null;
+	const secondary =
+		Array.isArray(rec.secondaryLoadIds) &&
+		rec.secondaryLoadIds.every((id) => typeof id === 'string')
+			? (rec.secondaryLoadIds as string[])
+			: undefined;
+	const rows = Array.isArray(rec.rows)
+		? rec.rows.map(normalizeRow).filter((row): row is ChromeRecapRowDisplay => row != null)
+		: undefined;
+	return {
+		loadId: rec.loadId,
+		...(secondary !== undefined ? { secondaryLoadIds: secondary } : {}),
+		...(rows !== undefined ? { rows } : {})
+	};
+}
+
+/** Paint-only: map server `chromeDisplay[fieldId]` DTO → ChromeDisplay. */
+export function displayFromChromeDisplayBag(
+	bag: Record<string, unknown> | undefined,
+	entry: ChromeDataReport
+): ChromeDisplay {
+	const fallbackTitle = entry.title ?? null;
+	const raw = bag?.[entry.id];
+	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
 		return {
 			value: null,
-			error: 'final-results-needs-snapshot',
-			title: entry.title ?? null,
+			error: 'chrome-display-missing',
+			title: fallbackTitle,
 			sections: []
 		};
 	}
-	const { sections } = projectFinalResults(snapshot);
+	const rec = raw as Record<string, unknown>;
+	const sections = Array.isArray(rec.sections)
+		? rec.sections
+				.map(normalizeSection)
+				.filter((s): s is ChromeDataReportSectionDisplay => s != null)
+		: [];
+	const title =
+		typeof rec.title === 'string'
+			? rec.title
+			: rec.title === null
+				? null
+				: fallbackTitle;
 	return {
-		value: null,
-		error: null,
-		title: entry.title ?? null,
-		sections: sections.map(finalResultsSectionDisplay)
+		value: rec.value == null ? null : String(rec.value),
+		error: rec.error == null ? null : String(rec.error),
+		title,
+		sections
 	};
 }
 
@@ -227,7 +197,7 @@ export function startLiveTaskChrome(
 		$effect(() => {
 			void JSON.stringify(ports.getValue());
 			void ports.getDomain();
-			void ports.getSnapshot?.();
+			void JSON.stringify(ports.getChromeDisplayBag?.() ?? null);
 			void ports.getInstance?.();
 			void ports.getOperator?.();
 			schedule();
@@ -260,7 +230,7 @@ async function applyChrome(
 
 	const sealableDraft = untrack(() => plan.sealSubmission(ports.getValue()));
 	const domain = untrack(() => ports.getDomain());
-	const snapshot = untrack(() => ports.getSnapshot?.());
+	const chromeDisplayBag = untrack(() => ports.getChromeDisplayBag?.());
 	const instance = untrack(() => ports.getInstance?.());
 	const operator = untrack(() => ports.getOperator?.());
 
@@ -275,14 +245,8 @@ async function applyChrome(
 				instance,
 				operator
 			);
-		} else if (entry.kind === 'finalResults') {
-			next[entry.id] = await evaluateFinalResultsEntry(
-				entry,
-				sealableDraft,
-				snapshot,
-				instance,
-				operator
-			);
+		} else if (entry.kind === 'dataReport') {
+			next[entry.id] = displayFromChromeDisplayBag(chromeDisplayBag, entry);
 		} else {
 			next[entry.id] = await evaluateChromeEntry(
 				entry.expr,

@@ -1,4 +1,4 @@
-/** Living Domain slice for chrome / finalResults (entities + submissions). */
+/** Living Domain slice for chrome / Derived bindings (entities + submissions). */
 export type EntityType = 'load' | 'pallet' | 'container';
 
 export type EntityFacts = Record<string, unknown>;

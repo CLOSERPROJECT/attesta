@@ -16,7 +16,7 @@ export type LiveTaskFormOptions = {
 };
 
 /**
- * Live substep apply: ConfigForm when derived present + chrome (valuePrint / recap) settlement.
+ * Live substep apply: ConfigForm when derived present + chrome (valuePrint / recap / dataReport) settlement.
  * Override policy stays on ConfigForm — not reimplemented here.
  */
 export class LiveTaskForm {

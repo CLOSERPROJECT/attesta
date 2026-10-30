@@ -83,9 +83,18 @@ export function planFromTaskFormBundle(bundle: TaskFormBundle): TaskFormPlan {
 }
 
 /**
- * DomainSnapshot-shaped bag from Task form bundle bindings for live Chrome/Derived
- * and finalResults `getSnapshot` — no SPA Domain/Config snapshot.
+ * Domain bag from Task form bundle bindings for live Chrome/Derived JSONata —
+ * no SPA Domain/Config snapshot.
  */
 export function domainFromBundleBindings(bindings: Record<string, unknown>): unknown {
 	return bindings.domain;
+}
+
+/** Server-precomputed dataReport displays (`bindings.chromeDisplay`). */
+export function chromeDisplayFromBundleBindings(
+	bindings: Record<string, unknown>
+): Record<string, unknown> | undefined {
+	const raw = bindings.chromeDisplay;
+	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+	return raw as Record<string, unknown>;
 }

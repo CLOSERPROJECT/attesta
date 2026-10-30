@@ -34,7 +34,8 @@ type FormColumns struct {
 	Value string `json:"value"`
 }
 
-// ChromeRule is a display chrome entry (rules only; live eval stays client-side).
+// ChromeRule is a display chrome entry. dataReport is evaluated server-side into
+// bindings.chromeDisplay; other kinds stay client-eval for now.
 type ChromeRule struct {
 	ID     string          `json:"id"`
 	Kind   string          `json:"kind"`
@@ -188,6 +189,9 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 
 	initial := seedInitialData(domain, payload, projected)
 	bindings := buildFormBindings(domain, payload, ref)
+	if err := evaluateDataReports(chrome, bindings); err != nil {
+		return nil, err
+	}
 
 	bundle := &TaskFormBundle{
 		JobID:          ref.JobID,
@@ -208,6 +212,42 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 		Bindings:       bindings,
 	}
 	return bundle, nil
+}
+
+// evaluateDataReports runs each dataReport chrome expr into bindings.chromeDisplay[id].
+// Input `$` is unused ({}); `$domain` (and `$instance` when present) come from bindings.
+func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
+	var reports []ChromeRule
+	for _, c := range chrome {
+		if c.Kind == "dataReport" {
+			reports = append(reports, c)
+		}
+	}
+	if len(reports) == 0 {
+		return nil
+	}
+	domainBag, _ := bindings["domain"].(map[string]any)
+	vars := ExprBindings{"domain": domainBag}
+	if inst, ok := bindings["instance"]; ok {
+		vars["instance"] = inst
+	}
+	display := map[string]any{}
+	for _, c := range reports {
+		raw, err := evaluateExpr(c.Expr, map[string]any{}, vars)
+		if err != nil {
+			return fmt.Errorf("living: dataReport %q: %w", c.ID, err)
+		}
+		dto, ok := raw.(map[string]any)
+		if !ok || dto == nil {
+			return fmt.Errorf("living: dataReport %q: expected object display DTO", c.ID)
+		}
+		if _, has := dto["title"]; !has && c.Title != "" {
+			dto["title"] = c.Title
+		}
+		display[c.ID] = dto
+	}
+	bindings["chromeDisplay"] = display
+	return nil
 }
 
 // ProjectAvailableBundles builds Task form bundles for every CollectAvailableTaskRefs
@@ -236,10 +276,10 @@ func taskTitle(payload map[string]any, taskID string) string {
 }
 
 func buildFormBindings(domain Domain, payload map[string]any, ref AvailableTaskRef) map[string]any {
-	// DomainSnapshot-shaped bag for SPA Chrome (finalResults needs submissions).
+	// DomainSnapshot-shaped bag (JSON field names) for Chrome / dataReport JSONata.
 	subs := make([]any, len(domain.Submissions))
 	for i, s := range domain.Submissions {
-		subs[i] = s
+		subs[i] = deepCloneJSON(s)
 	}
 	domainBag := map[string]any{
 		"load":        entityMapToAny(domain.Load),

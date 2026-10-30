@@ -9,6 +9,7 @@
 	import type { TaskFormPlan } from './form/task-form-plan.js';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {
+		chromeDisplayFromBundleBindings,
 		domainFromBundleBindings,
 		findTaskFormBundle,
 		planFromTaskFormBundle,
@@ -58,7 +59,7 @@
 		living.setDraft(path, jobInstanceId, next);
 	}
 
-	/** Live Chrome/Derived `$domain` + finalResults getSnapshot — bindings bag only. */
+	/** Live Chrome/Derived `$domain` — bindings bag only. */
 	function liveDomain(): unknown {
 		return domainFromBundleBindings(bundle.bindings) ?? emptySnapshot();
 	}
@@ -119,7 +120,7 @@
 			getValue: () => readDraft(),
 			setValue: (next) => writeDraft(next),
 			getDomain: () => liveDomain(),
-			getSnapshot: () => liveDomain(),
+			getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
 			getInstance: () => bundleInstance(),
 			onSubmit: (value) => {
 				void submitSealed(value);
