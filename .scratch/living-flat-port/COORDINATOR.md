@@ -22,7 +22,7 @@
 | 01–12 | through `dea2e04` | flat port implementable; rename deferred |
 | 16 | d03f0ba | config-driven Commit (ELT); reviewer APPROVE; human smoke |
 | 17 | 9ca1870 | readyWhenOk Cerbos attr; reviewer APPROVE; human smoke |
-| 18 | pending squash SHA | HttpPort after mutate + FakeHttpPort; reviewer APPROVE; human smoke |
+| 18 | ce9974c | HttpPort after mutate + FakeHttpPort; reviewer APPROVE; human smoke |
 
 ## Diagnostics
 
