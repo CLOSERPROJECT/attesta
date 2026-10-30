@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
 
 func TestSeedEmptyOnlyNoopsWhenMarkerOrgExists(t *testing.T) {
@@ -80,7 +82,7 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		t.Fatal("expected org roles on fixture organization")
 	}
 
-	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com"} {
+	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com", demoLivingUserEmail} {
 		user, err := identity.GetUserByEmail(t.Context(), email)
 		if err != nil {
 			t.Fatalf("user %s: %v", email, err)
@@ -96,6 +98,62 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 	}
 	if len(memberships) < 2 {
 		t.Fatalf("memberships = %d, want platform admin + org admin", len(memberships))
+	}
+
+	livingOrg, err := identity.GetOrganizationBySlug(t.Context(), demoLivingOrgSlug)
+	if err != nil {
+		t.Fatalf("living org: %v", err)
+	}
+	if livingOrg.Slug != demoLivingOrgSlug {
+		t.Fatalf("living org slug = %q", livingOrg.Slug)
+	}
+	livingMemberships, err := identity.ListOrganizationMemberships(t.Context(), demoLivingOrgSlug)
+	if err != nil {
+		t.Fatalf("living memberships: %v", err)
+	}
+	if len(livingMemberships) < 2 {
+		t.Fatalf("living memberships = %d, want platform admin + living all-roles", len(livingMemberships))
+	}
+}
+
+func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "admin@attesta.com")
+	t.Setenv("ADMIN_PASSWORD", "admin@attesta.com")
+
+	domains := living.NewMemoryDomainStore()
+	configs := living.NewMemoryConfigStore()
+	if err := domains.Put(t.Context(), "feragame", living.Domain{
+		Load: living.EntityMap{"L1": {"client": "NO"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := writeSeedTestConfigDir(t)
+	if err := Seed(t.Context(), SeedDeps{
+		Identity:      newSeedFakeIdentity(),
+		Store:         NewMemoryStore(),
+		ConfigDir:     dir,
+		RNG:           &fixedCatalogRNG{n: 1},
+		Replace:       true,
+		LivingDomains: domains,
+		LivingConfigs: configs,
+	}); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Load) != 0 {
+		t.Fatalf("domain not wiped on replace: %#v", got)
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != living.DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
 	}
 }
 

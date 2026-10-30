@@ -21,6 +21,12 @@ type demoFixture struct {
 	Users []demoFixtureUser
 }
 
+// Living truck-loop demo org / all-roles operator (Cerbos Commit demos on /app).
+const (
+	demoLivingOrgSlug   = "feragame"
+	demoLivingUserEmail = "living@attesta.com"
+)
+
 func defaultDemoFixture() demoFixture {
 	return demoFixture{
 		Orgs: []demoFixtureOrg{
@@ -44,6 +50,14 @@ func defaultDemoFixture() demoFixture {
 					{Slug: "qainspector", Name: "QA Inspector", Palette: "pink"},
 				},
 			},
+			{
+				Name: "Feragame",
+				Roles: []IdentityRole{
+					{Slug: "administration", Name: "Administration", Palette: "blue"},
+					{Slug: "logistic", Name: "Logistic", Palette: "cyan"},
+					{Slug: "line", Name: "Line", Palette: "emerald"},
+				},
+			},
 		},
 		Users: []demoFixtureUser{
 			{
@@ -51,7 +65,7 @@ func defaultDemoFixture() demoFixture {
 				Password:      "admin@attesta.com",
 				Name:          "Platform Admin",
 				PlatformAdmin: true,
-				OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3"},
+				OrgAdminSlugs: []string{"organization-1", "organization-2", "organization-3", demoLivingOrgSlug},
 			},
 			{
 				Email:         "admin@org1.com",
@@ -78,6 +92,15 @@ func defaultDemoFixture() demoFixture {
 				OrgAdminSlugs: []string{"organization-3"},
 				MembershipRoles: map[string][]string{
 					"organization-3": {"qainspector"},
+				},
+			},
+			{
+				Email:         demoLivingUserEmail,
+				Password:      demoLivingUserEmail,
+				Name:          "Living All Roles",
+				OrgAdminSlugs: []string{demoLivingOrgSlug},
+				MembershipRoles: map[string][]string{
+					demoLivingOrgSlug: {"administration", "logistic", "line"},
 				},
 			},
 		},

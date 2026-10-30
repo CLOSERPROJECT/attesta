@@ -22,8 +22,12 @@ Thumbs.db
 *~
 
 # Node / Vite
+/node_modules/
 web/node_modules/
 web/dist/
+app/node_modules/
+app/build/
+app/.svelte-kit/
 *.local
 !deployment/Dockerfile.local
 

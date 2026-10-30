@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
 
 // Empty-only presence marker: when this org exists and Replace is false, Seed is a no-op.
@@ -37,8 +39,13 @@ type SeedDeps struct {
 	CategoriesPath string
 	// Rewrite even when the marker org exists (local only).
 	Replace bool
+	// Optional living stores. When set, SeedDemo runs after identity+catalog;
+	// Replace wipes Domain. CLI Mongo seed wires these; server also seeds via
+	// ensureLivingStores / ATTESTA_LIVING_SEED.
+	LivingDomains living.DomainStore
+	LivingConfigs living.ConfigStore
 	// Nil picks a time-based source in Seed.
-	RNG catalogStreamRNG
+	RNG     catalogStreamRNG
 	Fixture *demoFixture
 	Now     func() time.Time
 }
@@ -105,6 +112,14 @@ func Seed(ctx context.Context, deps SeedDeps) error {
 	}
 	if _, err := seedDemoInstances(ctx, deps.Store, catalogResult.Catalog, now); err != nil {
 		return fmt.Errorf("seed: instances: %w", err)
+	}
+
+	if deps.LivingConfigs != nil {
+		if _, err := living.SeedDemo(ctx, deps.LivingDomains, deps.LivingConfigs, living.SeedOptions{
+			WipeDomain: deps.Replace,
+		}); err != nil {
+			return fmt.Errorf("seed: living: %w", err)
+		}
 	}
 	return nil
 }

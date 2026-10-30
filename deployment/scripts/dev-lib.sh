@@ -18,8 +18,10 @@ process_cwd() {
     readlink "/proc/$pid/cwd" 2>/dev/null || true
     return 0
   fi
-  # macOS: lsof cwd
-  lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk '/^n/ { print substr($0, 2); exit }'
+  # macOS: lsof cwd. Never fail the caller: with `set -o pipefail`, a vanished
+  # PID makes `lsof|awk` non-zero and would abort `dev-stop-local.sh`.
+  lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk '/^n/ { print substr($0, 2); exit }' || true
+  return 0
 }
 
 tcp_port_listening() {

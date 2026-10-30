@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/yaml.v3"
@@ -159,12 +160,17 @@ type Server struct {
 	catalogTaxonomyRev int64
 	catalog            map[string]RuntimeConfig
 	viteDevServer      string
+	appDevServer       string
 	enforceAuth        bool
 	buildVersion       string
 	turnstileSiteKey   string
 	turnstileSecretKey string
 	turnstileClient    *http.Client
 	turnstileVerifyURL string
+	livingDomains      living.DomainStore
+	livingConfigs      living.ConfigStore
+	livingAuthorizer   living.Authorizer
+	livingHttpPort     living.HttpPort
 }
 
 type SSEHub struct {
@@ -785,6 +791,7 @@ func main() {
 		workflowDefID:      primitive.NewObjectID(),
 		configDir:          configDir,
 		viteDevServer:      strings.TrimRight(strings.TrimSpace(os.Getenv("VITE_DEV_SERVER")), "/"),
+		appDevServer:       strings.TrimRight(strings.TrimSpace(os.Getenv("APP_DEV_SERVER")), "/"),
 		enforceAuth:        true,
 		buildVersion:       applicationVersion(),
 		mailer:             newMailerFromEnv(),
@@ -2526,6 +2533,9 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/docs/", s.handleDocs)
 	mux.HandleFunc("/about", s.handleAbout)
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
+	livingAPI := s.livingHandler()
+	mux.Handle("/api/living/domain", livingAPI)
+	mux.Handle("/api/living/commit", livingAPI)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)
@@ -2544,6 +2554,8 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/reset/", s.handleResetSet)
 	mux.HandleFunc("/formata-arch", s.handleEmbeddedFormataArch)
 	mux.HandleFunc("/formata-arch/", s.handleEmbeddedFormataArch)
+	mux.HandleFunc("/app", s.handleAppSPA)
+	mux.HandleFunc("/app/", s.handleAppSPA)
 	mux.HandleFunc("/organization/logo/", s.handleOrganizationLogo)
 	mux.HandleFunc("/streams/public", s.handlePublicStreamsPartial)
 	mux.HandleFunc("/streams/", s.handlePublicStream)

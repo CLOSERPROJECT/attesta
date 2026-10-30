@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -119,13 +120,19 @@ func runSeedSession(ctx context.Context, args []string, replace bool, creds *app
 		}
 		return appwriteIdentityFromCredentials(*creds, opts)
 	}, func(sess seedSession) error {
-		if err := Seed(ctx, SeedDeps{
+		deps := SeedDeps{
 			Identity:       sess.Identity,
 			Store:          sess.Store,
 			ConfigDir:      sess.ConfigDir,
 			CategoriesPath: sess.CategoriesPath,
 			Replace:        replace,
-		}); err != nil {
+		}
+		// Mongo CLI seed must rewrite Active Org Config (e.g. tasks array shape).
+		if ms, ok := sess.Store.(*MongoStore); ok && ms != nil && ms.db != nil {
+			deps.LivingDomains = living.NewMongoDomainStore(ms.db)
+			deps.LivingConfigs = living.NewMongoConfigStore(ms.db)
+		}
+		if err := Seed(ctx, deps); err != nil {
 			return err
 		}
 		if replace {

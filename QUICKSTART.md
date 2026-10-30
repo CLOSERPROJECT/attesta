@@ -51,6 +51,12 @@ After credentials exist, `task start` / `task start:docker` run the Go demo seed
 
 After `task reset` or `task purge`, the next start re-applies the Go demo seed when credentials exist.
 
+### Living Domain (`/app`) demo seed
+
+- Identity: `attesta seed` creates org `feragame` and all-roles user `living@attesta.com` / `living@attesta.com` (roles `administration`, `logistic`, `line`) for Cerbos Commit demos. Existing stacks need `task seed -- --replace` once to pick this up.
+- Domain + Active Config fixture: the server Memory living stores load the truck-loop fixture on first use. There is no harness `/api/runs` snapshot PUT.
+- Domain wipe on process start: set `ATTESTA_LIVING_SEED=true` (same truthy values as `ATTESTA_SEED`). Leave unset in production. In-memory Domain also clears on server restart.
+
 ## Migration Notes
 - Existing Mongo-backed sessions are not migrated. After Appwrite credentials are configured, users must log in again through Appwrite.
 - Existing Mongo invite and password-reset tokens are not migrated. Re-issue any still-needed invite or reset from the Appwrite-backed Attesta flows.

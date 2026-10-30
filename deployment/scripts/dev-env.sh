@@ -24,9 +24,11 @@ fi
 
 _shell_has_port=0
 _shell_has_vite=0
+_shell_has_app=0
 [[ -n "${PORT+x}" ]] && _shell_has_port=1 && _shell_port="$PORT"
 [[ -n "${VITE_PORT+x}" ]] && _shell_has_vite=1 && _shell_vite="$VITE_PORT"
-unset PORT VITE_PORT 2>/dev/null || true
+[[ -n "${APP_PORT+x}" ]] && _shell_has_app=1 && _shell_app="$APP_PORT"
+unset PORT VITE_PORT APP_PORT 2>/dev/null || true
 load_env_file "$REPO_ROOT/.env"
 
 # Primary checkouts may intentionally point host processes at external dev
@@ -51,6 +53,7 @@ eval "$_worktree_exports"
 if [[ "$_is_primary" -eq 1 ]]; then
   [[ "$_shell_has_port" -eq 1 ]] && export PORT="$_shell_port"
   [[ "$_shell_has_vite" -eq 1 ]] && export VITE_PORT="$_shell_vite"
+  [[ "$_shell_has_app" -eq 1 ]] && export APP_PORT="$_shell_app"
   for _index in "${!_primary_endpoint_keys[@]}"; do
     if [[ "${_primary_endpoint_set[$_index]:-0}" -eq 1 ]]; then
       _key="${_primary_endpoint_keys[$_index]}"
@@ -60,8 +63,9 @@ if [[ "$_is_primary" -eq 1 ]]; then
 fi
 [[ -n "${ATTESTA_ROOT_DIR:-}" ]] || ATTESTA_ROOT_DIR="${REPO_ROOT}"
 export ATTESTA_ROOT_DIR
-export PORT VITE_PORT
+export PORT VITE_PORT APP_PORT
 export PUBLIC_BASE_URL="http://localhost:${PORT}"
 export VITE_DEV_SERVER="http://localhost:${VITE_PORT}"
+export APP_DEV_SERVER="http://localhost:${APP_PORT}"
 
-echo "Attesta http://localhost:${PORT} (vite :${VITE_PORT})"
+echo "Attesta http://localhost:${PORT} (vite :${VITE_PORT}, app :${APP_PORT} → /app)"
