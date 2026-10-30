@@ -170,6 +170,7 @@ type Server struct {
 	livingDomains      living.DomainStore
 	livingConfigs      living.ConfigStore
 	livingAuthorizer   living.Authorizer
+	livingHttpPort     living.HttpPort
 }
 
 type SSEHub struct {

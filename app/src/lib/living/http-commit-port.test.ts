@@ -24,7 +24,17 @@ const sampleResult = {
 				idsTouched: ['NIR-261019-NO-1']
 			}
 		]
-	}
+	},
+	links: [
+		{ label: 'Stampa etichette', url: 'blob:labels', action: 'link' as const },
+		{
+			label: 'Scarica CSV',
+			url: 'blob:csv',
+			action: 'download' as const,
+			filename: 'reg.csv'
+		}
+	],
+	httpErrors: [] as string[]
 };
 
 describe('HttpCommitDomainPort', () => {
@@ -53,7 +63,28 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.org).toBe('feragame');
 		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
 		expect(got.domain.load['NIR-261019-NO-1']?.client).toBe('NO');
+		expect(got.links).toEqual(sampleResult.links);
+		expect(got.httpErrors).toEqual([]);
 		expect(fetchFn).toHaveBeenCalledOnce();
+	});
+
+	test('normalizes missing links/httpErrors to empty arrays', async () => {
+		const { links: _l, httpErrors: _e, ...withoutHttp } = sampleResult;
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify(withoutHttp), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				})
+		);
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		const got = await port.commit({
+			taskPath: 'intake/codiceFir',
+			jobInstanceId: 'NIR-261019-NO-1',
+			value: { codiceFir: 'FIR-1' }
+		});
+		expect(got.links).toEqual([]);
+		expect(got.httpErrors).toEqual([]);
 	});
 
 	test('rejects /api/runs-shaped URLs', async () => {

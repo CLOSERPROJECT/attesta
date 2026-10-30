@@ -11,9 +11,8 @@
 | Ticket | Branch | Stage | Notes |
 | --- | --- | --- | --- |
 | 13 | — | **paused** | discussion notes: `13-rename-placeholders-discussion.md` |
-| 14 | — | queued | FormPlan rendering (next UI; after/beside server follow-ons) |
+| 14 | — | queued | FormPlan rendering — next after 18 squash |
 | 15 | — | revised | gaps inventory (not implement) |
-| 18 | — | queued later | HttpPort after mutate — next after 17 squash |
 | 19 | — | queued later | durable Mongo Domain/OrgConfig stores |
 
 ## Done
@@ -23,6 +22,7 @@
 | 01–12 | through `dea2e04` | flat port implementable; rename deferred |
 | 16 | d03f0ba | config-driven Commit (ELT); reviewer APPROVE; human smoke |
 | 17 | 9ca1870 | readyWhenOk Cerbos attr; reviewer APPROVE; human smoke |
+| 18 | pending squash SHA | HttpPort after mutate + FakeHttpPort; reviewer APPROVE; human smoke |
 
 ## Diagnostics
 
@@ -46,5 +46,5 @@ Open: package name, HTTP paths, Cerbos kind, store renames, env flag, order vs t
 
 - Soft: large IntakeJob/LineJob — defer split
 - Demo: `living@attesta.com` / org `feragame`; wipe via `ATTESTA_LIVING_SEED`
-- **UI gap:** FormPlan/derived → ticket **14**
-- Follow-ons: **18** HttpPort, **19** durable stores
+- **UI gap:** FormPlan/derived → ticket **14** (next)
+- Follow-on: **19** durable stores

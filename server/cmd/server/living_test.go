@@ -226,6 +226,24 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if len(committed.Domain.Submissions) != 1 || committed.Domain.Submissions[0].TaskID != "register" {
 		t.Fatalf("submissions = %#v", committed.Domain.Submissions)
 	}
+	if len(committed.Links) != 2 {
+		t.Fatalf("wired HttpPort links = %#v", committed.Links)
+	}
+	if committed.Links[0].Label != "Stampa etichette" || committed.Links[0].Action != living.HttpActionLink {
+		t.Fatalf("link0 = %#v", committed.Links[0])
+	}
+	if !strings.HasPrefix(committed.Links[0].URL, "data:application/pdf;base64,") {
+		t.Fatalf("labels url = %q", committed.Links[0].URL)
+	}
+	if committed.Links[1].Label != "Scarica CSV registrazione" || committed.Links[1].Action != living.HttpActionDownload {
+		t.Fatalf("link1 = %#v", committed.Links[1])
+	}
+	if committed.Links[1].Filename != "NIR-261019-NO-1.csv" {
+		t.Fatalf("csv filename = %q", committed.Links[1].Filename)
+	}
+	if len(committed.HttpErrors) != 0 {
+		t.Fatalf("httpErrors = %#v", committed.HttpErrors)
+	}
 
 	loadReq := httptest.NewRequest(http.MethodGet, "/api/living/domain", nil)
 	loadReq.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
@@ -272,6 +290,27 @@ func TestLivingProductAuthorizerDefaultsToCerbos(t *testing.T) {
 	server.livingAuthorizer = stub
 	if got := server.livingProductAuthorizer(); got != stub {
 		t.Fatalf("override Authorizer = %#v", got)
+	}
+}
+
+func TestLivingProductHttpPortDefaultsToFake(t *testing.T) {
+	server := &Server{}
+	port := server.livingProductHttpPort()
+	if _, ok := port.(*living.FakeHttpPort); !ok {
+		t.Fatalf("product HttpPort type = %T, want *living.FakeHttpPort", port)
+	}
+	stub := &living.FakeHttpPort{}
+	server.livingHttpPort = stub
+	if got := server.livingProductHttpPort(); got != stub {
+		t.Fatalf("override HttpPort = %#v", got)
+	}
+	h := server.livingHandler()
+	handler, ok := h.(*living.Handler)
+	if !ok || handler.Committer == nil || handler.Committer.HttpPort == nil {
+		t.Fatalf("livingHandler Committer.HttpPort = %#v", h)
+	}
+	if handler.Committer.HttpPort != stub {
+		t.Fatalf("handler HttpPort = %T, want override", handler.Committer.HttpPort)
 	}
 }
 

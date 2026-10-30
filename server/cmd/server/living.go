@@ -47,6 +47,13 @@ func (s *Server) livingProductAuthorizer() living.Authorizer {
 	return living.NewCerbosAuthorizer(url, http.DefaultClient, now)
 }
 
+func (s *Server) livingProductHttpPort() living.HttpPort {
+	if s.livingHttpPort != nil {
+		return s.livingHttpPort
+	}
+	return living.NewFakeHttpPort()
+}
+
 func (s *Server) livingHandler() http.Handler {
 	s.ensureLivingStores()
 	return &living.Handler{
@@ -55,6 +62,7 @@ func (s *Server) livingHandler() http.Handler {
 			Domains:    s.livingDomains,
 			Configs:    s.livingConfigs,
 			Authorizer: s.livingProductAuthorizer(),
+			HttpPort:   s.livingProductHttpPort(),
 		},
 		Gate: s.livingVerifiedGate,
 	}

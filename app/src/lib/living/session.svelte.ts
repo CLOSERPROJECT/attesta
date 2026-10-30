@@ -1,4 +1,4 @@
-import type { CommitDomainPort, CommitRequest } from './commit-port.js';
+import type { CommitDomainPort, CommitRequest, HttpLinkItem } from './commit-port.js';
 import { createHttpCommitDomainPort } from './http-commit-port.js';
 import { draftKey } from './drafts.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
@@ -25,6 +25,9 @@ export class LivingSession {
 	committing = $state(false);
 	error = $state.raw<string | null>(null);
 	commitError = $state.raw<string | null>(null);
+	/** Last Commit HttpPort links (FormPlan strip can wait for ticket 14). */
+	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
+	lastHttpErrors = $state.raw<string[]>([]);
 	/** taskPath::jobInstanceId → sealed-shape draft object */
 	drafts = $state.raw<Record<string, Record<string, unknown>>>({});
 
@@ -118,10 +121,14 @@ export class LivingSession {
 					this.result = { ...loaded, domain: committed.domain };
 				}
 			}
+			this.lastHttpLinks = committed.links ?? [];
+			this.lastHttpErrors = committed.httpErrors ?? [];
 			this.clearDraft(req.taskPath, req.jobInstanceId);
 			return true;
 		} catch (err) {
 			this.commitError = err instanceof Error ? err.message : String(err);
+			this.lastHttpLinks = [];
+			this.lastHttpErrors = [];
 			await this.refreshKeepDrafts();
 			return false;
 		} finally {

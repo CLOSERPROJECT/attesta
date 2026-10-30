@@ -7,10 +7,22 @@ export type CommitRequest = {
 	value: Record<string, unknown>;
 };
 
+/** Post-Commit HttpPort link-strip item (server-resolved onSubmit.http). */
+export type HttpLinkItem = {
+	label: string;
+	url: string;
+	action: 'link' | 'download';
+	filename?: string;
+};
+
 export type CommitResult = {
 	org: string;
 	jobInstanceId: string;
 	domain: Domain;
+	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
+	links?: HttpLinkItem[];
+	/** HttpPort failures; Domain remains committed. */
+	httpErrors?: string[];
 };
 
 export type CommitDomainPort = {
