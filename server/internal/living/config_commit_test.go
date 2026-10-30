@@ -12,8 +12,7 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	intake := cfg.Jobs.Values["intake"].(Job)
-	taskVal, _ := intake.Tasks.Get("codiceFir")
-	task := taskVal.(map[string]any)
+	task, _ := TaskByID(intake.Tasks, "codiceFir")
 	onSubmit := task["onSubmit"].(map[string]any)
 	transform := onSubmit["transform"].([]any)
 	op := transform[0].(map[string]any)
@@ -40,6 +39,7 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 	opID := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	if _, err := c.Commit(t.Context(), "feragame", opID, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +66,7 @@ func TestCommitShiftLabelFromConfigExpr(t *testing.T) {
 	}, CommitRequest{
 		TaskPath: "line/shift", JobInstanceID: "1st",
 		Value: map[string]any{"shift": "1st"},
+		Mint:  startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)

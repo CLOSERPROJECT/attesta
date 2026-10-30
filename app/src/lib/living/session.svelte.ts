@@ -99,10 +99,11 @@ export class LivingSession {
 	};
 
 	/**
-	 * Commit sealed value. On success: replace Domain from response, clear that Draft.
+	 * Commit sealed value. On success: replace Domain from response, clear Draft
+	 * keyed by the request id (provisional '' → `_new`), return response jobInstanceId.
 	 * On failure: keep Domain + Draft, re-Load, surface error (Cerbos / Unlock / prep).
 	 */
-	commit = async (req: CommitRequest): Promise<boolean> => {
+	commit = async (req: CommitRequest): Promise<string | null> => {
 		this.committing = true;
 		this.commitError = null;
 		try {
@@ -124,13 +125,13 @@ export class LivingSession {
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
 			this.clearDraft(req.taskPath, req.jobInstanceId);
-			return true;
+			return committed.jobInstanceId;
 		} catch (err) {
 			this.commitError = err instanceof Error ? err.message : String(err);
 			this.lastHttpLinks = [];
 			this.lastHttpErrors = [];
 			await this.refreshKeepDrafts();
-			return false;
+			return null;
 		} finally {
 			this.committing = false;
 		}

@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// OrderedObject is a JSON/YAML object that preserves key order (unlock / authoring order).
+// OrderedObject is a JSON/YAML object that preserves key order (Jobs authoring order).
 type OrderedObject struct {
 	Keys   []string
 	Values map[string]any

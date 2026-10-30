@@ -1,13 +1,15 @@
 <script lang="ts">
 	import {
+		getChildPath,
 		getComponent,
 		getFieldErrors,
+		getFieldsErrors,
 		getFormContext,
 		type ComponentProps
 	} from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import { getLeftoverContext } from './leftover-context.js';
-	import { isPalletProgress, type PalletProgress } from './pallet-progress.js';
+	import { isPalletProgress, omitUntouchedProgressCells, type PalletProgress } from './pallet-progress.js';
 
 	let {
 		config,
@@ -19,9 +21,14 @@
 	const leftovers = getLeftoverContext();
 
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
-	const errors = $derived(getFieldErrors(ctx, config.path));
-
 	const rows = $derived(leftovers.ids);
+	// Ajv nests under progress/<id>; exact getFieldErrors(progress) alone is silent.
+	const errors = $derived.by(() => {
+		const own = getFieldErrors(ctx, config.path);
+		const childPaths = rows.map((id) => getChildPath(ctx, config.path, id));
+		const nested = getFieldsErrors(ctx, childPaths);
+		return nested.length === 0 ? own : [...own, ...nested];
+	});
 
 	// Display SoT is sjsf value (host seeds Draft from domain at open).
 	// null = clear write; missing/non-progress → undefined (available).
@@ -64,7 +71,7 @@
 		// `null` = clear intent for submit (unset domain progress); omit = untouched.
 		if (nextProgress === undefined) next[id] = null;
 		else next[id] = nextProgress;
-		commitFieldValue(next);
+		commitFieldValue(omitUntouchedProgressCells(next) as SchemaObjectValue);
 	}
 </script>
 

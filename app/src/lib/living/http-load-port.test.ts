@@ -18,13 +18,13 @@ const sample: LoadResult = {
 				repeatable: true,
 				label: '$load.id',
 				startLabel: 'Nuovo camion',
-				tasks: { register: {}, codiceFir: {} }
+				tasks: [{ id: 'register' }, { id: 'codiceFir' }]
 			},
 			line: {
 				repeatable: true,
 				label: "'Turno: ' & $.shift",
 				startLabel: 'Nuovo turno',
-				tasks: { lineLoad: {}, shift: {} }
+				tasks: [{ id: 'lineLoad' }, { id: 'shift' }]
 			}
 		}
 	}

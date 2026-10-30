@@ -1,4 +1,10 @@
-import { createForm, type FormState, type Schema, type UiSchemaRoot } from '@sjsf/form';
+import {
+	createForm,
+	type FailureValidationResult,
+	type FormState,
+	type Schema,
+	type UiSchemaRoot
+} from '@sjsf/form';
 import { createFormIdBuilder } from '@sjsf/form/id-builders/modern';
 import { createFormMerger } from '@sjsf/form/mergers/modern';
 import { resolver } from '@sjsf/form/resolvers/compat';
@@ -11,6 +17,10 @@ import { syncDeepLocalToDraft } from './deep-local-draft-sync.svelte.js';
 import { theme } from './form-theme.js';
 import { translation } from './form-translation-it.js';
 import { createAjvFormValidator } from './ajv-form-validator.js';
+import {
+	mergeSchemaDefaultsIntoFormData,
+	resolveSchemaDateDefaultSentinels
+} from './schema-defaults.js';
 
 export type { ConfigForm, ConfigFormDerivedEntry, ConfigFormOptions } from './config-form.svelte.js';
 
@@ -22,6 +32,8 @@ export type ConfigFormSchemas = {
 export type CreateConfigFormOptions<T extends Record<string, unknown> = Record<string, unknown>> = {
 	uiSchema?: UiSchemaRoot;
 	onSubmit?: (value: T) => void | Promise<void>;
+	/** Ajv rejected submit — createForm skips onSubmit; surface via banner. */
+	onSubmitError?: (result: FailureValidationResult) => void;
 	/** When set, wraps sjsf `createForm` with ConfigForm derived + override policy. */
 	derived?: Record<string, ConfigFormDerivedEntry>;
 	/** See ConfigFormOptions.getDomain — `$domain` for derived exprs. */
@@ -52,12 +64,17 @@ export function createConfigForm<T extends Record<string, unknown>>(
 	options: CreateConfigFormOptions<T> = {}
 ): CreateConfigFormResult<T> {
 	const uiSchema = options.uiSchema ?? schemas.uiSchema;
+	// Resolve `$today` once so sjsf re-merge/reset never injects the sentinel.
+	// createForm skips merge when `value` is bound — seed defaults here (NIR +
+	// resolved date). Merger preserves operator / partial drafts in formData.
+	const schema = resolveSchemaDateDefaultSentinels(schemas.schema);
+	const seededValue = mergeSchemaDefaultsIntoFormData(schema, getValue());
 
 	if (options.derived !== undefined) {
 		const engine = new ConfigForm<T>({
-			schema: schemas.schema,
+			schema,
 			uiSchema,
-			initialValue: getValue(),
+			initialValue: seededValue,
 			derived: options.derived,
 			getDomain: options.getDomain
 		});
@@ -68,7 +85,7 @@ export function createConfigForm<T extends Record<string, unknown>>(
 		);
 		const form = createForm<T>({
 			theme,
-			schema: schemas.schema,
+			schema,
 			uiSchema,
 			resolver,
 			translation,
@@ -80,6 +97,9 @@ export function createConfigForm<T extends Record<string, unknown>>(
 			value: [() => engine.value, (next) => setBound(next)],
 			onSubmit: (value) => {
 				void options.onSubmit?.(value);
+			},
+			onSubmitError: (result) => {
+				options.onSubmitError?.(result);
 			}
 		}) as CreateConfigFormResult<T>;
 		form.configForm = engine;
@@ -87,14 +107,14 @@ export function createConfigForm<T extends Record<string, unknown>>(
 		return form;
 	}
 
-	let local = $state($state.snapshot(getValue()) as T);
+	let local = $state($state.snapshot(seededValue) as T);
 	const disposeLocalDraftSync = syncDeepLocalToDraft(
 		() => local as Record<string, unknown>,
 		(next) => setValue(next as T)
 	);
 	const form = createForm<T>({
 		theme,
-		schema: schemas.schema,
+		schema,
 		uiSchema,
 		resolver,
 		translation,
@@ -111,6 +131,9 @@ export function createConfigForm<T extends Record<string, unknown>>(
 		],
 		onSubmit: (value) => {
 			void options.onSubmit?.(value);
+		},
+		onSubmitError: (result) => {
+			options.onSubmitError?.(result);
 		}
 	}) as CreateConfigFormResult<T>;
 	form.disposeLocalDraftSync = disposeLocalDraftSync;

@@ -18,13 +18,13 @@ const sample: LoadResult = {
 				repeatable: true,
 				label: '$load.id',
 				startLabel: 'Nuovo camion',
-				tasks: { register: {} }
+				tasks: [{ id: 'register' }]
 			},
 			line: {
 				repeatable: true,
 				label: 'line',
 				startLabel: 'Nuovo turno',
-				tasks: { shift: {} }
+				tasks: [{ id: 'shift' }]
 			}
 		}
 	}
@@ -90,15 +90,52 @@ describe('LivingSession', () => {
 		});
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
-		const ok = await session.commit({
+		const minted = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
-			value: { client: 'NO', palletCount: 1 }
+			value: { client: 'NO', palletCount: 1 },
+			mint: { kind: 'none' }
 		});
-		expect(ok).toBe(true);
+		expect(minted).toBe('NIR-1');
 		expect(session.result?.domain.load['NIR-1']?.client).toBe('NO');
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
 		expect(session.commitError).toBeNull();
+	});
+
+	test('provisional startingNew clears _new draft and returns response id', async () => {
+		const nextDomain = {
+			...emptyDomain(),
+			load: { 'NIR-1': { client: 'NO' } },
+			jobInstances: [{ jobId: 'intake', id: 'NIR-1', label: 'NIR-1' }],
+			submissions: []
+		};
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			domain: nextDomain
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		session.setDraft('intake/register', '', { client: 'NO' });
+		const minted = await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: '',
+			value: { client: 'NO' },
+			mint: { kind: 'startingNew' }
+		});
+		expect(minted).toBe('NIR-1');
+		expect(commit).toHaveBeenCalledWith({
+			taskPath: 'intake/register',
+			jobInstanceId: '',
+			value: { client: 'NO' },
+			mint: { kind: 'startingNew' }
+		});
+		expect(session.getDraft('intake/register', '')).toBeNull();
+		expect(session.getDraft('intake/register', '_new')).toBeNull();
 	});
 
 	test('commit denial keeps Domain + Draft and re-Loads', async () => {
@@ -116,12 +153,13 @@ describe('LivingSession', () => {
 		session.result = seeded;
 		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
 
-		const ok = await session.commit({
+		const minted = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
-			value: { client: 'NO' }
+			value: { client: 'NO' },
+			mint: { kind: 'none' }
 		});
-		expect(ok).toBe(false);
+		expect(minted).toBeNull();
 		expect(session.commitError).toBe('forbidden');
 		expect(session.getDraft('intake/register', '_new')).toEqual({
 			client: 'NO',

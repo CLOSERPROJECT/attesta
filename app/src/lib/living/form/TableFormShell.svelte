@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Schema, UiSchemaRoot } from '@sjsf/form';
-	import { untrack } from 'svelte';
+	import type { FailureValidationResult, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { onDestroy, untrack } from 'svelte';
 	import ConfigForm from './ConfigForm.svelte';
 	import { createConfigForm } from './create-config-form.svelte.js';
 	import { setLeftoverContext, type LeftoverContext } from './leftover-context.js';
@@ -16,6 +16,7 @@
 		valueType?: LeftoverContext['valueType'];
 		disabled?: boolean;
 		onSubmit: (value: Record<string, unknown>) => void | Promise<void>;
+		onSubmitError?: (result: FailureValidationResult) => void;
 	};
 
 	let props: Props = $props();
@@ -27,7 +28,8 @@
 		leftoverIds: props.leftoverIds,
 		columns: props.columns,
 		valueType: props.valueType ?? 'number',
-		onSubmit: props.onSubmit
+		onSubmit: props.onSubmit,
+		onSubmitError: props.onSubmitError
 	}));
 
 	setLeftoverContext({
@@ -47,9 +49,16 @@
 			onSubmit: (value) => {
 				if (props.disabled) return;
 				return mount.onSubmit(value);
+			},
+			onSubmitError: (result) => {
+				mount.onSubmitError?.(result);
 			}
 		}
 	);
+
+	onDestroy(() => {
+		form.disposeLocalDraftSync?.();
+	});
 </script>
 
 <ConfigForm {form} />

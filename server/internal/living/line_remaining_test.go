@@ -28,7 +28,7 @@ func commitLineLoadDone(t *testing.T, c *Committer, shift, intakeID string) {
 
 func TestFixtureContainerRegUnlockFromInstance(t *testing.T) {
 	line := lineJob(t)
-	task, ok := line.Tasks.Get("containerReg")
+	task, ok := TaskByID(line.Tasks, "containerReg")
 	if !ok {
 		t.Fatal("containerReg missing")
 	}
@@ -128,6 +128,7 @@ func TestCommitContainerRegDualSourceOmitsSecondaryWeight(t *testing.T) {
 	valB["palletCount"] = 1.0
 	if _, err := c.Commit(t.Context(), "feragame", opAdmin, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: intakeB, Value: valB,
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -286,10 +287,10 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	}
 
 	intakeID := "NIR-261019-NO-1"
-	post(`{"taskPath":"intake/register","jobInstanceId":"NIR-261019-NO-1","value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":900,"truckTare":50,"palletCount":2,"notes":""}}`)
+	post(`{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":900,"truckTare":50,"palletCount":2,"notes":""}}`)
 	post(`{"taskPath":"intake/codiceFir","jobInstanceId":"NIR-261019-NO-1","value":{"codiceFir":"FIR-E2E"}}`)
 	post(`{"taskPath":"intake/palletWeight","jobInstanceId":"NIR-261019-NO-1","value":{"averagePanelWeight":10,"tareKind":"euro","weights":{"NIR-261019-NO-1.1":{"weight":400,"tareKind":"euro","idoneita":"NIR","panelCount":1},"NIR-261019-NO-1.2":{"weight":450,"tareKind":"euro","idoneita":"NIR","panelCount":1}}}}`)
-	post(`{"taskPath":"line/shift","jobInstanceId":"1st","value":{"shift":"1st"}}`)
+	post(`{"taskPath":"line/shift","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"shift":"1st"}}`)
 	post(`{"taskPath":"line/lineLoad","jobInstanceId":"1st","value":{"progress":{"NIR-261019-NO-1.1":"done","NIR-261019-NO-1.2":"done"}}}`)
 	afterContainers := post(`{"taskPath":"line/containerReg","jobInstanceId":"1st","value":{"sourceLoadId":"NIR-261019-NO-1","polvereDiVetro":[{"weight":120}],"plastica":[{"weight":40}]}}`)
 	if len(afterContainers.Domain.Container) != 2 {

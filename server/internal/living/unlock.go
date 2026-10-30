@@ -7,14 +7,7 @@ type UnlockQuery struct {
 	TaskID        string
 	JobInstanceID string // empty only valid for the first Task
 	Submissions   []Submission
-	Tasks         OrderedObject
-}
-
-// OrderedTaskIDs returns Task ids in authored (Unlock) order.
-func OrderedTaskIDs(tasks OrderedObject) []string {
-	out := make([]string, len(tasks.Keys))
-	copy(out, tasks.Keys)
-	return out
+	Tasks         []TaskConfig
 }
 
 // IsTaskUnlocked: Task k+1 unlocks when predecessor k has a Submission on this
@@ -38,12 +31,12 @@ func IsTaskUnlocked(q UnlockQuery) bool {
 	}
 
 	previousID := q.OrderedIDs[index-1]
-	previous, ok := q.Tasks.Get(previousID)
+	previous, ok := TaskByID(q.Tasks, previousID)
 	if !ok {
 		return false
 	}
 	if !taskMayBeUnlockGate(previous) {
-		current, _ := q.Tasks.Get(q.TaskID)
+		current, _ := TaskByID(q.Tasks, q.TaskID)
 		return taskUnlocksWithInstance(current) && q.JobInstanceID != ""
 	}
 	return hasSubmissionOnInstance(q.Submissions, q.JobID, previousID, q.JobInstanceID)
@@ -60,8 +53,8 @@ func hasSubmissionOnInstance(subs []Submission, jobID, taskID, jobInstanceID str
 
 // Predecessor with Leftovers completeness "some" must not unlock the next Task.
 func taskMayBeUnlockGate(task any) bool {
-	m, ok := task.(map[string]any)
-	if !ok {
+	m := taskPayload(task)
+	if m == nil {
 		return true
 	}
 	dyn, ok := m["dynamicProperties"].(map[string]any)
@@ -81,8 +74,8 @@ func taskMayBeUnlockGate(task any) bool {
 }
 
 func taskUnlocksWithInstance(task any) bool {
-	m, ok := task.(map[string]any)
-	if !ok {
+	m := taskPayload(task)
+	if m == nil {
 		return false
 	}
 	return m["unlockFrom"] == "instance"
@@ -93,7 +86,7 @@ func sequenceOkForCommit(cfg OrgConfig, domain Domain, jobID, taskID, jobInstanc
 	if !ok {
 		return false
 	}
-	job, ok := jobVal.(Job)
+	job, ok := AsJob(jobVal)
 	if !ok {
 		return false
 	}

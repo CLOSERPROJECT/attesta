@@ -1,3 +1,4 @@
+import type { FailureValidationResult } from '@sjsf/form';
 import { untrack } from 'svelte';
 import type {
 	ChromeDisplay,
@@ -29,6 +30,7 @@ export type LiveTaskFormPorts = {
 	/** Chrome eval `$operator` — not readyWhen. */
 	getOperator?: () => OperatorIdentity;
 	onSubmit?: (value: Record<string, unknown>) => void | Promise<void>;
+	onSubmitError?: (result: FailureValidationResult) => void;
 };
 
 const EMPTY_DISPLAY: ChromeDisplay = { value: null, error: null };

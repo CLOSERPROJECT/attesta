@@ -68,6 +68,7 @@ func TestCommitLineShiftDeniedViaCerbosBeforeStartsWhen(t *testing.T) {
 		TaskPath:      "line/shift",
 		JobInstanceID: "1st",
 		Value:         map[string]any{"shift": "1st"},
+		Mint:          startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -104,6 +105,7 @@ func TestCommitLineShiftAllowedViaCerbosAfterStartsWhen(t *testing.T) {
 		TaskPath:      "line/shift",
 		JobInstanceID: "1st",
 		Value:         map[string]any{"shift": "1st"},
+		Mint:          startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)

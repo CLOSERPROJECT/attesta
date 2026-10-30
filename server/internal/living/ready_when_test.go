@@ -53,8 +53,10 @@ func committerWithReadyWhen(t *testing.T, taskID, readyWhen string, auth Authori
 		t.Fatal(err)
 	}
 	intake := cfg.Jobs.Values["intake"].(Job)
-	taskVal, _ := intake.Tasks.Get(taskID)
-	task := taskVal.(map[string]any)
+	task, ok := TaskByID(intake.Tasks, taskID)
+	if !ok {
+		t.Fatalf("missing task %q", taskID)
+	}
 	task["readyWhen"] = readyWhen
 
 	domains := NewMemoryDomainStore()
@@ -86,6 +88,7 @@ func TestCommitCodiceFirDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	instanceID := "NIR-261019-NO-1"
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -124,6 +127,7 @@ func TestCommitCodiceFirAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
 	instanceID := "NIR-261019-NO-1"
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}

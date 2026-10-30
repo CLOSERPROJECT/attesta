@@ -1,4 +1,4 @@
-import { taskMayBeUnlockGate } from './unlock.js';
+import { taskById, taskMayBeUnlockGate } from './unlock.js';
 import type { Domain, JobConfig, OrgConfig, Submission } from './types.js';
 
 export type StartsWhenGate = {
@@ -14,7 +14,7 @@ export function referencedStartsWhenTask(
 	if (!config?.jobs || !startsWhen?.task) return null;
 	const job = config.jobs[startsWhen.task.jobId];
 	if (!job?.tasks) return null;
-	return job.tasks[startsWhen.task.taskId] ?? null;
+	return taskById(job.tasks, startsWhen.task.taskId) ?? null;
 }
 
 /**

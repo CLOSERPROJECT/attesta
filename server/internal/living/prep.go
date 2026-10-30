@@ -91,10 +91,45 @@ func leftoverValueType(task map[string]any, primary string) string {
 	if add == nil {
 		return "weight"
 	}
-	if t, _ := add["type"].(string); t == "string" {
+	if additionalPropertiesIsProgress(add) {
 		return "progress"
 	}
 	return "weight"
+}
+
+// Progress cells are string enums; clear wire may allow null via anyOf / type union.
+func additionalPropertiesIsProgress(add map[string]any) bool {
+	if schemaTypeIncludesString(add["type"]) {
+		return true
+	}
+	anyOf, ok := add["anyOf"].([]any)
+	if !ok {
+		return false
+	}
+	for _, branch := range anyOf {
+		b, ok := branch.(map[string]any)
+		if !ok {
+			continue
+		}
+		if schemaTypeIncludesString(b["type"]) {
+			return true
+		}
+	}
+	return false
+}
+
+func schemaTypeIncludesString(raw any) bool {
+	switch t := raw.(type) {
+	case string:
+		return t == "string"
+	case []any:
+		for _, item := range t {
+			if s, ok := item.(string); ok && s == "string" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func enforceAllCompletenessKeys(facts map[string]any, leftoverIDs []string) string {
@@ -155,17 +190,13 @@ func lookupTask(cfg OrgConfig, jobID, taskID string) (Job, map[string]any, error
 	if !ok {
 		return Job{}, nil, fmt.Errorf("unknown Job %q", jobID)
 	}
-	job, ok := jobVal.(Job)
+	job, ok := AsJob(jobVal)
 	if !ok {
 		return Job{}, nil, fmt.Errorf("invalid Job %q", jobID)
 	}
-	taskVal, ok := job.Tasks.Get(taskID)
+	task, ok := TaskByID(job.Tasks, taskID)
 	if !ok {
 		return Job{}, nil, fmt.Errorf("unknown Task %q", jobID+"/"+taskID)
 	}
-	task, ok := taskVal.(map[string]any)
-	if !ok {
-		return Job{}, nil, fmt.Errorf("invalid Task %q", jobID+"/"+taskID)
-	}
-	return job, task, nil
+	return job, map[string]any(task), nil
 }

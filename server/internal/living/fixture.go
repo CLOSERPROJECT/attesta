@@ -125,24 +125,27 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 		return Job{}, nil, fmt.Errorf("jobs.%s: %w", jobID, err)
 	}
 	substepsNode := child(m, "substeps")
-	if substepsNode == nil {
-		return Job{}, nil, fmt.Errorf("jobs.%s.tasks (from substeps) required", jobID)
-	}
-	substepsMap := mappingContent(substepsNode)
-	if substepsMap == nil || len(substepsMap.Content) == 0 {
-		return Job{}, nil, fmt.Errorf("jobs.%s.tasks must be a non-empty mapping", jobID)
+	if substepsNode == nil || substepsNode.Kind != yaml.SequenceNode || len(substepsNode.Content) == 0 {
+		return Job{}, nil, fmt.Errorf("jobs.%s.tasks (from substeps) must be a non-empty list", jobID)
 	}
 
-	tasks := newOrderedObject()
+	tasks := make([]TaskConfig, 0, len(substepsNode.Content))
+	seen := make(map[string]struct{}, len(substepsNode.Content))
 	var roles []string
-	for i := 0; i < len(substepsMap.Content); i += 2 {
-		taskID := substepsMap.Content[i].Value
-		taskNode := substepsMap.Content[i+1]
-		var payload any
+	for i, taskNode := range substepsNode.Content {
+		var payload map[string]any
 		if err := taskNode.Decode(&payload); err != nil {
-			return Job{}, nil, fmt.Errorf("jobs.%s.tasks.%s: %w", jobID, taskID, err)
+			return Job{}, nil, fmt.Errorf("jobs.%s.tasks[%d]: %w", jobID, i, err)
 		}
-		tasks.Set(taskID, payload)
+		id, _ := payload["id"].(string)
+		if id == "" {
+			return Job{}, nil, fmt.Errorf("jobs.%s.tasks[%d]: id required", jobID, i)
+		}
+		if _, dup := seen[id]; dup {
+			return Job{}, nil, fmt.Errorf("jobs.%s.tasks: duplicate id %q", jobID, id)
+		}
+		seen[id] = struct{}{}
+		tasks = append(tasks, TaskConfig(payload))
 		roles = append(roles, rolesFromTask(payload)...)
 	}
 
@@ -189,8 +192,8 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 }
 
 func rolesFromTask(payload any) []string {
-	m, ok := payload.(map[string]any)
-	if !ok {
+	m := taskPayload(payload)
+	if m == nil {
 		return nil
 	}
 	raw, ok := m["roles"]
@@ -217,15 +220,15 @@ func rolesAllowedForTask(cfg OrgConfig, jobID, taskID string) []string {
 	if !ok {
 		return nil
 	}
-	job, ok := jobVal.(Job)
+	job, ok := AsJob(jobVal)
 	if !ok {
 		return nil
 	}
-	taskVal, ok := job.Tasks.Get(taskID)
+	task, ok := TaskByID(job.Tasks, taskID)
 	if !ok {
 		return nil
 	}
-	return rolesFromTask(taskVal)
+	return rolesFromTask(task)
 }
 
 func mappingContent(n *yaml.Node) *yaml.Node {

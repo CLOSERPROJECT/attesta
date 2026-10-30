@@ -3,10 +3,8 @@ import {
 	isMapTableUiField,
 	primaryDynamicProperty
 } from './dynamic-properties.js';
-
-function orderedTaskIds(tasks: Record<string, unknown>): string[] {
-	return Object.keys(tasks);
-}
+import type { TaskConfig } from '../types.js';
+import { orderedTaskIds, taskById } from '../unlock.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -54,19 +52,13 @@ export function needsSchemaProjection(substep: unknown): boolean {
 	return needsLeftoverProjection(substep) || hasEnumReads(substep);
 }
 
-export function leftoverTableIdsFromJob(job: {
-	tasks?: Record<string, unknown>;
-	substeps?: Record<string, unknown>;
-}): string[] {
-	const tasks = job.tasks ?? job.substeps ?? {};
-	return orderedTaskIds(tasks).filter((id) => isLeftoverTableTask(tasks[id]));
+export function leftoverTableIdsFromJob(job: { tasks?: TaskConfig[] }): string[] {
+	const tasks = job.tasks ?? [];
+	return orderedTaskIds(tasks).filter((id) => isLeftoverTableTask(taskById(tasks, id)));
 }
 
 /** Tasks refreshed at open: leftoverTable, mapTable, and enumReads forms. */
-export function leftoverProjectionIdsFromJob(job: {
-	tasks?: Record<string, unknown>;
-	substeps?: Record<string, unknown>;
-}): string[] {
-	const tasks = job.tasks ?? job.substeps ?? {};
-	return orderedTaskIds(tasks).filter((id) => needsSchemaProjection(tasks[id]));
+export function leftoverProjectionIdsFromJob(job: { tasks?: TaskConfig[] }): string[] {
+	const tasks = job.tasks ?? [];
+	return orderedTaskIds(tasks).filter((id) => needsSchemaProjection(taskById(tasks, id)));
 }

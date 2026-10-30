@@ -22,6 +22,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +74,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	if err != nil {
 		t.Fatalf("Commit must succeed when HttpPort fails: %v", err)
@@ -114,6 +116,7 @@ func TestCommitWithoutHTTPSkipsPort(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)

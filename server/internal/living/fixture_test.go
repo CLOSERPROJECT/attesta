@@ -44,8 +44,8 @@ func TestLoadTruckLoopFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatalf("intake = %#v", intake)
 	}
 	wantIntakeTasks := []string{"register", "codiceFir", "palletWeight", "weightCheck"}
-	if strings.Join(intake.Tasks.Keys, ",") != strings.Join(wantIntakeTasks, ",") {
-		t.Fatalf("intake tasks = %v", intake.Tasks.Keys)
+	if got := OrderedTaskIDs(intake.Tasks); strings.Join(got, ",") != strings.Join(wantIntakeTasks, ",") {
+		t.Fatalf("intake tasks = %v", got)
 	}
 
 	lineAny, _ := cfg.Jobs.Get("line")
@@ -60,8 +60,8 @@ func TestLoadTruckLoopFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatalf("quantifier = %q", line.StartsWhen.Quantifier)
 	}
 	wantLineTasks := []string{"shift", "lineLoad", "containerReg", "loadedExtracted"}
-	if strings.Join(line.Tasks.Keys, ",") != strings.Join(wantLineTasks, ",") {
-		t.Fatalf("line tasks = %v", line.Tasks.Keys)
+	if got := OrderedTaskIDs(line.Tasks); strings.Join(got, ",") != strings.Join(wantLineTasks, ",") {
+		t.Fatalf("line tasks = %v", got)
 	}
 
 	raw, err := json.Marshal(cfg)

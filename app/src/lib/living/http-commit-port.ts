@@ -67,7 +67,8 @@ export function createHttpCommitDomainPort(
 				body: JSON.stringify({
 					taskPath: req.taskPath,
 					jobInstanceId: req.jobInstanceId,
-					value: req.value
+					value: req.value,
+					mint: req.mint ?? { kind: 'none' }
 				})
 			});
 			if (!res.ok) {

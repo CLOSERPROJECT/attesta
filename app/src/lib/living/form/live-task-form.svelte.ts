@@ -52,7 +52,8 @@ export class LiveTaskForm {
 				? (value) => {
 						void ports.onSubmit?.(plan.sealSubmission(value as Record<string, unknown>));
 					}
-				: undefined
+				: undefined,
+			onSubmitError: ports.onSubmitError
 		});
 		(form as FormState<Record<string, unknown>> & { liveTaskForm?: LiveTaskForm }).liveTaskForm =
 			this;

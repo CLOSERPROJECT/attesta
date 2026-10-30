@@ -5,13 +5,15 @@ import {
 	isStartsWhenSatisfied,
 	referencedStartsWhenTask
 } from './starts-when.js';
-import { emptyDomain, type OrgConfig, type Submission } from './types.js';
+import { emptyDomain, type OrgConfig, type Submission, type TaskConfig } from './types.js';
 
-const palletWeightTask = {
+const palletWeightTask: TaskConfig = {
+	id: 'palletWeight',
 	dynamicProperties: { weights: { read: 'leftovers', completeness: 'all' } }
 };
 
-const lineLoadSomeTask = {
+const lineLoadSomeTask: TaskConfig = {
+	id: 'lineLoad',
 	dynamicProperties: { progress: { read: 'leftovers', completeness: 'some' } }
 };
 
@@ -22,9 +24,7 @@ const config: OrgConfig = {
 		intake: {
 			repeatable: true,
 			label: 'intake',
-			tasks: {
-				palletWeight: palletWeightTask
-			}
+			tasks: [palletWeightTask]
 		},
 		line: {
 			repeatable: true,
@@ -34,10 +34,7 @@ const config: OrgConfig = {
 				task: { jobId: 'intake', taskId: 'palletWeight' },
 				quantifier: 'some'
 			},
-			tasks: {
-				shift: {},
-				lineLoad: lineLoadSomeTask
-			}
+			tasks: [{ id: 'shift' }, lineLoadSomeTask]
 		}
 	}
 };
@@ -95,15 +92,11 @@ describe('canStartJob', () => {
 	test('line blocked until intake palletWeight gate', () => {
 		const domain = emptyDomain();
 		const line = config.jobs.line!;
-		expect(
-			canStartJob({ job: line, jobId: 'line', domain, config })
-		).toBe(false);
+		expect(canStartJob({ job: line, jobId: 'line', domain, config })).toBe(false);
 
 		domain.submissions = [sub('intake', 'palletWeight', 'NIR-1')];
 		domain.jobInstances = [{ jobId: 'intake', id: 'NIR-1', label: 'NIR-1' }];
-		expect(
-			canStartJob({ job: line, jobId: 'line', domain, config })
-		).toBe(true);
+		expect(canStartJob({ job: line, jobId: 'line', domain, config })).toBe(true);
 	});
 
 	test('repeatable stays startable after first instance', () => {
@@ -124,8 +117,8 @@ describe('canStartJob', () => {
 	});
 
 	test('referencedStartsWhenTask reads intake palletWeight', () => {
-		expect(
-			referencedStartsWhenTask(config, config.jobs.line!.startsWhen)
-		).toBe(palletWeightTask);
+		expect(referencedStartsWhenTask(config, config.jobs.line!.startsWhen)).toBe(
+			palletWeightTask
+		);
 	});
 });

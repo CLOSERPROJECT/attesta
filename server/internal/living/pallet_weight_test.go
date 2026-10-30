@@ -24,6 +24,7 @@ func commitThroughCodiceFir(t *testing.T, c *Committer, instanceID string) {
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic"}}
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -53,8 +54,8 @@ func lineJob(t *testing.T) Job {
 	return cfg.Jobs.Values["line"].(Job)
 }
 
-func palletWeightTask(intake Job) any {
-	v, _ := intake.Tasks.Get("palletWeight")
+func palletWeightTask(intake Job) TaskConfig {
+	v, _ := TaskByID(intake.Tasks, "palletWeight")
 	return v
 }
 

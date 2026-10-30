@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import truckLoopStepsYaml from './fixtures/truck-loop-steps.yaml?raw';
-import { loadTruckLoop, substepConfig } from './load-truck-loop.js';
+import { loadTruckLoop, substepConfig, taskConfig } from './load-truck-loop.js';
 import { emptyObjectRowWeighCell } from './object-row-weigh.js';
 import {
 	prepareMapTableForm,
@@ -46,6 +46,14 @@ describe('mapTable Substep mount', () => {
 		expect(seedMapTableDraft({}, palletWeight, [])).toBeNull();
 	});
 
+	test('seedMapTableDraft skips leftoverTable progress (lineLoad)', () => {
+		const config = loadTruckLoop(truckLoopStepsYaml);
+		const lineLoad = taskConfig(config.jobs.line, 'lineLoad')!;
+		expect(
+			seedMapTableDraft({ progress: { a: 'done' } }, lineLoad, ['a', 'b'])
+		).toBeNull();
+	});
+
 	test('prepareMapTableForm expands map-star Derived and injects tareKinds domain', () => {
 		const config = loadTruckLoop(truckLoopStepsYaml);
 		const cfg = substepConfig(config.jobs.intake, 'palletWeight') as {
@@ -74,6 +82,9 @@ describe('mapTable Substep mount', () => {
 		expect(taskForm).toContain('compileTaskFormPlan');
 		expect(taskForm).toContain('buildLiveTaskPlanContext');
 		expect(taskForm).toContain('seedMapTableDraft');
+		expect(taskForm).toContain('isMapTableTask');
+		expect(taskForm).toContain('startingNew');
+		expect(taskForm).not.toMatch(/jobInstanceId:\s*['"]_new['"]/);
 		expect(planSource).toContain('projectedSchemas');
 		expect(mountSvelte).toContain('createConfigForm');
 		expect(mountSvelte).toContain('prepareMapTableForm');

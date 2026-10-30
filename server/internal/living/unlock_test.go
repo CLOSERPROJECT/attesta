@@ -5,10 +5,11 @@ import (
 )
 
 func TestOrderedTaskIDsPreservesAuthoredOrder(t *testing.T) {
-	tasks := newOrderedObject()
-	tasks.Set("register", map[string]any{})
-	tasks.Set("codiceFir", map[string]any{})
-	tasks.Set("palletWeight", map[string]any{})
+	tasks := []TaskConfig{
+		{"id": "register"},
+		{"id": "codiceFir"},
+		{"id": "palletWeight"},
+	}
 	got := OrderedTaskIDs(tasks)
 	want := []string{"register", "codiceFir", "palletWeight"}
 	if len(got) != len(want) {
@@ -118,13 +119,15 @@ func TestIsTaskUnlockedDistinctFromStartsWhen(t *testing.T) {
 }
 
 func TestIsTaskUnlockedCompletenessSomeNeverGatesNext(t *testing.T) {
-	tasks := newOrderedObject()
-	tasks.Set("lineLoad", map[string]any{
-		"dynamicProperties": map[string]any{
-			"progress": map[string]any{"read": "leftovers", "completeness": "some"},
+	tasks := []TaskConfig{
+		{
+			"id": "lineLoad",
+			"dynamicProperties": map[string]any{
+				"progress": map[string]any{"read": "leftovers", "completeness": "some"},
+			},
 		},
-	})
-	tasks.Set("next", map[string]any{})
+		{"id": "next"},
+	}
 	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
 		JobInstanceID: "line", Submissions: []Submission{sub("line", "lineLoad", "line")},
@@ -134,17 +137,18 @@ func TestIsTaskUnlockedCompletenessSomeNeverGatesNext(t *testing.T) {
 	}
 }
 
-func intakeUnlockTasks() OrderedObject {
-	tasks := newOrderedObject()
-	tasks.Set("register", map[string]any{})
-	tasks.Set("codiceFir", map[string]any{})
-	tasks.Set("palletWeight", map[string]any{
-		"dynamicProperties": map[string]any{
-			"weights": map[string]any{"read": "leftovers", "completeness": "all"},
+func intakeUnlockTasks() []TaskConfig {
+	return []TaskConfig{
+		{"id": "register"},
+		{"id": "codiceFir"},
+		{
+			"id": "palletWeight",
+			"dynamicProperties": map[string]any{
+				"weights": map[string]any{"read": "leftovers", "completeness": "all"},
+			},
 		},
-	})
-	tasks.Set("weightCheck", map[string]any{})
-	return tasks
+		{"id": "weightCheck"},
+	}
 }
 
 func sub(jobID, taskID, instanceID string) Submission {

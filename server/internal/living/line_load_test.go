@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func lineLoadTask(line Job) any {
-	v, _ := line.Tasks.Get("lineLoad")
+func lineLoadTask(line Job) TaskConfig {
+	v, _ := TaskByID(line.Tasks, "lineLoad")
 	return v
 }
 
@@ -16,6 +16,7 @@ func commitLineShift(t *testing.T, c *Committer, shift string) Domain {
 	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "line/shift", JobInstanceID: shift,
 		Value: map[string]any{"shift": shift},
+		Mint:  startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -29,8 +30,7 @@ func TestFixtureLineLoadCompletenessSome(t *testing.T) {
 	if taskMayBeUnlockGate(task) {
 		t.Fatal("fixture lineLoad completeness some must not be an unlock / startsWhen gate")
 	}
-	m := task.(map[string]any)
-	dyn := m["dynamicProperties"].(map[string]any)
+	dyn := task["dynamicProperties"].(map[string]any)
 	progress := dyn["progress"].(map[string]any)
 	if progress["completeness"] != "some" {
 		t.Fatalf("completeness = %#v", progress["completeness"])
@@ -85,9 +85,7 @@ func TestCommitLineLoadBatchSomeDoesNotUnlockNext(t *testing.T) {
 		t.Fatal("lineLoad must stay a non-gate after Submission")
 	}
 	// Synthetic successor without unlockFrom:instance — Submission of some must not open it.
-	tasks := newOrderedObject()
-	tasks.Set("lineLoad", lineLoadTask(line))
-	tasks.Set("next", map[string]any{})
+	tasks := []TaskConfig{lineLoadTask(line), {"id": "next"}}
 	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
 		JobInstanceID: "1st", Submissions: result.Domain.Submissions, Tasks: tasks,
@@ -216,5 +214,12 @@ func TestCommitLineLoadRejectsEmptyBatch(t *testing.T) {
 	}
 	if len(domain.Submissions) != len(before.Submissions) {
 		t.Fatal("empty some batch must not append Submission")
+	}
+}
+
+func TestFixtureLineLoadAdditionalPropertiesIsProgress(t *testing.T) {
+	task := map[string]any(lineLoadTask(lineJob(t)))
+	if got := leftoverValueType(task, "progress"); got != "progress" {
+		t.Fatalf("leftoverValueType = %q (null|enum anyOf must still classify as progress)", got)
 	}
 }

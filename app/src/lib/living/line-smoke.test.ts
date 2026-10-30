@@ -3,19 +3,26 @@ import { describe, expect, test, vi } from 'vitest';
 import { lineLoadLeftoverIds } from './leftovers.js';
 import { LivingSession } from './session.svelte.js';
 import { canStartJob } from './starts-when.js';
-import { emptyDomain, type Domain, type LoadResult, type Submission } from './types.js';
-import { isTaskUnlocked } from './unlock.js';
+import {
+	emptyDomain,
+	type Domain,
+	type LoadResult,
+	type Submission,
+	type TaskConfig
+} from './types.js';
+import { isTaskUnlocked, orderedTaskIds } from './unlock.js';
 
-const lineTasks: Record<string, unknown> = {
-	shift: {},
-	lineLoad: {
+const lineTasks: TaskConfig[] = [
+	{ id: 'shift' },
+	{
+		id: 'lineLoad',
 		dynamicProperties: {
 			progress: { read: 'leftovers', completeness: 'some' }
 		}
 	},
-	containerReg: { unlockFrom: 'instance' },
-	loadedExtracted: {}
-};
+	{ id: 'containerReg', unlockFrom: 'instance' },
+	{ id: 'loadedExtracted' }
+];
 
 const sampleConfig: LoadResult['config'] = {
 	id: 'truck-loop',
@@ -25,13 +32,14 @@ const sampleConfig: LoadResult['config'] = {
 		intake: {
 			repeatable: true,
 			label: 'intake',
-			tasks: {
-				palletWeight: {
+			tasks: [
+				{
+					id: 'palletWeight',
 					dynamicProperties: {
 						weights: { read: 'leftovers', completeness: 'all' }
 					}
 				}
-			}
+			]
 		},
 		line: {
 			repeatable: true,
@@ -174,12 +182,13 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 			await session.commit({
 				taskPath: 'line/shift',
 				jobInstanceId: '1st',
-				value: { shift: '1st' }
+				value: { shift: '1st' },
+				mint: { kind: 'startingNew' }
 			})
-		).toBe(true);
+		).toBe('1st');
 
 		domain = session.result!.domain;
-		const ordered = Object.keys(lineTasks);
+		const ordered = orderedTaskIds(lineTasks);
 		expect(
 			isTaskUnlocked({
 				orderedIds: ordered,
@@ -200,9 +209,10 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 						[`${intakeId}.1`]: 'done',
 						[`${intakeId}.2`]: 'partial'
 					}
-				}
+				},
+				mint: { kind: 'none' }
 			})
-		).toBe(true);
+		).toBe('1st');
 		domain = session.result!.domain;
 		expect(lineLoadLeftoverIds(domain)).toEqual([`${intakeId}.2`]);
 		// some Submission must not be treated as an unlock gate for a synthetic successor.
@@ -213,10 +223,10 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 				taskId: 'next',
 				jobInstanceId: '1st',
 				submissions: domain.submissions,
-				tasks: {
-					lineLoad: lineTasks.lineLoad,
-					next: {}
-				}
+				tasks: [
+					lineTasks.find((t) => t.id === 'lineLoad')!,
+					{ id: 'next' }
+				]
 			})
 		).toBe(false);
 
@@ -224,9 +234,10 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 			await session.commit({
 				taskPath: 'line/lineLoad',
 				jobInstanceId: '1st',
-				value: { progress: { [`${intakeId}.2`]: 'done' } }
+				value: { progress: { [`${intakeId}.2`]: 'done' } },
+				mint: { kind: 'none' }
 			})
-		).toBe(true);
+		).toBe('1st');
 		domain = session.result!.domain;
 		expect(lineLoadLeftoverIds(domain)).toEqual([]);
 
@@ -238,17 +249,19 @@ describe('line Commit smoke (session + unlock + leftovers some)', () => {
 					sourceLoadId: intakeId,
 					polvereDiVetro: [{ weight: 120 }],
 					plastica: [{ weight: 40 }]
-				}
+				},
+				mint: { kind: 'none' }
 			})
-		).toBe(true);
+		).toBe('1st');
 
 		expect(
 			await session.commit({
 				taskPath: 'line/loadedExtracted',
 				jobInstanceId: '1st',
-				value: { checkedLoadedWeight: 850, checkedContainerSum: 160 }
+				value: { checkedLoadedWeight: 850, checkedContainerSum: 160 },
+				mint: { kind: 'none' }
 			})
-		).toBe(true);
+		).toBe('1st');
 
 		const final = session.result!.domain;
 		const lineSubs = final.submissions.filter(

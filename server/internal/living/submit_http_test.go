@@ -40,12 +40,12 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{
 			Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Stampa etichette"`, Action: "link",
-			Body: `{ "loadId": $load.id, "labels": [$keys($sift($domain.pallet, function($v){$v.loadId = $load.id}))] }`,
+			Body:    `{ "loadId": $load.id, "labels": [$keys($sift($domain.pallet, function($v){$v.loadId = $load.id}))] }`,
 			HasBody: true,
 		},
 		{
 			Method: `"POST"`, URL: `"/fake/register-csv"`, Label: `"Scarica CSV registrazione"`, Action: "download",
-			Body: `{ "client": $.client, "loadId": $load.id }`,
+			Body:    `{ "client": $.client, "loadId": $load.id }`,
 			HasBody: true,
 		},
 	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"load": map[string]any{"id": "acme-1"}}, domain, "acme-1")

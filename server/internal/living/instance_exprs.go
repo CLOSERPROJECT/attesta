@@ -48,15 +48,3 @@ func hasJobInstance(domain Domain, jobID, id string) bool {
 	}
 	return false
 }
-
-// shouldMintJobInstance: first Task in Job order and no existing instance for this id.
-func shouldMintJobInstance(job Job, jobID, taskID, jobInstanceID string, domain Domain) bool {
-	ids := OrderedTaskIDs(job.Tasks)
-	if len(ids) == 0 || ids[0] != taskID {
-		return false
-	}
-	if jobInstanceID != "" && hasJobInstance(domain, jobID, jobInstanceID) {
-		return false
-	}
-	return true
-}

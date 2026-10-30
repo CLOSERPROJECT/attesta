@@ -95,8 +95,12 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	if loaded.Version != "v1" || loaded.Org != org {
 		t.Fatalf("loaded = %#v", loaded)
 	}
-	if _, ok := loaded.Jobs.Get("intake"); !ok || loaded.Jobs.Keys[0] != "intake" {
+	intakeVal, ok := loaded.Jobs.Get("intake")
+	if !ok || loaded.Jobs.Keys[0] != "intake" {
 		t.Fatalf("jobs = %#v", loaded.Jobs)
+	}
+	if _, typed := intakeVal.(Job); !typed {
+		t.Fatalf("Get should normalize Job, got %T", intakeVal)
 	}
 	active, err := configs.ActiveVersion(ctx, org)
 	if err != nil {
@@ -156,8 +160,19 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := loaded.Jobs.Get("intake"); !ok {
+	intakeVal, ok := loaded.Jobs.Get("intake")
+	if !ok {
 		t.Fatalf("config jobs = %#v", loaded.Jobs.Keys)
+	}
+	if _, typed := intakeVal.(Job); !typed {
+		t.Fatalf("Get should normalize Job, got %T", intakeVal)
+	}
+	_, task, err := lookupTask(loaded, "intake", "register")
+	if err != nil {
+		t.Fatalf("lookupTask after Mongo Get: %v", err)
+	}
+	if task == nil {
+		t.Fatal("register task nil")
 	}
 }
 

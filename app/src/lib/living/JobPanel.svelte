@@ -8,7 +8,7 @@
 		type Domain,
 		type JobConfig
 	} from './types.js';
-	import { isTaskUnlocked, orderedTaskIds, taskSubmitted } from './unlock.js';
+	import { isTaskUnlocked, orderedTaskIds, taskById, taskSubmitted } from './unlock.js';
 	import {
 		isLeftoverTableTask,
 		isMapTableTask,
@@ -42,7 +42,7 @@
 			taskId,
 			jobInstanceId: instanceId,
 			submissions: domain.submissions,
-			tasks: job.tasks ?? {}
+			tasks: job.tasks ?? []
 		});
 	}
 
@@ -53,7 +53,7 @@
 	/** Show Task form: unlocked and (not done, or leftover-some still has rows). */
 	function taskVisible(taskId: string, instanceId: string): boolean {
 		if (!unlocked(taskId, instanceId)) return false;
-		const authored = job.tasks?.[taskId];
+		const authored = taskById(job.tasks, taskId);
 		if (isLeftoverTableTask(authored)) {
 			// lineLoad: keep open while shared leftovers remain
 			if (jobId === 'line' && taskId === 'lineLoad') {
@@ -128,7 +128,7 @@
 				{jobId}
 				taskId={firstTaskId}
 				jobInstanceId=""
-				authored={job.tasks[firstTaskId]}
+				authored={taskById(job.tasks, firstTaskId)}
 				{domain}
 				onCommitted={onProvisionalCommitted}
 			/>
@@ -166,7 +166,7 @@
 									{jobId}
 									taskId={tid}
 									jobInstanceId={inst.id}
-									authored={job.tasks[tid]}
+									authored={taskById(job.tasks, tid)}
 									{domain}
 								/>
 							</div>

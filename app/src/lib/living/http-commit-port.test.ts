@@ -38,7 +38,7 @@ const sampleResult = {
 };
 
 describe('HttpCommitDomainPort', () => {
-	test('POST /api/living/commit with taskPath + jobInstanceId + value', async () => {
+	test('POST /api/living/commit with taskPath + jobInstanceId + value + mint', async () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			expect(String(input)).toBe('/api/living/commit');
 			expect(init?.method).toBe('POST');
@@ -46,7 +46,8 @@ describe('HttpCommitDomainPort', () => {
 			expect(JSON.parse(String(init?.body))).toEqual({
 				taskPath: 'intake/register',
 				jobInstanceId: 'NIR-261019-NO-1',
-				value: { client: 'NO', palletCount: 1 }
+				value: { client: 'NO', palletCount: 1 },
+				mint: { kind: 'none' }
 			});
 			return new Response(JSON.stringify(sampleResult), {
 				status: 200,
@@ -58,7 +59,8 @@ describe('HttpCommitDomainPort', () => {
 		const got = await port.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-261019-NO-1',
-			value: { client: 'NO', palletCount: 1 }
+			value: { client: 'NO', palletCount: 1 },
+			mint: { kind: 'none' }
 		});
 		expect(got.org).toBe('feragame');
 		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
@@ -81,10 +83,33 @@ describe('HttpCommitDomainPort', () => {
 		const got = await port.commit({
 			taskPath: 'intake/codiceFir',
 			jobInstanceId: 'NIR-261019-NO-1',
-			value: { codiceFir: 'FIR-1' }
+			value: { codiceFir: 'FIR-1' },
+			mint: { kind: 'none' }
 		});
 		expect(got.links).toEqual([]);
 		expect(got.httpErrors).toEqual([]);
+	});
+
+	test('provisional startingNew omits real id on wire (empty jobInstanceId)', async () => {
+		const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+			expect(JSON.parse(String(init?.body))).toEqual({
+				taskPath: 'intake/register',
+				jobInstanceId: '',
+				value: { client: 'NO' },
+				mint: { kind: 'startingNew' }
+			});
+			return new Response(JSON.stringify(sampleResult), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		});
+		const port = createHttpCommitDomainPort({ fetch: fetchFn });
+		await port.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: '',
+			value: { client: 'NO' },
+			mint: { kind: 'startingNew' }
+		});
 	});
 
 	test('rejects /api/runs-shaped URLs', async () => {

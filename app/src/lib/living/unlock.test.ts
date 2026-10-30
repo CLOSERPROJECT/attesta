@@ -1,22 +1,20 @@
 import { describe, expect, test } from 'vitest';
 
-import type { Submission } from './types.js';
+import type { Submission, TaskConfig } from './types.js';
 import { isTaskUnlocked, orderedTaskIds, taskMayBeUnlockGate } from './unlock.js';
 
 const order = ['register', 'codiceFir', 'palletWeight', 'weightCheck'];
-const tasks: Record<string, unknown> = {
-	register: {},
-	codiceFir: {},
-	palletWeight: {
+const tasks: TaskConfig[] = [
+	{ id: 'register' },
+	{ id: 'codiceFir' },
+	{
+		id: 'palletWeight',
 		dynamicProperties: { weights: { read: 'leftovers', completeness: 'all' } }
 	},
-	weightCheck: {}
-};
+	{ id: 'weightCheck' }
+];
 
-function sub(
-	taskId: string,
-	jobInstanceId: string
-): Submission {
+function sub(taskId: string, jobInstanceId: string): Submission {
 	return {
 		jobId: 'intake',
 		taskId,
@@ -98,14 +96,15 @@ describe('isTaskUnlocked', () => {
 	});
 
 	test('completeness some predecessor does not unlock next without unlockFrom instance', () => {
-		const someTasks: Record<string, unknown> = {
-			lineLoad: {
+		const someTasks: TaskConfig[] = [
+			{
+				id: 'lineLoad',
 				dynamicProperties: {
 					progress: { read: 'leftovers', completeness: 'some' }
 				}
 			},
-			next: {}
-		};
+			{ id: 'next' }
+		];
 		expect(
 			isTaskUnlocked({
 				orderedIds: ['lineLoad', 'next'],
@@ -129,14 +128,15 @@ describe('isTaskUnlocked', () => {
 	});
 
 	test('completeness some predecessor unlocks next only with unlockFrom instance', () => {
-		const someTasks: Record<string, unknown> = {
-			lineLoad: {
+		const someTasks: TaskConfig[] = [
+			{
+				id: 'lineLoad',
 				dynamicProperties: {
 					progress: { read: 'leftovers', completeness: 'some' }
 				}
 			},
-			containerReg: { unlockFrom: 'instance' }
-		};
+			{ id: 'containerReg', unlockFrom: 'instance' }
+		];
 		expect(
 			isTaskUnlocked({
 				orderedIds: ['lineLoad', 'containerReg'],
@@ -159,7 +159,7 @@ describe('isTaskUnlocked', () => {
 		).toBe(false);
 	});
 
-	test('orderedTaskIds preserves object key order', () => {
+	test('orderedTaskIds preserves array order', () => {
 		expect(orderedTaskIds(tasks)).toEqual(order);
 		expect(orderedTaskIds(undefined)).toEqual([]);
 	});

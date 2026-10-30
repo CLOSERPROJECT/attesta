@@ -116,6 +116,7 @@ func TestCommitCodiceFirAllowedViaCerbosInUnlockOrder(t *testing.T) {
 	instanceID := "NIR-261019-NO-1"
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -151,6 +152,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	instanceID := "NIR-261019-NO-1"
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -190,6 +192,7 @@ func TestCommitRegisterAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -212,6 +215,7 @@ func TestCommitRegisterDeniedViaCerbosWhenRoleDisallowed(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -239,6 +243,7 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-ALLOW",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	}); err != nil {
 		t.Fatalf("administration should be allowed by living policy: %v", err)
 	}
@@ -260,6 +265,7 @@ func TestCommitRegisterIntegrationCerbosPolicy(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-DENY",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {

@@ -132,6 +132,7 @@ func (s *MongoConfigStore) Get(ctx context.Context, org, version string) (OrgCon
 	if err := json.Unmarshal(doc.Payload, &cfg); err != nil {
 		return OrgConfig{}, fmt.Errorf("living mongo config decode: %w", err)
 	}
+	normalizeOrgConfigJobs(&cfg)
 	cfg.Org = org
 	cfg.Version = version
 	return cfg, nil

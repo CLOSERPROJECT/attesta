@@ -1,9 +1,17 @@
-import type { Domain, Submission } from './types.js';
+import type { Domain, Submission, TaskConfig } from './types.js';
 
 /** Authored Task order under a Job (Unlock order). */
-export function orderedTaskIds(tasks: Record<string, unknown> | null | undefined): string[] {
-	if (!tasks) return [];
-	return Object.keys(tasks);
+export function orderedTaskIds(tasks: TaskConfig[] | null | undefined): string[] {
+	if (!tasks?.length) return [];
+	return tasks.map((t) => t.id);
+}
+
+/** Lookup by Task id within an ordered Task array. */
+export function taskById(
+	tasks: TaskConfig[] | null | undefined,
+	id: string
+): TaskConfig | undefined {
+	return tasks?.find((t) => t.id === id);
 }
 
 function hasSubmissionOnInstance(
@@ -43,7 +51,7 @@ export type UnlockQuery = {
 	taskId: string;
 	jobInstanceId: string;
 	submissions: Submission[];
-	tasks: Record<string, unknown>;
+	tasks: TaskConfig[];
 };
 
 /**
@@ -57,9 +65,9 @@ export function isTaskUnlocked(q: UnlockQuery): boolean {
 	if (!q.jobInstanceId) return false;
 
 	const previousId = q.orderedIds[index - 1]!;
-	const previous = q.tasks[previousId];
+	const previous = taskById(q.tasks, previousId);
 	if (!taskMayBeUnlockGate(previous)) {
-		const current = q.tasks[q.taskId];
+		const current = taskById(q.tasks, q.taskId);
 		return taskUnlocksWithInstance(current) && q.jobInstanceId !== '';
 	}
 	return hasSubmissionOnInstance(q.submissions, q.jobId, previousId, q.jobInstanceId);

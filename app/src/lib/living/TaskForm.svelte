@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import type { Schema, UiSchemaRoot } from '@sjsf/form';
+	import type { FailureValidationResult } from '@sjsf/form';
 	import { living } from './living-app.svelte.js';
-	import { computeIntakeInstanceId } from './intake-id.js';
 	import type { Domain } from './types.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/ConfigForm.svelte';
@@ -15,6 +14,7 @@
 	} from './form/task-form-plan.js';
 	import {
 		isLeftoverTableTask,
+		isMapTableTask,
 		needsLeftoverProjection,
 		needsSchemaProjection
 	} from './form/leftover-table-task.js';
@@ -27,11 +27,13 @@
 	} from './form/project-form-schema.js';
 	import {
 		domainProgressForIds,
+		progressDraftFromDomain,
 		seedProgressDraftFromDomain
 	} from './form/pallet-progress.js';
 	import { seedMapTableDraft } from './form/map-table-mount.js';
 	import { primaryDynamicProperty } from './form/dynamic-properties.js';
 	import { taskTitleFromConfig } from './form/task-title.js';
+	import { formatSubmitValidationError } from './form/submit-validation.js';
 
 	type Props = {
 		jobId: string;
@@ -61,9 +63,12 @@
 
 	let projected = $state.raw<ProjectedForm | null>(null);
 	let projectError = $state.raw<string | null>(null);
+	let submitError = $state.raw<string | null>(null);
 	let projecting = $state(false);
 	let live: LiveTaskForm | null = $state(null);
 	let plan = $state.raw<TaskFormPlan | null>(null);
+	/** Bumped after successful leftover Commit so TableFormShell remounts from domain seed. */
+	let shellEpoch = $state(0);
 
 	function readDraft(): Record<string, unknown> {
 		void drafts;
@@ -91,34 +96,34 @@
 		return out;
 	}
 
-	function resolveCommitInstanceId(value: Record<string, unknown>): string {
-		if (jobInstanceId) return jobInstanceId;
-		if (jobId === 'intake' && taskId === 'register') {
-			const id = computeIntakeInstanceId(domain, {
-				client: typeof value.client === 'string' ? value.client : '',
-				date: typeof value.date === 'string' ? value.date : '',
-				idoneitaRiutilizzo:
-					typeof value.idoneitaRiutilizzo === 'string' ? value.idoneitaRiutilizzo : ''
-			});
-			return id ?? '';
-		}
-		if (typeof value.shift === 'string' && value.shift.length > 0) return value.shift;
-		if (typeof value.id === 'string' && value.id.length > 0) return value.id;
-		return '';
+	function onFormSubmitError(result: FailureValidationResult) {
+		submitError = formatSubmitValidationError(result);
+	}
+
+	function resyncProgressDraftFromDomain(slice: ProjectedForm, snap: Domain) {
+		const primary = primaryDynamicProperty(authored);
+		if (primary !== 'progress') return;
+		const domainProg = domainProgressForIds(snap, slice.leftoverIds);
+		const seeded = progressDraftFromDomain(domainProg, slice.leftoverIds);
+		writeDraft({ ...readDraft(), [primary]: seeded });
 	}
 
 	async function submitSealed(value: Record<string, unknown>) {
-		const id = resolveCommitInstanceId(value);
-		if (!id) {
-			living.commitError = 'Missing Job instance id for Commit';
-			return;
-		}
-		const ok = await living.commit({
+		submitError = null;
+		const provisional = jobInstanceId === '';
+		const mintedId = await living.commit({
 			taskPath: path,
-			jobInstanceId: id,
-			value
+			jobInstanceId: provisional ? '' : jobInstanceId,
+			value,
+			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
 		});
-		if (ok) onCommitted?.(id);
+		if (mintedId == null) return;
+		if (isLeftoverTableTask(authored) && projected) {
+			const fresh = living.result?.domain ?? domain;
+			resyncProgressDraftFromDomain(projected, fresh);
+			shellEpoch += 1;
+		}
+		onCommitted?.(mintedId);
 	}
 
 	function disposeLive() {
@@ -142,7 +147,8 @@
 					: undefined,
 			onSubmit: (value) => {
 				void submitSealed(value);
-			}
+			},
+			onSubmitError: onFormSubmitError
 		});
 	}
 
@@ -160,6 +166,8 @@
 			current = { ...current, [primary]: seeded };
 			writeDraft(current);
 		}
+		// mapTable weigh rows only — leftoverTable progress must stay enum|null|omit
+		if (!isMapTableTask(authored)) return;
 		const mapSeeded = seedMapTableDraft(current, authored, slice.leftoverIds);
 		if (mapSeeded) writeDraft(mapSeeded);
 	}
@@ -229,6 +237,7 @@
 	const projectionKey = $derived(
 		projected ? leftoversIdentity(projected.leftoverIds) : ''
 	);
+	const shellKey = $derived(`${projectionKey}:${shellEpoch}`);
 	const showLinks = $derived(
 		living.lastHttpLinks.length > 0 || living.lastHttpErrors.length > 0
 	);
@@ -248,7 +257,7 @@
 		<p class="text-sm text-zinc-500">Loading schema…</p>
 	{:else if isLeftoverTableTask(authored)}
 		{#if projected}
-			{#key projectionKey}
+			{#key shellKey}
 				<fieldset disabled={disabled || living.committing} class="space-y-4">
 					<TableFormShell
 						schema={projected.schema}
@@ -259,6 +268,7 @@
 						value={readDraft()}
 						onValueChange={writeDraft}
 						onSubmit={(value) => void submitSealed(value)}
+						onSubmitError={onFormSubmitError}
 						disabled={disabled || living.committing}
 					/>
 				</fieldset>
@@ -275,6 +285,12 @@
 		{/key}
 	{:else}
 		<p class="text-sm text-zinc-500" data-testid="live-form-missing">Modulo non disponibile</p>
+	{/if}
+
+	{#if submitError}
+		<p class="text-sm text-red-700" data-testid="task-submit-error" role="alert">
+			{submitError}
+		</p>
 	{/if}
 
 	{#if showLinks}

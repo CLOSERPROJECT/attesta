@@ -8,11 +8,36 @@ import (
 	"time"
 )
 
+// MintKind selects Job-instance mint behavior on Commit.
+type MintKind string
+
+const (
+	MintKindNone        MintKind = "none"
+	MintKindStartingNew MintKind = "startingNew"
+)
+
+// CommitMint is the Commit wire mint knob (omit → none).
+type CommitMint struct {
+	Kind MintKind `json:"kind"`
+}
+
 // CommitRequest is the Commit wire body (no run id).
 type CommitRequest struct {
 	TaskPath      string         `json:"taskPath"`
 	JobInstanceID string         `json:"jobInstanceId"`
 	Value         map[string]any `json:"value"`
+	Mint          *CommitMint    `json:"mint,omitempty"`
+}
+
+func (req CommitRequest) mintKind() MintKind {
+	if req.Mint == nil || req.Mint.Kind == "" {
+		return MintKindNone
+	}
+	return req.Mint.Kind
+}
+
+func startingNewMint() *CommitMint {
+	return &CommitMint{Kind: MintKindStartingNew}
 }
 
 type CommitResult struct {
@@ -60,9 +85,27 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	if err != nil {
 		return CommitResult{}, &CommitError{Kind: "unknown-target", Message: err.Error()}
 	}
+	mintKind := req.mintKind()
+	switch mintKind {
+	case MintKindNone, MintKindStartingNew:
+	default:
+		return CommitResult{}, &CommitError{Kind: "prep", Message: "mint.kind must be startingNew or none"}
+	}
 	jobInstanceID := strings.TrimSpace(req.JobInstanceID)
-	if jobInstanceID == "" {
-		return CommitResult{}, &CommitError{Kind: "prep", Message: "jobInstanceId required"}
+	if jobInstanceID == "_new" {
+		return CommitResult{}, &CommitError{
+			Kind:    "prep",
+			Message: "jobInstanceId _new is not allowed; use mint.startingNew with empty jobInstanceId",
+		}
+	}
+	switch mintKind {
+	case MintKindStartingNew:
+		// Client id is ignored; authorize/Unlock with empty instance (first Task only).
+		jobInstanceID = ""
+	case MintKindNone:
+		if jobInstanceID == "" {
+			return CommitResult{}, &CommitError{Kind: "prep", Message: "jobInstanceId required"}
+		}
 	}
 	if req.Value == nil {
 		return CommitResult{}, &CommitError{Kind: "prep", Message: "value required"}
@@ -121,7 +164,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	ts := now().UTC().Format(time.RFC3339Nano)
 
-	applied, err := applyConfigCommit(domain, cfg, job, task, ref.JobID, ref.TaskID, jobInstanceID, op.UserID, req.Value, transform, ts)
+	applied, err := applyConfigCommit(domain, cfg, job, task, ref.JobID, ref.TaskID, jobInstanceID, op.UserID, req.Value, transform, ts, mintKind)
 	if err != nil {
 		var ce *CommitError
 		if errors.As(err, &ce) {
@@ -173,6 +216,7 @@ func applyConfigCommit(
 	value map[string]any,
 	transform any,
 	ts string,
+	mintKind MintKind,
 ) (appliedCommit, error) {
 	var leftoverIDs []string
 	if needsLeftoverProjection(task) {
@@ -206,12 +250,24 @@ func applyConfigCommit(
 	req.UserID = userID
 
 	resultInstanceID := jobInstanceID
-	if shouldMintJobInstance(job, jobID, taskID, jobInstanceID, domain) {
+	if mintKind == MintKindStartingNew {
+		ids := OrderedTaskIDs(job.Tasks)
+		if len(ids) == 0 || ids[0] != taskID {
+			return appliedCommit{}, &CommitError{
+				Kind:    "prep",
+				Message: "mint.startingNew requires the first Task in Job order",
+			}
+		}
 		id, label, err := EvaluateJobInstanceExprs(job, prep.Facts, run.Bindings)
 		if err != nil {
 			return appliedCommit{}, err
 		}
-		// Config instanceId/label are authority (not client-provisional jobInstanceId).
+		if hasJobInstance(domain, jobID, id) {
+			return appliedCommit{}, &CommitError{
+				Kind:    "prep",
+				Message: fmt.Sprintf("job instance %s/%s already exists", jobID, id),
+			}
+		}
 		req.NewJobInstance = &JobInstance{JobID: jobID, ID: id, Label: label}
 		req.JobInstanceID = id
 		resultInstanceID = id

@@ -9,6 +9,7 @@ import {
 	isLeftoverTableTask,
 	isMapTableTask
 } from './leftover-table-task.js';
+import { normalizeFormProgress } from './pallet-progress.js';
 import { leftoversIdentity } from './project-form-schema.js';
 
 export type ChromeValuePrint = {
@@ -423,7 +424,8 @@ export function compileTaskFormPlan(
 		chrome,
 		chromeFieldIds,
 		projectionKey: projectionKeyFor(authored, ctx),
-		sealSubmission: (value) => stripChromeFields(value, chromeFieldIds)
+		sealSubmission: (value) =>
+			normalizeFormProgress(stripChromeFields(value, chromeFieldIds))
 	};
 }
 

@@ -108,7 +108,11 @@ func Mutate(domain Domain, req MutateRequest) (Domain, error) {
 	}
 
 	if req.NewJobInstance != nil {
-		next.JobInstances = append(next.JobInstances, *req.NewJobInstance)
+		inst := *req.NewJobInstance
+		if hasJobInstance(next, inst.JobID, inst.ID) {
+			return Domain{}, MutateError{Kind: "duplicate-job-instance", ID: inst.ID}
+		}
+		next.JobInstances = append(next.JobInstances, inst)
 	}
 
 	return next, nil

@@ -1,10 +1,17 @@
 import type { Domain } from './types.js';
 
+/** Commit wire mint knob (omit → none on server). */
+export type CommitMint =
+	| { kind: 'none' }
+	| { kind: 'startingNew' };
+
 /** Org Domain Commit — Task path + Job instance; no run id. */
 export type CommitRequest = {
 	taskPath: string;
+	/** Empty only with mint.startingNew; never send `_new` on the wire. */
 	jobInstanceId: string;
 	value: Record<string, unknown>;
+	mint?: CommitMint;
 };
 
 /** Post-Commit HttpPort link-strip item (server-resolved onSubmit.http). */

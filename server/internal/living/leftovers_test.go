@@ -64,6 +64,23 @@ func TestLineLoadLeftoverIDsSkipsDone(t *testing.T) {
 	}
 }
 
+func TestAdditionalPropertiesIsProgressAllowsNullAnyOf(t *testing.T) {
+	if !additionalPropertiesIsProgress(map[string]any{"type": "string"}) {
+		t.Fatal("plain string type")
+	}
+	if !additionalPropertiesIsProgress(map[string]any{
+		"anyOf": []any{
+			map[string]any{"type": "null"},
+			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
+		},
+	}) {
+		t.Fatal("null|enum anyOf")
+	}
+	if additionalPropertiesIsProgress(map[string]any{"type": "object"}) {
+		t.Fatal("object weigh cells must not classify as progress")
+	}
+}
+
 func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
 	filled, err := filterFilledProgress(map[string]any{
 		"a": "done", "b": "partial", "c": "", "d": nil,

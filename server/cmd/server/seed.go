@@ -39,10 +39,9 @@ type SeedDeps struct {
 	CategoriesPath string
 	// Rewrite even when the marker org exists (local only).
 	Replace bool
-	// Optional living stores (tests / in-process). When set, SeedDemo runs after
-	// identity+catalog; Replace wipes Domain. CLI seed leaves these nil — the
-	// server path seeds via ensureLivingStores / ATTESTA_LIVING_SEED (Mongo when
-	// the process Store is MongoStore, else Memory).
+	// Optional living stores. When set, SeedDemo runs after identity+catalog;
+	// Replace wipes Domain. CLI Mongo seed wires these; server also seeds via
+	// ensureLivingStores / ATTESTA_LIVING_SEED.
 	LivingDomains living.DomainStore
 	LivingConfigs living.ConfigStore
 	// Nil picks a time-based source in Seed.

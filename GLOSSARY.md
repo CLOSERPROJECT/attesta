@@ -9,7 +9,7 @@ Decisions: [`docs/research/attesta-app-living-product-decisions.md`](docs/resear
 ### Org Config and domain
 
 **Org Config**:
-The versioned authored document for one Organization: role catalog plus the job/task map for that org’s whole operation.
+The versioned authored document for one Organization: role catalog plus keyed Jobs, each with an ordered Task array, for that org’s whole operation.
 _Avoid_: Stream; blueprint (when meaning this document); running the whole config as an instance; multiple unrelated configs per org as the default story
 
 **Config version**:

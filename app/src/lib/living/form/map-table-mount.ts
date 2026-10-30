@@ -12,6 +12,7 @@ import type {
 } from './create-config-form.svelte.js';
 import { expandMapDerived } from './derived-keys.js';
 import { primaryDynamicProperty } from './dynamic-properties.js';
+import { isMapTableTask } from './leftover-table-task.js';
 import {
 	nestObjectRowWeighMap,
 	peelObjectRowWeighMap,
@@ -32,7 +33,8 @@ export type MapTableAuthoredSubstep = {
 /**
  * Seed object-row keys from leftover ids; keep filled weight/panelCount.
  * New rows inherit form-level `tareKind` (default euro) + NIR idoneità.
- * Returns null when there is nothing to seed (empty leftovers or no primary).
+ * mapTable / object-row weigh maps only — never leftoverTable progress cells.
+ * Returns null when there is nothing to seed (empty leftovers, not mapTable, or no primary).
  */
 export function seedMapTableDraft(
 	draft: Record<string, unknown>,
@@ -40,6 +42,7 @@ export function seedMapTableDraft(
 	leftoverIds: readonly string[]
 ): Record<string, unknown> | null {
 	if (leftoverIds.length === 0) return null;
+	if (!isMapTableTask(substep)) return null;
 	const primary = primaryDynamicProperty(substep);
 	if (primary === null) return null;
 	const formTare =

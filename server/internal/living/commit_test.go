@@ -50,6 +50,7 @@ func TestCommitRegisterPersistsAndLoadReflects(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: instanceID,
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +93,7 @@ func TestCommitRejectsWhenAuthorizerDenies(t *testing.T) {
 		TaskPath:      "intake/register",
 		JobInstanceID: "NIR-261019-NO-1",
 		Value:         registerValue(),
+		Mint:          startingNewMint(),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "unauthorized" {
@@ -151,6 +153,7 @@ func TestCommitCodiceFirInOrderAfterRegister(t *testing.T) {
 	instanceID := "NIR-261019-NO-1"
 	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
 		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
+		Mint: startingNewMint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +196,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 		},
 	}
 
-	body := `{"taskPath":"intake/register","jobInstanceId":"NIR-261019-NO-1","value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
+	body := `{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	h.ServeHTTP(rec, req)

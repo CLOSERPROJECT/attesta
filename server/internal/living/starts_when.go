@@ -72,11 +72,11 @@ func referencedStartsWhenTask(cfg OrgConfig, sw *StartsWhen) any {
 	if !ok {
 		return nil
 	}
-	job, ok := jobVal.(Job)
+	job, ok := AsJob(jobVal)
 	if !ok {
 		return nil
 	}
-	task, ok := job.Tasks.Get(sw.Task.TaskID)
+	task, ok := TaskByID(job.Tasks, sw.Task.TaskID)
 	if !ok {
 		return nil
 	}
