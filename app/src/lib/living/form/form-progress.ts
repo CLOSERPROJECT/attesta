@@ -56,7 +56,7 @@ function firstMapAdditional(schema: unknown): unknown {
 	return undefined;
 }
 
-export function leftoverValueTypeFromSchema(schema: unknown): 'number' | 'progress' {
+export function rowValueTypeFromSchema(schema: unknown): 'number' | 'progress' {
 	const add = firstMapAdditional(schema);
 	return additionalIsProgress(add) ? 'progress' : 'number';
 }

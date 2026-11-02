@@ -12,7 +12,7 @@ import CheckboxOnlyField from './checkbox-only-field.svelte';
 import CompactArrayItemField from './compact-array-item-field.svelte';
 import DerivedLeafField from './derived-leaf-field.svelte';
 import FormThemeButton from './form-theme-button.svelte';
-import LeftoverTableField from './leftover-table-field.svelte';
+import RowTableField from './row-table-field.svelte';
 import MapTableField from './map-table-field.svelte';
 import DataReportField from './data-report-field.svelte';
 import ReadonlyField from './readonly-field.svelte';
@@ -22,7 +22,7 @@ import ReadonlyField from './readonly-field.svelte';
 // register beside button (authoredFieldThemeOverrides drops unknown keys).
 const withAuthored = overrideByRecord(shadcnTheme, {
 	...authoredFieldThemeOverrides({
-		leftoverTableField: LeftoverTableField,
+		rowTableField: RowTableField,
 		mapTableField: MapTableField,
 		derivedLeafField: DerivedLeafField,
 		checkboxOnlyField: CheckboxOnlyField

@@ -13,7 +13,7 @@
 
 	const taskIds = $derived(worklistJob.taskIds ?? []);
 	const instances = $derived(worklistJob.instances ?? []);
-	const startLabel = $derived(worklistJob.startLabel ?? 'Nuovo');
+	const startLabel = $derived(worklistJob.startLabel ?? 'New');
 	const canStart = $derived(worklistJob.canStart ?? false);
 	const bundles = $derived(living.result?.taskFormBundles ?? []);
 	const provisionalBundle = $derived(findTaskFormBundle(bundles, jobId, taskIds[0] ?? '', ''));

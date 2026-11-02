@@ -29,7 +29,7 @@ func TestFixtureLineLoadReadsDomainProgress(t *testing.T) {
 	task := lineLoadTask(line)
 	dyn := task["dynamicProperties"].(map[string]any)
 	progress := dyn["progress"].(map[string]any)
-	if progress["read"] != "leftovers" {
+	if progress["read"] != "rows" {
 		t.Fatalf("progress.read = %#v", progress["read"])
 	}
 }
@@ -72,9 +72,9 @@ func TestCommitLineLoadSubmissionUnlocksNext(t *testing.T) {
 	if result.Domain.Kind(kindPallet)[intakeID+".2"]["progress"] != "partial" {
 		t.Fatalf("pallet .2 = %#v", result.Domain.Kind(kindPallet)[intakeID+".2"])
 	}
-	leftovers := lineLoadLeftoverIDs(result.Domain)
-	if len(leftovers) != 1 || leftovers[0] != intakeID+".2" {
-		t.Fatalf("leftovers after batch = %#v", leftovers)
+	rows := lineLoadRowIDs(result.Domain)
+	if len(rows) != 1 || rows[0] != intakeID+".2" {
+		t.Fatalf("rows after batch = %#v", rows)
 	}
 
 	line := lineJob(t)
@@ -175,9 +175,9 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		t.Fatalf("lineLoad Submissions per instance: 1st=%d 2nd=%d", lineLoadOn1st, lineLoadOn2nd)
 	}
 
-	leftovers := lineLoadLeftoverIDs(second.Domain)
-	if len(leftovers) != 1 || leftovers[0] != intakeID+".2" {
-		t.Fatalf("cleared pallet must re-enter leftovers: %#v", leftovers)
+	rows := lineLoadRowIDs(second.Domain)
+	if len(rows) != 1 || rows[0] != intakeID+".2" {
+		t.Fatalf("cleared pallet must re-enter rows: %#v", rows)
 	}
 }
 

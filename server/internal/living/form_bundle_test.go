@@ -179,7 +179,7 @@ func addresses(bundles []*TaskFormBundle) []string {
 	return out
 }
 
-func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
+func TestLoadJSONTaskFormBundlePalletWeightRows(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	instanceID := "NIR-261019-NO-1"
 	commitThroughCodiceFir(t, c, instanceID)
@@ -195,8 +195,8 @@ func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
 	if bundle.Surface != "live" {
 		t.Fatalf("surface = %q", bundle.Surface)
 	}
-	if len(bundle.LeftoverIDs) == 0 {
-		t.Fatal("palletWeight bundle missing leftoverIds")
+	if len(bundle.RowIDs) == 0 {
+		t.Fatal("palletWeight bundle missing rowIds")
 	}
 	if bundle.ProjectionKey == "" {
 		t.Fatal("missing projectionKey")
@@ -227,8 +227,8 @@ func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
 		t.Fatal("expected submissions after codiceFir for DomainSnapshot-shaped bindings")
 	}
 	weights, _ := bundle.InitialData["weights"].(map[string]any)
-	if len(weights) != len(bundle.LeftoverIDs) {
-		t.Fatalf("initial weights = %#v, leftovers = %#v", weights, bundle.LeftoverIDs)
+	if len(weights) != len(bundle.RowIDs) {
+		t.Fatalf("initial weights = %#v, rows = %#v", weights, bundle.RowIDs)
 	}
 	props, _ := bundle.Schema["properties"].(map[string]any)
 	weightsSchema, _ := props["weights"].(map[string]any)
@@ -239,8 +239,8 @@ func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
 	case []any:
 		requiredLen = len(req)
 	}
-	if requiredLen != len(bundle.LeftoverIDs) {
-		t.Fatalf("projected weights.required = %#v, leftovers = %#v", weightsSchema["required"], bundle.LeftoverIDs)
+	if requiredLen != len(bundle.RowIDs) {
+		t.Fatalf("projected weights.required = %#v, rows = %#v", weightsSchema["required"], bundle.RowIDs)
 	}
 }
 
@@ -259,8 +259,8 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	if pallet == nil {
 		t.Fatalf("missing palletWeight; got %#v", addresses(afterFir.TaskFormBundles))
 	}
-	if len(pallet.LeftoverIDs) == 0 {
-		t.Fatal("palletWeight full-map needs Domain-read leftover ids")
+	if len(pallet.RowIDs) == 0 {
+		t.Fatal("palletWeight full-map needs Domain-read row ids")
 	}
 	weightsProps, _ := pallet.Schema["properties"].(map[string]any)
 	weightsSchema, _ := weightsProps["weights"].(map[string]any)
@@ -271,8 +271,8 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	case []any:
 		weightsRequired = len(req)
 	}
-	if weightsRequired != len(pallet.LeftoverIDs) {
-		t.Fatalf("full-map weights.required = %#v, leftovers = %#v", weightsSchema["required"], pallet.LeftoverIDs)
+	if weightsRequired != len(pallet.RowIDs) {
+		t.Fatalf("full-map weights.required = %#v, rows = %#v", weightsSchema["required"], pallet.RowIDs)
 	}
 
 	if _, err := c.Commit(t.Context(), "feragame", opLogistic, CommitRequest{
@@ -294,7 +294,7 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	if lineLoad == nil {
 		t.Fatalf("missing lineLoad; got %#v", addresses(shift.TaskFormBundles))
 	}
-	if len(lineLoad.LeftoverIDs) == 0 {
+	if len(lineLoad.RowIDs) == 0 {
 		t.Fatal("lineLoad partial-map still projects Domain-read row ids")
 	}
 	progressProps, _ := lineLoad.Schema["properties"].(map[string]any)

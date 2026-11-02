@@ -4,15 +4,15 @@
 	import ConfigForm from './ConfigForm.svelte';
 	import { createConfigForm } from './create-config-form.svelte.js';
 	import {
-		leftoverValueTypeFromSchema,
+		rowValueTypeFromSchema,
 		progressEnumsFromFormSchema
 	} from './form-progress.js';
-	import { setLeftoverContext } from './leftover-context.js';
+	import { setRowContext } from './row-context.js';
 
 	type Props = {
 		schema: Schema;
 		uiSchema: UiSchemaRoot;
-		leftoverIds: string[];
+		rowIds: string[];
 		columns: { id: string; value: string };
 		/** Draft owned by StepStackSession — shell does not persist. */
 		value: Record<string, unknown>;
@@ -26,11 +26,11 @@
 
 	// Parent remounts via {#key projectionKey}; capture mount snapshot once.
 	const mount = untrack(() => {
-		const valueType = leftoverValueTypeFromSchema(props.schema);
+		const valueType = rowValueTypeFromSchema(props.schema);
 		return {
 			schema: props.schema,
 			uiSchema: props.uiSchema,
-			leftoverIds: props.leftoverIds,
+			rowIds: props.rowIds,
 			columns: props.columns,
 			valueType,
 			progressEnums:
@@ -40,8 +40,8 @@
 		};
 	});
 
-	setLeftoverContext({
-		ids: mount.leftoverIds,
+	setRowContext({
+		ids: mount.rowIds,
 		columns: mount.columns,
 		valueType: mount.valueType,
 		progressEnums: mount.progressEnums

@@ -63,16 +63,16 @@ Task-level Domain readiness (boolean expression over Domain). Combined with the 
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression
 
 **Domain reads** (map/table Tasks):
-Authored `reads` + `dynamicProperties` that project current entity ids into a form map. Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate Leftovers subsystem; not spawn-many of full child registers.
-_Avoid_: Completeness `all`/`some` as product grammar; SPA twin leftover-id helpers; conflating map reads with Task group
+Authored `reads` + `dynamicProperties` that project current entity ids into a form map (row projection / `rowIds` on the Task form bundle). Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate subsystem; not spawn-many of full child registers.
+_Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product grammar; SPA twin Domain-read id helpers; conflating map reads with Task group
 
 **Submission**:
 Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order, startsWhen, and Worklist done status read Submissions only (one successful Submission finishes the Task on that instance).
-_Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts; leftover-id reopen as done law
+_Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts; row-id reopen as done law
 
 **Draft**:
 Working data of an in-progress Task before Submission. Operators keep WIP in draft and Invia once. Not part of Domain until Commit succeeds.
-_Avoid_: Submission; Domain; multi-pass Task reopen while “leftover ids remain”
+_Avoid_: Submission; Domain; multi-pass Task reopen while “row ids remain”
 
 ### Roles
 
@@ -130,11 +130,11 @@ _Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` a
 
 **Worklist**:
 Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, and `repeatable` for Config-free chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order and startsWhen are evaluated only on the server from **Submission** relations; a Task is `done` after Submission on the instance. The UI reads the projection and does not re-implement those rules.
-_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; leftover-id reopen for Task status; inventing Task order/labels from a client Org Config snapshot
+_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; row-id reopen for Task status; inventing Task order/labels from a client Org Config snapshot
 
 **Task form bundle**:
 Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load/Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Load/Commit ship a set for every Worklist-`available` Task plus a provisional bundle (`jobInstanceId` empty) when `canStart`.
-_Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live draft-driven Chrome results as static strings; SPA Domain walk for dataReport or leftover ids
+_Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live draft-driven Chrome results as static strings; SPA Domain walk for dataReport or row ids
 
 **AuthPort / AuthorizerPort**:
 Who is calling (`OperatorIdentity`) vs who may complete a Task; Commit uses both. Production AuthorizerPort Adapter is Cerbos.

@@ -129,8 +129,8 @@ func TestCommitPalletWeightCompleteAllUnlocksAndStartsWhen(t *testing.T) {
 	if len(result.Domain.Submissions) != 3 || result.Domain.Submissions[2].TaskID != "palletWeight" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
 	}
-	if leftovers := palletWeightLeftoverIDs(result.Domain, instanceID); len(leftovers) != 0 {
-		t.Fatalf("leftovers after complete = %#v", leftovers)
+	if rows := palletWeightRowIDs(result.Domain, instanceID); len(rows) != 0 {
+		t.Fatalf("rows after complete = %#v", rows)
 	}
 
 	intake := intakeTasks(t)

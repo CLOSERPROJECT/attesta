@@ -123,7 +123,7 @@ func TestIsTaskUnlockedSubmissionGatesNext(t *testing.T) {
 		{
 			"id": "lineLoad",
 			"dynamicProperties": map[string]any{
-				"progress": map[string]any{"read": "leftovers"},
+				"progress": map[string]any{"read": "rows"},
 			},
 		},
 		{"id": "next"},
@@ -150,7 +150,7 @@ func intakeUnlockTasks() []TaskConfig {
 		{
 			"id": "palletWeight",
 			"dynamicProperties": map[string]any{
-				"weights": map[string]any{"read": "leftovers"},
+				"weights": map[string]any{"read": "rows"},
 			},
 		},
 		{"id": "weightCheck"},

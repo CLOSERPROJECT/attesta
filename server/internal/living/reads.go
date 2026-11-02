@@ -105,8 +105,8 @@ func jobInstanceLabel(domain Domain, jobID, id string) string {
 	return ""
 }
 
-// leftoverReadFromTask extracts the Domain-read ReadDef from Task reads + dynamicProperties.
-func leftoverReadFromTask(task map[string]any) (ReadDef, bool, error) {
+// rowReadFromTask extracts the Domain-read ReadDef from Task reads + dynamicProperties.
+func rowReadFromTask(task map[string]any) (ReadDef, bool, error) {
 	primary, ok := primaryDynamicProperty(task)
 	if !ok {
 		return ReadDef{}, false, nil
@@ -167,7 +167,7 @@ func primaryDynamicProperty(task map[string]any) (key string, ok bool) {
 	return "", false
 }
 
-func needsLeftoverProjection(task map[string]any) bool {
+func needsRowProjection(task map[string]any) bool {
 	_, ok := primaryDynamicProperty(task)
 	return ok
 }

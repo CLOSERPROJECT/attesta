@@ -16,7 +16,7 @@
 
 	setThemeContext({ components });
 
-	// setContext must run at init; parent remounts via projection key when leftovers change.
+	// setContext must run at init; parent remounts via projection key when row ids change.
 	const mounted = untrack(() => form as CreateConfigFormResult<Record<string, unknown>>);
 	const configForm = mounted.configForm;
 	if (configForm) {

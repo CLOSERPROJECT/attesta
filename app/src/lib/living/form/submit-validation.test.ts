@@ -41,15 +41,15 @@ describe('submit validation visibility', () => {
 		).toMatch(/progress\.b/);
 	});
 
-	test('createConfigForm / leftoverTable / TaskForm wire onSubmitError path', () => {
+	test('createConfigForm / rowTable / TaskForm wire onSubmitError path', () => {
 		const createCfg = readFileSync(join(libDir, 'create-config-form.svelte.ts'), 'utf8');
-		const leftover = readFileSync(join(libDir, 'leftover-table-field.svelte'), 'utf8');
+		const rowSrc = readFileSync(join(libDir, 'row-table-field.svelte'), 'utf8');
 		const shell = readFileSync(join(libDir, 'TableFormShell.svelte'), 'utf8');
 		const task = readFileSync(join(libDir, '../TaskForm.svelte'), 'utf8');
 		expect(createCfg).toContain('onSubmitError');
 		expect(shell).toContain('onSubmitError');
-		expect(leftover).toContain('getFieldsErrors');
-		expect(leftover).toContain('getChildPath');
+		expect(rowSrc).toContain('getFieldsErrors');
+		expect(rowSrc).toContain('getChildPath');
 		expect(task).toContain('task-submit-error');
 		expect(task).toContain('onSubmitError');
 		expect(task).toContain('shellEpoch');

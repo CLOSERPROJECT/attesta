@@ -9,20 +9,20 @@
 	} from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import { omitUntouchedProgressCells } from './form-progress.js';
-	import { getLeftoverContext } from './leftover-context.js';
+	import { getRowContext } from './row-context.js';
 
 	let {
 		config,
 		value = $bindable(),
 		uiOption
-	}: ComponentProps['leftoverTableField'] = $props();
+	}: ComponentProps['rowTableField'] = $props();
 
 	const ctx = getFormContext();
-	const leftovers = getLeftoverContext();
+	const rowCtx = getRowContext();
 
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
-	const rows = $derived(leftovers.ids);
-	const progressEnums = $derived(leftovers.progressEnums);
+	const rows = $derived(rowCtx.ids);
+	const progressEnums = $derived(rowCtx.progressEnums);
 	// Ajv nests under map/<id>; exact getFieldErrors(map) alone is silent.
 	const errors = $derived.by(() => {
 		const own = getFieldErrors(ctx, config.path);
@@ -88,23 +88,23 @@
 	{errors}
 >
 	{#if rows.length === 0}
-		<p class="leftover-empty" data-testid="leftover-empty">No leftovers</p>
+		<p class="row-empty" data-testid="row-empty">No rows</p>
 	{:else}
-		<table class="leftover-table" data-testid="leftover-table">
+		<table class="row-table" data-testid="row-table">
 			<thead>
 				<tr>
-					<th scope="col">{leftovers.columns.id}</th>
-					<th scope="col">{leftovers.columns.value}</th>
+					<th scope="col">{rowCtx.columns.id}</th>
+					<th scope="col">{rowCtx.columns.value}</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each rows as id (id)}
 					<tr>
-						<td class="leftover-id">
+						<td class="row-id">
 							<code>{id}</code>
 						</td>
-						<td class="leftover-value">
-							{#if leftovers.valueType === 'progress'}
+						<td class="row-value">
+							{#if rowCtx.valueType === 'progress'}
 								<select
 									value={displayById[id] ?? ''}
 									onchange={(event) => {
@@ -139,30 +139,30 @@
 </Template>
 
 <style>
-	.leftover-table {
+	.row-table {
 		width: 100%;
 		border-collapse: collapse;
 		font-size: 0.875rem;
 	}
 
-	.leftover-table th,
-	.leftover-table td {
+	.row-table th,
+	.row-table td {
 		border-bottom: 1px solid #e4e4e7;
 		padding: 0.5rem 0.25rem;
 		text-align: left;
 	}
 
-	.leftover-table th {
+	.row-table th {
 		font-weight: 500;
 		color: #52525b;
 	}
 
-	.leftover-id code {
+	.row-id code {
 		font-size: 0.8rem;
 	}
 
-	.leftover-value input[type='number'],
-	.leftover-value select {
+	.row-value input[type='number'],
+	.row-value select {
 		width: 100%;
 		max-width: 10rem;
 		border: 1px solid #d4d4d8;
@@ -170,7 +170,7 @@
 		padding: 0.25rem 0.5rem;
 	}
 
-	.leftover-empty {
+	.row-empty {
 		margin: 0.25rem 0 0.75rem;
 		color: #71717a;
 		font-size: 0.875rem;

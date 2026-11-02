@@ -6,10 +6,10 @@ import (
 )
 
 type projectedForm struct {
-	Schema      map[string]any
-	UiSchema    map[string]any
-	LeftoverIDs []string
-	Columns     *FormColumns
+	Schema   map[string]any
+	UiSchema map[string]any
+	RowIDs   []string
+	Columns  *FormColumns
 }
 
 // projectTaskForm injects dynamicProperties propertyNames + enumReads enums,
@@ -32,7 +32,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 	uiRaw, _ := task["uiSchema"].(map[string]any)
 	uiSchema := cloneMapJSON(uiRaw)
 
-	leftoverIDs := []string{}
+	rowIDs := []string{}
 	var columns *FormColumns
 	primary, hasPrimary := primaryDynamicProperty(task)
 	mutated := false
@@ -80,7 +80,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			uiSchema[property] = paintAuthoredFieldMarkers(propUi)
 
 			if hasPrimary && property == primary {
-				leftoverIDs = ids
+				rowIDs = ids
 				columns = readFormColumns(uiSchema[property])
 			}
 		}
@@ -127,10 +127,10 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 	uiSchema["ui:options"] = rootOpts
 
 	return projectedForm{
-		Schema:      schema,
-		UiSchema:    uiSchema,
-		LeftoverIDs: leftoverIDs,
-		Columns:     columns,
+		Schema:   schema,
+		UiSchema: uiSchema,
+		RowIDs:   rowIDs,
+		Columns:  columns,
 	}, nil
 }
 
@@ -204,7 +204,7 @@ var authoredFieldRegistry = map[string]struct {
 	componentKey string
 	slot         string
 }{
-	"leftoverTable": {"leftoverTableField", "objectField"},
+	"rowTable":      {"rowTableField", "objectField"},
 	"mapTable":      {"mapTableField", "objectField"},
 	"derivedLeaf":   {"derivedLeafField", "numberField"},
 	"checkbox-only": {"checkboxOnlyField", "booleanField"},

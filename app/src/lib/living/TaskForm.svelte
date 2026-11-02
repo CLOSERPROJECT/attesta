@@ -47,7 +47,7 @@
 	let submitError = $state.raw<string | null>(null);
 	let live: LiveTaskForm | null = $state(null);
 	let plan = $state.raw<TaskFormPlan | null>(null);
-	/** Bumped after successful leftover Commit so TableFormShell remounts from bundle seed. */
+	/** Bumped after successful row-table Commit so TableFormShell remounts from bundle seed. */
 	let shellEpoch = $state(0);
 	let seededFromBundle = $state(false);
 
@@ -96,7 +96,7 @@
 			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
 		});
 		if (mintedId == null) return;
-		if (bundle.surface === 'leftover-table') {
+		if (bundle.surface === 'row-table') {
 			const next = findTaskFormBundle(
 				living.result?.taskFormBundles,
 				jobId,
@@ -155,7 +155,7 @@
 		void bundle;
 
 		seedBundleDraft(bundle);
-		if (bundle.surface === 'leftover-table') {
+		if (bundle.surface === 'row-table') {
 			disposeLive();
 			plan = planFromTaskFormBundle(bundle);
 			return;
@@ -168,16 +168,16 @@
 
 	onDestroy(() => disposeLive());
 
-	const leftoverIds = $derived(bundle.leftoverIds ?? []);
+	const rowIds = $derived(bundle.rowIds ?? []);
 	const projectionKey = $derived(bundle.projectionKey ?? '');
 	const shellKey = $derived(`${projectionKey}:${shellEpoch}`);
 	const showLinks = $derived(
 		living.lastHttpLinks.length > 0 || living.lastHttpErrors.length > 0
 	);
-	const leftoverColumns = $derived(bundle.columns);
-	const leftoverSchema = $derived(bundle.schema);
-	const leftoverUiSchema = $derived(bundle.uiSchema);
-	const showLeftoverTable = $derived(bundle.surface === 'leftover-table');
+	const rowColumns = $derived(bundle.columns);
+	const rowSchema = $derived(bundle.schema);
+	const rowUiSchema = $derived(bundle.uiSchema);
+	const showRowTable = $derived(bundle.surface === 'row-table');
 </script>
 
 <section
@@ -189,15 +189,15 @@
 >
 	<h3 class="text-sm font-semibold text-zinc-800">{title}</h3>
 
-	{#if showLeftoverTable}
-		{#if leftoverSchema && leftoverUiSchema}
+	{#if showRowTable}
+		{#if rowSchema && rowUiSchema}
 			{#key shellKey}
 				<fieldset disabled={disabled || living.committing} class="space-y-4">
 					<TableFormShell
-						schema={leftoverSchema}
-						uiSchema={leftoverUiSchema}
-						leftoverIds={[...leftoverIds]}
-						columns={leftoverColumns ?? { id: 'Id', value: 'Value' }}
+						schema={rowSchema}
+						uiSchema={rowUiSchema}
+						rowIds={[...rowIds]}
+						columns={rowColumns ?? { id: 'Id', value: 'Value' }}
 						value={readDraft()}
 						onValueChange={writeDraft}
 						onSubmit={(value) => void submitSealed(value)}
@@ -207,7 +207,7 @@
 				</fieldset>
 			{/key}
 			<p class="text-xs text-zinc-500">
-				Leftovers: {leftoverIds.length ? leftoverIds.join(', ') : 'none'}
+				Rows: {rowIds.length ? rowIds.join(', ') : 'none'}
 			</p>
 		{/if}
 	{:else if live?.form}

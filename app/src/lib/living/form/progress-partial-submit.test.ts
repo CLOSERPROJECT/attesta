@@ -1,7 +1,7 @@
 /**
- * Regression: leftover-table Commit with one enum cell + "—" clear.
+ * Regression: row-table Commit with one enum cell + "—" clear.
  *
- * leftover-table-field.setProgressCell writes `null` for clear. Authored
+ * row-table-field.setProgressCell writes `null` for clear. Authored
  * progress.additionalProperties must allow null | enum so Ajv Draft does not
  * block submit before onSubmit / Commit. Server filterFilledProgress keeps null
  * (clear) and omits untouched "".
@@ -31,7 +31,7 @@ describe('lineLoad partial progress submit (Ajv draft)', () => {
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 	const schema = lineLoadProjectedSchema();
 
-	/** Mirrors leftover-table-field.setProgressCell write semantics. */
+	/** Mirrors row-table-field.setProgressCell write semantics. */
 	function setProgressCell(
 		value: Record<string, unknown>,
 		id: string,

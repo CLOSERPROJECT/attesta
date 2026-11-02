@@ -107,18 +107,18 @@ func coerceSchemaValue(raw any, prop map[string]any, key, id string) (any, error
 	return raw, nil
 }
 
-func validateObjectRowFacts(facts map[string]any, leftoverIDs []string, rowSchema map[string]any) string {
+func validateObjectRowFacts(facts map[string]any, rowIDs []string, rowSchema map[string]any) string {
 	if len(facts) == 0 {
 		return "nothing to submit — fill at least one row"
 	}
-	allowed := make(map[string]struct{}, len(leftoverIDs))
-	for _, id := range leftoverIDs {
+	allowed := make(map[string]struct{}, len(rowIDs))
+	for _, id := range rowIDs {
 		allowed[id] = struct{}{}
 	}
 	props, _ := rowSchema["properties"].(map[string]any)
 	for id, raw := range facts {
 		if _, ok := allowed[id]; !ok {
-			return fmt.Sprintf("id not in leftovers: %s", id)
+			return fmt.Sprintf("id not in rows: %s", id)
 		}
 		row, _ := raw.(map[string]any)
 		if row == nil {
@@ -216,17 +216,17 @@ func progressEnumsFromSchema(add map[string]any) []string {
 	return nil
 }
 
-func validateProgressFacts(facts map[string]any, leftoverIDs []string) string {
+func validateProgressFacts(facts map[string]any, rowIDs []string) string {
 	if len(facts) == 0 {
 		return "nothing to submit — fill at least one row"
 	}
-	allowed := make(map[string]struct{}, len(leftoverIDs))
-	for _, id := range leftoverIDs {
+	allowed := make(map[string]struct{}, len(rowIDs))
+	for _, id := range rowIDs {
 		allowed[id] = struct{}{}
 	}
 	for id := range facts {
 		if _, ok := allowed[id]; !ok {
-			return fmt.Sprintf("id not in leftovers: %s", id)
+			return fmt.Sprintf("id not in rows: %s", id)
 		}
 	}
 	return ""
@@ -308,9 +308,9 @@ func additionalPropertiesSchema(task map[string]any, primary string) map[string]
 	return add
 }
 
-// leftoverIDsForTask resolves row eligibility from Task reads.where (config-driven).
-func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string, catalogs map[string]any) ([]string, error) {
-	read, ok, err := leftoverReadFromTask(task)
+// rowIDsForTask resolves row eligibility from Task reads.where (config-driven).
+func rowIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string, catalogs map[string]any) ([]string, error) {
+	read, ok, err := rowReadFromTask(task)
 	if err != nil {
 		return nil, err
 	}
@@ -319,29 +319,4 @@ func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobIns
 	}
 	label := jobInstanceLabel(domain, jobID, jobInstanceID)
 	return ResolveRead(domain, read, jobInstanceID, label, catalogs)
-}
-
-// Test helpers kept as thin wrappers over fixture where exprs (no plant filters in Go).
-func palletWeightLeftoverIDs(domain Domain, jobInstanceID string) []string {
-	ids, err := ResolveRead(domain, ReadDef{
-		Entity: EntityPallet,
-		Where:  "loadId = $instance.id and $not($exists(weight))",
-		Key:    "id",
-	}, jobInstanceID, "", nil)
-	if err != nil {
-		return nil
-	}
-	return ids
-}
-
-func lineLoadLeftoverIDs(domain Domain) []string {
-	ids, err := ResolveRead(domain, ReadDef{
-		Entity: EntityPallet,
-		Where:  "$exists(weight) and $not(progress = 'done')",
-		Key:    "id",
-	}, "", "", nil)
-	if err != nil {
-		return nil
-	}
-	return ids
 }

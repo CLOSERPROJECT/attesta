@@ -10,10 +10,10 @@ type prepResult struct {
 
 // prepTaskSubmission filters dynamic-map values into transform facts.
 // Chrome field ids (display-only) are stripped here — Commit law, not SPA seal.
-func prepTaskSubmission(task map[string]any, value map[string]any, leftoverIDs []string) (prepResult, error) {
+func prepTaskSubmission(task map[string]any, value map[string]any, rowIDs []string) (prepResult, error) {
 	value = stripChromeFields(task, value)
-	if needsLeftoverProjection(task) {
-		return prepDynamicMapFacts(task, value, leftoverIDs)
+	if needsRowProjection(task) {
+		return prepDynamicMapFacts(task, value, rowIDs)
 	}
 	return prepResult{Facts: cloneFacts(value)}, nil
 }
@@ -30,18 +30,18 @@ func stripChromeFields(task map[string]any, value map[string]any) map[string]any
 	return out
 }
 
-func prepDynamicMapFacts(task map[string]any, value map[string]any, leftoverIDs []string) (prepResult, error) {
+func prepDynamicMapFacts(task map[string]any, value map[string]any, rowIDs []string) (prepResult, error) {
 	primary, ok := primaryDynamicProperty(task)
 	if !ok {
 		return prepResult{}, fmt.Errorf("dynamic-map Task missing primary property")
 	}
 	fullMap := schemaRequiresProperty(task, primary)
 
-	if fullMap && len(leftoverIDs) == 0 {
+	if fullMap && len(rowIDs) == 0 {
 		return prepResult{Facts: map[string]any{}}, nil
 	}
 
-	mapValue := leftoverMapValue(task, value, primary)
+	mapValue := rowMapValue(task, value, primary)
 	addSchema := additionalPropertiesSchema(task, primary)
 
 	var facts map[string]any
@@ -50,7 +50,7 @@ func prepDynamicMapFacts(task map[string]any, value map[string]any, leftoverIDs 
 		if err != nil {
 			return prepResult{}, err
 		}
-		if msg := validateProgressFacts(filled, leftoverIDs); msg != "" {
+		if msg := validateProgressFacts(filled, rowIDs); msg != "" {
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
 		facts = filled
@@ -59,21 +59,21 @@ func prepDynamicMapFacts(task map[string]any, value map[string]any, leftoverIDs 
 		if err != nil {
 			return prepResult{}, err
 		}
-		if msg := validateObjectRowFacts(filled, leftoverIDs, addSchema); msg != "" {
+		if msg := validateObjectRowFacts(filled, rowIDs, addSchema); msg != "" {
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
 		facts = filled
 	}
 
 	if fullMap {
-		if msg := enforceRequiredMapKeys(facts, leftoverIDs); msg != "" {
+		if msg := enforceRequiredMapKeys(facts, rowIDs); msg != "" {
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
 	}
 	return prepResult{Facts: facts}, nil
 }
 
-func leftoverMapValue(task map[string]any, value map[string]any, primary string) map[string]any {
+func rowMapValue(task map[string]any, value map[string]any, primary string) map[string]any {
 	if primary == "" {
 		return value
 	}
@@ -122,12 +122,12 @@ func schemaTypeIncludesString(raw any) bool {
 	return false
 }
 
-func enforceRequiredMapKeys(facts map[string]any, leftoverIDs []string) string {
-	if len(leftoverIDs) == 0 {
+func enforceRequiredMapKeys(facts map[string]any, rowIDs []string) string {
+	if len(rowIDs) == 0 {
 		return ""
 	}
 	var missing []string
-	for _, id := range leftoverIDs {
+	for _, id := range rowIDs {
 		if _, ok := facts[id]; !ok {
 			missing = append(missing, id)
 		}

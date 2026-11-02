@@ -209,9 +209,9 @@ steps:
 
               dynamicProperties:
                 weights:
-                    read: leftovers
+                    read: rows
               reads:
-                leftovers:
+                rows:
                     entity: pallet
                     where: loadId = $instance.id and $not($exists(weight))
                     key: id
@@ -366,9 +366,9 @@ steps:
               # One Commit (draft → Invia); progress not in schema.required → partial map ok.
               dynamicProperties:
                 progress:
-                    read: leftovers
+                    read: rows
               reads:
-                leftovers:
+                rows:
                     entity: pallet
                     where: $exists(weight) and $not(progress = 'done')
                     key: id
@@ -386,7 +386,7 @@ steps:
                                   enum: [partial, done]
               uiSchema:
                 progress:
-                    ui:field: leftoverTable
+                    ui:field: rowTable
                     ui:options:
                         expandable: false
                         columns: {id: Bancale, value: Avanzamento}

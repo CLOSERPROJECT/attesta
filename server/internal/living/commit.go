@@ -233,16 +233,16 @@ func applyConfigCommit(
 	ts string,
 	mintKind MintKind,
 ) (appliedCommit, error) {
-	var leftoverIDs []string
-	if needsLeftoverProjection(task) {
-		ids, err := leftoverIDsForTask(domain, jobID, task, jobInstanceID, cfg.Catalogs)
+	var rowIDs []string
+	if needsRowProjection(task) {
+		ids, err := rowIDsForTask(domain, jobID, task, jobInstanceID, cfg.Catalogs)
 		if err != nil {
 			return appliedCommit{}, &CommitError{Kind: "prep", Message: err.Error()}
 		}
-		leftoverIDs = ids
+		rowIDs = ids
 	}
 
-	prep, err := prepTaskSubmission(task, value, leftoverIDs)
+	prep, err := prepTaskSubmission(task, value, rowIDs)
 	if err != nil {
 		return appliedCommit{}, &CommitError{Kind: "prep", Message: err.Error()}
 	}

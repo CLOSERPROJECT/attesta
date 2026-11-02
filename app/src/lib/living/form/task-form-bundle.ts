@@ -9,11 +9,11 @@ export type TaskFormBundle = {
 	taskId: string;
 	jobInstanceId: string;
 	title: string;
-	surface: 'live' | 'leftover-table';
+	surface: 'live' | 'row-table';
 	schema: Schema;
 	uiSchema: UiSchemaRoot;
 	initialData: Record<string, unknown>;
-	leftoverIds?: string[];
+	rowIds?: string[];
 	columns?: { id: string; value: string };
 	chrome: ChromeEntry[];
 	derived?: Record<string, DerivedKeyEntry>;

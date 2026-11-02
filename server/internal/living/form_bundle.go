@@ -14,11 +14,11 @@ type TaskFormBundle struct {
 	TaskID         string                 `json:"taskId"`
 	JobInstanceID  string                 `json:"jobInstanceId"`
 	Title          string                 `json:"title"`
-	Surface        string                 `json:"surface"` // live | leftover-table
+	Surface        string                 `json:"surface"` // live | row-table
 	Schema         map[string]any         `json:"schema"`
 	UiSchema       map[string]any         `json:"uiSchema"`
 	InitialData    map[string]any         `json:"initialData"`
-	LeftoverIDs    []string               `json:"leftoverIds,omitempty"`
+	RowIDs         []string               `json:"rowIds,omitempty"`
 	Columns        *FormColumns           `json:"columns,omitempty"`
 	Chrome         []ChromeRule           `json:"chrome"`
 	Derived        map[string]DerivedRule `json:"derived,omitempty"`
@@ -28,7 +28,7 @@ type TaskFormBundle struct {
 	Bindings       map[string]any         `json:"bindings"`
 }
 
-// FormColumns labels for leftover / map-table Id header.
+// FormColumns labels for row / map-table Id header.
 type FormColumns struct {
 	ID    string `json:"id"`
 	Value string `json:"value"`
@@ -159,19 +159,19 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 	uiSchema = withDefaultPlaceholders(uiSchema, schema, chromeFieldIDs)
 	paintHideRootFormTitle(uiSchema)
 
-	derived := compileDerivedRules(payload, projected.LeftoverIDs)
+	derived := compileDerivedRules(payload, projected.RowIDs)
 	surface := "live"
 	if primary, ok := primaryDynamicProperty(payload); ok {
 		if additionalPropertiesIsProgress(additionalPropertiesSchema(payload, primary)) {
-			surface = "leftover-table"
+			surface = "row-table"
 		}
 	}
 
 	sealFieldIDs := sortedKeys(sealIDs)
 	title := taskTitle(payload, ref.TaskID)
 	projectionKey := ""
-	if len(projected.LeftoverIDs) > 0 {
-		projectionKey = leftoversIdentity(projected.LeftoverIDs)
+	if len(projected.RowIDs) > 0 {
+		projectionKey = rowsIdentity(projected.RowIDs)
 	}
 
 	initial := seedInitialData(domain, payload, projected)
@@ -189,7 +189,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 		Schema:         schema,
 		UiSchema:       uiSchema,
 		InitialData:    initial,
-		LeftoverIDs:    projected.LeftoverIDs,
+		RowIDs:         projected.RowIDs,
 		Columns:        projected.Columns,
 		Chrome:         chrome,
 		Derived:        derived,
@@ -297,15 +297,15 @@ func buildFormBindings(domain Domain, ref AvailableTaskRef, catalogs map[string]
 func seedInitialData(domain Domain, payload map[string]any, projected projectedForm) map[string]any {
 	out := map[string]any{}
 	primary, ok := primaryDynamicProperty(payload)
-	if !ok || len(projected.LeftoverIDs) == 0 {
+	if !ok || len(projected.RowIDs) == 0 {
 		return out
 	}
 	add := additionalPropertiesSchema(payload, primary)
 	if additionalPropertiesIsProgress(add) {
 		enums := progressEnumsFromSchema(add)
 		progress := map[string]any{}
-		entities := leftoverEntityMap(domain, payload)
-		for _, id := range projected.LeftoverIDs {
+		entities := rowEntityMap(domain, payload)
+		for _, id := range projected.RowIDs {
 			facts, hit := entities[id]
 			if !hit {
 				continue
@@ -323,7 +323,7 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 	if schemaTypeIs(add["type"], "object") {
 		rows := map[string]any{}
 		template := seedRowFromSchema(add)
-		for _, id := range projected.LeftoverIDs {
+		for _, id := range projected.RowIDs {
 			rows[id] = cloneMapJSON(template)
 		}
 		out[primary] = rows
@@ -333,8 +333,8 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 	return out
 }
 
-func leftoverEntityMap(domain Domain, payload map[string]any) EntityMap {
-	read, ok, err := leftoverReadFromTask(payload)
+func rowEntityMap(domain Domain, payload map[string]any) EntityMap {
+	read, ok, err := rowReadFromTask(payload)
 	if err != nil || !ok {
 		return EntityMap{}
 	}
@@ -420,7 +420,7 @@ func schemaTypeIs(raw any, want string) bool {
 	return false
 }
 
-func leftoversIdentity(ids []string) string {
+func rowsIdentity(ids []string) string {
 	sorted := append([]string(nil), ids...)
 	sort.Strings(sorted)
 	return strings.Join(sorted, "|")

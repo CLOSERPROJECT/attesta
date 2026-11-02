@@ -10,7 +10,7 @@ func TestIsStartsWhenSatisfiedSomeRequiresMatchingSubmission(t *testing.T) {
 	instances := []JobInstance{{JobID: "intake", ID: "load-1", Label: "load-1"}}
 	eligible := map[string]any{
 		"dynamicProperties": map[string]any{
-			"weights": map[string]any{"read": "leftovers"},
+			"weights": map[string]any{"read": "rows"},
 		},
 	}
 	if IsStartsWhenSatisfied(gate, nil, instances, eligible) {

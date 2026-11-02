@@ -18,14 +18,14 @@ func feragameWeighRowSchema() map[string]any {
 	}
 }
 
-func TestPalletWeightLeftoverIDsSkipsWeighted(t *testing.T) {
+func TestPalletWeightRowIDsSkipsWeighted(t *testing.T) {
 	domain := EmptyDomain()
 	putKind(&domain, kindPallet, EntityMap{
 		"load-1.1": map[string]any{"loadId": "load-1"},
 		"load-1.2": map[string]any{"loadId": "load-1", "weight": 11.0},
 		"load-2.1": map[string]any{"loadId": "load-2"},
 	})
-	got := palletWeightLeftoverIDs(domain, "load-1")
+	got := palletWeightRowIDs(domain, "load-1")
 	if len(got) != 1 || got[0] != "load-1.1" {
 		t.Fatalf("got = %#v", got)
 	}
@@ -64,7 +64,7 @@ func TestFilterFilledObjectRowsUsesSchema(t *testing.T) {
 	}
 }
 
-func TestLineLoadLeftoverIDsSkipsDone(t *testing.T) {
+func TestLineLoadRowIDsSkipsDone(t *testing.T) {
 	domain := EmptyDomain()
 	putKind(&domain, kindPallet, EntityMap{
 		"a": map[string]any{"loadId": "load-1", "weight": 11.0},
@@ -72,13 +72,13 @@ func TestLineLoadLeftoverIDsSkipsDone(t *testing.T) {
 		"c": map[string]any{"loadId": "load-1", "weight": 33.0, "progress": "done"},
 		"d": map[string]any{"loadId": "load-1"},
 	})
-	got := lineLoadLeftoverIDs(domain)
+	got := lineLoadRowIDs(domain)
 	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
 		t.Fatalf("got = %#v", got)
 	}
 }
 
-func TestLeftoverCoercionSchemaAndHelperEdges(t *testing.T) {
+func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	_, err := coerceObjectRow(
 		map[string]any{"weight": "  ", "note": "x"},
 		map[string]any{"weight": map[string]any{"type": "number"}},
@@ -134,9 +134,9 @@ func TestLeftoverCoercionSchemaAndHelperEdges(t *testing.T) {
 	}, "weights") != nil {
 		t.Fatal("missing prop schema")
 	}
-	ids, err := leftoverIDsForTask(EmptyDomain(), "intake", map[string]any{}, "", nil)
+	ids, err := rowIDsForTask(EmptyDomain(), "intake", map[string]any{}, "", nil)
 	if err != nil || ids != nil {
-		t.Fatalf("no dynamic leftovers = %#v %v", ids, err)
+		t.Fatalf("no dynamic rows = %#v %v", ids, err)
 	}
 	if !schemaRequiresProperty(map[string]any{
 		"schema": map[string]any{"required": []string{"weights"}},
@@ -146,8 +146,8 @@ func TestLeftoverCoercionSchemaAndHelperEdges(t *testing.T) {
 	if !schemaTypeIs([]any{"object", "null"}, "object") || schemaTypeIs(1, "object") {
 		t.Fatal("schemaTypeIs array/default")
 	}
-	if len(leftoverEntityMap(EmptyDomain(), map[string]any{})) != 0 {
-		t.Fatal("leftoverEntityMap without read")
+	if len(rowEntityMap(EmptyDomain(), map[string]any{})) != 0 {
+		t.Fatal("rowEntityMap without read")
 	}
 	if len(seedRowFromSchema(map[string]any{})) != 0 {
 		t.Fatal("seedRow empty props")
@@ -197,4 +197,29 @@ func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "invalid progress") {
 		t.Fatalf("err = %v", err)
 	}
+}
+
+// Fixture where wrappers (tests only — no plant filters in product Go).
+func palletWeightRowIDs(domain Domain, jobInstanceID string) []string {
+	ids, err := ResolveRead(domain, ReadDef{
+		Entity: EntityPallet,
+		Where:  "loadId = $instance.id and $not($exists(weight))",
+		Key:    "id",
+	}, jobInstanceID, "", nil)
+	if err != nil {
+		return nil
+	}
+	return ids
+}
+
+func lineLoadRowIDs(domain Domain) []string {
+	ids, err := ResolveRead(domain, ReadDef{
+		Entity: EntityPallet,
+		Where:  "$exists(weight) and $not(progress = 'done')",
+		Key:    "id",
+	}, "", "", nil)
+	if err != nil {
+		return nil
+	}
+	return ids
 }

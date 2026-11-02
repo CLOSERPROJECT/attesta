@@ -1,5 +1,5 @@
 /**
- * Cascade #6 regression: one leftover enum + untouched siblings.
+ * Cascade #6 regression: one row enum + untouched siblings.
  * Untouched wire (`""` / own-property undefined) must be omitted before Ajv
  * so submit can Commit; null clear stays.
  *
@@ -15,14 +15,14 @@ import {
 } from './form-progress.js';
 import { planFromTaskFormBundle, type TaskFormBundle } from './task-form-bundle.js';
 
-/** Fixture: lineLoad leftoverTable after Go leftover projection. */
-function lineLoadProjectedSchema(leftoverIds: string[]): Schema {
+/** Fixture: lineLoad rowTable after Go row projection. */
+function lineLoadProjectedSchema(rowIds: string[]): Schema {
 	return {
 		type: 'object',
 		properties: {
 			progress: {
 				type: 'object',
-				propertyNames: { enum: leftoverIds },
+				propertyNames: { enum: rowIds },
 				additionalProperties: {
 					anyOf: [{ type: 'null' }, { type: 'string', enum: ['partial', 'done'] }]
 				}
@@ -32,17 +32,17 @@ function lineLoadProjectedSchema(leftoverIds: string[]): Schema {
 }
 
 function sealPlan() {
-	const leftoverIds = ['NIR-1.1', 'NIR-1.2', 'NIR-1.3'];
+	const rowIds = ['NIR-1.1', 'NIR-1.2', 'NIR-1.3'];
 	const bundle: TaskFormBundle = {
 		jobId: 'line',
 		taskId: 'lineLoad',
 		jobInstanceId: '1st',
 		title: 'lineLoad',
-		surface: 'leftover-table',
-		schema: lineLoadProjectedSchema(leftoverIds),
+		surface: 'row-table',
+		schema: lineLoadProjectedSchema(rowIds),
 		uiSchema: {} as UiSchemaRoot,
 		initialData: {},
-		leftoverIds,
+		rowIds,
 		chrome: [],
 		chromeFieldIds: [],
 		sealFieldIds: [],
@@ -52,8 +52,8 @@ function sealPlan() {
 }
 
 describe('cascade #6 omit untouched progress cells', () => {
-	const leftoverIds = ['NIR-1.1', 'NIR-1.2'];
-	const schema = lineLoadProjectedSchema(leftoverIds);
+	const rowIds = ['NIR-1.1', 'NIR-1.2'];
+	const schema = lineLoadProjectedSchema(rowIds);
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
 	test('omitUntouchedProgressCells drops "" and undefined; keeps null|enum strings', () => {
@@ -79,7 +79,7 @@ describe('cascade #6 omit untouched progress cells', () => {
 	});
 
 	test('createAjvFormValidator: enum + sibling "" validates (submit path)', () => {
-		const [touched, sibling] = leftoverIds;
+		const [touched, sibling] = rowIds;
 		const progress = { [touched]: 'done', [sibling]: '' };
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
 		const result = validator.validateFormValue(schema, { progress });
@@ -88,7 +88,7 @@ describe('cascade #6 omit untouched progress cells', () => {
 	});
 
 	test('createAjvFormValidator: enum + own-property undefined validates', () => {
-		const [touched, sibling] = leftoverIds;
+		const [touched, sibling] = rowIds;
 		const progress = { [touched]: 'done', [sibling]: undefined };
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
 		const result = validator.validateFormValue(schema, { progress });
@@ -97,7 +97,7 @@ describe('cascade #6 omit untouched progress cells', () => {
 	});
 
 	test('null clear sibling still validates; normalizeFormProgress keeps null', () => {
-		const [touched, sibling] = leftoverIds;
+		const [touched, sibling] = rowIds;
 		const progress = { [touched]: 'partial', [sibling]: null };
 		expect(normalizeFormProgress({ progress })).toEqual({ progress });
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);

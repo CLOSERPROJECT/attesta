@@ -342,7 +342,7 @@ func defaultPlaceholderText(fieldKey string, schema map[string]any) string {
 	return fmt.Sprintf("Enter %s…", label)
 }
 
-func compileDerivedRules(payload map[string]any, leftoverIDs []string) map[string]DerivedRule {
+func compileDerivedRules(payload map[string]any, rowIDs []string) map[string]DerivedRule {
 	raw, _ := payload["derived"].(map[string]any)
 	if len(raw) == 0 {
 		return nil
@@ -366,8 +366,8 @@ func compileDerivedRules(payload map[string]any, leftoverIDs []string) map[strin
 	if len(derived) == 0 {
 		return nil
 	}
-	if len(leftoverIDs) > 0 {
-		return expandMapDerived(derived, leftoverIDs)
+	if len(rowIDs) > 0 {
+		return expandMapDerived(derived, rowIDs)
 	}
 	concrete := map[string]DerivedRule{}
 	for key, rule := range derived {

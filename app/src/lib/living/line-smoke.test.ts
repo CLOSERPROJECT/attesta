@@ -219,7 +219,7 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 							taskId,
 							jobInstanceId: lineInst.id,
 							title: taskId,
-							surface: taskId === 'lineLoad' ? 'leftover-table' : 'live',
+							surface: taskId === 'lineLoad' ? 'row-table' : 'live',
 							schema: { type: 'object' },
 							uiSchema: {},
 							initialData: {},
