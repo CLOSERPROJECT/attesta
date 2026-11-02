@@ -242,7 +242,7 @@ describe('line Commit smoke (session + Worklist + leftovers some)', () => {
 		const initial: LoadResult = {
 			org: 'feragame',
 			activeConfigVersion: '1',
-			configId: 'truck-loop',
+			configId: 'feragame-config',
 			worklist,
 			taskFormBundles: []
 		};

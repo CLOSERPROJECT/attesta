@@ -48,7 +48,7 @@ func TestEvaluateReadyWhenRejectsNonString(t *testing.T) {
 
 func committerWithReadyWhen(t *testing.T, taskID, readyWhen string, auth Authorizer) (*Committer, *MemoryDomainStore) {
 	t.Helper()
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

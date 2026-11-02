@@ -9,7 +9,7 @@ import { emptyWorklist, type LoadResult } from './types.js';
 const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
-	configId: 'truck-loop',
+	configId: 'feragame-config',
 	worklist: {
 		jobs: [
 			{

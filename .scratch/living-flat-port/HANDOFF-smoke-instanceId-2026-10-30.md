@@ -72,7 +72,7 @@ Do **not** change fixture `instanceId: $load.id`. Fix decoder: decode each Job f
 | First Task | **`intake/register`** (fixture order) — this Commit mints the Job instance |
 | Chrome title | May show raw `register` (no Italian `schema.title` at top level) — cosmetic |
 
-Fixture intake Job exprs (`server/internal/living/fixtures/truck-loop-steps.yaml`):
+Fixture intake Job exprs (`server/internal/living/fixtures/feragame-config.yaml`):
 
 ```yaml
 instanceId: $load.id
@@ -141,7 +141,7 @@ SPA: Network on failed Commit — request body (`jobInstanceId`, `value` keys) +
 | Job coerce | `server/internal/living/config.go` (`AsJob`, `normalizeOrgConfigJobs`) |
 | Ordered decode | `server/internal/living/ordered.go` |
 | Mongo config | `server/internal/living/store_mongo.go` |
-| Fixture | `server/internal/living/fixtures/truck-loop-steps.yaml` |
+| Fixture | `server/internal/living/fixtures/feragame-config.yaml` |
 | Client provisional | `app/src/lib/living/TaskForm.svelte` |
 | Job start UI | `app/src/lib/living/JobPanel.svelte` |
 | Ledger | `.scratch/living-flat-port/COORDINATOR.md` |

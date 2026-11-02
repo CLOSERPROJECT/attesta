@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Schema } from '@sjsf/form';
-import truckLoopStepsYaml from './fixtures/truck-loop-steps.yaml?raw';
-import { loadTruckLoop, substepConfig } from './load-truck-loop.js';
+import feragameConfigYaml from '$living-fixtures/feragame-config.yaml?raw';
+import { loadFeragameConfig, substepConfig } from './load-feragame-config.js';
 import { createAjvFormValidator } from './ajv-form-validator.js';
 
 /** Gated field: when mode is `dual`, `detail` is required (JSON Schema if/then). */
@@ -44,7 +44,7 @@ describe('Ajv Draft validator', () => {
 
 describe('containerReg Ajv dual-load', () => {
 	const containerReg = substepConfig(
-		loadTruckLoop(truckLoopStepsYaml).jobs.line,
+		loadFeragameConfig(feragameConfigYaml).jobs.line,
 		'containerReg'
 	)!;
 	const schema = containerReg.schema as Schema;

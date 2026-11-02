@@ -41,8 +41,8 @@ resultsReport:
 
 Files:
 
-- `server/internal/living/fixtures/truck-loop-steps.yaml`
-- `app/src/lib/living/form/fixtures/truck-loop-steps.yaml`
+- `server/internal/living/fixtures/feragame-config.yaml`
+- `$living-fixtures/feragame-config.yaml (server single source)`
 
 ### Display DTO (expr output)
 

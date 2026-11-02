@@ -158,7 +158,7 @@ func primaryDynamicProperty(task map[string]any) (key string, completeness strin
 	if len(dyn) == 0 {
 		return "", "", false
 	}
-	// Prefer authored order when present; map iteration is fine for truck-loop (one key).
+	// Prefer authored order when present; map iteration is fine for feragame-config (one key).
 	for k, raw := range dyn {
 		m, isMap := raw.(map[string]any)
 		if !isMap {

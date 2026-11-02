@@ -11,7 +11,7 @@ type SeedOptions struct {
 	WipeDomain bool
 }
 
-// SeedDemo puts the truck-loop Org Config as the Active Config version and,
+// SeedDemo puts the Feragame Org Config as the Active Config version and,
 // when WipeDomain is set, replaces the org Domain with EmptyDomain.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
 func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opts SeedOptions) (OrgConfig, error) {
@@ -34,9 +34,9 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 	return cfg, nil
 }
 
-// FixtureConfigRoles returns the truck-loop Config role catalog (demo all-roles membership).
+// FixtureConfigRoles returns the Feragame Config role catalog (demo all-roles membership).
 func FixtureConfigRoles() ([]string, error) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		return nil, err
 	}

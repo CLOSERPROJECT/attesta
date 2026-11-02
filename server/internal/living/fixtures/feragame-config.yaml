@@ -1,10 +1,10 @@
 # Attesta Feragame plant fixture (steps / substeps).
-# Loaded via loadTruckLoop(truck-loop-steps.yaml).
+# Single source of truth: embedded by Go (LoadFeragameConfigFixture) and imported by SPA tests.
 # Config shape: docs/adr/0023-attesta-config-steps-substeps.md
 #
 # Authored tasks are ordered lists with required unique id (not maps).
 
-id: truck-loop
+id: feragame-config
 org: feragame
 domain:
     entities:

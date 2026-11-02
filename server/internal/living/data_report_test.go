@@ -34,7 +34,7 @@ func dataReportProbeDomain() Domain {
 }
 
 func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {
 }
 
 func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestBuildTaskFormBundleDataReportEmptySections(t *testing.T) {
 }
 
 func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func TestBuildTaskFormBundleWeightCheckRegisteredData(t *testing.T) {
 }
 
 func TestBuildTaskFormBundleDataReportBadExpr(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

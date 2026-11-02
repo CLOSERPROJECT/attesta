@@ -9,27 +9,27 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed fixtures/truck-loop-steps.yaml
-var truckLoopStepsYAML []byte
+//go:embed fixtures/feragame-config.yaml
+var feragameConfigYAML []byte
 
-// DefaultFixtureVersion is the Config version assigned when seeding the flat truck-loop fixture.
+// DefaultFixtureVersion is the Config version assigned when seeding the Feragame plant fixture.
 const DefaultFixtureVersion = "1"
 
-// LoadTruckLoopFixture parses the embedded flat truck-loop YAML and renames
+// LoadFeragameConfigFixture parses the embedded Feragame plant YAML and renames
 // steps/substeps → jobs/tasks so Load speaks living nouns only.
-func LoadTruckLoopFixture() (OrgConfig, error) {
-	return ParseTruckLoopFixture(truckLoopStepsYAML)
+func LoadFeragameConfigFixture() (OrgConfig, error) {
+	return ParseFeragameConfigFixture(feragameConfigYAML)
 }
 
-// ParseTruckLoopFixture parses truck-loop YAML bytes into an OrgConfig with Job/Task keys.
-func ParseTruckLoopFixture(raw []byte) (OrgConfig, error) {
+// ParseFeragameConfigFixture parses Feragame plant YAML bytes into an OrgConfig with Job/Task keys.
+func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 	var root yaml.Node
 	if err := yaml.Unmarshal(raw, &root); err != nil {
-		return OrgConfig{}, fmt.Errorf("parse truck-loop yaml: %w", err)
+		return OrgConfig{}, fmt.Errorf("parse feragame-config yaml: %w", err)
 	}
 	doc := mappingContent(&root)
 	if doc == nil {
-		return OrgConfig{}, fmt.Errorf("truck-loop YAML root must be a mapping")
+		return OrgConfig{}, fmt.Errorf("feragame-config YAML root must be a mapping")
 	}
 
 	id, err := requiredString(doc, "id")
@@ -40,11 +40,11 @@ func ParseTruckLoopFixture(raw []byte) (OrgConfig, error) {
 
 	stepsNode := child(doc, "steps")
 	if stepsNode == nil {
-		return OrgConfig{}, fmt.Errorf("truck-loop YAML requires steps")
+		return OrgConfig{}, fmt.Errorf("feragame-config YAML requires steps")
 	}
 	stepsMap := mappingContent(stepsNode)
 	if stepsMap == nil {
-		return OrgConfig{}, fmt.Errorf("truck-loop YAML steps must be a mapping")
+		return OrgConfig{}, fmt.Errorf("feragame-config YAML steps must be a mapping")
 	}
 
 	jobs := newOrderedObject()
@@ -87,15 +87,15 @@ func ParseTruckLoopFixture(raw []byte) (OrgConfig, error) {
 	return cfg, nil
 }
 
-// SeedFixtureConfigStore puts the truck-loop Org Config as the Active Config version for its org.
+// SeedFixtureConfigStore puts the Feragame Org Config as the Active Config version for its org.
 func SeedFixtureConfigStore(store ConfigStore) (OrgConfig, error) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		return OrgConfig{}, err
 	}
 	org := strings.TrimSpace(cfg.Org)
 	if org == "" {
-		return OrgConfig{}, fmt.Errorf("truck-loop fixture missing org")
+		return OrgConfig{}, fmt.Errorf("feragame-config fixture missing org")
 	}
 	ctx := context.Background()
 	if err := store.Put(ctx, org, cfg.Version, cfg); err != nil {

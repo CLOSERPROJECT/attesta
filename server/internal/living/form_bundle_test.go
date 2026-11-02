@@ -42,7 +42,7 @@ func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 			t.Fatalf("Load JSON must omit %q", key)
 		}
 	}
-	if loadWire["configId"] != "truck-loop" {
+	if loadWire["configId"] != "feragame-config" {
 		t.Fatalf("configId = %#v", loadWire["configId"])
 	}
 	if _, ok := loadWire["worklist"].(map[string]any); !ok {
@@ -323,7 +323,7 @@ func TestCommitReplacesTaskFormBundles(t *testing.T) {
 	}
 }
 
-func TestTruckLoopCommitsWalkBundlesIntakeAndLine(t *testing.T) {
+func TestFeragameConfigCommitsWalkBundlesIntakeAndLine(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	opLine := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	intakeID := "NIR-261019-NO-1"

@@ -125,7 +125,7 @@ Prefer tests that exercise **JSON Load/Commit shapes** (Worklist / bundles on th
 
 Not on this branch unless a ticket acceptance criterion forces a tiny touch:
 
-- Twin truck-loop fixture DRY  
+- Twin truck-loop fixture DRY → done (`feragame-config`)  
 - Delete JobChrome pass-through  
 - Rename `feragame*` chrome widget registry  
 - Task groups / lot intake / Cerbos on Load  

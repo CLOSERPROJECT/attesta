@@ -7,7 +7,7 @@ import (
 
 // Changing an authored transform must change Commit without a new apply* function.
 func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

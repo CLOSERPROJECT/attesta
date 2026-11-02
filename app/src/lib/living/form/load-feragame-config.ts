@@ -12,7 +12,7 @@ export type JobTemplate = {
 	tasks: TaskConfig[];
 };
 
-export type TruckLoopConfig = {
+export type FeragameConfig = {
 	id: string;
 	org?: string;
 	version?: string;
@@ -24,16 +24,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Parse truck-loop fixture YAML (steps/substeps) → living jobs/tasks for FormPlan tests.
+ * Parse feragame-config fixture YAML (steps/substeps) → living jobs/tasks for FormPlan tests.
  */
-export function loadTruckLoop(yamlText: string): TruckLoopConfig {
+export function loadFeragameConfig(yamlText: string): FeragameConfig {
 	const doc = parseYaml(yamlText);
-	if (!isPlainObject(doc)) throw new Error('truck-loop YAML must be a mapping');
+	if (!isPlainObject(doc)) throw new Error('feragame-config YAML must be a mapping');
 	if (typeof doc.id !== 'string' || doc.id.length === 0) {
-		throw new Error('truck-loop YAML id required');
+		throw new Error('feragame-config YAML id required');
 	}
 	const steps = isPlainObject(doc.steps) ? doc.steps : null;
-	if (!steps) throw new Error('truck-loop YAML requires steps');
+	if (!steps) throw new Error('feragame-config YAML requires steps');
 
 	const jobs: Record<string, JobTemplate> = {};
 	for (const [jobId, raw] of Object.entries(steps)) {

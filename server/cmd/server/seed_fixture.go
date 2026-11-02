@@ -21,7 +21,7 @@ type demoFixture struct {
 	Users []demoFixtureUser
 }
 
-// Living truck-loop demo org / all-roles operator (Cerbos Commit demos on /app).
+// Living Feragame demo org / all-roles operator (Cerbos Commit demos on /app).
 const (
 	demoLivingOrgSlug   = "feragame"
 	demoLivingUserEmail = "living@attesta.com"

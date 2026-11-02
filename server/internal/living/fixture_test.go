@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestLoadTruckLoopFixtureRenamesJobsAndTasks(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,7 +16,7 @@ func TestLoadTruckLoopFixtureRenamesJobsAndTasks(t *testing.T) {
 		t.Fatalf("register rolesAllowed = %#v, want [administration]", roles)
 	}
 
-	if cfg.ID != "truck-loop" {
+	if cfg.ID != "feragame-config" {
 		t.Fatalf("id = %q", cfg.ID)
 	}
 	if cfg.Org != "feragame" {
@@ -96,7 +96,7 @@ func TestSeedFixtureConfigStoreSetsActiveVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ID != "truck-loop" {
+	if got.ID != "feragame-config" {
 		t.Fatalf("got id = %q", got.ID)
 	}
 }

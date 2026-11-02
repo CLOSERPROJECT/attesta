@@ -11,7 +11,7 @@ import (
 // (register first). Remarshaling Jobs via unordered map sorted tasks to
 // codiceFir first → Nuovo camion minted on the wrong Task → empty $load.id.
 func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestSmokeNuovoCamionInstanceIdAfterMongoJSON(t *testing.T) {
 }
 
 func TestCommitRegisterStartingNewAfterMongoJSONMintsLoadID(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

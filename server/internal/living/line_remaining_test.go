@@ -231,7 +231,7 @@ func TestCommitLoadedExtractedDeniedViaCerbosBeforeContainerReg(t *testing.T) {
 	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
 	before := commitLineShift(t, c, "1st")
 
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -173,7 +173,7 @@ func TestCommitCodiceFirInOrderAfterRegister(t *testing.T) {
 	if result.Domain.Submissions[1].TaskID != "codiceFir" {
 		t.Fatalf("second submission = %#v", result.Domain.Submissions[1])
 	}
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

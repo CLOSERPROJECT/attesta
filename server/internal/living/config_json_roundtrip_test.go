@@ -8,7 +8,7 @@ import (
 // JSON/Mongo OrgConfig decode must yield typed Jobs with authored Task order
 // so lookupTask and mint.startingNew see register first.
 func TestLookupTaskAfterJSONRoundTrip(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

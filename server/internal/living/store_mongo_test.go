@@ -127,7 +127,7 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 	if err := domains.Put(ctx, org, Domain{Load: EntityMap{"L1": {"client": "NO"}}}); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	domains := NewMongoDomainStore(db)
 	configs := NewMongoConfigStore(db)
 
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

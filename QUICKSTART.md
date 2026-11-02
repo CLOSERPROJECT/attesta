@@ -54,7 +54,7 @@ After `task reset` or `task purge`, the next start re-applies the Go demo seed w
 ### Living Domain (`/app`) demo seed
 
 - Identity: `attesta seed` creates org `feragame` and all-roles user `living@attesta.com` / `living@attesta.com` (roles `administration`, `logistic`, `line`) for Cerbos Commit demos. Existing stacks need `task seed -- --replace` once to pick this up.
-- Domain + Active Config fixture: the server Memory living stores load the truck-loop fixture on first use. There is no harness `/api/runs` snapshot PUT.
+- Domain + Active Config fixture: the server Memory living stores load the feragame-config fixture on first use. There is no harness `/api/runs` snapshot PUT.
 - Domain wipe on process start: set `ATTESTA_LIVING_SEED=true` (same truthy values as `ATTESTA_SEED`). Leave unset in production. In-memory Domain also clears on server restart.
 
 ## Migration Notes

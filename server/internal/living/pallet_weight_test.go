@@ -38,7 +38,7 @@ func commitThroughCodiceFir(t *testing.T, c *Committer, instanceID string) {
 
 func intakeTasks(t *testing.T) Job {
 	t.Helper()
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func intakeTasks(t *testing.T) Job {
 
 func lineJob(t *testing.T) Job {
 	t.Helper()
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

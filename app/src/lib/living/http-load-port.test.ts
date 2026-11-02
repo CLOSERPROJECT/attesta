@@ -7,7 +7,7 @@ import { emptyWorklist, type LoadResult } from './types.js';
 const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
-	configId: 'truck-loop',
+	configId: 'feragame-config',
 	worklist: emptyWorklist(),
 	taskFormBundles: []
 };
@@ -28,7 +28,7 @@ describe('HttpLoadDomainPort', () => {
 		const got = await port.load();
 		expect(got.org).toBe('feragame');
 		expect(got.activeConfigVersion).toBe('1');
-		expect(got.configId).toBe('truck-loop');
+		expect(got.configId).toBe('feragame-config');
 		expect(got.worklist).toEqual(emptyWorklist());
 		expect(got.taskFormBundles).toEqual([]);
 		expect(fetchFn).toHaveBeenCalledOnce();

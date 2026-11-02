@@ -92,7 +92,7 @@ func TestIsTaskUnlockedIgnoresOtherJobInstance(t *testing.T) {
 func TestIsTaskUnlockedDistinctFromStartsWhen(t *testing.T) {
 	// Unlock order only reads prior Task Submissions on this Job instance —
 	// not Job.startsWhen (line opens from intake/weightCheck) or readyWhen.
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

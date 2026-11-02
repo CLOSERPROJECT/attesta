@@ -163,7 +163,7 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 	if wire["org"] != "feragame" || wire["activeConfigVersion"] != living.DefaultFixtureVersion {
 		t.Fatalf("got = %#v", wire)
 	}
-	if wire["configId"] != "truck-loop" {
+	if wire["configId"] != "feragame-config" {
 		t.Fatalf("configId = %#v", wire["configId"])
 	}
 	if _, has := wire["domain"]; has {

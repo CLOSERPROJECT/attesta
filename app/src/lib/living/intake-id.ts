@@ -7,7 +7,7 @@ export type RegisterDraftFields = {
 };
 
 /**
- * Load / Job instance id grammar from the truck-loop fixture:
+ * Load / Job instance id grammar from the feragame-config fixture:
  * `{idoneitaRiutilizzo}-{YYMMDD}-{client}-{n}` where n counts matching loads + 1.
  */
 export function computeIntakeInstanceId(

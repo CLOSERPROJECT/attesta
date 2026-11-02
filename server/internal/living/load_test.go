@@ -29,7 +29,7 @@ func TestLoaderEmptyDomainAndActiveConfig(t *testing.T) {
 	if len(result.Domain.Load) != 0 || len(result.Domain.Submissions) != 0 || len(result.Domain.JobInstances) != 0 {
 		t.Fatalf("domain not empty: %#v", result.Domain)
 	}
-	if result.Config.ID != "truck-loop" {
+	if result.Config.ID != "feragame-config" {
 		t.Fatalf("config id = %q", result.Config.ID)
 	}
 	if _, ok := result.Config.Jobs.Get("intake"); !ok {
@@ -75,7 +75,7 @@ func TestHandleLoadVerifiedEmptyDomain(t *testing.T) {
 	if wire["activeConfigVersion"] != "1" || wire["org"] != "feragame" {
 		t.Fatalf("got = %#v", wire)
 	}
-	if wire["configId"] != "truck-loop" {
+	if wire["configId"] != "feragame-config" {
 		t.Fatalf("configId = %#v", wire["configId"])
 	}
 	if _, has := wire["domain"]; has {

@@ -130,7 +130,7 @@ func TestCommitLineShiftAllowedViaCerbosAfterStartsWhen(t *testing.T) {
 }
 
 func TestSequenceOkForCommitIncludesStartsWhen(t *testing.T) {
-	cfg, err := LoadTruckLoopFixture()
+	cfg, err := LoadFeragameConfigFixture()
 	if err != nil {
 		t.Fatal(err)
 	}

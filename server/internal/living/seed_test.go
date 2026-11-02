@@ -92,7 +92,7 @@ func TestSeedDemoRequiresConfigStore(t *testing.T) {
 	}
 }
 
-func TestFixtureConfigRolesMatchesTruckLoop(t *testing.T) {
+func TestFixtureConfigRolesMatchesFeragameConfig(t *testing.T) {
 	roles, err := FixtureConfigRoles()
 	if err != nil {
 		t.Fatal(err)

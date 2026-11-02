@@ -7,7 +7,7 @@
  * Fix: resolve `$today` once, pass resolved schema into merge + createForm
  * so sjsf re-merge/reset cannot inject the sentinel literal.
  *
- * Authored schema comes from truck-loop YAML (Go ships the same shape in the bundle).
+ * Authored schema comes from feragame-config YAML (Go ships the same shape in the bundle).
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -15,9 +15,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import type { Schema } from '@sjsf/form';
 import { createFormMerger } from '@sjsf/form/mergers/modern';
-import truckLoopStepsYaml from './fixtures/truck-loop-steps.yaml?raw';
+import feragameConfigYaml from '$living-fixtures/feragame-config.yaml?raw';
 import { createAjvFormValidator } from './ajv-form-validator.js';
-import { loadTruckLoop, taskConfig } from './load-truck-loop.js';
+import { loadFeragameConfig, taskConfig } from './load-feragame-config.js';
 import {
 	localCalendarDateISO,
 	mergeSchemaDefaultsIntoFormData,
@@ -28,7 +28,7 @@ import {
 const libDir = dirname(fileURLToPath(import.meta.url));
 
 describe('cascade #8 schema defaults on register open', () => {
-	const config = loadTruckLoop(truckLoopStepsYaml);
+	const config = loadFeragameConfig(feragameConfigYaml);
 	const authored = taskConfig(config.jobs.intake, 'register')!;
 	const schema = authored.schema as Schema;
 	const props = (schema.properties ?? {}) as Record<string, Schema>;
