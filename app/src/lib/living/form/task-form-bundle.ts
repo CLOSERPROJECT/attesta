@@ -10,6 +10,10 @@ export type TaskFormBundle = {
 	jobInstanceId: string;
 	title: string;
 	surface: 'live' | 'row-table';
+	/** Present when surface is row-table; Go stamps `"progress"`. */
+	valueType?: 'progress';
+	/** Progress cell enum options from Go; SPA must not parse schema. */
+	progressEnums?: string[];
 	schema: Schema;
 	uiSchema: UiSchemaRoot;
 	initialData: Record<string, unknown>;

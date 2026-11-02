@@ -39,6 +39,8 @@ function sealPlan() {
 		jobInstanceId: '1st',
 		title: 'lineLoad',
 		surface: 'row-table',
+		valueType: 'progress',
+		progressEnums: ['partial', 'done'],
 		schema: lineLoadProjectedSchema(rowIds),
 		uiSchema: {} as UiSchemaRoot,
 		initialData: {},

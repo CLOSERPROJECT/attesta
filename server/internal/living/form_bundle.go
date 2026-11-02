@@ -15,6 +15,8 @@ type TaskFormBundle struct {
 	JobInstanceID  string                 `json:"jobInstanceId"`
 	Title          string                 `json:"title"`
 	Surface        string                 `json:"surface"` // live | row-table
+	ValueType      string                 `json:"valueType,omitempty"` // progress when surface is row-table
+	ProgressEnums  []string               `json:"progressEnums,omitempty"`
 	Schema         map[string]any         `json:"schema"`
 	UiSchema       map[string]any         `json:"uiSchema"`
 	InitialData    map[string]any         `json:"initialData"`
@@ -161,9 +163,15 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 
 	derived := compileDerivedRules(payload, projected.RowIDs)
 	surface := "live"
+	var progressEnums []string
+	var valueType string
 	if primary, ok := primaryDynamicProperty(payload); ok {
-		if additionalPropertiesIsProgress(additionalPropertiesSchema(payload, primary)) {
+		add := additionalPropertiesSchema(payload, primary)
+		if additionalPropertiesIsProgress(add) {
 			surface = "row-table"
+			valueType = "progress"
+			progressEnums = progressEnumsFromSchema(add)
+			stampRowTablePaint(uiSchema, primary, progressEnums)
 		}
 	}
 
@@ -186,6 +194,8 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 		JobInstanceID:  ref.JobInstanceID,
 		Title:          title,
 		Surface:        surface,
+		ValueType:      valueType,
+		ProgressEnums:  progressEnums,
 		Schema:         schema,
 		UiSchema:       uiSchema,
 		InitialData:    initial,
@@ -199,6 +209,31 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 		Bindings:       bindings,
 	}
 	return bundle, nil
+}
+
+// stampRowTablePaint merges progress paint into the primary property ui:options
+// without clobbering authored columns / expandable.
+func stampRowTablePaint(uiSchema map[string]any, primary string, enums []string) {
+	propUi, _ := uiSchema[primary].(map[string]any)
+	if propUi == nil {
+		propUi = map[string]any{}
+	} else {
+		propUi = cloneMapJSON(propUi)
+	}
+	opts, _ := propUi["ui:options"].(map[string]any)
+	if opts == nil {
+		opts = map[string]any{}
+	} else {
+		opts = cloneMapJSON(opts)
+	}
+	opts["valueType"] = "progress"
+	if len(enums) > 0 {
+		copied := make([]string, len(enums))
+		copy(copied, enums)
+		opts["progressEnums"] = copied
+	}
+	propUi["ui:options"] = opts
+	uiSchema[primary] = propUi
 }
 
 // evaluateDataReports runs each dataReport chrome expr into bindings.chromeDisplay[id].

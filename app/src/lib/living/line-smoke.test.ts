@@ -220,6 +220,12 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 							jobInstanceId: lineInst.id,
 							title: taskId,
 							surface: taskId === 'lineLoad' ? 'row-table' : 'live',
+							...(taskId === 'lineLoad'
+								? {
+										valueType: 'progress' as const,
+										progressEnums: ['partial', 'done']
+									}
+								: {}),
 							schema: { type: 'object' },
 							uiSchema: {},
 							initialData: {},

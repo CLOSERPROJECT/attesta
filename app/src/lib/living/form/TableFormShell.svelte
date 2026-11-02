@@ -3,10 +3,6 @@
 	import { onDestroy, untrack } from 'svelte';
 	import ConfigForm from './ConfigForm.svelte';
 	import { createConfigForm } from './create-config-form.svelte.js';
-	import {
-		rowValueTypeFromSchema,
-		progressEnumsFromFormSchema
-	} from './form-progress.js';
 	import { setRowContext } from './row-context.js';
 
 	type Props = {
@@ -14,6 +10,9 @@
 		uiSchema: UiSchemaRoot;
 		rowIds: string[];
 		columns: { id: string; value: string };
+		/** From TaskFormBundle — Go already classified; default progress for row-table. */
+		valueType?: 'number' | 'progress';
+		progressEnums?: string[];
 		/** Draft owned by StepStackSession — shell does not persist. */
 		value: Record<string, unknown>;
 		onValueChange: (next: Record<string, unknown>) => void;
@@ -26,15 +25,13 @@
 
 	// Parent remounts via {#key projectionKey}; capture mount snapshot once.
 	const mount = untrack(() => {
-		const valueType = rowValueTypeFromSchema(props.schema);
 		return {
 			schema: props.schema,
 			uiSchema: props.uiSchema,
 			rowIds: props.rowIds,
 			columns: props.columns,
-			valueType,
-			progressEnums:
-				valueType === 'progress' ? progressEnumsFromFormSchema(props.schema) : [],
+			valueType: props.valueType ?? 'progress',
+			progressEnums: props.progressEnums ?? [],
 			onSubmit: props.onSubmit,
 			onSubmitError: props.onSubmitError
 		};

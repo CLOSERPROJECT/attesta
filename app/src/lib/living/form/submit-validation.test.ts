@@ -46,8 +46,14 @@ describe('submit validation visibility', () => {
 		const rowSrc = readFileSync(join(libDir, 'row-table-field.svelte'), 'utf8');
 		const shell = readFileSync(join(libDir, 'TableFormShell.svelte'), 'utf8');
 		const task = readFileSync(join(libDir, '../TaskForm.svelte'), 'utf8');
+		const progress = readFileSync(join(libDir, 'form-progress.ts'), 'utf8');
 		expect(createCfg).toContain('onSubmitError');
 		expect(shell).toContain('onSubmitError');
+		expect(shell).toContain('progressEnums');
+		expect(shell).not.toContain('rowValueTypeFromSchema');
+		expect(shell).not.toContain('progressEnumsFromFormSchema');
+		expect(progress).not.toContain('export function rowValueTypeFromSchema');
+		expect(progress).not.toContain('export function progressEnumsFromFormSchema');
 		expect(rowSrc).toContain('getFieldsErrors');
 		expect(rowSrc).toContain('getChildPath');
 		expect(task).toContain('task-submit-error');
@@ -56,6 +62,7 @@ describe('submit validation visibility', () => {
 		expect(task).toContain('findTaskFormBundle');
 		expect(task).toContain('initialData');
 		expect(task).toContain('planFromTaskFormBundle');
+		expect(task).toContain('progressEnums={bundle.progressEnums');
 		expect(task).not.toContain('compileTaskFormPlan');
 		expect(task).not.toContain('seedMapTableDraft');
 		expect(task).not.toContain('seedProgressDraftFromDomain');

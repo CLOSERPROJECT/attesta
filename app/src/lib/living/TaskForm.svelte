@@ -198,6 +198,8 @@
 						uiSchema={rowUiSchema}
 						rowIds={[...rowIds]}
 						columns={rowColumns ?? { id: 'Id', value: 'Value' }}
+						valueType={bundle.valueType ?? 'progress'}
+						progressEnums={bundle.progressEnums ?? []}
 						value={readDraft()}
 						onValueChange={writeDraft}
 						onSubmit={(value) => void submitSealed(value)}

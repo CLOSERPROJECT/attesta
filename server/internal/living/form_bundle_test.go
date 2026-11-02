@@ -302,6 +302,67 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	if _, has := progressSchema["required"]; has {
 		t.Fatalf("partial-map progress must not project required from read ids; got %#v", progressSchema["required"])
 	}
+	assertLineLoadProgressPaint(t, lineLoad)
+}
+
+func assertLineLoadProgressPaint(t *testing.T, bundle *TaskFormBundle) {
+	t.Helper()
+	if bundle.Surface != "row-table" {
+		t.Fatalf("surface = %q, want row-table", bundle.Surface)
+	}
+	if bundle.ValueType != "progress" {
+		t.Fatalf("valueType = %q, want progress", bundle.ValueType)
+	}
+	wantEnums := []string{"partial", "done"}
+	if len(bundle.ProgressEnums) != len(wantEnums) {
+		t.Fatalf("progressEnums = %#v, want %#v", bundle.ProgressEnums, wantEnums)
+	}
+	for i, want := range wantEnums {
+		if bundle.ProgressEnums[i] != want {
+			t.Fatalf("progressEnums = %#v, want %#v", bundle.ProgressEnums, wantEnums)
+		}
+	}
+	props, _ := bundle.Schema["properties"].(map[string]any)
+	progress, _ := props["progress"].(map[string]any)
+	add, _ := progress["additionalProperties"].(map[string]any)
+	fromSchema := progressEnumsFromSchema(add)
+	if len(fromSchema) != len(wantEnums) {
+		t.Fatalf("schema enums = %#v, want %#v", fromSchema, wantEnums)
+	}
+	for i, want := range wantEnums {
+		if fromSchema[i] != want {
+			t.Fatalf("schema enums = %#v, want %#v", fromSchema, wantEnums)
+		}
+	}
+	propUi, _ := bundle.UiSchema["progress"].(map[string]any)
+	opts, _ := propUi["ui:options"].(map[string]any)
+	if opts == nil {
+		t.Fatal("progress ui:options missing")
+	}
+	cols, _ := opts["columns"].(map[string]any)
+	if cols["id"] != "Bancale" || cols["value"] != "Avanzamento" {
+		t.Fatalf("columns clobbered: %#v", cols)
+	}
+	if opts["valueType"] != "progress" {
+		t.Fatalf("ui:options.valueType = %#v", opts["valueType"])
+	}
+	stamped, ok := opts["progressEnums"].([]string)
+	if !ok {
+		raw, _ := opts["progressEnums"].([]any)
+		stamped = make([]string, len(raw))
+		for i, v := range raw {
+			s, _ := v.(string)
+			stamped[i] = s
+		}
+	}
+	if len(stamped) != len(wantEnums) {
+		t.Fatalf("ui:options.progressEnums = %#v, want %#v", opts["progressEnums"], wantEnums)
+	}
+	for i, want := range wantEnums {
+		if stamped[i] != want {
+			t.Fatalf("ui:options.progressEnums = %#v, want %#v", stamped, wantEnums)
+		}
+	}
 }
 
 func TestHandleLoadJSONIncludesTaskFormBundles(t *testing.T) {
