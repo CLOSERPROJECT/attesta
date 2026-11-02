@@ -16,10 +16,9 @@ import LeftoverTableField from './leftover-table-field.svelte';
 import MapTableField from './map-table-field.svelte';
 import DataReportField from './data-report-field.svelte';
 import ReadonlyField from './readonly-field.svelte';
-import ValuePrintField from './value-print-field.svelte';
 
 // override (not extend): base shadcn already defines `button`; extend would never win.
-// valuePrint / dataReport / readonly / compactArrayItem are not AUTHORED_FIELD_REGISTRY —
+// dataReport / readonly / compactArrayItem are not AUTHORED_FIELD_REGISTRY —
 // register beside button (authoredFieldThemeOverrides drops unknown keys).
 const withAuthored = overrideByRecord(shadcnTheme, {
 	...authoredFieldThemeOverrides({
@@ -28,7 +27,6 @@ const withAuthored = overrideByRecord(shadcnTheme, {
 		derivedLeafField: DerivedLeafField,
 		checkboxOnlyField: CheckboxOnlyField
 	}),
-	valuePrintField: ValuePrintField,
 	dataReportField: DataReportField,
 	readonlyField: ReadonlyField,
 	compactArrayItemField: CompactArrayItemField,

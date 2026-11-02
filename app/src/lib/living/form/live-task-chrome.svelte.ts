@@ -13,7 +13,7 @@ import type { ChromeDataReport, TaskFormPlan } from './task-form-plan.js';
 export type LiveTaskFormPorts = {
 	getValue: () => Record<string, unknown>;
 	setValue: (next: Record<string, unknown>) => void;
-	/** JSONata `$domain` binding (valuePrint / derived) — may be a thin projection. */
+	/** JSONata `$domain` binding (readonly / derived) — may be a thin projection. */
 	getDomain: () => unknown;
 	/** Server `bindings.chromeDisplay` bag for `kind: dataReport` (Load/Commit only). */
 	getChromeDisplayBag?: () => Record<string, unknown> | undefined;
@@ -26,7 +26,7 @@ export type LiveTaskFormPorts = {
 
 const EMPTY_DISPLAY: ChromeDisplay = { value: null, error: null };
 
-/** Stringify chrome expr results for valuePrint / readonly (display-only). */
+/** Stringify chrome expr results for readonly (display-only). */
 export function formatChromeEvalValue(value: unknown): ChromeDisplay {
 	if (value === undefined || (typeof value === 'number' && !Number.isFinite(value))) {
 		return { value: null, error: 'chrome-failed' };
@@ -205,7 +205,7 @@ async function applyChrome(
 		if (!isCurrent()) return;
 		if (entry.kind === 'dataReport') {
 			next[entry.id] = displayFromChromeDisplayBag(chromeDisplayBag, entry);
-		} else {
+		} else if (entry.kind === 'readonly') {
 			next[entry.id] = await evaluateChromeEntry(
 				entry.expr,
 				sealableDraft,

@@ -24,7 +24,7 @@ func readChromeRules(payload map[string]any) []ChromeRule {
 		before, _ := entry["before"].(string)
 		title, _ := entry["title"].(string)
 		switch kind {
-		case "valuePrint", "readonly":
+		case "readonly":
 			expr, _ := entry["expr"].(string)
 			if expr == "" {
 				continue
@@ -66,14 +66,16 @@ func chromeTitle(entry map[string]any, id string, rule ChromeRule) string {
 	return id
 }
 
-func stringFieldForChrome(kind string) string {
+// stringFieldForChrome maps known chrome kinds to sjsf stringField widgets.
+// Unknown kinds return ("", false) — callers must not invent a fallback widget.
+func stringFieldForChrome(kind string) (string, bool) {
 	switch kind {
 	case "readonly":
-		return "readonlyField"
+		return "readonlyField", true
 	case "dataReport":
-		return "dataReportField"
+		return "dataReportField", true
 	default:
-		return "valuePrintField"
+		return "", false
 	}
 }
 
@@ -170,9 +172,13 @@ func mergeChromeIntoSchemas(
 	uiSchema["ui:options"] = uiOpts
 
 	for _, c := range chrome {
+		sf, ok := stringFieldForChrome(c.Kind)
+		if !ok {
+			continue
+		}
 		uiSchema[c.ID] = map[string]any{
 			"ui:components": map[string]any{
-				"stringField": stringFieldForChrome(c.Kind),
+				"stringField": sf,
 			},
 			"ui:options": map[string]any{
 				"chromeId": c.ID,

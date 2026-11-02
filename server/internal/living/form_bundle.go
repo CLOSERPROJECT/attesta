@@ -35,7 +35,7 @@ type FormColumns struct {
 }
 
 // ChromeRule is a display chrome entry. dataReport is evaluated server-side into
-// bindings.chromeDisplay; valuePrint / readonly stay client-eval for now.
+// bindings.chromeDisplay; readonly stays client-eval for now.
 type ChromeRule struct {
 	ID     string `json:"id"`
 	Kind   string `json:"kind"`

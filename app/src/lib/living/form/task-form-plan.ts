@@ -1,14 +1,6 @@
 import type { Schema, UiSchemaRoot } from '@sjsf/form';
 import type { DerivedKeyEntry } from './derived-keys.js';
 
-export type ChromeValuePrint = {
-	id: string;
-	kind: 'valuePrint';
-	expr: string;
-	after?: string;
-	before?: string;
-};
-
 export type ChromeReadonly = {
 	id: string;
 	kind: 'readonly';
@@ -28,7 +20,7 @@ export type ChromeDataReport = {
 	expr?: string;
 };
 
-export type ChromeEntry = ChromeValuePrint | ChromeReadonly | ChromeDataReport;
+export type ChromeEntry = ChromeReadonly | ChromeDataReport;
 
 /** Frozen FormPlan — produced from a server TaskFormBundle, never client compile. */
 export type TaskFormPlan = {
