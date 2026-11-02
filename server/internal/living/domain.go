@@ -29,12 +29,6 @@ type JobInstance struct {
 	Label string `json:"label"`
 }
 
-const (
-	kindLoad      = "load"
-	kindPallet    = "pallet"
-	kindContainer = "container"
-)
-
 func EmptyDomain() Domain {
 	return Domain{
 		Entities:     map[string]EntityMap{},

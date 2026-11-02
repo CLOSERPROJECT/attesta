@@ -20,7 +20,7 @@ func feragameWeighRowSchema() map[string]any {
 
 func TestPalletWeightRowIDsSkipsWeighted(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, kindPallet, EntityMap{
+	putKind(&domain, "pallet", EntityMap{
 		"load-1.1": map[string]any{"loadId": "load-1"},
 		"load-1.2": map[string]any{"loadId": "load-1", "weight": 11.0},
 		"load-2.1": map[string]any{"loadId": "load-2"},
@@ -66,7 +66,7 @@ func TestFilterFilledObjectRowsUsesSchema(t *testing.T) {
 
 func TestLineLoadRowIDsSkipsDone(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, kindPallet, EntityMap{
+	putKind(&domain, "pallet", EntityMap{
 		"a": map[string]any{"loadId": "load-1", "weight": 11.0},
 		"b": map[string]any{"loadId": "load-1", "weight": 22.0, "progress": "partial"},
 		"c": map[string]any{"loadId": "load-1", "weight": 33.0, "progress": "done"},
@@ -202,7 +202,7 @@ func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
 // Fixture where wrappers (tests only — no plant filters in product Go).
 func palletWeightRowIDs(domain Domain, jobInstanceID string) []string {
 	ids, err := ResolveRead(domain, ReadDef{
-		Entity: EntityPallet,
+		Entity: EntityType("pallet"),
 		Where:  "loadId = $instance.id and $not($exists(weight))",
 		Key:    "id",
 	}, jobInstanceID, "", nil)
@@ -214,7 +214,7 @@ func palletWeightRowIDs(domain Domain, jobInstanceID string) []string {
 
 func lineLoadRowIDs(domain Domain) []string {
 	ids, err := ResolveRead(domain, ReadDef{
-		Entity: EntityPallet,
+		Entity: EntityType("pallet"),
 		Where:  "$exists(weight) and $not(progress = 'done')",
 		Key:    "id",
 	}, "", "", nil)

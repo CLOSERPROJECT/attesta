@@ -32,7 +32,7 @@ func TestEvaluateReadyWhenLiteralAndDomainExpr(t *testing.T) {
 		t.Fatalf("no loads → false, got ok=%v err=%v", ok, err)
 	}
 	withLoad := empty
-	putKind(&withLoad, kindLoad, EntityMap{"L1": {"client": "NO"}})
+	putKind(&withLoad, "load", EntityMap{"L1": {"client": "NO"}})
 	ok, err = evaluateReadyWhen(withLoad, "$count($domain.load.*) >= 1", "", nil)
 	if err != nil || !ok {
 		t.Fatalf("one load → true, got ok=%v err=%v", ok, err)
@@ -112,7 +112,7 @@ func TestCommitCodiceFirDeniedViaCerbosWhenReadyWhenFalse(t *testing.T) {
 	if len(after.Submissions) != len(before.Submissions) {
 		t.Fatalf("domain mutated on readyWhen deny: before=%d after=%d", len(before.Submissions), len(after.Submissions))
 	}
-	if _, has := after.Kind(kindLoad)[instanceID]["codiceFir"]; has {
+	if _, has := after.Kind("load")[instanceID]["codiceFir"]; has {
 		t.Fatal("codiceFir must not appear when readyWhen denies")
 	}
 }
@@ -139,7 +139,7 @@ func TestCommitCodiceFirAllowedViaCerbosWhenReadyWhenTrue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind(kindLoad)[instanceID]["codiceFir"] != "FIR-READY" {
-		t.Fatalf("domain = %#v", result.Domain.Kind(kindLoad)[instanceID])
+	if result.Domain.Kind("load")[instanceID]["codiceFir"] != "FIR-READY" {
+		t.Fatalf("domain = %#v", result.Domain.Kind("load")[instanceID])
 	}
 }

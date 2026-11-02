@@ -69,15 +69,15 @@ func TestCommitContainerRegMintsContainersAndUnlocksLoadedExtracted(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind(kindContainer)["C-1"]["material"] != "Polvere di vetro" ||
-		result.Domain.Kind(kindContainer)["C-1"]["weight"] != 120.0 ||
-		result.Domain.Kind(kindContainer)["C-1"]["sourceLoadId"] != intakeID {
-		t.Fatalf("C-1 = %#v", result.Domain.Kind(kindContainer)["C-1"])
+	if result.Domain.Kind("container")["C-1"]["material"] != "Polvere di vetro" ||
+		result.Domain.Kind("container")["C-1"]["weight"] != 120.0 ||
+		result.Domain.Kind("container")["C-1"]["sourceLoadId"] != intakeID {
+		t.Fatalf("C-1 = %#v", result.Domain.Kind("container")["C-1"])
 	}
-	if result.Domain.Kind(kindContainer)["C-2"]["material"] != "Plastica" {
-		t.Fatalf("C-2 = %#v", result.Domain.Kind(kindContainer)["C-2"])
+	if result.Domain.Kind("container")["C-2"]["material"] != "Plastica" {
+		t.Fatalf("C-2 = %#v", result.Domain.Kind("container")["C-2"])
 	}
-	if _, has := result.Domain.Kind(kindContainer)["C-1"]["secondarySourceLoadId"]; has {
+	if _, has := result.Domain.Kind("container")["C-1"]["secondarySourceLoadId"]; has {
 		t.Fatal("single-source must omit secondarySourceLoadId")
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
@@ -135,7 +135,7 @@ func TestCommitContainerRegDualSourceOmitsSecondaryWeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c1 := result.Domain.Kind(kindContainer)["C-1"]
+	c1 := result.Domain.Kind("container")["C-1"]
 	if c1["secondarySourceLoadId"] != intakeB || c1["sourceLoadId"] != intakeA {
 		t.Fatalf("dual container = %#v", c1)
 	}
@@ -161,8 +161,8 @@ func TestCommitContainerRegWithoutLineLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind(kindContainer)["C-1"]["material"] != "Alluminio" {
-		t.Fatalf("container = %#v", result.Domain.Kind(kindContainer))
+	if result.Domain.Kind("container")["C-1"]["material"] != "Alluminio" {
+		t.Fatalf("container = %#v", result.Domain.Kind("container"))
 	}
 }
 
@@ -182,7 +182,7 @@ func TestCommitLoadedExtractedRecordsFactsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	containerCount := len(afterReg.Domain.Kind(kindContainer))
+	containerCount := len(afterReg.Domain.Kind("container"))
 
 	opAdmin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	result, err := c.Commit(t.Context(), "feragame", opAdmin, CommitRequest{
@@ -195,7 +195,7 @@ func TestCommitLoadedExtractedRecordsFactsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Domain.Kind(kindContainer)) != containerCount {
+	if len(result.Domain.Kind("container")) != containerCount {
 		t.Fatal("loadedExtracted must not mint or patch containers")
 	}
 	last := result.Domain.Submissions[len(result.Domain.Submissions)-1]
@@ -291,8 +291,8 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(domain.Kind(kindContainer)) != 2 {
-		t.Fatalf("containers = %#v", domain.Kind(kindContainer))
+	if len(domain.Kind("container")) != 2 {
+		t.Fatalf("containers = %#v", domain.Kind("container"))
 	}
 	var sawShift, sawLineLoad, sawContainerReg, sawLoadedExtracted bool
 	for _, s := range domain.Submissions {
@@ -313,8 +313,8 @@ func TestHandleCommitLineJobEndToEnd(t *testing.T) {
 	if !sawShift || !sawLineLoad || !sawContainerReg || !sawLoadedExtracted {
 		t.Fatalf("line Submissions incomplete: %#v", domain.Submissions)
 	}
-	if domain.Kind(kindContainer)["C-1"]["sourceLoadId"] != intakeID {
-		t.Fatalf("C-1 = %#v", domain.Kind(kindContainer)["C-1"])
+	if domain.Kind("container")["C-1"]["sourceLoadId"] != intakeID {
+		t.Fatalf("C-1 = %#v", domain.Kind("container")["C-1"])
 	}
 
 	loadRec := httptest.NewRecorder()

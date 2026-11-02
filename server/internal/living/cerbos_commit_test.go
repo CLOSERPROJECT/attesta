@@ -133,8 +133,8 @@ func TestCommitCodiceFirAllowedViaCerbosInUnlockOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind(kindLoad)[instanceID]["codiceFir"] != "FIR-OK" {
-		t.Fatalf("domain = %#v", result.Domain.Kind(kindLoad)[instanceID])
+	if result.Domain.Kind("load")[instanceID]["codiceFir"] != "FIR-OK" {
+		t.Fatalf("domain = %#v", result.Domain.Kind("load")[instanceID])
 	}
 	if len(result.Domain.Submissions) != 2 || result.Domain.Submissions[1].TaskID != "codiceFir" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
@@ -175,7 +175,7 @@ func TestCommitOutOfOrderDoesNotMutateExistingDomain(t *testing.T) {
 	if len(after.Submissions) != len(before.Submissions) {
 		t.Fatalf("submissions mutated on deny: before=%d after=%d", len(before.Submissions), len(after.Submissions))
 	}
-	if _, hasFir := after.Kind(kindLoad)[instanceID]["codiceFir"]; hasFir {
+	if _, hasFir := after.Kind("load")[instanceID]["codiceFir"]; hasFir {
 		t.Fatal("codiceFir fact must not appear on out-of-order deny")
 	}
 }
@@ -195,7 +195,7 @@ func TestCommitRegisterAllowedViaCerbosWhenRolePermitted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind(kindLoad)["NIR-261019-NO-1"]["client"] != "NO" {
+	if result.Domain.Kind("load")["NIR-261019-NO-1"]["client"] != "NO" {
 		t.Fatalf("domain = %#v", result.Domain)
 	}
 }

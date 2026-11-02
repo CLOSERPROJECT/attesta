@@ -7,12 +7,6 @@ import (
 
 type EntityType string
 
-const (
-	EntityLoad      EntityType = "load"
-	EntityPallet    EntityType = "pallet"
-	EntityContainer EntityType = "container"
-)
-
 type MintOp struct {
 	Entity EntityType
 	ID     string

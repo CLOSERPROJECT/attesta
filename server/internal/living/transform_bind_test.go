@@ -7,7 +7,7 @@ import (
 
 func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, kindContainer, EntityMap{})
+	putKind(&domain, "container", EntityMap{})
 	got, err := RunTransform(domain, RunTransformInput{
 		JobInstanceID: "1st",
 		Facts: map[string]any{
@@ -76,7 +76,7 @@ func TestBindThenMintManyUsesReshapedDollar(t *testing.T) {
 
 func TestBindThenMintAndPatch(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, kindLoad, EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
 	got, err := RunTransform(domain, RunTransformInput{
 		Facts: map[string]any{"rawClient": "SU", "note": "n"},
 		Allowed: map[string]struct{}{"load": {}},

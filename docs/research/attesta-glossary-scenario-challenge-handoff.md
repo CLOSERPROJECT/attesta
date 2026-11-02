@@ -1,5 +1,7 @@
 # Handoff: challenge one plant scenario vs living glossary + experiment YAML
 
+> **Archival:** Historical challenge handoff. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers and `completeness` are retired product grammar (Domain reads + Submission law apply instead). Keep this narrative for context; do not treat leftovers/`completeness` here as current law.
+
 Use this in a **new chat**. Goal: pressure-test **one concrete plant/operations scenario** against **(A)** living Attesta glossary vocabulary and **(B)** `attesta-experiment` truck-loop YAML as it exists on disk today.
 
 The human (or the session) **picks the scenario**. The agent should **not invent the primary scenario** unless asked to sketch example prompts. Keep the challenge observational: map beats → glossary nouns → YAML (or gaps); record keep / rename / structural YAML change / glossary fix. Do not redesign Cerbos, implement code, or rewrite the decisions dump in that session.

@@ -62,7 +62,7 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 	}
 
 	domain := domainFromKinds(map[string]EntityMap{
-		kindLoad: {"a.b": {"k.v": 1}},
+		"load": {"a.b": {"k.v": 1}},
 		"kind.x": {"id.1": {"f.g": true}},
 		"nil":    nil,
 	})
@@ -86,8 +86,8 @@ func TestMongoCodecAndValidationWithoutDB(t *testing.T) {
 		t.Fatalf("encode submissions = %#v", doc.Submissions)
 	}
 	got := domainFromMongoDoc(doc)
-	if got.Kind(kindLoad)["a.b"]["k.v"] != 1 {
-		t.Fatalf("decode load = %#v", got.Kind(kindLoad))
+	if got.Kind("load")["a.b"]["k.v"] != 1 {
+		t.Fatalf("decode load = %#v", got.Kind("load"))
 	}
 	if got.Kind("kind.x")["id.1"]["f.g"] != true {
 		t.Fatalf("decode extra = %#v", got.Entities)

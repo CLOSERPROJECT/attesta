@@ -7,8 +7,8 @@ import (
 
 func TestDomainEntitiesWireRoundTripWellKnownAndExtra(t *testing.T) {
 	d := EmptyDomain()
-	putKind(&d, kindLoad, EntityMap{"L1": {"client": "NO"}})
-	putKind(&d, kindPallet, EntityMap{"L1.1": {"loadId": "L1"}})
+	putKind(&d, "load", EntityMap{"L1": {"client": "NO"}})
+	putKind(&d, "pallet", EntityMap{"L1.1": {"loadId": "L1"}})
 	putKind(&d, "custom.kind", EntityMap{"c.1": {"n": 1}})
 
 	raw, err := json.Marshal(d)
@@ -32,11 +32,11 @@ func TestDomainEntitiesWireRoundTripWellKnownAndExtra(t *testing.T) {
 		t.Fatal(err)
 	}
 	maps := got.EntityMaps()
-	if maps[kindLoad]["L1"]["client"] != "NO" {
-		t.Fatalf("load = %#v", maps[kindLoad])
+	if maps["load"]["L1"]["client"] != "NO" {
+		t.Fatalf("load = %#v", maps["load"])
 	}
-	if maps[kindPallet]["L1.1"]["loadId"] != "L1" {
-		t.Fatalf("pallet = %#v", maps[kindPallet])
+	if maps["pallet"]["L1.1"]["loadId"] != "L1" {
+		t.Fatalf("pallet = %#v", maps["pallet"])
 	}
 	if maps["custom.kind"]["c.1"]["n"] != float64(1) {
 		t.Fatalf("custom = %#v", maps["custom.kind"])
@@ -56,7 +56,7 @@ func TestEntityMapsMutateClonePreferEntities(t *testing.T) {
 		UserID: "u", JobID: "j", TaskID: "t", Timestamp: "ts",
 		Facts: map[string]any{},
 		Ops: []MutateOp{
-			MintOp{Entity: EntityLoad, ID: "L1", Set: map[string]any{"client": "NO"}},
+			MintOp{Entity: EntityType("load"), ID: "L1", Set: map[string]any{"client": "NO"}},
 			MintOp{Entity: EntityType("widget"), ID: "w2", Set: map[string]any{"ok": false}},
 			PatchOp{Entity: EntityType("widget"), ID: "w1", Set: map[string]any{"ok": false}},
 		},
@@ -64,7 +64,7 @@ func TestEntityMapsMutateClonePreferEntities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Entities[kindLoad]["L1"]["client"] != "NO" {
+	if got.Entities["load"]["L1"]["client"] != "NO" {
 		t.Fatalf("mutate load via Entities = %#v", got.Entities)
 	}
 	if got.Entities["widget"]["w1"]["ok"] != false || got.Entities["widget"]["w2"]["ok"] != false {
@@ -72,15 +72,15 @@ func TestEntityMapsMutateClonePreferEntities(t *testing.T) {
 	}
 
 	cloned := cloneDomain(got)
-	cloned.Entities[kindLoad]["L1"]["client"] = "SU"
-	if got.Entities[kindLoad]["L1"]["client"] != "NO" {
+	cloned.Entities["load"]["L1"]["client"] = "SU"
+	if got.Entities["load"]["L1"]["client"] != "NO" {
 		t.Fatal("cloneDomain must deep-copy Entities")
 	}
 }
 
 func TestMongoCodecUsesEntities(t *testing.T) {
 	domain := EmptyDomain()
-	putKind(&domain, kindLoad, EntityMap{"a.b": {"k.v": 1}})
+	putKind(&domain, "load", EntityMap{"a.b": {"k.v": 1}})
 	putKind(&domain, "kind.x", EntityMap{"id.1": {"f.g": true}})
 
 	doc := domainToMongoDoc("org", domain)
@@ -92,7 +92,7 @@ func TestMongoCodecUsesEntities(t *testing.T) {
 	}
 
 	got := domainFromMongoDoc(doc)
-	if got.Entities[kindLoad]["a.b"]["k.v"] != 1 {
+	if got.Entities["load"]["a.b"]["k.v"] != 1 {
 		t.Fatalf("decode Entities load = %#v", got.Entities)
 	}
 	if got.Entities["kind.x"]["id.1"]["f.g"] != true {

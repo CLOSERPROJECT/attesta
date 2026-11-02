@@ -7,14 +7,14 @@ import (
 
 func dataReportProbeDomain() Domain {
 	d := domainFromKinds(map[string]EntityMap{
-		kindLoad: {
+		"load": {
 			"L1": {"truckWeight": 1000.0, "truckTare": 200.0},
 		},
-		kindPallet: {
+		"pallet": {
 			"P1": {"loadId": "L1", "weight": 125.0, "progress": "done"},
 			"P2": {"loadId": "L1", "weight": 100.0, "progress": "partial"},
 		},
-		kindContainer: {
+		"container": {
 			"C1": {
 				"sourceLoadId": "L1", "material": "plastica", "weight": 50.0,
 				"secondarySourceLoadId": "L2",

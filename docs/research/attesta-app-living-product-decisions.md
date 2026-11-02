@@ -1,5 +1,7 @@
 # Living product into `/app` — decisions dump
 
+> **Archival:** Historical grill / challenge notes. Live product vocabulary is root [`GLOSSARY.md`](../../GLOSSARY.md) and ADRs. Leftovers and `completeness` are retired product grammar (Domain reads + Submission law apply instead). Keep this narrative for context; do not treat Leftovers/`completeness` here as current law.
+
 Status: working notes (2026-10-29). Not an ADR. Captures a grill on transplanting living Attesta (`attesta-experiment`) into `forkbomb/attesta` `/app` + Go JSON, without losing deferred work.
 
 **Related**

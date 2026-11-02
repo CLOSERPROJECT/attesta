@@ -59,7 +59,7 @@ func TestErrorStringsAndMarkerMethods(t *testing.T) {
 	if !strings.Contains((&CommitError{Kind: "prep", Message: "x"}).Error(), "prep: x") {
 		t.Fatal("CommitError with message")
 	}
-	if (MutateError{Kind: "missing-id", Entity: EntityLoad, ID: "L1"}).Error() == "" {
+	if (MutateError{Kind: "missing-id", Entity: EntityType("load"), ID: "L1"}).Error() == "" {
 		t.Fatal("MutateError")
 	}
 	if (InstanceExprError{Kind: "type", Message: "boom"}).Error() == "" {
@@ -257,7 +257,7 @@ func TestEntityMapsCloneDomainMutateEntities(t *testing.T) {
 	}
 	_, err = Mutate(EmptyDomain(), MutateRequest{
 		AppendSubmission: &noSub,
-		Ops:              []MutateOp{PatchOp{Entity: EntityLoad, ID: "missing", Set: map[string]any{"x": 1}}},
+		Ops:              []MutateOp{PatchOp{Entity: EntityType("load"), ID: "missing", Set: map[string]any{"x": 1}}},
 	})
 	var me MutateError
 	if !asMutateError(err, &me) || me.Kind != "missing-id" {
@@ -266,7 +266,7 @@ func TestEntityMapsCloneDomainMutateEntities(t *testing.T) {
 
 	_, err = Mutate(Domain{}, MutateRequest{
 		UserID: "u", JobID: "j", TaskID: "t", JobInstanceID: "i", Timestamp: "ts",
-		Ops: []MutateOp{MintOp{Entity: EntityLoad, ID: "L1", Set: map[string]any{"x": 1}}},
+		Ops: []MutateOp{MintOp{Entity: EntityType("load"), ID: "L1", Set: map[string]any{"x": 1}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -313,7 +313,7 @@ func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 	}
 
 	projected, err := projectTaskForm(domainFromKinds(map[string]EntityMap{
-		kindLoad: {"L1": {"client": "NO"}},
+		"load": {"L1": {"client": "NO"}},
 	}), map[string]any{
 		"enumReads": map[string]any{"sourceLoadId": "loads"},
 		"reads": map[string]any{
@@ -614,7 +614,7 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	domain := domainFromKinds(map[string]EntityMap{
-		kindLoad: {"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}},
+		"load": {"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}},
 	})
 	ids, err := ResolveRead(domain, def, "inst", "label", nil)
 	if err != nil {
@@ -623,7 +623,7 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 	if len(ids) != 1 || ids[0] != "NO" {
 		t.Fatalf("keyed ids = %#v", ids)
 	}
-	ids, err = ResolveRead(domain, ReadDef{Entity: EntityLoad, Key: "id"}, "", "", nil)
+	ids, err = ResolveRead(domain, ReadDef{Entity: EntityType("load"), Key: "id"}, "", "", nil)
 	if err != nil || len(ids) != 3 {
 		t.Fatalf("id key = %#v %v", ids, err)
 	}
@@ -704,8 +704,8 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 		t.Fatal("bad count type")
 	}
 	domain := EmptyDomain()
-	putKind(&domain, kindLoad, EntityMap{"L1": {"client": "NO"}})
-	putKind(&domain, kindPallet, EntityMap{"L1.1": {"loadId": "L1"}})
+	putKind(&domain, "load", EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, "pallet", EntityMap{"L1.1": {"loadId": "L1"}})
 	got, err := RunTransform(domain, RunTransformInput{
 		JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada",
 		Facts:   map[string]any{"L1.1": map[string]any{"weight": 1}},
@@ -724,7 +724,7 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 		t.Fatalf("ops = %#v", got.Request.Ops)
 	}
 	applyMintLocally(&Domain{}, EntityType(""), "x", nil) // empty kind no-op path
-	applyPatchLocally(&Domain{}, EntityLoad, "missing", map[string]any{"a": 1})
+	applyPatchLocally(&Domain{}, EntityType("load"), "missing", map[string]any{"a": 1})
 
 	if EntityKindsFromConfig(OrgConfig{}) != nil {
 		t.Fatal("nil domain")
@@ -1491,8 +1491,8 @@ func TestCommitAuthorizerErrorAndReadyWhen(t *testing.T) {
 	_, err = Mutate(EmptyDomain(), MutateRequest{
 		AppendSubmission: &noSub,
 		Ops: []MutateOp{
-			MintOp{Entity: EntityPallet, ID: "p1", Set: map[string]any{"x": 1}},
-			MintOp{Entity: EntityContainer, ID: "c1", Set: map[string]any{"x": 1}},
+			MintOp{Entity: EntityType("pallet"), ID: "p1", Set: map[string]any{"x": 1}},
+			MintOp{Entity: EntityType("container"), ID: "c1", Set: map[string]any{"x": 1}},
 		},
 	})
 	if err != nil {
@@ -1540,7 +1540,7 @@ func TestRowReadHelpersAndWorklistEdges(t *testing.T) {
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "rows"}},
 		"reads":             map[string]any{"rows": map[string]any{"entity": "pallet", "key": "id"}},
 	})
-	if err != nil || !ok || def.Entity != EntityPallet {
+	if err != nil || !ok || def.Entity != EntityType("pallet") {
 		t.Fatalf("row read = %#v %v %v", def, ok, err)
 	}
 	if _, err := rowIDsForTask(EmptyDomain(), "intake", map[string]any{

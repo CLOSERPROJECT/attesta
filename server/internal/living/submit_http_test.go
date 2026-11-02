@@ -34,8 +34,8 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 		},
 	}
 	domain := EmptyDomain()
-	putKind(&domain, kindLoad, EntityMap{"acme-1": {"client": "acme"}})
-	putKind(&domain, kindPallet, EntityMap{"acme-1.1": {"loadId": "acme-1"}})
+	putKind(&domain, "load", EntityMap{"acme-1": {"client": "acme"}})
+	putKind(&domain, "pallet", EntityMap{"acme-1.1": {"loadId": "acme-1"}})
 
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{

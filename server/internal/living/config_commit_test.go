@@ -50,11 +50,11 @@ func TestCommitRespectsTransformChangeInYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Kind(kindLoad)[instanceID]["codiceFir"] != "FIR-YAML" {
-		t.Fatalf("codiceFir = %#v", result.Domain.Kind(kindLoad)[instanceID])
+	if result.Domain.Kind("load")[instanceID]["codiceFir"] != "FIR-YAML" {
+		t.Fatalf("codiceFir = %#v", result.Domain.Kind("load")[instanceID])
 	}
-	if result.Domain.Kind(kindLoad)[instanceID]["plantNote"] != "FIR-YAML" {
-		t.Fatalf("transform YAML change should stamp plantNote without a new apply* — load=%#v", result.Domain.Kind(kindLoad)[instanceID])
+	if result.Domain.Kind("load")[instanceID]["plantNote"] != "FIR-YAML" {
+		t.Fatalf("transform YAML change should stamp plantNote without a new apply* — load=%#v", result.Domain.Kind("load")[instanceID])
 	}
 }
 

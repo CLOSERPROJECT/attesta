@@ -8,7 +8,7 @@ import (
 func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
-	seeded := domainFromKinds(map[string]EntityMap{kindLoad: {"L1": {"client": "NO"}}})
+	seeded := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{
 		{JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada"},
 	}
@@ -35,7 +35,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind(kindLoad)) != 1 || len(got.Submissions) != 1 {
+	if len(got.Kind("load")) != 1 || len(got.Submissions) != 1 {
 		t.Fatalf("domain wiped without WipeDomain: %#v", got)
 	}
 }
@@ -43,7 +43,7 @@ func TestSeedDemoSetsActiveConfigWithoutWipe(t *testing.T) {
 func TestSeedDemoWipesDomainAndSeedsFixture(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
-	seeded := domainFromKinds(map[string]EntityMap{kindLoad: {"L1": {"client": "NO"}}})
+	seeded := domainFromKinds(map[string]EntityMap{"load": {"L1": {"client": "NO"}}})
 	seeded.Submissions = []Submission{{JobID: "intake", TaskID: "register"}}
 	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestSeedDemoWipesDomainAndSeedsFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind(kindLoad)) != 0 || len(got.Submissions) != 0 || len(got.JobInstances) != 0 {
+	if len(got.Kind("load")) != 0 || len(got.Submissions) != 0 || len(got.JobInstances) != 0 {
 		t.Fatalf("domain not empty after wipe: %#v", got)
 	}
 

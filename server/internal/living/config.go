@@ -108,7 +108,7 @@ func AsJob(v any) (Job, bool) {
 	return Job{}, false
 }
 
-// normalizeOrgConfigJobs reifies any leftover non-Job values after Get.
+// normalizeOrgConfigJobs reifies any remaining non-Job values after Get.
 // OrgConfig.UnmarshalJSON already stores typed Job; this covers RawMessage.
 func normalizeOrgConfigJobs(cfg *OrgConfig) {
 	if cfg == nil || cfg.Jobs.Values == nil {
