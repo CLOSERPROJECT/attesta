@@ -27,10 +27,10 @@ func main() {
 	db := client.Database(dbName)
 	domains := living.NewMongoDomainStore(db)
 	configs := living.NewMongoConfigStore(db)
-	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{WipeDomain: true}); err != nil {
+	// Active Config only — smoke builds Domain from empty; staged matrix would collide on line "1st".
+	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{SkipEmptyDomainStaging: true}); err != nil {
 		must(err)
 	}
-	// Smoke builds its own Domain from empty; SeedDemo's staged matrix would collide on line "1st".
 	must(domains.Put(ctx, "feragame", living.EmptyDomain()))
 
 	c := &living.Committer{

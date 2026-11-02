@@ -7,10 +7,19 @@ import (
 	"time"
 )
 
-// SeedOptions controls Domain wipe during SeedDemo. Only task seed / tests
-// should call SeedDemo; WipeDomain follows Seed Replace — never ungated in prod.
+// SeedOptions controls Domain wipe and empty-Domain staging during SeedDemo.
+// Only task seed / tests should call SeedDemo; WipeDomain follows Seed Replace —
+// never ungated in prod.
+//
+// Staging runs when WipeDomain is set, or when Domain is missing or empty
+// (no JobInstances and no Submissions). SkipEmptyDomainStaging opts out of that
+// missing/empty path so callers can keep Active Config without staged data.
 type SeedOptions struct {
 	WipeDomain bool
+	// SkipEmptyDomainStaging keeps a missing or empty Domain untouched when
+	// WipeDomain is false. Handler/smoke helpers that only want Active Config
+	// set this — without it, EmptyDomain() would pick up the stage matrix.
+	SkipEmptyDomainStaging bool
 }
 
 // Deterministic demo Job instance ids for staged Domain (--replace rebuild).
@@ -23,8 +32,9 @@ const (
 )
 
 // SeedDemo puts the demo Feragame Org Config as the Active Config version and,
-// when WipeDomain is set or Domain is missing, replaces the org Domain with the
-// staged multi-actor fixture (not EmptyDomain).
+// when WipeDomain is set or Domain is missing/empty, replaces the org Domain
+// with the staged multi-actor fixture (not EmptyDomain), unless
+// SkipEmptyDomainStaging opts out of the missing/empty path.
 // Demo/fixture only — product hosts must not require this demo seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
 func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opts SeedOptions) (OrgConfig, error) {
@@ -40,11 +50,17 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 		if domains == nil {
 			return cfg, nil
 		}
-		_, err := domains.Get(ctx, cfg.Org)
+		domain, err := domains.Get(ctx, cfg.Org)
 		switch {
 		case err == nil:
-			return cfg, nil
+			if opts.SkipEmptyDomainStaging || !domainSeedEmpty(domain) {
+				return cfg, nil
+			}
+			needDomain = true
 		case errors.Is(err, ErrNotFound):
+			if opts.SkipEmptyDomainStaging {
+				return cfg, nil
+			}
 			needDomain = true
 		default:
 			return OrgConfig{}, err
@@ -57,6 +73,12 @@ func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opt
 		return OrgConfig{}, err
 	}
 	return cfg, nil
+}
+
+// domainSeedEmpty is true when Domain has no JobInstances and no Submissions
+// (entities alone do not count as staged demo data).
+func domainSeedEmpty(d Domain) bool {
+	return len(d.JobInstances) == 0 && len(d.Submissions) == 0
 }
 
 // seedStagedDemoDomain wipes then Commits the minimal intake/line stage matrix so

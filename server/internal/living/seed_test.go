@@ -91,6 +91,54 @@ func TestSeedDemoFillsMissingDomainWithoutWipe(t *testing.T) {
 	assertStagedDemoDomain(t, got)
 }
 
+func TestSeedDemoFillsEmptyDomainWithoutWipe(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	if err := domains.Put(t.Context(), "feragame", EmptyDomain()); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{WipeDomain: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := domains.Get(t.Context(), cfg.Org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStagedDemoDomain(t, got)
+}
+
+func TestSeedDemoSkipEmptyDomainStaging(t *testing.T) {
+	domains := NewMemoryDomainStore()
+	configs := NewMemoryConfigStore()
+	if err := domains.Put(t.Context(), "feragame", EmptyDomain()); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := SeedDemo(t.Context(), domains, configs, SeedOptions{SkipEmptyDomainStaging: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Org != "feragame" {
+		t.Fatalf("cfg = %#v", cfg)
+	}
+	got, err := domains.Get(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.JobInstances) != 0 || len(got.Submissions) != 0 {
+		t.Fatalf("empty Domain staged despite SkipEmptyDomainStaging: %#v", got)
+	}
+	version, err := configs.ActiveVersion(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != DefaultFixtureVersion {
+		t.Fatalf("active = %q", version)
+	}
+}
+
 func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()
