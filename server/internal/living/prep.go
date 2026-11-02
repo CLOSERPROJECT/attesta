@@ -8,19 +8,12 @@ type prepResult struct {
 	Facts map[string]any
 }
 
-// prepTaskSubmission filters leftover-table / containerReg values into transform facts.
+// prepTaskSubmission filters leftover-table values into transform facts.
 // Chrome field ids (display-only) are stripped here — Commit law, not SPA seal.
 func prepTaskSubmission(task map[string]any, value map[string]any, leftoverIDs []string) (prepResult, error) {
 	value = stripChromeFields(task, value)
 	if needsLeftoverProjection(task) {
 		return prepLeftoverFacts(task, value, leftoverIDs)
-	}
-	if materials, ok := containerRegMaterials(task); ok {
-		facts, err := flattenContainerRegFacts(value, materials)
-		if err != nil {
-			return prepResult{}, err
-		}
-		return prepResult{Facts: containerRegFactsAsMap(facts)}, nil
 	}
 	return prepResult{Facts: cloneFacts(value)}, nil
 }

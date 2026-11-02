@@ -84,6 +84,22 @@ describe('containerReg Ajv dual-load', () => {
 		expect(
 			validator.isValid(schema, schema, {
 				sourceLoadId: 'load-a',
+				secondarySourceLoadId: '',
+				polvereDiVetro: [{ weight: 10, dualSources: true }]
+			})
+		).toBe(false);
+
+		expect(
+			validator.isValid(schema, schema, {
+				sourceLoadId: 'load-a',
+				secondarySourceLoadId: '   ',
+				polvereDiVetro: [{ weight: 10, dualSources: true }]
+			})
+		).toBe(false);
+
+		expect(
+			validator.isValid(schema, schema, {
+				sourceLoadId: 'load-a',
 				secondarySourceLoadId: 'load-b',
 				polvereDiVetro: [{ weight: 10, dualSources: true }]
 			})

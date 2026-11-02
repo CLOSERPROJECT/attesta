@@ -399,7 +399,7 @@ steps:
                       entity: pallet
                       set:
                         progress: $value
-            # C5/C6 — fixed materials; rows flatten → mintMany; unlockFrom instance (lineLoad is some).
+            # C5/C6 — keyed material arrays; bind → {sourceLoadId,rows} then mintMany; unlockFrom instance.
             # Load enums at form root (91); per-row dual checkbox; form secondary required when any dual (90/92).
             - id: containerReg
               roles: [logistic]
@@ -422,6 +422,9 @@ steps:
                     secondarySourceLoadId:
                         type: string
                         title: Carico sorgente secondario
+                        # Reject empty/whitespace when present (dual if/then required); not-equal primary.
+                        minLength: 1
+                        pattern: '.*\S.*'
                         not:
                             const:
                                 $data: '/sourceLoadId'
@@ -552,8 +555,25 @@ steps:
                 polvereDiAspirazione: *containerRegMaterialArrayUi
               onSubmit:
                 transform:
-                    # Prep flattens form → { sourceLoadId, rows }; dual rows carry form secondary.
-                    # evalSet omits undefined so single-source Records stay clean.
+                    # Schema validates weight / dual secondary; bind only reshapes keyed arrays → rows.
+                    # Dual rows carry form secondary; $merge omits it for single-source.
+                    - op: bind
+                      expr: >-
+                        (
+                          $rows := $reduce($catalogs.materials, function($acc, $m){(
+                            $arr := $lookup($, $m.key) ? $lookup($, $m.key) : [];
+                            $type($arr) != "array" ? $acc : $append($acc, $map(
+                              $arr[$type(weight)="number" and weight > 0],
+                              function($r){
+                                $merge([
+                                  {"weight": $r.weight, "material": $m.label},
+                                  $r.dualSources = true ? {"secondarySourceLoadId": secondarySourceLoadId} : {}
+                                ])
+                              }
+                            ))
+                          )}, []);
+                          {"sourceLoadId": sourceLoadId, "rows": $rows}
+                        )
                     - op: mintMany
                       entity: container
                       count: $count($.rows)

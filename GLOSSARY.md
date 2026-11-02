@@ -90,6 +90,10 @@ _Avoid_: Treating catalogs as Domain kinds; conflating with Role catalog or Chro
 
 ### Authoring details
 
+**bind** (transform op):
+Authored JSONata step in `onSubmit.transform` whose result replaces `$` for later ops in that list. Does not emit Domain mutations itself.
+_Avoid_: Conflating with form **bindings** bag, **reads** bindings, or Org **catalogs** (`$catalogs`)
+
 **reads**:
 Authored Domain query bindings used at open time to project enums / property names into a Task — never bake instance ids into the Org Config.
 _Avoid_: Ref / `$refs` / `optionsFor` (retired kernel names)

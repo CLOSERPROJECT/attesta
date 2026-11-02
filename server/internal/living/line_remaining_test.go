@@ -99,9 +99,11 @@ func TestCommitContainerRegMintsContainersAndUnlocksLoadedExtracted(t *testing.T
 	if last.TaskID != "containerReg" || last.JobInstanceID != "1st" {
 		t.Fatalf("submission = %#v", last)
 	}
-	rows, _ := last.Facts["rows"].([]any)
-	if len(rows) != 2 {
-		t.Fatalf("submission facts rows = %#v", last.Facts)
+	// Submission facts stay form-shaped; bind reshapes only for mintMany.
+	glass, _ := last.Facts["polvereDiVetro"].([]any)
+	plastic, _ := last.Facts["plastica"].([]any)
+	if len(glass) != 1 || len(plastic) != 1 {
+		t.Fatalf("submission facts = %#v", last.Facts)
 	}
 	if len(last.IDsTouched) != 2 || last.IDsTouched[0] != "C-1" {
 		t.Fatalf("idsTouched = %#v", last.IDsTouched)

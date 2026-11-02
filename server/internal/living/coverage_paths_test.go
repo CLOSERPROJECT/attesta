@@ -1589,9 +1589,6 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	if msg := enforceAllCompletenessKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {
 		t.Fatalf("joinComma via completeness = %q", msg)
 	}
-	if _, ok := containerRegMaterials(map[string]any{"schema": map[string]any{}}); ok {
-		t.Fatal("no props")
-	}
 	if _, ok := taskOnSubmitTransform(map[string]any{}); ok {
 		t.Fatal("no onSubmit")
 	}

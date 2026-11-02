@@ -2,6 +2,7 @@ package living
 
 import (
 	"fmt"
+	"strings"
 )
 
 type transformMintOp struct {
@@ -29,6 +30,11 @@ type transformPatchOp struct {
 	Set    map[string]any
 }
 
+// bind replaces `$` for later ops; it does not emit a MutateOp.
+type transformBindOp struct {
+	Expr string
+}
+
 type transformOp interface {
 	transformOpTag()
 }
@@ -37,6 +43,7 @@ func (transformMintOp) transformOpTag()      {}
 func (transformMintManyOp) transformOpTag()  {}
 func (transformPatchEachOp) transformOpTag() {}
 func (transformPatchOp) transformOpTag()     {}
+func (transformBindOp) transformOpTag()      {}
 
 type TransformError struct {
 	Kind    string
@@ -114,6 +121,12 @@ func parseTransformOps(transform any, allowed map[string]struct{}) ([]transformO
 				return nil, TransformError{Kind: "invalid-transform", Message: "patch requires entity + id + set"}
 			}
 			ops = append(ops, transformPatchOp{Entity: entity, ID: m["id"], Set: set})
+		case "bind":
+			expr, _ := m["expr"].(string)
+			if strings.TrimSpace(expr) == "" {
+				return nil, TransformError{Kind: "invalid-transform", Message: "bind requires expr"}
+			}
+			ops = append(ops, transformBindOp{Expr: expr})
 		default:
 			return nil, TransformError{Kind: "unsupported-op", Op: opName}
 		}
@@ -183,7 +196,7 @@ type evalScalarResult struct {
 	Defined bool
 }
 
-func evalScalar(raw any, facts map[string]any, bindings ExprBindings) (evalScalarResult, error) {
+func evalScalar(raw any, input any, bindings ExprBindings) (evalScalarResult, error) {
 	s, ok := raw.(string)
 	if !ok {
 		return evalScalarResult{Value: raw, Defined: true}, nil
@@ -195,7 +208,7 @@ func evalScalar(raw any, facts map[string]any, bindings ExprBindings) (evalScala
 		}
 		return evalScalarResult{}, nil
 	}
-	value, err := evaluateExpr(s, facts, bindings)
+	value, err := evaluateExpr(s, input, bindings)
 	if err != nil {
 		return evalScalarResult{}, err
 	}
@@ -208,10 +221,10 @@ func evalScalar(raw any, facts map[string]any, bindings ExprBindings) (evalScala
 	return evalScalarResult{Value: value, Defined: true}, nil
 }
 
-func evalSet(set map[string]any, facts map[string]any, bindings ExprBindings) (map[string]any, error) {
+func evalSet(set map[string]any, input any, bindings ExprBindings) (map[string]any, error) {
 	out := make(map[string]any, len(set))
 	for key, raw := range set {
-		got, err := evalScalar(raw, facts, bindings)
+		got, err := evalScalar(raw, input, bindings)
 		if err != nil {
 			return nil, TransformError{Kind: "jsonata", Message: err.Error()}
 		}
@@ -259,7 +272,7 @@ func applyPatchLocally(working *Domain, entity EntityType, id string, set map[st
 	(*m)[id] = applyFactsPatch(existing, set)
 }
 
-// RunTransform evaluates authored mint/mintMany/patch/patchEach ops into a MutateRequest.
+// RunTransform evaluates authored bind/mint/mintMany/patch/patchEach ops into a MutateRequest.
 func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, error) {
 	parsed, err := parseTransformOps(input.Transform, input.Allowed)
 	if err != nil {
@@ -269,15 +282,30 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 	working := cloneDomain(domain)
 	aliases := ExprBindings{}
 	ops := make([]MutateOp, 0)
+	// Bind replaces this `$` for later ops; MutateRequest.Facts stays the prep input.
+	workingFacts := any(input.Facts)
 
 	for _, op := range parsed {
 		bindings := mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases)
 
 		switch o := op.(type) {
+		case transformBindOp:
+			value, err := evaluateExpr(o.Expr, workingFacts, bindings)
+			if err != nil {
+				return RunTransformResult{}, TransformError{Kind: "jsonata", Message: err.Error()}
+			}
+			if value == nil {
+				return RunTransformResult{}, TransformError{Kind: "type", Message: "bind expr must evaluate to a defined value"}
+			}
+			workingFacts = value
 		case transformPatchEachOp:
-			for id, cell := range input.Facts {
+			cells, ok := workingFacts.(map[string]any)
+			if !ok {
+				return RunTransformResult{}, TransformError{Kind: "type", Message: "patchEach requires $ to be an object"}
+			}
+			for id, cell := range cells {
 				cellBindings := mergeBindings(bindings, ExprBindings{"value": cell})
-				set, err := evalSet(o.Set, input.Facts, cellBindings)
+				set, err := evalSet(o.Set, workingFacts, cellBindings)
 				if err != nil {
 					return RunTransformResult{}, err
 				}
@@ -285,7 +313,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 				applyPatchLocally(&working, o.Entity, id, set)
 			}
 		case transformPatchOp:
-			idGot, err := evalScalar(o.ID, input.Facts, bindings)
+			idGot, err := evalScalar(o.ID, workingFacts, bindings)
 			if err != nil {
 				return RunTransformResult{}, TransformError{Kind: "jsonata", Message: err.Error()}
 			}
@@ -293,14 +321,14 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			if err != nil {
 				return RunTransformResult{}, err
 			}
-			set, err := evalSet(o.Set, input.Facts, bindings)
+			set, err := evalSet(o.Set, workingFacts, bindings)
 			if err != nil {
 				return RunTransformResult{}, err
 			}
 			ops = append(ops, PatchOp{Entity: o.Entity, ID: id, Set: set})
 			applyPatchLocally(&working, o.Entity, id, set)
 		case transformMintOp:
-			idGot, err := evalScalar(o.ID, input.Facts, bindings)
+			idGot, err := evalScalar(o.ID, workingFacts, bindings)
 			if err != nil {
 				return RunTransformResult{}, TransformError{Kind: "jsonata", Message: err.Error()}
 			}
@@ -308,7 +336,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			if err != nil {
 				return RunTransformResult{}, err
 			}
-			set, err := evalSet(o.Set, input.Facts, bindings)
+			set, err := evalSet(o.Set, workingFacts, bindings)
 			if err != nil {
 				return RunTransformResult{}, err
 			}
@@ -320,7 +348,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 				aliases[o.As] = alias
 			}
 		case transformMintManyOp:
-			countGot, err := evalScalar(o.Count, input.Facts, bindings)
+			countGot, err := evalScalar(o.Count, workingFacts, bindings)
 			if err != nil {
 				return RunTransformResult{}, TransformError{Kind: "jsonata", Message: err.Error()}
 			}
@@ -332,7 +360,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 				// Refresh $domain each iteration so count/id exprs see prior mints.
 				loopBindings := mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases)
 				loopBindings["index"] = index
-				idGot, err := evalScalar(o.ID, input.Facts, loopBindings)
+				idGot, err := evalScalar(o.ID, workingFacts, loopBindings)
 				if err != nil {
 					return RunTransformResult{}, TransformError{Kind: "jsonata", Message: err.Error()}
 				}
@@ -340,7 +368,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 				if err != nil {
 					return RunTransformResult{}, err
 				}
-				set, err := evalSet(o.Set, input.Facts, loopBindings)
+				set, err := evalSet(o.Set, workingFacts, loopBindings)
 				if err != nil {
 					return RunTransformResult{}, err
 				}

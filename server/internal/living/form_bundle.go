@@ -406,6 +406,20 @@ func seedFormDefaultsFromSchema(out map[string]any, payload map[string]any) {
 	}
 }
 
+func schemaTypeIs(raw any, want string) bool {
+	switch t := raw.(type) {
+	case string:
+		return t == want
+	case []any:
+		for _, item := range t {
+			if s, ok := item.(string); ok && s == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func leftoversIdentity(ids []string) string {
 	sorted := append([]string(nil), ids...)
 	sort.Strings(sorted)
