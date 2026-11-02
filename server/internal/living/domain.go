@@ -1,9 +1,5 @@
 package living
 
-import (
-	"encoding/json"
-)
-
 // Domain is the org's accumulating facts (entities + submissions + job instances).
 // Entities kind names are Org Config vocabulary (e.g. load); EntityMaps shares
 // nested map headers with Entities (caller must clone before mutating).
@@ -85,71 +81,4 @@ func ensureEntities(d *Domain) {
 	if d.Entities == nil {
 		d.Entities = map[string]EntityMap{}
 	}
-}
-
-// UnmarshalJSON prefers entities; folds legacy load/pallet/container/extra when absent.
-func (d *Domain) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	out := EmptyDomain()
-	if v, ok := raw["entities"]; ok {
-		var entities map[string]EntityMap
-		if err := json.Unmarshal(v, &entities); err != nil {
-			return err
-		}
-		for kind, m := range entities {
-			out.Entities[kind] = nonNilEntityMap(m)
-		}
-	}
-	ingestLegacy := func(key string) error {
-		v, ok := raw[key]
-		if !ok {
-			return nil
-		}
-		var m EntityMap
-		if err := json.Unmarshal(v, &m); err != nil {
-			return err
-		}
-		if _, exists := out.Entities[key]; !exists {
-			out.Entities[key] = nonNilEntityMap(m)
-		}
-		return nil
-	}
-	for _, key := range []string{kindLoad, kindPallet, kindContainer} {
-		if err := ingestLegacy(key); err != nil {
-			return err
-		}
-	}
-	if v, ok := raw["extra"]; ok {
-		var extra map[string]EntityMap
-		if err := json.Unmarshal(v, &extra); err != nil {
-			return err
-		}
-		for kind, m := range extra {
-			if _, exists := out.Entities[kind]; exists {
-				continue
-			}
-			out.Entities[kind] = nonNilEntityMap(m)
-		}
-	}
-	if v, ok := raw["submissions"]; ok {
-		if err := json.Unmarshal(v, &out.Submissions); err != nil {
-			return err
-		}
-	}
-	if v, ok := raw["jobInstances"]; ok {
-		if err := json.Unmarshal(v, &out.JobInstances); err != nil {
-			return err
-		}
-	}
-	if out.Submissions == nil {
-		out.Submissions = []Submission{}
-	}
-	if out.JobInstances == nil {
-		out.JobInstances = []JobInstance{}
-	}
-	*d = out
-	return nil
 }

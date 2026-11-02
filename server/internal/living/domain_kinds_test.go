@@ -43,27 +43,6 @@ func TestDomainEntitiesWireRoundTripWellKnownAndExtra(t *testing.T) {
 	}
 }
 
-func TestDomainLegacyWireIngest(t *testing.T) {
-	raw := []byte(`{
-		"load": {"L1": {"client": "NO"}},
-		"pallet": {},
-		"container": {},
-		"extra": {"widget": {"w1": {"ok": true}}},
-		"submissions": [],
-		"jobInstances": []
-	}`)
-	var got Domain
-	if err := json.Unmarshal(raw, &got); err != nil {
-		t.Fatal(err)
-	}
-	if got.Kind(kindLoad)["L1"]["client"] != "NO" {
-		t.Fatalf("legacy load = %#v", got.Entities)
-	}
-	if got.Kind("widget")["w1"]["ok"] != true {
-		t.Fatalf("legacy extra = %#v", got.Entities)
-	}
-}
-
 func TestEntityMapsMutateClonePreferEntities(t *testing.T) {
 	d := EmptyDomain()
 	putKind(&d, "widget", EntityMap{"w1": {"ok": true}})

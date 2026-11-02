@@ -6,55 +6,6 @@ import (
 	"testing"
 )
 
-func TestDomainFromMongoDocLegacyLoadPalletContainerExtra(t *testing.T) {
-	doc := mongoDomainDoc{
-		Org: "org",
-		Load: map[string]map[string]any{
-			"a_b": {"k_v": 1},
-		},
-		Pallet: map[string]map[string]any{
-			"a_b_1": {"loadId": "a.b"},
-		},
-		Container: map[string]map[string]any{},
-		Extra: map[string]map[string]map[string]any{
-			"kind_x": {"id_1": {"f_g": true}},
-		},
-	}
-	got := domainFromMongoDoc(doc)
-	if got.Kind(kindLoad)["a.b"]["k.v"] != 1 {
-		t.Fatalf("legacy load = %#v", got.Entities)
-	}
-	if got.Kind(kindPallet)["a.b.1"]["loadId"] != "a.b" {
-		t.Fatalf("legacy pallet = %#v", got.Entities)
-	}
-	if _, ok := got.Entities[kindContainer]; !ok {
-		t.Fatalf("legacy empty container missing: %#v", got.Entities)
-	}
-	if got.Kind("kind.x")["id.1"]["f.g"] != true {
-		t.Fatalf("legacy extra = %#v", got.Entities)
-	}
-
-	// entities wins over legacy top-level kinds when both are present.
-	doc.Entities = map[string]map[string]map[string]any{
-		"load": {"new": {"client": "NO"}},
-	}
-	got = domainFromMongoDoc(doc)
-	if got.Kind(kindLoad)["new"]["client"] != "NO" {
-		t.Fatalf("entities preferred = %#v", got.Entities)
-	}
-	if _, ok := got.Kind(kindLoad)["a.b"]; ok {
-		t.Fatalf("legacy load must not merge over entities: %#v", got.Kind(kindLoad))
-	}
-
-	written := domainToMongoDoc("org", got)
-	if written.Load != nil || written.Pallet != nil || written.Container != nil || written.Extra != nil {
-		t.Fatalf("write must emit entities only: %#v", written)
-	}
-	if written.Entities["load"]["new"]["client"] != "NO" {
-		t.Fatalf("write entities = %#v", written.Entities)
-	}
-}
-
 func TestEncodeDecodeMongoKey(t *testing.T) {
 	if got := encodeMongoKey("1.1"); got != "1_1" {
 		t.Fatalf("encode = %q", got)

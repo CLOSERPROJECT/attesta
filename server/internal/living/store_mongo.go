@@ -33,13 +33,8 @@ func NewMongoDomainStore(db *mongo.Database) *MongoDomainStore {
 }
 
 type mongoDomainDoc struct {
-	Org      string                               `bson:"_id"`
-	Entities map[string]map[string]map[string]any `bson:"entities"`
-	// Legacy top-level kinds: pre-entities Mongo docs still hold these; write emits entities only (demo wipe OK).
-	Load         map[string]map[string]any            `bson:"load,omitempty"`
-	Pallet       map[string]map[string]any            `bson:"pallet,omitempty"`
-	Container    map[string]map[string]any            `bson:"container,omitempty"`
-	Extra        map[string]map[string]map[string]any `bson:"extra,omitempty"`
+	Org          string                               `bson:"_id"`
+	Entities     map[string]map[string]map[string]any `bson:"entities"`
 	Submissions  []mongoSubmissionDoc                 `bson:"submissions"`
 	JobInstances []JobInstance                        `bson:"jobInstances"`
 }
@@ -234,25 +229,6 @@ func domainFromMongoDoc(doc mongoDomainDoc) Domain {
 	out.JobInstances = append([]JobInstance(nil), doc.JobInstances...)
 	for kind, m := range doc.Entities {
 		out.Entities[decodeMongoKey(kind)] = decodeEntityMap(m)
-	}
-	ingestLegacyMongoKind := func(kind string, raw map[string]map[string]any) {
-		if raw == nil {
-			return
-		}
-		if _, exists := out.Entities[kind]; exists {
-			return
-		}
-		out.Entities[kind] = decodeEntityMap(raw)
-	}
-	ingestLegacyMongoKind(kindLoad, doc.Load)
-	ingestLegacyMongoKind(kindPallet, doc.Pallet)
-	ingestLegacyMongoKind(kindContainer, doc.Container)
-	for kind, m := range doc.Extra {
-		decoded := decodeMongoKey(kind)
-		if _, exists := out.Entities[decoded]; exists {
-			continue
-		}
-		out.Entities[decoded] = decodeEntityMap(m)
 	}
 	if out.Submissions == nil {
 		out.Submissions = []Submission{}
