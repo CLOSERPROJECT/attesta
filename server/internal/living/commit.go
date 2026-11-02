@@ -70,7 +70,7 @@ type Committer struct {
 	Configs    ConfigStore
 	Authorizer Authorizer
 	// HttpPort runs onSubmit.http after DomainStore.Put. Nil is always a no-op
-	// (no links/errors) even when the Task declares effects; product wiring installs FakeHttpPort.
+	// (no links/errors) even when the Task declares effects; product uses SidecarHttpPort or soft-fail.
 	HttpPort HttpPort
 	Now      func() time.Time
 }
@@ -207,7 +207,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
-			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, applied.Bindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs)
+			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, applied.Bindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs, org)
 			result.Links = httpResult.Links
 			result.HttpErrors = httpResult.Errors
 		}

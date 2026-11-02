@@ -769,50 +769,50 @@ func TestSubmitHTTPParseAndEvalErrors(t *testing.T) {
 	if len(effects) != 1 || !effects[0].HasBody {
 		t.Fatalf("effects = %#v", effects)
 	}
-	if len(runSubmitHTTPEffects(t.Context(), nil, nil, nil, nil, EmptyDomain(), "", nil).Errors) != 0 {
+	if len(runSubmitHTTPEffects(t.Context(), nil, nil, nil, nil, EmptyDomain(), "", nil, "").Errors) != 0 {
 		t.Fatal("empty effects")
 	}
 
 	port := &recordingHttpPort{responses: []HttpPortResponse{{URL: "blob:ok"}}}
 	item, msg := runOneSubmitHTTP(t.Context(), port, SubmitHttpEffect{
 		Method: "1+", URL: `"/x"`, Label: `"L"`, Action: "link",
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg == "" {
 		t.Fatalf("bad method expr item=%v msg=%q", item, msg)
 	}
 	item, msg = runOneSubmitHTTP(t.Context(), port, SubmitHttpEffect{
 		Method: `""`, URL: `"/x"`, Label: `"L"`, Action: "link",
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg == "" {
 		t.Fatalf("empty method msg=%q", msg)
 	}
 	item, msg = runOneSubmitHTTP(t.Context(), port, SubmitHttpEffect{
 		Method: `"POST"`, URL: "1+", Label: `"L"`, Action: "link",
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg == "" {
 		t.Fatalf("bad url expr msg=%q", msg)
 	}
 	item, msg = runOneSubmitHTTP(t.Context(), port, SubmitHttpEffect{
 		Method: `"POST"`, URL: `"/x"`, Label: `""`, Action: "link",
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg == "" {
 		t.Fatalf("empty label msg=%q", msg)
 	}
 	item, msg = runOneSubmitHTTP(t.Context(), port, SubmitHttpEffect{
 		Method: `"POST"`, URL: `"/x"`, Label: `"L"`, Action: `"nope"`,
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg == "" {
 		t.Fatalf("bad action msg=%q", msg)
 	}
 	item, msg = runOneSubmitHTTP(t.Context(), nil, SubmitHttpEffect{
 		Method: `"POST"`, URL: `"/x"`, Label: `"L"`, Action: "link",
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg != "http port not configured" {
 		t.Fatalf("nil port msg=%q", msg)
 	}
 	item, msg = runOneSubmitHTTP(t.Context(), &recordingHttpPort{responses: []HttpPortResponse{{URL: ""}}}, SubmitHttpEffect{
 		Method: `"POST"`, URL: `"/x"`, Label: `"L"`, Action: "download",
-	}, nil, nil)
+	}, nil, nil, "")
 	if item != nil || msg == "" {
 		t.Fatalf("empty resp url msg=%q", msg)
 	}
@@ -820,9 +820,15 @@ func TestSubmitHTTPParseAndEvalErrors(t *testing.T) {
 		URL: "blob:x", Headers: map[string]string{"Content-Disposition": `attachment; filename="a.csv"`},
 	}}}, SubmitHttpEffect{
 		Method: `"POST"`, URL: `"/x"`, Label: `"L"`, Action: "download",
-	}, nil, nil)
+	}, nil, nil, "")
 	if msg != "" || item == nil || item.Filename != "a.csv" {
 		t.Fatalf("download filename = %#v msg=%q", item, msg)
+	}
+	item, msg = runOneSubmitHTTP(t.Context(), port, SubmitHttpEffect{
+		Method: `"POST"`, URL: `"https://evil.example/x"`, Label: `"L"`, Action: "link",
+	}, nil, nil, "feragame")
+	if item != nil || !strings.Contains(msg, "absolute URL") {
+		t.Fatalf("ssrf reject msg=%q", msg)
 	}
 
 	if filenameFromContentDisposition("") != "" {

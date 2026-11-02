@@ -48,7 +48,7 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 			Body:    `{ "client": $.client, "loadId": $load.id }`,
 			HasBody: true,
 		},
-	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"load": map[string]any{"id": "acme-1"}}, domain, "acme-1", nil)
+	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"load": map[string]any{"id": "acme-1"}}, domain, "acme-1", nil, "feragame")
 
 	if len(result.Errors) != 0 {
 		t.Fatalf("errors = %#v", result.Errors)
@@ -56,7 +56,7 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 	if len(port.calls) != 2 {
 		t.Fatalf("calls = %#v", port.calls)
 	}
-	if port.calls[0].Method != "POST" || port.calls[0].URL != "/fake/labels" {
+	if port.calls[0].Method != "POST" || port.calls[0].URL != "/fake/labels" || port.calls[0].Org != "feragame" {
 		t.Fatalf("call0 = %#v", port.calls[0])
 	}
 	body0, _ := port.calls[0].Body.(map[string]any)
@@ -83,7 +83,7 @@ func TestRunSubmitHTTPEffectsContinuesAfterPortFailure(t *testing.T) {
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Labels"`, Action: "link"},
 		{Method: `"POST"`, URL: `"/fake/register-csv"`, Label: `"CSV"`, Action: "download"},
-	}, map[string]any{}, nil, EmptyDomain(), "", nil)
+	}, map[string]any{}, nil, EmptyDomain(), "", nil, "feragame")
 
 	if len(result.Errors) != 1 || result.Errors[0] != "printer down" {
 		t.Fatalf("errors = %#v", result.Errors)

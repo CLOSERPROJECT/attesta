@@ -194,6 +194,8 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		enforceAuth:      true,
 		now:              func() time.Time { return now },
 		livingAuthorizer: living.AllowAllAuthorizer{},
+		// Test double: product no longer plants FakeHttpPort; exercise Commit+links seam.
+		livingHttpPort: living.NewFakeHttpPort(),
 	}
 	seedLivingDemo(t, server)
 
@@ -328,12 +330,29 @@ func TestLivingProductAuthorizerDefaultsToCerbos(t *testing.T) {
 	}
 }
 
-func TestLivingProductHttpPortDefaultsToFake(t *testing.T) {
+func TestLivingProductHttpPortFromEnvOrSoftFail(t *testing.T) {
+	t.Setenv("LIVING_HTTP_URL", "")
+	t.Setenv("LIVING_HTTP_TOKEN", "")
 	server := &Server{}
 	port := server.livingProductHttpPort()
-	if _, ok := port.(*living.FakeHttpPort); !ok {
-		t.Fatalf("product HttpPort type = %T, want *living.FakeHttpPort", port)
+	if _, ok := port.(living.UnconfiguredHttpPort); !ok {
+		t.Fatalf("product HttpPort type = %T, want living.UnconfiguredHttpPort", port)
 	}
+	if arts := server.livingProductArtifacts(); arts != nil {
+		t.Fatalf("artifacts without URL = %#v", arts)
+	}
+
+	t.Setenv("LIVING_HTTP_URL", "http://living-http:8090")
+	t.Setenv("LIVING_HTTP_TOKEN", "tok")
+	port = server.livingProductHttpPort()
+	sidecar, ok := port.(*living.SidecarHttpPort)
+	if !ok || sidecar.BaseURL != "http://living-http:8090" || sidecar.Token != "tok" {
+		t.Fatalf("env HttpPort = %#v", port)
+	}
+	if arts := server.livingProductArtifacts(); arts == nil || arts.BaseURL != "http://living-http:8090" {
+		t.Fatalf("artifacts = %#v", arts)
+	}
+
 	stub := &living.FakeHttpPort{}
 	server.livingHttpPort = stub
 	if got := server.livingProductHttpPort(); got != stub {
@@ -346,6 +365,9 @@ func TestLivingProductHttpPortDefaultsToFake(t *testing.T) {
 	}
 	if handler.Committer.HttpPort != stub {
 		t.Fatalf("handler HttpPort = %T, want override", handler.Committer.HttpPort)
+	}
+	if handler.Artifacts == nil {
+		t.Fatal("handler Artifacts should still come from env when HttpPort is overridden")
 	}
 }
 

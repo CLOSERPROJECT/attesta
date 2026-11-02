@@ -14,6 +14,8 @@ type HttpRequest struct {
 	Method string
 	URL    string
 	Body   any
+	// Org is the Commit organization; product Adapter sends it as X-Attesta-Org.
+	Org string
 }
 
 // HttpPortResponse URL is a plain-text body; headers may carry Content-Disposition.

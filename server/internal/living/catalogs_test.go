@@ -135,7 +135,7 @@ func TestRunSubmitHTTPEffectsUsesCatalogs(t *testing.T) {
 			Label:  `"L"`,
 			Action: "link",
 		},
-	}, map[string]any{}, nil, EmptyDomain(), "", map[string]any{"clients": map[string]any{"nord": "NO"}})
+	}, map[string]any{}, nil, EmptyDomain(), "", map[string]any{"clients": map[string]any{"nord": "NO"}}, "feragame")
 	if len(result.Errors) != 0 {
 		t.Fatalf("errors = %#v", result.Errors)
 	}

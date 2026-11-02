@@ -83,6 +83,7 @@ func runSubmitHTTPEffects(
 	domain Domain,
 	jobInstanceID string,
 	catalogs map[string]any,
+	org string,
 ) runSubmitHTTPResult {
 	if len(effects) == 0 {
 		return runSubmitHTTPResult{}
@@ -92,7 +93,7 @@ func runSubmitHTTPEffects(
 	var links []HttpLinkItem
 
 	for _, effect := range effects {
-		item, errMsg := runOneSubmitHTTP(ctx, port, effect, facts, merged)
+		item, errMsg := runOneSubmitHTTP(ctx, port, effect, facts, merged, org)
 		if errMsg != "" {
 			errors = append(errors, errMsg)
 			continue
@@ -110,6 +111,7 @@ func runOneSubmitHTTP(
 	effect SubmitHttpEffect,
 	facts map[string]any,
 	bindings ExprBindings,
+	org string,
 ) (*HttpLinkItem, string) {
 	methodGot, err := evalScalar(effect.Method, facts, bindings)
 	if err != nil {
@@ -125,6 +127,10 @@ func runOneSubmitHTTP(
 		return nil, err.Error()
 	}
 	reqURL, err := requireHTTPString(urlGot.Value, "http.url")
+	if err != nil {
+		return nil, err.Error()
+	}
+	reqURL, err = requirePathOnlyURL(reqURL)
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -154,7 +160,7 @@ func runOneSubmitHTTP(
 		return nil, err.Error()
 	}
 
-	req := HttpRequest{Method: method, URL: reqURL}
+	req := HttpRequest{Method: method, URL: reqURL, Org: strings.TrimSpace(org)}
 	if effect.HasBody {
 		bodyGot, err := evalScalar(effect.Body, facts, bindings)
 		if err != nil {

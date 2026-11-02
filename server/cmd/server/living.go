@@ -63,7 +63,17 @@ func (s *Server) livingProductHttpPort() living.HttpPort {
 	if s.livingHttpPort != nil {
 		return s.livingHttpPort
 	}
-	return living.NewFakeHttpPort()
+	return living.HttpPortFromEnv()
+}
+
+// livingProductArtifacts is the sidecar client used by the browser artifact proxy.
+// Independent of HttpPort overrides so tests can plant FakeHttpPort without losing proxy config.
+func (s *Server) livingProductArtifacts() *living.SidecarHttpPort {
+	base := strings.TrimSpace(os.Getenv("LIVING_HTTP_URL"))
+	if base == "" {
+		return nil
+	}
+	return living.NewSidecarHttpPort(base, strings.TrimSpace(os.Getenv("LIVING_HTTP_TOKEN")), nil)
 }
 
 func (s *Server) livingHandler() http.Handler {
@@ -76,7 +86,8 @@ func (s *Server) livingHandler() http.Handler {
 			Authorizer: s.livingProductAuthorizer(),
 			HttpPort:   s.livingProductHttpPort(),
 		},
-		Gate: s.livingVerifiedGate,
+		Gate:      s.livingVerifiedGate,
+		Artifacts: s.livingProductArtifacts(),
 	}
 }
 

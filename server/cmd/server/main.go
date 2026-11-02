@@ -2536,6 +2536,7 @@ func (s *Server) newMux() *http.ServeMux {
 	livingAPI := s.livingHandler()
 	mux.Handle("/api/living/domain", livingAPI)
 	mux.Handle("/api/living/commit", livingAPI)
+	mux.Handle("/api/living/artifacts/", livingAPI)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/signup", s.handleSignup)

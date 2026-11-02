@@ -15,7 +15,7 @@ mkdir -p "${tmpdir}/scripts" "${tmpdir}/bin"
 cp "${ROOT}/scripts/dev-ports.env" "${tmpdir}/scripts/dev-ports.env"
 
 # Make allocation deterministic and force every label to the same seed. The
-# collision walk must still produce eleven distinct ports.
+# collision walk must still produce twelve distinct ports.
 cat >"${tmpdir}/bin/wt" <<'EOF'
 #!/usr/bin/env bash
 [[ "$1" == "step" && "$2" == "eval" ]] || exit 1
@@ -47,6 +47,7 @@ MAILPIT_UI_PORT=11007
 APPWRITE_HTTP_PORT=11008
 APPWRITE_HTTPS_PORT=11009
 DOCKER_APP_PORT=11010
+LIVING_HTTP_PORT=11011
 COMPOSE_PROJECT_NAME=PROJECT_NAME
 EOF
 project_name="$(ATTESTA_ROOT_DIR="${tmpdir}" bash "${SCRIPT}" project-name)"
@@ -68,6 +69,8 @@ grep -q '^MONGODB_URI=mongodb://localhost:11003$' <<<"${resolved}" || fail "Mong
 grep -q '^APPWRITE_ENDPOINT=http://localhost:11008/v1$' <<<"${resolved}" || fail "Appwrite URL missing"
 grep -q '^MAILPIT_UI_URL=http://localhost:11007$' <<<"${resolved}" || fail "Mailpit URL missing"
 grep -q '^APP_DEV_SERVER=http://localhost:11002$' <<<"${resolved}" || fail "APP_DEV_SERVER missing"
+grep -q '^LIVING_HTTP_URL=http://localhost:11011$' <<<"${resolved}" || fail "LIVING_HTTP_URL missing"
+grep -q '^LIVING_HTTP_TOKEN=dev-living-http-token$' <<<"${resolved}" || fail "LIVING_HTTP_TOKEN missing"
 grep -q '^COMPOSE_PROJECT_NAME=' <<<"${resolved}" || fail "Compose project missing"
 grep -q '^ATTESTA_SEED=true$' <<<"${resolved}" || fail "ATTESTA_SEED flag missing"
 grep -qx "ATTESTA_ROOT_DIR=${tmpdir}" <<<"${resolved}" \
@@ -290,7 +293,7 @@ fi
 
 for env_file in "${concurrent_repo}/.env.worktree" "${concurrent_sibling}/.env.worktree"; do
   [[ -f "${env_file}" ]] || fail "concurrent allocation did not publish ${env_file}"
-  [[ "$(grep -Ec '^(PORT|[A-Z][A-Z0-9_]*_PORT)=[0-9]+$' "${env_file}")" -eq 11 ]] \
+  [[ "$(grep -Ec '^(PORT|[A-Z][A-Z0-9_]*_PORT)=[0-9]+$' "${env_file}")" -eq 12 ]] \
     || fail "concurrent allocation published an incomplete port file: ${env_file}"
   [[ "$(grep -c '^COMPOSE_PROJECT_NAME=' "${env_file}")" -eq 1 ]] \
     || fail "concurrent allocation published an incomplete project identity: ${env_file}"
@@ -299,9 +302,9 @@ concurrent_ports="$(
   sed -n -E 's/^(PORT|[A-Z][A-Z0-9_]*_PORT)=([0-9]+)$/\2/p' \
     "${concurrent_repo}/.env.worktree" "${concurrent_sibling}/.env.worktree"
 )"
-[[ "$(wc -l <<<"${concurrent_ports}" | tr -d '[:space:]')" -eq 22 ]] \
-  || fail "concurrent allocation did not publish twenty-two ports"
-[[ "$(sort -u <<<"${concurrent_ports}" | wc -l | tr -d '[:space:]')" -eq 22 ]] \
+[[ "$(wc -l <<<"${concurrent_ports}" | tr -d '[:space:]')" -eq 24 ]] \
+  || fail "concurrent allocation did not publish twenty-four ports"
+[[ "$(sort -u <<<"${concurrent_ports}" | wc -l | tr -d '[:space:]')" -eq 24 ]] \
   || fail "concurrent sibling worktrees received overlapping ports"
 if find "${concurrent_repo}" "${concurrent_sibling}" -maxdepth 1 -name '.env.worktree.tmp.*' | grep -q .; then
   fail "concurrent allocation left a partial publication file"
