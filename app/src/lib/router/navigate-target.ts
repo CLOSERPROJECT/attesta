@@ -1,5 +1,5 @@
 import { navigate } from './index.js';
-import type { PostCommitTarget } from '../living/worklist-overview.js';
+import type { PostCommitTarget } from '../living/worklist-nav.js';
 
 /** Apply ADR-0006 post-Commit / exit / deep-link target. */
 export function navigateLivingTarget(target: PostCommitTarget): void {

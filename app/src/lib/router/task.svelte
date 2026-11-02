@@ -9,7 +9,7 @@
 		resolveTaskDeepLink,
 		resolveTaskExit,
 		resolveUnmountableTaskTarget
-	} from '../living/worklist-overview.js';
+	} from '../living/worklist-nav.js';
 	import { route } from './index.js';
 	import { navigateLivingTarget } from './navigate-target.js';
 
