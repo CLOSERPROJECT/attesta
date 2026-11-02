@@ -9,7 +9,8 @@ import {
 	jobInstanceOverview,
 	resolvePostCommitNavigation,
 	resolveTaskDeepLink,
-	resolveTaskExit
+	resolveTaskExit,
+	resolveUnmountableTaskTarget
 } from './worklist-overview.js';
 
 const worklist: Worklist = {
@@ -51,6 +52,15 @@ const worklist: Worklist = {
 						register: 'done',
 						codiceFir: 'available',
 						palletWeight: 'locked'
+					}
+				},
+				{
+					id: 'NIR-both-available',
+					label: 'Split available',
+					tasks: {
+						register: 'available',
+						codiceFir: 'locked',
+						palletWeight: 'available'
 					}
 				}
 			]
@@ -111,12 +121,40 @@ describe('job instance overview model', () => {
 		]);
 		expect(admin?.handoffRoles).toEqual(['logistic']);
 		expect(formatHandoffCopy(admin!.handoffRoles!)).toContain('logistic');
+		expect(admin?.finished).toBe(false);
 
 		const logistic = jobInstanceOverview(worklist, 'intake', 'NIR-1', ['logistic']);
 		expect(logistic?.tasks.find((t) => t.taskId === 'palletWeight')?.linkable).toBe(
 			true
 		);
 		expect(logistic?.handoffRoles).toBeNull();
+	});
+
+	test('handoff uses first available only; no banner when next Task is theirs', () => {
+		const admin = jobInstanceOverview(worklist, 'intake', 'NIR-both-available', [
+			'administration'
+		]);
+		expect(admin?.tasks.map((t) => [t.taskId, t.status, t.linkable])).toEqual([
+			['register', 'available', true],
+			['codiceFir', 'locked', false],
+			['palletWeight', 'available', false]
+		]);
+		expect(admin?.handoffRoles).toBeNull();
+
+		const logistic = jobInstanceOverview(worklist, 'intake', 'NIR-both-available', [
+			'logistic'
+		]);
+		expect(logistic?.handoffRoles).toEqual(['administration']);
+		expect(logistic?.tasks.find((t) => t.taskId === 'register')?.linkable).toBe(false);
+		expect(logistic?.tasks.find((t) => t.taskId === 'palletWeight')?.linkable).toBe(
+			true
+		);
+	});
+
+	test('finished model marks all done', () => {
+		const done = jobInstanceOverview(worklist, 'intake', 'NIR-done', ['administration']);
+		expect(done?.finished).toBe(true);
+		expect(done?.handoffRoles).toBeNull();
 	});
 
 	test('unknown instance yields null', () => {
@@ -148,6 +186,18 @@ describe('Task deep link + exit', () => {
 		expect(
 			resolveTaskDeepLink('intake', 'new', 'register', true, worklist, ['administration'])
 		).toEqual({ kind: 'task' });
+	});
+
+	test('task-form deny shares unmountable redirect with deep-link', () => {
+		expect(
+			resolveUnmountableTaskTarget('intake', 'NIR-1', false, worklist)
+		).toEqual({ kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-1' });
+		expect(resolveUnmountableTaskTarget('intake', '', true, worklist)).toEqual({
+			kind: 'home'
+		});
+		expect(
+			resolveUnmountableTaskTarget('intake', 'missing', false, worklist)
+		).toEqual({ kind: 'home' });
 	});
 
 	test('Task exit: provisional Home; existing overview', () => {

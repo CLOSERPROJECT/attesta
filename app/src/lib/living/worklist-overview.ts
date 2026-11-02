@@ -41,13 +41,34 @@ function instanceFor(
 	return job.instances.find((inst) => inst.id === jobInstanceId) ?? null;
 }
 
-function orderedTaskIds(job: WorklistJob): string[] {
+/** Config/`taskIds` order for a Worklist Job (not `types.orderedTaskIds`). */
+function jobConfigTaskIds(job: WorklistJob): string[] {
 	if (job.taskIds?.length) return job.taskIds;
 	return (job.tasks ?? []).map((t) => t.id);
 }
 
 function taskChrome(job: WorklistJob, taskId: string) {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
+}
+
+/**
+ * When a Task cannot be mounted (deep-link gate miss, task-form 403/404):
+ * overview if the instance is known on the Worklist, else Home.
+ */
+export function resolveUnmountableTaskTarget(
+	jobId: string,
+	jobInstanceId: string,
+	provisional: boolean,
+	worklist: Worklist | null | undefined
+): Extract<PostCommitTarget, { kind: 'overview' | 'home' }> {
+	if (provisional || !jobId || !jobInstanceId || jobInstanceId === 'new') {
+		return { kind: 'home' };
+	}
+	const job = worklistJobFor(worklist, jobId);
+	if (!job || !instanceFor(job, jobInstanceId)) {
+		return { kind: 'home' };
+	}
+	return { kind: 'overview', jobId, jobInstanceId };
 }
 
 /** True when every authored Task on the instance is `done`. */
@@ -60,7 +81,7 @@ export function instanceIsFinished(
 	if (!job) return false;
 	const inst = instanceFor(job, jobInstanceId);
 	if (!inst) return false;
-	const ids = orderedTaskIds(job);
+	const ids = jobConfigTaskIds(job);
 	if (!ids.length) return false;
 	return ids.every((tid) => inst.tasks[tid] === 'done');
 }
@@ -75,7 +96,7 @@ export function instanceHasRemainingWork(
 	if (!job) return false;
 	const inst = instanceFor(job, jobInstanceId);
 	if (!inst) return false;
-	return orderedTaskIds(job).some((tid) => inst.tasks[tid] !== 'done');
+	return jobConfigTaskIds(job).some((tid) => inst.tasks[tid] !== 'done');
 }
 
 /**
@@ -125,19 +146,16 @@ export function resolveTaskDeepLink(
 	if (provisional) return { kind: 'task' };
 
 	const job = worklistJobFor(worklist, jobId);
-	if (!job) return { kind: 'home' };
-	const inst = instanceFor(job, jobInstanceId);
-	if (!inst) return { kind: 'home' };
-
-	const status = inst.tasks[taskId];
-	if (status == null) return { kind: 'overview', jobId, jobInstanceId };
-
-	const chrome = taskChrome(job, taskId);
-	const roles = chrome?.roles ?? [];
-	if (status === 'available' && rolesIntersect(viewerRoles, roles)) {
-		return { kind: 'task' };
+	const inst = job ? instanceFor(job, jobInstanceId) : null;
+	if (job && inst) {
+		const status = inst.tasks[taskId];
+		const chrome = taskChrome(job, taskId);
+		const roles = chrome?.roles ?? [];
+		if (status === 'available' && rolesIntersect(viewerRoles, roles)) {
+			return { kind: 'task' };
+		}
 	}
-	return { kind: 'overview', jobId, jobInstanceId };
+	return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
 }
 
 /** Exit from Task without Commit: provisional → Home; else overview. */
@@ -165,30 +183,32 @@ export function jobInstanceOverview(
 	if (!inst) return null;
 
 	const tasks: OverviewTaskRow[] = [];
-	let handoffRoles: string[] | null = null;
+	let firstAvailable: OverviewTaskRow | null = null;
 
-	for (const taskId of orderedTaskIds(job)) {
+	for (const taskId of jobConfigTaskIds(job)) {
 		const chrome = taskChrome(job, taskId);
 		const roles = chrome?.roles ?? [];
 		const status = (inst.tasks[taskId] ?? 'locked') as TaskStatus;
 		const eligible = rolesIntersect(viewerRoles, roles);
 		const linkable = status === 'available' && eligible;
-		tasks.push({
+		const row: OverviewTaskRow = {
 			taskId,
 			title: chrome?.title || taskId,
 			status,
 			roles,
 			linkable
-		});
-		if (
-			handoffRoles == null &&
-			status === 'available' &&
-			!eligible &&
-			roles.length > 0
-		) {
-			handoffRoles = [...roles];
+		};
+		tasks.push(row);
+		if (firstAvailable == null && status === 'available') {
+			firstAvailable = row;
 		}
 	}
+
+	// "Next" = first available in Config order; handoff only when that Task is not ours.
+	const handoffRoles =
+		firstAvailable && !firstAvailable.linkable && firstAvailable.roles.length > 0
+			? [...firstAvailable.roles]
+			: null;
 
 	return {
 		jobId,

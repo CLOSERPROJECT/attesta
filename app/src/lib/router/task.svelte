@@ -7,7 +7,8 @@
 	import {
 		resolvePostCommitNavigation,
 		resolveTaskDeepLink,
-		resolveTaskExit
+		resolveTaskExit,
+		resolveUnmountableTaskTarget
 	} from '../living/worklist-overview.js';
 	import { route } from './index.js';
 	import { navigateLivingTarget } from './navigate-target.js';
@@ -105,9 +106,12 @@
 				if (err instanceof TaskFormError && (err.status === 403 || err.status === 404)) {
 					redirected = true;
 					navigateLivingTarget(
-						isProv || !instanceId
-							? { kind: 'home' }
-							: { kind: 'overview', jobId: jid, jobInstanceId: instanceId }
+						resolveUnmountableTaskTarget(
+							jid,
+							instanceId,
+							isProv,
+							living.result?.worklist
+						)
 					);
 					return;
 				}

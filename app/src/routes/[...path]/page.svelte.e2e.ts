@@ -153,3 +153,10 @@ test('unknown Task instance redirects Home', async ({ page }) => {
 	await expect(page.getByTestId('living-shell')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 });
+
+test('finished overview URL redirects Home', async ({ page }) => {
+	await stubLivingApis(page);
+	await page.goto('/app/intake/NIR-done');
+	await expect(page.getByTestId('living-shell')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+});

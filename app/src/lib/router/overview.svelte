@@ -33,7 +33,7 @@
 			return;
 		}
 		if (living.loading || !living.result) return;
-		if (!model) {
+		if (!model || model.finished) {
 			navigate('/');
 		}
 	});
