@@ -29,7 +29,7 @@ describe('worklist helpers', () => {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register'],
-					tasks: [],
+					tasks: [{ id: 'register', title: 'Registrazione', roles: ['administration'] }],
 					instances: []
 				},
 				{
@@ -37,7 +37,10 @@ describe('worklist helpers', () => {
 					canStart: false,
 					repeatable: true,
 					taskIds: ['shift', 'lineLoad'],
-					tasks: [],
+					tasks: [
+						{ id: 'shift', title: 'Turno', roles: ['line'] },
+						{ id: 'lineLoad', title: 'Carico', roles: ['line'] }
+					],
 					instances: [
 						{
 							id: '1st',
@@ -52,5 +55,32 @@ describe('worklist helpers', () => {
 		expect(worklistJobFor(worklist, 'line')?.instances[0]?.tasks.lineLoad).toBe('available');
 		expect(worklistJobFor(worklist, 'missing')).toBeNull();
 		expect(worklistJobFor(null, 'intake')).toBeNull();
+	});
+
+	test('Load fixture Worklist chrome carries Task title + roles', () => {
+		const worklist: Worklist = {
+			jobs: [
+				{
+					jobId: 'intake',
+					canStart: true,
+					repeatable: true,
+					taskIds: ['register', 'palletWeight'],
+					tasks: [
+						{ id: 'register', title: 'Registrazione', roles: ['administration'] },
+						{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
+					],
+					instances: []
+				}
+			]
+		};
+		const intake = worklistJobFor(worklist, 'intake');
+		expect(intake?.tasks).toHaveLength(2);
+		expect(intake?.tasks[0]).toEqual({
+			id: 'register',
+			title: 'Registrazione',
+			roles: ['administration']
+		});
+		expect(intake?.tasks[1]?.title).toBeTruthy();
+		expect(intake?.tasks[1]?.roles).toEqual(['logistic']);
 	});
 });

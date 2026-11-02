@@ -17,8 +17,11 @@ const sample: LoadResult = {
 				canStart: true,
 				repeatable: true,
 				startLabel: 'Nuovo camion',
-				taskIds: ['register'],
-				tasks: [],
+				taskIds: ['register', 'palletWeight'],
+				tasks: [
+					{ id: 'register', title: 'Registrazione', roles: ['administration'] },
+					{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
+				],
 				instances: []
 			},
 			{
@@ -27,7 +30,7 @@ const sample: LoadResult = {
 				repeatable: true,
 				startLabel: 'Nuovo turno',
 				taskIds: ['shift'],
-				tasks: [],
+				tasks: [{ id: 'shift', title: 'Turno', roles: ['line'] }],
 				instances: []
 			}
 		]
@@ -49,6 +52,12 @@ describe('LivingSession', () => {
 		expect(session.result?.org).toBe('feragame');
 		expect(session.jobIds).toEqual(['intake', 'line']);
 		expect(session.worklistJob('intake')?.startLabel).toBe('Nuovo camion');
+		const register = session.worklistJob('intake')?.tasks.find((t) => t.id === 'register');
+		expect(register?.title).toBe('Registrazione');
+		expect(register?.roles).toEqual(['administration']);
+		const pallet = session.worklistJob('intake')?.tasks.find((t) => t.id === 'palletWeight');
+		expect(pallet?.title).toBeTruthy();
+		expect(pallet?.roles).toEqual(['logistic']);
 	});
 
 	test('hydrate surfaces port errors without leaving stale result', async () => {

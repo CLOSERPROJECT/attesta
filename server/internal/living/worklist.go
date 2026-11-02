@@ -103,7 +103,7 @@ func projectWorklistTasks(tasks []TaskConfig, ordered []string) []WorklistTask {
 	for _, taskID := range ordered {
 		task, ok := TaskByID(tasks, taskID)
 		if !ok {
-			out = append(out, WorklistTask{ID: taskID, Title: taskID, Roles: nil})
+			out = append(out, WorklistTask{ID: taskID, Title: taskID, Roles: []string{}})
 			continue
 		}
 		payload := taskPayload(task)

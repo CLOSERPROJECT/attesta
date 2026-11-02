@@ -32,7 +32,7 @@ export type WorklistJob = {
 	/** Authored Task id order for chrome iteration. */
 	taskIds: string[];
 	/** Config-free Task title + roles chrome (alongside taskIds). */
-	tasks?: WorklistTask[];
+	tasks: WorklistTask[];
 	instances: WorklistInstance[];
 };
 
