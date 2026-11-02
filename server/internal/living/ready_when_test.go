@@ -6,41 +6,41 @@ import (
 )
 
 func TestEvaluateReadyWhenOmitIsTrue(t *testing.T) {
-	ok, err := evaluateReadyWhen(EmptyDomain(), nil, "")
+	ok, err := evaluateReadyWhen(EmptyDomain(), nil, "", nil)
 	if err != nil || !ok {
 		t.Fatalf("omit → true, got ok=%v err=%v", ok, err)
 	}
-	ok, err = evaluateReadyWhen(EmptyDomain(), "", "")
+	ok, err = evaluateReadyWhen(EmptyDomain(), "", "", nil)
 	if err != nil || !ok {
 		t.Fatalf("blank → true, got ok=%v err=%v", ok, err)
 	}
 }
 
 func TestEvaluateReadyWhenLiteralAndDomainExpr(t *testing.T) {
-	ok, err := evaluateReadyWhen(EmptyDomain(), "false", "")
+	ok, err := evaluateReadyWhen(EmptyDomain(), "false", "", nil)
 	if err != nil || ok {
 		t.Fatalf("false → unavailable, got ok=%v err=%v", ok, err)
 	}
-	ok, err = evaluateReadyWhen(EmptyDomain(), "true", "")
+	ok, err = evaluateReadyWhen(EmptyDomain(), "true", "", nil)
 	if err != nil || !ok {
 		t.Fatalf("true → available, got ok=%v err=%v", ok, err)
 	}
 
 	empty := EmptyDomain()
-	ok, err = evaluateReadyWhen(empty, "$count($domain.load.*) >= 1", "")
+	ok, err = evaluateReadyWhen(empty, "$count($domain.load.*) >= 1", "", nil)
 	if err != nil || ok {
 		t.Fatalf("no loads → false, got ok=%v err=%v", ok, err)
 	}
 	withLoad := empty
 	withLoad.Load = EntityMap{"L1": {"client": "NO"}}
-	ok, err = evaluateReadyWhen(withLoad, "$count($domain.load.*) >= 1", "")
+	ok, err = evaluateReadyWhen(withLoad, "$count($domain.load.*) >= 1", "", nil)
 	if err != nil || !ok {
 		t.Fatalf("one load → true, got ok=%v err=%v", ok, err)
 	}
 }
 
 func TestEvaluateReadyWhenRejectsNonString(t *testing.T) {
-	_, err := evaluateReadyWhen(EmptyDomain(), 1, "")
+	_, err := evaluateReadyWhen(EmptyDomain(), 1, "", nil)
 	if err == nil {
 		t.Fatal("expected invalid-readyWhen")
 	}

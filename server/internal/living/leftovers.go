@@ -309,7 +309,7 @@ func additionalPropertiesSchema(task map[string]any, primary string) map[string]
 }
 
 // leftoverIDsForTask resolves leftover eligibility from Task reads.where (config-driven).
-func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string) ([]string, error) {
+func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string, catalogs map[string]any) ([]string, error) {
 	read, _, ok, err := leftoverReadFromTask(task)
 	if err != nil {
 		return nil, err
@@ -318,7 +318,7 @@ func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobIns
 		return nil, nil
 	}
 	label := jobInstanceLabel(domain, jobID, jobInstanceID)
-	return ResolveRead(domain, read, jobInstanceID, label)
+	return ResolveRead(domain, read, jobInstanceID, label, catalogs)
 }
 
 // Test helpers kept as thin wrappers over fixture where exprs (no plant filters in Go).
@@ -327,7 +327,7 @@ func palletWeightLeftoverIDs(domain Domain, jobInstanceID string) []string {
 		Entity: EntityPallet,
 		Where:  "loadId = $instance.id and $not($exists(weight))",
 		Key:    "id",
-	}, jobInstanceID, "")
+	}, jobInstanceID, "", nil)
 	if err != nil {
 		return nil
 	}
@@ -339,7 +339,7 @@ func lineLoadLeftoverIDs(domain Domain) []string {
 		Entity: EntityPallet,
 		Where:  "$exists(weight) and $not(progress = 'done')",
 		Key:    "id",
-	}, "", "")
+	}, "", "", nil)
 	if err != nil {
 		return nil
 	}

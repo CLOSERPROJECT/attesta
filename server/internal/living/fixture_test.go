@@ -25,6 +25,14 @@ func TestLoadFeragameConfigFixtureRenamesJobsAndTasks(t *testing.T) {
 	if cfg.Version != DefaultFixtureVersion {
 		t.Fatalf("version = %q", cfg.Version)
 	}
+	if cfg.Catalogs == nil {
+		t.Fatal("catalogs missing")
+	}
+	for _, key := range []string{"tareKinds", "materials", "clients"} {
+		if cfg.Catalogs[key] == nil {
+			t.Fatalf("catalogs.%s missing", key)
+		}
+	}
 	if cfg.Jobs.Len() != 2 {
 		t.Fatalf("jobs len = %d, keys=%v", cfg.Jobs.Len(), cfg.Jobs.Keys)
 	}

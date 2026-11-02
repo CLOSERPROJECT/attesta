@@ -78,6 +78,10 @@ export function domainFromBundleBindings(bindings: Record<string, unknown>): unk
 	return bindings.domain;
 }
 
+export function catalogsFromBundleBindings(bindings: Record<string, unknown>): unknown {
+	return bindings.catalogs;
+}
+
 /** Server-precomputed dataReport displays (`bindings.chromeDisplay`). */
 export function chromeDisplayFromBundleBindings(
 	bindings: Record<string, unknown>

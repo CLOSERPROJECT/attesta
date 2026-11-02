@@ -82,11 +82,12 @@ func runSubmitHTTPEffects(
 	bindings ExprBindings,
 	domain Domain,
 	jobInstanceID string,
+	catalogs map[string]any,
 ) runSubmitHTTPResult {
 	if len(effects) == 0 {
 		return runSubmitHTTPResult{}
 	}
-	merged := mergeBindings(domainBindings(domain, jobInstanceID), bindings)
+	merged := mergeBindings(domainBindings(domain, jobInstanceID, catalogs), bindings)
 	var errors []string
 	var links []HttpLinkItem
 

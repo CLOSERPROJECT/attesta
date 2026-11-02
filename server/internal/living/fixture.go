@@ -84,6 +84,15 @@ func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 			cfg.Domain = m
 		}
 	}
+	if catalogsNode := child(doc, "catalogs"); catalogsNode != nil {
+		var catalogs any
+		if err := catalogsNode.Decode(&catalogs); err != nil {
+			return OrgConfig{}, fmt.Errorf("decode catalogs: %w", err)
+		}
+		if m, ok := catalogs.(map[string]any); ok {
+			cfg.Catalogs = m
+		}
+	}
 	return cfg, nil
 }
 

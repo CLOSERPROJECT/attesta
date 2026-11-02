@@ -15,6 +15,7 @@ export type LiveTaskFormPorts = {
 	setValue: (next: Record<string, unknown>) => void;
 	/** JSONata `$domain` binding (readonly / derived) — may be a thin projection. */
 	getDomain: () => unknown;
+	getCatalogs?: () => unknown;
 	/** Server `bindings.chromeDisplay` bag for `kind: dataReport` (Load/Commit only). */
 	getChromeDisplayBag?: () => Record<string, unknown> | undefined;
 	getInstance?: () => unknown;
@@ -36,10 +37,14 @@ export function formatChromeEvalValue(value: unknown): ChromeDisplay {
 
 function chromeBindings(
 	domain: unknown,
+	catalogs: unknown | undefined,
 	instance: unknown | undefined,
 	operator: OperatorIdentity | undefined
 ): Record<string, unknown> {
 	const bindings: Record<string, unknown> = { domain };
+	if (catalogs !== undefined) {
+		bindings.catalogs = catalogs;
+	}
 	if (instance !== undefined) {
 		bindings.instance = instance;
 	}
@@ -54,12 +59,13 @@ export async function evaluateChromeEntry(
 	sealableDraft: Record<string, unknown>,
 	domain: unknown,
 	instance: unknown | undefined,
-	operator?: OperatorIdentity
+	operator?: OperatorIdentity,
+	catalogs?: unknown
 ): Promise<ChromeDisplay> {
 	const result = await evaluateSafe(
 		expr,
 		sealableDraft,
-		chromeBindings(domain, instance, operator)
+		chromeBindings(domain, catalogs, instance, operator)
 	);
 	if (!result.ok) {
 		return { value: null, error: formatJsonataError(result.error) };
@@ -163,6 +169,7 @@ export function startLiveTaskChrome(
 		$effect(() => {
 			void JSON.stringify(ports.getValue());
 			void ports.getDomain();
+			void ports.getCatalogs?.();
 			void JSON.stringify(ports.getChromeDisplayBag?.() ?? null);
 			void ports.getInstance?.();
 			void ports.getOperator?.();
@@ -196,6 +203,7 @@ async function applyChrome(
 
 	const sealableDraft = untrack(() => plan.sealSubmission(ports.getValue()));
 	const domain = untrack(() => ports.getDomain());
+	const catalogs = untrack(() => ports.getCatalogs?.());
 	const chromeDisplayBag = untrack(() => ports.getChromeDisplayBag?.());
 	const instance = untrack(() => ports.getInstance?.());
 	const operator = untrack(() => ports.getOperator?.());
@@ -211,7 +219,8 @@ async function applyChrome(
 				sealableDraft,
 				domain,
 				instance,
-				operator
+				operator,
+				catalogs
 			);
 		}
 	}

@@ -132,7 +132,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 		return nil, fmt.Errorf("living: empty task payload %s/%s", ref.JobID, ref.TaskID)
 	}
 
-	projected, err := projectTaskForm(domain, payload, ref.JobInstanceID, jobInstanceLabel(domain, ref.JobID, ref.JobInstanceID))
+	projected, err := projectTaskForm(domain, payload, ref.JobInstanceID, jobInstanceLabel(domain, ref.JobID, ref.JobInstanceID), cfg.Catalogs)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 	}
 
 	initial := seedInitialData(domain, payload, projected)
-	bindings := buildFormBindings(domain, payload, ref)
+	bindings := buildFormBindings(domain, ref, cfg.Catalogs)
 	if err := evaluateDataReports(chrome, bindings); err != nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 }
 
 // evaluateDataReports runs each dataReport chrome expr into bindings.chromeDisplay[id].
-// Input `$` is unused ({}); `$domain` (and `$instance` when present) come from bindings.
+// Input `$` is unused ({}); `$domain` / `$catalogs` (and `$instance` when present) come from bindings.
 func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 	var reports []ChromeRule
 	for _, c := range chrome {
@@ -214,7 +214,13 @@ func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 		return nil
 	}
 	domainBag, _ := bindings["domain"].(map[string]any)
-	vars := ExprBindings{"domain": domainBag}
+	vars := ExprBindings{
+		"domain":   domainBag,
+		"catalogs": catalogsBag(nil),
+	}
+	if c, ok := bindings["catalogs"].(map[string]any); ok {
+		vars["catalogs"] = c
+	}
 	if inst, ok := bindings["instance"]; ok {
 		vars["instance"] = inst
 	}
@@ -262,22 +268,22 @@ func taskTitle(payload map[string]any, taskID string) string {
 	return taskID
 }
 
-func buildFormBindings(domain Domain, payload map[string]any, ref AvailableTaskRef) map[string]any {
+func buildFormBindings(domain Domain, ref AvailableTaskRef, catalogs map[string]any) map[string]any {
 	// DomainSnapshot-shaped bag (JSON field names) for Chrome / dataReport JSONata.
 	subs := make([]any, len(domain.Submissions))
 	for i, s := range domain.Submissions {
 		subs[i] = deepCloneJSON(s)
 	}
 	maps := domain.EntityMaps()
-	domainBag := make(map[string]any, len(maps)+2)
+	domainBag := make(map[string]any, len(maps)+1)
 	for kind, m := range maps {
 		domainBag[kind] = entityMapToAny(m)
 	}
 	domainBag["submissions"] = subs
-	if tare, ok := payload["tareKinds"]; ok {
-		domainBag["tareKinds"] = deepCloneJSON(tare)
+	bindings := map[string]any{
+		"domain":   domainBag,
+		"catalogs": cloneMapJSON(catalogsBag(catalogs)),
 	}
-	bindings := map[string]any{"domain": domainBag}
 	if ref.JobInstanceID != "" {
 		inst := map[string]any{"id": ref.JobInstanceID}
 		if label := jobInstanceLabel(domain, ref.JobID, ref.JobInstanceID); label != "" {

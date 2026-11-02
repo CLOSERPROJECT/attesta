@@ -16,6 +16,23 @@ domain:
         # C5/C6: weight, material, primary load; dual rows add secondarySourceLoadId (no secondaryWeight).
         container:
             fields: [weight, material, sourceLoadId, secondarySourceLoadId]
+# Stable plant vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
+catalogs:
+    clients:
+        NO: Nord
+        SU: Sud
+    tareKinds:
+        euro: 25
+        industrial: 30
+    materials:
+        - {key: polvereDiVetro, label: Polvere di vetro}
+        - {key: granellaDiVetro, label: Granella di vetro}
+        - {key: granellaDiVetro2, label: Granella di vetro 2}
+        - {key: polvereDiSilicio, label: Polvere di silicio}
+        - {key: plastica, label: Plastica}
+        - {key: alluminio, label: Alluminio}
+        - {key: sopravaglio, label: Sopravaglio}
+        - {key: polvereDiAspirazione, label: Polvere di aspirazione}
 steps:
     intake:
         repeatable: true
@@ -170,9 +187,6 @@ steps:
             # Form-level tareKind seeds new rows; panelCount uses row tareKind (custom kg = form customTareWeight).
             - id: palletWeight
               roles: [logistic]
-              tareKinds:
-                euro: 25
-                industrial: 30
               # Map-level policy: host expands weights.*.panelCount → weights.<id>.panelCount
               # with __ROW_ID__ replaced for $lookup. overridable default false (ADR-0016).
               derived:
@@ -186,7 +200,7 @@ steps:
                           $kind := $exists($row.tareKind) ? $row.tareKind : $data.tareKind;
                           $tare := $kind = 'custom'
                             ? $data.customTareWeight
-                            : $lookup($domain.tareKinds, $kind);
+                            : $lookup($catalogs.tareKinds, $kind);
                           $w := $row.weight;
                           $avg > 0 and $type($tare) = 'number' and $type($w) = 'number'
                             ? $floor(($w - $tare) / $avg)
@@ -570,17 +584,8 @@ steps:
                     before: checkedLoadedWeight
                     expr: |-
                         (
-                          $tareKinds := {"euro": 25, "industrial": 30};
-                          $materials := [
-                            {"key":"polvereDiVetro","label":"Polvere di vetro"},
-                            {"key":"granellaDiVetro","label":"Granella di vetro"},
-                            {"key":"granellaDiVetro2","label":"Granella di vetro 2"},
-                            {"key":"polvereDiSilicio","label":"Polvere di silicio"},
-                            {"key":"plastica","label":"Plastica"},
-                            {"key":"alluminio","label":"Alluminio"},
-                            {"key":"sopravaglio","label":"Sopravaglio"},
-                            {"key":"polvereDiAspirazione","label":"Polvere di aspirazione"}
-                          ];
+                          $tareKinds := $catalogs.tareKinds;
+                          $materials := $catalogs.materials;
                           $materialKeys := $map($materials, function($m){$m.key});
                           $safeSum := function($arr){ $reduce($arr ? $arr : [], function($a,$b){$a+$b}, 0) };
                           $num := function($v){ $type($v) = "number" ? $v : undefined };

@@ -62,6 +62,7 @@ type RunTransformInput struct {
 	Facts         map[string]any
 	Transform     any
 	Allowed       map[string]struct{} // entity kinds from config domain.entities; empty = unrestricted
+	Catalogs      map[string]any
 }
 
 type RunTransformResult struct {
@@ -140,7 +141,7 @@ func requireEntitySet(m map[string]any, allowed map[string]struct{}, op string) 
 	return EntityType(entityRaw), set, nil
 }
 
-func domainBindings(domain Domain, jobInstanceID string) ExprBindings {
+func domainBindings(domain Domain, jobInstanceID string, catalogs map[string]any) ExprBindings {
 	entityMaps := domain.EntityMaps()
 	domainBag := make(map[string]any, len(entityMaps)+1)
 	for kind, m := range entityMaps {
@@ -151,11 +152,21 @@ func domainBindings(domain Domain, jobInstanceID string) ExprBindings {
 		subs[i] = s
 	}
 	domainBag["submissions"] = subs
-	bindings := ExprBindings{"domain": domainBag}
+	bindings := ExprBindings{
+		"domain":   domainBag,
+		"catalogs": catalogsBag(catalogs),
+	}
 	if jobInstanceID != "" {
 		bindings["instance"] = map[string]any{"id": jobInstanceID}
 	}
 	return bindings
+}
+
+func catalogsBag(catalogs map[string]any) map[string]any {
+	if catalogs == nil {
+		return map[string]any{}
+	}
+	return catalogs
 }
 
 func entityMapToAny(m EntityMap) map[string]any {
@@ -260,7 +271,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 	ops := make([]MutateOp, 0)
 
 	for _, op := range parsed {
-		bindings := mergeBindings(domainBindings(working, input.JobInstanceID), aliases)
+		bindings := mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases)
 
 		switch o := op.(type) {
 		case transformPatchEachOp:
@@ -319,7 +330,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			}
 			for index := 0; index < count; index++ {
 				// Refresh $domain each iteration so count/id exprs see prior mints.
-				loopBindings := mergeBindings(domainBindings(working, input.JobInstanceID), aliases)
+				loopBindings := mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases)
 				loopBindings["index"] = index
 				idGot, err := evalScalar(o.ID, input.Facts, loopBindings)
 				if err != nil {
@@ -350,7 +361,7 @@ func RunTransform(domain Domain, input RunTransformInput) (RunTransformResult, e
 			Ops:           ops,
 			UserID:        input.UserID,
 		},
-		Bindings: mergeBindings(domainBindings(working, input.JobInstanceID), aliases),
+		Bindings: mergeBindings(domainBindings(working, input.JobInstanceID, input.Catalogs), aliases),
 	}, nil
 }
 

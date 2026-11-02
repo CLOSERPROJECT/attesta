@@ -62,7 +62,7 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job) Wor
 		}
 		tasks := make(map[string]TaskStatus, len(ordered))
 		for _, taskID := range ordered {
-			tasks[taskID] = projectTaskStatus(domain, jobID, job.Tasks, ordered, taskID, inst.ID)
+			tasks[taskID] = projectTaskStatus(domain, jobID, job.Tasks, ordered, taskID, inst.ID, cfg.Catalogs)
 		}
 		instances = append(instances, WorklistInstance{
 			ID:    inst.ID,
@@ -88,6 +88,7 @@ func projectTaskStatus(
 	ordered []string,
 	taskID string,
 	jobInstanceID string,
+	catalogs map[string]any,
 ) TaskStatus {
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs:    ordered,
@@ -108,7 +109,7 @@ func projectTaskStatus(
 	if needsLeftoverProjection(payload) {
 		_, completeness, ok := primaryDynamicProperty(payload)
 		if ok && completeness == "some" {
-			ids, err := leftoverIDsForTask(domain, jobID, payload, jobInstanceID)
+			ids, err := leftoverIDsForTask(domain, jobID, payload, jobInstanceID, catalogs)
 			if err != nil {
 				return TaskStatusLocked
 			}

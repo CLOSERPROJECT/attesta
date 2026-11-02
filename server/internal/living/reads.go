@@ -29,12 +29,12 @@ func parseReadDef(raw any) (ReadDef, error) {
 }
 
 // ResolveRead returns entity ids matching an authored read (where + key).
-func ResolveRead(domain Domain, read ReadDef, jobInstanceID, jobInstanceLabel string) ([]string, error) {
+func ResolveRead(domain Domain, read ReadDef, jobInstanceID, jobInstanceLabel string, catalogs map[string]any) ([]string, error) {
 	entities, err := listEntities(domain, read.Entity)
 	if err != nil {
 		return nil, err
 	}
-	bindings := domainBindings(domain, "")
+	bindings := domainBindings(domain, "", catalogs)
 	if jobInstanceID != "" {
 		inst := map[string]any{"id": jobInstanceID}
 		if jobInstanceLabel != "" {

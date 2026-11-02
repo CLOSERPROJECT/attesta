@@ -48,6 +48,7 @@ export class LiveTaskForm {
 		const form = createConfigForm(plan.schemas, ports.getValue, ports.setValue, {
 			...(plan.derived !== undefined ? { derived: plan.derived } : {}),
 			getDomain: ports.getDomain,
+			getCatalogs: ports.getCatalogs,
 			onSubmit: ports.onSubmit
 				? (value) => {
 						void ports.onSubmit?.(plan.sealSubmission(value as Record<string, unknown>));

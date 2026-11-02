@@ -8,24 +8,26 @@ import (
 
 // OrgConfig is one Config version of the org's authored operating picture.
 type OrgConfig struct {
-	ID      string         `json:"id"`
-	Org     string         `json:"org,omitempty"`
-	Version string         `json:"version"`
-	Domain  map[string]any `json:"domain,omitempty"`
-	Roles   []string       `json:"roles,omitempty"`
-	Jobs    OrderedObject  `json:"jobs"`
+	ID       string         `json:"id"`
+	Org      string         `json:"org,omitempty"`
+	Version  string         `json:"version"`
+	Domain   map[string]any `json:"domain,omitempty"`
+	Catalogs map[string]any `json:"catalogs,omitempty"`
+	Roles    []string       `json:"roles,omitempty"`
+	Jobs     OrderedObject  `json:"jobs"`
 }
 
 // UnmarshalJSON decodes each Job from raw JSON so Jobs OrderedObject keeps
 // authored key order and nested Tasks stay typed ([]TaskConfig).
 func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 	var wire struct {
-		ID      string          `json:"id"`
-		Org     string          `json:"org,omitempty"`
-		Version string          `json:"version"`
-		Domain  map[string]any  `json:"domain,omitempty"`
-		Roles   []string        `json:"roles,omitempty"`
-		Jobs    json.RawMessage `json:"jobs"`
+		ID       string          `json:"id"`
+		Org      string          `json:"org,omitempty"`
+		Version  string          `json:"version"`
+		Domain   map[string]any  `json:"domain,omitempty"`
+		Catalogs map[string]any  `json:"catalogs,omitempty"`
+		Roles    []string        `json:"roles,omitempty"`
+		Jobs     json.RawMessage `json:"jobs"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
@@ -38,6 +40,7 @@ func (c *OrgConfig) UnmarshalJSON(data []byte) error {
 	c.Org = wire.Org
 	c.Version = wire.Version
 	c.Domain = wire.Domain
+	c.Catalogs = wire.Catalogs
 	c.Roles = wire.Roles
 	c.Jobs = jobs
 	return nil

@@ -38,6 +38,7 @@ export type CreateConfigFormOptions<T extends Record<string, unknown> = Record<s
 	derived?: Record<string, ConfigFormDerivedEntry>;
 	/** See ConfigFormOptions.getDomain — `$domain` for derived exprs. */
 	getDomain?: () => unknown;
+	getCatalogs?: () => unknown;
 };
 
 /**
@@ -76,7 +77,8 @@ export function createConfigForm<T extends Record<string, unknown>>(
 			uiSchema,
 			initialValue: seededValue,
 			derived: options.derived,
-			getDomain: options.getDomain
+			getDomain: options.getDomain,
+			getCatalogs: options.getCatalogs
 		});
 		const [, setBound] = engine.valueBinding();
 		const disposeLocalDraftSync = syncDeepLocalToDraft(

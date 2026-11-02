@@ -205,8 +205,16 @@ func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
 		t.Fatal("expected expanded derived rules")
 	}
 	domainBag, _ := bundle.Bindings["domain"].(map[string]any)
-	if domainBag["tareKinds"] == nil {
-		t.Fatal("bindings.domain missing tareKinds")
+	if _, has := domainBag["tareKinds"]; has {
+		t.Fatal("bindings.domain must not inject tareKinds")
+	}
+	catalogsBag, _ := bundle.Bindings["catalogs"].(map[string]any)
+	if catalogsBag == nil {
+		t.Fatal("bindings.catalogs missing")
+	}
+	tare, _ := catalogsBag["tareKinds"].(map[string]any)
+	if tare["euro"] == nil {
+		t.Fatalf("bindings.catalogs.tareKinds = %#v", catalogsBag["tareKinds"])
 	}
 	for _, key := range []string{"load", "pallet", "container"} {
 		if _, ok := domainBag[key].(map[string]any); !ok {

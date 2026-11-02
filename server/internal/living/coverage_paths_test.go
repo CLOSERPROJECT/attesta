@@ -324,7 +324,7 @@ func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 				"sourceLoadId": map[string]any{"type": "string"},
 			},
 		},
-	}, "", "")
+	}, "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,14 +613,14 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	domain := Domain{Load: EntityMap{"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}}}
-	ids, err := ResolveRead(domain, def, "inst", "label")
+	ids, err := ResolveRead(domain, def, "inst", "label", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(ids) != 1 || ids[0] != "NO" {
 		t.Fatalf("keyed ids = %#v", ids)
 	}
-	ids, err = ResolveRead(domain, ReadDef{Entity: EntityLoad, Key: "id"}, "", "")
+	ids, err = ResolveRead(domain, ReadDef{Entity: EntityLoad, Key: "id"}, "", "", nil)
 	if err != nil || len(ids) != 3 {
 		t.Fatalf("id key = %#v %v", ids, err)
 	}
@@ -705,7 +705,7 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 	domain.Pallet["L1.1"] = map[string]any{"loadId": "L1"}
 	got, err := RunTransform(domain, RunTransformInput{
 		JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada",
-		Facts: map[string]any{"L1.1": map[string]any{"weight": 1}},
+		Facts:   map[string]any{"L1.1": map[string]any{"weight": 1}},
 		Allowed: allowed,
 		Transform: []any{
 			map[string]any{"op": "mint", "entity": "load", "id": `"L2"`, "as": "load", "set": map[string]any{"client": `"X"`}},
@@ -766,7 +766,7 @@ func TestSubmitHTTPParseAndEvalErrors(t *testing.T) {
 	if len(effects) != 1 || !effects[0].HasBody {
 		t.Fatalf("effects = %#v", effects)
 	}
-	if len(runSubmitHTTPEffects(t.Context(), nil, nil, nil, nil, EmptyDomain(), "").Errors) != 0 {
+	if len(runSubmitHTTPEffects(t.Context(), nil, nil, nil, nil, EmptyDomain(), "", nil).Errors) != 0 {
 		t.Fatal("empty effects")
 	}
 
@@ -889,41 +889,41 @@ func TestWeighFilterAndValidateEdges(t *testing.T) {
 func TestProjectTaskFormErrorPathsAndPlaceholder(t *testing.T) {
 	_, err := projectTaskForm(EmptyDomain(), map[string]any{
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("dyn without reads")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
 		"dynamicProperties": map[string]any{"weights": map[string]any{}},
 		"reads":             map[string]any{},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("invalid dyn def")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "missing"}},
 		"reads":             map[string]any{},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("missing read")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
 		"enumReads": map[string]any{"sourceLoadId": "loads"},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("enumReads without reads")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
 		"enumReads": map[string]any{"sourceLoadId": ""},
 		"reads":     map[string]any{},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("empty enum read name")
 	}
 	_, err = projectTaskForm(EmptyDomain(), map[string]any{
 		"enumReads": map[string]any{"sourceLoadId": "loads"},
 		"reads":     map[string]any{},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("missing enum read")
 	}
@@ -931,7 +931,7 @@ func TestProjectTaskFormErrorPathsAndPlaceholder(t *testing.T) {
 		"enumReads": map[string]any{"sourceLoadId": "loads"},
 		"reads":     map[string]any{"loads": map[string]any{"entity": "load", "key": "id"}},
 		"schema":    map[string]any{"type": "object", "properties": map[string]any{}},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("enum property missing")
 	}
@@ -1062,9 +1062,9 @@ steps:
 func TestPrepStripsChromeFields(t *testing.T) {
 	got, err := prepTaskSubmission(map[string]any{
 		"chrome": map[string]any{
-			"hint":           map[string]any{"kind": "readonly", "expr": "1"},
-			"resultsReport":  map[string]any{"kind": "dataReport", "expr": "1", "title": "R"},
-			"ignoredNoExpr":  map[string]any{"kind": "readonly"},
+			"hint":          map[string]any{"kind": "readonly", "expr": "1"},
+			"resultsReport": map[string]any{"kind": "dataReport", "expr": "1", "title": "R"},
+			"ignoredNoExpr": map[string]any{"kind": "readonly"},
 		},
 		"schema": map[string]any{"properties": map[string]any{
 			"codiceFir": map[string]any{"type": "string"},
@@ -1472,13 +1472,13 @@ func TestCommitAuthorizerErrorAndReadyWhen(t *testing.T) {
 	if readyWhenFromTask(nil) != nil {
 		t.Fatal("nil task readyWhen")
 	}
-	if readyWhenOkForCommit(EmptyDomain(), map[string]any{"readyWhen": 1}, "") {
+	if readyWhenOkForCommit(EmptyDomain(), map[string]any{"readyWhen": 1}, "", nil) {
 		t.Fatal("non-string readyWhen")
 	}
-	if !readyWhenOkForCommit(EmptyDomain(), map[string]any{"readyWhen": "   "}, "") {
+	if !readyWhenOkForCommit(EmptyDomain(), map[string]any{"readyWhen": "   "}, "", nil) {
 		t.Fatal("blank readyWhen")
 	}
-	if readyWhenOkForCommit(EmptyDomain(), map[string]any{"readyWhen": "1+"}, "") {
+	if readyWhenOkForCommit(EmptyDomain(), map[string]any{"readyWhen": "1+"}, "", nil) {
 		t.Fatal("bad readyWhen expr")
 	}
 	noSub := false
@@ -1540,7 +1540,7 @@ func TestLeftoverReadHelpersAndWorklistEdges(t *testing.T) {
 	if _, err := leftoverIDsForTask(EmptyDomain(), "intake", map[string]any{
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
 		"reads":             map[string]any{"leftovers": "bad"},
-	}, ""); err == nil {
+	}, "", nil); err == nil {
 		t.Fatal("bad leftover read def")
 	}
 }
@@ -1623,8 +1623,8 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	}
 	paintHideRootFormTitle(ui)
 	expanded := expandMapDerived(map[string]DerivedRule{
-		"plain":            {Expr: "1"},
-		"weights.*.mass":   {Expr: "$lookup(weights, __ROW_ID__).mass"},
+		"plain":          {Expr: "1"},
+		"weights.*.mass": {Expr: "$lookup(weights, __ROW_ID__).mass"},
 	}, []string{"p1"})
 	if expanded["plain"].Expr != "1" || expanded[encodeFormPath([]string{"weights", "p1", "mass"})].Expr == "" {
 		t.Fatalf("expandMapDerived = %#v", expanded)
@@ -1633,7 +1633,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		"schema":            map[string]any{"type": "object", "properties": "bad"},
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{"leftovers": map[string]any{"entity": "pallet", "key": "id"}},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("props not map")
 	}
@@ -1641,7 +1641,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		"schema":            map[string]any{"type": "object", "properties": map[string]any{}},
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{"leftovers": "bad"},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("bad read def in project")
 	}
@@ -1649,7 +1649,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		"schema":            map[string]any{"type": "object", "properties": map[string]any{}},
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{"leftovers": map[string]any{"entity": "pallet", "key": "id"}},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("missing property schema")
 	}
@@ -1657,7 +1657,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		"enumReads": map[string]any{"sourceLoadId": "loads"},
 		"reads":     map[string]any{"loads": "bad"},
 		"schema":    map[string]any{"type": "object", "properties": map[string]any{"sourceLoadId": map[string]any{"type": "string"}}},
-	}, "", "")
+	}, "", "", nil)
 	if err == nil {
 		t.Fatal("bad enum read def")
 	}

@@ -14,7 +14,7 @@ type projectedForm struct {
 
 // projectTaskForm injects dynamicProperties propertyNames + enumReads enums,
 // paints authored ui:field markers → ui:components (generic registry).
-func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInstanceLabel string) (projectedForm, error) {
+func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInstanceLabel string, catalogs map[string]any) (projectedForm, error) {
 	schemaRaw, _ := task["schema"].(map[string]any)
 	if schemaRaw == nil {
 		schemaRaw = map[string]any{"type": "object", "properties": map[string]any{}}
@@ -57,7 +57,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			if err != nil {
 				return projectedForm{}, err
 			}
-			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel)
+			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel, catalogs)
 			if err != nil {
 				return projectedForm{}, err
 			}
@@ -102,7 +102,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			if err != nil {
 				return projectedForm{}, err
 			}
-			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel)
+			ids, err := ResolveRead(domain, read, jobInstanceID, jobInstanceLabel, catalogs)
 			if err != nil {
 				return projectedForm{}, err
 			}

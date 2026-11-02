@@ -153,7 +153,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		JobInstanceID: jobInstanceID,
 		RolesAllowed:  rolesAllowedForTask(cfg, ref.JobID, ref.TaskID),
 		SequenceOk:    sequenceOkForCommit(cfg, domain, ref.JobID, ref.TaskID, jobInstanceID),
-		ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID),
+		ReadyWhenOk:   readyWhenOkForCommit(domain, task, jobInstanceID, cfg.Catalogs),
 	})
 	if err != nil {
 		return CommitResult{}, err
@@ -207,7 +207,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
-			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, applied.Bindings, applied.Domain, applied.JobInstanceID)
+			httpResult := runSubmitHTTPEffects(ctx, c.HttpPort, effects, applied.Facts, applied.Bindings, applied.Domain, applied.JobInstanceID, cfg.Catalogs)
 			result.Links = httpResult.Links
 			result.HttpErrors = httpResult.Errors
 		}
@@ -235,7 +235,7 @@ func applyConfigCommit(
 ) (appliedCommit, error) {
 	var leftoverIDs []string
 	if needsLeftoverProjection(task) {
-		ids, err := leftoverIDsForTask(domain, jobID, task, jobInstanceID)
+		ids, err := leftoverIDsForTask(domain, jobID, task, jobInstanceID, cfg.Catalogs)
 		if err != nil {
 			return appliedCommit{}, &CommitError{Kind: "prep", Message: err.Error()}
 		}
@@ -255,6 +255,7 @@ func applyConfigCommit(
 		Facts:         prep.Facts,
 		Transform:     transform,
 		Allowed:       EntityKindsFromConfig(cfg),
+		Catalogs:      cfg.Catalogs,
 	})
 	if err != nil {
 		return appliedCommit{}, err

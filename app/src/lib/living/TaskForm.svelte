@@ -9,6 +9,7 @@
 	import type { TaskFormPlan } from './form/task-form-plan.js';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {
+		catalogsFromBundleBindings,
 		chromeDisplayFromBundleBindings,
 		domainFromBundleBindings,
 		findTaskFormBundle,
@@ -62,6 +63,10 @@
 	/** Live Chrome/Derived `$domain` — bindings bag only. */
 	function liveDomain(): unknown {
 		return domainFromBundleBindings(bundle.bindings) ?? emptySnapshot();
+	}
+
+	function liveCatalogs(): unknown {
+		return catalogsFromBundleBindings(bundle.bindings) ?? {};
 	}
 
 	function bundleInstance(): { id: string; label?: string } | undefined {
@@ -120,6 +125,7 @@
 			getValue: () => readDraft(),
 			setValue: (next) => writeDraft(next),
 			getDomain: () => liveDomain(),
+			getCatalogs: () => liveCatalogs(),
 			getChromeDisplayBag: () => chromeDisplayFromBundleBindings(bundle.bindings),
 			getInstance: () => bundleInstance(),
 			onSubmit: (value) => {

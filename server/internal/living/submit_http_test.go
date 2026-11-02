@@ -48,7 +48,7 @@ func TestRunSubmitHTTPEffectsSuccess(t *testing.T) {
 			Body:    `{ "client": $.client, "loadId": $load.id }`,
 			HasBody: true,
 		},
-	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"load": map[string]any{"id": "acme-1"}}, domain, "acme-1")
+	}, map[string]any{"client": "acme", "palletCount": 1.0}, ExprBindings{"load": map[string]any{"id": "acme-1"}}, domain, "acme-1", nil)
 
 	if len(result.Errors) != 0 {
 		t.Fatalf("errors = %#v", result.Errors)
@@ -83,7 +83,7 @@ func TestRunSubmitHTTPEffectsContinuesAfterPortFailure(t *testing.T) {
 	result := runSubmitHTTPEffects(t.Context(), port, []SubmitHttpEffect{
 		{Method: `"POST"`, URL: `"/fake/labels"`, Label: `"Labels"`, Action: "link"},
 		{Method: `"POST"`, URL: `"/fake/register-csv"`, Label: `"CSV"`, Action: "download"},
-	}, map[string]any{}, nil, EmptyDomain(), "")
+	}, map[string]any{}, nil, EmptyDomain(), "", nil)
 
 	if len(result.Errors) != 1 || result.Errors[0] != "printer down" {
 		t.Fatalf("errors = %#v", result.Errors)

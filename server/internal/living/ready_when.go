@@ -14,8 +14,8 @@ func readyWhenFromTask(task map[string]any) any {
 
 // readyWhenOkForCommit evaluates Task readyWhen over Domain into a compact boolean.
 // Omit / null / blank ⇒ true (experiment parity). Invalid or eval failure ⇒ false (fail closed).
-func readyWhenOkForCommit(domain Domain, task map[string]any, jobInstanceID string) bool {
-	ok, err := evaluateReadyWhen(domain, readyWhenFromTask(task), jobInstanceID)
+func readyWhenOkForCommit(domain Domain, task map[string]any, jobInstanceID string, catalogs map[string]any) bool {
+	ok, err := evaluateReadyWhen(domain, readyWhenFromTask(task), jobInstanceID, catalogs)
 	if err != nil {
 		return false
 	}
@@ -23,7 +23,7 @@ func readyWhenOkForCommit(domain Domain, task map[string]any, jobInstanceID stri
 }
 
 // evaluateReadyWhen runs an optional readyWhen JSONata boolean over Domain ($domain).
-func evaluateReadyWhen(domain Domain, expression any, jobInstanceID string) (bool, error) {
+func evaluateReadyWhen(domain Domain, expression any, jobInstanceID string, catalogs map[string]any) (bool, error) {
 	if expression == nil {
 		return true, nil
 	}
@@ -34,7 +34,7 @@ func evaluateReadyWhen(domain Domain, expression any, jobInstanceID string) (boo
 	if strings.TrimSpace(s) == "" {
 		return true, nil
 	}
-	value, err := evaluateExpr(s, nil, domainBindings(domain, jobInstanceID))
+	value, err := evaluateExpr(s, nil, domainBindings(domain, jobInstanceID, catalogs))
 	if err != nil {
 		return false, err
 	}

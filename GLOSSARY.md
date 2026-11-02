@@ -84,6 +84,10 @@ _Avoid_: Putting platform-only standing in the catalog; Stream role (legacy blue
 One named role in the Org Config catalog (slug). Tasks list which Config roles may complete them; Cerbos allow/deny uses principal roles matched by slug.
 _Avoid_: Stream role; conflating with Org admin standing; Operator (the default membership role name) for every Config role
 
+**Org catalogs** / `$catalogs`:
+Authored bag on Org Config for stable plant knowledge (materials, tareKinds, clients, …). Bound as `$catalogs` wherever Load/Commit exprs see `$domain` (transform, readyWhen, reads.where, onSubmit.http, form Derived/Chrome). Not Domain entities, not the Role catalog, not Chrome.
+_Avoid_: Treating catalogs as Domain kinds; conflating with Role catalog or Chrome display catalog
+
 ### Authoring details
 
 **reads**:

@@ -19,6 +19,7 @@ export type ConfigFormOptions<T extends Record<string, unknown> = Record<string,
 	 * (= live form value) when evaluating derived exprs — Attesta has no kernel `$refs`.
 	 */
 	getDomain?: () => unknown;
+	getCatalogs?: () => unknown;
 };
 
 type NormalizedDerived = {
@@ -36,6 +37,7 @@ export class ConfigForm<T extends Record<string, unknown> = Record<string, unkno
 	readonly uiSchema: UiSchemaRoot;
 	#derived: Record<string, NormalizedDerived>;
 	#getDomain: () => unknown;
+	#getCatalogs: () => unknown;
 	#overrides = new Set<string>();
 	#overrideEpoch = $state(0);
 	/** $state so derivedLeaf can track computed() after async apply. */
@@ -50,6 +52,7 @@ export class ConfigForm<T extends Record<string, unknown> = Record<string, unkno
 		this.uiSchema = options.uiSchema ?? {};
 		this.#derived = normalizeDerived(options.derived);
 		this.#getDomain = options.getDomain ?? (() => undefined);
+		this.#getCatalogs = options.getCatalogs ?? (() => undefined);
 		this.value = $state.snapshot(options.initialValue) as T;
 
 		watchDerivedApply({
@@ -176,12 +179,13 @@ export class ConfigForm<T extends Record<string, unknown> = Record<string, unkno
 	#applyDerived = async (generation: number): Promise<void> => {
 		const data = untrack(() => $state.snapshot(this.value));
 		const domain = untrack(() => this.#getDomain());
+		const catalogs = untrack(() => this.#getCatalogs());
 		const overrides = untrack(() => new Set(this.#overrides));
 		const computed = new Map<string, unknown>();
 		let next = data as Record<string, unknown>;
 
 		for (const [path, entry] of Object.entries(this.#derived)) {
-			const result = await evaluateSafe(entry.expr, {}, { data, domain });
+			const result = await evaluateSafe(entry.expr, {}, { data, domain, catalogs });
 			if (generation !== this.#generation) return;
 			if (!result.ok) continue;
 			computed.set(path, result.value);
