@@ -33,11 +33,13 @@ type WorklistJob struct {
 	Instances  []WorklistInstance `json:"instances"`
 }
 
-// WorklistInstance is one Job instance's Task status map.
+// WorklistInstance is one Job instance's Task status map plus viewer Available refs.
+// Tasks stay role-blind (handoff); ViewerAvailable is status-available ∩ slug∩roles.
 type WorklistInstance struct {
-	ID    string                `json:"id"`
-	Label string                `json:"label"`
-	Tasks map[string]TaskStatus `json:"tasks"`
+	ID              string                `json:"id"`
+	Label           string                `json:"label"`
+	Tasks           map[string]TaskStatus `json:"tasks"`
+	ViewerAvailable []string              `json:"viewerAvailable"`
 }
 
 // ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
@@ -77,13 +79,23 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 			continue
 		}
 		tasks := make(map[string]TaskStatus, len(ordered))
-		for _, taskID := range ordered {
-			tasks[taskID] = projectTaskStatus(domain, jobID, job.Tasks, ordered, taskID, inst.ID)
+		viewerAvailable := make([]string, 0)
+		for i, taskID := range ordered {
+			status := projectTaskStatus(domain, jobID, job.Tasks, ordered, taskID, inst.ID)
+			tasks[taskID] = status
+			if status != TaskStatusAvailable {
+				continue
+			}
+			if i >= len(chrome) || !rolesIntersect(op.Roles, chrome[i].Roles) {
+				continue
+			}
+			viewerAvailable = append(viewerAvailable, taskID)
 		}
 		instances = append(instances, WorklistInstance{
-			ID:    inst.ID,
-			Label: inst.Label,
-			Tasks: tasks,
+			ID:              inst.ID,
+			Label:           inst.Label,
+			Tasks:           tasks,
+			ViewerAvailable: viewerAvailable,
 		})
 	}
 
@@ -178,16 +190,6 @@ func worklistTaskByID(job WorklistJob, taskID string) (WorklistTask, bool) {
 		}
 	}
 	return WorklistTask{}, false
-}
-
-// ViewerCanActOnTask reports whether Worklist Available affordances include this
-// Task for the viewer (Config-role intersection only).
-func ViewerCanActOnTask(job WorklistJob, taskID string, viewerRoles []string) bool {
-	chrome, ok := worklistTaskByID(job, taskID)
-	if !ok {
-		return false
-	}
-	return rolesIntersect(viewerRoles, chrome.Roles)
 }
 
 func worklistJobByID(wl Worklist, jobID string) (WorklistJob, bool) {

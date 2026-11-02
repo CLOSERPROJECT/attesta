@@ -166,9 +166,9 @@ func TestSeedDemoStagedDomainSplitRoleWorklists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	adminRefs := CollectAvailableTaskRefs(admin.Config, admin.Worklist, []string{"administration"})
-	logRefs := CollectAvailableTaskRefs(logistic.Config, logistic.Worklist, []string{"logistic"})
-	lineRefs := CollectAvailableTaskRefs(line.Config, line.Worklist, []string{"line"})
+	adminRefs := CollectAvailableTaskRefs(admin.Config, admin.Worklist)
+	logRefs := CollectAvailableTaskRefs(logistic.Config, logistic.Worklist)
+	lineRefs := CollectAvailableTaskRefs(line.Config, line.Worklist)
 
 	if !hasAvailableRef(adminRefs, "intake", "codiceFir", SeedIntakeAfterRegisterID) {
 		t.Fatalf("administration Available missing codiceFir@%s: %#v", SeedIntakeAfterRegisterID, adminRefs)

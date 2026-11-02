@@ -21,17 +21,20 @@ const homeLoad = {
 					{
 						id: 'NIR-1',
 						label: 'NIR-1',
-						tasks: { register: 'done', palletWeight: 'available' }
+						tasks: { register: 'done', palletWeight: 'available' },
+						viewerAvailable: []
 					},
 					{
 						id: 'NIR-2',
 						label: 'Camion B',
-						tasks: { register: 'available', palletWeight: 'locked' }
+						tasks: { register: 'available', palletWeight: 'locked' },
+						viewerAvailable: ['register']
 					},
 					{
 						id: 'NIR-done',
 						label: 'Finished',
-						tasks: { register: 'done', palletWeight: 'done' }
+						tasks: { register: 'done', palletWeight: 'done' },
+						viewerAvailable: []
 					}
 				]
 			}

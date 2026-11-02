@@ -40,7 +40,10 @@ export type WorklistJob = {
 export type WorklistInstance = {
 	id: string;
 	label: string;
+	/** Role-blind Unlock/Submission status (handoff). */
 	tasks: Record<string, TaskStatus>;
+	/** Viewer-scoped Available Task ids (status-available ∩ slug∩roles). */
+	viewerAvailable?: string[];
 };
 
 export type TaskStatus = 'locked' | 'available' | 'done';

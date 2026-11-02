@@ -14,9 +14,7 @@
 		void living.hydrate();
 	});
 
-	const available = $derived(
-		availableRowsFromWorklist(living.result?.worklist, living.result?.roles)
-	);
+	const available = $derived(availableRowsFromWorklist(living.result?.worklist));
 	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
 </script>
 

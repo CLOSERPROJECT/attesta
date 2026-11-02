@@ -59,10 +59,10 @@ type AvailableTaskRef struct {
 }
 
 // CollectAvailableTaskRefs walks Worklist in Org Config Job order: provisional
-// first Task when canStart (empty jobInstanceId), then every available Task on
-// each instance in authored Task order whose Config roles intersect viewerRoles.
-// canStart is already viewer-scoped by ProjectWorklist.
-func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist, viewerRoles []string) []AvailableTaskRef {
+// first Task when canStart (empty jobInstanceId), then each instance's projected
+// ViewerAvailable refs (authored Task order). canStart / ViewerAvailable are
+// already viewer-scoped by ProjectWorklist.
+func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist) []AvailableTaskRef {
 	byJob := make(map[string]WorklistJob, len(wl.Jobs))
 	for _, j := range wl.Jobs {
 		byJob[j.JobID] = j
@@ -90,13 +90,7 @@ func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist, viewerRoles []string) 
 			})
 		}
 		for _, inst := range wlJob.Instances {
-			for _, taskID := range ordered {
-				if inst.Tasks[taskID] != TaskStatusAvailable {
-					continue
-				}
-				if !ViewerCanActOnTask(wlJob, taskID, viewerRoles) {
-					continue
-				}
+			for _, taskID := range inst.ViewerAvailable {
 				out = append(out, AvailableTaskRef{
 					JobID:         jobID,
 					TaskID:        taskID,
@@ -109,8 +103,8 @@ func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist, viewerRoles []string) 
 }
 
 // FirstAvailableTask returns the first CollectAvailableTaskRefs entry.
-func FirstAvailableTask(cfg OrgConfig, wl Worklist, viewerRoles []string) (AvailableTaskRef, bool) {
-	refs := CollectAvailableTaskRefs(cfg, wl, viewerRoles)
+func FirstAvailableTask(cfg OrgConfig, wl Worklist) (AvailableTaskRef, bool) {
+	refs := CollectAvailableTaskRefs(cfg, wl)
 	if len(refs) == 0 {
 		return AvailableTaskRef{}, false
 	}
@@ -127,10 +121,9 @@ func NormalizeJobInstanceID(jobInstanceID string) string {
 	return id
 }
 
-// NextAdvanceTaskRef picks the first Worklist-available Task on jobInstanceID
-// whose Config roles intersect viewerRoles, in authored taskIds order
-// (ADR-0006 auto-advance). Empty jobInstanceID never advances.
-func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string, viewerRoles []string) (AvailableTaskRef, bool) {
+// NextAdvanceTaskRef picks the first projected ViewerAvailable Task on
+// jobInstanceID (ADR-0006 auto-advance). Empty jobInstanceID never advances.
+func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string) (AvailableTaskRef, bool) {
 	jobID = strings.TrimSpace(jobID)
 	jobInstanceID = strings.TrimSpace(jobInstanceID)
 	if jobID == "" || jobInstanceID == "" {
@@ -141,30 +134,21 @@ func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string, viewerRoles []
 		return AvailableTaskRef{}, false
 	}
 	inst, ok := worklistInstance(job, jobInstanceID)
-	if !ok {
+	if !ok || len(inst.ViewerAvailable) == 0 {
 		return AvailableTaskRef{}, false
 	}
-	for _, taskID := range job.TaskIDs {
-		if inst.Tasks[taskID] != TaskStatusAvailable {
-			continue
-		}
-		if !ViewerCanActOnTask(job, taskID, viewerRoles) {
-			continue
-		}
-		return AvailableTaskRef{
-			JobID:         jobID,
-			TaskID:        taskID,
-			JobInstanceID: jobInstanceID,
-		}, true
-	}
-	return AvailableTaskRef{}, false
+	return AvailableTaskRef{
+		JobID:         jobID,
+		TaskID:        inst.ViewerAvailable[0],
+		JobInstanceID: jobInstanceID,
+	}, true
 }
 
 // ViewerMayMountTask reports whether addressed Task form hydrate is in board
 // scope for the viewer (same CollectAvailableTaskRefs law as Available chrome).
-func ViewerMayMountTask(cfg OrgConfig, wl Worklist, ref AvailableTaskRef, viewerRoles []string) bool {
+func ViewerMayMountTask(cfg OrgConfig, wl Worklist, ref AvailableTaskRef) bool {
 	ref.JobInstanceID = NormalizeJobInstanceID(ref.JobInstanceID)
-	for _, got := range CollectAvailableTaskRefs(cfg, wl, viewerRoles) {
+	for _, got := range CollectAvailableTaskRefs(cfg, wl) {
 		if got.JobID == ref.JobID && got.TaskID == ref.TaskID && got.JobInstanceID == ref.JobInstanceID {
 			return true
 		}

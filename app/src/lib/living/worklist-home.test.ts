@@ -4,11 +4,22 @@ import type { Worklist } from './types.js';
 import {
 	availableRowsFromWorklist,
 	canStartRowsFromWorklist,
-	rolesIntersect,
 	taskRouteInstanceSegment
 } from './worklist-home.js';
 
-const worklist: Worklist = {
+const chrome = {
+	intake: [
+		{ id: 'register', title: 'Registrazione', roles: ['administration'] },
+		{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
+	],
+	line: [
+		{ id: 'shift', title: 'Turno', roles: ['line'] },
+		{ id: 'lineLoad', title: 'Carico', roles: ['line'] }
+	]
+} as const;
+
+/** Viewer-scoped Worklists (statuses shared; viewerAvailable differs). */
+const adminWorklist: Worklist = {
 	jobs: [
 		{
 			jobId: 'intake',
@@ -16,20 +27,19 @@ const worklist: Worklist = {
 			repeatable: true,
 			startLabel: 'Nuovo camion',
 			taskIds: ['register', 'palletWeight'],
-			tasks: [
-				{ id: 'register', title: 'Registrazione', roles: ['administration'] },
-				{ id: 'palletWeight', title: 'Peso pallet', roles: ['logistic'] }
-			],
+			tasks: [...chrome.intake],
 			instances: [
 				{
 					id: 'NIR-1',
 					label: 'NIR-1',
-					tasks: { register: 'done', palletWeight: 'available' }
+					tasks: { register: 'done', palletWeight: 'available' },
+					viewerAvailable: []
 				},
 				{
 					id: 'NIR-2',
 					label: 'Camion B',
-					tasks: { register: 'available', palletWeight: 'locked' }
+					tasks: { register: 'available', palletWeight: 'locked' },
+					viewerAvailable: ['register']
 				}
 			]
 		},
@@ -39,15 +49,142 @@ const worklist: Worklist = {
 			repeatable: true,
 			startLabel: 'Nuovo turno',
 			taskIds: ['shift', 'lineLoad'],
-			tasks: [
-				{ id: 'shift', title: 'Turno', roles: ['line'] },
-				{ id: 'lineLoad', title: 'Carico', roles: ['line'] }
-			],
+			tasks: [...chrome.line],
 			instances: [
 				{
 					id: '1st',
 					label: 'Turno: 1st',
-					tasks: { shift: 'done', lineLoad: 'available' }
+					tasks: { shift: 'done', lineLoad: 'available' },
+					viewerAvailable: []
+				}
+			]
+		}
+	]
+};
+
+const logisticWorklist: Worklist = {
+	jobs: [
+		{
+			jobId: 'intake',
+			canStart: false,
+			repeatable: true,
+			startLabel: 'Nuovo camion',
+			taskIds: ['register', 'palletWeight'],
+			tasks: [...chrome.intake],
+			instances: [
+				{
+					id: 'NIR-1',
+					label: 'NIR-1',
+					tasks: { register: 'done', palletWeight: 'available' },
+					viewerAvailable: ['palletWeight']
+				},
+				{
+					id: 'NIR-2',
+					label: 'Camion B',
+					tasks: { register: 'available', palletWeight: 'locked' },
+					viewerAvailable: []
+				}
+			]
+		},
+		{
+			jobId: 'line',
+			canStart: false,
+			repeatable: true,
+			startLabel: 'Nuovo turno',
+			taskIds: ['shift', 'lineLoad'],
+			tasks: [...chrome.line],
+			instances: [
+				{
+					id: '1st',
+					label: 'Turno: 1st',
+					tasks: { shift: 'done', lineLoad: 'available' },
+					viewerAvailable: []
+				}
+			]
+		}
+	]
+};
+
+const lineWorklist: Worklist = {
+	jobs: [
+		{
+			jobId: 'intake',
+			canStart: false,
+			repeatable: true,
+			startLabel: 'Nuovo camion',
+			taskIds: ['register', 'palletWeight'],
+			tasks: [...chrome.intake],
+			instances: [
+				{
+					id: 'NIR-1',
+					label: 'NIR-1',
+					tasks: { register: 'done', palletWeight: 'available' },
+					viewerAvailable: []
+				},
+				{
+					id: 'NIR-2',
+					label: 'Camion B',
+					tasks: { register: 'available', palletWeight: 'locked' },
+					viewerAvailable: []
+				}
+			]
+		},
+		{
+			jobId: 'line',
+			canStart: false,
+			repeatable: true,
+			startLabel: 'Nuovo turno',
+			taskIds: ['shift', 'lineLoad'],
+			tasks: [...chrome.line],
+			instances: [
+				{
+					id: '1st',
+					label: 'Turno: 1st',
+					tasks: { shift: 'done', lineLoad: 'available' },
+					viewerAvailable: ['lineLoad']
+				}
+			]
+		}
+	]
+};
+
+const allRolesWorklist: Worklist = {
+	jobs: [
+		{
+			jobId: 'intake',
+			canStart: true,
+			repeatable: true,
+			startLabel: 'Nuovo camion',
+			taskIds: ['register', 'palletWeight'],
+			tasks: [...chrome.intake],
+			instances: [
+				{
+					id: 'NIR-1',
+					label: 'NIR-1',
+					tasks: { register: 'done', palletWeight: 'available' },
+					viewerAvailable: ['palletWeight']
+				},
+				{
+					id: 'NIR-2',
+					label: 'Camion B',
+					tasks: { register: 'available', palletWeight: 'locked' },
+					viewerAvailable: ['register']
+				}
+			]
+		},
+		{
+			jobId: 'line',
+			canStart: false,
+			repeatable: true,
+			startLabel: 'Nuovo turno',
+			taskIds: ['shift', 'lineLoad'],
+			tasks: [...chrome.line],
+			instances: [
+				{
+					id: '1st',
+					label: 'Turno: 1st',
+					tasks: { shift: 'done', lineLoad: 'available' },
+					viewerAvailable: ['lineLoad']
 				}
 			]
 		}
@@ -55,36 +192,26 @@ const worklist: Worklist = {
 };
 
 describe('worklist-home bands', () => {
-	test('rolesIntersect is slug∩roles', () => {
-		expect(rolesIntersect(['administration'], ['administration', 'logistic'])).toBe(true);
-		expect(rolesIntersect(['line'], ['administration'])).toBe(false);
-		expect(rolesIntersect([], ['line'])).toBe(false);
-	});
-
-	test('availableRows sort Job → instance → Task and filter by viewer roles', () => {
-		const admin = availableRowsFromWorklist(worklist, ['administration']);
+	test('availableRows sort Job → instance → Task from viewerAvailable', () => {
+		const admin = availableRowsFromWorklist(adminWorklist);
 		expect(admin.map((r) => `${r.jobId}/${r.jobInstanceId}/${r.taskId}`)).toEqual([
 			'intake/NIR-2/register'
 		]);
 		expect(admin[0]?.title).toBe('Registrazione');
 		expect(admin[0]?.instanceLabel).toBe('Camion B');
 
-		const logistic = availableRowsFromWorklist(worklist, ['logistic']);
+		const logistic = availableRowsFromWorklist(logisticWorklist);
 		expect(logistic.map((r) => `${r.jobId}/${r.jobInstanceId}/${r.taskId}`)).toEqual([
 			'intake/NIR-1/palletWeight'
 		]);
 		expect(logistic[0]?.title).toBe('Peso pallet');
 
-		const line = availableRowsFromWorklist(worklist, ['line']);
+		const line = availableRowsFromWorklist(lineWorklist);
 		expect(line.map((r) => `${r.jobId}/${r.jobInstanceId}/${r.taskId}`)).toEqual([
 			'line/1st/lineLoad'
 		]);
 
-		const all = availableRowsFromWorklist(worklist, [
-			'administration',
-			'logistic',
-			'line'
-		]);
+		const all = availableRowsFromWorklist(allRolesWorklist);
 		expect(all.map((r) => `${r.jobId}/${r.jobInstanceId}/${r.taskId}`)).toEqual([
 			'intake/NIR-1/palletWeight',
 			'intake/NIR-2/register',
@@ -93,7 +220,7 @@ describe('worklist-home bands', () => {
 	});
 
 	test('canStartRows use startLabel and first Task; provisional segment is new', () => {
-		expect(canStartRowsFromWorklist(worklist)).toEqual([
+		expect(canStartRowsFromWorklist(adminWorklist)).toEqual([
 			{ jobId: 'intake', startLabel: 'Nuovo camion', firstTaskId: 'register' }
 		]);
 		expect(taskRouteInstanceSegment('')).toBe('new');
@@ -101,8 +228,8 @@ describe('worklist-home bands', () => {
 	});
 
 	test('empty Worklist yields empty bands', () => {
-		expect(availableRowsFromWorklist({ jobs: [] }, ['administration'])).toEqual([]);
+		expect(availableRowsFromWorklist({ jobs: [] })).toEqual([]);
 		expect(canStartRowsFromWorklist({ jobs: [] })).toEqual([]);
-		expect(availableRowsFromWorklist(null, ['administration'])).toEqual([]);
+		expect(availableRowsFromWorklist(null)).toEqual([]);
 	});
 });

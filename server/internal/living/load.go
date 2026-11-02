@@ -109,7 +109,7 @@ func (l *Loader) LoadTaskBundle(ctx context.Context, org string, op OperatorIden
 
 	wl := ProjectWorklist(cfg, domain, op)
 	ref := AvailableTaskRef{JobID: jobID, TaskID: taskID, JobInstanceID: jobInstanceID}
-	if !ViewerMayMountTask(cfg, wl, ref, op.Roles) {
+	if !ViewerMayMountTask(cfg, wl, ref) {
 		return nil, ErrTaskBundleForbidden
 	}
 	return BuildTaskFormBundle(cfg, domain, ref)

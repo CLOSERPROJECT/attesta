@@ -18,12 +18,7 @@
 	});
 
 	const model = $derived(
-		jobInstanceOverview(
-			living.result?.worklist,
-			jobId,
-			jobInstanceId,
-			living.result?.roles
-		)
+		jobInstanceOverview(living.result?.worklist, jobId, jobInstanceId)
 	);
 
 	$effect(() => {

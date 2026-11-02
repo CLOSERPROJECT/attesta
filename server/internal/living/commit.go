@@ -199,7 +199,7 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 
 	wl := ProjectWorklist(cfg, applied.Domain, op)
 	var nextBundle *TaskFormBundle
-	if advance, ok := NextAdvanceTaskRef(wl, ref.JobID, applied.JobInstanceID, op.Roles); ok {
+	if advance, ok := NextAdvanceTaskRef(wl, ref.JobID, applied.JobInstanceID); ok {
 		b, err := BuildTaskFormBundle(cfg, applied.Domain, advance)
 		if err != nil {
 			return CommitResult{}, err

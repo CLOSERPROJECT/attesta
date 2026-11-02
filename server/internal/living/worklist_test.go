@@ -390,9 +390,15 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	if adminInst.Tasks["palletWeight"] != TaskStatusAvailable || logInst.Tasks["palletWeight"] != TaskStatusAvailable {
 		t.Fatalf("palletWeight status admin=%q logistic=%q, want available", adminInst.Tasks["palletWeight"], logInst.Tasks["palletWeight"])
 	}
+	if containsString(adminInst.ViewerAvailable, "palletWeight") {
+		t.Fatalf("administration ViewerAvailable must exclude palletWeight: %#v", adminInst.ViewerAvailable)
+	}
+	if !containsString(logInst.ViewerAvailable, "palletWeight") {
+		t.Fatalf("logistic ViewerAvailable must include palletWeight: %#v", logInst.ViewerAvailable)
+	}
 
-	adminRefs := CollectAvailableTaskRefs(cfg, adminWL, admin.Roles)
-	logRefs := CollectAvailableTaskRefs(cfg, logWL, logistic.Roles)
+	adminRefs := CollectAvailableTaskRefs(cfg, adminWL)
+	logRefs := CollectAvailableTaskRefs(cfg, logWL)
 	if hasAvailableRef(adminRefs, "intake", "palletWeight", instanceID) {
 		t.Fatalf("administration Available affordances must exclude palletWeight: %#v", adminRefs)
 	}
@@ -422,6 +428,15 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 func hasAvailableRef(refs []AvailableTaskRef, jobID, taskID, jobInstanceID string) bool {
 	for _, r := range refs {
 		if r.JobID == jobID && r.TaskID == taskID && r.JobInstanceID == jobInstanceID {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(ids []string, want string) bool {
+	for _, id := range ids {
+		if id == want {
 			return true
 		}
 	}

@@ -116,7 +116,7 @@ func main() {
 			}
 		}
 	}
-	refs := living.CollectAvailableTaskRefs(cfg, wl, living.FixtureAllRolesOp().Roles)
+	refs := living.CollectAvailableTaskRefs(cfg, wl)
 	var haveLE, haveWC bool
 	for _, ref := range refs {
 		b, err := living.BuildTaskFormBundle(cfg, res.Domain, ref)

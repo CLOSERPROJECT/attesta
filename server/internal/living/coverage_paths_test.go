@@ -342,11 +342,11 @@ func TestFirstAvailableTaskAndCompileDerivedEdges(t *testing.T) {
 	}
 	domain := EmptyDomain()
 	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
-	ref, ok := FirstAvailableTask(cfg, wl, FixtureAllRolesOp().Roles)
+	ref, ok := FirstAvailableTask(cfg, wl)
 	if !ok || ref.JobID != "intake" || ref.TaskID != "register" || ref.JobInstanceID != "" {
 		t.Fatalf("first = %#v ok=%v", ref, ok)
 	}
-	ref, ok = FirstAvailableTask(OrgConfig{}, Worklist{}, FixtureAllRolesOp().Roles)
+	ref, ok = FirstAvailableTask(OrgConfig{}, Worklist{})
 	if ok || ref.JobID != "" {
 		t.Fatalf("empty first = %#v", ref)
 	}

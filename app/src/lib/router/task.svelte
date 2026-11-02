@@ -73,8 +73,7 @@
 			instanceId,
 			tid,
 			isProv,
-			living.result.worklist,
-			living.result.roles
+			living.result.worklist
 		);
 		if (gate.kind !== 'task') {
 			redirected = true;

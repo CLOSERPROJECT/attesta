@@ -1,7 +1,6 @@
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { TaskStatus, Worklist, WorklistInstance, WorklistJob } from './types.js';
 import { worklistJobFor } from './types.js';
-import { rolesIntersect } from './worklist-home.js';
 
 /** Post-Commit SPA target (ADR-0006). */
 export type PostCommitTarget =
@@ -19,7 +18,7 @@ export type OverviewTaskRow = {
 	title: string;
 	status: TaskStatus;
 	roles: string[];
-	/** Role-eligible `available` — link to Task route; else status-only. */
+	/** Projected viewerAvailable membership — link to Task route; else status-only. */
 	linkable: boolean;
 };
 
@@ -48,6 +47,10 @@ function jobConfigTaskIds(job: WorklistJob): string[] {
 
 function taskChrome(job: WorklistJob, taskId: string) {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
+}
+
+function viewerMayAct(inst: WorklistInstance, taskId: string): boolean {
+	return (inst.viewerAvailable ?? []).includes(taskId);
 }
 
 /**
@@ -129,28 +132,22 @@ export function resolvePostCommitNavigation(
 
 /**
  * Deep-link gate: provisional Start always mounts; existing instance must be
- * role-eligible `available` or redirect to overview/Home.
+ * projected viewerAvailable or redirect to overview/Home.
  */
 export function resolveTaskDeepLink(
 	jobId: string,
 	jobInstanceId: string,
 	taskId: string,
 	provisional: boolean,
-	worklist: Worklist | null | undefined,
-	viewerRoles: string[] | null | undefined
+	worklist: Worklist | null | undefined
 ): TaskDeepLinkTarget {
 	if (!jobId || !taskId) return { kind: 'home' };
 	if (provisional) return { kind: 'task' };
 
 	const job = worklistJobFor(worklist, jobId);
 	const inst = job ? instanceFor(job, jobInstanceId) : null;
-	if (job && inst) {
-		const status = inst.tasks[taskId];
-		const chrome = taskChrome(job, taskId);
-		const roles = chrome?.roles ?? [];
-		if (status === 'available' && rolesIntersect(viewerRoles, roles)) {
-			return { kind: 'task' };
-		}
+	if (job && inst && viewerMayAct(inst, taskId)) {
+		return { kind: 'task' };
 	}
 	return resolveUnmountableTaskTarget(jobId, jobInstanceId, false, worklist);
 }
@@ -170,8 +167,7 @@ export function resolveTaskExit(
 export function jobInstanceOverview(
 	worklist: Worklist | null | undefined,
 	jobId: string,
-	jobInstanceId: string,
-	viewerRoles: string[] | null | undefined
+	jobInstanceId: string
 ): JobInstanceOverviewModel | null {
 	if (!jobId || !jobInstanceId || jobInstanceId === 'new') return null;
 	const job = worklistJobFor(worklist, jobId);
@@ -186,8 +182,7 @@ export function jobInstanceOverview(
 		const chrome = taskChrome(job, taskId);
 		const roles = chrome?.roles ?? [];
 		const status = (inst.tasks[taskId] ?? 'locked') as TaskStatus;
-		const eligible = rolesIntersect(viewerRoles, roles);
-		const linkable = status === 'available' && eligible;
+		const linkable = viewerMayAct(inst, taskId);
 		const row: OverviewTaskRow = {
 			taskId,
 			title: chrome?.title || taskId,
