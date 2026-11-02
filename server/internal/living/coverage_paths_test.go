@@ -1054,6 +1054,35 @@ steps:
 	}
 }
 
+func TestPrepStripsChromeFields(t *testing.T) {
+	got, err := prepTaskSubmission(map[string]any{
+		"chrome": map[string]any{
+			"hint":           map[string]any{"kind": "readonly", "expr": "1"},
+			"resultsReport":  map[string]any{"kind": "dataReport", "expr": "1", "title": "R"},
+			"ignoredNoExpr":  map[string]any{"kind": "readonly"},
+		},
+		"schema": map[string]any{"properties": map[string]any{
+			"codiceFir": map[string]any{"type": "string"},
+		}},
+	}, map[string]any{
+		"codiceFir":     "FIR-1",
+		"hint":          "x",
+		"resultsReport": map[string]any{"sections": []any{}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.Facts["hint"]; ok {
+		t.Fatalf("readonly chrome kept: %#v", got.Facts)
+	}
+	if _, ok := got.Facts["resultsReport"]; ok {
+		t.Fatalf("dataReport chrome kept: %#v", got.Facts)
+	}
+	if got.Facts["codiceFir"] != "FIR-1" {
+		t.Fatalf("facts = %#v", got.Facts)
+	}
+}
+
 func TestPrepLeftoverAndLoaderEdges(t *testing.T) {
 	got, err := prepTaskSubmission(map[string]any{
 		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import JobChrome from './JobChrome.svelte';
+	import JobPanel from './JobPanel.svelte';
 	import { living } from './living-app.svelte.js';
 
 	onMount(() => {
@@ -56,7 +56,7 @@
 			{#each living.jobIds as jobId (jobId)}
 				{@const worklistJob = living.worklistJob(jobId)}
 				{#if worklistJob}
-					<JobChrome {jobId} {worklistJob} />
+					<JobPanel {jobId} {worklistJob} />
 				{/if}
 			{/each}
 		</div>

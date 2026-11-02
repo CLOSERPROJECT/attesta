@@ -53,18 +53,6 @@ export function findTaskFormBundle(
 	);
 }
 
-function stripChromeFields(
-	value: Record<string, unknown>,
-	chromeFieldIds: readonly string[]
-): Record<string, unknown> {
-	if (chromeFieldIds.length === 0) return value;
-	const out = { ...value };
-	for (const id of chromeFieldIds) {
-		delete out[id];
-	}
-	return out;
-}
-
 /** Frozen FormPlan from a server Task form bundle — no authored+Domain compile. */
 export function planFromTaskFormBundle(bundle: TaskFormBundle): TaskFormPlan {
 	return {
@@ -77,8 +65,8 @@ export function planFromTaskFormBundle(bundle: TaskFormBundle): TaskFormPlan {
 		chrome: bundle.chrome ?? [],
 		chromeFieldIds: bundle.chromeFieldIds ?? [],
 		projectionKey: bundle.projectionKey ?? '',
-		sealSubmission: (value) =>
-			normalizeFormProgress(stripChromeFields(value, bundle.chromeFieldIds ?? []))
+		// Chrome ids are stripped in Go prep; keep progress normalize until Draft never writes "".
+		sealSubmission: (value) => normalizeFormProgress(value)
 	};
 }
 

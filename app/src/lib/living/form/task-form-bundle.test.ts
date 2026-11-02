@@ -55,7 +55,7 @@ describe('task-form-bundle', () => {
 		expect(findTaskFormBundle([], 'intake', 'register', '')).toBeNull();
 	});
 
-	test('planFromTaskFormBundle skips authored compile and strips chrome on seal', () => {
+	test('planFromTaskFormBundle skips authored compile; chrome strip is Go prep', () => {
 		const bundle = sampleBundle({
 			chrome: [
 				{
@@ -71,7 +71,8 @@ describe('task-form-bundle', () => {
 		expect(plan.schemas.schema).toBe(bundle.schema);
 		expect(plan.chromeFieldIds).toEqual(['hint']);
 		expect(plan.sealSubmission({ codiceFir: 'FIR-1', hint: 'x' })).toEqual({
-			codiceFir: 'FIR-1'
+			codiceFir: 'FIR-1',
+			hint: 'x'
 		});
 	});
 
