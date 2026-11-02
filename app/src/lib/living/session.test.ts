@@ -125,13 +125,14 @@ describe('LivingSession', () => {
 		});
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', 'NIR-1', { client: 'NO' });
-		const minted = await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO', palletCount: 1 },
 			mint: { kind: 'none' }
 		});
-		expect(minted).toBe('NIR-1');
+		expect(outcome?.jobInstanceId).toBe('NIR-1');
+		expect(outcome?.nextTaskFormBundle).toBeNull();
 		expect(session.result?.worklist).toEqual(nextWorklist);
 		expect(session.result?.taskFormBundles).toEqual(nextBundles);
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
@@ -143,6 +144,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
+			nextTaskFormBundle: null,
 			taskFormBundles: []
 		}));
 		const session = new LivingSession({
@@ -152,13 +154,13 @@ describe('LivingSession', () => {
 		});
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '', { client: 'NO' });
-		const minted = await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: '',
 			value: { client: 'NO' },
 			mint: { kind: 'startingNew' }
 		});
-		expect(minted).toBe('NIR-1');
+		expect(outcome?.jobInstanceId).toBe('NIR-1');
 		expect(commit).toHaveBeenCalledWith({
 			taskPath: 'intake/register',
 			jobInstanceId: '',
@@ -167,6 +169,43 @@ describe('LivingSession', () => {
 		});
 		expect(session.getDraft('intake/register', '')).toBeNull();
 		expect(session.getDraft('intake/register', '_new')).toBeNull();
+	});
+
+	test('commit outcome surfaces nextTaskFormBundle for auto-advance', async () => {
+		const next: TaskFormBundle = {
+			jobId: 'intake',
+			taskId: 'codiceFir',
+			jobInstanceId: 'NIR-1',
+			title: 'Codice FIR',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		};
+		const commit = vi.fn(async () => ({
+			org: 'feragame',
+			jobInstanceId: 'NIR-1',
+			worklist: emptyWorklist(),
+			nextTaskFormBundle: next,
+			taskFormBundles: []
+		}));
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			commit: { commit },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const outcome = await session.commit({
+			taskPath: 'intake/register',
+			jobInstanceId: 'NIR-1',
+			value: { client: 'NO' },
+			mint: { kind: 'none' }
+		});
+		expect(outcome?.nextTaskFormBundle).toEqual(next);
 	});
 
 	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
@@ -224,13 +263,13 @@ describe('LivingSession', () => {
 		session.result = structuredClone(sample);
 		session.setDraft('intake/register', '_new', { client: 'NO', notes: 'keep me' });
 
-		const minted = await session.commit({
+		const outcome = await session.commit({
 			taskPath: 'intake/register',
 			jobInstanceId: 'NIR-1',
 			value: { client: 'NO' },
 			mint: { kind: 'none' }
 		});
-		expect(minted).toBeNull();
+		expect(outcome).toBeNull();
 		expect(session.commitError).toBe('forbidden');
 		expect(session.getDraft('intake/register', '_new')).toEqual({
 			client: 'NO',

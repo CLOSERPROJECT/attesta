@@ -125,7 +125,7 @@ Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Ta
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group
 
 **Load**:
-Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**, viewer Config **roles** (for Available affordances), and Active Config version metadata for the home board; not a dump of full Domain + full Org Config. **Task form bundle**s load when opening a Task route via addressed fetch (`GET /api/living/task-form`; provisional `jobInstanceId` empty / `new`) and may return on Commit as `nextTaskFormBundle` when auto-advancing — home Load omits bulk bundles (ADR-0006). Commit may still ship interim bulk until post-Commit routing drops it.
+Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**, viewer Config **roles** (for Available affordances), and Active Config version metadata for the home board; not a dump of full Domain + full Org Config. **Task form bundle**s load when opening a Task route via addressed fetch (`GET /api/living/task-form`; provisional `jobInstanceId` empty / `new`) and may return on Commit as `nextTaskFormBundle` when auto-advancing — home Load omits bulk bundles (ADR-0006). SPA post-Commit routing uses `nextTaskFormBundle` + Worklist (overview / Home); interim Commit bulk is unused for navigation.
 _Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport; treating bulk Available bundles as the lasting home-Load shape
 
 **Worklist**:

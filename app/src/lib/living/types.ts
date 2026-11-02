@@ -11,8 +11,8 @@ export type LoadResult = {
 	roles: string[];
 	worklist: Worklist;
 	/**
-	 * Empty on home Load (ADR-0006). Commit may still ship interim bulk until
-	 * post-Commit routing (ticket 05) drops it; Task mounts use task-form port.
+	 * Empty on home Load (ADR-0006). Commit may still ship interim bulk; SPA
+	 * post-Commit routing uses nextTaskFormBundle + Worklist (ticket 05).
 	 */
 	taskFormBundles: TaskFormBundle[];
 };

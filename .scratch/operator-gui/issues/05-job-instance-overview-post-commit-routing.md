@@ -4,11 +4,11 @@
 
 **Blocked by:** 03 (Lazy Task bundle + Commit navigation payload), 04 (Worklist Home + Task routes)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Overview route renders instance label + per-Task statuses from Worklist projection
-- [ ] Handoff copy names Config roles when next `available` work is not role-eligible for the viewer
-- [ ] Role-eligible `available` Tasks on overview link to the Task route; locked/done are status-only
-- [ ] Post-Commit navigation implements auto-advance → overview → Home per ADR-0006
-- [ ] Unauthorized/locked Task URL resolves to overview or Home, not an empty form
-- [ ] Coverage for advance, handoff, and finished-instance paths (tests and/or e2e)
+- [x] Overview route renders instance label + per-Task statuses from Worklist projection
+- [x] Handoff copy names Config roles when next `available` work is not role-eligible for the viewer
+- [x] Role-eligible `available` Tasks on overview link to the Task route; locked/done are status-only
+- [x] Post-Commit navigation implements auto-advance → overview → Home per ADR-0006
+- [x] Unauthorized/locked Task URL resolves to overview or Home, not an empty form
+- [x] Coverage for advance, handoff, and finished-instance paths (tests and/or e2e)

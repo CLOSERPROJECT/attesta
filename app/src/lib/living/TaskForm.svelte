@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { FailureValidationResult } from '@sjsf/form';
+	import type { CommitOutcome } from './commit-port.js';
 	import { living } from './living-app.svelte.js';
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/ConfigForm.svelte';
@@ -26,8 +27,8 @@
 		/** Mount payload from Load/Commit bundle set — only mount path. */
 		bundle: TaskFormBundle;
 		disabled?: boolean;
-		/** Called after successful Commit (e.g. close provisional). */
-		onCommitted?: (jobInstanceId: string) => void;
+		/** Called after successful Commit for post-Commit routing. */
+		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
 	let {
@@ -86,23 +87,23 @@
 	async function submitSealed(value: Record<string, unknown>) {
 		submitError = null;
 		const provisional = jobInstanceId === '';
-		const mintedId = await living.commit({
+		const outcome = await living.commit({
 			taskPath: path,
 			jobInstanceId: provisional ? '' : jobInstanceId,
 			value,
 			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
 		});
-		if (mintedId == null) return;
+		if (outcome == null) return;
 		const next = findTaskFormBundle(
 			living.result?.taskFormBundles,
 			jobId,
 			taskId,
-			mintedId
+			outcome.jobInstanceId
 		);
 		if (next) {
 			writeDraft({ ...(next.initialData ?? {}) });
 		}
-		onCommitted?.(mintedId);
+		onCommitted?.(outcome);
 	}
 
 	function disposeLive() {

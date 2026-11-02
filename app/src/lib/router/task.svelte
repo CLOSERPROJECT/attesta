@@ -1,9 +1,16 @@
 <script lang="ts">
+	import type { CommitOutcome } from '../living/commit-port.js';
 	import TaskForm from '../living/TaskForm.svelte';
 	import type { TaskFormBundle } from '../living/form/task-form-bundle.js';
 	import { living } from '../living/living-app.svelte.js';
 	import { TaskFormError } from '../living/task-form-port.js';
-	import { navigate, route } from './index.js';
+	import {
+		resolvePostCommitNavigation,
+		resolveTaskDeepLink,
+		resolveTaskExit
+	} from '../living/worklist-overview.js';
+	import { route } from './index.js';
+	import { navigateLivingTarget } from './navigate-target.js';
 
 	const jobId = $derived(String(route.params.jobId ?? ''));
 	const taskId = $derived(String(route.params.taskId ?? ''));
@@ -15,13 +22,33 @@
 	let loading = $state(false);
 	let error = $state.raw<string | null>(null);
 	let loadGen = 0;
+	let redirected = $state(false);
+
+	function goExit() {
+		navigateLivingTarget(resolveTaskExit(jobId, jobInstanceId, provisional));
+	}
+
+	function onCommitted(outcome: CommitOutcome) {
+		navigateLivingTarget(
+			resolvePostCommitNavigation(
+				jobId,
+				outcome.jobInstanceId,
+				outcome.worklist,
+				outcome.nextTaskFormBundle
+			)
+		);
+	}
 
 	$effect(() => {
 		const jid = jobId;
 		const tid = taskId;
 		const isProv = provisional;
 		const instanceId = jobInstanceId;
+		void living.result;
+		void living.loading;
+
 		const gen = ++loadGen;
+		redirected = false;
 
 		if (!jid || !tid) {
 			bundle = null;
@@ -30,13 +57,36 @@
 			return;
 		}
 
+		if (!living.result) {
+			bundle = null;
+			error = null;
+			loading = true;
+			if (!living.loading) {
+				void living.hydrate();
+			}
+			return;
+		}
+
+		const gate = resolveTaskDeepLink(
+			jid,
+			instanceId,
+			tid,
+			isProv,
+			living.result.worklist,
+			living.result.roles
+		);
+		if (gate.kind !== 'task') {
+			redirected = true;
+			loading = false;
+			bundle = null;
+			error = null;
+			navigateLivingTarget(gate);
+			return;
+		}
+
 		loading = true;
 		error = null;
 		bundle = null;
-
-		if (!living.result && !living.loading) {
-			void living.hydrate();
-		}
 
 		void living
 			.fetchTaskForm({
@@ -52,6 +102,15 @@
 			.catch((err: unknown) => {
 				if (gen !== loadGen) return;
 				bundle = null;
+				if (err instanceof TaskFormError && (err.status === 403 || err.status === 404)) {
+					redirected = true;
+					navigateLivingTarget(
+						isProv || !instanceId
+							? { kind: 'home' }
+							: { kind: 'overview', jobId: jid, jobInstanceId: instanceId }
+					);
+					return;
+				}
 				error =
 					err instanceof TaskFormError
 						? err.message
@@ -63,14 +122,6 @@
 				if (gen === loadGen) loading = false;
 			});
 	});
-
-	function goHome() {
-		navigate('/');
-	}
-
-	function onCommitted(_mintedId: string) {
-		navigate('/');
-	}
 </script>
 
 <div class="mx-auto max-w-3xl space-y-4" data-testid="task-route">
@@ -89,9 +140,9 @@
 			type="button"
 			class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
 			data-testid="task-back-home"
-			onclick={goHome}
+			onclick={goExit}
 		>
-			Home
+			{provisional ? 'Home' : 'Overview'}
 		</button>
 	</header>
 
@@ -101,7 +152,9 @@
 		</p>
 	{/if}
 
-	{#if loading}
+	{#if redirected}
+		<p class="text-sm text-zinc-500" data-testid="task-redirecting">Redirecting…</p>
+	{:else if loading}
 		<p class="text-sm text-zinc-500" data-testid="task-load-status">Loading…</p>
 	{:else if error}
 		<p class="text-sm text-red-700" data-testid="task-load-error" role="alert">
@@ -119,7 +172,7 @@
 			type="button"
 			class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
 			data-testid="task-annulla"
-			onclick={goHome}
+			onclick={goExit}
 		>
 			Annulla
 		</button>

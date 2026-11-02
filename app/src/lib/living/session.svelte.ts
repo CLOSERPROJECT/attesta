@@ -1,4 +1,9 @@
-import type { CommitDomainPort, CommitRequest, HttpLinkItem } from './commit-port.js';
+import type {
+	CommitDomainPort,
+	CommitOutcome,
+	CommitRequest,
+	HttpLinkItem
+} from './commit-port.js';
 import { createHttpCommitDomainPort } from './http-commit-port.js';
 import { draftKey } from './drafts.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
@@ -108,9 +113,9 @@ export class LivingSession {
 	/**
 	 * Commit sealed value. On success: replace Worklist + Task form bundles
 	 * from response, clear Draft keyed by the request id (provisional '' → `_new`),
-	 * return response jobInstanceId. On failure: keep Draft, re-Load, surface error.
+	 * return outcome for post-Commit routing. On failure: keep Draft, re-Load, surface error.
 	 */
-	commit = async (req: CommitRequest): Promise<string | null> => {
+	commit = async (req: CommitRequest): Promise<CommitOutcome | null> => {
 		this.committing = true;
 		this.commitError = null;
 		try {
@@ -137,7 +142,11 @@ export class LivingSession {
 			this.lastHttpLinks = committed.links ?? [];
 			this.lastHttpErrors = committed.httpErrors ?? [];
 			this.clearDraft(req.taskPath, req.jobInstanceId);
-			return committed.jobInstanceId;
+			return {
+				jobInstanceId: committed.jobInstanceId,
+				worklist: committed.worklist,
+				nextTaskFormBundle: committed.nextTaskFormBundle ?? null
+			};
 		} catch (err) {
 			this.commitError = err instanceof Error ? err.message : String(err);
 			this.lastHttpLinks = [];

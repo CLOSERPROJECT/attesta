@@ -33,14 +33,21 @@ export type CommitResult = {
 	 */
 	nextTaskFormBundle?: TaskFormBundle | null;
 	/**
-	 * Interim bulk Available + provisional mounts (pre-04 JobPanel).
-	 * Navigation should prefer nextTaskFormBundle + GET /api/living/task-form.
+	 * Interim bulk Available mounts (pre-05). Prefer nextTaskFormBundle +
+	 * addressed GET /api/living/task-form for post-Commit routing.
 	 */
 	taskFormBundles: TaskFormBundle[];
 	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
 	links?: HttpLinkItem[];
 	/** HttpPort failures; Domain remains committed server-side. */
 	httpErrors?: string[];
+};
+
+/** SPA-facing Commit success for post-Commit routing (ticket 05). */
+export type CommitOutcome = {
+	jobInstanceId: string;
+	worklist: Worklist;
+	nextTaskFormBundle: TaskFormBundle | null;
 };
 
 export type CommitDomainPort = {
