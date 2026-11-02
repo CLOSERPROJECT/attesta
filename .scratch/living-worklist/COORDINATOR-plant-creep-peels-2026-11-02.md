@@ -26,4 +26,4 @@
 
 ## Frontier
 
-**08 done** (squashed into `feat/attesta-rework`). Current: **09** ready. 10–11 blocked.
+**08–09 done** (squashed into `feat/attesta-rework`). Current: **10** ready. 11 blocked.
