@@ -7,6 +7,7 @@
 		availableRowKey,
 		availableRowsFromWorklist,
 		canStartRowsFromWorklist,
+		progressFraction,
 		taskRouteInstanceSegment
 	} from './worklist-home.js';
 
@@ -16,6 +17,9 @@
 
 	const available = $derived(availableRowsFromWorklist(living.result?.worklist));
 	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
+
+	const PROGRESS_RING_R = 10;
+	const PROGRESS_RING_C = 2 * Math.PI * PROGRESS_RING_R;
 </script>
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="living-shell">
@@ -65,6 +69,8 @@
 			<h2 class="text-lg font-semibold text-zinc-900">Available</h2>
 			<ul class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
 				{#each available as row (availableRowKey(row))}
+					{@const ringFrac = progressFraction(row.tasksDone, row.tasksTotal)}
+					{@const ringOffset = PROGRESS_RING_C * (1 - ringFrac)}
 					<li>
 						<a
 							class="block px-4 py-3 hover:bg-zinc-50"
@@ -80,10 +86,58 @@
 								}
 							})}
 						>
-							<p class="text-sm font-medium text-zinc-900">{row.title}</p>
-							<p class="mt-0.5 font-mono text-xs text-zinc-500">
-								{row.jobId} / {row.instanceLabel} / {row.taskId}
-							</p>
+							<div class="flex items-start justify-between gap-3">
+								<p class="min-w-0 text-sm font-bold text-zinc-900">
+									{row.instanceLabel}
+								</p>
+								<span
+									class="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"
+									role="img"
+									aria-label="Available"
+									data-testid="available-ready-dot"
+								></span>
+							</div>
+							<div class="mt-1 flex items-center justify-between gap-3">
+								<p class="min-w-0 text-sm text-zinc-600">{row.title}</p>
+								<span
+									class="inline-flex shrink-0 items-center gap-1.5"
+									role="img"
+									aria-label="{row.tasksDone} of {row.tasksTotal} tasks done"
+									data-testid="available-progress"
+									data-done={row.tasksDone}
+									data-total={row.tasksTotal}
+								>
+									<svg
+										class="size-6 -rotate-90 text-zinc-200"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<circle
+											cx="12"
+											cy="12"
+											r={PROGRESS_RING_R}
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2.5"
+										/>
+										<circle
+											class="text-zinc-700"
+											cx="12"
+											cy="12"
+											r={PROGRESS_RING_R}
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-dasharray={PROGRESS_RING_C}
+											stroke-dashoffset={ringOffset}
+										/>
+									</svg>
+									<span class="tabular-nums text-xs text-zinc-500">
+										{row.tasksDone}/{row.tasksTotal}
+									</span>
+								</span>
+							</div>
 						</a>
 					</li>
 				{:else}

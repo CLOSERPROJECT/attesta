@@ -1,12 +1,15 @@
-import type { Worklist, WorklistJob, WorklistTask } from './types.js';
+import type { Worklist, WorklistInstance, WorklistJob, WorklistTask } from './types.js';
 
 export type AvailableRow = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
+	/** Job instance label (product-facing name); falls back to instance id. */
 	instanceLabel: string;
 	title: string;
 	roles: string[];
+	tasksDone: number;
+	tasksTotal: number;
 };
 
 export type CanStartRow = {
@@ -19,6 +22,30 @@ function taskChrome(job: WorklistJob, taskId: string): WorklistTask | null {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
 }
 
+function jobConfigTaskIds(job: WorklistJob): string[] {
+	if (job.taskIds?.length) return job.taskIds;
+	return (job.tasks ?? []).map((t) => t.id);
+}
+
+/** done/total Task counts for one Job instance (Config taskIds order). */
+export function instanceTaskProgress(
+	job: WorklistJob,
+	inst: WorklistInstance
+): { done: number; total: number } {
+	const ids = jobConfigTaskIds(job);
+	let done = 0;
+	for (const taskId of ids) {
+		if (inst.tasks[taskId] === 'done') done += 1;
+	}
+	return { done, total: ids.length };
+}
+
+/** Fraction for ring stroke; 0 when total is 0. */
+export function progressFraction(done: number, total: number): number {
+	if (total <= 0) return 0;
+	return Math.min(1, Math.max(0, done / total));
+}
+
 /** Sort: Job → instance → Task (Worklist / Org Config order). Reads projected viewerAvailable. */
 export function availableRowsFromWorklist(
 	worklist: Worklist | null | undefined
@@ -28,6 +55,7 @@ export function availableRowsFromWorklist(
 	const out: AvailableRow[] = [];
 	for (const job of jobs) {
 		for (const inst of job.instances ?? []) {
+			const { done, total } = instanceTaskProgress(job, inst);
 			for (const taskId of inst.viewerAvailable ?? []) {
 				const chrome = taskChrome(job, taskId);
 				out.push({
@@ -36,7 +64,9 @@ export function availableRowsFromWorklist(
 					taskId,
 					instanceLabel: inst.label || inst.id,
 					title: chrome?.title || taskId,
-					roles: chrome?.roles ?? []
+					roles: chrome?.roles ?? [],
+					tasksDone: done,
+					tasksTotal: total
 				});
 			}
 		}
