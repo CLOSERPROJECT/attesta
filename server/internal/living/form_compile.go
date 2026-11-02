@@ -337,9 +337,9 @@ func defaultPlaceholderText(fieldKey string, schema map[string]any) string {
 		label = fieldKey
 	}
 	if _, hasEnum := schema["enum"]; hasEnum {
-		return fmt.Sprintf("Seleziona %s…", label)
+		return fmt.Sprintf("Select %s…", label)
 	}
-	return fmt.Sprintf("Inserisci %s…", label)
+	return fmt.Sprintf("Enter %s…", label)
 }
 
 func compileDerivedRules(payload map[string]any, leftoverIDs []string) map[string]DerivedRule {

@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func feragameWeighRowSchema() map[string]any {
+	return map[string]any{
+		"type":     "object",
+		"required": []any{"weight"},
+		"properties": map[string]any{
+			"weight":     map[string]any{"type": "number", "exclusiveMinimum": 0},
+			"tareKind":   map[string]any{"type": "string", "enum": []any{"euro", "industrial", "custom"}},
+			"idoneita":   map[string]any{"type": "string", "enum": []any{"NIR", "IR"}},
+			"panelCount": map[string]any{"type": "number"},
+		},
+	}
+}
+
 func TestPalletWeightLeftoverIDsSkipsWeighted(t *testing.T) {
 	domain := EmptyDomain()
 	domain.Pallet = EntityMap{
@@ -19,34 +32,35 @@ func TestPalletWeightLeftoverIDsSkipsWeighted(t *testing.T) {
 }
 
 func TestEnforceAllCompletenessPartial(t *testing.T) {
-	facts := map[string]WeighRowFact{
-		"a": {Weight: 1, TareKind: "euro", Idoneita: "NIR", PanelCount: 1},
-	}
-	msg := enforceAllCompleteness(facts, []string{"a", "b"})
+	facts := map[string]any{"a": map[string]any{"weight": 1.0}}
+	msg := enforceAllCompletenessKeys(facts, []string{"a", "b"})
 	if msg == "" || !strings.Contains(msg, "b") {
 		t.Fatalf("msg = %q", msg)
 	}
-	if enforceAllCompleteness(facts, []string{"a"}) != "" {
+	if enforceAllCompletenessKeys(facts, []string{"a"}) != "" {
 		t.Fatal("complete map must pass")
 	}
 }
 
-func TestFilterFilledObjectWeightsRequiresRowFields(t *testing.T) {
-	_, err := filterFilledObjectWeights(map[string]any{
-		"p1": map[string]any{"weight": 11.0, "tareKind": "euro", "panelCount": 1.0},
-	})
-	if err == nil || !strings.Contains(err.Error(), "idoneita") {
-		t.Fatalf("err = %v", err)
-	}
-	filled, err := filterFilledObjectWeights(map[string]any{
+func TestFilterFilledObjectRowsUsesSchema(t *testing.T) {
+	schema := feragameWeighRowSchema()
+	filled, err := filterFilledObjectRows(map[string]any{
 		"p1": map[string]any{"weight": 11.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0},
 		"p2": map[string]any{},
-	})
+		"p3": map[string]any{"tareKind": "euro"}, // required weight missing → untouched
+	}, schema)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(filled) != 1 {
 		t.Fatalf("filled = %#v", filled)
+	}
+
+	_, err = filterFilledObjectRows(map[string]any{
+		"p1": map[string]any{"weight": 11.0, "idoneita": "ZZ"},
+	}, schema)
+	if err == nil || !strings.Contains(err.Error(), "idoneita") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -82,9 +96,15 @@ func TestAdditionalPropertiesIsProgressAllowsNullAnyOf(t *testing.T) {
 }
 
 func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
+	schema := map[string]any{
+		"anyOf": []any{
+			map[string]any{"type": "null"},
+			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
+		},
+	}
 	filled, err := filterFilledProgress(map[string]any{
 		"a": "done", "b": "partial", "c": "", "d": nil,
-	})
+	}, schema)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +117,7 @@ func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
 	if validateProgressFacts(filled, []string{"a", "b", "d"}) != "" {
 		t.Fatal("valid batch must pass")
 	}
-	_, err = filterFilledProgress(map[string]any{"a": false})
+	_, err = filterFilledProgress(map[string]any{"a": false}, schema)
 	if err == nil || !strings.Contains(err.Error(), "invalid progress") {
 		t.Fatalf("err = %v", err)
 	}

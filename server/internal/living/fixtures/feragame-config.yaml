@@ -367,7 +367,7 @@ steps:
                 properties:
                     progress:
                         type: object
-                        # "—" clear writes null; server filterFilledProgress drops it.
+                        # "—" clear writes null; server filterFilledProgress keeps null (clear), omits "".
                         additionalProperties:
                             anyOf:
                                 - type: 'null'

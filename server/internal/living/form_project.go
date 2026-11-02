@@ -244,35 +244,6 @@ func paintAuthoredFieldMarkers(uiNode map[string]any) map[string]any {
 	return next
 }
 
-func isLeftoverTablePayload(task map[string]any) bool {
-	primary, _, ok := primaryDynamicProperty(task)
-	if !ok {
-		return false
-	}
-	return uiFieldFor(task, primary) == "leftoverTable"
-}
-
-func isMapTablePayload(task map[string]any) bool {
-	primary, _, ok := primaryDynamicProperty(task)
-	if !ok {
-		return false
-	}
-	return uiFieldFor(task, primary) == "mapTable"
-}
-
-func uiFieldFor(task map[string]any, property string) string {
-	ui, _ := task["uiSchema"].(map[string]any)
-	if ui == nil {
-		return ""
-	}
-	prop, _ := ui[property].(map[string]any)
-	if prop == nil {
-		return ""
-	}
-	field, _ := prop["ui:field"].(string)
-	return field
-}
-
 func sortedStringKeys(m map[string]any) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

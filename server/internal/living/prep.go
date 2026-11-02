@@ -15,8 +15,8 @@ func prepTaskSubmission(task map[string]any, value map[string]any, leftoverIDs [
 	if needsLeftoverProjection(task) {
 		return prepLeftoverFacts(task, value, leftoverIDs)
 	}
-	if isContainerRegTask(task) {
-		facts, err := flattenContainerRegFacts(value)
+	if materials, ok := containerRegMaterials(task); ok {
+		facts, err := flattenContainerRegFacts(value, materials)
 		if err != nil {
 			return prepResult{}, err
 		}
@@ -48,12 +48,11 @@ func prepLeftoverFacts(task map[string]any, value map[string]any, leftoverIDs []
 	}
 
 	mapValue := leftoverMapValue(task, value, primary)
-	valueType := leftoverValueType(task, primary)
+	addSchema := additionalPropertiesSchema(task, primary)
 
 	var facts map[string]any
-	switch valueType {
-	case "progress":
-		filled, err := filterFilledProgress(mapValue)
+	if additionalPropertiesIsProgress(addSchema) {
+		filled, err := filterFilledProgress(mapValue, addSchema)
 		if err != nil {
 			return prepResult{}, err
 		}
@@ -61,15 +60,15 @@ func prepLeftoverFacts(task map[string]any, value map[string]any, leftoverIDs []
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
 		facts = filled
-	default:
-		filled, err := filterFilledObjectWeights(mapValue)
+	} else {
+		filled, err := filterFilledObjectRows(mapValue, addSchema)
 		if err != nil {
 			return prepResult{}, err
 		}
-		if msg := validateWeighFacts(filled, leftoverIDs); msg != "" {
+		if msg := validateObjectRowFacts(filled, leftoverIDs, addSchema); msg != "" {
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
-		facts = weighFactsAsMap(filled)
+		facts = filled
 	}
 
 	if completeness == "all" {
@@ -91,28 +90,11 @@ func leftoverMapValue(task map[string]any, value map[string]any, primary string)
 	return nested
 }
 
-func leftoverValueType(task map[string]any, primary string) string {
-	schema, _ := task["schema"].(map[string]any)
-	props, _ := schema["properties"].(map[string]any)
-	if props == nil {
-		return "weight"
-	}
-	prop, _ := props[primary].(map[string]any)
-	if prop == nil {
-		return "weight"
-	}
-	add, _ := prop["additionalProperties"].(map[string]any)
-	if add == nil {
-		return "weight"
-	}
-	if additionalPropertiesIsProgress(add) {
-		return "progress"
-	}
-	return "weight"
-}
-
 // Progress cells are string enums; clear wire may allow null via anyOf / type union.
 func additionalPropertiesIsProgress(add map[string]any) bool {
+	if add == nil {
+		return false
+	}
 	if schemaTypeIncludesString(add["type"]) {
 		return true
 	}
@@ -171,23 +153,6 @@ func joinComma(ids []string) string {
 		out += id
 	}
 	return out
-}
-
-func isContainerRegTask(task map[string]any) bool {
-	schema, _ := task["schema"].(map[string]any)
-	props, _ := schema["properties"].(map[string]any)
-	if props == nil {
-		return false
-	}
-	if _, ok := props["sourceLoadId"]; !ok {
-		return false
-	}
-	for _, mat := range containerRegMaterials {
-		if _, ok := props[mat.Key]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func taskOnSubmitTransform(task map[string]any) (any, bool) {

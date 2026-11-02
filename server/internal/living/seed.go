@@ -11,8 +11,9 @@ type SeedOptions struct {
 	WipeDomain bool
 }
 
-// SeedDemo puts the Feragame Org Config as the Active Config version and,
+// SeedDemo puts the demo Feragame Org Config as the Active Config version and,
 // when WipeDomain is set, replaces the org Domain with EmptyDomain.
+// Demo/fixture only — product hosts must not require this plant seed path.
 // There is no harness /api/runs snapshot PUT — reset is this re-seed path.
 func SeedDemo(ctx context.Context, domains DomainStore, configs ConfigStore, opts SeedOptions) (OrgConfig, error) {
 	if configs == nil {

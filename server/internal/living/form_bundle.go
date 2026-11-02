@@ -161,14 +161,16 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 
 	derived := compileDerivedRules(payload, projected.LeftoverIDs)
 	surface := "live"
-	if isLeftoverTablePayload(payload) {
-		surface = "leftover-table"
+	if primary, _, ok := primaryDynamicProperty(payload); ok {
+		if additionalPropertiesIsProgress(additionalPropertiesSchema(payload, primary)) {
+			surface = "leftover-table"
+		}
 	}
 
 	sealFieldIDs := sortedKeys(sealIDs)
 	title := taskTitle(payload, ref.TaskID)
 	projectionKey := ""
-	if isMapTablePayload(payload) && len(projected.LeftoverIDs) > 0 {
+	if len(projected.LeftoverIDs) > 0 {
 		projectionKey = leftoversIdentity(projected.LeftoverIDs)
 	}
 
@@ -266,12 +268,12 @@ func buildFormBindings(domain Domain, payload map[string]any, ref AvailableTaskR
 	for i, s := range domain.Submissions {
 		subs[i] = deepCloneJSON(s)
 	}
-	domainBag := map[string]any{
-		"load":        entityMapToAny(domain.Load),
-		"pallet":      entityMapToAny(domain.Pallet),
-		"container":   entityMapToAny(domain.Container),
-		"submissions": subs,
+	maps := domain.EntityMaps()
+	domainBag := make(map[string]any, len(maps)+2)
+	for kind, m := range maps {
+		domainBag[kind] = entityMapToAny(m)
 	}
+	domainBag["submissions"] = subs
 	if tare, ok := payload["tareKinds"]; ok {
 		domainBag["tareKinds"] = deepCloneJSON(tare)
 	}
@@ -292,15 +294,18 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 	if !ok || len(projected.LeftoverIDs) == 0 {
 		return out
 	}
-	if isLeftoverTablePayload(payload) {
+	add := additionalPropertiesSchema(payload, primary)
+	if additionalPropertiesIsProgress(add) {
+		enums := progressEnumsFromSchema(add)
 		progress := map[string]any{}
+		entities := leftoverEntityMap(domain, payload)
 		for _, id := range projected.LeftoverIDs {
-			facts, hit := domain.Pallet[id]
+			facts, hit := entities[id]
 			if !hit {
 				continue
 			}
 			p, _ := facts["progress"].(string)
-			if p == "partial" || p == "done" {
+			if stringInList(p, enums) {
 				progress[id] = p
 			}
 		}
@@ -309,21 +314,90 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 		}
 		return out
 	}
-	if isMapTablePayload(payload) {
+	if schemaTypeIs(add["type"], "object") {
 		rows := map[string]any{}
+		template := seedRowFromSchema(add)
 		for _, id := range projected.LeftoverIDs {
-			rows[id] = map[string]any{
-				"weight":     "",
-				"tareKind":   "euro",
-				"idoneita":   "NIR",
-				"panelCount": 0,
-			}
+			rows[id] = cloneMapJSON(template)
 		}
 		out[primary] = rows
-		out["tareKind"] = "euro"
+		seedFormDefaultsFromSchema(out, payload)
 		return out
 	}
 	return out
+}
+
+func leftoverEntityMap(domain Domain, payload map[string]any) EntityMap {
+	read, _, ok, err := leftoverReadFromTask(payload)
+	if err != nil || !ok {
+		return EntityMap{}
+	}
+	m, err := listEntities(domain, read.Entity)
+	if err != nil || m == nil {
+		return EntityMap{}
+	}
+	return m
+}
+
+// seedRowFromSchema densifies optional defaults/enums only — never invents "" for numbers.
+func seedRowFromSchema(rowSchema map[string]any) map[string]any {
+	props, _ := rowSchema["properties"].(map[string]any)
+	if props == nil {
+		return map[string]any{}
+	}
+	required := make(map[string]struct{})
+	for _, key := range schemaStringList(rowSchema["required"]) {
+		required[key] = struct{}{}
+	}
+	out := map[string]any{}
+	for key, raw := range props {
+		if _, need := required[key]; need {
+			continue
+		}
+		prop, _ := raw.(map[string]any)
+		if prop == nil {
+			continue
+		}
+		if def, ok := prop["default"]; ok {
+			out[key] = def
+			continue
+		}
+		if enums := schemaStringEnum(prop); len(enums) > 0 {
+			out[key] = enums[0]
+		}
+	}
+	return out
+}
+
+func seedFormDefaultsFromSchema(out map[string]any, payload map[string]any) {
+	schema, _ := payload["schema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	if props == nil {
+		return
+	}
+	required := make(map[string]struct{})
+	for _, key := range schemaStringList(schema["required"]) {
+		required[key] = struct{}{}
+	}
+	for key, raw := range props {
+		if _, exists := out[key]; exists {
+			continue
+		}
+		prop, _ := raw.(map[string]any)
+		if prop == nil || schemaTypeIs(prop["type"], "object") || schemaTypeIs(prop["type"], "array") {
+			continue
+		}
+		if def, ok := prop["default"]; ok {
+			out[key] = def
+			continue
+		}
+		if _, need := required[key]; !need {
+			continue
+		}
+		if enums := schemaStringEnum(prop); len(enums) > 0 {
+			out[key] = enums[0]
+		}
+	}
 }
 
 func leftoversIdentity(ids []string) string {

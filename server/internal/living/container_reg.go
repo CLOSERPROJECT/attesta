@@ -5,19 +5,9 @@ import (
 	"strings"
 )
 
-// Fixed plant materials for containerReg — schema keys + human labels as entity facts.
-var containerRegMaterials = []struct {
+type materialProp struct {
 	Key   string
 	Label string
-}{
-	{Key: "polvereDiVetro", Label: "Polvere di vetro"},
-	{Key: "granellaDiVetro", Label: "Granella di vetro"},
-	{Key: "granellaDiVetro2", Label: "Granella di vetro 2"},
-	{Key: "polvereDiSilicio", Label: "Polvere di silicio"},
-	{Key: "plastica", Label: "Plastica"},
-	{Key: "alluminio", Label: "Alluminio"},
-	{Key: "sopravaglio", Label: "Sopravaglio"},
-	{Key: "polvereDiAspirazione", Label: "Polvere di aspirazione"},
 }
 
 type containerRegRow struct {
@@ -31,8 +21,100 @@ type containerRegFacts struct {
 	Rows         []containerRegRow
 }
 
+// containerRegMaterials discovers weight-row array properties from schema.
+// Requires sourceLoadId so unrelated array forms do not flatten. Labels = titles.
+// Order follows authored uiSchema ui:options.order when present.
+func containerRegMaterials(task map[string]any) ([]materialProp, bool) {
+	schema, _ := task["schema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	if props == nil {
+		return nil, false
+	}
+	if _, ok := props["sourceLoadId"]; !ok {
+		return nil, false
+	}
+	byKey := make(map[string]materialProp)
+	for key, raw := range props {
+		if key == "sourceLoadId" || key == "secondarySourceLoadId" {
+			continue
+		}
+		prop, _ := raw.(map[string]any)
+		if prop == nil {
+			continue
+		}
+		if !schemaTypeIs(prop["type"], "array") {
+			continue
+		}
+		items, _ := prop["items"].(map[string]any)
+		if items == nil {
+			continue
+		}
+		itemProps, _ := items["properties"].(map[string]any)
+		if itemProps == nil {
+			continue
+		}
+		if _, ok := itemProps["weight"]; !ok {
+			continue
+		}
+		label, _ := prop["title"].(string)
+		label = strings.TrimSpace(label)
+		if label == "" {
+			label = key
+		}
+		byKey[key] = materialProp{Key: key, Label: label}
+	}
+	if len(byKey) == 0 {
+		return nil, false
+	}
+	out := make([]materialProp, 0, len(byKey))
+	seen := make(map[string]struct{}, len(byKey))
+	for _, key := range uiSchemaPropertyOrder(task) {
+		mat, ok := byKey[key]
+		if !ok {
+			continue
+		}
+		out = append(out, mat)
+		seen[key] = struct{}{}
+	}
+	for _, key := range sortedStringKeys(props) {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		if mat, ok := byKey[key]; ok {
+			out = append(out, mat)
+		}
+	}
+	return out, true
+}
+
+func uiSchemaPropertyOrder(task map[string]any) []string {
+	ui, _ := task["uiSchema"].(map[string]any)
+	if ui == nil {
+		return nil
+	}
+	opts, _ := ui["ui:options"].(map[string]any)
+	if opts == nil {
+		return nil
+	}
+	return schemaStringList(opts["order"])
+}
+
+func schemaTypeIs(raw any, want string) bool {
+	switch t := raw.(type) {
+	case string:
+		return t == want
+	case []any:
+		for _, item := range t {
+			if s, ok := item.(string); ok && s == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Flatten keyed material arrays → mintMany rows (experiment flattenContainerRegFacts).
-func flattenContainerRegFacts(value map[string]any) (containerRegFacts, error) {
+func flattenContainerRegFacts(value map[string]any, materials []materialProp) (containerRegFacts, error) {
 	sourceRaw, _ := value["sourceLoadId"].(string)
 	sourceLoadID := strings.TrimSpace(sourceRaw)
 	if sourceLoadID == "" {
@@ -43,7 +125,7 @@ func flattenContainerRegFacts(value map[string]any) (containerRegFacts, error) {
 	formSecondary := strings.TrimSpace(secondaryRaw)
 
 	rows := make([]containerRegRow, 0)
-	for _, mat := range containerRegMaterials {
+	for _, mat := range materials {
 		arrRaw, exists := value[mat.Key]
 		if !exists || arrRaw == nil {
 			continue
@@ -58,7 +140,7 @@ func flattenContainerRegFacts(value map[string]any) (containerRegFacts, error) {
 				return containerRegFacts{}, fmt.Errorf("invalid row in %s", mat.Label)
 			}
 			weightRaw, hasWeight := row["weight"]
-			if !hasWeight || isEmptyWeightCell(weightRaw) {
+			if !hasWeight || isEmptyScalar(weightRaw) {
 				continue
 			}
 			weight, ok := floatFromAny(weightRaw)

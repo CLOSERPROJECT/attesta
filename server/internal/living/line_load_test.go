@@ -219,7 +219,8 @@ func TestCommitLineLoadRejectsEmptyBatch(t *testing.T) {
 
 func TestFixtureLineLoadAdditionalPropertiesIsProgress(t *testing.T) {
 	task := map[string]any(lineLoadTask(lineJob(t)))
-	if got := leftoverValueType(task, "progress"); got != "progress" {
-		t.Fatalf("leftoverValueType = %q (null|enum anyOf must still classify as progress)", got)
+	add := additionalPropertiesSchema(task, "progress")
+	if !additionalPropertiesIsProgress(add) {
+		t.Fatalf("additionalPropertiesIsProgress = false (null|enum anyOf must still classify as progress); schema=%#v", add)
 	}
 }

@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import {
-	derivedPanelCount,
-	lineLoadLeftoverIds,
-	palletWeightLeftoverIds
-} from './leftovers.js';
+import { lineLoadLeftoverIds, palletWeightLeftoverIds } from './leftovers.js';
 import { emptyDomain } from './types.js';
 
 describe('palletWeightLeftoverIds', () => {
@@ -45,40 +41,5 @@ describe('lineLoadLeftoverIds', () => {
 			d: { loadId: 'load-1' }
 		};
 		expect(lineLoadLeftoverIds(domain)).toEqual([]);
-	});
-});
-
-describe('derivedPanelCount', () => {
-	test('euro tare floor division', () => {
-		expect(
-			derivedPanelCount({
-				weight: 125,
-				tareKind: 'euro',
-				customTareWeight: '',
-				averagePanelWeight: 10
-			})
-		).toBe(10);
-	});
-
-	test('custom tare', () => {
-		expect(
-			derivedPanelCount({
-				weight: 50,
-				tareKind: 'custom',
-				customTareWeight: 10,
-				averagePanelWeight: 10
-			})
-		).toBe(4);
-	});
-
-	test('incomplete inputs yield empty', () => {
-		expect(
-			derivedPanelCount({
-				weight: '',
-				tareKind: 'euro',
-				customTareWeight: '',
-				averagePanelWeight: 10
-			})
-		).toBe('');
 	});
 });

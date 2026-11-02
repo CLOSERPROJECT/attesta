@@ -837,47 +837,52 @@ func TestSubmitHTTPParseAndEvalErrors(t *testing.T) {
 }
 
 func TestWeighFilterAndValidateEdges(t *testing.T) {
-	_, err := filterFilledObjectWeights(map[string]any{"a": "not-empty"})
+	schema := feragameWeighRowSchema()
+	_, err := filterFilledObjectRows(map[string]any{"a": "not-empty"}, schema)
 	if err == nil {
 		t.Fatal("invalid cell type")
 	}
-	_, err = filterFilledObjectWeights(map[string]any{"a": map[string]any{"weight": "x", "panelCount": 1, "tareKind": "t", "idoneita": "NIR"}})
+	_, err = filterFilledObjectRows(map[string]any{"a": map[string]any{"weight": "x", "panelCount": 1, "tareKind": "euro", "idoneita": "NIR"}}, schema)
 	if err == nil {
 		t.Fatal("bad weight")
 	}
-	_, err = filterFilledObjectWeights(map[string]any{"a": map[string]any{"weight": 1, "panelCount": "x", "tareKind": "t", "idoneita": "NIR"}})
+	_, err = filterFilledObjectRows(map[string]any{"a": map[string]any{"weight": 1, "panelCount": "x", "tareKind": "euro", "idoneita": "NIR"}}, schema)
 	if err == nil {
 		t.Fatal("bad panel")
 	}
-	_, err = filterFilledObjectWeights(map[string]any{"a": map[string]any{"weight": 1, "panelCount": 1, "tareKind": "", "idoneita": "NIR"}})
+	_, err = filterFilledObjectRows(map[string]any{"a": map[string]any{"weight": 1, "panelCount": 1, "tareKind": "t", "idoneita": "NIR"}}, schema)
 	if err == nil {
-		t.Fatal("bad tare")
+		t.Fatal("bad tare enum")
 	}
-	_, err = filterFilledObjectWeights(map[string]any{"a": map[string]any{"weight": 1, "panelCount": 1, "tareKind": "t", "idoneita": "ZZ"}})
+	_, err = filterFilledObjectRows(map[string]any{"a": map[string]any{"weight": 1, "panelCount": 1, "tareKind": "euro", "idoneita": "ZZ"}}, schema)
 	if err == nil {
 		t.Fatal("bad idoneita")
 	}
-	filled, err := filterFilledObjectWeights(map[string]any{
-		"skip": nil,
+	filled, err := filterFilledObjectRows(map[string]any{
+		"skip":  nil,
 		"empty": "",
-		"ok":    map[string]any{"weight": 2, "panelCount": 1, "tareKind": "wood", "idoneita": "IR"},
+		"ok":    map[string]any{"weight": 2, "panelCount": 1, "tareKind": "euro", "idoneita": "IR"},
 		"blank": map[string]any{},
-	})
-	if err != nil || len(filled) != 1 || filled["ok"].Weight != 2 {
+	}, schema)
+	if err != nil || len(filled) != 1 {
 		t.Fatalf("filled = %#v err=%v", filled, err)
 	}
-	if msg := validateWeighFacts(nil, []string{"ok"}); msg == "" {
+	row, _ := filled["ok"].(map[string]any)
+	if row["weight"] != 2.0 {
+		t.Fatalf("filled = %#v", filled)
+	}
+	if msg := validateObjectRowFacts(nil, []string{"ok"}, schema); msg == "" {
 		t.Fatal("empty facts")
 	}
-	if msg := validateWeighFacts(filled, []string{"other"}); !strings.Contains(msg, "leftovers") {
+	if msg := validateObjectRowFacts(filled, []string{"other"}, schema); !strings.Contains(msg, "leftovers") {
 		t.Fatalf("not in leftovers = %q", msg)
 	}
-	filled["ok"] = WeighRowFact{Weight: 0, TareKind: "wood", Idoneita: "IR", PanelCount: 1}
-	if msg := validateWeighFacts(filled, []string{"ok"}); !strings.Contains(msg, "> 0") {
+	filled["ok"] = map[string]any{"weight": 0.0, "tareKind": "euro", "idoneita": "IR", "panelCount": 1.0}
+	if msg := validateObjectRowFacts(filled, []string{"ok"}, schema); !strings.Contains(msg, "> 0") {
 		t.Fatalf("weight>0 = %q", msg)
 	}
-	if isEmptyWeightCell("  ") != true || isEmptyWeightCell(1) {
-		t.Fatal("isEmptyWeightCell")
+	if isEmptyScalar("  ") != true || isEmptyScalar(1) {
+		t.Fatal("isEmptyScalar")
 	}
 }
 
@@ -948,7 +953,7 @@ func TestProjectTaskFormErrorPathsAndPlaceholder(t *testing.T) {
 	if fieldHasPlaceholder(map[string]any{}) {
 		t.Fatal("no placeholder")
 	}
-	if defaultPlaceholderText("k", map[string]any{}) != "Inserisci k…" {
+	if defaultPlaceholderText("k", map[string]any{}) != "Enter k…" {
 		t.Fatal("default placeholder key")
 	}
 	painted := paintAuthoredFieldMarkers(map[string]any{
@@ -1119,7 +1124,7 @@ func TestPrepLeftoverAndLoaderEdges(t *testing.T) {
 	if err == nil {
 		t.Fatal("all completeness missing b")
 	}
-	_, err = filterFilledProgress(map[string]any{"a": "nope"})
+	_, err = filterFilledProgress(map[string]any{"a": "nope"}, map[string]any{"type": "string", "enum": []any{"partial", "done"}})
 	if err == nil {
 		t.Fatal("filterFilledProgress")
 	}
@@ -1135,8 +1140,8 @@ func TestPrepLeftoverAndLoaderEdges(t *testing.T) {
 	if len(leftoverMapValue(nil, map[string]any{}, "weights")) != 0 {
 		t.Fatal("missing nested map")
 	}
-	if leftoverValueType(map[string]any{}, "x") != "weight" {
-		t.Fatal("default weight type")
+	if additionalPropertiesSchema(map[string]any{}, "x") != nil {
+		t.Fatal("missing additionalProperties")
 	}
 	if !additionalPropertiesIsProgress(map[string]any{"type": "string"}) {
 		t.Fatal("progress type string")
@@ -1562,12 +1567,6 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	if deepCloneJSON(make(chan int)) != nil {
 		t.Fatal("unmarshalable clone")
 	}
-	if uiFieldFor(nil, "w") != "" || uiFieldFor(map[string]any{"uiSchema": map[string]any{}}, "w") != "" {
-		t.Fatal("uiFieldFor missing")
-	}
-	if uiFieldFor(map[string]any{"uiSchema": map[string]any{"w": map[string]any{"ui:field": "mapTable"}}}, "w") != "mapTable" {
-		t.Fatal("uiFieldFor hit")
-	}
 	if TaskConfig(nil).ID() != "" {
 		t.Fatal("nil task id")
 	}
@@ -1590,7 +1589,7 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	if msg := enforceAllCompletenessKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {
 		t.Fatalf("joinComma via completeness = %q", msg)
 	}
-	if isContainerRegTask(map[string]any{"schema": map[string]any{}}) {
+	if _, ok := containerRegMaterials(map[string]any{"schema": map[string]any{}}); ok {
 		t.Fatal("no props")
 	}
 	if _, ok := taskOnSubmitTransform(map[string]any{}); ok {

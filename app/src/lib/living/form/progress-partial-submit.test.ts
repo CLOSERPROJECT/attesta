@@ -3,7 +3,8 @@
  *
  * leftover-table-field.setProgressCell writes `null` for clear. Authored
  * progress.additionalProperties must allow null | enum so Ajv Draft does not
- * block Invia before onSubmit / Commit. Server filterFilledProgress drops nulls.
+ * block Invia before onSubmit / Commit. Server filterFilledProgress keeps null
+ * (clear) and omits untouched "".
  *
  * Schema fixture mirrors Go TaskFormBundle projection (no client projectFormSchema).
  */
