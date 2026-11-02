@@ -30,6 +30,8 @@ func main() {
 	if _, err := living.SeedDemo(ctx, domains, configs, living.SeedOptions{WipeDomain: true}); err != nil {
 		must(err)
 	}
+	// Smoke builds its own Domain from empty; SeedDemo's staged matrix would collide on line "1st".
+	must(domains.Put(ctx, "feragame", living.EmptyDomain()))
 
 	c := &living.Committer{
 		Domains:    domains,

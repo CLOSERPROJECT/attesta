@@ -14,9 +14,13 @@ import (
 
 // seedLivingDemo puts Feragame Active Config for handler tests. Product boot
 // (ensureLivingStores) no longer seeds — only task seed / tests call SeedDemo.
+// Pre-puts EmptyDomain so SeedDemo (no WipeDomain) does not fill the staged matrix.
 func seedLivingDemo(t *testing.T, server *Server) {
 	t.Helper()
 	server.ensureLivingStores()
+	if err := server.livingDomains.Put(t.Context(), "feragame", living.EmptyDomain()); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := living.SeedDemo(t.Context(), server.livingDomains, server.livingConfigs, living.SeedOptions{}); err != nil {
 		t.Fatal(err)
 	}

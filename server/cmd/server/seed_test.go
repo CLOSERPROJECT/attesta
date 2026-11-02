@@ -82,7 +82,10 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 		t.Fatal("expected org roles on fixture organization")
 	}
 
-	for _, email := range []string{"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com", demoLivingUserEmail} {
+	for _, email := range []string{
+		"admin@attesta.com", "admin@org1.com", "admin@org2.com", "admin@org3.com",
+		demoLivingUserEmail, demoLivingAdminUserEmail, demoLivingLogisticUserEmail, demoLivingLineUserEmail,
+	} {
 		user, err := identity.GetUserByEmail(t.Context(), email)
 		if err != nil {
 			t.Fatalf("user %s: %v", email, err)
@@ -111,8 +114,9 @@ func TestSeedAppliesIdentityWhenEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("living memberships: %v", err)
 	}
-	if len(livingMemberships) < 2 {
-		t.Fatalf("living memberships = %d, want platform admin + living all-roles", len(livingMemberships))
+	// platform admin + living all-roles + administration / logistic / line
+	if len(livingMemberships) < 5 {
+		t.Fatalf("living memberships = %d, want platform admin + 4 living operators", len(livingMemberships))
 	}
 }
 
@@ -145,11 +149,14 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := got.Kind("load")[living.DemoIntakeInstanceID]; !ok {
-		t.Fatalf("demo intake missing after replace: %#v", got.Kind("load"))
+	if _, ok := got.Kind("load")["L1"]; ok {
+		t.Fatal("pre-replace L1 must not survive staged rebuild")
 	}
-	if _, hadPrior := got.Kind("load")["L1"]; hadPrior {
-		t.Fatalf("prior load L1 survived replace: %#v", got.Kind("load"))
+	if _, ok := got.Kind("load")[living.SeedIntakeWeightCheckID]; !ok {
+		t.Fatalf("staged Domain missing weightCheck intake: %#v", got.Kind("load"))
+	}
+	if len(got.Submissions) == 0 || len(got.JobInstances) == 0 {
+		t.Fatalf("staged Domain empty after replace: submissions=%d instances=%d", len(got.Submissions), len(got.JobInstances))
 	}
 	version, err := configs.ActiveVersion(t.Context(), "feragame")
 	if err != nil {
