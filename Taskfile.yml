@@ -193,6 +193,11 @@ tasks:
       - task: goa:generate
       - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test $(go list ./... | grep -v "/gen")'
 
+  test:integration:
+    desc: Run backend integration tests (requires Compose Mongo/Cerbos).
+    cmds:
+      - sh -c 'cd server && GOCACHE=${GOCACHE:-/tmp/gocache-attesta} go test -tags=integration $(go list ./... | grep -v "/gen")'
+
   test:worktree:
     desc: Run worktree lifecycle and Compose safety tests.
     cmds:
