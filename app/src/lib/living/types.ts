@@ -8,7 +8,10 @@ export type LoadResult = {
 	activeConfigVersion: string;
 	configId: string;
 	worklist: Worklist;
-	/** Worklist-available + provisional Task form mount payloads (replaced on Commit). */
+	/**
+	 * Interim bulk Available + provisional mounts for pre-04 JobPanel.
+	 * End-state (ADR-0006): omit; hydrate via GET /api/living/task-form.
+	 */
 	taskFormBundles: TaskFormBundle[];
 };
 

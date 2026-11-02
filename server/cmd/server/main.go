@@ -2535,6 +2535,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/api/catalog", s.handlePublicCatalog)
 	livingAPI := s.livingHandler()
 	mux.Handle("/api/living/domain", livingAPI)
+	mux.Handle("/api/living/task-form", livingAPI)
 	mux.Handle("/api/living/commit", livingAPI)
 	mux.Handle("/api/living/artifacts/", livingAPI)
 	mux.HandleFunc("/01/", s.handleDigitalLinkDPP)

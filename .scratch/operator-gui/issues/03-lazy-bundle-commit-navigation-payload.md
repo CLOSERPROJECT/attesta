@@ -4,12 +4,18 @@
 
 **Blocked by:** 01 (Viewer-scoped Worklist chrome)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] An authenticated living API can return one Task form bundle for `jobId` + `taskId` + `jobInstanceId` (provisional start supported)
-- [ ] Bundle endpoint denies or does not mount work the viewer cannot role-complete (aligned with board scope)
-- [ ] Successful Commit response includes viewer-scoped Worklist
-- [ ] When the same operator has a next role-eligible `available` Task on the instance, Commit includes that Task’s form bundle (or unambiguous ref + bundle)
-- [ ] When auto-advance does not apply, Commit still returns Worklist suitable for overview/home routing without inventing Unlock client-side
-- [ ] Tests cover advance vs handoff vs finished-instance payload shapes
-- [ ] Home Load can omit bulk `taskFormBundles` without breaking the new fetch path (old bulk may remain briefly only if still required by pre-04 UI)
+- [x] An authenticated living API can return one Task form bundle for `jobId` + `taskId` + `jobInstanceId` (provisional start supported)
+- [x] Bundle endpoint denies or does not mount work the viewer cannot role-complete (aligned with board scope)
+- [x] Successful Commit response includes viewer-scoped Worklist
+- [x] When the same operator has a next role-eligible `available` Task on the instance, Commit includes that Task’s form bundle (or unambiguous ref + bundle)
+- [x] When auto-advance does not apply, Commit still returns Worklist suitable for overview/home routing without inventing Unlock client-side
+- [x] Tests cover advance vs handoff vs finished-instance payload shapes
+- [x] Home Load can omit bulk `taskFormBundles` without breaking the new fetch path (old bulk may remain briefly only if still required by pre-04 UI)
+
+## Notes for 04
+
+- `GET /api/living/task-form?jobId=&taskId=&jobInstanceId=` (+ `new`/empty provisional) is the on-demand mount path.
+- Commit wire adds `nextTaskFormBundle` (omit when no advance).
+- Load/Commit still ship interim bulk `taskFormBundles` because pre-04 `JobPanel` mounts from that array; drop bulk once Task routes fetch on demand.

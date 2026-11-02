@@ -41,6 +41,11 @@ function parseTaskFormBundles(raw: unknown): TaskFormBundle[] {
 	) as TaskFormBundle[];
 }
 
+function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
+	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	return raw as TaskFormBundle;
+}
+
 /** Normalize Commit JSON so SPA always sees arrays for links / httpErrors / bundles. */
 export function parseCommitResult(raw: unknown): CommitResult {
 	const body = raw as CommitResult;
@@ -56,9 +61,13 @@ export function parseCommitResult(raw: unknown): CommitResult {
 		if (parsed) links.push(parsed);
 	}
 	const httpErrors = errorsRaw.filter((e): e is string => typeof e === 'string');
+	const next = parseOptionalTaskFormBundle(
+		(raw as { nextTaskFormBundle?: unknown })?.nextTaskFormBundle
+	);
 	return {
 		...body,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
+		nextTaskFormBundle: next,
 		taskFormBundles: parseTaskFormBundles(
 			(raw as { taskFormBundles?: unknown })?.taskFormBundles
 		),

@@ -125,7 +125,7 @@ Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Ta
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group
 
 **Load**:
-Hydrate what the operator UI needs for the org: viewer-scoped **Worklist** (and Active Config version metadata) for the home board; not a dump of full Domain + full Org Config. Decided end-state: **Task form bundle**s load when opening a Task route (and may return on Commit for the just-worked / next Task), not as a full available-set on every home Load. Until that lazy-bundle work lands, home Load still ships viewer-filtered bulk bundles for Available Tasks.
+Hydrate what the operator UI needs for the org: viewer-scoped **Worklist** (and Active Config version metadata) for the home board; not a dump of full Domain + full Org Config. Decided end-state: **Task form bundle**s load when opening a Task route via addressed fetch (`GET /api/living/task-form`; provisional `jobInstanceId` empty / `new`) and may return on Commit as `nextTaskFormBundle` when auto-advancing — not as a full available-set on every home Load. Addressed fetch is live; home Load may still ship viewer-filtered bulk bundles until JobPanel (ticket 04) consumes on-demand mounts.
 _Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport; treating today’s bulk Available bundles as the lasting home-Load shape
 
 **Worklist**:
@@ -137,7 +137,7 @@ Operator screen for one Job instance at `/app/{jobId}/{jobInstanceId}`: Task sta
 _Avoid_: Stream timeline; process page; embedding the full instance tree on Worklist home
 
 **Task form bundle**:
-Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load-of-Task and Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Decided end-state: fetched for the Task being opened (provisional `jobInstanceId` empty / `new` when starting). Until lazy bundles, home Load still bulk-ships viewer-filtered bundles for Worklist-`available` Tasks.
+Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load-of-Task and Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Fetched addressed by `jobId` + `taskId` + `jobInstanceId` (provisional empty / `new` when starting); Commit may include the next bundle as `nextTaskFormBundle` when auto-advance applies. Home Load may still bulk-ship viewer-filtered Available bundles until ticket 04 drops JobPanel’s bulk dependency.
 _Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live draft-driven Chrome results as static strings; SPA Domain walk for dataReport or row ids
 
 **AuthPort / AuthorizerPort**:

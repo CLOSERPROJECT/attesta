@@ -117,6 +117,61 @@ func FirstAvailableTask(cfg OrgConfig, wl Worklist, viewerRoles []string) (Avail
 	return refs[0], true
 }
 
+// NormalizeJobInstanceID maps SPA provisional "new" to the empty instance id
+// used by CollectAvailableTaskRefs / BuildTaskFormBundle.
+func NormalizeJobInstanceID(jobInstanceID string) string {
+	id := strings.TrimSpace(jobInstanceID)
+	if id == "new" {
+		return ""
+	}
+	return id
+}
+
+// NextAdvanceTaskRef picks the first Worklist-available Task on jobInstanceID
+// whose Config roles intersect viewerRoles, in authored taskIds order
+// (ADR-0006 auto-advance). Empty jobInstanceID never advances.
+func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string, viewerRoles []string) (AvailableTaskRef, bool) {
+	jobID = strings.TrimSpace(jobID)
+	jobInstanceID = strings.TrimSpace(jobInstanceID)
+	if jobID == "" || jobInstanceID == "" {
+		return AvailableTaskRef{}, false
+	}
+	job, ok := worklistJobByID(wl, jobID)
+	if !ok {
+		return AvailableTaskRef{}, false
+	}
+	inst, ok := worklistInstance(job, jobInstanceID)
+	if !ok {
+		return AvailableTaskRef{}, false
+	}
+	for _, taskID := range job.TaskIDs {
+		if inst.Tasks[taskID] != TaskStatusAvailable {
+			continue
+		}
+		if !ViewerCanActOnTask(job, taskID, viewerRoles) {
+			continue
+		}
+		return AvailableTaskRef{
+			JobID:         jobID,
+			TaskID:        taskID,
+			JobInstanceID: jobInstanceID,
+		}, true
+	}
+	return AvailableTaskRef{}, false
+}
+
+// ViewerMayMountTask reports whether addressed Task form hydrate is in board
+// scope for the viewer (same CollectAvailableTaskRefs law as bulk Load).
+func ViewerMayMountTask(cfg OrgConfig, wl Worklist, ref AvailableTaskRef, viewerRoles []string) bool {
+	ref.JobInstanceID = NormalizeJobInstanceID(ref.JobInstanceID)
+	for _, got := range CollectAvailableTaskRefs(cfg, wl, viewerRoles) {
+		if got.JobID == ref.JobID && got.TaskID == ref.TaskID && got.JobInstanceID == ref.JobInstanceID {
+			return true
+		}
+	}
+	return false
+}
+
 // BuildTaskFormBundle projects schema/ui + chrome/derived rules for one Task.
 // Living code stays generic (no fixture Task id branches).
 func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*TaskFormBundle, error) {

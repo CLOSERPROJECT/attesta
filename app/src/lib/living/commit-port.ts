@@ -27,7 +27,15 @@ export type CommitResult = {
 	jobInstanceId: string;
 	/** Server-projected board after this Commit (same projector as Load). */
 	worklist: Worklist;
-	/** Replaces prior Load/Commit bundle set (available + provisional). */
+	/**
+	 * ADR-0006 auto-advance: next role-eligible available Task on this instance.
+	 * Omitted on handoff / finished instance — Worklist alone drives overview/home.
+	 */
+	nextTaskFormBundle?: TaskFormBundle | null;
+	/**
+	 * Interim bulk Available + provisional mounts (pre-04 JobPanel).
+	 * Navigation should prefer nextTaskFormBundle + GET /api/living/task-form.
+	 */
 	taskFormBundles: TaskFormBundle[];
 	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
 	links?: HttpLinkItem[];

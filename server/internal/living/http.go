@@ -18,7 +18,7 @@ type OperatorIdentity struct {
 // Gate authenticates the caller; on failure it writes the HTTP error and returns ok=false.
 type Gate func(w http.ResponseWriter, r *http.Request) (OperatorIdentity, bool)
 
-// Handler serves Load, Commit, and artifact proxy over HTTP seams.
+// Handler serves Load, addressed Task form bundle, Commit, and artifact proxy over HTTP seams.
 type Handler struct {
 	Loader    *Loader
 	Committer *Committer
@@ -32,6 +32,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case path == "/api/living/domain":
 		h.handleLoad(w, r)
+	case path == "/api/living/task-form":
+		h.handleTaskForm(w, r)
 	case path == "/api/living/commit":
 		h.handleCommit(w, r)
 	case strings.HasPrefix(path, ArtifactProxyPathPrefix):
@@ -80,6 +82,57 @@ func (h *Handler) handleLoad(w http.ResponseWriter, r *http.Request) {
 	if err := enc.Encode(result); err != nil {
 		return
 	}
+}
+
+func (h *Handler) handleTaskForm(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.Gate == nil || h.Loader == nil {
+		http.Error(w, "living task-form not configured", http.StatusInternalServerError)
+		return
+	}
+	op, ok := h.Gate(w, r)
+	if !ok {
+		return
+	}
+	org := strings.TrimSpace(op.Org)
+	if org == "" {
+		http.Error(w, "organization required", http.StatusForbidden)
+		return
+	}
+	q := r.URL.Query()
+	jobID := strings.TrimSpace(q.Get("jobId"))
+	taskID := strings.TrimSpace(q.Get("taskId"))
+	jobInstanceID := q.Get("jobInstanceId")
+	if jobID == "" || taskID == "" {
+		http.Error(w, "jobId and taskId required", http.StatusBadRequest)
+		return
+	}
+
+	bundle, err := h.Loader.LoadTaskBundle(r.Context(), org, op, jobID, taskID, jobInstanceID)
+	if err != nil {
+		if errors.Is(err, ErrTaskBundleForbidden) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "active config not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to load task form", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method == http.MethodHead {
+		return
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(bundle)
 }
 
 func (h *Handler) handleCommit(w http.ResponseWriter, r *http.Request) {

@@ -21,24 +21,6 @@ func mustActiveConfig(t *testing.T, c *Committer) OrgConfig {
 	return cfg
 }
 
-func worklistJobByID(wl Worklist, jobID string) (WorklistJob, bool) {
-	for _, j := range wl.Jobs {
-		if j.JobID == jobID {
-			return j, true
-		}
-	}
-	return WorklistJob{}, false
-}
-
-func worklistInstance(job WorklistJob, id string) (WorklistInstance, bool) {
-	for _, inst := range job.Instances {
-		if inst.ID == id {
-			return inst, true
-		}
-	}
-	return WorklistInstance{}, false
-}
-
 func TestLoaderWorklistEmptyDomainIntakeOpenLineBlocked(t *testing.T) {
 	domains := NewMemoryDomainStore()
 	configs := NewMemoryConfigStore()

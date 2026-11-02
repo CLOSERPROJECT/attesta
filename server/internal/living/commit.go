@@ -40,13 +40,20 @@ func startingNewMint() *CommitMint {
 	return &CommitMint{Kind: MintKindStartingNew}
 }
 
-// CommitResult is the SPA Commit response: Worklist + Task form bundles.
-// Domain stays on the Go value for server tests / callers but is omitted from JSON.
+// CommitResult is the SPA Commit response: viewer-scoped Worklist, optional
+// auto-advance next Task form bundle, and (interim) bulk TaskFormBundles for
+// pre-04 JobPanel. Domain stays on the Go value for tests; omitted from JSON.
 type CommitResult struct {
 	Org             string            `json:"org"`
 	JobInstanceID   string            `json:"jobInstanceId"`
 	Domain          Domain            `json:"-"`
 	Worklist        Worklist          `json:"worklist"`
+	// NextTaskFormBundle is set when another role-eligible available Task
+	// remains on this Job instance (ADR-0006 auto-advance); omitted on handoff
+	// or finished instance.
+	NextTaskFormBundle *TaskFormBundle `json:"nextTaskFormBundle,omitempty"`
+	// TaskFormBundles remains bulk until ticket 04 consumes LoadTaskBundle /
+	// NextTaskFormBundle for mounts; navigation must not rely on bulk alone.
 	TaskFormBundles []*TaskFormBundle `json:"taskFormBundles"`
 	Links           []HttpLinkItem    `json:"links,omitempty"`
 	HttpErrors      []string          `json:"httpErrors,omitempty"`
@@ -194,16 +201,25 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 
 	wl := ProjectWorklist(cfg, applied.Domain, op)
+	// Interim bulk for pre-04 JobPanel (same as Load).
 	bundles, err := ProjectAvailableBundles(cfg, applied.Domain, wl, op.Roles)
 	if err != nil {
 		return CommitResult{}, err
 	}
+	var nextBundle *TaskFormBundle
+	if advance, ok := NextAdvanceTaskRef(wl, ref.JobID, applied.JobInstanceID, op.Roles); ok {
+		nextBundle, err = BuildTaskFormBundle(cfg, applied.Domain, advance)
+		if err != nil {
+			return CommitResult{}, err
+		}
+	}
 	result := CommitResult{
-		Org:             org,
-		JobInstanceID:   applied.JobInstanceID,
-		Domain:          applied.Domain,
-		Worklist:        wl,
-		TaskFormBundles: bundles,
+		Org:                org,
+		JobInstanceID:      applied.JobInstanceID,
+		Domain:             applied.Domain,
+		Worklist:           wl,
+		NextTaskFormBundle: nextBundle,
+		TaskFormBundles:    bundles,
 	}
 	if c.HttpPort != nil {
 		if effects := taskOnSubmitHTTP(task); len(effects) > 0 {
