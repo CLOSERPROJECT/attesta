@@ -8,8 +8,8 @@
 		type ComponentProps
 	} from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
+	import { omitUntouchedProgressCells } from './form-progress.js';
 	import { getLeftoverContext } from './leftover-context.js';
-	import { isPalletProgress, omitUntouchedProgressCells, type PalletProgress } from './pallet-progress.js';
 
 	let {
 		config,
@@ -22,7 +22,8 @@
 
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
 	const rows = $derived(leftovers.ids);
-	// Ajv nests under progress/<id>; exact getFieldErrors(progress) alone is silent.
+	const progressEnums = $derived(leftovers.progressEnums);
+	// Ajv nests under map/<id>; exact getFieldErrors(map) alone is silent.
 	const errors = $derived.by(() => {
 		const own = getFieldErrors(ctx, config.path);
 		const childPaths = rows.map((id) => getChildPath(ctx, config.path, id));
@@ -31,13 +32,14 @@
 	});
 
 	// Display SoT is sjsf value (host seeds Draft from domain at open).
-	// null = clear write; missing/non-progress → undefined (available).
+	// null = clear write; missing/non-enum → undefined (available).
 	const displayById = $derived.by(() => {
-		const out: Record<string, PalletProgress | undefined> = {};
+		const out: Record<string, string | undefined> = {};
+		const allowed = new Set(progressEnums);
 		for (const id of rows) {
 			const cell = value?.[id];
 			if (cell === null) out[id] = undefined;
-			else if (isPalletProgress(cell)) out[id] = cell;
+			else if (typeof cell === 'string' && allowed.has(cell)) out[id] = cell;
 			else out[id] = undefined;
 		}
 		return out;
@@ -66,7 +68,7 @@
 		commitFieldValue(next);
 	}
 
-	function setProgressCell(id: string, nextProgress: PalletProgress | undefined): void {
+	function setProgressCell(id: string, nextProgress: string | undefined): void {
 		const next: SchemaObjectValue = { ...(value ?? {}) };
 		// `null` = clear intent for submit (unset domain progress); omit = untouched.
 		if (nextProgress === undefined) next[id] = null;
@@ -86,7 +88,7 @@
 	{errors}
 >
 	{#if rows.length === 0}
-		<p class="leftover-empty" data-testid="leftover-empty">Nessun residuo</p>
+		<p class="leftover-empty" data-testid="leftover-empty">No leftovers</p>
 	{:else}
 		<table class="leftover-table" data-testid="leftover-table">
 			<thead>
@@ -107,12 +109,16 @@
 									value={displayById[id] ?? ''}
 									onchange={(event) => {
 										const raw = event.currentTarget.value;
-										setProgressCell(id, isPalletProgress(raw) ? raw : undefined);
+										setProgressCell(
+											id,
+											progressEnums.includes(raw) ? raw : undefined
+										);
 									}}
 								>
 									<option value="">—</option>
-									<option value="partial">Parziale</option>
-									<option value="done">Completo</option>
+									{#each progressEnums as opt (opt)}
+										<option value={opt}>{opt}</option>
+									{/each}
 								</select>
 							{:else}
 								<input

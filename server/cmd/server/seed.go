@@ -40,8 +40,8 @@ type SeedDeps struct {
 	// Rewrite even when the marker org exists (local only).
 	Replace bool
 	// Optional living stores. When set, SeedDemo runs after identity+catalog;
-	// Replace wipes Domain. CLI Mongo seed wires these; server also seeds via
-	// ensureLivingStores / ATTESTA_LIVING_SEED.
+	// Replace wipes Domain. Only the seed command / task seed wires these —
+	// product boot (ensureLivingStores) must not call SeedDemo.
 	LivingDomains living.DomainStore
 	LivingConfigs living.ConfigStore
 	// Nil picks a time-based source in Seed.

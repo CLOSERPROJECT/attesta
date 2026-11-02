@@ -109,7 +109,7 @@ func coerceSchemaValue(raw any, prop map[string]any, key, id string) (any, error
 
 func validateObjectRowFacts(facts map[string]any, leftoverIDs []string, rowSchema map[string]any) string {
 	if len(facts) == 0 {
-		return "nothing to submit — fill at least one weight"
+		return "nothing to submit — fill at least one row"
 	}
 	allowed := make(map[string]struct{}, len(leftoverIDs))
 	for _, id := range leftoverIDs {
@@ -118,7 +118,7 @@ func validateObjectRowFacts(facts map[string]any, leftoverIDs []string, rowSchem
 	props, _ := rowSchema["properties"].(map[string]any)
 	for id, raw := range facts {
 		if _, ok := allowed[id]; !ok {
-			return fmt.Sprintf("pallet not in leftovers: %s", id)
+			return fmt.Sprintf("id not in leftovers: %s", id)
 		}
 		row, _ := raw.(map[string]any)
 		if row == nil {
@@ -218,7 +218,7 @@ func progressEnumsFromSchema(add map[string]any) []string {
 
 func validateProgressFacts(facts map[string]any, leftoverIDs []string) string {
 	if len(facts) == 0 {
-		return "nothing to submit — set or clear progress on at least one pallet"
+		return "nothing to submit — fill at least one row"
 	}
 	allowed := make(map[string]struct{}, len(leftoverIDs))
 	for _, id := range leftoverIDs {
@@ -226,7 +226,7 @@ func validateProgressFacts(facts map[string]any, leftoverIDs []string) string {
 	}
 	for id := range facts {
 		if _, ok := allowed[id]; !ok {
-			return fmt.Sprintf("pallet not in leftovers: %s", id)
+			return fmt.Sprintf("id not in leftovers: %s", id)
 		}
 	}
 	return ""

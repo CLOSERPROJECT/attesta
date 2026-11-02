@@ -3,7 +3,7 @@ import {
 	DEFAULT_AJV_CONFIG
 } from '@sjsf/ajv8-validator';
 import type { FormValidator, ValidatorFactoryOptions } from '@sjsf/form';
-import { normalizeFormProgress } from './pallet-progress.js';
+import { normalizeFormProgress } from './form-progress.js';
 
 /**
  * Draft validator: real Ajv (not noop) so JSON Schema `if`/`then` and
@@ -11,7 +11,7 @@ import { normalizeFormProgress } from './pallet-progress.js';
  * kernel seal Ajv lockstep stays out of this Attesta cut.
  *
  * createForm validates before onSubmit/seal — omit untouched progress cells
- * (`""` / undefined) so Completo-on-one siblings do not block Invia.
+ * (`""` / undefined) so one filled sibling does not block submit.
  */
 export function createAjvFormValidator<T>(
 	_options?: ValidatorFactoryOptions

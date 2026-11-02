@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -18,14 +16,6 @@ func (s *Server) ensureLivingStores() {
 	}
 	if s.livingConfigs == nil {
 		s.livingConfigs = s.newLivingConfigStore()
-		// Always load Active Config fixture. Wipe Domain only when
-		// ATTESTA_LIVING_SEED is set (local/dev gate — not an ungated prod footgun).
-		wipe := livingSeedWipeEnabled(os.Getenv("ATTESTA_LIVING_SEED"))
-		if _, err := living.SeedDemo(context.Background(), s.livingDomains, s.livingConfigs, living.SeedOptions{
-			WipeDomain: wipe,
-		}); err != nil {
-			log.Printf("living: seed demo: %v", err)
-		}
 	}
 }
 
@@ -52,10 +42,6 @@ func (s *Server) newLivingConfigStore() living.ConfigStore {
 		return living.NewMongoConfigStore(db)
 	}
 	return living.NewMemoryConfigStore()
-}
-
-func livingSeedWipeEnabled(value string) bool {
-	return attestaSeedEnabled(value)
 }
 
 func (s *Server) livingProductAuthorizer() living.Authorizer {

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -35,7 +36,6 @@ func TestEnsureLivingStoresUsesMongoWhenAvailable(t *testing.T) {
 		_ = db.Collection("living_org_configs").Drop(context.Background())
 		_ = db.Collection("living_active_config").Drop(context.Background())
 	})
-	t.Setenv("ATTESTA_LIVING_SEED", "")
 	server := &Server{store: NewMongoStore(db)}
 	server.ensureLivingStores()
 	if _, ok := server.livingDomains.(*living.MongoDomainStore); !ok {
@@ -44,11 +44,8 @@ func TestEnsureLivingStoresUsesMongoWhenAvailable(t *testing.T) {
 	if _, ok := server.livingConfigs.(*living.MongoConfigStore); !ok {
 		t.Fatalf("configs = %T, want *living.MongoConfigStore", server.livingConfigs)
 	}
-	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != living.DefaultFixtureVersion {
-		t.Fatalf("active = %q", version)
+	_, err = server.livingConfigs.ActiveVersion(t.Context(), "feragame")
+	if !errors.Is(err, living.ErrNotFound) {
+		t.Fatalf("expected no Active Config from ensureLivingStores, got %v", err)
 	}
 }

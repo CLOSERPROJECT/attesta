@@ -15,7 +15,7 @@ import {
 } from './config-form.svelte.js';
 import { syncDeepLocalToDraft } from './deep-local-draft-sync.svelte.js';
 import { theme } from './form-theme.js';
-import { translation } from './form-translation-it.js';
+import { translation } from '@sjsf/form/translations/en';
 import { createAjvFormValidator } from './ajv-form-validator.js';
 import {
 	mergeSchemaDefaultsIntoFormData,

@@ -197,8 +197,7 @@
 						schema={leftoverSchema}
 						uiSchema={leftoverUiSchema}
 						leftoverIds={[...leftoverIds]}
-						columns={leftoverColumns ?? { id: 'Id', value: 'Valore' }}
-						valueType="progress"
+						columns={leftoverColumns ?? { id: 'Id', value: 'Value' }}
 						value={readDraft()}
 						onValueChange={writeDraft}
 						onSubmit={(value) => void submitSealed(value)}
@@ -208,7 +207,7 @@
 				</fieldset>
 			{/key}
 			<p class="text-xs text-zinc-500">
-				Residui: {leftoverIds.length ? leftoverIds.join(', ') : 'nessuno'}
+				Leftovers: {leftoverIds.length ? leftoverIds.join(', ') : 'none'}
 			</p>
 		{/if}
 	{:else if live?.form}

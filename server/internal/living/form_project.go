@@ -135,7 +135,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 }
 
 func readFormColumns(propUi any) *FormColumns {
-	cols := &FormColumns{ID: "Id", Value: "Valore"}
+	cols := &FormColumns{ID: "Id", Value: "Value"}
 	m, _ := propUi.(map[string]any)
 	if m == nil {
 		return cols

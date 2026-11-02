@@ -4,6 +4,7 @@ export type LeftoverContext = {
 	ids: string[];
 	columns: { id: string; value: string };
 	valueType: 'number' | 'progress';
+	progressEnums: string[];
 };
 
 const KEY = Symbol('attesta-leftover-context');

@@ -1,9 +1,9 @@
 /**
- * Regression: lineLoad leftoverTable Commit with Parziale + "—" clear.
+ * Regression: leftover-table Commit with one enum cell + "—" clear.
  *
  * leftover-table-field.setProgressCell writes `null` for clear. Authored
  * progress.additionalProperties must allow null | enum so Ajv Draft does not
- * block Invia before onSubmit / Commit. Server filterFilledProgress keeps null
+ * block submit before onSubmit / Commit. Server filterFilledProgress keeps null
  * (clear) and omits untouched "".
  *
  * Schema fixture mirrors Go TaskFormBundle projection (no client projectFormSchema).
@@ -11,7 +11,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Schema } from '@sjsf/form';
 import { createAjvFormValidator } from './ajv-form-validator.js';
-import type { PalletProgress } from './pallet-progress.js';
 
 function lineLoadProjectedSchema(): Schema {
 	return {
@@ -36,7 +35,7 @@ describe('lineLoad partial progress submit (Ajv draft)', () => {
 	function setProgressCell(
 		value: Record<string, unknown>,
 		id: string,
-		nextProgress: PalletProgress | undefined
+		nextProgress: string | undefined
 	): Record<string, unknown> {
 		const next = { ...value };
 		if (nextProgress === undefined) next[id] = null;
@@ -58,20 +57,20 @@ describe('lineLoad partial progress submit (Ajv draft)', () => {
 		);
 	});
 
-	test('single Parziale (omit siblings) validates', () => {
+	test('single enum cell (omit siblings) validates', () => {
 		expect(
 			validator.isValid(schema, schema, { progress: { 'NIR-1.1': 'partial' } })
 		).toBe(true);
 	});
 
-	test('Parziale + — clear (null) validates so Invia / Commit can fire', () => {
+	test('enum + — clear (null) validates so submit / Commit can fire', () => {
 		let progress: Record<string, unknown> = {};
 		progress = setProgressCell(progress, 'NIR-1.1', 'partial');
 		progress = setProgressCell(progress, 'NIR-1.2', undefined); // UI "—"
 		const form = validator.validateFormValue(schema, { progress });
 		expect(
 			form.errors,
-			'null clear is intentional wire (server filterFilledProgress); Ajv must not block Invia'
+			'null clear is intentional wire (server filterFilledProgress); Ajv must not block submit'
 		).toBeUndefined();
 	});
 });

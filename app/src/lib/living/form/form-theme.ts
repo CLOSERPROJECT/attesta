@@ -5,7 +5,7 @@ import { theme as shadcnTheme } from '@sjsf/shadcn4-theme';
 import '@sjsf/form/fields/extra/enum-include';
 // format: date → shadcn DatePicker (register Substep).
 import '@sjsf/shadcn4-theme/extra-widgets/date-picker-include';
-// register idoneitaRiutilizzo: ui:components.selectWidget → radioWidget.
+// register selectWidget → radioWidget for authored string enums.
 import '@sjsf/shadcn4-theme/extra-widgets/radio-include';
 import { authoredFieldThemeOverrides } from './authored-field-registry.js';
 import CheckboxOnlyField from './checkbox-only-field.svelte';

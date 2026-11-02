@@ -1,5 +1,5 @@
 import type { Schema, UiSchemaRoot } from '@sjsf/form';
-import { normalizeFormProgress } from './pallet-progress.js';
+import { normalizeFormProgress } from './form-progress.js';
 import type { ChromeEntry, TaskFormPlan } from './task-form-plan.js';
 import type { DerivedKeyEntry } from './derived-keys.js';
 

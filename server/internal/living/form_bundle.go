@@ -310,7 +310,7 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 			if !hit {
 				continue
 			}
-			p, _ := facts["progress"].(string)
+			p, _ := facts[primary].(string)
 			if stringInList(p, enums) {
 				progress[id] = p
 			}

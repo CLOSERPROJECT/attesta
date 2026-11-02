@@ -12,14 +12,13 @@ import (
 	"github.com/CLOSERPROJECT/attesta/server/internal/living"
 )
 
-func TestLivingSeedWipeEnabled(t *testing.T) {
-	if livingSeedWipeEnabled("") || livingSeedWipeEnabled("0") || livingSeedWipeEnabled("false") {
-		t.Fatal("expected disabled")
-	}
-	for _, v := range []string{"1", "true", "YES", "on"} {
-		if !livingSeedWipeEnabled(v) {
-			t.Fatalf("livingSeedWipeEnabled(%q) = false", v)
-		}
+// seedLivingDemo puts Feragame Active Config for handler tests. Product boot
+// (ensureLivingStores) no longer seeds — only task seed / tests call SeedDemo.
+func seedLivingDemo(t *testing.T, server *Server) {
+	t.Helper()
+	server.ensureLivingStores()
+	if _, err := living.SeedDemo(t.Context(), server.livingDomains, server.livingConfigs, living.SeedOptions{}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -34,34 +33,7 @@ func TestEnsureLivingStoresUsesMemoryWithoutMongo(t *testing.T) {
 	}
 }
 
-func TestEnsureLivingStoresSeedsFixtureAndOptionalWipe(t *testing.T) {
-	t.Setenv("ATTESTA_LIVING_SEED", "true")
-	domains := living.NewMemoryDomainStore()
-	seeded := living.EmptyDomain()
-	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
-	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
-		t.Fatal(err)
-	}
-	server := &Server{livingDomains: domains}
-	server.ensureLivingStores()
-	got, err := domains.Get(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.Kind("load")) != 0 {
-		t.Fatalf("expected wipe when ATTESTA_LIVING_SEED set: %#v", got)
-	}
-	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != living.DefaultFixtureVersion {
-		t.Fatalf("active = %q", version)
-	}
-}
-
-func TestEnsureLivingStoresSeedsFixtureWithoutWipeByDefault(t *testing.T) {
-	t.Setenv("ATTESTA_LIVING_SEED", "")
+func TestEnsureLivingStoresDoesNotSeed(t *testing.T) {
 	domains := living.NewMemoryDomainStore()
 	seeded := living.EmptyDomain()
 	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
@@ -75,14 +47,11 @@ func TestEnsureLivingStoresSeedsFixtureWithoutWipeByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got.Kind("load")) != 1 {
-		t.Fatalf("domain wiped without ATTESTA_LIVING_SEED: %#v", got)
+		t.Fatalf("domain mutated by ensureLivingStores: %#v", got)
 	}
-	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != living.DefaultFixtureVersion {
-		t.Fatalf("active = %q", version)
+	_, err = server.livingConfigs.ActiveVersion(t.Context(), "feragame")
+	if !errors.Is(err, living.ErrNotFound) {
+		t.Fatalf("expected no Active Config (SeedDemo is task seed only), got %v", err)
 	}
 }
 
@@ -104,6 +73,7 @@ func TestLivingDomainLoadVerifiedSession(t *testing.T) {
 		enforceAuth: true,
 		now:         func() time.Time { return now },
 	}
+	seedLivingDemo(t, server)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/living/domain", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
@@ -195,6 +165,7 @@ func TestLivingDomainMuxRegistration(t *testing.T) {
 		now:         func() time.Time { return now },
 		tmpl:        testTemplates(),
 	}
+	seedLivingDemo(t, server)
 	mux := server.newMux()
 	req := httptest.NewRequest(http.MethodGet, "/api/living/domain", nil)
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
@@ -224,6 +195,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 		now:              func() time.Time { return now },
 		livingAuthorizer: living.AllowAllAuthorizer{},
 	}
+	seedLivingDemo(t, server)
 
 	body := `{"taskPath":"intake/register","jobInstanceId":"","mint":{"kind":"startingNew"},"value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1,"notes":""}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
@@ -396,6 +368,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 		now:              func() time.Time { return now },
 		livingAuthorizer: living.DenyAllAuthorizer{},
 	}
+	seedLivingDemo(t, server)
 	body := `{"taskPath":"intake/register","jobInstanceId":"NIR-261019-NO-1","value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "attesta_session", Value: sessionID})
@@ -457,6 +430,7 @@ func TestLivingCommitMuxRegistration(t *testing.T) {
 		tmpl:             testTemplates(),
 		livingAuthorizer: living.AllowAllAuthorizer{},
 	}
+	seedLivingDemo(t, server)
 	mux := server.newMux()
 	body := `{"taskPath":"intake/register","jobInstanceId":"NIR-261019-NO-1","value":{"client":"NO","date":"2026-10-19","wasteCode":"191212","idoneitaRiutilizzo":"NIR","truckWeight":100,"truckTare":200,"palletCount":1}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/living/commit", strings.NewReader(body))

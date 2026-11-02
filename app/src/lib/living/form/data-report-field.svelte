@@ -122,7 +122,7 @@
 		{:else if flatMode}
 			{@render reportRows(rows)}
 		{:else if sectionsEmpty}
-			<p class="data-report__empty">Nessun carico primario</p>
+			<p class="data-report__empty">No primary load</p>
 		{:else}
 			{#each sections as section (section.loadId)}
 				<article class="data-report__section" data-load-id={section.loadId}>

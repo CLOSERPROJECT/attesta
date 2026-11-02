@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
-// SeedOptions controls Domain wipe during SeedDemo. Hosts must gate WipeDomain
-// (for example ATTESTA_LIVING_SEED); never enable wipe ungated in production.
+// SeedOptions controls Domain wipe during SeedDemo. Only task seed / tests
+// should call SeedDemo; WipeDomain follows Seed Replace — never ungated in prod.
 type SeedOptions struct {
 	WipeDomain bool
 }

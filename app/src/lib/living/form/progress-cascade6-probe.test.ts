@@ -1,7 +1,7 @@
 /**
- * Cascade #6 regression: Completo on one leftover + untouched siblings.
+ * Cascade #6 regression: one leftover enum + untouched siblings.
  * Untouched wire (`""` / own-property undefined) must be omitted before Ajv
- * so Invia can Commit; null clear stays.
+ * so submit can Commit; null clear stays.
  *
  * Projected schema shape mirrors Go TaskFormBundle (propertyNames + nullability);
  * seal uses planFromTaskFormBundle — no client compile / projectFormSchema.
@@ -12,7 +12,7 @@ import { createAjvFormValidator } from './ajv-form-validator.js';
 import {
 	normalizeFormProgress,
 	omitUntouchedProgressCells
-} from './pallet-progress.js';
+} from './form-progress.js';
 import { planFromTaskFormBundle, type TaskFormBundle } from './task-form-bundle.js';
 
 /** Fixture: lineLoad leftoverTable after Go leftover projection. */
@@ -56,7 +56,7 @@ describe('cascade #6 omit untouched progress cells', () => {
 	const schema = lineLoadProjectedSchema(leftoverIds);
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
-	test('omitUntouchedProgressCells drops "" and undefined; keeps null|partial|done', () => {
+	test('omitUntouchedProgressCells drops "" and undefined; keeps null|enum strings', () => {
 		expect(
 			omitUntouchedProgressCells({
 				a: 'done',
@@ -78,7 +78,7 @@ describe('cascade #6 omit untouched progress cells', () => {
 		).toEqual({ a: 'done' });
 	});
 
-	test('createAjvFormValidator: Completo + sibling "" validates (Invia path)', () => {
+	test('createAjvFormValidator: enum + sibling "" validates (submit path)', () => {
 		const [touched, sibling] = leftoverIds;
 		const progress = { [touched]: 'done', [sibling]: '' };
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
@@ -87,7 +87,7 @@ describe('cascade #6 omit untouched progress cells', () => {
 		expect(result.value).toEqual({ progress: { [touched]: 'done' } });
 	});
 
-	test('createAjvFormValidator: Completo + own-property undefined validates', () => {
+	test('createAjvFormValidator: enum + own-property undefined validates', () => {
 		const [touched, sibling] = leftoverIds;
 		const progress = { [touched]: 'done', [sibling]: undefined };
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);

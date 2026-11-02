@@ -3,7 +3,11 @@
 	import { onDestroy, untrack } from 'svelte';
 	import ConfigForm from './ConfigForm.svelte';
 	import { createConfigForm } from './create-config-form.svelte.js';
-	import { setLeftoverContext, type LeftoverContext } from './leftover-context.js';
+	import {
+		leftoverValueTypeFromSchema,
+		progressEnumsFromFormSchema
+	} from './form-progress.js';
+	import { setLeftoverContext } from './leftover-context.js';
 
 	type Props = {
 		schema: Schema;
@@ -13,7 +17,6 @@
 		/** Draft owned by StepStackSession — shell does not persist. */
 		value: Record<string, unknown>;
 		onValueChange: (next: Record<string, unknown>) => void;
-		valueType?: LeftoverContext['valueType'];
 		disabled?: boolean;
 		onSubmit: (value: Record<string, unknown>) => void | Promise<void>;
 		onSubmitError?: (result: FailureValidationResult) => void;
@@ -22,20 +25,26 @@
 	let props: Props = $props();
 
 	// Parent remounts via {#key projectionKey}; capture mount snapshot once.
-	const mount = untrack(() => ({
-		schema: props.schema,
-		uiSchema: props.uiSchema,
-		leftoverIds: props.leftoverIds,
-		columns: props.columns,
-		valueType: props.valueType ?? 'number',
-		onSubmit: props.onSubmit,
-		onSubmitError: props.onSubmitError
-	}));
+	const mount = untrack(() => {
+		const valueType = leftoverValueTypeFromSchema(props.schema);
+		return {
+			schema: props.schema,
+			uiSchema: props.uiSchema,
+			leftoverIds: props.leftoverIds,
+			columns: props.columns,
+			valueType,
+			progressEnums:
+				valueType === 'progress' ? progressEnumsFromFormSchema(props.schema) : [],
+			onSubmit: props.onSubmit,
+			onSubmitError: props.onSubmitError
+		};
+	});
 
 	setLeftoverContext({
 		ids: mount.leftoverIds,
 		columns: mount.columns,
-		valueType: mount.valueType
+		valueType: mount.valueType,
+		progressEnums: mount.progressEnums
 	});
 
 	const form = createConfigForm(

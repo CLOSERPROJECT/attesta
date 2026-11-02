@@ -1,4 +1,4 @@
-/** `ui:options.columns` labels (map-table Id header); defaults match Italian chrome. */
+/** `ui:options.columns` labels (map-table Id header); English defaults when unset. */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -9,6 +9,6 @@ export function readColumns(uiSchema: Record<string, unknown>): { id: string; va
 	const columns = options && isPlainObject(options.columns) ? options.columns : null;
 	return {
 		id: typeof columns?.id === 'string' ? columns.id : 'Id',
-		value: typeof columns?.value === 'string' ? columns.value : 'Valore'
+		value: typeof columns?.value === 'string' ? columns.value : 'Value'
 	};
 }
