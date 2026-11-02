@@ -341,12 +341,12 @@ func TestFirstAvailableTaskAndCompileDerivedEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	domain := EmptyDomain()
-	wl := ProjectWorklist(cfg, domain)
-	ref, ok := FirstAvailableTask(cfg, wl)
+	wl := ProjectWorklist(cfg, domain, FixtureAllRolesOp())
+	ref, ok := FirstAvailableTask(cfg, wl, FixtureAllRolesOp().Roles)
 	if !ok || ref.JobID != "intake" || ref.TaskID != "register" || ref.JobInstanceID != "" {
 		t.Fatalf("first = %#v ok=%v", ref, ok)
 	}
-	ref, ok = FirstAvailableTask(OrgConfig{}, Worklist{})
+	ref, ok = FirstAvailableTask(OrgConfig{}, Worklist{}, FixtureAllRolesOp().Roles)
 	if ok || ref.JobID != "" {
 		t.Fatalf("empty first = %#v", ref)
 	}
@@ -1179,10 +1179,10 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 		t.Fatal("missing keys")
 	}
 
-	if _, err := (&Loader{}).Load(t.Context(), ""); err == nil {
+	if _, err := (&Loader{}).Load(t.Context(), "", OperatorIdentity{}); err == nil {
 		t.Fatal("empty org")
 	}
-	if _, err := (&Loader{}).Load(t.Context(), "x"); err == nil {
+	if _, err := (&Loader{}).Load(t.Context(), "x", OperatorIdentity{}); err == nil {
 		t.Fatal("nil stores")
 	}
 	configs := NewMemoryConfigStore()
@@ -1193,7 +1193,7 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 		Domains: &errDomainStore{err: errors.New("boom")},
 		Configs: configs,
 	}
-	if _, err := failing.Load(t.Context(), "feragame"); err == nil {
+	if _, err := failing.Load(t.Context(), "feragame", FixtureAllRolesOp()); err == nil {
 		t.Fatal("domain get error")
 	}
 }
@@ -1693,12 +1693,12 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		ids = []string{}
 	}
 	_ = lineLoadRowIDs(EmptyDomain())
-	wl := ProjectWorklist(OrgConfig{Jobs: badJobs}, EmptyDomain())
+	wl := ProjectWorklist(OrgConfig{Jobs: badJobs}, EmptyDomain(), FixtureAllRolesOp())
 	if len(wl.Jobs) != 0 {
 		t.Fatalf("skip invalid jobs = %#v", wl)
 	}
 	cfg := OrgConfig{Jobs: goodJobs}
-	wl = ProjectWorklist(cfg, Domain{JobInstances: []JobInstance{{JobID: "other", ID: "x"}}})
+	wl = ProjectWorklist(cfg, Domain{JobInstances: []JobInstance{{JobID: "other", ID: "x"}}}, FixtureAllRolesOp())
 	if len(wl.Jobs) != 1 || len(wl.Jobs[0].Instances) != 0 {
 		t.Fatalf("filter instances = %#v", wl)
 	}

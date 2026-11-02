@@ -16,7 +16,7 @@ func TestLoaderEmptyDomainAndActiveConfig(t *testing.T) {
 	}
 
 	loader := &Loader{Domains: domains, Configs: configs}
-	result, err := loader.Load(t.Context(), "feragame")
+	result, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestLoaderMissingActiveConfig(t *testing.T) {
 		Domains: NewMemoryDomainStore(),
 		Configs: NewMemoryConfigStore(),
 	}
-	_, err := loader.Load(t.Context(), "feragame")
+	_, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}

@@ -60,8 +60,9 @@ type AvailableTaskRef struct {
 
 // CollectAvailableTaskRefs walks Worklist in Org Config Job order: provisional
 // first Task when canStart (empty jobInstanceId), then every available Task on
-// each instance in authored Task order.
-func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist) []AvailableTaskRef {
+// each instance in authored Task order whose Config roles intersect viewerRoles.
+// canStart is already viewer-scoped by ProjectWorklist.
+func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist, viewerRoles []string) []AvailableTaskRef {
 	byJob := make(map[string]WorklistJob, len(wl.Jobs))
 	for _, j := range wl.Jobs {
 		byJob[j.JobID] = j
@@ -90,13 +91,17 @@ func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist) []AvailableTaskRef {
 		}
 		for _, inst := range wlJob.Instances {
 			for _, taskID := range ordered {
-				if inst.Tasks[taskID] == TaskStatusAvailable {
-					out = append(out, AvailableTaskRef{
-						JobID:         jobID,
-						TaskID:        taskID,
-						JobInstanceID: inst.ID,
-					})
+				if inst.Tasks[taskID] != TaskStatusAvailable {
+					continue
 				}
+				if !ViewerCanActOnTask(wlJob, taskID, viewerRoles) {
+					continue
+				}
+				out = append(out, AvailableTaskRef{
+					JobID:         jobID,
+					TaskID:        taskID,
+					JobInstanceID: inst.ID,
+				})
 			}
 		}
 	}
@@ -104,8 +109,8 @@ func CollectAvailableTaskRefs(cfg OrgConfig, wl Worklist) []AvailableTaskRef {
 }
 
 // FirstAvailableTask returns the first CollectAvailableTaskRefs entry.
-func FirstAvailableTask(cfg OrgConfig, wl Worklist) (AvailableTaskRef, bool) {
-	refs := CollectAvailableTaskRefs(cfg, wl)
+func FirstAvailableTask(cfg OrgConfig, wl Worklist, viewerRoles []string) (AvailableTaskRef, bool) {
+	refs := CollectAvailableTaskRefs(cfg, wl, viewerRoles)
 	if len(refs) == 0 {
 		return AvailableTaskRef{}, false
 	}
@@ -238,9 +243,9 @@ func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 }
 
 // ProjectAvailableBundles builds Task form bundles for every CollectAvailableTaskRefs
-// address (available + provisional). Empty when none.
-func ProjectAvailableBundles(cfg OrgConfig, domain Domain, wl Worklist) ([]*TaskFormBundle, error) {
-	refs := CollectAvailableTaskRefs(cfg, wl)
+// address (viewer-scoped available + provisional). Empty when none.
+func ProjectAvailableBundles(cfg OrgConfig, domain Domain, wl Worklist, viewerRoles []string) ([]*TaskFormBundle, error) {
+	refs := CollectAvailableTaskRefs(cfg, wl, viewerRoles)
 	out := make([]*TaskFormBundle, 0, len(refs))
 	for _, ref := range refs {
 		bundle, err := BuildTaskFormBundle(cfg, domain, ref)

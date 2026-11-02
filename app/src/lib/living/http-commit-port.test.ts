@@ -14,6 +14,7 @@ const sampleResult = {
 				canStart: true,
 				repeatable: true,
 				taskIds: ['register', 'codiceFir'],
+				tasks: [],
 				instances: [
 					{
 						id: 'NIR-261019-NO-1',
@@ -27,6 +28,7 @@ const sampleResult = {
 				canStart: false,
 				repeatable: true,
 				taskIds: ['shift'],
+				tasks: [],
 				instances: []
 			}
 		]

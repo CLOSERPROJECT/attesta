@@ -60,7 +60,7 @@ func (h *Handler) handleLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.Loader.Load(r.Context(), org)
+	result, err := h.Loader.Load(r.Context(), org, op)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, "active config not found", http.StatusNotFound)

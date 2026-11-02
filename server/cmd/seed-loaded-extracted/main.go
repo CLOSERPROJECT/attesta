@@ -103,7 +103,7 @@ func main() {
 	must(err)
 	cfg, err := configs.Get(ctx, "feragame", ver)
 	must(err)
-	wl := living.ProjectWorklist(cfg, res.Domain)
+	wl := living.ProjectWorklist(cfg, res.Domain, living.FixtureAllRolesOp())
 	fmt.Printf("seeded feragame in %s\n", dbName)
 	fmt.Printf("containers=%d submissions=%d\n", len(res.Domain.Kind("container")), len(res.Domain.Submissions))
 	for _, j := range wl.Jobs {
@@ -114,7 +114,7 @@ func main() {
 			}
 		}
 	}
-	bundles, err := living.ProjectAvailableBundles(cfg, res.Domain, wl)
+	bundles, err := living.ProjectAvailableBundles(cfg, res.Domain, wl, living.FixtureAllRolesOp().Roles)
 	must(err)
 	var haveLE, haveWC bool
 	for _, b := range bundles {

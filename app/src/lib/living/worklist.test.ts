@@ -29,6 +29,7 @@ describe('worklist helpers', () => {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register'],
+					tasks: [],
 					instances: []
 				},
 				{
@@ -36,6 +37,7 @@ describe('worklist helpers', () => {
 					canStart: false,
 					repeatable: true,
 					taskIds: ['shift', 'lineLoad'],
+					tasks: [],
 					instances: [
 						{
 							id: '1st',

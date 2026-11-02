@@ -17,6 +17,13 @@ export type Worklist = {
 	jobs: WorklistJob[];
 };
 
+export type WorklistTask = {
+	id: string;
+	title: string;
+	/** Authored Config role slugs for board chrome (slug∩roles; not Cerbos). */
+	roles: string[];
+};
+
 export type WorklistJob = {
 	jobId: string;
 	canStart: boolean;
@@ -24,6 +31,8 @@ export type WorklistJob = {
 	startLabel?: string;
 	/** Authored Task id order for chrome iteration. */
 	taskIds: string[];
+	/** Config-free Task title + roles chrome (alongside taskIds). */
+	tasks?: WorklistTask[];
 	instances: WorklistInstance[];
 };
 

@@ -41,6 +41,7 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register', 'codiceFir', 'palletWeight', 'weightCheck'],
+					tasks: [],
 					instances: []
 				},
 				{
@@ -85,6 +86,7 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 				canStart: true,
 				repeatable: true,
 				taskIds: ['register', 'codiceFir', 'palletWeight', 'weightCheck'],
+				tasks: [],
 				instances: []
 			},
 			{

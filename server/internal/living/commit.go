@@ -193,8 +193,8 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		return CommitResult{}, err
 	}
 
-	wl := ProjectWorklist(cfg, applied.Domain)
-	bundles, err := ProjectAvailableBundles(cfg, applied.Domain, wl)
+	wl := ProjectWorklist(cfg, applied.Domain, op)
+	bundles, err := ProjectAvailableBundles(cfg, applied.Domain, wl, op.Roles)
 	if err != nil {
 		return CommitResult{}, err
 	}

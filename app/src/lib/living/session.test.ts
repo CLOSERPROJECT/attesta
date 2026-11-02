@@ -18,6 +18,7 @@ const sample: LoadResult = {
 				repeatable: true,
 				startLabel: 'Nuovo camion',
 				taskIds: ['register'],
+				tasks: [],
 				instances: []
 			},
 			{
@@ -26,6 +27,7 @@ const sample: LoadResult = {
 				repeatable: true,
 				startLabel: 'Nuovo turno',
 				taskIds: ['shift'],
+				tasks: [],
 				instances: []
 			}
 		]
@@ -72,6 +74,7 @@ describe('LivingSession', () => {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register', 'codiceFir'],
+					tasks: [],
 					instances: [
 						{
 							id: 'NIR-1',
@@ -80,7 +83,7 @@ describe('LivingSession', () => {
 						}
 					]
 				},
-				{ jobId: 'line', canStart: false, repeatable: true, taskIds: ['shift'], instances: [] }
+				{ jobId: 'line', canStart: false, repeatable: true, taskIds: ['shift'], tasks: [], instances: [] }
 			]
 		};
 		const nextBundles: TaskFormBundle[] = [
@@ -165,6 +168,7 @@ describe('LivingSession', () => {
 					canStart: true,
 					repeatable: true,
 					taskIds: ['register'],
+					tasks: [],
 					instances: []
 				}
 			]

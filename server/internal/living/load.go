@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-// LoadResult is the SPA hydrate for an org: Worklist + Task form bundles +
-// Active Config version metadata. Full Domain / Org Config stay server-side
-// (json:"-" for Go callers); they are not on the wire.
+// LoadResult is the SPA hydrate for an org: viewer-scoped Worklist + Task form
+// bundles + Active Config version metadata. Full Domain / Org Config stay
+// server-side (json:"-" for Go callers); they are not on the wire.
 type LoadResult struct {
 	Org                 string            `json:"org"`
 	ActiveConfigVersion string            `json:"activeConfigVersion"`
@@ -26,8 +26,9 @@ type Loader struct {
 	Configs ConfigStore
 }
 
-// Load returns the org Domain (empty when none stored) and the Active Config version document.
-func (l *Loader) Load(ctx context.Context, org string) (LoadResult, error) {
+// Load returns the org Domain (empty when none stored) and the Active Config
+// version document, projecting Worklist Available / canStart for op's roles.
+func (l *Loader) Load(ctx context.Context, org string, op OperatorIdentity) (LoadResult, error) {
 	org = strings.TrimSpace(org)
 	if org == "" {
 		return LoadResult{}, fmt.Errorf("living: org required")
@@ -53,8 +54,8 @@ func (l *Loader) Load(ctx context.Context, org string) (LoadResult, error) {
 		domain = EmptyDomain()
 	}
 
-	wl := ProjectWorklist(cfg, domain)
-	bundles, err := ProjectAvailableBundles(cfg, domain, wl)
+	wl := ProjectWorklist(cfg, domain, op)
+	bundles, err := ProjectAvailableBundles(cfg, domain, wl, op.Roles)
 	if err != nil {
 		return LoadResult{}, err
 	}

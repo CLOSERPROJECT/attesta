@@ -14,14 +14,22 @@ type Worklist struct {
 	Jobs []WorklistJob `json:"jobs"`
 }
 
+// WorklistTask is Config-free Task chrome (title + roles) for board display.
+type WorklistTask struct {
+	ID    string   `json:"id"`
+	Title string   `json:"title"`
+	Roles []string `json:"roles"`
+}
+
 // WorklistJob is one Job's start affordance and per-instance Task statuses.
-// TaskIDs / StartLabel / Repeatable are chrome-only (not a second gate body).
+// TaskIDs / StartLabel / Repeatable / Tasks are chrome-only (not a second gate body).
 type WorklistJob struct {
 	JobID      string             `json:"jobId"`
 	CanStart   bool               `json:"canStart"`
 	Repeatable bool               `json:"repeatable"`
 	StartLabel string             `json:"startLabel,omitempty"`
 	TaskIDs    []string           `json:"taskIds"`
+	Tasks      []WorklistTask     `json:"tasks"`
 	Instances  []WorklistInstance `json:"instances"`
 }
 
@@ -33,8 +41,11 @@ type WorklistInstance struct {
 }
 
 // ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
-// statuses. A Task is done after Submission on the instance (Submission law).
-func ProjectWorklist(cfg OrgConfig, domain Domain) Worklist {
+// statuses, then scopes canStart to OperatorIdentity Config-role intersection
+// with the Job's first Task (board chrome; not Cerbos). A Task is done after
+// Submission on the instance (Submission law). Status vocabulary stays unlock /
+// Submission based so overview can hand off role-gated available work.
+func ProjectWorklist(cfg OrgConfig, domain Domain, op OperatorIdentity) Worklist {
 	out := Worklist{Jobs: make([]WorklistJob, 0, cfg.Jobs.Len())}
 	for _, jobID := range cfg.Jobs.Keys {
 		jobVal, ok := cfg.Jobs.Get(jobID)
@@ -45,16 +56,21 @@ func ProjectWorklist(cfg OrgConfig, domain Domain) Worklist {
 		if !ok {
 			continue
 		}
-		out.Jobs = append(out.Jobs, projectWorklistJob(cfg, domain, jobID, job))
+		out.Jobs = append(out.Jobs, projectWorklistJob(cfg, domain, jobID, job, op))
 	}
 	return out
 }
 
-func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job) WorklistJob {
+func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op OperatorIdentity) WorklistJob {
 	refTask := referencedStartsWhenTask(cfg, job.StartsWhen)
 	canStart := CanStartJob(job, jobID, domain.Submissions, domain.JobInstances, refTask)
 
 	ordered := OrderedTaskIDs(job.Tasks)
+	chrome := projectWorklistTasks(job.Tasks, ordered)
+	if canStart && (len(chrome) == 0 || !rolesIntersect(op.Roles, chrome[0].Roles)) {
+		canStart = false
+	}
+
 	instances := make([]WorklistInstance, 0)
 	for _, inst := range domain.JobInstances {
 		if inst.JobID != jobID {
@@ -77,8 +93,31 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job) Wor
 		Repeatable: job.Repeatable,
 		StartLabel: job.StartLabel,
 		TaskIDs:    ordered,
+		Tasks:      chrome,
 		Instances:  instances,
 	}
+}
+
+func projectWorklistTasks(tasks []TaskConfig, ordered []string) []WorklistTask {
+	out := make([]WorklistTask, 0, len(ordered))
+	for _, taskID := range ordered {
+		task, ok := TaskByID(tasks, taskID)
+		if !ok {
+			out = append(out, WorklistTask{ID: taskID, Title: taskID, Roles: nil})
+			continue
+		}
+		payload := taskPayload(task)
+		roles := rolesFromTask(task)
+		if roles == nil {
+			roles = []string{}
+		}
+		out = append(out, WorklistTask{
+			ID:    taskID,
+			Title: taskTitle(payload, taskID),
+			Roles: roles,
+		})
+	}
+	return out
 }
 
 func projectTaskStatus(
@@ -107,4 +146,46 @@ func projectTaskStatus(
 		return TaskStatusDone
 	}
 	return TaskStatusAvailable
+}
+
+// rolesIntersect is slug∩roles board chrome (not Cerbos).
+func rolesIntersect(viewer, allowed []string) bool {
+	if len(viewer) == 0 || len(allowed) == 0 {
+		return false
+	}
+	have := make(map[string]struct{}, len(viewer))
+	for _, r := range viewer {
+		if r == "" {
+			continue
+		}
+		have[r] = struct{}{}
+	}
+	for _, r := range allowed {
+		if r == "" {
+			continue
+		}
+		if _, ok := have[r]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func worklistTaskByID(job WorklistJob, taskID string) (WorklistTask, bool) {
+	for _, t := range job.Tasks {
+		if t.ID == taskID {
+			return t, true
+		}
+	}
+	return WorklistTask{}, false
+}
+
+// ViewerCanActOnTask reports whether Worklist Available affordances include this
+// Task for the viewer (Config-role intersection only).
+func ViewerCanActOnTask(job WorklistJob, taskID string, viewerRoles []string) bool {
+	chrome, ok := worklistTaskByID(job, taskID)
+	if !ok {
+		return false
+	}
+	return rolesIntersect(viewerRoles, chrome.Roles)
 }

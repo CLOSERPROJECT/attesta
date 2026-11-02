@@ -83,7 +83,7 @@ func TestSeedDemoWipesDomainAndSeedsFixture(t *testing.T) {
 	}
 
 	loader := &Loader{Domains: domains, Configs: configs}
-	loaded, err := loader.Load(t.Context(), cfg.Org)
+	loaded, err := loader.Load(t.Context(), cfg.Org, FixtureAllRolesOp())
 	if err != nil {
 		t.Fatal(err)
 	}

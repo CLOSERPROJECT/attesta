@@ -200,6 +200,16 @@ func parseStartsWhen(jobID string, node *yaml.Node) (*StartsWhen, error) {
 	return &StartsWhen{Task: StartsWhenRef{JobID: ref.JobID, TaskID: ref.TaskID}, Quantifier: quantifier}, nil
 }
 
+// FixtureAllRolesOp returns a Feragame OperatorIdentity with every Config role
+// (debug / role-blind projection for tests and seed tooling).
+func FixtureAllRolesOp() OperatorIdentity {
+	return OperatorIdentity{
+		UserID: "ada",
+		Org:    "feragame",
+		Roles:  []string{"administration", "logistic", "line"},
+	}
+}
+
 func rolesFromTask(payload any) []string {
 	m := taskPayload(payload)
 	if m == nil {
