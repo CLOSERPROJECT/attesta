@@ -19,9 +19,8 @@
 	$effect(() => {
 		const jid = jobId;
 		const tid = taskId;
-		const inst = routeInstance;
-		const isProv = inst === '' || inst === 'new';
-		const instanceId = isProv ? '' : inst;
+		const isProv = provisional;
+		const instanceId = jobInstanceId;
 		const gen = ++loadGen;
 
 		if (!jid || !tid) {
