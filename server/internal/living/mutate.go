@@ -123,33 +123,14 @@ func entityMap(d *Domain, entity EntityType) (*EntityMap, error) {
 	if kind == "" {
 		return nil, fmt.Errorf("living: empty entity kind")
 	}
-	switch EntityType(kind) {
-	case EntityLoad:
-		if d.Load == nil {
-			d.Load = EntityMap{}
-		}
-		return &d.Load, nil
-	case EntityPallet:
-		if d.Pallet == nil {
-			d.Pallet = EntityMap{}
-		}
-		return &d.Pallet, nil
-	case EntityContainer:
-		if d.Container == nil {
-			d.Container = EntityMap{}
-		}
-		return &d.Container, nil
-	default:
-		if d.Extra == nil {
-			d.Extra = map[string]*EntityMap{}
-		}
-		if p, ok := d.Extra[kind]; ok && p != nil {
-			return p, nil
-		}
-		m := EntityMap{}
-		d.Extra[kind] = &m
-		return d.Extra[kind], nil
+	ensureEntities(d)
+	m, ok := d.Entities[kind]
+	if !ok || m == nil {
+		m = EntityMap{}
+		d.Entities[kind] = m
 	}
+	// Map header copy; content mutations share the Entities backing store.
+	return &m, nil
 }
 
 func cloneFacts(facts map[string]any) map[string]any {

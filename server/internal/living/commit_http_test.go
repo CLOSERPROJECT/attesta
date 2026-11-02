@@ -27,8 +27,8 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
-		t.Fatalf("domain rolled back? %#v", result.Domain.Load)
+	if result.Domain.Kind(kindLoad)["NIR-261019-NO-1"]["client"] != "NO" {
+		t.Fatalf("domain rolled back? %#v", result.Domain.Kind(kindLoad))
 	}
 	if len(port.calls) != 2 {
 		t.Fatalf("http calls = %#v", port.calls)
@@ -56,7 +56,7 @@ func TestCommitRegisterRunsOnSubmitHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Load["NIR-261019-NO-1"]["client"] != "NO" {
+	if stored.Kind(kindLoad)["NIR-261019-NO-1"]["client"] != "NO" {
 		t.Fatalf("persisted domain = %#v", stored)
 	}
 }
@@ -79,11 +79,11 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commit must succeed when HttpPort fails: %v", err)
 	}
-	if result.Domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
-		t.Fatalf("domain missing after http failure: %#v", result.Domain.Load)
+	if result.Domain.Kind(kindLoad)["NIR-261019-NO-1"]["client"] != "NO" {
+		t.Fatalf("domain missing after http failure: %#v", result.Domain.Kind(kindLoad))
 	}
-	if len(result.Domain.Pallet) != 2 {
-		t.Fatalf("pallets = %#v", result.Domain.Pallet)
+	if len(result.Domain.Kind(kindPallet)) != 2 {
+		t.Fatalf("pallets = %#v", result.Domain.Kind(kindPallet))
 	}
 	if len(result.Links) != 0 {
 		t.Fatalf("links = %#v", result.Links)
@@ -99,7 +99,7 @@ func TestCommitHTTPFailureDoesNotRollbackDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Load["NIR-261019-NO-1"]["client"] != "NO" {
+	if stored.Kind(kindLoad)["NIR-261019-NO-1"]["client"] != "NO" {
 		t.Fatalf("DomainStore rolled back: %#v", stored)
 	}
 }

@@ -1,5 +1,4 @@
-/** Living Domain slice for chrome / Derived bindings (entities + submissions). */
-export type EntityType = 'load' | 'pallet' | 'container';
+/** Living Domain slice for chrome / Derived bindings (dynamic kinds + submissions). */
 
 export type EntityFacts = Record<string, unknown>;
 
@@ -19,18 +18,20 @@ export type Submission = {
 	idsTouched?: string[];
 };
 
+/** Server bag: kind names are Org Config vocabulary (e.g. load / pallet / container). */
 export type DomainSnapshot = {
-	load: EntityMap;
-	pallet: EntityMap;
-	container: EntityMap;
 	submissions: Submission[];
 	jobInstances?: unknown[];
-};
+} & Record<string, EntityMap | Submission[] | unknown[] | undefined>;
 
-export function listEntities(snapshot: DomainSnapshot, entity: EntityType): EntityMap {
-	return snapshot[entity];
+export function listEntities(snapshot: DomainSnapshot, entity: string): EntityMap {
+	const value = snapshot[entity];
+	if (value == null || Array.isArray(value) || typeof value !== 'object') {
+		return {};
+	}
+	return value as EntityMap;
 }
 
 export function emptySnapshot(): DomainSnapshot {
-	return { load: {}, pallet: {}, container: {}, submissions: [], jobInstances: [] };
+	return { submissions: [], jobInstances: [] };
 }

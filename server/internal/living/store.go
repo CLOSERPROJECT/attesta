@@ -108,24 +108,14 @@ func (s *MemoryConfigStore) SetActiveVersion(_ context.Context, org, version str
 }
 
 func cloneDomain(d Domain) Domain {
+	ensureEntities(&d)
 	out := Domain{
-		Load:         cloneEntityMap(d.Load),
-		Pallet:       cloneEntityMap(d.Pallet),
-		Container:    cloneEntityMap(d.Container),
+		Entities:     make(map[string]EntityMap, len(d.Entities)),
 		Submissions:  append([]Submission(nil), d.Submissions...),
 		JobInstances: append([]JobInstance(nil), d.JobInstances...),
 	}
-	if len(d.Extra) > 0 {
-		out.Extra = make(map[string]*EntityMap, len(d.Extra))
-		for kind, m := range d.Extra {
-			if m == nil {
-				empty := EntityMap{}
-				out.Extra[kind] = &empty
-				continue
-			}
-			cloned := cloneEntityMap(*m)
-			out.Extra[kind] = &cloned
-		}
+	for kind, m := range d.Entities {
+		out.Entities[kind] = cloneEntityMap(m)
 	}
 	if out.Submissions == nil {
 		out.Submissions = []Submission{}

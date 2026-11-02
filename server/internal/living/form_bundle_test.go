@@ -216,10 +216,8 @@ func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
 	if tare["euro"] == nil {
 		t.Fatalf("bindings.catalogs.tareKinds = %#v", catalogsBag["tareKinds"])
 	}
-	for _, key := range []string{"load", "pallet", "container"} {
-		if _, ok := domainBag[key].(map[string]any); !ok {
-			t.Fatalf("bindings.domain.%s = %#v, want object", key, domainBag[key])
-		}
+	if load, ok := domainBag["load"].(map[string]any); !ok || len(load) == 0 {
+		t.Fatalf("bindings.domain.load = %#v, want minted load kind", domainBag["load"])
 	}
 	subs, ok := domainBag["submissions"].([]any)
 	if !ok {

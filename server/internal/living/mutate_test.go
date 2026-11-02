@@ -19,8 +19,8 @@ func TestMutateMintsAndAppendsSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Load["load-1"]["truckWeight"] != 900 {
-		t.Fatalf("load = %#v", got.Load)
+	if got.Kind(kindLoad)["load-1"]["truckWeight"] != 900 {
+		t.Fatalf("load = %#v", got.Kind(kindLoad))
 	}
 	if len(got.Submissions) != 1 || got.Submissions[0].TaskID != "register" {
 		t.Fatalf("submissions = %#v", got.Submissions)
@@ -35,7 +35,7 @@ func TestMutateMintsAndAppendsSubmission(t *testing.T) {
 
 func TestMutateDuplicateID(t *testing.T) {
 	domain := EmptyDomain()
-	domain.Load["load-1"] = map[string]any{"client": "NO"}
+	putKind(&domain, kindLoad, EntityMap{"load-1": {"client": "NO"}})
 	_, err := Mutate(domain, MutateRequest{
 		UserID: "ada",
 		JobID:  "intake",

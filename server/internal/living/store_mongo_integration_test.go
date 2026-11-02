@@ -21,20 +21,18 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	configs := NewMongoConfigStore(db)
 
 	org := "mongo-roundtrip-" + t.Name()
-	domain := Domain{
-		Load: EntityMap{
+	domain := domainFromKinds(map[string]EntityMap{
+		kindLoad: {
 			"NIR-1": {"client": "NO", "a.b": 42},
 		},
-		Extra: map[string]*EntityMap{
-			"kind.x": {"id.1": {"k.v": true}},
-		},
-		Submissions: []Submission{{
-			JobID: "intake", TaskID: "register", JobInstanceID: "NIR-1",
-			UserID: "ada", Facts: map[string]any{"f.g": "h"},
-			IDsTouched: []string{"NIR-1"},
-		}},
-		JobInstances: []JobInstance{{JobID: "intake", ID: "NIR-1", Label: "L"}},
-	}
+		"kind.x": {"id.1": {"k.v": true}},
+	})
+	domain.Submissions = []Submission{{
+		JobID: "intake", TaskID: "register", JobInstanceID: "NIR-1",
+		UserID: "ada", Facts: map[string]any{"f.g": "h"},
+		IDsTouched: []string{"NIR-1"},
+	}}
+	domain.JobInstances = []JobInstance{{JobID: "intake", ID: "NIR-1", Label: "L"}}
 	if err := domains.Put(ctx, org, domain); err != nil {
 		t.Fatal(err)
 	}
@@ -42,19 +40,16 @@ func TestMongoDomainAndConfigStoreRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Load["NIR-1"]["client"] != "NO" {
-		t.Fatalf("load = %#v", got.Load)
+	if got.Kind(kindLoad)["NIR-1"]["client"] != "NO" {
+		t.Fatalf("load = %#v", got.Kind(kindLoad))
 	}
-	switch got.Load["NIR-1"]["a.b"].(type) {
+	switch got.Kind(kindLoad)["NIR-1"]["a.b"].(type) {
 	case int, int32, int64, float64:
 	default:
-		t.Fatalf("dotted fact = %#v", got.Load["NIR-1"]["a.b"])
+		t.Fatalf("dotted fact = %#v", got.Kind(kindLoad)["NIR-1"]["a.b"])
 	}
-	if got.Extra == nil || got.Extra["kind.x"] == nil {
-		t.Fatalf("extra missing: %#v", got.Extra)
-	}
-	if (*got.Extra["kind.x"])["id.1"]["k.v"] != true {
-		t.Fatalf("extra entity = %#v", got.Extra)
+	if got.Kind("kind.x")["id.1"]["k.v"] != true {
+		t.Fatalf("extra entity = %#v", got.Entities)
 	}
 	if len(got.Submissions) != 1 || got.Submissions[0].Facts["f.g"] != "h" {
 		t.Fatalf("submissions = %#v", got.Submissions)
@@ -110,7 +105,7 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 
 	domains := NewMongoDomainStore(db)
 	configs := NewMongoConfigStore(db)
-	if err := domains.Put(ctx, org, Domain{Load: EntityMap{"L1": {"client": "NO"}}}); err != nil {
+	if err := domains.Put(ctx, org, domainFromKinds(map[string]EntityMap{kindLoad: {"L1": {"client": "NO"}}})); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadFeragameConfigFixture()
@@ -132,7 +127,7 @@ func TestMongoStoresSurviveReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Load["L1"]["client"] != "NO" {
+	if got.Kind(kindLoad)["L1"]["client"] != "NO" {
 		t.Fatalf("domain after reconnect = %#v", got)
 	}
 	active, err := configs2.ActiveVersion(ctx, org)
@@ -172,7 +167,7 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := domains.Put(ctx, cfg.Org, Domain{Load: EntityMap{"L1": {"client": "NO"}}}); err != nil {
+	if err := domains.Put(ctx, cfg.Org, domainFromKinds(map[string]EntityMap{kindLoad: {"L1": {"client": "NO"}}})); err != nil {
 		t.Fatal(err)
 	}
 	seeded, err := SeedDemo(ctx, domains, configs, SeedOptions{WipeDomain: true})
@@ -183,7 +178,7 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Load) != 0 {
+	if len(got.Kind(kindLoad)) != 0 {
 		t.Fatalf("wipe failed: %#v", got)
 	}
 	active, err := configs.ActiveVersion(ctx, seeded.Org)

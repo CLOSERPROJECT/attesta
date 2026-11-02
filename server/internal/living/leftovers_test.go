@@ -20,11 +20,11 @@ func feragameWeighRowSchema() map[string]any {
 
 func TestPalletWeightLeftoverIDsSkipsWeighted(t *testing.T) {
 	domain := EmptyDomain()
-	domain.Pallet = EntityMap{
+	putKind(&domain, kindPallet, EntityMap{
 		"load-1.1": map[string]any{"loadId": "load-1"},
 		"load-1.2": map[string]any{"loadId": "load-1", "weight": 11.0},
 		"load-2.1": map[string]any{"loadId": "load-2"},
-	}
+	})
 	got := palletWeightLeftoverIDs(domain, "load-1")
 	if len(got) != 1 || got[0] != "load-1.1" {
 		t.Fatalf("got = %#v", got)
@@ -66,12 +66,12 @@ func TestFilterFilledObjectRowsUsesSchema(t *testing.T) {
 
 func TestLineLoadLeftoverIDsSkipsDone(t *testing.T) {
 	domain := EmptyDomain()
-	domain.Pallet = EntityMap{
+	putKind(&domain, kindPallet, EntityMap{
 		"a": map[string]any{"loadId": "load-1", "weight": 11.0},
 		"b": map[string]any{"loadId": "load-1", "weight": 22.0, "progress": "partial"},
 		"c": map[string]any{"loadId": "load-1", "weight": 33.0, "progress": "done"},
 		"d": map[string]any{"loadId": "load-1"},
-	}
+	})
 	got := lineLoadLeftoverIDs(domain)
 	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
 		t.Fatalf("got = %#v", got)

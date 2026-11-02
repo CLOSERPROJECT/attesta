@@ -33,10 +33,12 @@ func NewMongoDomainStore(db *mongo.Database) *MongoDomainStore {
 }
 
 type mongoDomainDoc struct {
-	Org          string                               `bson:"_id"`
-	Load         map[string]map[string]any            `bson:"load"`
-	Pallet       map[string]map[string]any            `bson:"pallet"`
-	Container    map[string]map[string]any            `bson:"container"`
+	Org      string                               `bson:"_id"`
+	Entities map[string]map[string]map[string]any `bson:"entities"`
+	// Legacy top-level kinds: pre-entities Mongo docs still hold these; write emits entities only (demo wipe OK).
+	Load         map[string]map[string]any            `bson:"load,omitempty"`
+	Pallet       map[string]map[string]any            `bson:"pallet,omitempty"`
+	Container    map[string]map[string]any            `bson:"container,omitempty"`
 	Extra        map[string]map[string]map[string]any `bson:"extra,omitempty"`
 	Submissions  []mongoSubmissionDoc                 `bson:"submissions"`
 	JobInstances []JobInstance                        `bson:"jobInstances"`
@@ -204,24 +206,18 @@ func (s *MongoConfigStore) SetActiveVersion(ctx context.Context, org, version st
 }
 
 func domainToMongoDoc(org string, domain Domain) mongoDomainDoc {
+	ensureEntities(&domain)
 	doc := mongoDomainDoc{
 		Org:          org,
-		Load:         encodeEntityMap(domain.Load),
-		Pallet:       encodeEntityMap(domain.Pallet),
-		Container:    encodeEntityMap(domain.Container),
+		Entities:     make(map[string]map[string]map[string]any, len(domain.Entities)),
 		Submissions:  encodeSubmissions(domain.Submissions),
 		JobInstances: append([]JobInstance(nil), domain.JobInstances...),
 	}
-	if len(domain.Extra) > 0 {
-		doc.Extra = make(map[string]map[string]map[string]any, len(domain.Extra))
-		for kind, m := range domain.Extra {
-			encKind := encodeMongoKey(kind)
-			if m == nil {
-				doc.Extra[encKind] = map[string]map[string]any{}
-				continue
-			}
-			doc.Extra[encKind] = encodeEntityMap(*m)
-		}
+	for kind, m := range domain.Entities {
+		doc.Entities[encodeMongoKey(kind)] = encodeEntityMap(m)
+	}
+	if doc.Entities == nil {
+		doc.Entities = map[string]map[string]map[string]any{}
 	}
 	if doc.Submissions == nil {
 		doc.Submissions = []mongoSubmissionDoc{}
@@ -233,19 +229,30 @@ func domainToMongoDoc(org string, domain Domain) mongoDomainDoc {
 }
 
 func domainFromMongoDoc(doc mongoDomainDoc) Domain {
-	out := Domain{
-		Load:         decodeEntityMap(doc.Load),
-		Pallet:       decodeEntityMap(doc.Pallet),
-		Container:    decodeEntityMap(doc.Container),
-		Submissions:  decodeSubmissions(doc.Submissions),
-		JobInstances: append([]JobInstance(nil), doc.JobInstances...),
+	out := EmptyDomain()
+	out.Submissions = decodeSubmissions(doc.Submissions)
+	out.JobInstances = append([]JobInstance(nil), doc.JobInstances...)
+	for kind, m := range doc.Entities {
+		out.Entities[decodeMongoKey(kind)] = decodeEntityMap(m)
 	}
-	if len(doc.Extra) > 0 {
-		out.Extra = make(map[string]*EntityMap, len(doc.Extra))
-		for kind, m := range doc.Extra {
-			decoded := decodeEntityMap(m)
-			out.Extra[decodeMongoKey(kind)] = &decoded
+	ingestLegacyMongoKind := func(kind string, raw map[string]map[string]any) {
+		if raw == nil {
+			return
 		}
+		if _, exists := out.Entities[kind]; exists {
+			return
+		}
+		out.Entities[kind] = decodeEntityMap(raw)
+	}
+	ingestLegacyMongoKind(kindLoad, doc.Load)
+	ingestLegacyMongoKind(kindPallet, doc.Pallet)
+	ingestLegacyMongoKind(kindContainer, doc.Container)
+	for kind, m := range doc.Extra {
+		decoded := decodeMongoKey(kind)
+		if _, exists := out.Entities[decoded]; exists {
+			continue
+		}
+		out.Entities[decoded] = decodeEntityMap(m)
 	}
 	if out.Submissions == nil {
 		out.Submissions = []Submission{}

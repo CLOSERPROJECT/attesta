@@ -87,7 +87,7 @@ func TestCommitPalletWeightRejectsPartialLeftoversAll(t *testing.T) {
 	if len(domain.Submissions) != 2 {
 		t.Fatalf("partial must not append Submission: %#v", domain.Submissions)
 	}
-	if _, has := domain.Pallet[instanceID+".1"]["weight"]; has {
+	if _, has := domain.Kind(kindPallet)[instanceID+".1"]["weight"]; has {
 		t.Fatal("partial reject must not patch pallets")
 	}
 
@@ -120,11 +120,11 @@ func TestCommitPalletWeightCompleteAllUnlocksAndStartsWhen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Pallet[instanceID+".1"]["weight"] != 11.0 {
-		t.Fatalf("pallet .1 = %#v", result.Domain.Pallet[instanceID+".1"])
+	if result.Domain.Kind(kindPallet)[instanceID+".1"]["weight"] != 11.0 {
+		t.Fatalf("pallet .1 = %#v", result.Domain.Kind(kindPallet)[instanceID+".1"])
 	}
-	if result.Domain.Pallet[instanceID+".2"]["weight"] != 22.0 {
-		t.Fatalf("pallet .2 = %#v", result.Domain.Pallet[instanceID+".2"])
+	if result.Domain.Kind(kindPallet)[instanceID+".2"]["weight"] != 22.0 {
+		t.Fatalf("pallet .2 = %#v", result.Domain.Kind(kindPallet)[instanceID+".2"])
 	}
 	if len(result.Domain.Submissions) != 3 || result.Domain.Submissions[2].TaskID != "palletWeight" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)

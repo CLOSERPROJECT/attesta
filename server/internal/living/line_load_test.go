@@ -69,11 +69,11 @@ func TestCommitLineLoadBatchSomeDoesNotUnlockNext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Pallet[intakeID+".1"]["progress"] != "done" {
-		t.Fatalf("pallet .1 = %#v", result.Domain.Pallet[intakeID+".1"])
+	if result.Domain.Kind(kindPallet)[intakeID+".1"]["progress"] != "done" {
+		t.Fatalf("pallet .1 = %#v", result.Domain.Kind(kindPallet)[intakeID+".1"])
 	}
-	if result.Domain.Pallet[intakeID+".2"]["progress"] != "partial" {
-		t.Fatalf("pallet .2 = %#v", result.Domain.Pallet[intakeID+".2"])
+	if result.Domain.Kind(kindPallet)[intakeID+".2"]["progress"] != "partial" {
+		t.Fatalf("pallet .2 = %#v", result.Domain.Kind(kindPallet)[intakeID+".2"])
 	}
 	leftovers := lineLoadLeftoverIDs(result.Domain)
 	if len(leftovers) != 1 || leftovers[0] != intakeID+".2" {
@@ -144,11 +144,11 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, has := second.Domain.Pallet[intakeID+".2"]["progress"]; has {
-		t.Fatalf("second instance clear must unset progress: %#v", second.Domain.Pallet[intakeID+".2"])
+	if _, has := second.Domain.Kind(kindPallet)[intakeID+".2"]["progress"]; has {
+		t.Fatalf("second instance clear must unset progress: %#v", second.Domain.Kind(kindPallet)[intakeID+".2"])
 	}
-	if second.Domain.Pallet[intakeID+".1"]["progress"] != "done" {
-		t.Fatalf("first instance done must remain: %#v", second.Domain.Pallet[intakeID+".1"])
+	if second.Domain.Kind(kindPallet)[intakeID+".1"]["progress"] != "done" {
+		t.Fatalf("first instance done must remain: %#v", second.Domain.Kind(kindPallet)[intakeID+".1"])
 	}
 
 	var saw1st, saw2nd bool

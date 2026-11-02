@@ -52,7 +52,7 @@ func TestDomainBindingsEmptyCatalogsWhenNil(t *testing.T) {
 
 func TestRunTransformBindingsIncludeCatalogs(t *testing.T) {
 	domain := EmptyDomain()
-	domain.Load = EntityMap{}
+	putKind(&domain, kindLoad, EntityMap{})
 	got, err := RunTransform(domain, RunTransformInput{
 		JobInstanceID: "L1",
 		Facts:         map[string]any{},
@@ -89,7 +89,7 @@ func TestRunTransformBindingsIncludeCatalogs(t *testing.T) {
 
 func TestBuildFormBindingsNoTareKindsInjection(t *testing.T) {
 	domain := EmptyDomain()
-	domain.Load = EntityMap{"L1": {"client": "NO"}}
+	putKind(&domain, kindLoad, EntityMap{"L1": {"client": "NO"}})
 	bindings := buildFormBindings(domain, AvailableTaskRef{
 		JobID: "intake", TaskID: "palletWeight", JobInstanceID: "L1",
 	}, map[string]any{
@@ -107,10 +107,12 @@ func TestBuildFormBindingsNoTareKindsInjection(t *testing.T) {
 }
 
 func TestResolveReadWhereUsesCatalogs(t *testing.T) {
-	domain := Domain{Load: EntityMap{
-		"L1": {"client": "NO"},
-		"L2": {"client": "SU"},
-	}}
+	domain := domainFromKinds(map[string]EntityMap{
+		kindLoad: {
+			"L1": {"client": "NO"},
+			"L2": {"client": "SU"},
+		},
+	})
 	ids, err := ResolveRead(domain, ReadDef{
 		Entity: EntityLoad,
 		Where:  "client = $lookup($catalogs.clients, 'nord')",

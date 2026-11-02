@@ -6,15 +6,15 @@ import (
 )
 
 func dataReportProbeDomain() Domain {
-	return Domain{
-		Load: EntityMap{
+	d := domainFromKinds(map[string]EntityMap{
+		kindLoad: {
 			"L1": {"truckWeight": 1000.0, "truckTare": 200.0},
 		},
-		Pallet: EntityMap{
+		kindPallet: {
 			"P1": {"loadId": "L1", "weight": 125.0, "progress": "done"},
 			"P2": {"loadId": "L1", "weight": 100.0, "progress": "partial"},
 		},
-		Container: EntityMap{
+		kindContainer: {
 			"C1": {
 				"sourceLoadId": "L1", "material": "plastica", "weight": 50.0,
 				"secondarySourceLoadId": "L2",
@@ -23,14 +23,15 @@ func dataReportProbeDomain() Domain {
 			"C3": {"sourceLoadId": "L1", "material": "alluminio", "weight": 30.0},
 			"C4": {"sourceLoadId": "L1", "material": "mystery", "weight": 5.0},
 		},
-		Submissions: []Submission{{
-			JobID: "intake", TaskID: "palletWeight", JobInstanceID: "L1",
-			Facts: map[string]any{
-				"tareKind": "euro",
-				"weights":  map[string]any{"P1": map[string]any{}, "P2": map[string]any{}},
-			},
-		}},
-	}
+	})
+	d.Submissions = []Submission{{
+		JobID: "intake", TaskID: "palletWeight", JobInstanceID: "L1",
+		Facts: map[string]any{
+			"tareKind": "euro",
+			"weights":  map[string]any{"P1": map[string]any{}, "P2": map[string]any{}},
+		},
+	}}
+	return d
 }
 
 func TestBuildTaskFormBundleDataReportChromeDisplay(t *testing.T) {

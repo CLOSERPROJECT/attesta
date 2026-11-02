@@ -37,9 +37,9 @@ func TestEnsureLivingStoresUsesMemoryWithoutMongo(t *testing.T) {
 func TestEnsureLivingStoresSeedsFixtureAndOptionalWipe(t *testing.T) {
 	t.Setenv("ATTESTA_LIVING_SEED", "true")
 	domains := living.NewMemoryDomainStore()
-	if err := domains.Put(t.Context(), "feragame", living.Domain{
-		Load: living.EntityMap{"L1": {"client": "NO"}},
-	}); err != nil {
+	seeded := living.EmptyDomain()
+	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
+	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{livingDomains: domains}
@@ -48,7 +48,7 @@ func TestEnsureLivingStoresSeedsFixtureAndOptionalWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Load) != 0 {
+	if len(got.Kind("load")) != 0 {
 		t.Fatalf("expected wipe when ATTESTA_LIVING_SEED set: %#v", got)
 	}
 	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
@@ -63,9 +63,9 @@ func TestEnsureLivingStoresSeedsFixtureAndOptionalWipe(t *testing.T) {
 func TestEnsureLivingStoresSeedsFixtureWithoutWipeByDefault(t *testing.T) {
 	t.Setenv("ATTESTA_LIVING_SEED", "")
 	domains := living.NewMemoryDomainStore()
-	if err := domains.Put(t.Context(), "feragame", living.Domain{
-		Load: living.EntityMap{"L1": {"client": "NO"}},
-	}); err != nil {
+	seeded := living.EmptyDomain()
+	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
+	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{livingDomains: domains}
@@ -74,7 +74,7 @@ func TestEnsureLivingStoresSeedsFixtureWithoutWipeByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Load) != 1 {
+	if len(got.Kind("load")) != 1 {
 		t.Fatalf("domain wiped without ATTESTA_LIVING_SEED: %#v", got)
 	}
 	version, err := server.livingConfigs.ActiveVersion(t.Context(), "feragame")
@@ -248,7 +248,7 @@ func TestLivingCommitRegisterVerifiedSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
+	if domain.Kind("load")["NIR-261019-NO-1"]["client"] != "NO" {
 		t.Fatalf("stored domain = %#v", domain)
 	}
 	if len(domain.Submissions) != 1 || domain.Submissions[0].TaskID != "register" {
@@ -423,7 +423,7 @@ func TestLivingCommitAuthorizerDeny(t *testing.T) {
 	if err != nil && !errors.Is(err, living.ErrNotFound) {
 		t.Fatal(err)
 	}
-	if err == nil && (len(domain.Submissions) != 0 || len(domain.Load) != 0) {
+	if err == nil && (len(domain.Submissions) != 0 || len(domain.Kind("load")) != 0) {
 		t.Fatalf("domain should be unchanged after deny: %#v", domain)
 	}
 	var loaded living.LoadResult

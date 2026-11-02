@@ -58,11 +58,11 @@ func TestCommitRegisterPersistsAndLoadReflects(t *testing.T) {
 	if result.JobInstanceID != instanceID {
 		t.Fatalf("jobInstanceId = %q", result.JobInstanceID)
 	}
-	if result.Domain.Load[instanceID]["client"] != "NO" {
-		t.Fatalf("load = %#v", result.Domain.Load)
+	if result.Domain.Kind(kindLoad)[instanceID]["client"] != "NO" {
+		t.Fatalf("load = %#v", result.Domain.Kind(kindLoad))
 	}
-	if len(result.Domain.Pallet) != 2 {
-		t.Fatalf("pallets = %#v", result.Domain.Pallet)
+	if len(result.Domain.Kind(kindPallet)) != 2 {
+		t.Fatalf("pallets = %#v", result.Domain.Kind(kindPallet))
 	}
 	if len(result.Domain.Submissions) != 1 {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
@@ -79,7 +79,7 @@ func TestCommitRegisterPersistsAndLoadReflects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Domain.Load[instanceID]["truckWeight"] != 100.0 {
+	if loaded.Domain.Kind(kindLoad)[instanceID]["truckWeight"] != 100.0 {
 		t.Fatalf("loaded domain = %#v", loaded.Domain)
 	}
 	if len(loaded.Domain.JobInstances) != 1 || loaded.Domain.JobInstances[0].ID != instanceID {
@@ -139,8 +139,8 @@ func TestCommitWeightCheckAfterPalletWeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Load[instanceID]["checkedTruckWeight"] != 100.0 {
-		t.Fatalf("load = %#v", result.Domain.Load[instanceID])
+	if result.Domain.Kind(kindLoad)[instanceID]["checkedTruckWeight"] != 100.0 {
+		t.Fatalf("load = %#v", result.Domain.Kind(kindLoad)[instanceID])
 	}
 	if len(result.Domain.Submissions) != 4 || result.Domain.Submissions[3].TaskID != "weightCheck" {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
@@ -164,8 +164,8 @@ func TestCommitCodiceFirInOrderAfterRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Domain.Load[instanceID]["codiceFir"] != "FIR-TEST-1" {
-		t.Fatalf("load = %#v", result.Domain.Load[instanceID])
+	if result.Domain.Kind(kindLoad)[instanceID]["codiceFir"] != "FIR-TEST-1" {
+		t.Fatalf("load = %#v", result.Domain.Kind(kindLoad)[instanceID])
 	}
 	if len(result.Domain.Submissions) != 2 {
 		t.Fatalf("submissions = %#v", result.Domain.Submissions)
@@ -222,7 +222,7 @@ func TestHandleCommitHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if domain.Load["NIR-261019-NO-1"]["client"] != "NO" {
+	if domain.Kind(kindLoad)["NIR-261019-NO-1"]["client"] != "NO" {
 		t.Fatalf("stored domain = %#v", domain)
 	}
 

@@ -54,14 +54,11 @@ export function orderedJobIdsFromWorklist(
 	return worklist.jobs.map((row) => row.jobId);
 }
 
-/** Entity Domain shape (server-side / bindings bag); not kept on SPA Load/Commit. */
+/** Entity Domain shape (server-side / bindings bag); kinds are Org Config vocabulary. */
 export type Domain = {
-	load: EntityMap;
-	pallet: EntityMap;
-	container: EntityMap;
 	submissions: Submission[];
 	jobInstances: JobInstance[];
-};
+} & Record<string, EntityMap | Submission[] | JobInstance[] | undefined>;
 
 export type EntityMap = Record<string, Record<string, unknown>>;
 
@@ -87,9 +84,6 @@ export function taskPath(jobId: string, taskId: string): string {
 
 export function emptyDomain(): Domain {
 	return {
-		load: {},
-		pallet: {},
-		container: {},
 		submissions: [],
 		jobInstances: []
 	};

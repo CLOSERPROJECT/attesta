@@ -133,7 +133,7 @@ func main() {
 	must(err)
 	wl := living.ProjectWorklist(cfg, res.Domain)
 	fmt.Printf("seeded feragame in %s\n", dbName)
-	fmt.Printf("containers=%d submissions=%d\n", len(res.Domain.Container), len(res.Domain.Submissions))
+	fmt.Printf("containers=%d submissions=%d\n", len(res.Domain.Kind("container")), len(res.Domain.Submissions))
 	for _, j := range wl.Jobs {
 		for _, inst := range j.Instances {
 			fmt.Printf("%s@%s:\n", j.JobID, inst.ID)

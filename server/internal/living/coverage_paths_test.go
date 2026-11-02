@@ -216,16 +216,17 @@ func TestParseTaskPathAndStartsWhenAll(t *testing.T) {
 	}
 }
 
-func TestEntityMapsCloneDomainMutateExtra(t *testing.T) {
+func TestEntityMapsCloneDomainMutateEntities(t *testing.T) {
 	d := EmptyDomain()
-	d.Extra = map[string]*EntityMap{"kind.x": nil, "kind.y": &EntityMap{"id": {"k": 1}}}
+	putKind(&d, "kind.x", nil)
+	putKind(&d, "kind.y", EntityMap{"id": {"k": 1}})
 	maps := d.EntityMaps()
 	if len(maps["kind.x"]) != 0 || maps["kind.y"]["id"]["k"] != 1 {
 		t.Fatalf("EntityMaps = %#v", maps)
 	}
 	cloned := cloneDomain(d)
-	if cloned.Extra["kind.x"] == nil || (*cloned.Extra["kind.y"])["id"]["k"] != 1 {
-		t.Fatalf("cloneDomain Extra = %#v", cloned.Extra)
+	if len(cloned.Kind("kind.x")) != 0 || cloned.Kind("kind.y")["id"]["k"] != 1 {
+		t.Fatalf("cloneDomain kinds = %#v", cloned.Entities)
 	}
 
 	got, err := Mutate(EmptyDomain(), MutateRequest{
@@ -239,10 +240,10 @@ func TestEntityMapsCloneDomainMutateExtra(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if (*got.Extra["custom"])["c1"]["a"] != 2 {
-		t.Fatalf("extra mutate = %#v", got.Extra)
+	if got.Kind("custom")["c1"]["a"] != 2 {
+		t.Fatalf("extra mutate = %#v", got.Entities)
 	}
-	if _, ok := (*got.Extra["custom"])["c1"]["b"]; ok {
+	if _, ok := got.Kind("custom")["c1"]["b"]; ok {
 		t.Fatal("nil patch should unset")
 	}
 
@@ -311,9 +312,9 @@ func TestInjectEnumOnSchemaPropertyBranches(t *testing.T) {
 		t.Fatal("missing property")
 	}
 
-	projected, err := projectTaskForm(Domain{
-		Load: EntityMap{"L1": {"client": "NO"}},
-	}, map[string]any{
+	projected, err := projectTaskForm(domainFromKinds(map[string]EntityMap{
+		kindLoad: {"L1": {"client": "NO"}},
+	}), map[string]any{
 		"enumReads": map[string]any{"sourceLoadId": "loads"},
 		"reads": map[string]any{
 			"loads": map[string]any{"entity": "load", "key": "id"},
@@ -612,7 +613,9 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	domain := Domain{Load: EntityMap{"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}}}
+	domain := domainFromKinds(map[string]EntityMap{
+		kindLoad: {"L1": {"client": "NO"}, "L2": {"client": "SU"}, "L3": {}},
+	})
 	ids, err := ResolveRead(domain, def, "inst", "label", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -624,7 +627,7 @@ func TestParseReadDefAndResolveReadEdges(t *testing.T) {
 	if err != nil || len(ids) != 3 {
 		t.Fatalf("id key = %#v %v", ids, err)
 	}
-	extra, err := listEntities(Domain{Extra: map[string]*EntityMap{"custom": nil}}, EntityType("custom"))
+	extra, err := listEntities(domainFromKinds(map[string]EntityMap{"custom": nil}), EntityType("custom"))
 	if err != nil || len(extra) != 0 {
 		t.Fatalf("nil extra list = %#v %v", extra, err)
 	}
@@ -701,8 +704,8 @@ func TestParseTransformOpsAndRunTransformErrors(t *testing.T) {
 		t.Fatal("bad count type")
 	}
 	domain := EmptyDomain()
-	domain.Load["L1"] = map[string]any{"client": "NO"}
-	domain.Pallet["L1.1"] = map[string]any{"loadId": "L1"}
+	putKind(&domain, kindLoad, EntityMap{"L1": {"client": "NO"}})
+	putKind(&domain, kindPallet, EntityMap{"L1.1": {"loadId": "L1"}})
 	got, err := RunTransform(domain, RunTransformInput{
 		JobID: "intake", TaskID: "register", JobInstanceID: "L1", UserID: "ada",
 		Facts:   map[string]any{"L1.1": map[string]any{"weight": 1}},

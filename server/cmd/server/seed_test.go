@@ -122,9 +122,9 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 
 	domains := living.NewMemoryDomainStore()
 	configs := living.NewMemoryConfigStore()
-	if err := domains.Put(t.Context(), "feragame", living.Domain{
-		Load: living.EntityMap{"L1": {"client": "NO"}},
-	}); err != nil {
+	seeded := living.EmptyDomain()
+	seeded.Entities["load"] = living.EntityMap{"L1": {"client": "NO"}}
+	if err := domains.Put(t.Context(), "feragame", seeded); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,7 +145,7 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Load) != 0 {
+	if len(got.Kind("load")) != 0 {
 		t.Fatalf("domain not wiped on replace: %#v", got)
 	}
 	version, err := configs.ActiveVersion(t.Context(), "feragame")
