@@ -1,17 +1,14 @@
 import type { Worklist, WorklistJob, WorklistTask } from './types.js';
 
-/** Flat Available row keyed by jobId / jobInstanceId / taskId. */
 export type AvailableRow = {
 	jobId: string;
 	jobInstanceId: string;
 	taskId: string;
-	/** Instance label when present; else instance id. */
 	instanceLabel: string;
 	title: string;
 	roles: string[];
 };
 
-/** Can start row: Job order with startLabel → provisional first Task. */
 export type CanStartRow = {
 	jobId: string;
 	startLabel: string;
@@ -29,10 +26,7 @@ function taskChrome(job: WorklistJob, taskId: string): WorklistTask | null {
 	return job.tasks.find((t) => t.id === taskId) ?? null;
 }
 
-/**
- * Flat Available affordances: status `available` ∩ viewer roles, sorted
- * Job → instance → Task (Worklist / Org Config order).
- */
+/** Sort: Job → instance → Task (Worklist / Org Config order). */
 export function availableRowsFromWorklist(
 	worklist: Worklist | null | undefined,
 	viewerRoles: string[] | null | undefined
@@ -64,7 +58,7 @@ export function availableRowsFromWorklist(
 	return out;
 }
 
-/** Can start Jobs in Worklist order (canStart already viewer-scoped). */
+/** `canStart` is already viewer-scoped on the wire. */
 export function canStartRowsFromWorklist(
 	worklist: Worklist | null | undefined
 ): CanStartRow[] {

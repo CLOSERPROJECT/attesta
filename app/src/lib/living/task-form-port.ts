@@ -1,6 +1,5 @@
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 
-/** Addressed Task form hydrate — jobId + taskId + jobInstanceId (no run id). */
 export type TaskFormRequest = {
 	jobId: string;
 	taskId: string;

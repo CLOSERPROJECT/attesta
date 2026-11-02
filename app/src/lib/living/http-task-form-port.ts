@@ -18,7 +18,6 @@ function taskFormUrl(base: string, req: TaskFormRequest): string {
 	return `${base}/api/living/task-form?${params}`;
 }
 
-/** Browser Adapter: GET /api/living/task-form → one Task form bundle. */
 export function createHttpTaskFormPort(
 	options: HttpTaskFormPortOptions = {}
 ): TaskFormPort {

@@ -21,7 +21,6 @@ export type LivingSessionOptions = {
 	hydrate?: boolean;
 };
 
-/** Living org session: Load Worklist; Commit sealed Tasks; client Drafts. */
 export class LivingSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
@@ -34,7 +33,6 @@ export class LivingSession {
 	/** Last Commit HttpPort links (FormPlan strip can wait for ticket 14). */
 	lastHttpLinks = $state.raw<HttpLinkItem[]>([]);
 	lastHttpErrors = $state.raw<string[]>([]);
-	/** taskPath::jobInstanceId → sealed-shape draft object */
 	drafts = $state.raw<Record<string, Record<string, unknown>>>({});
 
 	constructor(options: LivingSessionOptions = {}) {

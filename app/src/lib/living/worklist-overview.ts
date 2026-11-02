@@ -9,7 +9,6 @@ export type PostCommitTarget =
 	| { kind: 'overview'; jobId: string; jobInstanceId: string }
 	| { kind: 'home' };
 
-/** Where a deep-linked Task URL should land when it is not mountable. */
 export type TaskDeepLinkTarget =
 	| { kind: 'task' }
 	| { kind: 'overview'; jobId: string; jobInstanceId: string }
@@ -71,7 +70,6 @@ export function resolveUnmountableTaskTarget(
 	return { kind: 'overview', jobId, jobInstanceId };
 }
 
-/** True when every authored Task on the instance is `done`. */
 export function instanceIsFinished(
 	worklist: Worklist | null | undefined,
 	jobId: string,
@@ -86,7 +84,6 @@ export function instanceIsFinished(
 	return ids.every((tid) => inst.tasks[tid] === 'done');
 }
 
-/** True when any Task on the instance is not yet `done` (overview still useful). */
 export function instanceHasRemainingWork(
 	worklist: Worklist | null | undefined,
 	jobId: string,

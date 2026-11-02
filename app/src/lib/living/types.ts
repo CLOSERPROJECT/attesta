@@ -2,7 +2,6 @@ import type { TaskFormBundle } from './form/task-form-bundle.js';
 
 export type { TaskFormBundle };
 
-/** Org hydrate from GET /api/living/domain — Worklist + config metadata. */
 export type LoadResult = {
 	org: string;
 	activeConfigVersion: string;

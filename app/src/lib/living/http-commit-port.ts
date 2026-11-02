@@ -65,7 +65,6 @@ export function parseCommitResult(raw: unknown): CommitResult {
 	};
 }
 
-/** Browser Adapter: POST /api/living/commit → Worklist + nextTaskFormBundle. Drafts stay client-side. */
 export function createHttpCommitDomainPort(
 	options: HttpCommitDomainPortOptions = {}
 ): CommitDomainPort {

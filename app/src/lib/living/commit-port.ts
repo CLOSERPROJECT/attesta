@@ -5,7 +5,6 @@ export type CommitMint =
 	| { kind: 'none' }
 	| { kind: 'startingNew' };
 
-/** Org Domain Commit — Task path + Job instance; no run id. */
 export type CommitRequest = {
 	taskPath: string;
 	/** Empty only with mint.startingNew; never send `_new` on the wire. */
@@ -38,7 +37,6 @@ export type CommitResult = {
 	httpErrors?: string[];
 };
 
-/** SPA-facing Commit success for post-Commit routing (ticket 05). */
 export type CommitOutcome = {
 	jobInstanceId: string;
 	worklist: Worklist;

@@ -1,4 +1,4 @@
 import { LivingSession } from './session.svelte.js';
 
-/** Shared living session for `/app`. Hydrate from the shell on mount (browser). */
+/** Shell hydrates on mount (browser); module ctor skips auto-hydrate. */
 export const living = new LivingSession({ hydrate: false });

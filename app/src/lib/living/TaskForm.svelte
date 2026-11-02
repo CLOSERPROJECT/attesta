@@ -23,10 +23,8 @@
 		taskId: string;
 		/** Empty string = provisional start (first Task / mint). */
 		jobInstanceId: string;
-		/** Mount payload from addressed fetch or Commit nextTaskFormBundle. */
 		bundle: TaskFormBundle;
 		disabled?: boolean;
-		/** Called after successful Commit for post-Commit routing. */
 		onCommitted?: (outcome: CommitOutcome) => void;
 	};
 
