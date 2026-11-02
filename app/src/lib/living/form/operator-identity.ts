@@ -1,5 +1,5 @@
 /**
- * Local operator identity for role-gated Substep availability.
+ * Local operator identity for chrome eval `$operator` + submit stamp.
  * No kernel / Appwrite / Cerbos — harness supplies via getOperator().
  */
 export type OperatorIdentity = {
@@ -9,15 +9,3 @@ export type OperatorIdentity = {
 	org: string;
 	roles: string[];
 };
-
-/**
- * Omit or empty `roles` ⇒ pass. Else operator must hold ≥1 listed role.
- */
-export function operatorPassesRoleGate(
-	operator: OperatorIdentity,
-	roles: readonly string[] | undefined
-): boolean {
-	if (roles === undefined || roles.length === 0) return true;
-	const held = new Set(operator.roles);
-	return roles.some((role) => held.has(role));
-}
