@@ -2,12 +2,16 @@ import type { CommitDomainPort, CommitRequest, HttpLinkItem } from './commit-por
 import { createHttpCommitDomainPort } from './http-commit-port.js';
 import { draftKey } from './drafts.js';
 import { createHttpLoadDomainPort } from './http-load-port.js';
+import { createHttpTaskFormPort } from './http-task-form-port.js';
 import type { LoadDomainPort } from './load-port.js';
+import type { TaskFormPort, TaskFormRequest } from './task-form-port.js';
+import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { orderedJobIdsFromWorklist, type LoadResult, type WorklistJob } from './types.js';
 
 export type LivingSessionOptions = {
 	load?: LoadDomainPort;
 	commit?: CommitDomainPort;
+	taskForm?: TaskFormPort;
 	/** When false, skip background hydrate (tests inject result). Default true. */
 	hydrate?: boolean;
 };
@@ -16,6 +20,7 @@ export type LivingSessionOptions = {
 export class LivingSession {
 	readonly load: LoadDomainPort;
 	readonly commitPort: CommitDomainPort;
+	readonly taskFormPort: TaskFormPort;
 	result = $state.raw<LoadResult | null>(null);
 	loading = $state(false);
 	committing = $state(false);
@@ -30,6 +35,7 @@ export class LivingSession {
 	constructor(options: LivingSessionOptions = {}) {
 		this.load = options.load ?? createHttpLoadDomainPort();
 		this.commitPort = options.commit ?? createHttpCommitDomainPort();
+		this.taskFormPort = options.taskForm ?? createHttpTaskFormPort();
 		if (options.hydrate !== false) {
 			void this.hydrate();
 		}
@@ -75,6 +81,11 @@ export class LivingSession {
 		} finally {
 			this.loading = false;
 		}
+	};
+
+	/** Addressed Task form hydrate (ticket 04 mounts); does not touch home bulk. */
+	fetchTaskForm = (req: TaskFormRequest): Promise<TaskFormBundle> => {
+		return this.taskFormPort.fetch(req);
 	};
 
 	/**

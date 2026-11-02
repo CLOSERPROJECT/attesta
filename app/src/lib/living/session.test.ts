@@ -168,6 +168,35 @@ describe('LivingSession', () => {
 		expect(session.getDraft('intake/register', '_new')).toBeNull();
 	});
 
+	test('fetchTaskForm delegates to TaskFormPort without touching home bulk', async () => {
+		const bundle: TaskFormBundle = {
+			jobId: 'intake',
+			taskId: 'register',
+			jobInstanceId: '',
+			title: 'Register',
+			surface: 'live',
+			schema: { type: 'object' },
+			uiSchema: {},
+			initialData: {},
+			chrome: [],
+			chromeFieldIds: [],
+			sealFieldIds: [],
+			bindings: { domain: {} }
+		};
+		const fetch = vi.fn(async () => bundle);
+		const session = new LivingSession({
+			load: { load: async () => sample },
+			taskForm: { fetch },
+			hydrate: false
+		});
+		session.result = structuredClone(sample);
+		const priorBundles = session.result.taskFormBundles;
+		const got = await session.fetchTaskForm({ jobId: 'intake', taskId: 'register' });
+		expect(got).toEqual(bundle);
+		expect(fetch).toHaveBeenCalledWith({ jobId: 'intake', taskId: 'register' });
+		expect(session.result?.taskFormBundles).toBe(priorBundles);
+	});
+
 	test('commit denial keeps Draft and re-Loads Worklist', async () => {
 		const reloaded = structuredClone(sample);
 		reloaded.worklist = {

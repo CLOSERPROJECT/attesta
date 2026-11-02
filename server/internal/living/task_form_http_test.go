@@ -44,6 +44,40 @@ func TestLoadTaskBundleProvisionalAndAvailable(t *testing.T) {
 	}
 }
 
+// Addressed fetch must not depend on LoadResult.TaskFormBundles (home may omit bulk).
+func TestLoadTaskBundleIndependentOfHomeBulk(t *testing.T) {
+	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
+	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
+	instanceID := "NIR-261019-NO-1"
+	if _, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
+		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(), Mint: startingNewMint(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	bundle, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "codiceFir", instanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.TaskID != "codiceFir" || bundle.JobInstanceID != instanceID {
+		t.Fatalf("addressed = %s", bundleAddress(bundle))
+	}
+
+	// Simulate ADR-0006 end-state omit on a prior Load payload; remount must still work.
+	loaded, err := loader.Load(t.Context(), "feragame", admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded.TaskFormBundles = nil
+	again, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "codiceFir", instanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.TaskID != "codiceFir" {
+		t.Fatalf("remount after empty bulk = %s", bundleAddress(again))
+	}
+}
+
 func TestLoadTaskBundleDeniesRoleOutsideBoardScope(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	instanceID := "NIR-261019-NO-1"
