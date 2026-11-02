@@ -4,22 +4,24 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done (squashed into `feat/attesta-rework`)
 
 **Execution:** sequential subagents only (finish A before B).
 
 ### Subagent 08A — Kernel catalogs
 
-- [ ] Org Config accepts `catalogs`; Commit/Load expr bindings include `$catalogs`
-- [ ] Task-local `tareKinds` is no longer copied into form `bindings.domain` by the host
-- [ ] Go tests cover `$catalogs` visibility and absence of tareKinds injection
+- [x] Org Config accepts `catalogs`; Commit/Load expr bindings include `$catalogs`
+- [x] Task-local `tareKinds` is no longer copied into form `bindings.domain` by the host
+- [x] Go tests cover `$catalogs` visibility and absence of tareKinds injection
 
 ### Subagent 08B — Feragame migration
 
-- [ ] Feragame materials, tareKinds, and clients live under `catalogs`
-- [ ] Derived / chrome / transforms that used inlined lists read `$catalogs.*`
-- [ ] Living fixture / Commit paths that depended on those lists stay green
+- [x] Feragame materials, tareKinds, and clients live under `catalogs`
+- [x] Derived / chrome / transforms that used inlined lists read `$catalogs.*`
+- [x] Living fixture / Commit paths that depended on those lists stay green
 
 **Decisions (grill 2026-11-02):** catalogs ≠ Domain entities; schema/enum codegen from catalogs is later; Go stays dumb — catalogs are config data only.
 
 **Out of scope:** `bind` op; Domain kind map; leftovers/`completeness` removal; schema generation from catalogs.
+
+**Landed:** squash on integration after review+fix (`$catalogs` on ResolveRead/submit-http; glossary Org catalogs).
