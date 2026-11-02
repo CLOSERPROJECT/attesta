@@ -121,19 +121,23 @@ Host-injected `{ userId, org, roles }` for role gates, chrome, and Submission ac
 _Avoid_: Principal; forging actor via schema fields; Operator (catalog role label) for this bag
 
 **Commit**:
-Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are Adapters only.
+Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are Adapters only. The Commit response includes an updated viewer-scoped **Worklist** and, when auto-advance applies, the next **Task form bundle**, so the SPA can route to the next Task, **Job instance overview**, or Worklist home without a blind re-Load.
 _Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group
 
 **Load**:
-Hydrate what the operator UI needs for the org: **Worklist**, **Task form bundle**s for available work (including `bindings.chromeDisplay` for `dataReport`), and Active Config version metadata — not a dump of full Domain + full Org Config for client-side gate or FormPlan compile.
-_Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport
+Hydrate what the operator UI needs for the org: viewer-scoped **Worklist** (and Active Config version metadata) for the home board; not a dump of full Domain + full Org Config. **Task form bundle**s are loaded when opening a Task route (and may return on Commit for the just-worked / next Task), not as a full available-set on every home Load.
+_Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport; requiring every available Task’s form bundle on home Load
 
 **Worklist**:
-Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, and `repeatable` for Config-free chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order and startsWhen are evaluated only on the server from **Submission** relations; a Task is `done` after Submission on the instance. The UI reads the projection and does not re-implement those rules.
-_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; row-id reopen for Task status; inventing Task order/labels from a client Org Config snapshot
+Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, and `repeatable` for Config-free chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order and startsWhen are evaluated only on the server from **Submission** relations; a Task is `done` after Submission on the instance. For the operator home, **Available** and **Can start** are further scoped to the current **OperatorIdentity**’s Config roles (first Task for Can start). The UI reads the projection and does not re-implement those rules. Living `/app` landing for the affiliated operator is this board (not legacy Operator home at `/my`): two actionable bands, not `locked`/`done` rows.
+_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; row-id reopen for Task status; inventing Task order/labels from a client Org Config snapshot; Operator home (the `/my` Stream landing); client-side role filtering from a full Org Config
+
+**Job instance overview**:
+Operator screen for one Job instance at `/app/{jobId}/{jobInstanceId}`: Task statuses on that instance plus handoff copy when the next work is gated to Config roles the viewer lacks. Used after Commit when auto-advance does not apply, and as an exit target from Task/Available. Not the Worklist and not an authoring surface.
+_Avoid_: Stream timeline; process page; embedding the full instance tree on Worklist home
 
 **Task form bundle**:
-Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load/Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Load/Commit ship a set for every Worklist-`available` Task plus a provisional bundle (`jobInstanceId` empty) when `canStart`.
+Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load-of-Task and Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Fetched for the Task being opened (provisional `jobInstanceId` empty / `new` when starting), not bulk-shipped for every Worklist-`available` Task on home Load.
 _Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live draft-driven Chrome results as static strings; SPA Domain walk for dataReport or row ids
 
 **AuthPort / AuthorizerPort**:
