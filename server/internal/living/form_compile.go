@@ -198,46 +198,88 @@ func withDefaultPlaceholders(uiSchema, schema map[string]any, chromeFieldIDs []s
 	for _, id := range chromeFieldIDs {
 		skip[id] = struct{}{}
 	}
-	props, _ := schema["properties"].(map[string]any)
 	out := cloneMapJSON(uiSchema)
+	applyDefaultPlaceholders(out, schema, skip, true)
+	return out
+}
+
+func applyDefaultPlaceholders(uiNode, schemaNode map[string]any, skipRoot map[string]struct{}, atRoot bool) bool {
+	props, _ := schemaNode["properties"].(map[string]any)
+	if len(props) == 0 {
+		return false
+	}
+	changed := false
 	for key, raw := range props {
-		if _, hit := skip[key]; hit {
-			continue
+		if atRoot {
+			if _, hit := skipRoot[key]; hit {
+				continue
+			}
 		}
 		prop, _ := raw.(map[string]any)
-		if prop == nil || !acceptsPlaceholder(prop) {
+		if prop == nil {
 			continue
 		}
-		existing, _ := out[key].(map[string]any)
-		if existing == nil {
-			existing = map[string]any{}
+		fieldUi, _ := uiNode[key].(map[string]any)
+		if fieldUi == nil {
+			fieldUi = map[string]any{}
 		} else {
-			existing = cloneMapJSON(existing)
+			fieldUi = cloneMapJSON(fieldUi)
 		}
-		if fieldHasPlaceholder(existing) {
-			continue
+		fieldChanged := false
+		if acceptsPlaceholder(prop) && !fieldHasPlaceholder(fieldUi) {
+			writeDefaultPlaceholder(fieldUi, defaultPlaceholderText(key, prop))
+			fieldChanged = true
 		}
-		text := defaultPlaceholderText(key, prop)
-		opts, _ := existing["ui:options"].(map[string]any)
-		if opts == nil {
-			opts = map[string]any{}
-		} else {
-			opts = cloneMapJSON(opts)
-		}
-		for _, widgetKey := range []string{"shadcn4Text", "shadcn4Number", "shadcn4Select"} {
-			prev, _ := opts[widgetKey].(map[string]any)
-			if prev == nil {
-				prev = map[string]any{}
-			} else {
-				prev = cloneMapJSON(prev)
+		if _, ok := prop["properties"].(map[string]any); ok {
+			if applyDefaultPlaceholders(fieldUi, prop, nil, false) {
+				fieldChanged = true
 			}
-			prev["placeholder"] = text
-			opts[widgetKey] = prev
 		}
-		existing["ui:options"] = opts
-		out[key] = existing
+		if items, ok := prop["items"].(map[string]any); ok {
+			itemsUi, _ := fieldUi["items"].(map[string]any)
+			if itemsUi == nil {
+				itemsUi = map[string]any{}
+			} else {
+				itemsUi = cloneMapJSON(itemsUi)
+			}
+			itemsChanged := false
+			if _, ok := items["properties"].(map[string]any); ok {
+				itemsChanged = applyDefaultPlaceholders(itemsUi, items, nil, false)
+			} else if acceptsPlaceholder(items) && !fieldHasPlaceholder(itemsUi) {
+				writeDefaultPlaceholder(itemsUi, defaultPlaceholderText(key, items))
+				itemsChanged = true
+			}
+			if itemsChanged {
+				fieldUi["items"] = itemsUi
+				fieldChanged = true
+			}
+		}
+		if fieldChanged {
+			uiNode[key] = fieldUi
+			changed = true
+		}
 	}
-	return out
+	return changed
+}
+
+func writeDefaultPlaceholder(fieldUi map[string]any, text string) {
+	opts, _ := fieldUi["ui:options"].(map[string]any)
+	if opts == nil {
+		opts = map[string]any{}
+	} else {
+		opts = cloneMapJSON(opts)
+	}
+	for _, widgetKey := range []string{"shadcn4Text", "shadcn4Number", "shadcn4Select"} {
+		prev, _ := opts[widgetKey].(map[string]any)
+		if prev == nil {
+			prev = map[string]any{}
+		} else {
+			prev = cloneMapJSON(prev)
+		}
+		prev["placeholder"] = text
+		opts[widgetKey] = prev
+	}
+	fieldUi["ui:options"] = opts
 }
 
 func acceptsPlaceholder(schema map[string]any) bool {
@@ -287,6 +329,9 @@ func defaultPlaceholderText(fieldKey string, schema map[string]any) string {
 	label := title
 	if label == "" {
 		label = fieldKey
+	}
+	if _, hasEnum := schema["enum"]; hasEnum {
+		return fmt.Sprintf("Seleziona %s…", label)
 	}
 	return fmt.Sprintf("Inserisci %s…", label)
 }

@@ -495,6 +495,47 @@ steps:
               uiSchema:
                 ui:options:
                     order: [sourceLoadId, secondarySourceLoadId, polvereDiVetro, granellaDiVetro, granellaDiVetro2, polvereDiSilicio, plastica, alluminio, sopravaglio, polvereDiAspirazione]
+                sourceLoadId:
+                    ui:components:
+                        stringField: enumField
+                secondarySourceLoadId:
+                    ui:components:
+                        stringField: enumField
+                # Compact material arrays: shared chrome via anchor (SPA paintContainerRegCompactArrayUi semantics).
+                polvereDiVetro: &containerRegMaterialArrayUi
+                    ui:components:
+                        arrayItemField: compactArrayItemField
+                    ui:options:
+                        orderable: false
+                        copyable: false
+                        layouts:
+                            array-field:
+                                class: 'gap-0 has-[[data-layout=array-items]>*]:gap-2 [&>button]:w-auto [&>button]:self-start has-[[data-layout=array-items]>*]:[&_[data-layout=array-field-title-row]]:mb-3'
+                            array-items:
+                                class: gap-1
+                            array-field-title-row:
+                                variant: label
+                                class: mb-1
+                    items:
+                        ui:options:
+                            hideTitle: true
+                            order: [weight, dualSources]
+                            layouts:
+                                object-properties:
+                                    class: flex w-full flex-row flex-nowrap items-stretch gap-2
+                        weight:
+                            ui:options:
+                                hideTitle: true
+                        dualSources:
+                            ui:components:
+                                booleanField: checkboxOnlyField
+                granellaDiVetro: *containerRegMaterialArrayUi
+                granellaDiVetro2: *containerRegMaterialArrayUi
+                polvereDiSilicio: *containerRegMaterialArrayUi
+                plastica: *containerRegMaterialArrayUi
+                alluminio: *containerRegMaterialArrayUi
+                sopravaglio: *containerRegMaterialArrayUi
+                polvereDiAspirazione: *containerRegMaterialArrayUi
               onSubmit:
                 transform:
                     # Prep flattens form → { sourceLoadId, rows }; dual rows carry form secondary.
