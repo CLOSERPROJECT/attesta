@@ -204,7 +204,6 @@ var authoredFieldRegistry = map[string]struct {
 	componentKey string
 	slot         string
 }{
-	"rowTable":      {"rowTableField", "objectField"},
 	"mapTable":      {"mapTableField", "objectField"},
 	"derivedLeaf":   {"derivedLeafField", "numberField"},
 	"checkbox-only": {"checkboxOnlyField", "booleanField"},

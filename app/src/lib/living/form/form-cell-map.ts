@@ -1,6 +1,6 @@
 /**
- * Progress-map Draft helpers: omit untouched cells before Ajv / seal.
- * Enum values and valueType come from TaskFormBundle — not schema classifiers.
+ * Cell-map Draft helpers: omit untouched scalar cells before Ajv / seal.
+ * Enum values live on the cell schema — not table-owned paint.
  */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -12,11 +12,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * non-string cells (e.g. weigh-row objects from a mis-seed).
  * Keep `null` (explicit clear) and non-empty strings (schema validates enum).
  */
-export function omitUntouchedProgressCells(
-	progress: Readonly<Record<string, unknown>>
+export function omitUntouchedCells(
+	cells: Readonly<Record<string, unknown>>
 ): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
-	for (const [id, cell] of Object.entries(progress)) {
+	for (const [id, cell] of Object.entries(cells)) {
 		if (cell === undefined) continue;
 		if (typeof cell === 'string' && cell.trim() === '') continue;
 		if (cell === null) {
@@ -28,7 +28,7 @@ export function omitUntouchedProgressCells(
 	return out;
 }
 
-function looksLikeProgressMap(value: unknown): value is Record<string, unknown> {
+function looksLikeCellMap(value: unknown): value is Record<string, unknown> {
 	if (!isPlainObject(value)) return false;
 	for (const cell of Object.values(value)) {
 		if (cell === null || cell === undefined) continue;
@@ -38,7 +38,7 @@ function looksLikeProgressMap(value: unknown): value is Record<string, unknown> 
 	return true;
 }
 
-function progressCellTypeLabel(cell: unknown): string {
+function cellTypeLabel(cell: unknown): string {
 	if (cell === null) return 'null';
 	if (cell === undefined) return 'undefined';
 	if (typeof cell === 'string' && cell.trim() === '') return 'empty-string';
@@ -47,20 +47,20 @@ function progressCellTypeLabel(cell: unknown): string {
 	return typeof cell;
 }
 
-/** Normalize progress-shaped maps before Ajv submit / sealSubmission. */
-export function normalizeFormProgress<T extends Record<string, unknown>>(value: T): T {
+/** Normalize cell-map-shaped maps before Ajv submit / sealSubmission. */
+export function normalizeFormCellMaps<T extends Record<string, unknown>>(value: T): T {
 	let changed = false;
 	const next: Record<string, unknown> = { ...value };
 	for (const [key, raw] of Object.entries(value)) {
-		if (!looksLikeProgressMap(raw)) continue;
+		if (!looksLikeCellMap(raw)) continue;
 		if (import.meta.env.DEV) {
 			const types: Record<string, string> = {};
 			for (const [id, cell] of Object.entries(raw)) {
-				types[id] = progressCellTypeLabel(cell);
+				types[id] = cellTypeLabel(cell);
 			}
-			console.debug('[normalizeFormProgress] cell types', key, types);
+			console.debug('[normalizeFormCellMaps] cell types', key, types);
 		}
-		const cleaned = omitUntouchedProgressCells(raw);
+		const cleaned = omitUntouchedCells(raw);
 		next[key] = cleaned;
 		changed = true;
 	}

@@ -960,7 +960,7 @@ func TestProjectTaskFormErrorPathsAndPlaceholder(t *testing.T) {
 		t.Fatal("default placeholder key")
 	}
 	painted := paintAuthoredFieldMarkers(map[string]any{
-		"ui:field": "rowTable",
+		"ui:field": "mapTable",
 		"additionalProperties": map[string]any{
 			"child": map[string]any{"ui:field": "mapTable"},
 			"raw":   1,
@@ -1134,18 +1134,18 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 	if err == nil {
 		t.Fatal("full-map required missing b")
 	}
-	_, err = filterFilledProgress(map[string]any{"a": "nope"}, map[string]any{"type": "string", "enum": []any{"partial", "done"}})
+	_, err = filterFilledCells(map[string]any{"a": "nope"}, map[string]any{"type": "string", "enum": []any{"partial", "done"}})
 	if err == nil {
-		t.Fatal("filterFilledProgress")
+		t.Fatal("filterFilledCells")
 	}
-	_, err = filterFilledProgress(map[string]any{"a": "done"}, map[string]any{"type": "string"})
+	_, err = filterFilledCells(map[string]any{"a": "done"}, map[string]any{"type": "string"})
 	if err == nil {
 		t.Fatal("missing enum must not silently accept progress")
 	}
-	if msg := validateProgressFacts(nil, []string{"a"}); msg == "" {
+	if msg := validateCellFacts(nil, []string{"a"}); msg == "" {
 		t.Fatal("empty progress facts")
 	}
-	if msg := validateProgressFacts(map[string]any{"z": "done"}, []string{"a"}); msg == "" {
+	if msg := validateCellFacts(map[string]any{"z": "done"}, []string{"a"}); msg == "" {
 		t.Fatal("progress not in rows")
 	}
 	if rowMapValue(nil, map[string]any{"a": 1}, "")["a"] != 1 {
@@ -1157,13 +1157,13 @@ func TestPrepRowAndLoaderEdges(t *testing.T) {
 	if additionalPropertiesSchema(map[string]any{}, "x") != nil {
 		t.Fatal("missing additionalProperties")
 	}
-	if !additionalPropertiesIsProgress(map[string]any{"type": "string"}) {
+	if !additionalPropertiesIsCellMap(map[string]any{"type": "string"}) {
 		t.Fatal("progress type string")
 	}
-	if !additionalPropertiesIsProgress(map[string]any{"type": []any{"string", "null"}}) {
+	if !additionalPropertiesIsCellMap(map[string]any{"type": []any{"string", "null"}}) {
 		t.Fatal("progress type union")
 	}
-	if additionalPropertiesIsProgress(map[string]any{"type": "object"}) {
+	if additionalPropertiesIsCellMap(map[string]any{"type": "object"}) {
 		t.Fatal("object not progress")
 	}
 	if enforceRequiredMapKeys(map[string]any{}, nil) != "" {
@@ -1586,10 +1586,10 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	if _, ok := dynamicPropertyDef(map[string]any{"dynamicProperties": map[string]any{"x": "bad"}}, "x"); ok {
 		t.Fatal("dyn not object")
 	}
-	if additionalPropertiesIsProgress(map[string]any{"anyOf": []any{"nope", map[string]any{"type": "number"}}}) {
+	if additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{"nope", map[string]any{"type": "number"}}}) {
 		t.Fatal("anyOf skip non-map")
 	}
-	if !additionalPropertiesIsProgress(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
+	if !additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
 		t.Fatal("anyOf string")
 	}
 	if msg := enforceRequiredMapKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {

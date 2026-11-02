@@ -45,12 +45,12 @@ func prepDynamicMapFacts(task map[string]any, value map[string]any, rowIDs []str
 	addSchema := additionalPropertiesSchema(task, primary)
 
 	var facts map[string]any
-	if additionalPropertiesIsProgress(addSchema) {
-		filled, err := filterFilledProgress(mapValue, addSchema)
+	if additionalPropertiesIsCellMap(addSchema) {
+		filled, err := filterFilledCells(mapValue, addSchema)
 		if err != nil {
 			return prepResult{}, err
 		}
-		if msg := validateProgressFacts(filled, rowIDs); msg != "" {
+		if msg := validateCellFacts(filled, rowIDs); msg != "" {
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
 		facts = filled
@@ -84,8 +84,8 @@ func rowMapValue(task map[string]any, value map[string]any, primary string) map[
 	return nested
 }
 
-// Progress cells are string enums; clear wire may allow null via anyOf / type union.
-func additionalPropertiesIsProgress(add map[string]any) bool {
+// Cell maps use scalar additionalProperties (string enums); clear may allow null via anyOf.
+func additionalPropertiesIsCellMap(add map[string]any) bool {
 	if add == nil {
 		return false
 	}

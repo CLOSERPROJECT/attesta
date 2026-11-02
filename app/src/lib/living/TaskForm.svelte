@@ -5,7 +5,6 @@
 	import { taskPath } from './types.js';
 	import ConfigForm from './form/ConfigForm.svelte';
 	import HttpLinkStrip from './form/HttpLinkStrip.svelte';
-	import TableFormShell from './form/TableFormShell.svelte';
 	import type { TaskFormPlan } from './form/task-form-plan.js';
 	import { emptySnapshot } from './form/domain-snapshot.js';
 	import {
@@ -47,8 +46,6 @@
 	let submitError = $state.raw<string | null>(null);
 	let live: LiveTaskForm | null = $state(null);
 	let plan = $state.raw<TaskFormPlan | null>(null);
-	/** Bumped after successful row-table Commit so TableFormShell remounts from bundle seed. */
-	let shellEpoch = $state(0);
 	let seededFromBundle = $state(false);
 
 	function readDraft(): Record<string, unknown> {
@@ -96,17 +93,14 @@
 			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
 		});
 		if (mintedId == null) return;
-		if (bundle.surface === 'row-table') {
-			const next = findTaskFormBundle(
-				living.result?.taskFormBundles,
-				jobId,
-				taskId,
-				mintedId
-			);
-			if (next) {
-				writeDraft({ ...(next.initialData ?? {}) });
-			}
-			shellEpoch += 1;
+		const next = findTaskFormBundle(
+			living.result?.taskFormBundles,
+			jobId,
+			taskId,
+			mintedId
+		);
+		if (next) {
+			writeDraft({ ...(next.initialData ?? {}) });
 		}
 		onCommitted?.(mintedId);
 	}
@@ -120,7 +114,6 @@
 	function remountLive(nextPlan: TaskFormPlan) {
 		disposeLive();
 		plan = nextPlan;
-		if (nextPlan.surface !== 'live') return;
 		live = new LiveTaskForm(nextPlan, {
 			getValue: () => readDraft(),
 			setValue: (next) => writeDraft(next),
@@ -155,11 +148,6 @@
 		void bundle;
 
 		seedBundleDraft(bundle);
-		if (bundle.surface === 'row-table') {
-			disposeLive();
-			plan = planFromTaskFormBundle(bundle);
-			return;
-		}
 		const compiled = planFromTaskFormBundle(bundle);
 		if (plan?.projectionKey !== compiled.projectionKey || live === null) {
 			remountLive(compiled);
@@ -168,16 +156,9 @@
 
 	onDestroy(() => disposeLive());
 
-	const rowIds = $derived(bundle.rowIds ?? []);
-	const projectionKey = $derived(bundle.projectionKey ?? '');
-	const shellKey = $derived(`${projectionKey}:${shellEpoch}`);
 	const showLinks = $derived(
 		living.lastHttpLinks.length > 0 || living.lastHttpErrors.length > 0
 	);
-	const rowColumns = $derived(bundle.columns);
-	const rowSchema = $derived(bundle.schema);
-	const rowUiSchema = $derived(bundle.uiSchema);
-	const showRowTable = $derived(bundle.surface === 'row-table');
 </script>
 
 <section
@@ -189,30 +170,7 @@
 >
 	<h3 class="text-sm font-semibold text-zinc-800">{title}</h3>
 
-	{#if showRowTable}
-		{#if rowSchema && rowUiSchema}
-			{#key shellKey}
-				<fieldset disabled={disabled || living.committing} class="space-y-4">
-					<TableFormShell
-						schema={rowSchema}
-						uiSchema={rowUiSchema}
-						rowIds={[...rowIds]}
-						columns={rowColumns ?? { id: 'Id', value: 'Value' }}
-						valueType={bundle.valueType ?? 'progress'}
-						progressEnums={bundle.progressEnums ?? []}
-						value={readDraft()}
-						onValueChange={writeDraft}
-						onSubmit={(value) => void submitSealed(value)}
-						onSubmitError={onFormSubmitError}
-						disabled={disabled || living.committing}
-					/>
-				</fieldset>
-			{/key}
-			<p class="text-xs text-zinc-500">
-				Rows: {rowIds.length ? rowIds.join(', ') : 'none'}
-			</p>
-		{/if}
-	{:else if live?.form}
+	{#if live?.form}
 		{#key live.plan.projectionKey}
 			<fieldset disabled={disabled || living.committing} class="space-y-4">
 				<ConfigForm form={live.form} class="space-y-4" />

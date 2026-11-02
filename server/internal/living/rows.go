@@ -158,7 +158,7 @@ func isEmptyScalar(cell any) bool {
 }
 
 // Untouched this pass — omit from batch (not the same as clear null).
-func isUntouchedProgressCell(cell any) bool {
+func isUntouchedCell(cell any) bool {
 	if cell == nil {
 		return false
 	}
@@ -168,13 +168,13 @@ func isUntouchedProgressCell(cell any) bool {
 	return false
 }
 
-// Set or clear progress cells; untouched rows stay out of the batch.
-// nil in the result means clear/unset entity progress (kept, not dropped).
-func filterFilledProgress(value map[string]any, cellSchema map[string]any) (map[string]any, error) {
-	enums := progressEnumsFromSchema(cellSchema)
+// Set or clear scalar cells; untouched rows stay out of the batch.
+// nil in the result means clear/unset (kept, not dropped).
+func filterFilledCells(value map[string]any, cellSchema map[string]any) (map[string]any, error) {
+	enums := stringEnumsFromSchema(cellSchema)
 	filled := make(map[string]any)
 	for id, cell := range value {
-		if isUntouchedProgressCell(cell) {
+		if isUntouchedCell(cell) {
 			continue
 		}
 		if cell == nil {
@@ -182,18 +182,18 @@ func filterFilledProgress(value map[string]any, cellSchema map[string]any) (map[
 			continue
 		}
 		if len(enums) == 0 {
-			return nil, fmt.Errorf("progress cell schema missing string enum")
+			return nil, fmt.Errorf("cell schema missing string enum")
 		}
 		s, ok := cell.(string)
 		if !ok || !stringInList(s, enums) {
-			return nil, fmt.Errorf("invalid progress for %s", id)
+			return nil, fmt.Errorf("invalid cell for %s", id)
 		}
 		filled[id] = s
 	}
 	return filled, nil
 }
 
-func progressEnumsFromSchema(add map[string]any) []string {
+func stringEnumsFromSchema(add map[string]any) []string {
 	if add == nil {
 		return nil
 	}
@@ -216,7 +216,7 @@ func progressEnumsFromSchema(add map[string]any) []string {
 	return nil
 }
 
-func validateProgressFacts(facts map[string]any, rowIDs []string) string {
+func validateCellFacts(facts map[string]any, rowIDs []string) string {
 	if len(facts) == 0 {
 		return "nothing to submit — fill at least one row"
 	}

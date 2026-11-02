@@ -302,30 +302,20 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	if _, has := progressSchema["required"]; has {
 		t.Fatalf("partial-map progress must not project required from read ids; got %#v", progressSchema["required"])
 	}
-	assertLineLoadProgressPaint(t, lineLoad)
+	assertLineLoadCellMapBundle(t, lineLoad)
 }
 
-func assertLineLoadProgressPaint(t *testing.T, bundle *TaskFormBundle) {
+// Cell-map Tasks mount as live ConfigForm; enums stay on cell schema only.
+func assertLineLoadCellMapBundle(t *testing.T, bundle *TaskFormBundle) {
 	t.Helper()
-	if bundle.Surface != "row-table" {
-		t.Fatalf("surface = %q, want row-table", bundle.Surface)
-	}
-	if bundle.ValueType != "progress" {
-		t.Fatalf("valueType = %q, want progress", bundle.ValueType)
-	}
-	wantEnums := []string{"partial", "done"}
-	if len(bundle.ProgressEnums) != len(wantEnums) {
-		t.Fatalf("progressEnums = %#v, want %#v", bundle.ProgressEnums, wantEnums)
-	}
-	for i, want := range wantEnums {
-		if bundle.ProgressEnums[i] != want {
-			t.Fatalf("progressEnums = %#v, want %#v", bundle.ProgressEnums, wantEnums)
-		}
+	if bundle.Surface != "live" {
+		t.Fatalf("surface = %q, want live", bundle.Surface)
 	}
 	props, _ := bundle.Schema["properties"].(map[string]any)
 	progress, _ := props["progress"].(map[string]any)
 	add, _ := progress["additionalProperties"].(map[string]any)
-	fromSchema := progressEnumsFromSchema(add)
+	wantEnums := []string{"partial", "done"}
+	fromSchema := stringEnumsFromSchema(add)
 	if len(fromSchema) != len(wantEnums) {
 		t.Fatalf("schema enums = %#v, want %#v", fromSchema, wantEnums)
 	}
@@ -335,6 +325,13 @@ func assertLineLoadProgressPaint(t *testing.T, bundle *TaskFormBundle) {
 		}
 	}
 	propUi, _ := bundle.UiSchema["progress"].(map[string]any)
+	if propUi == nil {
+		t.Fatal("progress uiSchema missing")
+	}
+	comps, _ := propUi["ui:components"].(map[string]any)
+	if comps["objectField"] != "mapTableField" {
+		t.Fatalf("ui:components = %#v, want mapTableField objectField", comps)
+	}
 	opts, _ := propUi["ui:options"].(map[string]any)
 	if opts == nil {
 		t.Fatal("progress ui:options missing")
@@ -343,25 +340,11 @@ func assertLineLoadProgressPaint(t *testing.T, bundle *TaskFormBundle) {
 	if cols["id"] != "Bancale" || cols["value"] != "Avanzamento" {
 		t.Fatalf("columns clobbered: %#v", cols)
 	}
-	if opts["valueType"] != "progress" {
-		t.Fatalf("ui:options.valueType = %#v", opts["valueType"])
+	if _, has := opts["valueType"]; has {
+		t.Fatalf("ui:options must not stamp valueType; got %#v", opts["valueType"])
 	}
-	stamped, ok := opts["progressEnums"].([]string)
-	if !ok {
-		raw, _ := opts["progressEnums"].([]any)
-		stamped = make([]string, len(raw))
-		for i, v := range raw {
-			s, _ := v.(string)
-			stamped[i] = s
-		}
-	}
-	if len(stamped) != len(wantEnums) {
-		t.Fatalf("ui:options.progressEnums = %#v, want %#v", opts["progressEnums"], wantEnums)
-	}
-	for i, want := range wantEnums {
-		if stamped[i] != want {
-			t.Fatalf("ui:options.progressEnums = %#v, want %#v", stamped, wantEnums)
-		}
+	if _, has := opts["progressEnums"]; has {
+		t.Fatalf("ui:options must not stamp progressEnums; got %#v", opts["progressEnums"])
 	}
 }
 

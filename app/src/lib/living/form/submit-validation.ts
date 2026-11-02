@@ -1,6 +1,6 @@
 /**
- * createForm skips onSubmit when Ajv fails; rowTable exact-path
- * getFieldErrors misses nested progress/<id> errors. Helpers surface both.
+ * createForm skips onSubmit when Ajv fails; exact-path getFieldErrors
+ * misses nested map/<id> errors. Helpers surface both.
  */
 
 export type SubmitValidationError = {
@@ -33,7 +33,7 @@ export function messagesUnderPath(
 	return out;
 }
 
-/** Exact-path only — what rowTable used before child aggregation. */
+/** Exact-path only — contrast with messagesUnderPath for nested cells. */
 export function messagesAtExactPath(
 	errors: ReadonlyArray<SubmitValidationError>,
 	path: ReadonlyArray<string | number>

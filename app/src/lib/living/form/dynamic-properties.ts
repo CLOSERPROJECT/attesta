@@ -13,8 +13,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** rowTable (flat cells) or mapTable (object-row composition) — both need dynamicProperties. */
-const DYNAMIC_TABLE_FIELDS = new Set(['rowTable', 'mapTable']);
+/** mapTable (cell map or object-row composition) needs dynamicProperties. */
+const DYNAMIC_TABLE_FIELDS = new Set(['mapTable']);
 
 function dynamicTableProperties(uiSchema: unknown): string[] {
 	if (!isPlainObject(uiSchema)) return [];
@@ -61,7 +61,7 @@ function parseDynamicPropertyDef(
 }
 
 /**
- * Validate row-table paint vs `dynamicProperties`; reject legacy `propertyNamesFrom`.
+ * Validate mapTable paint vs `dynamicProperties`; reject legacy `propertyNamesFrom`.
  * Returns a shallow copy with normalized `dynamicProperties` when present.
  */
 export function parseAuthoredPayload(path: string, raw: unknown): Record<string, unknown> {
@@ -93,14 +93,14 @@ export function parseAuthoredPayload(path: string, raw: unknown): Record<string,
 
 	if (tableProps.includes('')) {
 		throw new Error(
-			`${path}: rowTable/mapTable must be under a named schema property (not root uiSchema)`
+			`${path}: mapTable must be under a named schema property (not root uiSchema)`
 		);
 	}
 
 	if (!hasDynamic) {
 		if (tableProps.length > 0) {
 			throw new Error(
-				`${path}: rowTable/mapTable requires dynamicProperties entry for each painted property`
+				`${path}: mapTable requires dynamicProperties entry for each painted property`
 			);
 		}
 		return { ...raw };
@@ -133,7 +133,7 @@ export function parseAuthoredPayload(path: string, raw: unknown): Record<string,
 	for (const property of tableProps) {
 		if (!(property in dynamicProperties)) {
 			throw new Error(
-				`${path}: rowTable/mapTable on "${property}" requires dynamicProperties.${property}`
+				`${path}: mapTable on "${property}" requires dynamicProperties.${property}`
 			);
 		}
 	}
@@ -141,7 +141,7 @@ export function parseAuthoredPayload(path: string, raw: unknown): Record<string,
 	for (const property of Object.keys(dynamicProperties)) {
 		if (!tableProps.includes(property)) {
 			throw new Error(
-				`${path}.dynamicProperties.${property}: uiSchema.${property}.ui:field must be rowTable or mapTable`
+				`${path}.dynamicProperties.${property}: uiSchema.${property}.ui:field must be mapTable`
 			);
 		}
 	}

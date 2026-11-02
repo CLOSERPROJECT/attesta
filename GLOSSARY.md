@@ -63,8 +63,8 @@ Task-level Domain readiness (boolean expression over Domain). Combined with the 
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression
 
 **Domain reads** (map/table Tasks):
-Authored `reads` + `dynamicProperties` that project current entity ids into a form map (row projection / `rowIds` on the Task form bundle). Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate subsystem; not spawn-many of full child registers.
-_Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product grammar; SPA twin Domain-read id helpers; conflating map reads with Task group
+Authored `reads` + `dynamicProperties` that project current entity ids into a form map (row projection / `rowIds` on the Task form bundle). Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate subsystem; not spawn-many of full child registers. Two shapes share one authored `ui:field: mapTable`: a **cell map** (`additionalProperties` scalar — one value column, sjsf field per cell schema) and an **object map** (`additionalProperties` object — property columns, sjsf field per property).
+_Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product grammar; SPA twin Domain-read id helpers; conflating map reads with Task group; dual markers (`rowTable`); table-owned enum paint
 
 **Submission**:
 Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order, startsWhen, and Worklist done status read Submissions only (one successful Submission finishes the Task on that instance).
@@ -107,12 +107,12 @@ Task-root display catalog (readonly, dataReport, …). Sibling to `derived`; str
 _Avoid_: Encoding live readouts as schema fields meant for submit; naming the Worklist “Chrome”; SPA Domain aggregation for dataReport
 
 **dynamicProperties**:
-Field-keyed map config: each property names a Domain **read** whose ids fill that map. Full vs partial Commit is `schema.required` projection, not completeness.
-_Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`
+Field-keyed map config: each property names a Domain **read** whose ids fill that map. Full vs partial Commit is `schema.required` projection, not completeness. Drives both cell maps and object maps under `mapTable`.
+_Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`; `ui:field: rowTable`
 
 **progress** (entity field):
-Plant-style entity fact on some rows: unset; `partial`; `done`. Draft ≠ progress; Worklist done is Submission law.
-_Avoid_: boolean `processed` as a Worklist gate; treating progress enums as unlock grammar
+Plant-style entity fact on some rows: unset; `partial`; `done`. Draft ≠ progress; Worklist done is Submission law. Not a form/map type — cell enums live on the JSON Schema cell (`additionalProperties`), rendered by sjsf.
+_Avoid_: boolean `processed` as a Worklist gate; treating progress enums as unlock grammar; form `progressEnums` / `valueType: "progress"` / table-owned enum paint
 
 ### Operator and seams
 

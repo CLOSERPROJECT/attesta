@@ -24,7 +24,7 @@ export type ChromeEntry = ChromeReadonly | ChromeDataReport;
 
 /** Frozen FormPlan — produced from a server TaskFormBundle, never client compile. */
 export type TaskFormPlan = {
-	surface: 'live' | 'row-table';
+	surface: 'live';
 	schemas: { schema: Schema; uiSchema: UiSchemaRoot };
 	derived?: Record<string, DerivedKeyEntry>;
 	chrome: readonly ChromeEntry[];

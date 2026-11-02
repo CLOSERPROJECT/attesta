@@ -378,7 +378,7 @@ steps:
                 properties:
                     progress:
                         type: object
-                        # "—" clear writes null; server filterFilledProgress keeps null (clear), omits "".
+                        # "—" clear writes null; server filterFilledCells keeps null (clear), omits "".
                         additionalProperties:
                             anyOf:
                                 - type: 'null'
@@ -386,7 +386,7 @@ steps:
                                   enum: [partial, done]
               uiSchema:
                 progress:
-                    ui:field: rowTable
+                    ui:field: mapTable
                     ui:options:
                         expandable: false
                         columns: {id: Bancale, value: Avanzamento}

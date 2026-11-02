@@ -41,28 +41,26 @@ describe('submit validation visibility', () => {
 		).toMatch(/progress\.b/);
 	});
 
-	test('createConfigForm / rowTable / TaskForm wire onSubmitError path', () => {
+	test('createConfigForm / mapTable / TaskForm wire onSubmitError path', () => {
 		const createCfg = readFileSync(join(libDir, 'create-config-form.svelte.ts'), 'utf8');
-		const rowSrc = readFileSync(join(libDir, 'row-table-field.svelte'), 'utf8');
-		const shell = readFileSync(join(libDir, 'TableFormShell.svelte'), 'utf8');
+		const mapSrc = readFileSync(join(libDir, 'map-table-field.svelte'), 'utf8');
 		const task = readFileSync(join(libDir, '../TaskForm.svelte'), 'utf8');
-		const progress = readFileSync(join(libDir, 'form-progress.ts'), 'utf8');
+		const cellMap = readFileSync(join(libDir, 'form-cell-map.ts'), 'utf8');
 		expect(createCfg).toContain('onSubmitError');
-		expect(shell).toContain('onSubmitError');
-		expect(shell).toContain('progressEnums');
-		expect(shell).not.toContain('rowValueTypeFromSchema');
-		expect(shell).not.toContain('progressEnumsFromFormSchema');
-		expect(progress).not.toContain('export function rowValueTypeFromSchema');
-		expect(progress).not.toContain('export function progressEnumsFromFormSchema');
-		expect(rowSrc).toContain('getFieldsErrors');
-		expect(rowSrc).toContain('getChildPath');
+		expect(mapSrc).toContain('getFieldComponent');
+		expect(mapSrc).toContain('data-testid="map-table"');
+		expect(cellMap).toContain('export function omitUntouchedCells');
+		expect(cellMap).toContain('export function normalizeFormCellMaps');
+		expect(cellMap).not.toContain('progressEnumsFromFormSchema');
+		expect(cellMap).not.toContain('rowValueTypeFromSchema');
 		expect(task).toContain('task-submit-error');
 		expect(task).toContain('onSubmitError');
-		expect(task).toContain('shellEpoch');
 		expect(task).toContain('findTaskFormBundle');
 		expect(task).toContain('initialData');
 		expect(task).toContain('planFromTaskFormBundle');
-		expect(task).toContain('progressEnums={bundle.progressEnums');
+		expect(task).toContain('ConfigForm');
+		expect(task).not.toContain('TableFormShell');
+		expect(task).not.toContain('progressEnums');
 		expect(task).not.toContain('compileTaskFormPlan');
 		expect(task).not.toContain('seedMapTableDraft');
 		expect(task).not.toContain('seedProgressDraftFromDomain');

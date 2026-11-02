@@ -209,10 +209,10 @@ func TestCommitLineLoadRejectsEmptyBatch(t *testing.T) {
 	}
 }
 
-func TestFixtureLineLoadAdditionalPropertiesIsProgress(t *testing.T) {
+func TestFixtureLineLoadAdditionalPropertiesIsCellMap(t *testing.T) {
 	task := map[string]any(lineLoadTask(lineJob(t)))
 	add := additionalPropertiesSchema(task, "progress")
-	if !additionalPropertiesIsProgress(add) {
-		t.Fatalf("additionalPropertiesIsProgress = false (null|enum anyOf must still classify as progress); schema=%#v", add)
+	if !additionalPropertiesIsCellMap(add) {
+		t.Fatalf("additionalPropertiesIsCellMap = false (null|enum anyOf must still classify as cell map); schema=%#v", add)
 	}
 }

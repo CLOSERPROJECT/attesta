@@ -114,10 +114,10 @@ func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	if schemaStringEnum(nil) != nil {
 		t.Fatal("nil schemaStringEnum")
 	}
-	if progressEnumsFromSchema(nil) != nil {
-		t.Fatal("nil progressEnums")
+	if stringEnumsFromSchema(nil) != nil {
+		t.Fatal("nil stringEnums")
 	}
-	if progressEnumsFromSchema(map[string]any{"anyOf": []any{"x", map[string]any{"type": "null"}}}) != nil {
+	if stringEnumsFromSchema(map[string]any{"anyOf": []any{"x", map[string]any{"type": "null"}}}) != nil {
 		t.Fatal("anyOf without enums")
 	}
 	if numberViolatesBounds(1, map[string]any{"minimum": 2}) != true || numberViolatesBounds(3, map[string]any{"minimum": 2}) {
@@ -154,11 +154,11 @@ func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	}
 }
 
-func TestAdditionalPropertiesIsProgressAllowsNullAnyOf(t *testing.T) {
-	if !additionalPropertiesIsProgress(map[string]any{"type": "string"}) {
+func TestAdditionalPropertiesIsCellMapAllowsNullAnyOf(t *testing.T) {
+	if !additionalPropertiesIsCellMap(map[string]any{"type": "string"}) {
 		t.Fatal("plain string type")
 	}
-	if !additionalPropertiesIsProgress(map[string]any{
+	if !additionalPropertiesIsCellMap(map[string]any{
 		"anyOf": []any{
 			map[string]any{"type": "null"},
 			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
@@ -166,19 +166,19 @@ func TestAdditionalPropertiesIsProgressAllowsNullAnyOf(t *testing.T) {
 	}) {
 		t.Fatal("null|enum anyOf")
 	}
-	if additionalPropertiesIsProgress(map[string]any{"type": "object"}) {
-		t.Fatal("object weigh cells must not classify as progress")
+	if additionalPropertiesIsCellMap(map[string]any{"type": "object"}) {
+		t.Fatal("object weigh cells must not classify as cell map")
 	}
 }
 
-func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
+func TestFilterFilledCellsKeepsPartialDoneAndNullClear(t *testing.T) {
 	schema := map[string]any{
 		"anyOf": []any{
 			map[string]any{"type": "null"},
 			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
 		},
 	}
-	filled, err := filterFilledProgress(map[string]any{
+	filled, err := filterFilledCells(map[string]any{
 		"a": "done", "b": "partial", "c": "", "d": nil,
 	}, schema)
 	if err != nil {
@@ -190,11 +190,11 @@ func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
 	if filled["a"] != "done" || filled["b"] != "partial" || filled["d"] != nil {
 		t.Fatalf("filled = %#v", filled)
 	}
-	if validateProgressFacts(filled, []string{"a", "b", "d"}) != "" {
+	if validateCellFacts(filled, []string{"a", "b", "d"}) != "" {
 		t.Fatal("valid batch must pass")
 	}
-	_, err = filterFilledProgress(map[string]any{"a": false}, schema)
-	if err == nil || !strings.Contains(err.Error(), "invalid progress") {
+	_, err = filterFilledCells(map[string]any{"a": false}, schema)
+	if err == nil || !strings.Contains(err.Error(), "invalid cell") {
 		t.Fatalf("err = %v", err)
 	}
 }

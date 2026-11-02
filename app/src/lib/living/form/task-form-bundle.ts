@@ -1,5 +1,5 @@
 import type { Schema, UiSchemaRoot } from '@sjsf/form';
-import { normalizeFormProgress } from './form-progress.js';
+import { normalizeFormCellMaps } from './form-cell-map.js';
 import type { ChromeEntry, TaskFormPlan } from './task-form-plan.js';
 import type { DerivedKeyEntry } from './derived-keys.js';
 
@@ -9,11 +9,7 @@ export type TaskFormBundle = {
 	taskId: string;
 	jobInstanceId: string;
 	title: string;
-	surface: 'live' | 'row-table';
-	/** Present when surface is row-table; Go stamps `"progress"`. */
-	valueType?: 'progress';
-	/** Progress cell enum options from Go; SPA must not parse schema. */
-	progressEnums?: string[];
+	surface: 'live';
 	schema: Schema;
 	uiSchema: UiSchemaRoot;
 	initialData: Record<string, unknown>;
@@ -69,8 +65,8 @@ export function planFromTaskFormBundle(bundle: TaskFormBundle): TaskFormPlan {
 		chrome: bundle.chrome ?? [],
 		chromeFieldIds: bundle.chromeFieldIds ?? [],
 		projectionKey: bundle.projectionKey ?? '',
-		// Chrome ids are stripped in Go prep; keep progress normalize until Draft never writes "".
-		sealSubmission: (value) => normalizeFormProgress(value)
+		// Chrome ids are stripped in Go prep; keep cell-map omit until Draft never writes "".
+		sealSubmission: (value) => normalizeFormCellMaps(value)
 	};
 }
 

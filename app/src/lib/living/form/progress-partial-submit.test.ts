@@ -1,10 +1,9 @@
 /**
- * Regression: row-table Commit with one enum cell + "—" clear.
+ * Regression: cell-map Commit with one enum cell + "—" clear.
  *
- * row-table-field.setProgressCell writes `null` for clear. Authored
- * progress.additionalProperties must allow null | enum so Ajv Draft does not
- * block submit before onSubmit / Commit. Server filterFilledProgress keeps null
- * (clear) and omits untouched "".
+ * Clear writes `null`. Authored progress.additionalProperties must allow
+ * null | enum so Ajv Draft does not block submit before onSubmit / Commit.
+ * Server filterFilledCells keeps null (clear) and omits untouched "".
  *
  * Schema fixture mirrors Go TaskFormBundle projection (no client projectFormSchema).
  */
@@ -27,20 +26,20 @@ function lineLoadProjectedSchema(): Schema {
 	} as Schema;
 }
 
-describe('lineLoad partial progress submit (Ajv draft)', () => {
+describe('lineLoad partial cell-map submit (Ajv draft)', () => {
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 	const schema = lineLoadProjectedSchema();
 
-	/** Mirrors row-table-field.setProgressCell write semantics. */
-	function setProgressCell(
+	/** Mirrors scalar mapTable clear write semantics. */
+	function setCell(
 		value: Record<string, unknown>,
 		id: string,
-		nextProgress: string | undefined
+		next: string | undefined
 	): Record<string, unknown> {
-		const next = { ...value };
-		if (nextProgress === undefined) next[id] = null;
-		else next[id] = nextProgress;
-		return next;
+		const out = { ...value };
+		if (next === undefined) out[id] = null;
+		else out[id] = next;
+		return out;
 	}
 
 	test('projection keeps nullability on progress.additionalProperties', () => {
@@ -65,12 +64,12 @@ describe('lineLoad partial progress submit (Ajv draft)', () => {
 
 	test('enum + — clear (null) validates so submit / Commit can fire', () => {
 		let progress: Record<string, unknown> = {};
-		progress = setProgressCell(progress, 'NIR-1.1', 'partial');
-		progress = setProgressCell(progress, 'NIR-1.2', undefined); // UI "—"
+		progress = setCell(progress, 'NIR-1.1', 'partial');
+		progress = setCell(progress, 'NIR-1.2', undefined); // UI "—"
 		const form = validator.validateFormValue(schema, { progress });
 		expect(
 			form.errors,
-			'null clear is intentional wire (server filterFilledProgress); Ajv must not block submit'
+			'null clear is intentional wire (server filterFilledCells); Ajv must not block submit'
 		).toBeUndefined();
 	});
 });

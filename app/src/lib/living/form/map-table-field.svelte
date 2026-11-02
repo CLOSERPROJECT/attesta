@@ -61,8 +61,27 @@
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
 	const errors = $derived(getFieldErrors(ctx, config.path));
 
-	/** Columns from additionalProperties.properties (or first row schema). */
+	const columns = $derived(readColumns({ 'ui:options': { columns: uiOption('columns') } }));
+
+	function isObjectRowSchema(schema: Schema): boolean {
+		if (schema.properties && typeof schema.properties === 'object') return true;
+		const t = schema.type;
+		if (t === 'object') return true;
+		if (Array.isArray(t) && t.includes('object')) return true;
+		return false;
+	}
+
+	/** Object map → property columns; cell map → single value column. */
+	const objectMap = $derived.by(() => {
+		const order = objCtx.propertiesOrder();
+		const sample = order[0];
+		if (!sample) return false;
+		const rowCfg = objCtx.propertyConfig(config, sample, objCtx.isAdditionalProperty(sample));
+		return isObjectRowSchema(rowCfg.schema);
+	});
+
 	const columnKeys = $derived.by(() => {
+		if (!objectMap) return [] as string[];
 		const order = objCtx.propertiesOrder();
 		const sample = order[0];
 		if (!sample) return [] as string[];
@@ -70,9 +89,14 @@
 		return objectRowMapColumnKeys(rowCfg.schema.properties);
 	});
 
-	const idColumnTitle = $derived(
-		readColumns({ 'ui:options': { columns: uiOption('columns') } }).id
-	);
+	const valueColumnTitle = $derived.by(() => {
+		if (columns.value !== 'Value') return columns.value;
+		const order = objCtx.propertiesOrder();
+		const sample = order[0];
+		if (!sample) return columns.value;
+		const rowCfg = objCtx.propertyConfig(config, sample, objCtx.isAdditionalProperty(sample));
+		return rowCfg.schema.title ?? columns.value;
+	});
 
 	function withHiddenTitle(uiSchema: UiSchema): UiSchema {
 		const options =
@@ -115,11 +139,27 @@
 		});
 	}
 
+	/** Cell-map: additionalProperties schema is the cell itself. */
+	function scalarCellConfig(rowCfg: Config): Config {
+		return getStableConfig(ctx, {
+			path: rowCfg.path,
+			title: rowCfg.title,
+			schema: rowCfg.schema,
+			uiSchema: withHiddenTitle(rowCfg.uiSchema),
+			required: rowCfg.required,
+			value: rowCfg.value
+		});
+	}
+
 	function setCell(rowKey: string, column: string, cell: SchemaValue | undefined): void {
 		const row = {
 			...((value?.[rowKey] as SchemaObjectValue | undefined) ?? {})
 		} as Record<string, unknown>;
 		objCtx.set(rowKey, writeObjectRowMapCell(row, column, cell) as SchemaObjectValue | undefined);
+	}
+
+	function setScalarCell(rowKey: string, cell: SchemaValue | undefined): void {
+		objCtx.set(rowKey, cell as SchemaObjectValue | undefined);
 	}
 
 	function columnHeaderTitle(column: string): string {
@@ -144,10 +184,14 @@
 	<table class="map-table" data-testid="map-table">
 		<thead>
 			<tr>
-				<th scope="col">{idColumnTitle}</th>
-				{#each columnKeys as col (col)}
-					<th scope="col">{columnHeaderTitle(col)}</th>
-				{/each}
+				<th scope="col">{columns.id}</th>
+				{#if objectMap}
+					{#each columnKeys as col (col)}
+						<th scope="col">{columnHeaderTitle(col)}</th>
+					{/each}
+				{:else}
+					<th scope="col">{valueColumnTitle}</th>
+				{/if}
 			</tr>
 		</thead>
 		<tbody>
@@ -156,23 +200,40 @@
 				{@const rowCfg = objCtx.propertyConfig(config, rowKey, isAdditional)}
 				<tr data-testid="map-row" data-row={rowKey}>
 					<td><code>{rowKey}</code></td>
-					{#each columnKeys as col (col)}
-						{@const cellCfg = cellConfig(rowCfg, col)}
+					{#if objectMap}
+						{#each columnKeys as col (col)}
+							{@const cellCfg = cellConfig(rowCfg, col)}
+							{@const Field = getFieldComponent(ctx, cellCfg)}
+							<td data-testid="map-cell" data-col={col}>
+								<Field
+									type="field"
+									bind:value={
+										() =>
+											(value?.[rowKey] as SchemaObjectValue | undefined)?.[col] as undefined,
+										(v) => setCell(rowKey, col, v)
+									}
+									config={cellCfg}
+									uiOption={(opt) => retrieveUiOption(ctx, cellCfg, opt)}
+									translate={retrieveTranslate(ctx, cellCfg)}
+								/>
+							</td>
+						{/each}
+					{:else}
+						{@const cellCfg = scalarCellConfig(rowCfg)}
 						{@const Field = getFieldComponent(ctx, cellCfg)}
-						<td data-testid="map-cell" data-col={col}>
+						<td data-testid="map-cell" data-col="value">
 							<Field
 								type="field"
 								bind:value={
-									() =>
-										(value?.[rowKey] as SchemaObjectValue | undefined)?.[col] as undefined,
-									(v) => setCell(rowKey, col, v)
+									() => value?.[rowKey] as undefined,
+									(v) => setScalarCell(rowKey, v)
 								}
 								config={cellCfg}
 								uiOption={(opt) => retrieveUiOption(ctx, cellCfg, opt)}
 								translate={retrieveTranslate(ctx, cellCfg)}
 							/>
 						</td>
-					{/each}
+					{/if}
 				</tr>
 			{/each}
 		</tbody>

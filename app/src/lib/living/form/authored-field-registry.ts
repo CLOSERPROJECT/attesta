@@ -20,7 +20,6 @@ export type AuthoredFieldRow = {
 
 /** Sole authored → resolved name map. New `ui:field` = one row. */
 export const AUTHORED_FIELD_REGISTRY = [
-	{ authored: 'rowTable', componentKey: 'rowTableField', slot: 'objectField' },
 	{ authored: 'mapTable', componentKey: 'mapTableField', slot: 'objectField' },
 	{ authored: 'derivedLeaf', componentKey: 'derivedLeafField', slot: 'numberField' },
 	{ authored: 'checkbox-only', componentKey: 'checkboxOnlyField', slot: 'booleanField' }
@@ -43,25 +42,21 @@ export function authoredFieldThemeOverrides<
 
 declare module '@sjsf/form' {
 	interface FoundationalComponents {
-		rowTableField: {};
 		mapTableField: {};
 		derivedLeafField: {};
 		checkboxOnlyField: {};
 	}
 	interface ComponentProps {
-		rowTableField: FieldCommonProps<SchemaObjectValue>;
 		mapTableField: FieldCommonProps<SchemaObjectValue>;
 		derivedLeafField: FieldCommonProps<number | string | undefined>;
 		checkboxOnlyField: FieldCommonProps<boolean | undefined>;
 	}
 	interface ComponentBindings {
-		rowTableField: 'value';
 		mapTableField: 'value';
 		derivedLeafField: 'value';
 		checkboxOnlyField: 'value';
 	}
 	interface ActionFields {
-		rowTableField: {};
 		mapTableField: {};
 		derivedLeafField: {};
 		checkboxOnlyField: {};

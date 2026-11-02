@@ -9,13 +9,10 @@
 import { describe, expect, test } from 'vitest';
 import type { Schema, UiSchemaRoot } from '@sjsf/form';
 import { createAjvFormValidator } from './ajv-form-validator.js';
-import {
-	normalizeFormProgress,
-	omitUntouchedProgressCells
-} from './form-progress.js';
+import { normalizeFormCellMaps, omitUntouchedCells } from './form-cell-map.js';
 import { planFromTaskFormBundle, type TaskFormBundle } from './task-form-bundle.js';
 
-/** Fixture: lineLoad rowTable after Go row projection. */
+/** Fixture: lineLoad mapTable after Go row projection. */
 function lineLoadProjectedSchema(rowIds: string[]): Schema {
 	return {
 		type: 'object',
@@ -38,9 +35,7 @@ function sealPlan() {
 		taskId: 'lineLoad',
 		jobInstanceId: '1st',
 		title: 'lineLoad',
-		surface: 'row-table',
-		valueType: 'progress',
-		progressEnums: ['partial', 'done'],
+		surface: 'live',
 		schema: lineLoadProjectedSchema(rowIds),
 		uiSchema: {} as UiSchemaRoot,
 		initialData: {},
@@ -53,14 +48,14 @@ function sealPlan() {
 	return planFromTaskFormBundle(bundle);
 }
 
-describe('cascade #6 omit untouched progress cells', () => {
+describe('cascade #6 omit untouched cell-map cells', () => {
 	const rowIds = ['NIR-1.1', 'NIR-1.2'];
 	const schema = lineLoadProjectedSchema(rowIds);
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 
-	test('omitUntouchedProgressCells drops "" and undefined; keeps null|enum strings', () => {
+	test('omitUntouchedCells drops "" and undefined; keeps null|enum strings', () => {
 		expect(
-			omitUntouchedProgressCells({
+			omitUntouchedCells({
 				a: 'done',
 				b: '',
 				c: '  ',
@@ -71,9 +66,9 @@ describe('cascade #6 omit untouched progress cells', () => {
 		).toEqual({ a: 'done', e: null, f: 'partial' });
 	});
 
-	test('omitUntouchedProgressCells drops weigh-row objects (mis-seed)', () => {
+	test('omitUntouchedCells drops weigh-row objects (mis-seed)', () => {
 		expect(
-			omitUntouchedProgressCells({
+			omitUntouchedCells({
 				a: 'done',
 				b: { weight: '', tareKind: 'euro', idoneita: 'NIR', panelCount: 0 }
 			})
@@ -98,14 +93,14 @@ describe('cascade #6 omit untouched progress cells', () => {
 		expect(result.value).toEqual({ progress: { [touched]: 'done' } });
 	});
 
-	test('null clear sibling still validates; normalizeFormProgress keeps null', () => {
+	test('null clear sibling still validates; normalizeFormCellMaps keeps null', () => {
 		const [touched, sibling] = rowIds;
 		const progress = { [touched]: 'partial', [sibling]: null };
-		expect(normalizeFormProgress({ progress })).toEqual({ progress });
+		expect(normalizeFormCellMaps({ progress })).toEqual({ progress });
 		expect(validator.isValid(schema, schema, { progress })).toBe(true);
 	});
 
-	test('sealSubmission omits untouched progress cells', () => {
+	test('sealSubmission omits untouched cell-map cells', () => {
 		const plan = sealPlan();
 		expect(
 			plan.sealSubmission({
