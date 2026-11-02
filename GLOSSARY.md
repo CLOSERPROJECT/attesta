@@ -63,8 +63,8 @@ Task-level Domain readiness (boolean expression over Domain). Combined with the 
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression
 
 **Domain reads** (map/table Tasks):
-Authored `reads` + `dynamicProperties` that project current entity ids into a form map (row projection / `rowIds` on the Task form bundle). Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate subsystem; not spawn-many of full child registers. Two shapes share one authored `ui:field: mapTable`: a **cell map** (`additionalProperties` scalar — one value column, sjsf field per cell schema) and an **object map** (`additionalProperties` object — property columns, sjsf field per property).
-_Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product grammar; SPA twin Domain-read id helpers; conflating map reads with Task group; dual markers (`rowTable`); table-owned enum paint
+Authored `reads` + `dynamicProperties` that project current entity ids into a form map (row projection / `rowIds` on the Task form bundle). Projection **materializes** those ids into concrete `schema.properties`; authored `additionalProperties` is the per-id **template** only (`additionalProperties: false` after project). Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate subsystem; not spawn-many of full child registers. Two shapes share one authored `ui:field: mapTable`: a **cell map** (template scalar — one value column, sjsf field per cell schema) and an **object map** (template object — property columns, sjsf field per property). Cell enums are **real values only** (`partial`, `done`, …) — no `null` in enum. Stock sjsf clearable is for draft fix only: emptying a cell drops the key (`omit`/`undefined`); Commit treats omit as untouched (set-or-skip). Never unset Domain facts via Commit.
+_Avoid_: Completeness `all`/`some` as product grammar; Leftovers as product grammar; SPA twin Domain-read id helpers; SPA cell-map normalize; densify first-enum without `default`; densify `default: null` into Draft cell maps; form-level `""` as untouched sentinel; conflating map reads with Task group; dual markers (`rowTable`); table-owned enum paint; `enum: [null,…]` Domain clear; stamping `clearable: false` for enum-null law; `anyOf` null|enum as product clear; Commit nil as Domain unset
 
 **Submission**:
 Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order, startsWhen, and Worklist done status read Submissions only (one successful Submission finishes the Task on that instance).
@@ -107,7 +107,7 @@ Task-root display catalog (readonly, dataReport, …). Sibling to `derived`; str
 _Avoid_: Encoding live readouts as schema fields meant for submit; naming the Worklist “Chrome”; SPA Domain aggregation for dataReport
 
 **dynamicProperties**:
-Field-keyed map config: each property names a Domain **read** whose ids fill that map. Full vs partial Commit is `schema.required` projection, not completeness. Drives both cell maps and object maps under `mapTable`.
+Field-keyed map config: each property names a Domain **read** whose ids fill that map. Those ids are materialized into `properties`; authored `additionalProperties` is template only. Full vs partial Commit is `schema.required` projection, not completeness. Drives both cell maps and object maps under `mapTable`.
 _Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`; `ui:field: rowTable`
 
 **progress** (entity field):

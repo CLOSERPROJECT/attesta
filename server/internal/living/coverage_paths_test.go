@@ -1593,10 +1593,10 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 		t.Fatal("dyn not object")
 	}
 	if additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{"nope", map[string]any{"type": "number"}}}) {
-		t.Fatal("anyOf skip non-map")
+		t.Fatal("anyOf must not classify")
 	}
-	if !additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
-		t.Fatal("anyOf string")
+	if additionalPropertiesIsCellMap(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
+		t.Fatal("anyOf string must not classify as cell map")
 	}
 	if msg := enforceRequiredMapKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {
 		t.Fatalf("joinComma via required keys = %q", msg)

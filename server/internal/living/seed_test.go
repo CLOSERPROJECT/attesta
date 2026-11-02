@@ -58,8 +58,28 @@ func TestSeedDemoWipesDomainAndSeedsFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind("load")) != 0 || len(got.Submissions) != 0 || len(got.JobInstances) != 0 {
-		t.Fatalf("domain not empty after wipe: %#v", got)
+	if _, ok := got.Kind("load")[DemoIntakeInstanceID]; !ok {
+		t.Fatalf("demo intake load missing: %#v", got.Kind("load"))
+	}
+	if len(got.Kind("pallet")) != 2 {
+		t.Fatalf("demo pallets = %#v", got.Kind("pallet"))
+	}
+	if len(got.Submissions) != 4 {
+		t.Fatalf("submissions = %#v", got.Submissions)
+	}
+	last := got.Submissions[len(got.Submissions)-1]
+	if last.JobID != "line" || last.TaskID != "shift" || last.JobInstanceID != DemoLineShiftID {
+		t.Fatalf("last Submission = %#v", last)
+	}
+	foundLine := false
+	for _, inst := range got.JobInstances {
+		if inst.JobID == "line" && inst.ID == DemoLineShiftID {
+			foundLine = true
+			break
+		}
+	}
+	if !foundLine {
+		t.Fatalf("line Job instance missing: %#v", got.JobInstances)
 	}
 
 	loader := &Loader{Domains: domains, Configs: configs}
@@ -72,6 +92,25 @@ func TestSeedDemoWipesDomainAndSeedsFixture(t *testing.T) {
 	}
 	if _, ok := loaded.Config.Jobs.Get("intake"); !ok {
 		t.Fatalf("fixture jobs missing: %v", loaded.Config.Jobs.Keys)
+	}
+
+	line, ok := worklistJobByID(loaded.Worklist, "line")
+	if !ok {
+		t.Fatal("missing line worklist job")
+	}
+	inst, ok := worklistInstance(line, DemoLineShiftID)
+	if !ok {
+		t.Fatalf("missing line instance %q: %#v", DemoLineShiftID, line.Instances)
+	}
+	if inst.Tasks["lineLoad"] != TaskStatusAvailable {
+		t.Fatalf("lineLoad = %q, want available", inst.Tasks["lineLoad"])
+	}
+	lineLoad := findBundle(loaded.TaskFormBundles, "line", "lineLoad", DemoLineShiftID)
+	if lineLoad == nil {
+		t.Fatalf("missing lineLoad bundle; got %#v", addresses(loaded.TaskFormBundles))
+	}
+	if len(lineLoad.RowIDs) == 0 {
+		t.Fatal("lineLoad bundle needs weighed pallet row ids")
 	}
 }
 

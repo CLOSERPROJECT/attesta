@@ -1,5 +1,4 @@
 import type { Schema, UiSchemaRoot } from '@sjsf/form';
-import { normalizeFormCellMaps } from './form-cell-map.js';
 import type { ChromeEntry, TaskFormPlan } from './task-form-plan.js';
 import type { DerivedKeyEntry } from './derived-keys.js';
 
@@ -65,8 +64,8 @@ export function planFromTaskFormBundle(bundle: TaskFormBundle): TaskFormPlan {
 		chrome: bundle.chrome ?? [],
 		chromeFieldIds: bundle.chromeFieldIds ?? [],
 		projectionKey: bundle.projectionKey ?? '',
-		// Chrome ids are stripped in Go prep; keep cell-map omit until Draft never writes "".
-		sealSubmission: (value) => normalizeFormCellMaps(value)
+		// Chrome strip + cell omit live in Go prep; SPA seal is pass-through.
+		sealSubmission: (value) => value
 	};
 }
 

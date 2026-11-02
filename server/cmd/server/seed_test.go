@@ -145,8 +145,11 @@ func TestSeedLivingStoresWipeDomainOnReplace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind("load")) != 0 {
-		t.Fatalf("domain not wiped on replace: %#v", got)
+	if _, ok := got.Kind("load")[living.DemoIntakeInstanceID]; !ok {
+		t.Fatalf("demo intake missing after replace: %#v", got.Kind("load"))
+	}
+	if _, hadPrior := got.Kind("load")["L1"]; hadPrior {
+		t.Fatalf("prior load L1 survived replace: %#v", got.Kind("load"))
 	}
 	version, err := configs.ActiveVersion(t.Context(), "feragame")
 	if err != nil {

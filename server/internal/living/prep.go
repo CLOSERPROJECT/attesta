@@ -84,7 +84,7 @@ func rowMapValue(task map[string]any, value map[string]any, primary string) map[
 	return nested
 }
 
-// Cell maps use scalar additionalProperties (string enums); clear may allow null via anyOf.
+// Cell maps use scalar additionalProperties: string type and/or string enums.
 func additionalPropertiesIsCellMap(add map[string]any) bool {
 	if add == nil {
 		return false
@@ -92,20 +92,7 @@ func additionalPropertiesIsCellMap(add map[string]any) bool {
 	if schemaTypeIncludesString(add["type"]) {
 		return true
 	}
-	anyOf, ok := add["anyOf"].([]any)
-	if !ok {
-		return false
-	}
-	for _, branch := range anyOf {
-		b, ok := branch.(map[string]any)
-		if !ok {
-			continue
-		}
-		if schemaTypeIncludesString(b["type"]) {
-			return true
-		}
-	}
-	return false
+	return len(schemaStringEnum(add)) > 0
 }
 
 func schemaTypeIncludesString(raw any) bool {

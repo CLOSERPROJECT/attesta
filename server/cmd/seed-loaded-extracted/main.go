@@ -1,6 +1,7 @@
 // One-shot: wipe feragame Domain and Commit smoke jobs for /app dataReport:
 //   - intake NIR-…-NO-1 through weightCheck + line through containerReg → loadedExtracted
 //   - intake NIR-…-SU-1 through palletWeight only → weightCheck available
+// SeedDemo(--replace) already leaves NO-1 through palletWeight + line/shift 1st.
 package main
 
 import (
@@ -37,46 +38,17 @@ func main() {
 		Now:        func() time.Time { return time.Date(2026, 10, 30, 16, 0, 0, 0, time.UTC) },
 	}
 
-	intakeID := "NIR-261019-NO-1"
+	intakeID := living.DemoIntakeInstanceID
 	admin := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"administration", "logistic", "line"}}
 	lineOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"line"}}
 	logOp := living.OperatorIdentity{UserID: "living", Org: "feragame", Roles: []string{"logistic"}}
 
 	commit(c, admin, living.CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: intakeID,
-		Value: map[string]any{
-			"client": "NO", "date": "2026-10-19", "wasteCode": "191212",
-			"idoneitaRiutilizzo": "NIR", "truckWeight": 1000.0, "truckTare": 200.0,
-			"palletCount": 2.0, "notes": "",
-		},
-		Mint: mintNew(),
-	})
-	commit(c, admin, living.CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: intakeID,
-		Value: map[string]any{"codiceFir": "FIR-SMOKE-1"},
-	})
-	commit(c, logOp, living.CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: intakeID,
-		Value: map[string]any{
-			"averagePanelWeight": 10.0,
-			"tareKind":           "euro",
-			"weights": map[string]any{
-				intakeID + ".1": map[string]any{"weight": 125.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 10.0},
-				intakeID + ".2": map[string]any{"weight": 100.0, "tareKind": "euro", "idoneita": "NIR", "panelCount": 7.0},
-			},
-		},
-	})
-	commit(c, admin, living.CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: intakeID,
-		Value: map[string]any{"checkedTruckWeight": 1000.0, "checkedPalletSum": 225.0},
+		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 33.0},
 	})
 	commit(c, lineOp, living.CommitRequest{
-		TaskPath: "line/shift", JobInstanceID: "1st",
-		Value: map[string]any{"shift": "1st"},
-		Mint:  mintNew(),
-	})
-	commit(c, lineOp, living.CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: "1st",
+		TaskPath: "line/lineLoad", JobInstanceID: living.DemoLineShiftID,
 		Value: map[string]any{
 			"progress": map[string]any{
 				intakeID + ".1": "done",
@@ -85,7 +57,7 @@ func main() {
 		},
 	})
 	res := commit(c, logOp, living.CommitRequest{
-		TaskPath: "line/containerReg", JobInstanceID: "1st",
+		TaskPath: "line/containerReg", JobInstanceID: living.DemoLineShiftID,
 		Value: map[string]any{
 			"sourceLoadId": intakeID,
 			"polvereDiVetro": []any{

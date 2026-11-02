@@ -1,15 +1,18 @@
 /**
- * Regression: cell-map Commit with one enum cell + "—" clear.
+ * Regression: cell-map Commit with one enum cell + omit siblings.
  *
- * Clear writes `null`. Authored progress.additionalProperties must allow
- * null | enum so Ajv Draft does not block submit before onSubmit / Commit.
- * Server filterFilledCells keeps null (clear) and omits untouched "".
+ * Stock clearable wipes a bad draft pick → omit/undefined → drop the key.
+ * Enum options are real values only. Server filterFilledCells omits untouched.
  *
- * Schema fixture mirrors Go TaskFormBundle projection (no client projectFormSchema).
+ * Schema fixture mirrors Go concrete-property projection (no SPA normalize).
  */
 import { describe, expect, test } from 'vitest';
-import type { Schema } from '@sjsf/form';
+import type { FormValue, Schema } from '@sjsf/form';
 import { createAjvFormValidator } from './ajv-form-validator.js';
+
+const cellSchema = {
+	enum: ['partial', 'done']
+};
 
 function lineLoadProjectedSchema(): Schema {
 	return {
@@ -17,10 +20,11 @@ function lineLoadProjectedSchema(): Schema {
 		properties: {
 			progress: {
 				type: 'object',
-				propertyNames: { enum: ['NIR-1.1', 'NIR-1.2'] },
-				additionalProperties: {
-					anyOf: [{ type: 'null' }, { type: 'string', enum: ['partial', 'done'] }]
-				}
+				properties: {
+					'NIR-1.1': cellSchema,
+					'NIR-1.2': cellSchema
+				},
+				additionalProperties: false
 			}
 		}
 	} as Schema;
@@ -30,30 +34,23 @@ describe('lineLoad partial cell-map submit (Ajv draft)', () => {
 	const validator = createAjvFormValidator<Record<string, unknown>>();
 	const schema = lineLoadProjectedSchema();
 
-	/** Mirrors scalar mapTable clear write semantics. */
-	function setCell(
-		value: Record<string, unknown>,
-		id: string,
-		next: string | undefined
-	): Record<string, unknown> {
-		const out = { ...value };
-		if (next === undefined) out[id] = null;
-		else out[id] = next;
-		return out;
-	}
-
-	test('projection keeps nullability on progress.additionalProperties', () => {
+	test('projection keeps real-value enums on each concrete cell schema', () => {
 		const progress = (
 			schema as {
 				properties?: {
-					progress?: { additionalProperties?: { anyOf?: unknown[] } };
+					progress?: {
+						properties?: Record<string, { enum?: unknown[]; anyOf?: unknown[] }>;
+						additionalProperties?: unknown;
+					};
 				};
 			}
 		).properties?.progress;
-		const anyOf = progress?.additionalProperties?.anyOf;
-		expect(anyOf).toEqual(
-			expect.arrayContaining([{ type: 'null' }, { type: 'string', enum: ['partial', 'done'] }])
-		);
+		expect(progress?.additionalProperties).toBe(false);
+		expect(progress?.properties?.['NIR-1.1']?.enum).toEqual(['partial', 'done']);
+		expect(progress?.properties?.['NIR-1.2']?.enum).toEqual(['partial', 'done']);
+		expect(progress?.properties?.['NIR-1.1']?.enum).not.toContain(null);
+		expect(progress?.properties?.['NIR-1.1']?.anyOf).toBeUndefined();
+		expect(progress?.properties?.['NIR-1.2']?.anyOf).toBeUndefined();
 	});
 
 	test('single enum cell (omit siblings) validates', () => {
@@ -62,14 +59,30 @@ describe('lineLoad partial cell-map submit (Ajv draft)', () => {
 		).toBe(true);
 	});
 
-	test('enum + — clear (null) validates so submit / Commit can fire', () => {
-		let progress: Record<string, unknown> = {};
-		progress = setCell(progress, 'NIR-1.1', 'partial');
-		progress = setCell(progress, 'NIR-1.2', undefined); // UI "—"
-		const form = validator.validateFormValue(schema, { progress });
+	test('empty-string cell fails without SPA normalize', () => {
 		expect(
-			form.errors,
-			'null clear is intentional wire (server filterFilledCells); Ajv must not block submit'
-		).toBeUndefined();
+			validator.isValid(schema, schema, {
+				progress: { 'NIR-1.1': 'partial', 'NIR-1.2': '' }
+			})
+		).toBe(false);
+	});
+
+	test('enum + omit sibling validates', () => {
+		const progress = { 'NIR-1.1': 'partial' };
+		const form = validator.validateFormValue(schema, { progress } as FormValue);
+		expect(form.errors).toBeUndefined();
+	});
+
+	test('enum + own-property undefined sibling validates', () => {
+		const progress = { 'NIR-1.1': 'partial', 'NIR-1.2': undefined };
+		expect(validator.isValid(schema, schema, { progress })).toBe(true);
+	});
+
+	test('null cell fails (not a Domain clear option)', () => {
+		expect(
+			validator.isValid(schema, schema, {
+				progress: { 'NIR-1.1': 'partial', 'NIR-1.2': null }
+			})
+		).toBe(false);
 	});
 });

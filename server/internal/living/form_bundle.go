@@ -296,7 +296,7 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 	}
 	add := additionalPropertiesSchema(payload, primary)
 	if additionalPropertiesIsCellMap(add) {
-		enums := stringEnumsFromSchema(add)
+		enums := schemaStringEnum(add)
 		cells := map[string]any{}
 		entities := rowEntityMap(domain, payload)
 		for _, id := range projected.RowIDs {
@@ -315,12 +315,13 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 		return out
 	}
 	if schemaTypeIs(add["type"], "object") {
-		rows := map[string]any{}
-		template := seedRowFromSchema(add)
-		for _, id := range projected.RowIDs {
-			rows[id] = cloneMapJSON(template)
+		if template := seedRowFromAuthoredDefaults(add); len(template) > 0 {
+			rows := map[string]any{}
+			for _, id := range projected.RowIDs {
+				rows[id] = cloneMapJSON(template)
+			}
+			out[primary] = rows
 		}
-		out[primary] = rows
 		seedFormDefaultsFromSchema(out, payload)
 		return out
 	}
@@ -339,31 +340,20 @@ func rowEntityMap(domain Domain, payload map[string]any) EntityMap {
 	return m
 }
 
-// seedRowFromSchema densifies optional defaults/enums only — never invents "" for numbers.
-func seedRowFromSchema(rowSchema map[string]any) map[string]any {
+// Prefer omit over inventing first-enum values when a row has no authored defaults.
+func seedRowFromAuthoredDefaults(rowSchema map[string]any) map[string]any {
 	props, _ := rowSchema["properties"].(map[string]any)
 	if props == nil {
 		return map[string]any{}
 	}
-	required := make(map[string]struct{})
-	for _, key := range schemaStringList(rowSchema["required"]) {
-		required[key] = struct{}{}
-	}
 	out := map[string]any{}
 	for key, raw := range props {
-		if _, need := required[key]; need {
-			continue
-		}
 		prop, _ := raw.(map[string]any)
 		if prop == nil {
 			continue
 		}
 		if def, ok := prop["default"]; ok {
 			out[key] = def
-			continue
-		}
-		if enums := schemaStringEnum(prop); len(enums) > 0 {
-			out[key] = enums[0]
 		}
 	}
 	return out

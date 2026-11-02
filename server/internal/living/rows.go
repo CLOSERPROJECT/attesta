@@ -157,28 +157,12 @@ func isEmptyScalar(cell any) bool {
 	return false
 }
 
-// Untouched this pass — omit from batch (not the same as clear null).
-func isUntouchedCell(cell any) bool {
-	if cell == nil {
-		return false
-	}
-	if s, ok := cell.(string); ok {
-		return strings.TrimSpace(s) == ""
-	}
-	return false
-}
-
-// Set or clear scalar cells; untouched rows stay out of the batch.
-// nil in the result means clear/unset (kept, not dropped).
+// Set-or-skip scalar cells; empty (omit/nil/blank) stay out of the batch.
 func filterFilledCells(value map[string]any, cellSchema map[string]any) (map[string]any, error) {
-	enums := stringEnumsFromSchema(cellSchema)
+	enums := schemaStringEnum(cellSchema)
 	filled := make(map[string]any)
 	for id, cell := range value {
-		if isUntouchedCell(cell) {
-			continue
-		}
-		if cell == nil {
-			filled[id] = nil
+		if isEmptyScalar(cell) {
 			continue
 		}
 		if len(enums) == 0 {
@@ -191,29 +175,6 @@ func filterFilledCells(value map[string]any, cellSchema map[string]any) (map[str
 		filled[id] = s
 	}
 	return filled, nil
-}
-
-func stringEnumsFromSchema(add map[string]any) []string {
-	if add == nil {
-		return nil
-	}
-	if enums := schemaStringEnum(add); len(enums) > 0 {
-		return enums
-	}
-	anyOf, ok := add["anyOf"].([]any)
-	if !ok {
-		return nil
-	}
-	for _, branch := range anyOf {
-		b, ok := branch.(map[string]any)
-		if !ok {
-			continue
-		}
-		if enums := schemaStringEnum(b); len(enums) > 0 {
-			return enums
-		}
-	}
-	return nil
 }
 
 func validateCellFacts(facts map[string]any, rowIDs []string) string {

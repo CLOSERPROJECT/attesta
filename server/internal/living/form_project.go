@@ -12,8 +12,6 @@ type projectedForm struct {
 	Columns  *FormColumns
 }
 
-// projectTaskForm injects dynamicProperties propertyNames + enumReads enums,
-// paints authored ui:field markers → ui:components (generic registry).
 func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInstanceLabel string, catalogs map[string]any) (projectedForm, error) {
 	schemaRaw, _ := task["schema"].(map[string]any)
 	if schemaRaw == nil {
@@ -65,10 +63,9 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			if propSchema == nil {
 				return projectedForm{}, fmt.Errorf("dynamicProperties.%s requires schema.properties.%s", property, property)
 			}
-			propSchema = cloneMapJSON(propSchema)
-			propSchema["propertyNames"] = map[string]any{"enum": ids}
-			if schemaRequiresProperty(task, property) {
-				propSchema["required"] = ids
+			propSchema, err = materializeDynamicMapSchema(propSchema, ids, schemaRequiresProperty(task, property))
+			if err != nil {
+				return projectedForm{}, fmt.Errorf("dynamicProperties.%s: %w", property, err)
 			}
 			props[property] = propSchema
 			mutated = true
@@ -77,7 +74,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			if propUi == nil {
 				propUi = map[string]any{}
 			}
-			uiSchema[property] = paintAuthoredFieldMarkers(propUi)
+			uiSchema[property] = stampConcreteMapUi(paintAuthoredFieldMarkers(propUi), ids)
 
 			if hasPrimary && property == primary {
 				rowIDs = ids
@@ -132,6 +129,40 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 		RowIDs:   rowIDs,
 		Columns:  columns,
 	}, nil
+}
+
+// Authored additionalProperties is the per-id template; projection turns read
+// ids into real properties so Ajv (and mapTable) see schema.properties rows.
+func materializeDynamicMapSchema(propSchema map[string]any, ids []string, fullMap bool) (map[string]any, error) {
+	next := cloneMapJSON(propSchema)
+	template, ok := next["additionalProperties"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("requires additionalProperties schema template")
+	}
+	concrete := make(map[string]any, len(ids))
+	for _, id := range ids {
+		concrete[id] = cloneMapJSON(template)
+	}
+	next["properties"] = concrete
+	next["additionalProperties"] = false
+	delete(next, "propertyNames")
+	if fullMap {
+		next["required"] = ids
+	}
+	return next, nil
+}
+
+func stampConcreteMapUi(propUi map[string]any, ids []string) map[string]any {
+	next := cloneMapJSON(propUi)
+	addUi, _ := next["additionalProperties"].(map[string]any)
+	delete(next, "additionalProperties")
+	if addUi == nil {
+		return next
+	}
+	for _, id := range ids {
+		next[id] = cloneMapJSON(addUi)
+	}
+	return next
 }
 
 func readFormColumns(propUi any) *FormColumns {

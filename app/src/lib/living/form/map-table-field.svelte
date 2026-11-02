@@ -30,10 +30,8 @@
 		createObjectContext,
 		setObjectContext
 	} from '@sjsf/form/fields/object/context.svelte';
-	import {
-		objectRowMapColumnKeys,
-		writeObjectRowMapCell
-	} from './object-row-weigh.js';
+	import { MapTableCells } from './map-table-cells.svelte.js';
+	import { objectRowMapColumnKeys } from './object-row-weigh.js';
 	import { readColumns } from './read-columns.js';
 
 	let {
@@ -58,12 +56,20 @@
 	});
 	setObjectContext(objCtx);
 
+	const cells = new MapTableCells({
+		getValue: () => value,
+		setValue: (next) => {
+			value = next;
+		},
+		setRow: (rowKey, cell) => objCtx.set(rowKey, cell)
+	});
+
 	const Template = $derived(getComponent(ctx, 'fieldTemplate', config));
 	const errors = $derived(getFieldErrors(ctx, config.path));
 
 	const columns = $derived(readColumns({ 'ui:options': { columns: uiOption('columns') } }));
 
-	function isObjectRowSchema(schema: Schema): boolean {
+	function isObjectPropsSchema(schema: Schema): boolean {
 		if (schema.properties && typeof schema.properties === 'object') return true;
 		const t = schema.type;
 		if (t === 'object') return true;
@@ -71,13 +77,18 @@
 		return false;
 	}
 
-	/** Object map → property columns; cell map → single value column. */
+	// Sample first row schema: object-map → property columns; cell-map → one value column.
+	// Go projection materializes ids as concrete properties, so isAdditionalProperty is false.
 	const objectMap = $derived.by(() => {
 		const order = objCtx.propertiesOrder();
 		const sample = order[0];
 		if (!sample) return false;
-		const rowCfg = objCtx.propertyConfig(config, sample, objCtx.isAdditionalProperty(sample));
-		return isObjectRowSchema(rowCfg.schema);
+		const rowCfg = objCtx.propertyConfig(
+			config,
+			sample,
+			objCtx.isAdditionalProperty(sample)
+		);
+		return isObjectPropsSchema(rowCfg.schema);
 	});
 
 	const columnKeys = $derived.by(() => {
@@ -85,7 +96,11 @@
 		const order = objCtx.propertiesOrder();
 		const sample = order[0];
 		if (!sample) return [] as string[];
-		const rowCfg = objCtx.propertyConfig(config, sample, objCtx.isAdditionalProperty(sample));
+		const rowCfg = objCtx.propertyConfig(
+			config,
+			sample,
+			objCtx.isAdditionalProperty(sample)
+		);
 		return objectRowMapColumnKeys(rowCfg.schema.properties);
 	});
 
@@ -94,7 +109,11 @@
 		const order = objCtx.propertiesOrder();
 		const sample = order[0];
 		if (!sample) return columns.value;
-		const rowCfg = objCtx.propertyConfig(config, sample, objCtx.isAdditionalProperty(sample));
+		const rowCfg = objCtx.propertyConfig(
+			config,
+			sample,
+			objCtx.isAdditionalProperty(sample)
+		);
 		return rowCfg.schema.title ?? columns.value;
 	});
 
@@ -139,7 +158,6 @@
 		});
 	}
 
-	/** Cell-map: additionalProperties schema is the cell itself. */
 	function scalarCellConfig(rowCfg: Config): Config {
 		return getStableConfig(ctx, {
 			path: rowCfg.path,
@@ -152,21 +170,22 @@
 	}
 
 	function setCell(rowKey: string, column: string, cell: SchemaValue | undefined): void {
-		const row = {
-			...((value?.[rowKey] as SchemaObjectValue | undefined) ?? {})
-		} as Record<string, unknown>;
-		objCtx.set(rowKey, writeObjectRowMapCell(row, column, cell) as SchemaObjectValue | undefined);
+		cells.setCell(rowKey, column, cell);
 	}
 
 	function setScalarCell(rowKey: string, cell: SchemaValue | undefined): void {
-		objCtx.set(rowKey, cell as SchemaObjectValue | undefined);
+		cells.setScalarCell(rowKey, cell);
 	}
 
 	function columnHeaderTitle(column: string): string {
 		const order = objCtx.propertiesOrder();
 		const sample = order[0];
 		if (!sample) return column;
-		const rowCfg = objCtx.propertyConfig(config, sample, objCtx.isAdditionalProperty(sample));
+		const rowCfg = objCtx.propertyConfig(
+			config,
+			sample,
+			objCtx.isAdditionalProperty(sample)
+		);
 		return cellConfig(rowCfg, column).title;
 	}
 </script>
@@ -196,8 +215,11 @@
 		</thead>
 		<tbody>
 			{#each objCtx.propertiesOrder() as rowKey (objCtx.key(rowKey))}
-				{@const isAdditional = objCtx.isAdditionalProperty(rowKey)}
-				{@const rowCfg = objCtx.propertyConfig(config, rowKey, isAdditional)}
+				{@const rowCfg = objCtx.propertyConfig(
+					config,
+					rowKey,
+					objCtx.isAdditionalProperty(rowKey)
+				)}
 				<tr data-testid="map-row" data-row={rowKey}>
 					<td><code>{rowKey}</code></td>
 					{#if objectMap}

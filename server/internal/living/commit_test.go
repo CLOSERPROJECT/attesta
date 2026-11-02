@@ -9,19 +9,6 @@ import (
 	"time"
 )
 
-func registerValue() map[string]any {
-	return map[string]any{
-		"client":             "NO",
-		"date":               "2026-10-19",
-		"wasteCode":          "191212",
-		"idoneitaRiutilizzo": "NIR",
-		"truckWeight":        100.0,
-		"truckTare":          200.0,
-		"palletCount":        2.0,
-		"notes":              "",
-	}
-}
-
 func testCommitter(t *testing.T, auth Authorizer) (*Committer, *MemoryDomainStore, *Loader) {
 	t.Helper()
 	domains := NewMemoryDomainStore()

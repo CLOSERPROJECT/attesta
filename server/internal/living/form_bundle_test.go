@@ -226,21 +226,52 @@ func TestLoadJSONTaskFormBundlePalletWeightRows(t *testing.T) {
 	if len(subs) == 0 {
 		t.Fatal("expected submissions after codiceFir for DomainSnapshot-shaped bindings")
 	}
-	weights, _ := bundle.InitialData["weights"].(map[string]any)
-	if len(weights) != len(bundle.RowIDs) {
-		t.Fatalf("initial weights = %#v, rows = %#v", weights, bundle.RowIDs)
+	if weights, has := bundle.InitialData["weights"]; has {
+		m, _ := weights.(map[string]any)
+		if len(m) != 0 {
+			t.Fatalf("object-map initialData must not densify; got %#v", weights)
+		}
 	}
 	props, _ := bundle.Schema["properties"].(map[string]any)
 	weightsSchema, _ := props["weights"].(map[string]any)
+	assertConcreteDynamicMap(t, weightsSchema, bundle.RowIDs, true)
+}
+
+func assertConcreteDynamicMap(t *testing.T, mapSchema map[string]any, rowIDs []string, fullMap bool) {
+	t.Helper()
+	if mapSchema == nil {
+		t.Fatal("map schema missing")
+	}
+	if _, has := mapSchema["propertyNames"]; has {
+		t.Fatalf("must not stamp propertyNames; got %#v", mapSchema["propertyNames"])
+	}
+	if mapSchema["additionalProperties"] != false {
+		t.Fatalf("additionalProperties = %#v, want false", mapSchema["additionalProperties"])
+	}
+	concrete, _ := mapSchema["properties"].(map[string]any)
+	if len(concrete) != len(rowIDs) {
+		t.Fatalf("properties = %#v, rows = %#v", concrete, rowIDs)
+	}
+	for _, id := range rowIDs {
+		if _, ok := concrete[id].(map[string]any); !ok {
+			t.Fatalf("missing concrete property %q in %#v", id, concrete)
+		}
+	}
 	var requiredLen int
-	switch req := weightsSchema["required"].(type) {
+	switch req := mapSchema["required"].(type) {
 	case []string:
 		requiredLen = len(req)
 	case []any:
 		requiredLen = len(req)
 	}
-	if requiredLen != len(bundle.RowIDs) {
-		t.Fatalf("projected weights.required = %#v, rows = %#v", weightsSchema["required"], bundle.RowIDs)
+	if fullMap {
+		if requiredLen != len(rowIDs) {
+			t.Fatalf("full-map required = %#v, rows = %#v", mapSchema["required"], rowIDs)
+		}
+		return
+	}
+	if _, has := mapSchema["required"]; has {
+		t.Fatalf("partial-map must not project required; got %#v", mapSchema["required"])
 	}
 }
 
@@ -264,16 +295,7 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	}
 	weightsProps, _ := pallet.Schema["properties"].(map[string]any)
 	weightsSchema, _ := weightsProps["weights"].(map[string]any)
-	var weightsRequired int
-	switch req := weightsSchema["required"].(type) {
-	case []string:
-		weightsRequired = len(req)
-	case []any:
-		weightsRequired = len(req)
-	}
-	if weightsRequired != len(pallet.RowIDs) {
-		t.Fatalf("full-map weights.required = %#v, rows = %#v", weightsSchema["required"], pallet.RowIDs)
-	}
+	assertConcreteDynamicMap(t, weightsSchema, pallet.RowIDs, true)
 
 	if _, err := c.Commit(t.Context(), "feragame", opLogistic, CommitRequest{
 		TaskPath: "intake/palletWeight", JobInstanceID: intakeID,
@@ -299,13 +321,11 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	}
 	progressProps, _ := lineLoad.Schema["properties"].(map[string]any)
 	progressSchema, _ := progressProps["progress"].(map[string]any)
-	if _, has := progressSchema["required"]; has {
-		t.Fatalf("partial-map progress must not project required from read ids; got %#v", progressSchema["required"])
-	}
+	assertConcreteDynamicMap(t, progressSchema, lineLoad.RowIDs, false)
 	assertLineLoadCellMapBundle(t, lineLoad)
 }
 
-// Cell-map Tasks mount as live ConfigForm; enums stay on cell schema only.
+// Cell-map Tasks mount as live ConfigForm; enums stay on concrete cell schemas.
 func assertLineLoadCellMapBundle(t *testing.T, bundle *TaskFormBundle) {
 	t.Helper()
 	if bundle.Surface != "live" {
@@ -313,24 +333,57 @@ func assertLineLoadCellMapBundle(t *testing.T, bundle *TaskFormBundle) {
 	}
 	props, _ := bundle.Schema["properties"].(map[string]any)
 	progress, _ := props["progress"].(map[string]any)
-	add, _ := progress["additionalProperties"].(map[string]any)
-	wantEnums := []string{"partial", "done"}
-	fromSchema := stringEnumsFromSchema(add)
-	if len(fromSchema) != len(wantEnums) {
-		t.Fatalf("schema enums = %#v, want %#v", fromSchema, wantEnums)
-	}
-	for i, want := range wantEnums {
-		if fromSchema[i] != want {
-			t.Fatalf("schema enums = %#v, want %#v", fromSchema, wantEnums)
-		}
-	}
+	assertConcreteDynamicMap(t, progress, bundle.RowIDs, false)
+	concrete, _ := progress["properties"].(map[string]any)
 	propUi, _ := bundle.UiSchema["progress"].(map[string]any)
 	if propUi == nil {
 		t.Fatal("progress uiSchema missing")
 	}
+	wantEnums := []string{"partial", "done"}
+	for _, id := range bundle.RowIDs {
+		cell, _ := concrete[id].(map[string]any)
+		rawEnum, _ := cell["enum"].([]any)
+		if len(rawEnum) != 2 || rawEnum[0] != "partial" || rawEnum[1] != "done" {
+			t.Fatalf("cell %q enum = %#v, want [partial done] (no leading null)", id, rawEnum)
+		}
+		if _, hasAnyOf := cell["anyOf"]; hasAnyOf {
+			t.Fatalf("cell %q must use enum not anyOf; got %#v", id, cell)
+		}
+		fromSchema := schemaStringEnum(cell)
+		if len(fromSchema) != len(wantEnums) {
+			t.Fatalf("schema enums for %q = %#v, want %#v", id, fromSchema, wantEnums)
+		}
+		for i, want := range wantEnums {
+			if fromSchema[i] != want {
+				t.Fatalf("schema enums for %q = %#v, want %#v", id, fromSchema, wantEnums)
+			}
+		}
+		cellUi, _ := propUi[id].(map[string]any)
+		cellOpts, _ := cellUi["ui:options"].(map[string]any)
+		if cellOpts == nil {
+			t.Fatalf("cell %q ui:options missing", id)
+		}
+		if _, has := cellOpts["clearable"]; has {
+			t.Fatalf("cell %q must not stamp clearable; got %#v", id, cellOpts["clearable"])
+		}
+		if cellOpts["placeholder"] != "–" {
+			t.Fatalf("cell %q placeholder = %#v, want –", id, cellOpts["placeholder"])
+		}
+		shadcn, _ := cellOpts["shadcn4Select"].(map[string]any)
+		if shadcn["placeholder"] != "–" {
+			t.Fatalf("cell %q shadcn4Select.placeholder = %#v, want –", id, shadcn["placeholder"])
+		}
+		names := schemaStringList(cellOpts["enumNames"])
+		if len(names) != 2 || names[0] != "Parziale" || names[1] != "Fatto" {
+			t.Fatalf("cell %q enumNames = %#v, want [Parziale Fatto]", id, cellOpts["enumNames"])
+		}
+	}
 	comps, _ := propUi["ui:components"].(map[string]any)
 	if comps["objectField"] != "mapTableField" {
 		t.Fatalf("ui:components = %#v, want mapTableField objectField", comps)
+	}
+	if _, has := propUi["additionalProperties"]; has {
+		t.Fatalf("uiSchema must stamp concrete ids, not additionalProperties; got %#v", propUi["additionalProperties"])
 	}
 	opts, _ := propUi["ui:options"].(map[string]any)
 	if opts == nil {

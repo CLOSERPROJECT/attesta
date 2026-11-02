@@ -5,33 +5,9 @@ import (
 	"testing"
 )
 
-func weighRow(weight float64) map[string]any {
-	return map[string]any{
-		"weight": weight, "tareKind": "euro", "idoneita": "NIR", "panelCount": 1.0,
-	}
-}
-
-func palletWeightValue(weights map[string]any) map[string]any {
-	return map[string]any{
-		"averagePanelWeight": 10.0,
-		"tareKind":           "euro",
-		"weights":            weights,
-	}
-}
-
 func commitThroughCodiceFir(t *testing.T, c *Committer, instanceID string) {
 	t.Helper()
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration", "logistic"}}
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/register", JobInstanceID: instanceID, Value: registerValue(),
-		Mint: startingNewMint(),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/codiceFir", JobInstanceID: instanceID,
-		Value: map[string]any{"codiceFir": "FIR-1"},
-	}); err != nil {
+	if err := commitIntakeThroughCodiceFir(t.Context(), c, "feragame", instanceID); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -178,8 +178,11 @@ func TestMongoSeedDemoWipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Kind("load")) != 0 {
-		t.Fatalf("wipe failed: %#v", got)
+	if _, ok := got.Kind("load")[DemoIntakeInstanceID]; !ok {
+		t.Fatalf("demo intake missing after wipe+seed: %#v", got.Kind("load"))
+	}
+	if len(got.Submissions) < 4 {
+		t.Fatalf("demo submissions = %#v", got.Submissions)
 	}
 	active, err := configs.ActiveVersion(ctx, seeded.Org)
 	if err != nil {

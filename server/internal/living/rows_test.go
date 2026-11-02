@@ -114,11 +114,10 @@ func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	if schemaStringEnum(nil) != nil {
 		t.Fatal("nil schemaStringEnum")
 	}
-	if stringEnumsFromSchema(nil) != nil {
-		t.Fatal("nil stringEnums")
-	}
-	if stringEnumsFromSchema(map[string]any{"anyOf": []any{"x", map[string]any{"type": "null"}}}) != nil {
-		t.Fatal("anyOf without enums")
+	if schemaStringEnum(map[string]any{
+		"anyOf": []any{map[string]any{"type": "string", "enum": []any{"partial", "done"}}},
+	}) != nil {
+		t.Fatal("anyOf enums ignored")
 	}
 	if numberViolatesBounds(1, map[string]any{"minimum": 2}) != true || numberViolatesBounds(3, map[string]any{"minimum": 2}) {
 		t.Fatal("minimum bounds")
@@ -149,34 +148,44 @@ func TestRowCoercionSchemaAndHelperEdges(t *testing.T) {
 	if len(rowEntityMap(EmptyDomain(), map[string]any{})) != 0 {
 		t.Fatal("rowEntityMap without read")
 	}
-	if len(seedRowFromSchema(map[string]any{})) != 0 {
+	if len(seedRowFromAuthoredDefaults(map[string]any{})) != 0 {
 		t.Fatal("seedRow empty props")
+	}
+	if got := seedRowFromAuthoredDefaults(map[string]any{
+		"properties": map[string]any{
+			"tareKind": map[string]any{"type": "string", "enum": []any{"euro", "industrial"}, "default": "euro"},
+			"idoneita": map[string]any{"type": "string", "enum": []any{"NIR", "IR"}},
+		},
+	}); len(got) != 1 || got["tareKind"] != "euro" {
+		t.Fatalf("authored default only = %#v", got)
 	}
 }
 
-func TestAdditionalPropertiesIsCellMapAllowsNullAnyOf(t *testing.T) {
+func TestAdditionalPropertiesIsCellMap(t *testing.T) {
 	if !additionalPropertiesIsCellMap(map[string]any{"type": "string"}) {
 		t.Fatal("plain string type")
 	}
 	if !additionalPropertiesIsCellMap(map[string]any{
+		"enum": []any{"partial", "done"},
+	}) {
+		t.Fatal("string enum")
+	}
+	if additionalPropertiesIsCellMap(map[string]any{
 		"anyOf": []any{
 			map[string]any{"type": "null"},
 			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
 		},
 	}) {
-		t.Fatal("null|enum anyOf")
+		t.Fatal("anyOf must not classify as cell map")
 	}
 	if additionalPropertiesIsCellMap(map[string]any{"type": "object"}) {
 		t.Fatal("object weigh cells must not classify as cell map")
 	}
 }
 
-func TestFilterFilledCellsKeepsPartialDoneAndNullClear(t *testing.T) {
+func TestFilterFilledCellsKeepsPartialDoneOmitsNilAndBlank(t *testing.T) {
 	schema := map[string]any{
-		"anyOf": []any{
-			map[string]any{"type": "null"},
-			map[string]any{"type": "string", "enum": []any{"partial", "done"}},
-		},
+		"enum": []any{"partial", "done"},
 	}
 	filled, err := filterFilledCells(map[string]any{
 		"a": "done", "b": "partial", "c": "", "d": nil,
@@ -184,13 +193,16 @@ func TestFilterFilledCellsKeepsPartialDoneAndNullClear(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(filled) != 3 {
+	if len(filled) != 2 {
 		t.Fatalf("filled = %#v", filled)
 	}
-	if filled["a"] != "done" || filled["b"] != "partial" || filled["d"] != nil {
+	if filled["a"] != "done" || filled["b"] != "partial" {
 		t.Fatalf("filled = %#v", filled)
 	}
-	if validateCellFacts(filled, []string{"a", "b", "d"}) != "" {
+	if _, has := filled["d"]; has {
+		t.Fatalf("nil must omit, not Domain clear: %#v", filled)
+	}
+	if validateCellFacts(filled, []string{"a", "b"}) != "" {
 		t.Fatal("valid batch must pass")
 	}
 	_, err = filterFilledCells(map[string]any{"a": false}, schema)

@@ -12,16 +12,11 @@ func lineLoadTask(line Job) TaskConfig {
 
 func commitLineShift(t *testing.T, c *Committer, shift string) Domain {
 	t.Helper()
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/shift", JobInstanceID: shift,
-		Value: map[string]any{"shift": shift},
-		Mint:  startingNewMint(),
-	})
+	domain, err := commitLineShiftNew(t.Context(), c, "feragame", shift)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return result.Domain
+	return domain
 }
 
 func TestFixtureLineLoadReadsDomainProgress(t *testing.T) {
@@ -128,7 +123,7 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		TaskPath: "line/lineLoad", JobInstanceID: "2nd",
 		Value: map[string]any{
 			"progress": map[string]any{
-				intakeID + ".2": nil,
+				intakeID + ".2": "done",
 			},
 		},
 	})
@@ -136,11 +131,11 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, has := second.Domain.Kind("pallet")[intakeID+".2"]["progress"]; has {
-		t.Fatalf("second instance clear must unset progress: %#v", second.Domain.Kind("pallet")[intakeID+".2"])
-	}
 	if second.Domain.Kind("pallet")[intakeID+".1"]["progress"] != "done" {
 		t.Fatalf("first instance done must remain: %#v", second.Domain.Kind("pallet")[intakeID+".1"])
+	}
+	if second.Domain.Kind("pallet")[intakeID+".2"]["progress"] != "done" {
+		t.Fatalf("second instance set must apply: %#v", second.Domain.Kind("pallet")[intakeID+".2"])
 	}
 
 	var saw1st, saw2nd bool
@@ -176,8 +171,8 @@ func TestCommitLineLoadMultiInstanceIndependentProgress(t *testing.T) {
 	}
 
 	rows := lineLoadRowIDs(second.Domain)
-	if len(rows) != 1 || rows[0] != intakeID+".2" {
-		t.Fatalf("cleared pallet must re-enter rows: %#v", rows)
+	if len(rows) != 0 {
+		t.Fatalf("both done → no remaining rows: %#v", rows)
 	}
 }
 
@@ -213,6 +208,6 @@ func TestFixtureLineLoadAdditionalPropertiesIsCellMap(t *testing.T) {
 	task := map[string]any(lineLoadTask(lineJob(t)))
 	add := additionalPropertiesSchema(task, "progress")
 	if !additionalPropertiesIsCellMap(add) {
-		t.Fatalf("additionalPropertiesIsCellMap = false (null|enum anyOf must still classify as cell map); schema=%#v", add)
+		t.Fatalf("additionalPropertiesIsCellMap = false (string enum must classify as cell map); schema=%#v", add)
 	}
 }

@@ -232,7 +232,11 @@ func applyDefaultPlaceholders(uiNode, schemaNode map[string]any, skipRoot map[st
 			fieldUi = cloneMapJSON(fieldUi)
 		}
 		fieldChanged := false
-		if acceptsPlaceholder(prop) && !fieldHasPlaceholder(fieldUi) {
+		if fieldHasPlaceholder(fieldUi) {
+			if expandPlaceholderToShadcn(fieldUi) {
+				fieldChanged = true
+			}
+		} else if acceptsPlaceholder(prop) {
 			writeDefaultPlaceholder(fieldUi, defaultPlaceholderText(key, prop))
 			fieldChanged = true
 		}
@@ -251,7 +255,9 @@ func applyDefaultPlaceholders(uiNode, schemaNode map[string]any, skipRoot map[st
 			itemsChanged := false
 			if _, ok := items["properties"].(map[string]any); ok {
 				itemsChanged = applyDefaultPlaceholders(itemsUi, items, nil, false)
-			} else if acceptsPlaceholder(items) && !fieldHasPlaceholder(itemsUi) {
+			} else if fieldHasPlaceholder(itemsUi) {
+				itemsChanged = expandPlaceholderToShadcn(itemsUi)
+			} else if acceptsPlaceholder(items) {
 				writeDefaultPlaceholder(itemsUi, defaultPlaceholderText(key, items))
 				itemsChanged = true
 			}
@@ -268,24 +274,82 @@ func applyDefaultPlaceholders(uiNode, schemaNode map[string]any, skipRoot map[st
 	return changed
 }
 
+var shadcnPlaceholderWidgets = []string{"shadcn4Text", "shadcn4Number", "shadcn4Select"}
+
 func writeDefaultPlaceholder(fieldUi map[string]any, text string) {
+	_ = stampPlaceholder(fieldUi, text, true)
+}
+
+// Authored placeholder lives at ui:options.placeholder (or ui:placeholder);
+// SPA shadcn widgets read ui:options.shadcn4*.placeholder — fill gaps only.
+func expandPlaceholderToShadcn(fieldUi map[string]any) bool {
+	text := authoredPlaceholderText(fieldUi)
+	if text == "" {
+		return false
+	}
+	return stampPlaceholder(fieldUi, text, false)
+}
+
+func authoredPlaceholderText(fieldUi map[string]any) string {
+	if s, ok := fieldUi["ui:placeholder"].(string); ok && s != "" {
+		return s
+	}
+	opts, _ := fieldUi["ui:options"].(map[string]any)
+	if opts == nil {
+		return ""
+	}
+	if s, ok := opts["placeholder"].(string); ok && s != "" {
+		return s
+	}
+	for _, key := range shadcnPlaceholderWidgets {
+		widget, _ := opts[key].(map[string]any)
+		if s, ok := widget["placeholder"].(string); ok && s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// stampPlaceholder writes opts.placeholder and each shadcn4* widget placeholder.
+// When force, overwrite widgets; otherwise only fill missing widget slots.
+func stampPlaceholder(fieldUi map[string]any, text string, force bool) bool {
 	opts, _ := fieldUi["ui:options"].(map[string]any)
 	if opts == nil {
 		opts = map[string]any{}
 	} else {
 		opts = cloneMapJSON(opts)
 	}
-	for _, widgetKey := range []string{"shadcn4Text", "shadcn4Number", "shadcn4Select"} {
+	changed := false
+	if prev, _ := opts["placeholder"].(string); prev != text {
+		opts["placeholder"] = text
+		changed = true
+	}
+	for _, widgetKey := range shadcnPlaceholderWidgets {
 		prev, _ := opts[widgetKey].(map[string]any)
 		if prev == nil {
 			prev = map[string]any{}
 		} else {
 			prev = cloneMapJSON(prev)
 		}
+		cur, _ := prev["placeholder"].(string)
+		if !force && cur != "" {
+			continue
+		}
+		if cur == text {
+			if _, ok := opts[widgetKey]; !ok {
+				opts[widgetKey] = prev
+				changed = true
+			}
+			continue
+		}
 		prev["placeholder"] = text
 		opts[widgetKey] = prev
+		changed = true
 	}
-	fieldUi["ui:options"] = opts
+	if changed {
+		fieldUi["ui:options"] = opts
+	}
+	return changed
 }
 
 func acceptsPlaceholder(schema map[string]any) bool {

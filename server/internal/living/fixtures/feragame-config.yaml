@@ -378,18 +378,19 @@ steps:
                 properties:
                     progress:
                         type: object
-                        # "—" clear writes null; server filterFilledCells keeps null (clear), omits "".
                         additionalProperties:
-                            anyOf:
-                                - type: 'null'
-                                - type: string
-                                  enum: [partial, done]
+                            enum: [partial, done]
               uiSchema:
                 progress:
                     ui:field: mapTable
                     ui:options:
                         expandable: false
                         columns: {id: Bancale, value: Avanzamento}
+                    additionalProperties:
+                        ui:options:
+                            enumNames: [Parziale, Fatto]
+                            # U+2013 — empty / stock-clearable trigger; Go expands to shadcn4*
+                            placeholder: –
               onSubmit:
                 transform:
                     - op: patchEach

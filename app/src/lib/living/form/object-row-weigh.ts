@@ -7,6 +7,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Absent for empty→empty bind churn: undefined | null both mean omit/skip
+ * (neither is Domain unset via Commit). `""` is a real value.
+ */
+export function isQuietEmptyCell(value: unknown): boolean {
+	return value === undefined || value === null;
+}
+
 /** Column headers from a row schema's `properties` (map-table; empty → no columns). */
 export function objectRowMapColumnKeys(rowProperties: unknown): string[] {
 	if (!isPlainObject(rowProperties)) return [];

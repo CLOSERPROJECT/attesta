@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Schema } from '@sjsf/form';
 import { createAjvFormValidator } from './ajv-form-validator.js';
 import {
 	formatSubmitValidationError,
@@ -15,16 +16,20 @@ import {
 const libDir = dirname(fileURLToPath(import.meta.url));
 
 describe('submit validation visibility', () => {
+	/** Concrete properties (Go projection); string-only cells reject null. */
 	const stringOnlyProgress = {
 		type: 'object',
 		properties: {
 			progress: {
 				type: 'object',
-				propertyNames: { enum: ['a', 'b'] },
-				additionalProperties: { type: 'string', enum: ['partial', 'done'] }
+				properties: {
+					a: { type: 'string', enum: ['partial', 'done'] },
+					b: { type: 'string', enum: ['partial', 'done'] }
+				},
+				additionalProperties: false
 			}
 		}
-	};
+	} as Schema;
 
 	test('nested progress/<id> Ajv errors are invisible with exact-path only', () => {
 		const validator = createAjvFormValidator<Record<string, unknown>>();
@@ -45,14 +50,19 @@ describe('submit validation visibility', () => {
 		const createCfg = readFileSync(join(libDir, 'create-config-form.svelte.ts'), 'utf8');
 		const mapSrc = readFileSync(join(libDir, 'map-table-field.svelte'), 'utf8');
 		const task = readFileSync(join(libDir, '../TaskForm.svelte'), 'utf8');
-		const cellMap = readFileSync(join(libDir, 'form-cell-map.ts'), 'utf8');
+		const ajvSrc = readFileSync(join(libDir, 'ajv-form-validator.ts'), 'utf8');
+		const bundleSrc = readFileSync(join(libDir, 'task-form-bundle.ts'), 'utf8');
 		expect(createCfg).toContain('onSubmitError');
 		expect(mapSrc).toContain('getFieldComponent');
 		expect(mapSrc).toContain('data-testid="map-table"');
-		expect(cellMap).toContain('export function omitUntouchedCells');
-		expect(cellMap).toContain('export function normalizeFormCellMaps');
-		expect(cellMap).not.toContain('progressEnumsFromFormSchema');
-		expect(cellMap).not.toContain('rowValueTypeFromSchema');
+		expect(mapSrc).not.toContain('rowTable');
+		expect(mapSrc).not.toContain('progressEnums');
+		expect(mapSrc).not.toContain('TableFormShell');
+		expect(() => readFileSync(join(libDir, 'form-cell-map.ts'), 'utf8')).toThrow();
+		expect(ajvSrc).not.toContain('normalizeFormCellMaps');
+		expect(ajvSrc).not.toContain('form-cell-map');
+		expect(bundleSrc).not.toContain('normalizeFormCellMaps');
+		expect(bundleSrc).not.toContain('form-cell-map');
 		expect(task).toContain('task-submit-error');
 		expect(task).toContain('onSubmitError');
 		expect(task).toContain('findTaskFormBundle');

@@ -7,19 +7,11 @@ import (
 
 func completeIntakeThroughPalletWeight(t *testing.T, c *Committer, instanceID string) Domain {
 	t.Helper()
-	commitThroughCodiceFir(t, c, instanceID)
-	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
-	result, err := c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
-		Value: palletWeightValue(map[string]any{
-			instanceID + ".1": weighRow(11),
-			instanceID + ".2": weighRow(22),
-		}),
-	})
+	domain, err := commitIntakeThroughPalletWeight(t.Context(), c, "feragame", instanceID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return result.Domain
+	return domain
 }
 
 func TestFixtureLineStartsWhenSomeQuantifier(t *testing.T) {

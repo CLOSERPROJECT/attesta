@@ -147,3 +147,32 @@ func TestWithDefaultPlaceholdersEnumSelect(t *testing.T) {
 		t.Fatalf("plain string placeholder = %q, want Enter…", got)
 	}
 }
+
+func TestWithDefaultPlaceholdersExpandsAuthoredToShadcn(t *testing.T) {
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"progress": map[string]any{
+				"enum": []any{"partial", "done"},
+			},
+		},
+	}
+	authored := map[string]any{
+		"progress": map[string]any{
+			"ui:options": map[string]any{
+				"placeholder": "–",
+			},
+		},
+	}
+
+	ui := withDefaultPlaceholders(authored, schema, nil)
+	progress, _ := ui["progress"].(map[string]any)
+	opts, _ := progress["ui:options"].(map[string]any)
+	if opts["placeholder"] != "–" {
+		t.Fatalf("opts.placeholder = %#v, want –", opts["placeholder"])
+	}
+	shadcn, _ := opts["shadcn4Select"].(map[string]any)
+	if shadcn["placeholder"] != "–" {
+		t.Fatalf("shadcn4Select.placeholder = %#v, want – (expanded from authored)", shadcn["placeholder"])
+	}
+}
