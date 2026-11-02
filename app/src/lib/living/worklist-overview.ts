@@ -1,8 +1,9 @@
+import type { CommitNext } from './commit-port.js';
 import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { TaskStatus, Worklist, WorklistInstance, WorklistJob } from './types.js';
 import { worklistJobFor } from './types.js';
 
-/** Post-Commit SPA target (ADR-0006). */
+/** Post-Commit / exit / deep-link SPA target (ADR-0006). */
 export type PostCommitTarget =
 	| { kind: 'task'; jobId: string; jobInstanceId: string; taskId: string }
 	| { kind: 'overview'; jobId: string; jobInstanceId: string }
@@ -73,58 +74,35 @@ export function resolveUnmountableTaskTarget(
 	return { kind: 'overview', jobId, jobInstanceId };
 }
 
-export function instanceIsFinished(
-	worklist: Worklist | null | undefined,
-	jobId: string,
-	jobInstanceId: string
-): boolean {
-	const job = worklistJobFor(worklist, jobId);
-	if (!job) return false;
-	const inst = instanceFor(job, jobInstanceId);
-	if (!inst) return false;
-	const ids = jobConfigTaskIds(job);
-	if (!ids.length) return false;
-	return ids.every((tid) => inst.tasks[tid] === 'done');
-}
-
-export function instanceHasRemainingWork(
-	worklist: Worklist | null | undefined,
-	jobId: string,
-	jobInstanceId: string
-): boolean {
-	const job = worklistJobFor(worklist, jobId);
-	if (!job) return false;
-	const inst = instanceFor(job, jobInstanceId);
-	if (!inst) return false;
-	return jobConfigTaskIds(job).some((tid) => inst.tasks[tid] !== 'done');
-}
-
 /**
- * ADR-0006: nextTaskFormBundle → Task; else overview while instance has work;
- * else Home when finished / unknown.
+ * Thin adapter over Commit `next` (ADR-0006). Does not re-walk Worklist —
+ * destination is server-evaluated.
  */
 export function resolvePostCommitNavigation(
+	next: CommitNext,
 	jobId: string,
 	jobInstanceId: string,
-	worklist: Worklist | null | undefined,
 	nextTaskFormBundle: TaskFormBundle | null | undefined
 ): PostCommitTarget {
-	const next = nextTaskFormBundle;
-	if (
-		next &&
-		next.jobId &&
-		next.taskId &&
-		next.jobInstanceId &&
-		next.jobId === jobId
-	) {
-		return {
-			kind: 'task',
-			jobId: next.jobId,
-			jobInstanceId: next.jobInstanceId,
-			taskId: next.taskId
-		};
+	if (next === 'task') {
+		const bundle = nextTaskFormBundle;
+		if (
+			bundle &&
+			bundle.jobId &&
+			bundle.taskId &&
+			bundle.jobInstanceId &&
+			bundle.jobId === jobId
+		) {
+			return {
+				kind: 'task',
+				jobId: bundle.jobId,
+				jobInstanceId: bundle.jobInstanceId,
+				taskId: bundle.taskId
+			};
+		}
+		return { kind: 'home' };
 	}
-	if (jobInstanceId && instanceHasRemainingWork(worklist, jobId, jobInstanceId)) {
+	if (next === 'overview' && jobId && jobInstanceId) {
 		return { kind: 'overview', jobId, jobInstanceId };
 	}
 	return { kind: 'home' };

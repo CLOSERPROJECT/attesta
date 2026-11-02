@@ -121,11 +121,11 @@ Host-injected `{ userId, org, roles }` for role gates, chrome, and Submission ac
 _Avoid_: Principal; forging actor via schema fields; Operator (catalog role label) for this bag
 
 **Commit**:
-Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are Adapters only. The Commit response includes an updated viewer-scoped **Worklist** and, when auto-advance applies, the next **Task form bundle**, so the SPA can route to the next Task, **Job instance overview**, or Worklist home without a blind re-Load.
-_Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group
+Authoritative accept of a sealed **Task** into Domain (cmd-bag), addressed by Task path + Job instance id. Production allow/deny is Cerbos; HTTP handlers are Adapters only. The Commit response includes an updated viewer-scoped **Worklist**, an explicit `next` destination (`task` | `overview` | `home`), and, when auto-advance applies, the next **Task form bundle**, so the SPA navigates without a blind re-Load or Worklist re-walk for overview-vs-home.
+_Avoid_: Treating the SPA route handler as the Seam; folding Drafts into Commit; Committing a Task group; SPA re-deriving post-Commit destination from Worklist
 
 **Load**:
-Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**, viewer Config **roles** (for Available affordances), and Active Config version metadata for the home board; not a dump of full Domain + full Org Config. **Task form bundle**s load when opening a Task route via addressed fetch (`GET /api/living/task-form`; provisional `jobInstanceId` empty / `new`) and may return on Commit as `nextTaskFormBundle` when auto-advancing — home Load omits bulk bundles (ADR-0006). SPA post-Commit routing uses `nextTaskFormBundle` + Worklist (overview / Home).
+Hydrate what the operator UI needs for the org: viewer-scoped **Worklist**, viewer Config **roles** (for Available affordances), and Active Config version metadata for the home board; not a dump of full Domain + full Org Config. **Task form bundle**s load when opening a Task route via addressed fetch (`GET /api/living/task-form`; provisional `jobInstanceId` empty / `new`) and may return on Commit as `nextTaskFormBundle` when auto-advancing — home Load omits bulk bundles (ADR-0006). SPA post-Commit routing consumes Commit `next` (+ bundle when `task`).
 _Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport; treating bulk Available bundles as the lasting home-Load or Commit shape
 
 **Worklist**:

@@ -21,15 +21,17 @@ export type HttpLinkItem = {
 	filename?: string;
 };
 
+/** ADR-0006 post-Commit destination (server-evaluated; SPA navigates only). */
+export type CommitNext = 'task' | 'overview' | 'home';
+
 export type CommitResult = {
 	org: string;
 	jobInstanceId: string;
 	/** Server-projected board after this Commit (same projector as Load). */
 	worklist: Worklist;
-	/**
-	 * ADR-0006 auto-advance: next role-eligible available Task on this instance.
-	 * Omitted on handoff / finished instance — Worklist alone drives overview/home.
-	 */
+	/** Explicit destination: task | overview | home. */
+	next: CommitNext;
+	/** Present only when next is task (auto-advance bundle). */
 	nextTaskFormBundle?: TaskFormBundle | null;
 	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
 	links?: HttpLinkItem[];
@@ -40,6 +42,7 @@ export type CommitResult = {
 export type CommitOutcome = {
 	jobInstanceId: string;
 	worklist: Worklist;
+	next: CommitNext;
 	nextTaskFormBundle: TaskFormBundle | null;
 };
 

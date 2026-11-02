@@ -1,6 +1,7 @@
 import {
 	CommitDomainError,
 	type CommitDomainPort,
+	type CommitNext,
 	type CommitResult,
 	type HttpLinkItem
 } from './commit-port.js';
@@ -38,6 +39,11 @@ function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
 	return raw as TaskFormBundle;
 }
 
+function parseCommitNext(raw: unknown): CommitNext {
+	if (raw === 'task' || raw === 'overview' || raw === 'home') return raw;
+	return 'home';
+}
+
 /** Normalize Commit JSON so SPA always sees arrays for links / httpErrors. */
 export function parseCommitResult(raw: unknown): CommitResult {
 	const body = raw as CommitResult;
@@ -53,13 +59,14 @@ export function parseCommitResult(raw: unknown): CommitResult {
 		if (parsed) links.push(parsed);
 	}
 	const httpErrors = errorsRaw.filter((e): e is string => typeof e === 'string');
-	const next = parseOptionalTaskFormBundle(
+	const nextBundle = parseOptionalTaskFormBundle(
 		(raw as { nextTaskFormBundle?: unknown })?.nextTaskFormBundle
 	);
 	return {
 		...body,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
-		nextTaskFormBundle: next,
+		next: parseCommitNext((raw as { next?: unknown })?.next),
+		nextTaskFormBundle: nextBundle,
 		links,
 		httpErrors
 	};

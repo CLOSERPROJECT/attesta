@@ -7,6 +7,7 @@ import { emptyWorklist } from './types.js';
 const sampleResult = {
 	org: 'feragame',
 	jobInstanceId: 'NIR-261019-NO-1',
+	next: 'task' as const,
 	worklist: {
 		jobs: [
 			{
@@ -86,6 +87,7 @@ describe('HttpCommitDomainPort', () => {
 		});
 		expect(got.org).toBe('feragame');
 		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
+		expect(got.next).toBe('task');
 		expect(got.worklist).toEqual(sampleResult.worklist);
 		expect(got.nextTaskFormBundle).toEqual(sampleResult.nextTaskFormBundle);
 		expect(got.links).toEqual(sampleResult.links);
@@ -93,11 +95,12 @@ describe('HttpCommitDomainPort', () => {
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
 
-	test('normalizes missing links/httpErrors/worklist/next', async () => {
+	test('normalizes missing links/httpErrors/worklist/next/bundle', async () => {
 		const {
 			links: _l,
 			httpErrors: _e,
 			worklist: _w,
+			next: _next,
 			nextTaskFormBundle: _n,
 			...withoutHttp
 		} = sampleResult;
@@ -118,6 +121,7 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.links).toEqual([]);
 		expect(got.httpErrors).toEqual([]);
 		expect(got.worklist).toEqual(emptyWorklist());
+		expect(got.next).toBe('home');
 		expect(got.nextTaskFormBundle).toBeNull();
 	});
 

@@ -32,9 +32,9 @@
 	function onCommitted(outcome: CommitOutcome) {
 		navigateLivingTarget(
 			resolvePostCommitNavigation(
+				outcome.next,
 				jobId,
 				outcome.jobInstanceId,
-				outcome.worklist,
 				outcome.nextTaskFormBundle
 			)
 		);

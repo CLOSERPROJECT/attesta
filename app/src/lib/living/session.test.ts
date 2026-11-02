@@ -100,6 +100,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: nextWorklist,
+			next: 'overview' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
@@ -116,6 +117,7 @@ describe('LivingSession', () => {
 			mint: { kind: 'none' }
 		});
 		expect(outcome?.jobInstanceId).toBe('NIR-1');
+		expect(outcome?.next).toBe('overview');
 		expect(outcome?.nextTaskFormBundle).toBeNull();
 		expect(session.result?.worklist).toEqual(nextWorklist);
 		expect(session.result?.taskFormBundles).toEqual([]);
@@ -128,6 +130,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
+			next: 'task' as const,
 			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
@@ -154,7 +157,7 @@ describe('LivingSession', () => {
 		expect(session.getDraft('intake/register', '_new')).toBeNull();
 	});
 
-	test('commit outcome surfaces nextTaskFormBundle for auto-advance', async () => {
+	test('commit outcome surfaces next + nextTaskFormBundle for auto-advance', async () => {
 		const next: TaskFormBundle = {
 			jobId: 'intake',
 			taskId: 'codiceFir',
@@ -173,6 +176,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
+			next: 'task' as const,
 			nextTaskFormBundle: next
 		}));
 		const session = new LivingSession({
@@ -187,6 +191,7 @@ describe('LivingSession', () => {
 			value: { client: 'NO' },
 			mint: { kind: 'none' }
 		});
+		expect(outcome?.next).toBe('task');
 		expect(outcome?.nextTaskFormBundle).toEqual(next);
 	});
 

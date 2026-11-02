@@ -40,17 +40,27 @@ func startingNewMint() *CommitMint {
 	return &CommitMint{Kind: MintKindStartingNew}
 }
 
-// CommitResult is the SPA Commit response: viewer-scoped Worklist and optional
-// auto-advance next Task form bundle. Domain stays on the Go value for tests;
-// omitted from JSON. Task mounts use addressed GET /api/living/task-form.
+// CommitNext is the ADR-0006 post-Commit destination (SPA navigates; does not re-derive).
+type CommitNext string
+
+const (
+	CommitNextTask     CommitNext = "task"
+	CommitNextOverview CommitNext = "overview"
+	CommitNextHome     CommitNext = "home"
+)
+
+// CommitResult is the SPA Commit response: viewer-scoped Worklist, explicit
+// next destination, and optional auto-advance Task form bundle when next is
+// task. Domain stays on the Go value for tests; omitted from JSON. Task mounts
+// use addressed GET /api/living/task-form.
 type CommitResult struct {
 	Org           string   `json:"org"`
 	JobInstanceID string   `json:"jobInstanceId"`
 	Domain        Domain   `json:"-"`
 	Worklist      Worklist `json:"worklist"`
-	// NextTaskFormBundle is set when another role-eligible available Task
-	// remains on this Job instance (ADR-0006 auto-advance); omitted on handoff
-	// or finished instance.
+	// Next is always set: task (auto-advance), overview (handoff), or home (finished).
+	Next CommitNext `json:"next"`
+	// NextTaskFormBundle is set only when Next is task; omitted otherwise.
 	NextTaskFormBundle *TaskFormBundle `json:"nextTaskFormBundle,omitempty"`
 	Links              []HttpLinkItem  `json:"links,omitempty"`
 	HttpErrors         []string        `json:"httpErrors,omitempty"`
@@ -198,19 +208,16 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 	}
 
 	wl := ProjectWorklist(cfg, applied.Domain, op)
-	var nextBundle *TaskFormBundle
-	if advance, ok := NextAdvanceTaskRef(wl, ref.JobID, applied.JobInstanceID); ok {
-		b, err := BuildTaskFormBundle(cfg, applied.Domain, advance)
-		if err != nil {
-			return CommitResult{}, err
-		}
-		nextBundle = b
+	next, nextBundle, err := resolveCommitDestination(cfg, applied.Domain, wl, ref.JobID, applied.JobInstanceID)
+	if err != nil {
+		return CommitResult{}, err
 	}
 	result := CommitResult{
 		Org:                org,
 		JobInstanceID:      applied.JobInstanceID,
 		Domain:             applied.Domain,
 		Worklist:           wl,
+		Next:               next,
 		NextTaskFormBundle: nextBundle,
 	}
 	if c.HttpPort != nil {
@@ -221,6 +228,26 @@ func (c *Committer) Commit(ctx context.Context, org string, op OperatorIdentity,
 		}
 	}
 	return result, nil
+}
+
+// resolveCommitDestination evaluates ADR-0006: auto-advance → overview → home.
+func resolveCommitDestination(
+	cfg OrgConfig,
+	domain Domain,
+	wl Worklist,
+	jobID, jobInstanceID string,
+) (CommitNext, *TaskFormBundle, error) {
+	if advance, ok := NextAdvanceTaskRef(wl, jobID, jobInstanceID); ok {
+		b, err := BuildTaskFormBundle(cfg, domain, advance)
+		if err != nil {
+			return "", nil, err
+		}
+		return CommitNextTask, b, nil
+	}
+	if worklistInstanceHasRemainingWork(wl, jobID, jobInstanceID) {
+		return CommitNextOverview, nil, nil
+	}
+	return CommitNextHome, nil, nil
 }
 
 type appliedCommit struct {

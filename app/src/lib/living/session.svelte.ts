@@ -141,6 +141,7 @@ export class LivingSession {
 			return {
 				jobInstanceId: committed.jobInstanceId,
 				worklist: committed.worklist,
+				next: committed.next,
 				nextTaskFormBundle: committed.nextTaskFormBundle ?? null
 			};
 		} catch (err) {

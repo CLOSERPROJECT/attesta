@@ -171,8 +171,11 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if reg.Next != CommitNextTask {
+		t.Fatalf("advance Next = %q, want task", reg.Next)
+	}
 	if reg.NextTaskFormBundle == nil || reg.NextTaskFormBundle.TaskID != "codiceFir" {
-		t.Fatalf("advance next = %s, want codiceFir", bundleAddress(reg.NextTaskFormBundle))
+		t.Fatalf("advance bundle = %s, want codiceFir", bundleAddress(reg.NextTaskFormBundle))
 	}
 	if reg.NextTaskFormBundle.JobInstanceID != instanceID {
 		t.Fatalf("advance instance = %q", reg.NextTaskFormBundle.JobInstanceID)
@@ -188,9 +191,12 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		t.Fatal(err)
 	}
+	if wire["next"] != string(CommitNextTask) {
+		t.Fatalf("advance JSON next = %#v", wire["next"])
+	}
 	nextWire, ok := wire["nextTaskFormBundle"].(map[string]any)
 	if !ok || nextWire["taskId"] != "codiceFir" {
-		t.Fatalf("advance JSON next = %#v", wire["nextTaskFormBundle"])
+		t.Fatalf("advance JSON nextTaskFormBundle = %#v", wire["nextTaskFormBundle"])
 	}
 
 	// Handoff: codiceFir done → palletWeight available but logistic-only.
@@ -201,8 +207,11 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if fir.Next != CommitNextOverview {
+		t.Fatalf("handoff Next = %q, want overview", fir.Next)
+	}
 	if fir.NextTaskFormBundle != nil {
-		t.Fatalf("handoff next must be nil; got %s", bundleAddress(fir.NextTaskFormBundle))
+		t.Fatalf("handoff bundle must be nil; got %s", bundleAddress(fir.NextTaskFormBundle))
 	}
 	intake, ok := worklistJobByID(fir.Worklist, "intake")
 	if !ok {
@@ -212,7 +221,11 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if !ok || inst.Tasks["palletWeight"] != TaskStatusAvailable {
 		t.Fatalf("handoff palletWeight status = %#v", inst)
 	}
-	if _, has := mustCommitWire(t, fir)["nextTaskFormBundle"]; has {
+	firWire := mustCommitWire(t, fir)
+	if firWire["next"] != string(CommitNextOverview) {
+		t.Fatalf("handoff JSON next = %#v", firWire["next"])
+	}
+	if _, has := firWire["nextTaskFormBundle"]; has {
 		t.Fatal("handoff JSON must omit nextTaskFormBundle")
 	}
 
@@ -227,11 +240,14 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if pw.Next != CommitNextOverview {
+		t.Fatalf("logistic Next = %q, want overview", pw.Next)
+	}
 	if pw.NextTaskFormBundle != nil {
 		t.Fatalf("logistic after palletWeight must not advance; got %s", bundleAddress(pw.NextTaskFormBundle))
 	}
 
-	// Finished instance: admin completes weightCheck → no further advance.
+	// Finished instance: admin completes weightCheck → home.
 	done, err := c.Commit(t.Context(), "feragame", admin, CommitRequest{
 		TaskPath: "intake/weightCheck", JobInstanceID: instanceID,
 		Value: map[string]any{"checkedTruckWeight": 100.0, "checkedPalletSum": 23.0},
@@ -239,8 +255,15 @@ func TestCommitNextTaskFormBundleAdvanceHandoffFinished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if done.Next != CommitNextHome {
+		t.Fatalf("finished Next = %q, want home", done.Next)
+	}
 	if done.NextTaskFormBundle != nil {
-		t.Fatalf("finished next must be nil; got %s", bundleAddress(done.NextTaskFormBundle))
+		t.Fatalf("finished bundle must be nil; got %s", bundleAddress(done.NextTaskFormBundle))
+	}
+	doneWire := mustCommitWire(t, done)
+	if doneWire["next"] != string(CommitNextHome) {
+		t.Fatalf("finished JSON next = %#v", doneWire["next"])
 	}
 	intake, ok = worklistJobByID(done.Worklist, "intake")
 	if !ok {

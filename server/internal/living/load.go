@@ -11,7 +11,7 @@ import (
 // Config version metadata (+ OperatorIdentity roles for Available affordances).
 // Full Domain / Org Config stay server-side (json:"-" for Go callers); they are
 // not on the wire. ADR-0006: home Load omits bulk Task form bundles — Task
-// routes fetch via LoadTaskBundle; Commit returns nextTaskFormBundle when advancing.
+// routes fetch via LoadTaskBundle; Commit returns next + nextTaskFormBundle when advancing.
 type LoadResult struct {
 	Org                 string `json:"org"`
 	ActiveConfigVersion string `json:"activeConfigVersion"`

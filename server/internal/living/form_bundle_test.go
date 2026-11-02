@@ -464,8 +464,11 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if committed.Next != CommitNextTask {
+		t.Fatalf("advance Next = %q, want task", committed.Next)
+	}
 	if committed.NextTaskFormBundle == nil || committed.NextTaskFormBundle.TaskID != "palletWeight" {
-		t.Fatalf("advance next = %s, want palletWeight", bundleAddress(committed.NextTaskFormBundle))
+		t.Fatalf("advance bundle = %s, want palletWeight", bundleAddress(committed.NextTaskFormBundle))
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "codiceFir", instanceID); err == nil {
 		t.Fatal("addressed codiceFir must deny after it leaves available")
@@ -485,6 +488,9 @@ func TestCommitNextBundleNotBulk(t *testing.T) {
 	if _, has := wire["taskFormBundles"]; has {
 		t.Fatalf("Commit JSON must omit taskFormBundles: %s", string(raw))
 	}
+	if wire["next"] != string(CommitNextTask) {
+		t.Fatalf("Commit JSON next = %#v", wire["next"])
+	}
 	if _, ok := wire["nextTaskFormBundle"].(map[string]any); !ok {
 		t.Fatalf("Commit JSON missing nextTaskFormBundle: %s", string(raw))
 	}
@@ -503,8 +509,11 @@ func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if shift.Next != CommitNextTask {
+		t.Fatalf("after shift Next = %q, want task", shift.Next)
+	}
 	if shift.NextTaskFormBundle == nil || shift.NextTaskFormBundle.TaskID != "lineLoad" {
-		t.Fatalf("after shift next = %s, want lineLoad", bundleAddress(shift.NextTaskFormBundle))
+		t.Fatalf("after shift bundle = %s, want lineLoad", bundleAddress(shift.NextTaskFormBundle))
 	}
 	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "register", ""); err == nil {
 		t.Fatal("line viewer must not mount intake provisional register")

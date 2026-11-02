@@ -4,8 +4,6 @@ import type { TaskFormBundle } from './form/task-form-bundle.js';
 import type { Worklist } from './types.js';
 import {
 	formatHandoffCopy,
-	instanceHasRemainingWork,
-	instanceIsFinished,
 	jobInstanceOverview,
 	resolvePostCommitNavigation,
 	resolveTaskDeepLink,
@@ -103,10 +101,10 @@ const nextBundle: TaskFormBundle = {
 	bindings: { domain: {} }
 };
 
-describe('post-Commit navigation', () => {
-	test('advance prefers nextTaskFormBundle', () => {
+describe('post-Commit navigation adapter', () => {
+	test('task next uses nextTaskFormBundle address', () => {
 		expect(
-			resolvePostCommitNavigation('intake', 'NIR-advance', adminWorklist, nextBundle)
+			resolvePostCommitNavigation('task', 'intake', 'NIR-advance', nextBundle)
 		).toEqual({
 			kind: 'task',
 			jobId: 'intake',
@@ -115,18 +113,24 @@ describe('post-Commit navigation', () => {
 		});
 	});
 
-	test('handoff opens overview when remaining work is not role-eligible', () => {
-		expect(
-			resolvePostCommitNavigation('intake', 'NIR-1', adminWorklist, null)
-		).toEqual({ kind: 'overview', jobId: 'intake', jobInstanceId: 'NIR-1' });
-		expect(instanceHasRemainingWork(adminWorklist, 'intake', 'NIR-1')).toBe(true);
+	test('task next without usable bundle falls back to home', () => {
+		expect(resolvePostCommitNavigation('task', 'intake', 'NIR-advance', null)).toEqual({
+			kind: 'home'
+		});
 	});
 
-	test('finished instance goes Home', () => {
-		expect(
-			resolvePostCommitNavigation('intake', 'NIR-done', adminWorklist, null)
-		).toEqual({ kind: 'home' });
-		expect(instanceIsFinished(adminWorklist, 'intake', 'NIR-done')).toBe(true);
+	test('overview next opens overview for the committed instance', () => {
+		expect(resolvePostCommitNavigation('overview', 'intake', 'NIR-1', null)).toEqual({
+			kind: 'overview',
+			jobId: 'intake',
+			jobInstanceId: 'NIR-1'
+		});
+	});
+
+	test('home next goes Home', () => {
+		expect(resolvePostCommitNavigation('home', 'intake', 'NIR-done', null)).toEqual({
+			kind: 'home'
+		});
 	});
 });
 

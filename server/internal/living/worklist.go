@@ -209,3 +209,22 @@ func worklistInstance(job WorklistJob, id string) (WorklistInstance, bool) {
 	}
 	return WorklistInstance{}, false
 }
+
+// worklistInstanceHasRemainingWork is true when any Task on the instance is not done
+// (ADR-0006 overview vs home after Commit when auto-advance does not apply).
+func worklistInstanceHasRemainingWork(wl Worklist, jobID, jobInstanceID string) bool {
+	job, ok := worklistJobByID(wl, jobID)
+	if !ok {
+		return false
+	}
+	inst, ok := worklistInstance(job, jobInstanceID)
+	if !ok {
+		return false
+	}
+	for _, tid := range job.TaskIDs {
+		if inst.Tasks[tid] != TaskStatusDone {
+			return true
+		}
+	}
+	return false
+}
