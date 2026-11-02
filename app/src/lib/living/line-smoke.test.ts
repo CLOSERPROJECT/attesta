@@ -1,7 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import type { TaskFormBundle } from './form/task-form-bundle.js';
-import { lineLoadLeftoverIds } from './leftovers.js';
 import { LivingSession } from './session.svelte.js';
 import {
 	emptyDomain,
@@ -31,7 +30,7 @@ function sub(
 	};
 }
 
-/** Fixture Worklist — mirrors Go ProjectWorklist for this smoke path (no SPA gates). */
+/** Fixture Worklist — mirrors Go ProjectWorklist for this smoke path (Submission law). */
 function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 	const lineInst = domain.jobInstances.find((i) => i.jobId === 'line');
 	if (!lineInst) {
@@ -65,13 +64,14 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 		(s) => s.jobId === 'line' && s.jobInstanceId === lineInst.id
 	);
 	const has = (taskId: string) => lineSubs.some((s) => s.taskId === taskId);
-	const leftoversOpen = lineLoadLeftoverIds(domain).length > 0;
 
 	if (has('shift')) tasks.shift = 'done';
 	else tasks.shift = 'available';
 
 	if (has('shift')) {
-		tasks.lineLoad = leftoversOpen || !has('lineLoad') ? 'available' : 'done';
+		tasks.lineLoad = has('lineLoad') ? 'done' : 'available';
+	}
+	if (has('lineLoad')) {
 		tasks.containerReg = has('containerReg') ? 'done' : 'available';
 	}
 	if (has('containerReg')) {
@@ -105,7 +105,7 @@ function worklistFor(domain: Domain, canStartLine: boolean): Worklist {
 	};
 }
 
-describe('line Commit smoke (session + Worklist + leftovers some)', () => {
+describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 	test('intake gate then one line instance through loadedExtracted', async () => {
 		const intakeId = 'NIR-261019-NO-1';
 		let domain: Domain = {
@@ -261,7 +261,6 @@ describe('line Commit smoke (session + Worklist + leftovers some)', () => {
 		session.result = { ...initial, worklist, taskFormBundles: [] };
 
 		expect(worklistJobFor(session.result.worklist, 'line')?.canStart).toBe(true);
-		expect(lineLoadLeftoverIds(domain)).toEqual([`${intakeId}.1`, `${intakeId}.2`]);
 
 		expect(
 			await session.commit({
@@ -274,8 +273,11 @@ describe('line Commit smoke (session + Worklist + leftovers some)', () => {
 
 		expect(session.result?.worklist).toEqual(worklist);
 		expect(
-			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
 		).toBe('available');
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
+		).toBe('locked');
 		expect(
 			session.result?.taskFormBundles.some(
 				(b) => b.jobId === 'line' && b.taskId === 'lineLoad' && b.jobInstanceId === '1st'
@@ -294,34 +296,23 @@ describe('line Commit smoke (session + Worklist + leftovers some)', () => {
 				value: {
 					progress: {
 						[`${intakeId}.1`]: 'done',
-						[`${intakeId}.2`]: 'partial'
+						[`${intakeId}.2`]: 'done'
 					}
 				},
 				mint: { kind: 'none' }
 			})
 		).toBe('1st');
-		expect(lineLoadLeftoverIds(domain)).toEqual([`${intakeId}.2`]);
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
+		).toBe('done');
+		expect(
+			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
 		).toBe('available');
 		expect(
 			session.result?.taskFormBundles.some(
 				(b) => b.jobId === 'line' && b.taskId === 'containerReg' && b.jobInstanceId === '1st'
 			)
 		).toBe(true);
-
-		expect(
-			await session.commit({
-				taskPath: 'line/lineLoad',
-				jobInstanceId: '1st',
-				value: { progress: { [`${intakeId}.2`]: 'done' } },
-				mint: { kind: 'none' }
-			})
-		).toBe('1st');
-		expect(lineLoadLeftoverIds(domain)).toEqual([]);
-		expect(
-			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
-		).toBe('done');
 
 		expect(
 			await session.commit({
@@ -350,7 +341,6 @@ describe('line Commit smoke (session + Worklist + leftovers some)', () => {
 		);
 		expect(lineSubs.map((s) => s.taskId)).toEqual([
 			'shift',
-			'lineLoad',
 			'lineLoad',
 			'containerReg',
 			'loadedExtracted'

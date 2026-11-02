@@ -59,7 +59,7 @@ func palletWeightTask(intake Job) TaskConfig {
 	return v
 }
 
-func TestCommitPalletWeightRejectsPartialLeftoversAll(t *testing.T) {
+func TestCommitPalletWeightRejectsPartialRequiredMap(t *testing.T) {
 	c, domains, _ := testCommitter(t, AllowAllAuthorizer{})
 	instanceID := "NIR-261019-NO-1"
 	commitThroughCodiceFir(t, c, instanceID)
@@ -69,14 +69,14 @@ func TestCommitPalletWeightRejectsPartialLeftoversAll(t *testing.T) {
 		TaskPath: "intake/palletWeight", JobInstanceID: instanceID,
 		Value: palletWeightValue(map[string]any{
 			instanceID + ".1": weighRow(11),
-			// .2 omitted — incomplete all
+			// .2 omitted — required map keys incomplete
 		}),
 	})
 	var ce *CommitError
 	if err == nil || !asCommitError(err, &ce) || ce.Kind != "prep" {
 		t.Fatalf("err = %v", err)
 	}
-	if !strings.Contains(ce.Message, "completeness all") {
+	if !strings.Contains(ce.Message, "required map keys") {
 		t.Fatalf("message = %q", ce.Message)
 	}
 
@@ -96,11 +96,11 @@ func TestCommitPalletWeightRejectsPartialLeftoversAll(t *testing.T) {
 		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
 		JobInstanceID: instanceID, Submissions: domain.Submissions, Tasks: intake.Tasks,
 	}) {
-		t.Fatal("incomplete all must not unlock weightCheck")
+		t.Fatal("incomplete required map must not unlock weightCheck")
 	}
 	line := lineJob(t)
 	if IsStartsWhenSatisfied(line.StartsWhen, domain.Submissions, domain.JobInstances, palletWeightTask(intake)) {
-		t.Fatal("incomplete all must not satisfy line startsWhen")
+		t.Fatal("incomplete required map must not satisfy line startsWhen")
 	}
 }
 
@@ -134,22 +134,19 @@ func TestCommitPalletWeightCompleteAllUnlocksAndStartsWhen(t *testing.T) {
 	}
 
 	intake := intakeTasks(t)
-	if !taskMayBeUnlockGate(palletWeightTask(intake)) {
-		t.Fatal("completeness all must remain an unlock / startsWhen gate")
-	}
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(intake.Tasks), JobID: "intake", TaskID: "weightCheck",
 		JobInstanceID: instanceID, Submissions: result.Domain.Submissions, Tasks: intake.Tasks,
 	}) {
-		t.Fatal("completed all must unlock weightCheck")
+		t.Fatal("palletWeight Submission must unlock weightCheck")
 	}
 	line := lineJob(t)
 	if !IsStartsWhenSatisfied(line.StartsWhen, result.Domain.Submissions, result.Domain.JobInstances, palletWeightTask(intake)) {
-		t.Fatal("completed all must enable authored line startsWhen target")
+		t.Fatal("palletWeight Submission must enable authored line startsWhen target")
 	}
 }
 
-func TestIsTaskUnlockedAfterCompletenessAllSubmission(t *testing.T) {
+func TestIsTaskUnlockedAfterPalletWeightSubmission(t *testing.T) {
 	tasks := intakeUnlockTasks()
 	order := []string{"register", "codiceFir", "palletWeight", "weightCheck"}
 	afterFir := []Submission{
@@ -167,6 +164,6 @@ func TestIsTaskUnlockedAfterCompletenessAllSubmission(t *testing.T) {
 		OrderedIDs: order, JobID: "intake", TaskID: "weightCheck",
 		JobInstanceID: "load-1", Submissions: afterAll, Tasks: tasks,
 	}) {
-		t.Fatal("palletWeight completeness all Submission unlocks weightCheck")
+		t.Fatal("palletWeight Submission unlocks weightCheck")
 	}
 }

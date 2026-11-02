@@ -121,7 +121,7 @@ func TestLoadJSONWorklistIntakeUnlockOrder(t *testing.T) {
 	}
 }
 
-func TestLoadJSONWorklistLineStartsWhenAndLeftoverSome(t *testing.T) {
+func TestLoadJSONWorklistLineStartsWhenAndSubmissionDone(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	intakeID := "NIR-261019-NO-1"
 	completeIntakeThroughPalletWeight(t, c, intakeID)
@@ -179,32 +179,11 @@ func TestLoadJSONWorklistLineStartsWhenAndLeftoverSome(t *testing.T) {
 	if inst.Tasks["shift"] != TaskStatusDone {
 		t.Fatalf("shift = %q, want done", inst.Tasks["shift"])
 	}
-	if inst.Tasks["lineLoad"] != TaskStatusAvailable {
-		t.Fatalf("lineLoad with leftovers = %q, want available", inst.Tasks["lineLoad"])
+	if inst.Tasks["lineLoad"] != TaskStatusDone {
+		t.Fatalf("lineLoad after Submission = %q, want done", inst.Tasks["lineLoad"])
 	}
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
-		t.Fatalf("containerReg = %q, want available", inst.Tasks["containerReg"])
-	}
-
-	_, err = c.Commit(t.Context(), "feragame", op, CommitRequest{
-		TaskPath: "line/lineLoad", JobInstanceID: "1st",
-		Value: map[string]any{
-			"progress": map[string]any{
-				intakeID + ".2": "done",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	loaded, err = loader.Load(t.Context(), "feragame")
-	if err != nil {
-		t.Fatal(err)
-	}
-	line, _ = worklistJobByID(loaded.Worklist, "line")
-	inst, _ = worklistInstance(line, "1st")
-	if inst.Tasks["lineLoad"] != TaskStatusDone {
-		t.Fatalf("lineLoad leftovers clear = %q, want done", inst.Tasks["lineLoad"])
+		t.Fatalf("containerReg = %q, want available after lineLoad Submission", inst.Tasks["containerReg"])
 	}
 }
 
@@ -330,11 +309,11 @@ func TestCommitResultWorklistMatchesPostCommitDomain(t *testing.T) {
 	if !ok {
 		t.Fatal("missing line instance 1st")
 	}
-	if inst.Tasks["lineLoad"] != TaskStatusAvailable {
-		t.Fatalf("lineLoad = %q, want available", inst.Tasks["lineLoad"])
+	if inst.Tasks["lineLoad"] != TaskStatusDone {
+		t.Fatalf("lineLoad = %q, want done after Submission", inst.Tasks["lineLoad"])
 	}
 	if inst.Tasks["containerReg"] != TaskStatusAvailable {
-		t.Fatalf("containerReg = %q, want available", inst.Tasks["containerReg"])
+		t.Fatalf("containerReg = %q, want available after lineLoad Submission", inst.Tasks["containerReg"])
 	}
 	want := ProjectWorklist(mustActiveConfig(t, c), result.Domain)
 	rawGot, _ := json.Marshal(result.Worklist)

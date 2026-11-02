@@ -24,20 +24,17 @@ func commitLineShift(t *testing.T, c *Committer, shift string) Domain {
 	return result.Domain
 }
 
-func TestFixtureLineLoadCompletenessSome(t *testing.T) {
+func TestFixtureLineLoadReadsDomainProgress(t *testing.T) {
 	line := lineJob(t)
 	task := lineLoadTask(line)
-	if taskMayBeUnlockGate(task) {
-		t.Fatal("fixture lineLoad completeness some must not be an unlock / startsWhen gate")
-	}
 	dyn := task["dynamicProperties"].(map[string]any)
 	progress := dyn["progress"].(map[string]any)
-	if progress["completeness"] != "some" {
-		t.Fatalf("completeness = %#v", progress["completeness"])
+	if progress["read"] != "leftovers" {
+		t.Fatalf("progress.read = %#v", progress["read"])
 	}
 }
 
-func TestLineLoadSomeNeverSatisfiesStartsWhen(t *testing.T) {
+func TestLineLoadSubmissionSatisfiesStartsWhen(t *testing.T) {
 	line := lineJob(t)
 	gate := &StartsWhen{
 		Task:       StartsWhenRef{JobID: "line", TaskID: "lineLoad"},
@@ -45,12 +42,12 @@ func TestLineLoadSomeNeverSatisfiesStartsWhen(t *testing.T) {
 	}
 	subs := []Submission{sub("line", "lineLoad", "1st")}
 	instances := []JobInstance{{JobID: "line", ID: "1st", Label: "Turno: 1st"}}
-	if IsStartsWhenSatisfied(gate, subs, instances, lineLoadTask(line)) {
-		t.Fatal("lineLoad completeness some must never satisfy startsWhen")
+	if !IsStartsWhenSatisfied(gate, subs, instances, lineLoadTask(line)) {
+		t.Fatal("lineLoad Submission must satisfy startsWhen")
 	}
 }
 
-func TestCommitLineLoadBatchSomeDoesNotUnlockNext(t *testing.T) {
+func TestCommitLineLoadSubmissionUnlocksNext(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	intakeID := "NIR-261019-NO-1"
 	completeIntakeThroughPalletWeight(t, c, intakeID)
@@ -81,23 +78,18 @@ func TestCommitLineLoadBatchSomeDoesNotUnlockNext(t *testing.T) {
 	}
 
 	line := lineJob(t)
-	if taskMayBeUnlockGate(lineLoadTask(line)) {
-		t.Fatal("lineLoad must stay a non-gate after Submission")
-	}
-	// Synthetic successor without unlockFrom:instance — Submission of some must not open it.
 	tasks := []TaskConfig{lineLoadTask(line), {"id": "next"}}
-	if IsTaskUnlocked(UnlockQuery{
+	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
 		JobInstanceID: "1st", Submissions: result.Domain.Submissions, Tasks: tasks,
 	}) {
-		t.Fatal("completeness some Submission must not unlock next Task")
+		t.Fatal("lineLoad Submission must unlock next Task")
 	}
-	// Fixture containerReg opens with the Job instance, not via lineLoad as unlock gate.
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "containerReg",
 		JobInstanceID: "1st", Submissions: result.Domain.Submissions, Tasks: line.Tasks,
 	}) {
-		t.Fatal("containerReg unlockFrom instance must open with Job instance despite some predecessor")
+		t.Fatal("containerReg must unlock after lineLoad Submission")
 	}
 }
 

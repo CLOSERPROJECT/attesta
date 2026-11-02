@@ -105,34 +105,33 @@ func jobInstanceLabel(domain Domain, jobID, id string) string {
 	return ""
 }
 
-// leftoverReadFromTask extracts the leftovers ReadDef from Task reads + dynamicProperties.
-func leftoverReadFromTask(task map[string]any) (ReadDef, string, bool, error) {
-	primary, completeness, ok := primaryDynamicProperty(task)
+// leftoverReadFromTask extracts the Domain-read ReadDef from Task reads + dynamicProperties.
+func leftoverReadFromTask(task map[string]any) (ReadDef, bool, error) {
+	primary, ok := primaryDynamicProperty(task)
 	if !ok {
-		return ReadDef{}, "", false, nil
+		return ReadDef{}, false, nil
 	}
 	reads, _ := task["reads"].(map[string]any)
 	if reads == nil {
-		return ReadDef{}, "", false, fmt.Errorf("leftover-table Task missing reads")
+		return ReadDef{}, false, fmt.Errorf("dynamic-map Task missing reads")
 	}
 	def, ok := dynamicPropertyDef(task, primary)
 	if !ok || def.Read == "" {
-		return ReadDef{}, "", false, fmt.Errorf("leftover-table Task missing read key")
+		return ReadDef{}, false, fmt.Errorf("dynamic-map Task missing read key")
 	}
 	raw, ok := reads[def.Read]
 	if !ok {
-		return ReadDef{}, "", false, fmt.Errorf("reads.%s missing", def.Read)
+		return ReadDef{}, false, fmt.Errorf("reads.%s missing", def.Read)
 	}
 	read, err := parseReadDef(raw)
 	if err != nil {
-		return ReadDef{}, "", false, err
+		return ReadDef{}, false, err
 	}
-	return read, completeness, true, nil
+	return read, true, nil
 }
 
 type dynamicPropDef struct {
-	Read         string
-	Completeness string
+	Read string
 }
 
 func dynamicPropertyDef(task map[string]any, key string) (dynamicPropDef, bool) {
@@ -149,31 +148,49 @@ func dynamicPropertyDef(task map[string]any, key string) (dynamicPropDef, bool) 
 		return dynamicPropDef{}, false
 	}
 	read, _ := m["read"].(string)
-	completeness, _ := m["completeness"].(string)
-	return dynamicPropDef{Read: read, Completeness: completeness}, true
+	if read == "" {
+		return dynamicPropDef{}, false
+	}
+	return dynamicPropDef{Read: read}, true
 }
 
-func primaryDynamicProperty(task map[string]any) (key string, completeness string, ok bool) {
+func primaryDynamicProperty(task map[string]any) (key string, ok bool) {
 	dyn, _ := task["dynamicProperties"].(map[string]any)
 	if len(dyn) == 0 {
-		return "", "", false
+		return "", false
 	}
-	// Prefer authored order when present; map iteration is fine for feragame-config (one key).
-	for k, raw := range dyn {
-		m, isMap := raw.(map[string]any)
-		if !isMap {
-			continue
+	for _, k := range sortedStringKeys(dyn) {
+		if _, ok := dynamicPropertyDef(task, k); ok {
+			return k, true
 		}
-		comp, _ := m["completeness"].(string)
-		if comp == "" {
-			continue
-		}
-		return k, comp, true
 	}
-	return "", "", false
+	return "", false
 }
 
 func needsLeftoverProjection(task map[string]any) bool {
-	_, _, ok := primaryDynamicProperty(task)
+	_, ok := primaryDynamicProperty(task)
 	return ok
+}
+
+// Full-map gate shared with prep: property in schema.required means every
+// Domain-read id must be required so projected Ajv matches Commit.
+func schemaRequiresProperty(task map[string]any, property string) bool {
+	schema, _ := task["schema"].(map[string]any)
+	if schema == nil {
+		return false
+	}
+	for _, s := range schemaStringList(schema["required"]) {
+		if s == property {
+			return true
+		}
+	}
+	// YAML/JSON may keep a typed string slice.
+	if strs, ok := schema["required"].([]string); ok {
+		for _, s := range strs {
+			if s == property {
+				return true
+			}
+		}
+	}
+	return false
 }

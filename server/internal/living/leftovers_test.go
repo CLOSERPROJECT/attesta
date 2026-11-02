@@ -31,13 +31,13 @@ func TestPalletWeightLeftoverIDsSkipsWeighted(t *testing.T) {
 	}
 }
 
-func TestEnforceAllCompletenessPartial(t *testing.T) {
+func TestEnforceRequiredMapKeysPartial(t *testing.T) {
 	facts := map[string]any{"a": map[string]any{"weight": 1.0}}
-	msg := enforceAllCompletenessKeys(facts, []string{"a", "b"})
+	msg := enforceRequiredMapKeys(facts, []string{"a", "b"})
 	if msg == "" || !strings.Contains(msg, "b") {
 		t.Fatalf("msg = %q", msg)
 	}
-	if enforceAllCompletenessKeys(facts, []string{"a"}) != "" {
+	if enforceRequiredMapKeys(facts, []string{"a"}) != "" {
 		t.Fatal("complete map must pass")
 	}
 }

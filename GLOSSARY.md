@@ -35,12 +35,12 @@ A top-level authored chapter in the Org Config. Groups a Task tree; may be **rep
 _Avoid_: Step (legacy experiment name); Stream; phase; nesting Jobs; treating a Job as a single submit leaf
 
 **Task**:
-A **leaf** submit unit: schema, gates, leftovers, and one successful **Submission** via **Commit**. Names which **Config roles** may complete it. Cerbos Commit targets Tasks only.
-_Avoid_: Substep (legacy experiment name); Form (when meaning this unit); composite/spawn-many nodes (see Task group); leaf Job
+A **leaf** submit unit: schema, gates, Domain **reads** into the form, and one successful **Submission** via **Commit**. Names which **Config roles** may complete it. Cerbos Commit targets Tasks only.
+_Avoid_: Substep (legacy experiment name); Form (when meaning this unit); composite/spawn-many nodes (see Task group); leaf Job; multi-pass reopen after Submission
 
 **Task group**:
 _Deferred product name (working label)._ A composite node under a Job: children, may be repeatable with parent-scoped instances; **no** Commit of its own. Spawn-many (e.g. lot under truck). Not implemented in the flat port.
-_Avoid_: Calling a Task group a Task; jobs all the way down; faking spawn-many with leftovers `completeness: some`
+_Avoid_: Calling a Task group a Task; jobs all the way down; faking spawn-many with map/table Domain reads
 
 **Job instance**:
 One occurrence of a repeatable Job within the org Domain (e.g. one truck, one line). Often created on first Task submit; id/label from config and/or submitted data.
@@ -62,17 +62,17 @@ _Avoid_: Locked (as the gate state word); Seal-gated start
 Task-level Domain readiness (boolean expression over Domain). Combined with the Task’s role gate. When false: visible but unavailable.
 _Avoid_: availableWhen; hiding unavailable Tasks; binding operator identity into the expression
 
-**Leftovers**:
-Map/table-style Task progress over many Domain entities in one Task. Authored **completeness**: `all` (every eligible entity; may unlock later work / be a `startsWhen` target) or `some` (batch progress only; must not unlock next or be a `startsWhen` target). Not spawn-many of full child registers.
-_Avoid_: Using `completeness: some` for unknown-N full lots/registers; conflating leftovers with Task group
+**Domain reads** (map/table Tasks):
+Authored `reads` + `dynamicProperties` that project current entity ids into a form map. Full-map Tasks list the map property in `schema.required` so every current read id is required; partial maps omit that and leave untouched keys unforced. Not a separate Leftovers subsystem; not spawn-many of full child registers.
+_Avoid_: Completeness `all`/`some` as product grammar; SPA twin leftover-id helpers; conflating map reads with Task group
 
 **Submission**:
-Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order and startsWhen read Submissions.
-_Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts
+Record that a Task succeeded on a Job instance: time, actor, facts snapshot; keyed with Task path. Unlock order, startsWhen, and Worklist done status read Submissions only (one successful Submission finishes the Task on that instance).
+_Avoid_: Treating entity fields alone as completion; putting the submitter only inside form facts; leftover-id reopen as done law
 
 **Draft**:
-Working data of an in-progress Task before Submission. Not part of Domain until Commit succeeds.
-_Avoid_: Submission; Domain
+Working data of an in-progress Task before Submission. Operators keep WIP in draft and Invia once. Not part of Domain until Commit succeeds.
+_Avoid_: Submission; Domain; multi-pass Task reopen while “leftover ids remain”
 
 ### Roles
 
@@ -107,12 +107,12 @@ Task-root display catalog (readonly, dataReport, …). Sibling to `derived`; str
 _Avoid_: Encoding live readouts as schema fields meant for submit; naming the Worklist “Chrome”; SPA Domain aggregation for dataReport
 
 **dynamicProperties**:
-Field-keyed leftover/map config for leftover-style Tasks (see Leftovers).
-_Avoid_: form-level `propertyNamesFrom` (rejected)
+Field-keyed map config: each property names a Domain **read** whose ids fill that map. Full vs partial Commit is `schema.required` projection, not completeness.
+_Avoid_: form-level `propertyNamesFrom` (rejected); authored `completeness`
 
 **progress** (entity field):
-Plant-style availability on some entities: unset = available; `partial`; `done`. Draft ≠ partial.
-_Avoid_: boolean `processed` as the living leftover gate
+Plant-style entity fact on some rows: unset; `partial`; `done`. Draft ≠ progress; Worklist done is Submission law.
+_Avoid_: boolean `processed` as a Worklist gate; treating progress enums as unlock grammar
 
 ### Operator and seams
 
@@ -129,12 +129,12 @@ Hydrate what the operator UI needs for the org: **Worklist**, **Task form bundle
 _Avoid_: Hydrate by whole-config execution id; `LoadRunPort` / `/api/runs/...` as product shape; treating Kit load functions as the Seam; shipping full Domain/Org Config so the SPA re-derives Unlock order / startsWhen / FormPlan / dataReport
 
 **Worklist**:
-Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, and `repeatable` for Config-free chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order, startsWhen, and Leftovers openness are evaluated only on the server; the UI reads the projection and does not re-implement those rules.
-_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; a second boolean visibility matrix beside status; inventing Task order/labels from a client Org Config snapshot
+Go-projected operator board for one org: which Jobs may start (`canStart`); per Job, authored `taskIds`, `startLabel`, and `repeatable` for Config-free chrome; and per Job instance, each Task’s status (`locked` | `available` | `done`). Unlock order and startsWhen are evaluated only on the server from **Submission** relations; a Task is `done` after Submission on the instance. The UI reads the projection and does not re-implement those rules.
+_Avoid_: Job surface; Chrome (FormPlan display catalog); SPA copies of Unlock / startsWhen; leftover-id reopen for Task status; inventing Task order/labels from a client Org Config snapshot
 
 **Task form bundle**:
-Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, leftover ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load/Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Load/Commit ship a set for every Worklist-`available` Task plus a provisional bundle (`jobInstanceId` empty) when `canStart`.
-_Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live draft-driven Chrome results as static strings; SPA Domain walk for dataReport
+Minimum payload to mount one Task form: compiled schema + uiSchema, initial/seed data, projected read ids/columns when needed, Chrome and Derived *rules*, seal/chrome field ids, title, and a DomainSnapshot-shaped bindings bag (including `submissions`) for live Chrome/Derived — not the full Domain or authored Org Config Task document. On Load/Commit, server-evaluated `dataReport` results land in `bindings.chromeDisplay` for SPA paint-only; draft-driven Chrome stays live on the client. Load/Commit ship a set for every Worklist-`available` Task plus a provisional bundle (`jobInstanceId` empty) when `canStart`.
+_Avoid_: Client compile from full authored Task + full Domain; calling this Chrome; baking live draft-driven Chrome results as static strings; SPA Domain walk for dataReport or leftover ids
 
 **AuthPort / AuthorizerPort**:
 Who is calling (`OperatorIdentity`) vs who may complete a Task; Commit uses both. Production AuthorizerPort Adapter is Cerbos.

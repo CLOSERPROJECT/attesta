@@ -31,13 +31,8 @@ func IsTaskUnlocked(q UnlockQuery) bool {
 	}
 
 	previousID := q.OrderedIDs[index-1]
-	previous, ok := TaskByID(q.Tasks, previousID)
-	if !ok {
+	if _, ok := TaskByID(q.Tasks, previousID); !ok {
 		return false
-	}
-	if !taskMayBeUnlockGate(previous) {
-		current, _ := TaskByID(q.Tasks, q.TaskID)
-		return taskUnlocksWithInstance(current) && q.JobInstanceID != ""
 	}
 	return hasSubmissionOnInstance(q.Submissions, q.JobID, previousID, q.JobInstanceID)
 }
@@ -49,36 +44,6 @@ func hasSubmissionOnInstance(subs []Submission, jobID, taskID, jobInstanceID str
 		}
 	}
 	return false
-}
-
-// Predecessor with Leftovers completeness "some" must not unlock the next Task.
-func taskMayBeUnlockGate(task any) bool {
-	m := taskPayload(task)
-	if m == nil {
-		return true
-	}
-	dyn, ok := m["dynamicProperties"].(map[string]any)
-	if !ok {
-		return true
-	}
-	for _, raw := range dyn {
-		def, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-		if def["completeness"] == "some" {
-			return false
-		}
-	}
-	return true
-}
-
-func taskUnlocksWithInstance(task any) bool {
-	m := taskPayload(task)
-	if m == nil {
-		return false
-	}
-	return m["unlockFrom"] == "instance"
 }
 
 func sequenceOkForCommit(cfg OrgConfig, domain Domain, jobID, taskID, jobInstanceID string) bool {

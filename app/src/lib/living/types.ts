@@ -12,7 +12,7 @@ export type LoadResult = {
 	taskFormBundles: TaskFormBundle[];
 };
 
-/** Server-projected operator board (Unlock / startsWhen / leftover openness). */
+/** Server-projected operator board (Unlock / startsWhen; done after Submission only). */
 export type Worklist = {
 	jobs: WorklistJob[];
 };

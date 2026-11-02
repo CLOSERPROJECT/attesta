@@ -2,13 +2,12 @@ package living
 
 // IsStartsWhenSatisfied: absent gate always allows. `some` = ≥1 matching Submission;
 // `all` = every Job instance of the referenced Job has that Task Submission
-// (and at least one instance exists). Completeness `some` Tasks never satisfy
-// (fail closed) — they must not be startsWhen targets.
+// (and at least one instance exists). Eligibility is Submission relations only.
 func IsStartsWhenSatisfied(startsWhen *StartsWhen, submissions []Submission, jobInstances []JobInstance, referencedTask any) bool {
 	if startsWhen == nil {
 		return true
 	}
-	if referencedTask == nil || !taskMayBeUnlockGate(referencedTask) {
+	if referencedTask == nil {
 		return false
 	}
 

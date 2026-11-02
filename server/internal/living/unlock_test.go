@@ -118,22 +118,28 @@ func TestIsTaskUnlockedDistinctFromStartsWhen(t *testing.T) {
 	}
 }
 
-func TestIsTaskUnlockedCompletenessSomeNeverGatesNext(t *testing.T) {
+func TestIsTaskUnlockedSubmissionGatesNext(t *testing.T) {
 	tasks := []TaskConfig{
 		{
 			"id": "lineLoad",
 			"dynamicProperties": map[string]any{
-				"progress": map[string]any{"read": "leftovers", "completeness": "some"},
+				"progress": map[string]any{"read": "leftovers"},
 			},
 		},
 		{"id": "next"},
 	}
 	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
+		JobInstanceID: "line", Submissions: nil, Tasks: tasks,
+	}) {
+		t.Fatal("next must stay locked without predecessor Submission")
+	}
+	if !IsTaskUnlocked(UnlockQuery{
+		OrderedIDs: []string{"lineLoad", "next"}, JobID: "line", TaskID: "next",
 		JobInstanceID: "line", Submissions: []Submission{sub("line", "lineLoad", "line")},
 		Tasks: tasks,
 	}) {
-		t.Fatal("completeness some predecessor must not unlock next")
+		t.Fatal("predecessor Submission must unlock next")
 	}
 }
 
@@ -144,7 +150,7 @@ func intakeUnlockTasks() []TaskConfig {
 		{
 			"id": "palletWeight",
 			"dynamicProperties": map[string]any{
-				"weights": map[string]any{"read": "leftovers", "completeness": "all"},
+				"weights": map[string]any{"read": "leftovers"},
 			},
 		},
 		{"id": "weightCheck"},

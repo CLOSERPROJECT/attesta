@@ -161,7 +161,7 @@ func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*T
 
 	derived := compileDerivedRules(payload, projected.LeftoverIDs)
 	surface := "live"
-	if primary, _, ok := primaryDynamicProperty(payload); ok {
+	if primary, ok := primaryDynamicProperty(payload); ok {
 		if additionalPropertiesIsProgress(additionalPropertiesSchema(payload, primary)) {
 			surface = "leftover-table"
 		}
@@ -296,7 +296,7 @@ func buildFormBindings(domain Domain, ref AvailableTaskRef, catalogs map[string]
 
 func seedInitialData(domain Domain, payload map[string]any, projected projectedForm) map[string]any {
 	out := map[string]any{}
-	primary, _, ok := primaryDynamicProperty(payload)
+	primary, ok := primaryDynamicProperty(payload)
 	if !ok || len(projected.LeftoverIDs) == 0 {
 		return out
 	}
@@ -334,7 +334,7 @@ func seedInitialData(domain Domain, payload map[string]any, projected projectedF
 }
 
 func leftoverEntityMap(domain Domain, payload map[string]any) EntityMap {
-	read, _, ok, err := leftoverReadFromTask(payload)
+	read, ok, err := leftoverReadFromTask(payload)
 	if err != nil || !ok {
 		return EntityMap{}
 	}

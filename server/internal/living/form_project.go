@@ -34,7 +34,7 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 
 	leftoverIDs := []string{}
 	var columns *FormColumns
-	primary, _, hasPrimary := primaryDynamicProperty(task)
+	primary, hasPrimary := primaryDynamicProperty(task)
 	mutated := false
 
 	dyn, _ := task["dynamicProperties"].(map[string]any)
@@ -67,6 +67,9 @@ func projectTaskForm(domain Domain, task map[string]any, jobInstanceID, jobInsta
 			}
 			propSchema = cloneMapJSON(propSchema)
 			propSchema["propertyNames"] = map[string]any{"enum": ids}
+			if schemaRequiresProperty(task, property) {
+				propSchema["required"] = ids
+			}
 			props[property] = propSchema
 			mutated = true
 

@@ -210,8 +210,6 @@ steps:
               dynamicProperties:
                 weights:
                     read: leftovers
-                    # all = full leftover map before unlock / startsWhen.
-                    completeness: all
               reads:
                 leftovers:
                     entity: pallet
@@ -220,6 +218,7 @@ steps:
               schema:
                 type: object
                 title: Pesi bancali
+                # weights in required → host projects every current read id into weights.required.
                 required: [averagePanelWeight, tareKind, weights]
                 properties:
                     averagePanelWeight:
@@ -364,15 +363,13 @@ steps:
                 transform: []
             - id: lineLoad
               roles: [line]
+              # One Commit (draft → Invia); progress not in schema.required → partial map ok.
               dynamicProperties:
                 progress:
                     read: leftovers
-                    # some = batch Submissions while leftovers remain (not an unlock gate).
-                    completeness: some
               reads:
                 leftovers:
                     entity: pallet
-                    # unset + partial stay in pool; done drops out
                     where: $exists(weight) and $not(progress = 'done')
                     key: id
               schema:
@@ -399,11 +396,11 @@ steps:
                       entity: pallet
                       set:
                         progress: $value
-            # C5/C6 — keyed material arrays; bind → {sourceLoadId,rows} then mintMany; unlockFrom instance.
+            # C5/C6 — keyed material arrays; bind → {sourceLoadId,rows} then mintMany.
+            # Unlocks after lineLoad Submission on this Job instance.
             # Load enums at form root (91); per-row dual checkbox; form secondary required when any dual (90/92).
             - id: containerReg
               roles: [logistic]
-              unlockFrom: instance
               enumReads:
                 sourceLoadId: loads
                 secondarySourceLoadId: loads

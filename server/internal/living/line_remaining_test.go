@@ -26,31 +26,17 @@ func commitLineLoadDone(t *testing.T, c *Committer, shift, intakeID string) {
 	}
 }
 
-func TestFixtureContainerRegUnlockFromInstance(t *testing.T) {
-	line := lineJob(t)
-	task, ok := TaskByID(line.Tasks, "containerReg")
-	if !ok {
-		t.Fatal("containerReg missing")
-	}
-	if !taskUnlocksWithInstance(task) {
-		t.Fatal("fixture containerReg must set unlockFrom: instance")
-	}
-	if taskMayBeUnlockGate(lineLoadTask(line)) {
-		t.Fatal("lineLoad must stay a non-gate so unlockFrom instance applies")
-	}
-}
-
-func TestContainerRegUnlocksWithInstanceWithoutLineLoad(t *testing.T) {
+func TestContainerRegLockedUntilLineLoadSubmission(t *testing.T) {
 	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
 	completeIntakeThroughPalletWeight(t, c, "NIR-261019-NO-1")
 	domain := commitLineShift(t, c, "1st")
 
 	line := lineJob(t)
-	if !IsTaskUnlocked(UnlockQuery{
+	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "containerReg",
 		JobInstanceID: "1st", Submissions: domain.Submissions, Tasks: line.Tasks,
 	}) {
-		t.Fatal("containerReg must unlock with Job instance despite no lineLoad Submission")
+		t.Fatal("containerReg must stay locked until lineLoad Submission")
 	}
 	if IsTaskUnlocked(UnlockQuery{
 		OrderedIDs: OrderedTaskIDs(line.Tasks), JobID: "line", TaskID: "loadedExtracted",
@@ -65,7 +51,6 @@ func TestCommitContainerRegMintsContainersAndUnlocksLoadedExtracted(t *testing.T
 	intakeID := "NIR-261019-NO-1"
 	completeIntakeThroughPalletWeight(t, c, intakeID)
 	commitLineShift(t, c, "1st")
-	// Authored walk still runs lineLoad; unlock does not require it.
 	commitLineLoadDone(t, c, "1st", intakeID)
 
 	op := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}

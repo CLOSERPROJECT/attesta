@@ -1,13 +1,10 @@
 /**
- * Field-keyed leftover map config (`dynamicProperties`) — parse + validate at load.
- * Completeness all|some drives submit prep and unlock-gate eligibility.
+ * Field-keyed dynamic map config (`dynamicProperties`) — parse + validate at load.
+ * Row ids come from Domain reads; full vs partial Commit is schema.required projection.
  */
-
-export type LeftoverCompleteness = 'all' | 'some';
 
 export type DynamicPropertyDef = {
 	read: string;
-	completeness: LeftoverCompleteness;
 };
 
 export type DynamicProperties = Record<string, DynamicPropertyDef>;
@@ -55,12 +52,12 @@ function parseDynamicPropertyDef(
 	if (typeof raw.read !== 'string' || raw.read.length === 0) {
 		throw new Error(`${path}.dynamicProperties.${property}.read must be a non-empty string`);
 	}
-	if (raw.completeness !== 'all' && raw.completeness !== 'some') {
+	if (raw.completeness !== undefined) {
 		throw new Error(
-			`${path}.dynamicProperties.${property}.completeness must be "all" or "some"`
+			`${path}.dynamicProperties.${property}.completeness is removed; use schema.required for full-map`
 		);
 	}
-	return { read: raw.read, completeness: raw.completeness };
+	return { read: raw.read };
 }
 
 /**
@@ -76,8 +73,8 @@ export function parseAuthoredPayload(path: string, raw: unknown): Record<string,
 			`${path}: propertyNamesFrom is removed; use field-keyed dynamicProperties`
 		);
 	}
-	if (raw.unlockFrom !== undefined && raw.unlockFrom !== 'instance') {
-		throw new Error(`${path}.unlockFrom must be "instance" when present`);
+	if (raw.unlockFrom !== undefined) {
+		throw new Error(`${path}.unlockFrom is removed; Unlock follows Submission order only`);
 	}
 	if (raw.roles !== undefined) {
 		if (!Array.isArray(raw.roles) || raw.roles.length === 0) {
@@ -173,31 +170,6 @@ export function dynamicPropertyDef(
 	}
 	const raw = formConfig.dynamicProperties[property];
 	if (!isPlainObject(raw)) return null;
-	if (typeof raw.read !== 'string') return null;
-	if (raw.completeness !== 'all' && raw.completeness !== 'some') return null;
-	return { read: raw.read, completeness: raw.completeness };
-}
-
-/**
- * Unlock / startsWhen gate target: false when any field uses completeness `some`
- * (batch leftovers must not unlock the next Substep or cross-Step start).
- */
-export function taskMayBeUnlockGate(substep: unknown): boolean {
-	if (!isPlainObject(substep) || !isPlainObject(substep.dynamicProperties)) {
-		return true;
-	}
-	for (const property of Object.keys(substep.dynamicProperties)) {
-		const def = dynamicPropertyDef(substep, property);
-		if (def?.completeness === 'some') return false;
-	}
-	return true;
-}
-
-/**
- * When the in-order predecessor is not an unlock gate (`completeness: some`),
- * a Substep may still open once the Step instance exists (`unlockFrom: instance`).
- * Used so `containerReg` can follow batch `lineLoad` and remain unlock-eligible for later checks.
- */
-export function taskUnlocksWithInstance(substep: unknown): boolean {
-	return isPlainObject(substep) && substep.unlockFrom === 'instance';
+	if (typeof raw.read !== 'string' || raw.read.length === 0) return null;
+	return { read: raw.read };
 }

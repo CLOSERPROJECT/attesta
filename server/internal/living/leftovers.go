@@ -172,9 +172,6 @@ func isUntouchedProgressCell(cell any) bool {
 // nil in the result means clear/unset entity progress (kept, not dropped).
 func filterFilledProgress(value map[string]any, cellSchema map[string]any) (map[string]any, error) {
 	enums := progressEnumsFromSchema(cellSchema)
-	if len(enums) == 0 {
-		enums = []string{"partial", "done"}
-	}
 	filled := make(map[string]any)
 	for id, cell := range value {
 		if isUntouchedProgressCell(cell) {
@@ -183,6 +180,9 @@ func filterFilledProgress(value map[string]any, cellSchema map[string]any) (map[
 		if cell == nil {
 			filled[id] = nil
 			continue
+		}
+		if len(enums) == 0 {
+			return nil, fmt.Errorf("progress cell schema missing string enum")
 		}
 		s, ok := cell.(string)
 		if !ok || !stringInList(s, enums) {
@@ -308,9 +308,9 @@ func additionalPropertiesSchema(task map[string]any, primary string) map[string]
 	return add
 }
 
-// leftoverIDsForTask resolves leftover eligibility from Task reads.where (config-driven).
+// leftoverIDsForTask resolves row eligibility from Task reads.where (config-driven).
 func leftoverIDsForTask(domain Domain, jobID string, task map[string]any, jobInstanceID string, catalogs map[string]any) ([]string, error) {
-	read, _, ok, err := leftoverReadFromTask(task)
+	read, ok, err := leftoverReadFromTask(task)
 	if err != nil {
 		return nil, err
 	}

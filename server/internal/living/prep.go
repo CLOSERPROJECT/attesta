@@ -8,12 +8,12 @@ type prepResult struct {
 	Facts map[string]any
 }
 
-// prepTaskSubmission filters leftover-table values into transform facts.
+// prepTaskSubmission filters dynamic-map values into transform facts.
 // Chrome field ids (display-only) are stripped here — Commit law, not SPA seal.
 func prepTaskSubmission(task map[string]any, value map[string]any, leftoverIDs []string) (prepResult, error) {
 	value = stripChromeFields(task, value)
 	if needsLeftoverProjection(task) {
-		return prepLeftoverFacts(task, value, leftoverIDs)
+		return prepDynamicMapFacts(task, value, leftoverIDs)
 	}
 	return prepResult{Facts: cloneFacts(value)}, nil
 }
@@ -30,13 +30,14 @@ func stripChromeFields(task map[string]any, value map[string]any) map[string]any
 	return out
 }
 
-func prepLeftoverFacts(task map[string]any, value map[string]any, leftoverIDs []string) (prepResult, error) {
-	primary, completeness, ok := primaryDynamicProperty(task)
-	if !ok || completeness == "" {
-		return prepResult{}, fmt.Errorf("leftover-table Task missing completeness")
+func prepDynamicMapFacts(task map[string]any, value map[string]any, leftoverIDs []string) (prepResult, error) {
+	primary, ok := primaryDynamicProperty(task)
+	if !ok {
+		return prepResult{}, fmt.Errorf("dynamic-map Task missing primary property")
 	}
+	fullMap := schemaRequiresProperty(task, primary)
 
-	if completeness == "all" && len(leftoverIDs) == 0 {
+	if fullMap && len(leftoverIDs) == 0 {
 		return prepResult{Facts: map[string]any{}}, nil
 	}
 
@@ -64,8 +65,8 @@ func prepLeftoverFacts(task map[string]any, value map[string]any, leftoverIDs []
 		facts = filled
 	}
 
-	if completeness == "all" {
-		if msg := enforceAllCompletenessKeys(facts, leftoverIDs); msg != "" {
+	if fullMap {
+		if msg := enforceRequiredMapKeys(facts, leftoverIDs); msg != "" {
 			return prepResult{}, fmt.Errorf("%s", msg)
 		}
 	}
@@ -121,7 +122,7 @@ func schemaTypeIncludesString(raw any) bool {
 	return false
 }
 
-func enforceAllCompletenessKeys(facts map[string]any, leftoverIDs []string) string {
+func enforceRequiredMapKeys(facts map[string]any, leftoverIDs []string) string {
 	if len(leftoverIDs) == 0 {
 		return ""
 	}
@@ -134,7 +135,7 @@ func enforceAllCompletenessKeys(facts map[string]any, leftoverIDs []string) stri
 	if len(missing) == 0 {
 		return ""
 	}
-	return "completeness all requires every leftover — missing " + joinComma(missing)
+	return "required map keys missing — " + joinComma(missing)
 }
 
 func joinComma(ids []string) string {

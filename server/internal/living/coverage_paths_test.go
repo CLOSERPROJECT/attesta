@@ -185,7 +185,7 @@ func TestParseTaskPathAndStartsWhenAll(t *testing.T) {
 
 	eligible := map[string]any{
 		"dynamicProperties": map[string]any{
-			"weights": map[string]any{"read": "leftovers", "completeness": "all"},
+			"weights": map[string]any{"read": "leftovers"},
 		},
 	}
 	gate := &StartsWhen{Task: StartsWhenRef{JobID: "intake", TaskID: "palletWeight"}, Quantifier: "all"}
@@ -1093,43 +1093,54 @@ func TestPrepStripsChromeFields(t *testing.T) {
 
 func TestPrepLeftoverAndLoaderEdges(t *testing.T) {
 	got, err := prepTaskSubmission(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{"leftovers": map[string]any{"entity": "pallet", "key": "id"}},
-		"schema":            map[string]any{"properties": map[string]any{"weights": map[string]any{}}},
+		"schema": map[string]any{
+			"required":   []any{"weights"},
+			"properties": map[string]any{"weights": map[string]any{}},
+		},
 	}, map[string]any{}, nil)
 	if err != nil || len(got.Facts) != 0 {
-		t.Fatalf("all+empty leftovers = %#v %v", got, err)
+		t.Fatalf("full-map+empty leftovers = %#v %v", got, err)
 	}
+	progressSchema := map[string]any{"type": "string", "enum": []any{"partial", "done"}}
 	_, err = prepTaskSubmission(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "some"}},
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"schema": map[string]any{"properties": map[string]any{
-			"weights": map[string]any{"additionalProperties": map[string]any{"type": "string"}},
+			"weights": map[string]any{"additionalProperties": progressSchema},
 		}},
 	}, map[string]any{"weights": map[string]any{"a": "done"}}, []string{"a"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = prepTaskSubmission(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "some"}},
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"schema": map[string]any{"properties": map[string]any{
-			"weights": map[string]any{"additionalProperties": map[string]any{"type": "string"}},
+			"weights": map[string]any{"additionalProperties": progressSchema},
 		}},
 	}, map[string]any{"weights": map[string]any{"a": "nope"}}, []string{"a"})
 	if err == nil {
 		t.Fatal("bad progress")
 	}
 	_, err = prepTaskSubmission(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
-		"schema":            map[string]any{"properties": map[string]any{"weights": map[string]any{}}},
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
+		"schema": map[string]any{
+			"required":   []any{"weights"},
+			"properties": map[string]any{"weights": map[string]any{}},
+		},
 	}, map[string]any{"weights": map[string]any{
 		"a": map[string]any{"weight": 1.0, "panelCount": 1.0, "tareKind": "wood", "idoneita": "NIR"},
 	}}, []string{"a", "b"})
 	if err == nil {
-		t.Fatal("all completeness missing b")
+		t.Fatal("full-map required missing b")
 	}
 	_, err = filterFilledProgress(map[string]any{"a": "nope"}, map[string]any{"type": "string", "enum": []any{"partial", "done"}})
 	if err == nil {
 		t.Fatal("filterFilledProgress")
+	}
+	_, err = filterFilledProgress(map[string]any{"a": "done"}, map[string]any{"type": "string"})
+	if err == nil {
+		t.Fatal("missing enum must not silently accept progress")
 	}
 	if msg := validateProgressFacts(nil, []string{"a"}); msg == "" {
 		t.Fatal("empty progress facts")
@@ -1155,10 +1166,10 @@ func TestPrepLeftoverAndLoaderEdges(t *testing.T) {
 	if additionalPropertiesIsProgress(map[string]any{"type": "object"}) {
 		t.Fatal("object not progress")
 	}
-	if enforceAllCompletenessKeys(map[string]any{}, nil) != "" {
+	if enforceRequiredMapKeys(map[string]any{}, nil) != "" {
 		t.Fatal("empty leftovers ok")
 	}
-	if msg := enforceAllCompletenessKeys(map[string]any{}, []string{"a"}); msg == "" {
+	if msg := enforceRequiredMapKeys(map[string]any{}, []string{"a"}); msg == "" {
 		t.Fatal("missing keys")
 	}
 
@@ -1228,14 +1239,6 @@ func TestChromeCompileHelpersAndUnlockEdges(t *testing.T) {
 	}
 	if encodeFormPath([]string{"row", "a.b", "cell"}) == "row.a.b.cell" {
 		t.Fatal("dotted path should use json pointer style")
-	}
-	if !taskMayBeUnlockGate(nil) || taskMayBeUnlockGate(map[string]any{
-		"dynamicProperties": map[string]any{"p": map[string]any{"completeness": "some"}},
-	}) {
-		t.Fatal("taskMayBeUnlockGate")
-	}
-	if taskUnlocksWithInstance(nil) || !taskUnlocksWithInstance(map[string]any{"unlockFrom": "instance"}) {
-		t.Fatal("taskUnlocksWithInstance")
 	}
 	if sequenceOkForCommit(OrgConfig{}, EmptyDomain(), "missing", "t", "") {
 		t.Fatal("unknown job sequence")
@@ -1516,32 +1519,32 @@ func TestConfigJSONDecodeErrorLines(t *testing.T) {
 }
 
 func TestLeftoverReadHelpersAndWorklistEdges(t *testing.T) {
-	_, _, ok, err := leftoverReadFromTask(map[string]any{})
+	_, ok, err := leftoverReadFromTask(map[string]any{})
 	if err != nil || ok {
 		t.Fatalf("no primary = %v %v", ok, err)
 	}
-	_, _, ok, err = leftoverReadFromTask(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
+	_, ok, err = leftoverReadFromTask(map[string]any{
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 	})
 	if err == nil || ok {
 		t.Fatal("missing reads")
 	}
-	_, _, ok, err = leftoverReadFromTask(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
+	_, ok, err = leftoverReadFromTask(map[string]any{
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{},
 	})
 	if err == nil || ok {
 		t.Fatal("missing def read")
 	}
-	def, completeness, ok, err := leftoverReadFromTask(map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
+	def, ok, err := leftoverReadFromTask(map[string]any{
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{"leftovers": map[string]any{"entity": "pallet", "key": "id"}},
 	})
-	if err != nil || !ok || completeness != "all" || def.Entity != EntityPallet {
-		t.Fatalf("leftover read = %#v %q %v %v", def, completeness, ok, err)
+	if err != nil || !ok || def.Entity != EntityPallet {
+		t.Fatalf("leftover read = %#v %v %v", def, ok, err)
 	}
 	if _, err := leftoverIDsForTask(EmptyDomain(), "intake", map[string]any{
-		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers", "completeness": "all"}},
+		"dynamicProperties": map[string]any{"weights": map[string]any{"read": "leftovers"}},
 		"reads":             map[string]any{"leftovers": "bad"},
 	}, "", nil); err == nil {
 		t.Fatal("bad leftover read def")
@@ -1589,8 +1592,8 @@ func TestCoverageBufferHelpersAndHTTP(t *testing.T) {
 	if !additionalPropertiesIsProgress(map[string]any{"anyOf": []any{map[string]any{"type": "string"}}}) {
 		t.Fatal("anyOf string")
 	}
-	if msg := enforceAllCompletenessKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {
-		t.Fatalf("joinComma via completeness = %q", msg)
+	if msg := enforceRequiredMapKeys(map[string]any{}, []string{"a", "b"}); !strings.Contains(msg, "a, b") {
+		t.Fatalf("joinComma via required keys = %q", msg)
 	}
 	if _, ok := taskOnSubmitTransform(map[string]any{}); ok {
 		t.Fatal("no onSubmit")

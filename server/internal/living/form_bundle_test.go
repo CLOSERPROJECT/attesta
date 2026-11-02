@@ -230,6 +230,78 @@ func TestLoadJSONTaskFormBundlePalletWeightLeftovers(t *testing.T) {
 	if len(weights) != len(bundle.LeftoverIDs) {
 		t.Fatalf("initial weights = %#v, leftovers = %#v", weights, bundle.LeftoverIDs)
 	}
+	props, _ := bundle.Schema["properties"].(map[string]any)
+	weightsSchema, _ := props["weights"].(map[string]any)
+	var requiredLen int
+	switch req := weightsSchema["required"].(type) {
+	case []string:
+		requiredLen = len(req)
+	case []any:
+		requiredLen = len(req)
+	}
+	if requiredLen != len(bundle.LeftoverIDs) {
+		t.Fatalf("projected weights.required = %#v, leftovers = %#v", weightsSchema["required"], bundle.LeftoverIDs)
+	}
+}
+
+func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
+	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
+	intakeID := "NIR-261019-NO-1"
+	opLogistic := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"logistic"}}
+	opLine := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
+
+	commitThroughCodiceFir(t, c, intakeID)
+	afterFir, err := loader.Load(t.Context(), "feragame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pallet := findBundle(afterFir.TaskFormBundles, "intake", "palletWeight", intakeID)
+	if pallet == nil {
+		t.Fatalf("missing palletWeight; got %#v", addresses(afterFir.TaskFormBundles))
+	}
+	if len(pallet.LeftoverIDs) == 0 {
+		t.Fatal("palletWeight full-map needs Domain-read leftover ids")
+	}
+	weightsProps, _ := pallet.Schema["properties"].(map[string]any)
+	weightsSchema, _ := weightsProps["weights"].(map[string]any)
+	var weightsRequired int
+	switch req := weightsSchema["required"].(type) {
+	case []string:
+		weightsRequired = len(req)
+	case []any:
+		weightsRequired = len(req)
+	}
+	if weightsRequired != len(pallet.LeftoverIDs) {
+		t.Fatalf("full-map weights.required = %#v, leftovers = %#v", weightsSchema["required"], pallet.LeftoverIDs)
+	}
+
+	if _, err := c.Commit(t.Context(), "feragame", opLogistic, CommitRequest{
+		TaskPath: "intake/palletWeight", JobInstanceID: intakeID,
+		Value: palletWeightValue(map[string]any{
+			intakeID + ".1": weighRow(11),
+			intakeID + ".2": weighRow(22),
+		}),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	shift, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
+		TaskPath: "line/shift", JobInstanceID: "1st", Value: map[string]any{"shift": "1st"}, Mint: startingNewMint(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lineLoad := findBundle(shift.TaskFormBundles, "line", "lineLoad", "1st")
+	if lineLoad == nil {
+		t.Fatalf("missing lineLoad; got %#v", addresses(shift.TaskFormBundles))
+	}
+	if len(lineLoad.LeftoverIDs) == 0 {
+		t.Fatal("lineLoad partial-map still projects Domain-read row ids")
+	}
+	progressProps, _ := lineLoad.Schema["properties"].(map[string]any)
+	progressSchema, _ := progressProps["progress"].(map[string]any)
+	if _, has := progressSchema["required"]; has {
+		t.Fatalf("partial-map progress must not project required from read ids; got %#v", progressSchema["required"])
+	}
 }
 
 func TestHandleLoadJSONIncludesTaskFormBundles(t *testing.T) {
@@ -365,8 +437,8 @@ func TestFeragameConfigCommitsWalkBundlesIntakeAndLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if findBundle(loaded.TaskFormBundles, "line", "lineLoad", "1st") == nil {
-		t.Fatalf("lineLoad still open should keep bundle; got %#v", addresses(loaded.TaskFormBundles))
+	if findBundle(loaded.TaskFormBundles, "line", "lineLoad", "1st") != nil {
+		t.Fatalf("lineLoad done after Submission must drop bundle; got %#v", addresses(loaded.TaskFormBundles))
 	}
 	if findBundle(loaded.TaskFormBundles, "line", "containerReg", "1st") == nil {
 		t.Fatalf("containerReg available missing; got %#v", addresses(loaded.TaskFormBundles))

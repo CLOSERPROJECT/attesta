@@ -32,8 +32,8 @@ type WorklistInstance struct {
 	Tasks map[string]TaskStatus `json:"tasks"`
 }
 
-// ProjectWorklist evaluates Unlock order, startsWhen, and Leftovers openness
-// into canStart + Task statuses. Living code stays generic (no plant Task paths).
+// ProjectWorklist evaluates Unlock order and startsWhen into canStart + Task
+// statuses. A Task is done after Submission on the instance (Submission law).
 func ProjectWorklist(cfg OrgConfig, domain Domain) Worklist {
 	out := Worklist{Jobs: make([]WorklistJob, 0, cfg.Jobs.Len())}
 	for _, jobID := range cfg.Jobs.Keys {
@@ -62,7 +62,7 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job) Wor
 		}
 		tasks := make(map[string]TaskStatus, len(ordered))
 		for _, taskID := range ordered {
-			tasks[taskID] = projectTaskStatus(domain, jobID, job.Tasks, ordered, taskID, inst.ID, cfg.Catalogs)
+			tasks[taskID] = projectTaskStatus(domain, jobID, job.Tasks, ordered, taskID, inst.ID)
 		}
 		instances = append(instances, WorklistInstance{
 			ID:    inst.ID,
@@ -88,7 +88,6 @@ func projectTaskStatus(
 	ordered []string,
 	taskID string,
 	jobInstanceID string,
-	catalogs map[string]any,
 ) TaskStatus {
 	if !IsTaskUnlocked(UnlockQuery{
 		OrderedIDs:    ordered,
@@ -101,25 +100,9 @@ func projectTaskStatus(
 		return TaskStatusLocked
 	}
 
-	task, ok := TaskByID(tasks, taskID)
-	if !ok {
+	if _, ok := TaskByID(tasks, taskID); !ok {
 		return TaskStatusLocked
 	}
-	payload := taskPayload(task)
-	if needsLeftoverProjection(payload) {
-		_, completeness, ok := primaryDynamicProperty(payload)
-		if ok && completeness == "some" {
-			ids, err := leftoverIDsForTask(domain, jobID, payload, jobInstanceID, catalogs)
-			if err != nil {
-				return TaskStatusLocked
-			}
-			if len(ids) > 0 {
-				return TaskStatusAvailable
-			}
-			return TaskStatusDone
-		}
-	}
-
 	if hasSubmissionOnInstance(domain.Submissions, jobID, taskID, jobInstanceID) {
 		return TaskStatusDone
 	}
