@@ -78,6 +78,82 @@ func TestLineLoadLeftoverIDsSkipsDone(t *testing.T) {
 	}
 }
 
+func TestLeftoverCoercionSchemaAndHelperEdges(t *testing.T) {
+	_, err := coerceObjectRow(
+		map[string]any{"weight": "  ", "note": "x"},
+		map[string]any{"weight": map[string]any{"type": "number"}},
+		[]string{"weight"},
+		"p1",
+	)
+	if err == nil || !strings.Contains(err.Error(), "weight") {
+		t.Fatalf("empty required scalar = %v", err)
+	}
+	_, err = coerceObjectRow(
+		map[string]any{"extra": "keep"},
+		map[string]any{"weight": map[string]any{"type": "number"}},
+		[]string{"weight"},
+		"p1",
+	)
+	if err == nil || !strings.Contains(err.Error(), "weight") {
+		t.Fatalf("missing required = %v", err)
+	}
+
+	if _, err := coerceSchemaValue(1, map[string]any{"type": "string"}, "label", "p1"); err == nil {
+		t.Fatal("non-string for string type")
+	}
+	if _, err := coerceSchemaValue("  ", map[string]any{"type": "string"}, "label", "p1"); err == nil {
+		t.Fatal("blank string")
+	}
+	got, err := coerceSchemaValue(true, map[string]any{"type": "boolean"}, "flag", "p1")
+	if err != nil || got != true {
+		t.Fatalf("passthrough = %#v %v", got, err)
+	}
+	if !schemaTypeIncludesNumber([]any{"string", "integer"}) || schemaTypeIncludesNumber([]any{"string"}) || schemaTypeIncludesNumber(1) {
+		t.Fatal("schemaTypeIncludesNumber branches")
+	}
+	if schemaStringEnum(nil) != nil {
+		t.Fatal("nil schemaStringEnum")
+	}
+	if progressEnumsFromSchema(nil) != nil {
+		t.Fatal("nil progressEnums")
+	}
+	if progressEnumsFromSchema(map[string]any{"anyOf": []any{"x", map[string]any{"type": "null"}}}) != nil {
+		t.Fatal("anyOf without enums")
+	}
+	if numberViolatesBounds(1, map[string]any{"minimum": 2}) != true || numberViolatesBounds(3, map[string]any{"minimum": 2}) {
+		t.Fatal("minimum bounds")
+	}
+	if !isEmptyScalar(nil) {
+		t.Fatal("nil empty scalar")
+	}
+	if msg := validateObjectRowFacts(map[string]any{"ok": "skip"}, []string{"ok"}, map[string]any{"properties": map[string]any{}}); msg != "" {
+		t.Fatalf("non-map row = %q", msg)
+	}
+	if additionalPropertiesSchema(map[string]any{
+		"schema": map[string]any{"properties": map[string]any{}},
+	}, "weights") != nil {
+		t.Fatal("missing prop schema")
+	}
+	ids, err := leftoverIDsForTask(EmptyDomain(), "intake", map[string]any{}, "", nil)
+	if err != nil || ids != nil {
+		t.Fatalf("no dynamic leftovers = %#v %v", ids, err)
+	}
+	if !schemaRequiresProperty(map[string]any{
+		"schema": map[string]any{"required": []string{"weights"}},
+	}, "weights") || schemaRequiresProperty(map[string]any{}, "weights") {
+		t.Fatal("schemaRequiresProperty typed required")
+	}
+	if !schemaTypeIs([]any{"object", "null"}, "object") || schemaTypeIs(1, "object") {
+		t.Fatal("schemaTypeIs array/default")
+	}
+	if len(leftoverEntityMap(EmptyDomain(), map[string]any{})) != 0 {
+		t.Fatal("leftoverEntityMap without read")
+	}
+	if len(seedRowFromSchema(map[string]any{})) != 0 {
+		t.Fatal("seedRow empty props")
+	}
+}
+
 func TestAdditionalPropertiesIsProgressAllowsNullAnyOf(t *testing.T) {
 	if !additionalPropertiesIsProgress(map[string]any{"type": "string"}) {
 		t.Fatal("plain string type")

@@ -1,6 +1,40 @@
 package living
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+type unknownMutateOp struct{}
+
+func (unknownMutateOp) mutateOp() {}
+
+func TestMutateUnknownOpEmptyUserAndPatchKind(t *testing.T) {
+	noSub := false
+	_, err := Mutate(EmptyDomain(), MutateRequest{
+		AppendSubmission: &noSub,
+		Ops:              []MutateOp{PatchOp{Entity: EntityType(""), ID: "x", Set: map[string]any{"a": 1}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "empty entity kind") {
+		t.Fatalf("empty patch kind = %v", err)
+	}
+	_, err = Mutate(EmptyDomain(), MutateRequest{
+		AppendSubmission: &noSub,
+		Ops:              []MutateOp{unknownMutateOp{}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unknown mutate op") {
+		t.Fatalf("unknown op = %v", err)
+	}
+	_, err = Mutate(EmptyDomain(), MutateRequest{
+		UserID: "",
+		JobID:  "intake",
+		TaskID: "register",
+		Ops:    []MutateOp{MintOp{Entity: EntityLoad, ID: "L1", Set: map[string]any{"x": 1}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "userId required") {
+		t.Fatalf("empty user = %v", err)
+	}
+}
 
 func TestMutateMintsAndAppendsSubmission(t *testing.T) {
 	got, err := Mutate(EmptyDomain(), MutateRequest{
