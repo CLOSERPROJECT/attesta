@@ -161,7 +161,7 @@ func NextAdvanceTaskRef(wl Worklist, jobID, jobInstanceID string, viewerRoles []
 }
 
 // ViewerMayMountTask reports whether addressed Task form hydrate is in board
-// scope for the viewer (same CollectAvailableTaskRefs law as bulk Load).
+// scope for the viewer (same CollectAvailableTaskRefs law as Available chrome).
 func ViewerMayMountTask(cfg OrgConfig, wl Worklist, ref AvailableTaskRef, viewerRoles []string) bool {
 	ref.JobInstanceID = NormalizeJobInstanceID(ref.JobInstanceID)
 	for _, got := range CollectAvailableTaskRefs(cfg, wl, viewerRoles) {
@@ -295,21 +295,6 @@ func evaluateDataReports(chrome []ChromeRule, bindings map[string]any) error {
 	}
 	bindings["chromeDisplay"] = display
 	return nil
-}
-
-// ProjectAvailableBundles builds Task form bundles for every CollectAvailableTaskRefs
-// address (viewer-scoped available + provisional). Empty when none.
-func ProjectAvailableBundles(cfg OrgConfig, domain Domain, wl Worklist, viewerRoles []string) ([]*TaskFormBundle, error) {
-	refs := CollectAvailableTaskRefs(cfg, wl, viewerRoles)
-	out := make([]*TaskFormBundle, 0, len(refs))
-	for _, ref := range refs {
-		bundle, err := BuildTaskFormBundle(cfg, domain, ref)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, bundle)
-	}
-	return out, nil
 }
 
 func taskTitle(payload map[string]any, taskID string) string {

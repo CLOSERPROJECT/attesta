@@ -40,7 +40,7 @@ const sample: LoadResult = {
 };
 
 describe('LivingSession', () => {
-	test('hydrate loads Worklist + bundles via LoadDomainPort', async () => {
+	test('hydrate loads Worklist via LoadDomainPort', async () => {
 		const load = vi.fn(async () => sample) satisfies LoadDomainPort['load'];
 		const session = new LivingSession({
 			load: { load },
@@ -76,7 +76,7 @@ describe('LivingSession', () => {
 		expect(session.error).toBe('boom');
 	});
 
-	test('commit success replaces Worklist + bundles and clears Draft', async () => {
+	test('commit success replaces Worklist and clears Draft', async () => {
 		const nextWorklist = {
 			jobs: [
 				{
@@ -96,27 +96,11 @@ describe('LivingSession', () => {
 				{ jobId: 'line', canStart: false, repeatable: true, taskIds: ['shift'], tasks: [], instances: [] }
 			]
 		};
-		const nextBundles: TaskFormBundle[] = [
-			{
-				jobId: 'intake',
-				taskId: 'codiceFir',
-				jobInstanceId: 'NIR-1',
-				title: 'Codice FIR',
-				surface: 'live',
-				schema: { type: 'object' },
-				uiSchema: {},
-				initialData: {},
-				chrome: [],
-				chromeFieldIds: [],
-				sealFieldIds: ['codiceFir'],
-				bindings: { domain: {} }
-			}
-		];
 		const commit = vi.fn(async () => ({
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: nextWorklist,
-			taskFormBundles: nextBundles
+			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
@@ -134,7 +118,7 @@ describe('LivingSession', () => {
 		expect(outcome?.jobInstanceId).toBe('NIR-1');
 		expect(outcome?.nextTaskFormBundle).toBeNull();
 		expect(session.result?.worklist).toEqual(nextWorklist);
-		expect(session.result?.taskFormBundles).toEqual(nextBundles);
+		expect(session.result?.taskFormBundles).toEqual([]);
 		expect(session.getDraft('intake/register', 'NIR-1')).toBeNull();
 		expect(session.commitError).toBeNull();
 	});
@@ -144,8 +128,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
-			nextTaskFormBundle: null,
-			taskFormBundles: []
+			nextTaskFormBundle: null
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },
@@ -190,8 +173,7 @@ describe('LivingSession', () => {
 			org: 'feragame',
 			jobInstanceId: 'NIR-1',
 			worklist: emptyWorklist(),
-			nextTaskFormBundle: next,
-			taskFormBundles: []
+			nextTaskFormBundle: next
 		}));
 		const session = new LivingSession({
 			load: { load: async () => sample },

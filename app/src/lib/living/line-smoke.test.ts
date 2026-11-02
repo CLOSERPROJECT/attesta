@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import type { TaskFormBundle } from './form/task-form-bundle.js';
 import { LivingSession } from './session.svelte.js';
 import {
 	emptyDomain,
@@ -193,35 +192,17 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 					};
 				}
 				worklist = worklistFor(domain, true);
-				const lineJob = worklistJobFor(worklist, 'line');
-				const lineInst = lineJob?.instances[0];
-				const taskFormBundles: TaskFormBundle[] = [];
-				if (lineJob?.canStart) {
-					taskFormBundles.push({
-						jobId: 'line',
-						taskId: 'shift',
-						jobInstanceId: '',
-						title: 'Shift',
-						surface: 'live',
-						schema: { type: 'object' },
-						uiSchema: {},
-						initialData: {},
-						chrome: [],
-						chromeFieldIds: [],
-						sealFieldIds: ['shift'],
-						bindings: { domain: {} }
-					});
-				}
+				const lineInst = worklistJobFor(worklist, 'line')?.instances[0];
+				let nextTaskFormBundle = null;
 				if (lineInst) {
 					for (const taskId of lineTaskIds) {
-						const st = lineInst.tasks[taskId];
-						if (st !== 'available') continue;
-						taskFormBundles.push({
+						if (lineInst.tasks[taskId] !== 'available') continue;
+						nextTaskFormBundle = {
 							jobId: 'line',
 							taskId,
 							jobInstanceId: lineInst.id,
 							title: taskId,
-							surface: 'live',
+							surface: 'live' as const,
 							schema: { type: 'object' },
 							uiSchema: {},
 							initialData: {},
@@ -229,14 +210,15 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 							chromeFieldIds: [],
 							sealFieldIds: [],
 							bindings: { domain: {} }
-						});
+						};
+						break;
 					}
 				}
 				return {
 					org: 'feragame',
 					jobInstanceId: req.jobInstanceId,
 					worklist,
-					taskFormBundles
+					nextTaskFormBundle
 				};
 			}
 		);
@@ -266,12 +248,14 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 		expect(worklistJobFor(session.result.worklist, 'line')?.canStart).toBe(true);
 
 		expect(
-			await session.commit({
-				taskPath: 'line/shift',
-				jobInstanceId: '1st',
-				value: { shift: '1st' },
-				mint: { kind: 'startingNew' }
-			})
+			(
+				await session.commit({
+					taskPath: 'line/shift',
+					jobInstanceId: '1st',
+					value: { shift: '1st' },
+					mint: { kind: 'startingNew' }
+				})
+			)?.jobInstanceId
 		).toBe('1st');
 
 		expect(session.result?.worklist).toEqual(worklist);
@@ -281,29 +265,21 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
 		).toBe('locked');
-		expect(
-			session.result?.taskFormBundles.some(
-				(b) => b.jobId === 'line' && b.taskId === 'lineLoad' && b.jobInstanceId === '1st'
-			)
-		).toBe(true);
-		expect(
-			session.result?.taskFormBundles.some(
-				(b) => b.jobId === 'line' && b.taskId === 'shift' && b.jobInstanceId === ''
-			)
-		).toBe(true);
 
 		expect(
-			await session.commit({
-				taskPath: 'line/lineLoad',
-				jobInstanceId: '1st',
-				value: {
-					progress: {
-						[`${intakeId}.1`]: 'done',
-						[`${intakeId}.2`]: 'done'
-					}
-				},
-				mint: { kind: 'none' }
-			})
+			(
+				await session.commit({
+					taskPath: 'line/lineLoad',
+					jobInstanceId: '1st',
+					value: {
+						progress: {
+							[`${intakeId}.1`]: 'done',
+							[`${intakeId}.2`]: 'done'
+						}
+					},
+					mint: { kind: 'none' }
+				})
+			)?.jobInstanceId
 		).toBe('1st');
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.lineLoad
@@ -311,32 +287,31 @@ describe('line Commit smoke (session + Worklist + one-submit lineLoad)', () => {
 		expect(
 			worklistJobFor(session.result!.worklist, 'line')?.instances[0]?.tasks.containerReg
 		).toBe('available');
-		expect(
-			session.result?.taskFormBundles.some(
-				(b) => b.jobId === 'line' && b.taskId === 'containerReg' && b.jobInstanceId === '1st'
-			)
-		).toBe(true);
 
 		expect(
-			await session.commit({
-				taskPath: 'line/containerReg',
-				jobInstanceId: '1st',
-				value: {
-					sourceLoadId: intakeId,
-					polvereDiVetro: [{ weight: 120 }],
-					plastica: [{ weight: 40 }]
-				},
-				mint: { kind: 'none' }
-			})
+			(
+				await session.commit({
+					taskPath: 'line/containerReg',
+					jobInstanceId: '1st',
+					value: {
+						sourceLoadId: intakeId,
+						polvereDiVetro: [{ weight: 120 }],
+						plastica: [{ weight: 40 }]
+					},
+					mint: { kind: 'none' }
+				})
+			)?.jobInstanceId
 		).toBe('1st');
 
 		expect(
-			await session.commit({
-				taskPath: 'line/loadedExtracted',
-				jobInstanceId: '1st',
-				value: { checkedLoadedWeight: 850, checkedContainerSum: 160 },
-				mint: { kind: 'none' }
-			})
+			(
+				await session.commit({
+					taskPath: 'line/loadedExtracted',
+					jobInstanceId: '1st',
+					value: { checkedLoadedWeight: 850, checkedContainerSum: 160 },
+					mint: { kind: 'none' }
+				})
+			)?.jobInstanceId
 		).toBe('1st');
 
 		const lineSubs = domain.submissions.filter(

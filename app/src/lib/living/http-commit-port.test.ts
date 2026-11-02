@@ -47,36 +47,6 @@ const sampleResult = {
 		sealFieldIds: ['codiceFir'],
 		bindings: { domain: {} }
 	},
-	taskFormBundles: [
-		{
-			jobId: 'intake',
-			taskId: 'register',
-			jobInstanceId: '',
-			title: 'Register',
-			surface: 'live' as const,
-			schema: { type: 'object' },
-			uiSchema: {},
-			initialData: {},
-			chrome: [],
-			chromeFieldIds: [],
-			sealFieldIds: [],
-			bindings: { domain: {} }
-		},
-		{
-			jobId: 'intake',
-			taskId: 'codiceFir',
-			jobInstanceId: 'NIR-261019-NO-1',
-			title: 'Codice FIR',
-			surface: 'live' as const,
-			schema: { type: 'object' },
-			uiSchema: {},
-			initialData: {},
-			chrome: [],
-			chromeFieldIds: [],
-			sealFieldIds: ['codiceFir'],
-			bindings: { domain: {} }
-		}
-	],
 	links: [
 		{ label: 'Stampa etichette', url: 'blob:labels', action: 'link' as const },
 		{
@@ -118,18 +88,16 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.jobInstanceId).toBe('NIR-261019-NO-1');
 		expect(got.worklist).toEqual(sampleResult.worklist);
 		expect(got.nextTaskFormBundle).toEqual(sampleResult.nextTaskFormBundle);
-		expect(got.taskFormBundles).toEqual(sampleResult.taskFormBundles);
 		expect(got.links).toEqual(sampleResult.links);
 		expect(got.httpErrors).toEqual([]);
 		expect(fetchFn).toHaveBeenCalledOnce();
 	});
 
-	test('normalizes missing links/httpErrors/worklist/bundles/next', async () => {
+	test('normalizes missing links/httpErrors/worklist/next', async () => {
 		const {
 			links: _l,
 			httpErrors: _e,
 			worklist: _w,
-			taskFormBundles: _b,
 			nextTaskFormBundle: _n,
 			...withoutHttp
 		} = sampleResult;
@@ -150,7 +118,6 @@ describe('HttpCommitDomainPort', () => {
 		expect(got.links).toEqual([]);
 		expect(got.httpErrors).toEqual([]);
 		expect(got.worklist).toEqual(emptyWorklist());
-		expect(got.taskFormBundles).toEqual([]);
 		expect(got.nextTaskFormBundle).toBeNull();
 	});
 

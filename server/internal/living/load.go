@@ -11,18 +11,18 @@ import (
 // Config version metadata (+ OperatorIdentity roles for Available affordances).
 // Full Domain / Org Config stay server-side (json:"-" for Go callers); they are
 // not on the wire. ADR-0006: home Load omits bulk Task form bundles — Task
-// routes fetch via LoadTaskBundle; Commit may still ship interim bulk.
+// routes fetch via LoadTaskBundle; Commit returns nextTaskFormBundle when advancing.
 type LoadResult struct {
-	Org                 string            `json:"org"`
-	ActiveConfigVersion string            `json:"activeConfigVersion"`
-	ConfigID            string            `json:"configId"`
+	Org                 string `json:"org"`
+	ActiveConfigVersion string `json:"activeConfigVersion"`
+	ConfigID            string `json:"configId"`
 	// Roles are the caller's Config role slugs (OperatorIdentity; not Cerbos).
-	Roles               []string          `json:"roles"`
-	Domain              Domain            `json:"-"`
-	Config              OrgConfig         `json:"-"`
-	Worklist            Worklist          `json:"worklist"`
+	Roles    []string  `json:"roles"`
+	Domain   Domain    `json:"-"`
+	Config   OrgConfig `json:"-"`
+	Worklist Worklist  `json:"worklist"`
 	// Empty on home Load (ADR-0006). Kept on the wire as [] for stable JSON shape.
-	TaskFormBundles     []*TaskFormBundle `json:"taskFormBundles"`
+	TaskFormBundles []*TaskFormBundle `json:"taskFormBundles"`
 }
 
 // ErrTaskBundleForbidden is returned when the viewer cannot role-mount the Task

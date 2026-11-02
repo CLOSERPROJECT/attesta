@@ -116,10 +116,11 @@ func main() {
 			}
 		}
 	}
-	bundles, err := living.ProjectAvailableBundles(cfg, res.Domain, wl, living.FixtureAllRolesOp().Roles)
-	must(err)
+	refs := living.CollectAvailableTaskRefs(cfg, wl, living.FixtureAllRolesOp().Roles)
 	var haveLE, haveWC bool
-	for _, b := range bundles {
+	for _, ref := range refs {
+		b, err := living.BuildTaskFormBundle(cfg, res.Domain, ref)
+		must(err)
 		cd, _ := b.Bindings["chromeDisplay"].(map[string]any)
 		switch b.TaskID {
 		case "loadedExtracted":

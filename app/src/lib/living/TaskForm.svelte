@@ -12,7 +12,6 @@
 		catalogsFromBundleBindings,
 		chromeDisplayFromBundleBindings,
 		domainFromBundleBindings,
-		findTaskFormBundle,
 		planFromTaskFormBundle,
 		type TaskFormBundle
 	} from './form/task-form-bundle.js';
@@ -24,7 +23,7 @@
 		taskId: string;
 		/** Empty string = provisional start (first Task / mint). */
 		jobInstanceId: string;
-		/** Mount payload from Load/Commit bundle set — only mount path. */
+		/** Mount payload from addressed fetch or Commit nextTaskFormBundle. */
 		bundle: TaskFormBundle;
 		disabled?: boolean;
 		/** Called after successful Commit for post-Commit routing. */
@@ -94,15 +93,6 @@
 			mint: provisional ? { kind: 'startingNew' } : { kind: 'none' }
 		});
 		if (outcome == null) return;
-		const next = findTaskFormBundle(
-			living.result?.taskFormBundles,
-			jobId,
-			taskId,
-			outcome.jobInstanceId
-		);
-		if (next) {
-			writeDraft({ ...(next.initialData ?? {}) });
-		}
 		onCommitted?.(outcome);
 	}
 

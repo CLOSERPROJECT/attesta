@@ -14,15 +14,6 @@ func bundleAddress(b *TaskFormBundle) string {
 	return b.JobID + "/" + b.TaskID + "@" + b.JobInstanceID
 }
 
-func findBundle(bundles []*TaskFormBundle, jobID, taskID, instanceID string) *TaskFormBundle {
-	for _, b := range bundles {
-		if b != nil && b.JobID == jobID && b.TaskID == taskID && b.JobInstanceID == instanceID {
-			return b
-		}
-	}
-	return nil
-}
-
 func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	loaded, err := loader.Load(t.Context(), "feragame", FixtureAllRolesOp())
@@ -87,8 +78,8 @@ func TestLoadCommitJSONOmitsDomainAndConfig(t *testing.T) {
 	if _, ok := commitWire["worklist"].(map[string]any); !ok {
 		t.Fatal("Commit JSON missing worklist")
 	}
-	if _, ok := commitWire["taskFormBundles"].([]any); !ok {
-		t.Fatal("Commit JSON missing taskFormBundles")
+	if _, has := commitWire["taskFormBundles"]; has {
+		t.Fatal("Commit JSON must omit taskFormBundles")
 	}
 }
 
@@ -307,9 +298,9 @@ func TestFullMapProjectsRequiredPartialMapDoesNot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lineLoad := findBundle(shift.TaskFormBundles, "line", "lineLoad", "1st")
-	if lineLoad == nil {
-		t.Fatalf("missing lineLoad; got %#v", addresses(shift.TaskFormBundles))
+	lineLoad := shift.NextTaskFormBundle
+	if lineLoad == nil || lineLoad.TaskID != "lineLoad" || lineLoad.JobInstanceID != "1st" {
+		t.Fatalf("after shift next = %s, want line/lineLoad@1st", bundleAddress(lineLoad))
 	}
 	if len(lineLoad.RowIDs) == 0 {
 		t.Fatal("lineLoad partial-map still projects Domain-read row ids")
@@ -441,7 +432,7 @@ func TestHandleLoadJSONOmitsBulkTaskFormBundles(t *testing.T) {
 	}
 }
 
-func TestCommitReplacesTaskFormBundles(t *testing.T) {
+func TestCommitNextBundleNotBulk(t *testing.T) {
 	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	admin := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"administration"}}
 	all := FixtureAllRolesOp()
@@ -473,15 +464,14 @@ func TestCommitReplacesTaskFormBundles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if findBundle(committed.TaskFormBundles, "intake", "codiceFir", instanceID) != nil {
-		t.Fatal("Commit must drop codiceFir bundle after it leaves available")
+	if committed.NextTaskFormBundle == nil || committed.NextTaskFormBundle.TaskID != "palletWeight" {
+		t.Fatalf("advance next = %s, want palletWeight", bundleAddress(committed.NextTaskFormBundle))
 	}
-	pallet := findBundle(committed.TaskFormBundles, "intake", "palletWeight", instanceID)
-	if pallet == nil {
-		t.Fatalf("Commit missing palletWeight; got %#v", addresses(committed.TaskFormBundles))
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "codiceFir", instanceID); err == nil {
+		t.Fatal("addressed codiceFir must deny after it leaves available")
 	}
-	if findBundle(committed.TaskFormBundles, "intake", "register", "") == nil {
-		t.Fatal("Commit must keep provisional register while canStart")
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", all, "intake", "register", ""); err != nil {
+		t.Fatalf("provisional register while canStart: %v", err)
 	}
 
 	raw, err := json.Marshal(committed)
@@ -492,13 +482,16 @@ func TestCommitReplacesTaskFormBundles(t *testing.T) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := wire["taskFormBundles"].([]any); !ok {
-		t.Fatalf("Commit JSON missing taskFormBundles: %s", string(raw))
+	if _, has := wire["taskFormBundles"]; has {
+		t.Fatalf("Commit JSON must omit taskFormBundles: %s", string(raw))
+	}
+	if _, ok := wire["nextTaskFormBundle"].(map[string]any); !ok {
+		t.Fatalf("Commit JSON missing nextTaskFormBundle: %s", string(raw))
 	}
 }
 
-func TestFeragameConfigCommitsWalkBundlesIntakeAndLine(t *testing.T) {
-	c, _, _ := testCommitter(t, AllowAllAuthorizer{})
+func TestFeragameConfigCommitsWalkAdvanceAndHandoff(t *testing.T) {
+	c, _, loader := testCommitter(t, AllowAllAuthorizer{})
 	opLine := OperatorIdentity{UserID: "ada", Org: "feragame", Roles: []string{"line"}}
 	intakeID := "NIR-261019-NO-1"
 
@@ -510,15 +503,14 @@ func TestFeragameConfigCommitsWalkBundlesIntakeAndLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if findBundle(shift.TaskFormBundles, "intake", "register", "") != nil {
-		t.Fatal("line viewer must not get intake provisional register (administration-only)")
+	if shift.NextTaskFormBundle == nil || shift.NextTaskFormBundle.TaskID != "lineLoad" {
+		t.Fatalf("after shift next = %s, want lineLoad", bundleAddress(shift.NextTaskFormBundle))
 	}
-	if findBundle(shift.TaskFormBundles, "line", "shift", "") == nil {
-		t.Fatal("line canStart provisional shift missing after first shift mint")
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "intake", "register", ""); err == nil {
+		t.Fatal("line viewer must not mount intake provisional register")
 	}
-	lineLoad := findBundle(shift.TaskFormBundles, "line", "lineLoad", "1st")
-	if lineLoad == nil {
-		t.Fatalf("after shift: %#v", addresses(shift.TaskFormBundles))
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "shift", ""); err != nil {
+		t.Fatalf("line canStart provisional shift after first shift mint: %v", err)
 	}
 
 	loaded, err := c.Commit(t.Context(), "feragame", opLine, CommitRequest{
@@ -533,12 +525,11 @@ func TestFeragameConfigCommitsWalkBundlesIntakeAndLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if findBundle(loaded.TaskFormBundles, "line", "lineLoad", "1st") != nil {
-		t.Fatalf("lineLoad done after Submission must drop bundle; got %#v", addresses(loaded.TaskFormBundles))
+	if loaded.NextTaskFormBundle != nil {
+		t.Fatalf("line after lineLoad must hand off; got %s", bundleAddress(loaded.NextTaskFormBundle))
 	}
-	// containerReg is logistic-only; line Worklist still shows available status for handoff.
-	if findBundle(loaded.TaskFormBundles, "line", "containerReg", "1st") != nil {
-		t.Fatalf("line viewer must not get containerReg bundle; got %#v", addresses(loaded.TaskFormBundles))
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", opLine, "line", "containerReg", "1st"); err == nil {
+		t.Fatal("line viewer must not mount containerReg")
 	}
 	lineJob, ok := worklistJobByID(loaded.Worklist, "line")
 	if !ok {

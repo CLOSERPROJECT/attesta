@@ -33,20 +33,12 @@ function parseWorklist(raw: unknown): Worklist {
 	return { jobs: jobs as Worklist['jobs'] };
 }
 
-function parseTaskFormBundles(raw: unknown): TaskFormBundle[] {
-	if (!Array.isArray(raw)) return [];
-	return raw.filter(
-		(item): item is TaskFormBundle =>
-			item != null && typeof item === 'object' && !Array.isArray(item)
-	) as TaskFormBundle[];
-}
-
 function parseOptionalTaskFormBundle(raw: unknown): TaskFormBundle | null {
 	if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
 	return raw as TaskFormBundle;
 }
 
-/** Normalize Commit JSON so SPA always sees arrays for links / httpErrors / bundles. */
+/** Normalize Commit JSON so SPA always sees arrays for links / httpErrors. */
 export function parseCommitResult(raw: unknown): CommitResult {
 	const body = raw as CommitResult;
 	const linksRaw = Array.isArray((raw as { links?: unknown })?.links)
@@ -68,15 +60,12 @@ export function parseCommitResult(raw: unknown): CommitResult {
 		...body,
 		worklist: parseWorklist((raw as { worklist?: unknown })?.worklist),
 		nextTaskFormBundle: next,
-		taskFormBundles: parseTaskFormBundles(
-			(raw as { taskFormBundles?: unknown })?.taskFormBundles
-		),
 		links,
 		httpErrors
 	};
 }
 
-/** Browser Adapter: POST /api/living/commit → Worklist + bundles. Drafts stay client-side. */
+/** Browser Adapter: POST /api/living/commit → Worklist + nextTaskFormBundle. Drafts stay client-side. */
 export function createHttpCommitDomainPort(
 	options: HttpCommitDomainPortOptions = {}
 ): CommitDomainPort {

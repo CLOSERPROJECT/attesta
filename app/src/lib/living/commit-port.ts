@@ -32,11 +32,6 @@ export type CommitResult = {
 	 * Omitted on handoff / finished instance — Worklist alone drives overview/home.
 	 */
 	nextTaskFormBundle?: TaskFormBundle | null;
-	/**
-	 * Interim bulk Available mounts (pre-05). Prefer nextTaskFormBundle +
-	 * addressed GET /api/living/task-form for post-Commit routing.
-	 */
-	taskFormBundles: TaskFormBundle[];
 	/** Successful HttpPort side-effects; empty when Task has no onSubmit.http. */
 	links?: HttpLinkItem[];
 	/** HttpPort failures; Domain remains committed server-side. */

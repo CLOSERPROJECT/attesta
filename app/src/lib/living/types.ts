@@ -10,10 +10,7 @@ export type LoadResult = {
 	/** Viewer Config role slugs (OperatorIdentity; board chrome, not Cerbos). */
 	roles: string[];
 	worklist: Worklist;
-	/**
-	 * Empty on home Load (ADR-0006). Commit may still ship interim bulk; SPA
-	 * post-Commit routing uses nextTaskFormBundle + Worklist (ticket 05).
-	 */
+	/** Always empty on home Load (ADR-0006); Task mounts use addressed fetch. */
 	taskFormBundles: TaskFormBundle[];
 };
 
