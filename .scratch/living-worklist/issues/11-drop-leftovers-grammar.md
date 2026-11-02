@@ -4,28 +4,30 @@
 
 **Blocked by:** 10 Domain kinds map.
 
-**Status:** ready-for-agent
+**Status:** done (squashed into `feat/attesta-rework`)
 
 **Execution:** sequential subagents only (A → B → C).
 
 ### Subagent 11A — Workflow law
 
-- [ ] Worklist marks a Task `done` after Submission on the instance (no “open while leftover ids remain”)
-- [ ] Unlock / startsWhen no longer infer gate eligibility from `completeness`
-- [ ] Go worklist/unlock tests match Submission-only law; Feragame still unlocks as authored by relations
+- [x] Worklist marks a Task `done` after Submission on the instance (no “open while leftover ids remain”)
+- [x] Unlock / startsWhen no longer infer gate eligibility from `completeness`
+- [x] Go worklist/unlock tests match Submission-only law; Feragame still unlocks as authored by relations
 
 ### Subagent 11B — Submit shape
 
-- [ ] Full-map Tasks get projected `required` for current read ids; validation is schema, not `completeness: all` prep
-- [ ] Partial maps omit that full `required`; untouched keys are not forced
-- [ ] Leftover completeness prep / silent `partial`/`done` fallback are gone; prep tests updated
+- [x] Full-map Tasks get projected `required` for current read ids; validation is schema, not `completeness: all` prep
+- [x] Partial maps omit that full `required`; untouched keys are not forced
+- [x] Leftover completeness prep / silent `partial`/`done` fallback are gone; prep tests updated
 
 ### Subagent 11C — Plant + SPA
 
-- [ ] Feragame lineLoad / palletWeight are one-Commit flows (draft until Invia); no multi-pass leftover reopen
-- [ ] SPA leftover-id helpers removed; tests use server leftover ids / Worklist only where still needed mid-migration
-- [ ] Glossary/ADR wording drops Leftovers-as-subsystem (Domain reads + Submission law)
+- [x] Feragame lineLoad / palletWeight are one-Commit flows (draft until Invia); no multi-pass leftover reopen
+- [x] SPA leftover-id helpers removed; tests use server leftover ids / Worklist only where still needed mid-migration
+- [x] Glossary/ADR wording drops Leftovers-as-subsystem (Domain reads + Submission law)
 
 **Decisions (grill 2026-11-02):** Leftovers noun retired; Domain + reads are the feature; drop `completeness`; one Submission; no lineLoad multi-pass; Completo one-shot absorbed by draft→single submit.
 
 **Out of scope:** Completo-as-separate-product; catalogs/bind/domain peels (08–10); inventing server-side draft persistence (client draft is enough unless already present).
+
+**Landed:** after review+fix — Worklist JSDoc; partial-map `required` omit test. Residual: server `leftover*` wire/identifiers rename (mid-migration).

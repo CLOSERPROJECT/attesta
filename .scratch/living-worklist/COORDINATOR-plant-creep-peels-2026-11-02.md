@@ -26,4 +26,4 @@
 
 ## Frontier
 
-**08–10 done** (squashed into `feat/attesta-rework`). Current: **11** ready.
+**08–11 done** (all squashed into `feat/attesta-rework`). Frontier empty. Residual: rename server `leftover*` wire identifiers when ready.
