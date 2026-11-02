@@ -408,11 +408,14 @@ func TestProjectWorklistViewerRoleSplitAvailableAffordances(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bundleHasTask(adminLoaded.TaskFormBundles, "palletWeight") {
-		t.Fatal("administration Load must not ship palletWeight bundle")
+	if len(adminLoaded.TaskFormBundles) != 0 || len(logLoaded.TaskFormBundles) != 0 {
+		t.Fatal("home Load must omit bulk Task form bundles for all viewers")
 	}
-	if !bundleHasTask(logLoaded.TaskFormBundles, "palletWeight") {
-		t.Fatal("logistic Load must ship palletWeight bundle")
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", admin, "intake", "palletWeight", instanceID); err == nil {
+		t.Fatal("administration addressed fetch must forbid palletWeight")
+	}
+	if _, err := loader.LoadTaskBundle(t.Context(), "feragame", logistic, "intake", "palletWeight", instanceID); err != nil {
+		t.Fatalf("logistic addressed fetch must allow palletWeight: %v", err)
 	}
 }
 

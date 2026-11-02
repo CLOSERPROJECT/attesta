@@ -121,7 +121,7 @@ export class LivingSession {
 					...prior,
 					org: committed.org || prior.org,
 					worklist: committed.worklist,
-					taskFormBundles: committed.taskFormBundles
+					taskFormBundles: committed.taskFormBundles ?? []
 				};
 			} else {
 				await this.refreshKeepDrafts();
@@ -130,7 +130,7 @@ export class LivingSession {
 					this.result = {
 						...loaded,
 						worklist: committed.worklist,
-						taskFormBundles: committed.taskFormBundles
+						taskFormBundles: committed.taskFormBundles ?? []
 					};
 				}
 			}

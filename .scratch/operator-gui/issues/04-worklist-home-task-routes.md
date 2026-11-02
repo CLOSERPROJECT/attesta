@@ -4,12 +4,12 @@
 
 **Blocked by:** 01 (Viewer-scoped Worklist chrome), 03 (Lazy Task bundle + Commit navigation payload)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `/app` shows Home with Available + Can start bands (empty-state copy when a band has no rows)
-- [ ] Available rows use three-part identity and the agreed sort; display uses path/label + Task title chrome as designed
-- [ ] Can start uses `startLabel` and opens provisional `/…/new/{firstTaskId}`
-- [ ] Task route loads one bundle and supports Commit; Annulla/back → Home; Draft persists as today
-- [ ] JobPanel-style inline multi-form board is gone; About nav entry is removed
-- [ ] Home Load does not depend on bulk Task form bundles
-- [ ] Basic e2e or component coverage for Home → Task → back
+- [x] `/app` shows Home with Available + Can start bands (empty-state copy when a band has no rows)
+- [x] Available rows use three-part identity and the agreed sort; display uses path/label + Task title chrome as designed
+- [x] Can start uses `startLabel` and opens provisional `/…/new/{firstTaskId}`
+- [x] Task route loads one bundle and supports Commit; Annulla/back → Home; Draft persists as today
+- [x] JobPanel-style inline multi-form board is gone; About nav entry is removed
+- [x] Home Load does not depend on bulk Task form bundles
+- [x] Basic e2e or component coverage for Home → Task → back

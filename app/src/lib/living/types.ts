@@ -2,15 +2,17 @@ import type { TaskFormBundle } from './form/task-form-bundle.js';
 
 export type { TaskFormBundle };
 
-/** Org hydrate from GET /api/living/domain — Worklist + bundles + config metadata. */
+/** Org hydrate from GET /api/living/domain — Worklist + config metadata. */
 export type LoadResult = {
 	org: string;
 	activeConfigVersion: string;
 	configId: string;
+	/** Viewer Config role slugs (OperatorIdentity; board chrome, not Cerbos). */
+	roles: string[];
 	worklist: Worklist;
 	/**
-	 * Interim bulk Available + provisional mounts for pre-04 JobPanel.
-	 * End-state (ADR-0006): omit; hydrate via GET /api/living/task-form.
+	 * Empty on home Load (ADR-0006). Commit may still ship interim bulk until
+	 * post-Commit routing (ticket 05) drops it; Task mounts use task-form port.
 	 */
 	taskFormBundles: TaskFormBundle[];
 };

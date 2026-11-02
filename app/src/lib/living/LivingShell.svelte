@@ -1,18 +1,29 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import JobPanel from './JobPanel.svelte';
+	import { p } from '../router/index.js';
 	import { living } from './living-app.svelte.js';
+	import {
+		availableRowKey,
+		availableRowsFromWorklist,
+		canStartRowsFromWorklist,
+		taskRouteInstanceSegment
+	} from './worklist-home.js';
 
 	onMount(() => {
 		void living.hydrate();
 	});
+
+	const available = $derived(
+		availableRowsFromWorklist(living.result?.worklist, living.result?.roles)
+	);
+	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
 </script>
 
 <div class="mx-auto max-w-3xl space-y-6" data-testid="living-shell">
 	<header class="space-y-2">
 		<div class="flex flex-wrap items-center justify-between gap-3">
-			<h1 class="text-2xl font-semibold text-zinc-900">Jobs</h1>
+			<h1 class="text-2xl font-semibold text-zinc-900">Home</h1>
 			<button
 				type="button"
 				class="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
@@ -52,13 +63,72 @@
 	</header>
 
 	{#if living.result}
-		<div class="space-y-4" data-testid="living-jobs">
-			{#each living.jobIds as jobId (jobId)}
-				{@const worklistJob = living.worklistJob(jobId)}
-				{#if worklistJob}
-					<JobPanel {jobId} {worklistJob} />
-				{/if}
-			{/each}
-		</div>
+		<section class="space-y-3" data-testid="worklist-available">
+			<h2 class="text-lg font-semibold text-zinc-900">Available</h2>
+			<ul class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+				{#each available as row (availableRowKey(row))}
+					<li>
+						<a
+							class="block px-4 py-3 hover:bg-zinc-50"
+							data-testid="available-row"
+							data-job-id={row.jobId}
+							data-instance-id={row.jobInstanceId}
+							data-task-id={row.taskId}
+							href={p('/:jobId/:jobInstanceId/:taskId', {
+								params: {
+									jobId: row.jobId,
+									jobInstanceId: row.jobInstanceId,
+									taskId: row.taskId
+								}
+							})}
+						>
+							<p class="text-sm font-medium text-zinc-900">{row.title}</p>
+							<p class="mt-0.5 font-mono text-xs text-zinc-500">
+								{row.jobId} / {row.instanceLabel} / {row.taskId}
+							</p>
+						</a>
+					</li>
+				{:else}
+					<li
+						class="px-4 py-3 text-sm text-zinc-500"
+						data-testid="available-empty"
+					>
+						No available Tasks.
+					</li>
+				{/each}
+			</ul>
+		</section>
+
+		<section class="space-y-3" data-testid="worklist-can-start">
+			<h2 class="text-lg font-semibold text-zinc-900">Can start</h2>
+			<ul class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+				{#each canStart as row (row.jobId)}
+					<li>
+						<a
+							class="block px-4 py-3 hover:bg-zinc-50"
+							data-testid="can-start-row"
+							data-job-id={row.jobId}
+							href={p('/:jobId/:jobInstanceId/:taskId', {
+								params: {
+									jobId: row.jobId,
+									jobInstanceId: taskRouteInstanceSegment(''),
+									taskId: row.firstTaskId
+								}
+							})}
+						>
+							<p class="text-sm font-medium text-zinc-900">{row.startLabel}</p>
+							<p class="mt-0.5 font-mono text-xs text-zinc-500">{row.jobId}</p>
+						</a>
+					</li>
+				{:else}
+					<li
+						class="px-4 py-3 text-sm text-zinc-500"
+						data-testid="can-start-empty"
+					>
+						No Jobs to start.
+					</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 </div>

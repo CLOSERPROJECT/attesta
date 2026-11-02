@@ -8,6 +8,7 @@ const sample: LoadResult = {
 	org: 'feragame',
 	activeConfigVersion: '1',
 	configId: 'feragame-config',
+	roles: ['administration'],
 	worklist: emptyWorklist(),
 	taskFormBundles: []
 };

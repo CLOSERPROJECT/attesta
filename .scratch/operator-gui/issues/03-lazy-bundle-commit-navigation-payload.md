@@ -18,4 +18,4 @@
 
 - `GET /api/living/task-form?jobId=&taskId=&jobInstanceId=` (+ `new`/empty provisional) is the on-demand mount path.
 - Commit wire adds `nextTaskFormBundle` (omit when no advance).
-- Load/Commit still ship interim bulk `taskFormBundles` because pre-04 `JobPanel` mounts from that array; drop bulk once Task routes fetch on demand.
+- Home Load omits bulk `taskFormBundles` (ticket 04); Commit may still ship interim bulk until post-Commit routing (05) drops it. Task mounts use addressed fetch.

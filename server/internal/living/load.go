@@ -7,20 +7,21 @@ import (
 	"strings"
 )
 
-// LoadResult is the SPA hydrate for an org: viewer-scoped Worklist + Task form
-// bundles + Active Config version metadata. Full Domain / Org Config stay
-// server-side (json:"-" for Go callers); they are not on the wire.
-//
-// Interim (pre-04 JobPanel): TaskFormBundles still ships every
-// CollectAvailableTaskRefs address. ADR-0006 end-state omits bulk once Task
-// routes fetch via LoadTaskBundle; the addressed path does not depend on bulk.
+// LoadResult is the SPA hydrate for an org: viewer-scoped Worklist + Active
+// Config version metadata (+ OperatorIdentity roles for Available affordances).
+// Full Domain / Org Config stay server-side (json:"-" for Go callers); they are
+// not on the wire. ADR-0006: home Load omits bulk Task form bundles — Task
+// routes fetch via LoadTaskBundle; Commit may still ship interim bulk.
 type LoadResult struct {
 	Org                 string            `json:"org"`
 	ActiveConfigVersion string            `json:"activeConfigVersion"`
 	ConfigID            string            `json:"configId"`
+	// Roles are the caller's Config role slugs (OperatorIdentity; not Cerbos).
+	Roles               []string          `json:"roles"`
 	Domain              Domain            `json:"-"`
 	Config              OrgConfig         `json:"-"`
 	Worklist            Worklist          `json:"worklist"`
+	// Empty on home Load (ADR-0006). Kept on the wire as [] for stable JSON shape.
 	TaskFormBundles     []*TaskFormBundle `json:"taskFormBundles"`
 }
 
@@ -63,20 +64,15 @@ func (l *Loader) Load(ctx context.Context, org string, op OperatorIdentity) (Loa
 	}
 
 	wl := ProjectWorklist(cfg, domain, op)
-	// Bulk Available bundles: keep for pre-04 JobPanel; ticket 04 drops once
-	// Task routes use LoadTaskBundle.
-	bundles, err := ProjectAvailableBundles(cfg, domain, wl, op.Roles)
-	if err != nil {
-		return LoadResult{}, err
-	}
 	return LoadResult{
 		Org:                 org,
 		ActiveConfigVersion: version,
 		ConfigID:            cfg.ID,
+		Roles:               append([]string(nil), op.Roles...),
 		Domain:              domain,
 		Config:              cfg,
 		Worklist:            wl,
-		TaskFormBundles:     bundles,
+		TaskFormBundles:     []*TaskFormBundle{},
 	}, nil
 }
 
