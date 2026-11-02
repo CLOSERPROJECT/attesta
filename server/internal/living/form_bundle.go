@@ -113,7 +113,7 @@ func FirstAvailableTask(cfg OrgConfig, wl Worklist) (AvailableTaskRef, bool) {
 }
 
 // BuildTaskFormBundle projects schema/ui + chrome/derived rules for one Task.
-// Living code stays generic (no plant Task id branches).
+// Living code stays generic (no fixture Task id branches).
 func BuildTaskFormBundle(cfg OrgConfig, domain Domain, ref AvailableTaskRef) (*TaskFormBundle, error) {
 	jobVal, ok := cfg.Jobs.Get(ref.JobID)
 	if !ok {

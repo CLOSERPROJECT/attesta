@@ -12,16 +12,16 @@ import (
 //go:embed fixtures/feragame-config.yaml
 var feragameConfigYAML []byte
 
-// DefaultFixtureVersion is the Config version assigned when seeding the Feragame plant fixture.
+// DefaultFixtureVersion is the Config version assigned when seeding the Feragame fixture.
 const DefaultFixtureVersion = "1"
 
-// LoadFeragameConfigFixture parses the embedded Feragame plant YAML and renames
+// LoadFeragameConfigFixture parses the embedded Feragame YAML and renames
 // steps/substeps → jobs/tasks so Load speaks living nouns only.
 func LoadFeragameConfigFixture() (OrgConfig, error) {
 	return ParseFeragameConfigFixture(feragameConfigYAML)
 }
 
-// ParseFeragameConfigFixture parses Feragame plant YAML bytes into an OrgConfig with Job/Task keys.
+// ParseFeragameConfigFixture parses Feragame YAML bytes into an OrgConfig with Job/Task keys.
 func ParseFeragameConfigFixture(raw []byte) (OrgConfig, error) {
 	var root yaml.Node
 	if err := yaml.Unmarshal(raw, &root); err != nil {

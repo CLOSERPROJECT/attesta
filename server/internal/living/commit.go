@@ -70,7 +70,7 @@ type Committer struct {
 	Configs    ConfigStore
 	Authorizer Authorizer
 	// HttpPort runs onSubmit.http after DomainStore.Put. Nil is always a no-op
-	// (no links/errors) even when the Task declares effects; product wiring plants FakeHttpPort.
+	// (no links/errors) even when the Task declares effects; product wiring installs FakeHttpPort.
 	HttpPort HttpPort
 	Now      func() time.Time
 }

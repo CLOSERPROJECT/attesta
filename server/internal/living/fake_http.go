@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 )
 
-// FakeHttpPort is the plant stand-in for fixture /fake/* onSubmit.http endpoints.
+// FakeHttpPort stands in for fixture /fake/* onSubmit.http endpoints.
 // Labels return a minimal PDF data URL; register-csv returns a CSV data URL with disposition.
 type FakeHttpPort struct {
 	seq atomic.Uint64

@@ -199,7 +199,7 @@ func injectEnumOnSchemaProperty(schemaProperties map[string]any, property string
 	return found
 }
 
-// Authored ui:field → sjsf ui:components (generic; not plant Task ids).
+// Authored ui:field → sjsf ui:components (generic; not fixture Task ids).
 var authoredFieldRegistry = map[string]struct {
 	componentKey string
 	slot         string

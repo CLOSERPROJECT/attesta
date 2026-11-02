@@ -199,7 +199,7 @@ func TestFilterFilledProgressKeepsPartialDoneAndNullClear(t *testing.T) {
 	}
 }
 
-// Fixture where wrappers (tests only — no plant filters in product Go).
+// Fixture where wrappers (tests only — no fixture filters in product Go).
 func palletWeightRowIDs(domain Domain, jobInstanceID string) []string {
 	ids, err := ResolveRead(domain, ReadDef{
 		Entity: EntityType("pallet"),

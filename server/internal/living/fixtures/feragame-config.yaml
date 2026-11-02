@@ -1,4 +1,4 @@
-# Attesta Feragame plant fixture (steps / substeps).
+# Attesta Feragame demo fixture (steps / substeps).
 # Single source of truth: embedded by Go (LoadFeragameConfigFixture) and imported by SPA tests.
 # Config shape: docs/adr/0023-attesta-config-steps-substeps.md
 #
@@ -16,7 +16,7 @@ domain:
         # C5/C6: weight, material, primary load; dual rows add secondarySourceLoadId (no secondaryWeight).
         container:
             fields: [weight, material, sourceLoadId, secondarySourceLoadId]
-# Stable plant vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
+# Stable catalog vocabulary for exprs ($catalogs.*). Schema enums stay authored until codegen.
 catalogs:
     clients:
         NO: Nord
@@ -125,7 +125,7 @@ steps:
                       id: "$load.id & '.' & $string($index + 1)"
                       set:
                         loadId: $load.id
-                # B2/G2 — plant HTTP side-effects after mint (fake-http → link strip; user click)
+                # B2/G2 — HTTP side-effects after mint (fake-http → link strip; user click)
                 http:
                     - method: '"POST"'
                       url: '"/fake/labels"'
@@ -515,7 +515,7 @@ steps:
                 secondarySourceLoadId:
                     ui:components:
                         stringField: enumField
-                # Compact material arrays: shared chrome via anchor (SPA paintContainerRegCompactArrayUi semantics).
+                # Compact material arrays: shared chrome via YAML anchor (authored uiSchema).
                 polvereDiVetro: &containerRegMaterialArrayUi
                     ui:components:
                         arrayItemField: compactArrayItemField

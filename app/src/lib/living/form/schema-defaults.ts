@@ -5,7 +5,7 @@ import { createAjvFormValidator } from './ajv-form-validator.js';
 /** Authored sentinel — not a valid calendar date until resolved at form open. */
 export const TODAY_DEFAULT_SENTINEL = '$today';
 
-/** Local calendar date as `YYYY-MM-DD` (plant UI / operator timezone). */
+/** Local calendar date as `YYYY-MM-DD` (operator-local timezone). */
 export function localCalendarDateISO(now: Date = new Date()): string {
 	const y = now.getFullYear();
 	const m = String(now.getMonth() + 1).padStart(2, '0');

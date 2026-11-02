@@ -1,6 +1,6 @@
 /**
  * Progress-map Draft helpers: omit untouched cells before Ajv / seal.
- * Enum values come from schema additionalProperties — not plant constants.
+ * Enum values come from schema additionalProperties — not hard-coded constants.
  */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
