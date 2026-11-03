@@ -27,6 +27,7 @@ const adminWorklist: Worklist = {
 			jobId: 'intake',
 			canStart: true,
 			repeatable: true,
+			title: 'Camion',
 			startLabel: 'Nuovo camion',
 			taskIds: ['register', 'palletWeight'],
 			tasks: [...chrome.intake],
@@ -49,6 +50,7 @@ const adminWorklist: Worklist = {
 			jobId: 'line',
 			canStart: false,
 			repeatable: true,
+			title: 'Linea',
 			startLabel: 'Nuovo turno',
 			taskIds: ['shift', 'lineLoad'],
 			tasks: [...chrome.line],
@@ -70,6 +72,7 @@ const logisticWorklist: Worklist = {
 			jobId: 'intake',
 			canStart: false,
 			repeatable: true,
+			title: 'Camion',
 			startLabel: 'Nuovo camion',
 			taskIds: ['register', 'palletWeight'],
 			tasks: [...chrome.intake],
@@ -92,6 +95,7 @@ const logisticWorklist: Worklist = {
 			jobId: 'line',
 			canStart: false,
 			repeatable: true,
+			title: 'Linea',
 			startLabel: 'Nuovo turno',
 			taskIds: ['shift', 'lineLoad'],
 			tasks: [...chrome.line],
@@ -113,6 +117,7 @@ const lineWorklist: Worklist = {
 			jobId: 'intake',
 			canStart: false,
 			repeatable: true,
+			title: 'Camion',
 			startLabel: 'Nuovo camion',
 			taskIds: ['register', 'palletWeight'],
 			tasks: [...chrome.intake],
@@ -135,6 +140,7 @@ const lineWorklist: Worklist = {
 			jobId: 'line',
 			canStart: false,
 			repeatable: true,
+			title: 'Linea',
 			startLabel: 'Nuovo turno',
 			taskIds: ['shift', 'lineLoad'],
 			tasks: [...chrome.line],
@@ -156,6 +162,7 @@ const allRolesWorklist: Worklist = {
 			jobId: 'intake',
 			canStart: true,
 			repeatable: true,
+			title: 'Camion',
 			startLabel: 'Nuovo camion',
 			taskIds: ['register', 'palletWeight'],
 			tasks: [...chrome.intake],
@@ -178,6 +185,7 @@ const allRolesWorklist: Worklist = {
 			jobId: 'line',
 			canStart: false,
 			repeatable: true,
+			title: 'Linea',
 			startLabel: 'Nuovo turno',
 			taskIds: ['shift', 'lineLoad'],
 			tasks: [...chrome.line],
@@ -201,6 +209,7 @@ describe('worklist-home bands', () => {
 		]);
 		expect(admin[0]?.title).toBe('Registrazione');
 		expect(admin[0]?.instanceLabel).toBe('Camion B');
+		expect(admin[0]?.jobTitle).toBe('Camion');
 		expect(admin[0]?.tasksDone).toBe(0);
 		expect(admin[0]?.tasksTotal).toBe(2);
 
@@ -209,6 +218,7 @@ describe('worklist-home bands', () => {
 			'intake/NIR-1/palletWeight'
 		]);
 		expect(logistic[0]?.title).toBe('Peso pallet');
+		expect(logistic[0]?.jobTitle).toBe('Camion');
 		expect(logistic[0]?.tasksDone).toBe(1);
 		expect(logistic[0]?.tasksTotal).toBe(2);
 
@@ -216,6 +226,7 @@ describe('worklist-home bands', () => {
 		expect(line.map((r) => `${r.jobId}/${r.jobInstanceId}/${r.taskId}`)).toEqual([
 			'line/1st/lineLoad'
 		]);
+		expect(line[0]?.jobTitle).toBe('Linea');
 		expect(line[0]?.tasksDone).toBe(1);
 		expect(line[0]?.tasksTotal).toBe(2);
 
@@ -239,7 +250,12 @@ describe('worklist-home bands', () => {
 
 	test('canStartRows use startLabel and first Task; provisional segment is new', () => {
 		expect(canStartRowsFromWorklist(adminWorklist)).toEqual([
-			{ jobId: 'intake', startLabel: 'Nuovo camion', firstTaskId: 'register' }
+			{
+				jobId: 'intake',
+				jobTitle: 'Camion',
+				startLabel: 'Nuovo camion',
+				firstTaskId: 'register'
+			}
 		]);
 		expect(taskRouteInstanceSegment('')).toBe('new');
 		expect(taskRouteInstanceSegment('NIR-1')).toBe('NIR-1');

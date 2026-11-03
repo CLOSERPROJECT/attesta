@@ -6,6 +6,8 @@ export type AvailableRow = {
 	taskId: string;
 	/** Job instance label (product-facing name); falls back to instance id. */
 	instanceLabel: string;
+	/** Job display title; falls back to jobId when absent. */
+	jobTitle: string;
 	title: string;
 	roles: string[];
 	tasksDone: number;
@@ -14,6 +16,8 @@ export type AvailableRow = {
 
 export type CanStartRow = {
 	jobId: string;
+	/** Job display title; falls back to jobId when absent. */
+	jobTitle: string;
 	startLabel: string;
 	firstTaskId: string;
 };
@@ -63,6 +67,7 @@ export function availableRowsFromWorklist(
 					jobInstanceId: inst.id,
 					taskId,
 					instanceLabel: inst.label || inst.id,
+					jobTitle: job.title?.trim() || job.jobId,
 					title: chrome?.title || taskId,
 					roles: chrome?.roles ?? [],
 					tasksDone: done,
@@ -87,6 +92,7 @@ export function canStartRowsFromWorklist(
 		if (!firstTaskId) continue;
 		out.push({
 			jobId: job.jobId,
+			jobTitle: job.title?.trim() || job.jobId,
 			startLabel: job.startLabel?.trim() || 'Start',
 			firstTaskId
 		});

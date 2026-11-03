@@ -29,6 +29,8 @@ export type WorklistJob = {
 	jobId: string;
 	canStart: boolean;
 	repeatable: boolean;
+	/** Authored Job display name (chrome; not the instance-label CEL). */
+	title?: string;
 	startLabel?: string;
 	/** Authored Task id order for chrome iteration. */
 	taskIds: string[];

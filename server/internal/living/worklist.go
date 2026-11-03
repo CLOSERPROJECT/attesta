@@ -24,11 +24,12 @@ type WorklistTask struct {
 }
 
 // WorklistJob is one Job's start affordance and per-instance Task statuses.
-// TaskIDs / StartLabel / Repeatable / Tasks are chrome-only (not a second gate body).
+// TaskIDs / Title / StartLabel / Repeatable / Tasks are chrome-only (not a second gate body).
 type WorklistJob struct {
 	JobID      string             `json:"jobId"`
 	CanStart   bool               `json:"canStart"`
 	Repeatable bool               `json:"repeatable"`
+	Title      string             `json:"title,omitempty"`
 	StartLabel string             `json:"startLabel,omitempty"`
 	TaskIDs    []string           `json:"taskIds"`
 	Tasks      []WorklistTask     `json:"tasks"`
@@ -105,6 +106,7 @@ func projectWorklistJob(cfg OrgConfig, domain Domain, jobID string, job Job, op 
 		JobID:      jobID,
 		CanStart:   canStart,
 		Repeatable: job.Repeatable,
+		Title:      job.Title,
 		StartLabel: job.StartLabel,
 		TaskIDs:    ordered,
 		Tasks:      chrome,

@@ -341,6 +341,9 @@ func TestProjectWorklistViewerRoleSplitCanStartAndChrome(t *testing.T) {
 	if adminIntake.Tasks[0].Title == "" {
 		t.Fatal("register title chrome empty")
 	}
+	if adminIntake.Title != "Camion" {
+		t.Fatalf("intake job title = %q", adminIntake.Title)
+	}
 	pallet := worklistTaskByIDOrFatal(t, adminIntake, "palletWeight")
 	if len(pallet.Roles) != 1 || pallet.Roles[0] != "logistic" {
 		t.Fatalf("palletWeight roles = %#v", pallet.Roles)

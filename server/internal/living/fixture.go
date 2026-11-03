@@ -164,6 +164,9 @@ func parseJob(jobID string, node *yaml.Node) (Job, []string, error) {
 		Label:      label,
 		Tasks:      tasks,
 	}
+	if title, ok := optionalString(m, "title"); ok {
+		job.Title = title
+	}
 	if startLabel, ok := optionalString(m, "startLabel"); ok {
 		job.StartLabel = startLabel
 	}

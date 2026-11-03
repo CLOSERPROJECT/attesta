@@ -18,7 +18,7 @@
 	const available = $derived(availableRowsFromWorklist(living.result?.worklist));
 	const canStart = $derived(canStartRowsFromWorklist(living.result?.worklist));
 
-	const PROGRESS_RING_R = 10;
+	const PROGRESS_RING_R = 5.5;
 	const PROGRESS_RING_C = 2 * Math.PI * PROGRESS_RING_R;
 </script>
 
@@ -89,6 +89,12 @@
 							<div class="flex items-start justify-between gap-3">
 								<p class="min-w-0 text-sm font-bold text-zinc-900">
 									{row.instanceLabel}
+									<span class="font-normal text-zinc-400">·</span>
+									{#if row.jobTitle === row.jobId}
+										<span class="font-mono text-xs font-normal text-zinc-500">{row.jobId}</span>
+									{:else}
+										<span class="text-xs font-normal text-zinc-500">{row.jobTitle}</span>
+									{/if}
 								</p>
 								<span
 									class="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"
@@ -97,10 +103,10 @@
 									data-testid="available-ready-dot"
 								></span>
 							</div>
-							<div class="mt-1 flex items-center justify-between gap-3">
-								<p class="min-w-0 text-sm text-zinc-600">{row.title}</p>
+							<div class="mt-1 flex min-w-0 items-center gap-1.5">
+								<p class="min-w-0 truncate text-sm text-zinc-600">{row.title}</p>
 								<span
-									class="inline-flex shrink-0 items-center gap-1.5"
+									class="inline-flex shrink-0 items-center gap-1"
 									role="img"
 									aria-label="{row.tasksDone} of {row.tasksTotal} tasks done"
 									data-testid="available-progress"
@@ -108,32 +114,32 @@
 									data-total={row.tasksTotal}
 								>
 									<svg
-										class="size-6 -rotate-90 text-zinc-200"
-										viewBox="0 0 24 24"
+										class="size-3.5 -rotate-90 text-zinc-200"
+										viewBox="0 0 14 14"
 										aria-hidden="true"
 									>
 										<circle
-											cx="12"
-											cy="12"
+											cx="7"
+											cy="7"
 											r={PROGRESS_RING_R}
 											fill="none"
 											stroke="currentColor"
-											stroke-width="2.5"
+											stroke-width="1.75"
 										/>
 										<circle
 											class="text-zinc-700"
-											cx="12"
-											cy="12"
+											cx="7"
+											cy="7"
 											r={PROGRESS_RING_R}
 											fill="none"
 											stroke="currentColor"
-											stroke-width="2.5"
+											stroke-width="1.75"
 											stroke-linecap="round"
 											stroke-dasharray={PROGRESS_RING_C}
 											stroke-dashoffset={ringOffset}
 										/>
 									</svg>
-									<span class="tabular-nums text-xs text-zinc-500">
+									<span class="tabular-nums text-[11px] leading-none text-zinc-500">
 										{row.tasksDone}/{row.tasksTotal}
 									</span>
 								</span>
@@ -169,7 +175,11 @@
 							})}
 						>
 							<p class="text-sm font-medium text-zinc-900">{row.startLabel}</p>
-							<p class="mt-0.5 font-mono text-xs text-zinc-500">{row.jobId}</p>
+							{#if row.jobTitle === row.jobId}
+								<p class="mt-0.5 font-mono text-xs text-zinc-500">{row.jobId}</p>
+							{:else}
+								<p class="mt-0.5 text-xs text-zinc-500">{row.jobTitle}</p>
+							{/if}
 						</a>
 					</li>
 				{:else}
